@@ -83,7 +83,11 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
             let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
             tokio::spawn(async move {
-                agent::run(&text, &state_clone, tx).await;
+                // 消息格式支持两种：
+                // 1. 纯文本：直接传给默认代理
+                // 2. JSON: { "user_id": "alice", "message": "...", "agent": "deepseek" }
+                let (user_id, content, agent_name) = parse_ws_message(&text);
+                agent::run(&user_id, &content, agent_name.as_deref(), &state_clone, tx).await;
             });
 
             while let Some(progress) = rx.recv().await {
@@ -95,4 +99,16 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
     }
 
     info!("WebSocket 连接断开");
+}
+
+/// 解析 WebSocket 消息，返回 (user_id, content, agent_name)
+fn parse_ws_message(raw: &str) -> (String, String, Option<String>) {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+        let user_id = v["user_id"].as_str().unwrap_or("default").to_string();
+        let content = v["message"].as_str().unwrap_or(raw).to_string();
+        let agent   = v["agent"].as_str().map(|s| s.to_lowercase());
+        (user_id, content, agent)
+    } else {
+        ("default".to_string(), raw.to_string(), None)
+    }
 }

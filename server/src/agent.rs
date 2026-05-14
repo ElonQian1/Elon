@@ -153,26 +153,60 @@ fn system_prompt(project_root: &str) -> String {
 }
 
 /// 运行 AI 代理的主循环
-/// 接收用户消息，通过 LLM API 执行工具调用，将进度通过 tx 发回给 WebSocket
-pub async fn run(user_message: &str, state: &Arc<AppState>, tx: UnboundedSender<String>) {
-    if let Err(e) = run_inner(user_message, state, &tx).await {
+/// - user_id:      用户标识（决定工作区目录）
+/// - user_message: 用户发送的消息
+/// - agent_name:   可选，指定使用哪个 AI 代理
+pub async fn run(
+    user_id: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    if let Err(e) = run_inner(user_id, user_message, agent_name, state, &tx).await {
         error!("AI 代理运行出错: {}", e);
         let _ = tx.send(WsMessage::Error { message: e.to_string() }.to_json());
     }
 }
 
 async fn run_inner(
+    user_id: &str,
     user_message: &str,
+    agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    let project_root_str = state.project_root.to_string_lossy().to_string();
+    let agent = state.get_agent(agent_name);
+    // 每个用户操作自己的工作区，不能访问其他用户目录
+    let workspace = state.get_user_workspace(user_id);
+    // 确保用户工作区存在
+    std::fs::create_dir_all(&workspace)?;
+    // 初始化 git（如果还未初始化）
+    if !workspace.join(".git").exists() {
+        let _ = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(&workspace)
+            .output();
+        let _ = std::process::Command::new("git")
+            .args(["config", "user.email", &format!("{}@elon.app", user_id)])
+            .current_dir(&workspace)
+            .output();
+        let _ = std::process::Command::new("git")
+            .args(["config", "user.name", user_id])
+            .current_dir(&workspace)
+            .output();
+    }
+    let workspace_str = workspace.to_string_lossy().to_string();
+
+    let _ = tx.send(WsMessage::Progress {
+        message: format!("正在使用 AI 代理: {} ({})", agent.name, agent.model),
+    }.to_json());
 
     // 初始化对话历史
     let mut messages = vec![
         json!({
             "role": "system",
-            "content": system_prompt(&project_root_str)
+            "content": system_prompt(&workspace_str)
         }),
         json!({
             "role": "user",
@@ -181,12 +215,12 @@ async fn run_inner(
     ];
 
     let _ = tx.send(WsMessage::Progress {
-        message: "AI 正在理解你的需求...".into(),
+        message: "AI 正在理解需求...".into(),
     }.to_json());
 
     // 工具调用循环（最多 20 轮，防止死循环）
     for round in 0..20 {
-        let response = call_llm(state, &messages).await?;
+        let response = call_llm(state, agent_name, &messages).await?;
 
         let choice = &response["choices"][0];
         let finish_reason = choice["finish_reason"].as_str().unwrap_or("");
@@ -230,7 +264,7 @@ async fn run_inner(
                 }.to_json());
 
                 // 执行工具
-                let result = execute_tool(state, &tool_name, &args);
+                let result = execute_tool(state, &workspace, &tool_name, &args);
 
                 let result_str = match result {
                     Ok(r) => r,
@@ -265,11 +299,16 @@ async fn run_inner(
 }
 
 /// 调用 LLM API（OpenAI 兼容接口）
-async fn call_llm(state: &Arc<AppState>, messages: &[Value]) -> Result<Value> {
-    let url = format!("{}/chat/completions", state.ai_api_base);
+async fn call_llm(
+    state: &Arc<AppState>,
+    agent_name: Option<&str>,
+    messages: &[Value],
+) -> Result<Value> {
+    let agent = state.get_agent(agent_name);
+    let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
-        "model": state.ai_model,
+        "model": agent.model,
         "messages": messages,
         "tools": tool_definitions(),
         "tool_choice": "auto",
@@ -278,7 +317,7 @@ async fn call_llm(state: &Arc<AppState>, messages: &[Value]) -> Result<Value> {
     let resp = state
         .http_client
         .post(&url)
-        .bearer_auth(&state.ai_api_key)
+        .bearer_auth(&agent.api_key)
         .json(&body)
         .send()
         .await?;
@@ -293,34 +332,37 @@ async fn call_llm(state: &Arc<AppState>, messages: &[Value]) -> Result<Value> {
 }
 
 /// 根据工具名和参数，调用对应的工具函数
-fn execute_tool(state: &Arc<AppState>, tool_name: &str, args: &Value) -> Result<String> {
-    let root = &state.project_root;
-
+fn execute_tool(
+    state: &Arc<AppState>,
+    workspace: &std::path::Path,
+    tool_name: &str,
+    args: &Value,
+) -> Result<String> {
     match tool_name {
         "read_file" => {
             let path = args["path"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
-            tools::read_file(root, path)
+            tools::read_file(workspace, path)
         }
         "write_file" => {
             let path = args["path"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
             let content = args["content"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 content 参数"))?;
-            tools::write_file(root, path, content)
+            tools::write_file(workspace, path, content)
         }
         "list_dir" => {
             let path = args["path"].as_str().unwrap_or(".");
-            tools::list_dir(root, path)
+            tools::list_dir(workspace, path)
         }
         "run_shell" => {
             let command = args["command"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 command 参数"))?;
-            tools::run_shell(root, command)
+            tools::run_shell(workspace, command)
         }
         "git_commit" => {
             let message = args["message"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 message 参数"))?;
-            tools::git_commit(root, message)
+            tools::git_commit(workspace, message)
         }
         "build_project" => {
             let target = args["target"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 target 参数"))?;
-            tools::build_project(root, target)
+            tools::build_project(workspace, target)
         }
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
     }

@@ -11,7 +11,11 @@ pub async fn health() -> &'static str {
 /// REST 接口（APK 也可以用这个，不需要 WebSocket）
 #[derive(serde::Deserialize)]
 pub struct ChatRequest {
+    /// 用户 ID（决定工作区目录，不同用户的项目相互隔离）
+    pub user_id: Option<String>,
     pub message: String,
+    /// 可选，指定 AI 代理名称（openai / deepseek / claude）
+    pub agent: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -27,10 +31,12 @@ pub async fn chat(
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     let state_clone = state.clone();
+    let user_id = req.user_id.clone().unwrap_or_else(|| "default".into());
     let msg = req.message.clone();
+    let agent_name = req.agent.clone();
 
     tokio::spawn(async move {
-        crate::agent::run(&msg, &state_clone, tx).await;
+        crate::agent::run(&user_id, &msg, agent_name.as_deref(), &state_clone, tx).await;
     });
 
     let mut final_reply = String::new();
