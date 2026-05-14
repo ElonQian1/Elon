@@ -1,0 +1,17 @@
+# Rust
+server/target/
+server/cargo-config.toml
+
+# Android build outputs & local config
+android/.gradle/
+android/app/build/
+android/local.properties
+android/*.apk
+
+# Environment secrets
+server/.env
+!server/.env.example
+
+# OS
+.DS_Store
+Thumbs.db
