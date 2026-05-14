@@ -3,6 +3,10 @@
 > 本文档描述 AI 代理在接收到用户需求后，如何安全地修改代码、触发编译、部署，并将结果反馈给用户。
 > AI 代理在执行任何代码操作前，必须先阅读本文档。
 
+> **强制工作流规则**（git 提交、多 AI 并发、临时工作树部署）见：
+> [.github/instructions/git-deploy-workflow.instructions.md](../.github/instructions/git-deploy-workflow.instructions.md)
+> 该文件通过 `applyTo: "**"` 自动注入，AI 代理编辑任何文件时均自动生效。
+
 ---
 
 ## 总体流程
