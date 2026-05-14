@@ -41,12 +41,15 @@ fn auth_error() -> Response {
         .into_response()
 }
 
-/// 将 API key 脱敏：仅显示前4位和后4位
+/// 将 API key 脱敏：仅显示前4个字符和后4个字符（按字符而非字节，兼容中文）
 fn mask_key(key: &str) -> String {
-    if key.len() <= 8 {
+    let chars: Vec<char> = key.chars().collect();
+    if chars.len() <= 8 {
         return "••••••••".into();
     }
-    format!("{}••••{}", &key[..4], &key[key.len() - 4..])
+    let head: String = chars[..4].iter().collect();
+    let tail: String = chars[chars.len() - 4..].iter().collect();
+    format!("{}••••{}", head, tail)
 }
 
 // ─────────────────────────────────────────────
