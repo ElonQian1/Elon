@@ -6,12 +6,30 @@ use tracing::{error, info, warn};
 
 use crate::{
     tools,
-    types::{AppState, WsMessage},
+    types::{AgentConfig, AppState, WsMessage},
 };
 
 /// AI 代理工具定义列表（告诉 LLM 它可以用哪些工具）
 fn tool_definitions() -> Value {
     json!([
+        {
+            "type": "function",
+            "function": {
+                "name": "init_project",
+                "description": "在用户工作区初始化项目模板。用户第一次请求开发 Android 应用时必须先调用此工具。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_type": {
+                            "type": "string",
+                            "enum": ["android"],
+                            "description": "项目类型，目前支持 android"
+                        }
+                    },
+                    "required": ["project_type"]
+                }
+            }
+        },
         {
             "type": "function",
             "function": {
@@ -22,7 +40,7 @@ fn tool_definitions() -> Value {
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "相对于项目根目录的文件路径，如 server/src/main.rs"
+                            "description": "相对于项目根目录的文件路径，如 app/src/main/kotlin/com/template/app/MainActivity.kt"
                         }
                     },
                     "required": ["path"]
@@ -123,32 +141,44 @@ fn tool_definitions() -> Value {
 }
 
 /// 系统提示词（告诉 LLM 它的角色和规则）
-fn system_prompt(project_root: &str) -> String {
+fn system_prompt(workspace: &str) -> String {
     format!(
-        r#"你是一龙云端APK开发平台的 AI 编程代理。
-用户通过手机APK向你描述他们想要的功能，你负责修改服务器上的代码来实现。
+        r#"你是「一龙」云端 Android 应用开发平台的 AI 编程助手。
+用户通过手机描述需求，你负责在服务器上帮他们开发完整的 Android APK，并编译好供下载体验。
 
-项目根目录: {project_root}
-项目结构:
-- server/     Rust 服务端代码
-- android/    Android APK 代码
-- frontend/   前端 Web 代码（如有）
-- scripts/    构建部署脚本
+用户工作区: {workspace}
+（这是用户自己的项目目录，与平台代码完全隔离）
 
-你的工作流程:
-1. 先用 list_dir 了解项目结构
-2. 用 read_file 读取要修改的文件（修改前必须先读）
-3. 用 write_file 精确写入修改后的文件
-4. 用 git_commit 提交变更（中文 commit message）
-5. 如需要，用 build_project 触发编译
+=== 开发流程 ===
+1. **新项目**（工作区为空时）:
+   - 先调用 init_project("android") 初始化模板
+   - 读取模板中的关键文件了解结构
+   - 用 write_file 修改/新增文件实现用户功能
+   - git_commit 提交
+   - build_project("android") 编译打包
 
-重要规则:
-- 修改文件前必须先读取原内容，不允许盲改
-- 不要删除用户未要求删除的功能
-- 每次修改后必须 git commit
-- 回复用户时用简洁的中文，说明你做了什么
-- 如果编译失败，分析错误并修复，最多尝试3次"#,
-        project_root = project_root
+2. **已有项目**（继续迭代）:
+   - list_dir(".") 查看当前结构
+   - read_file 读取要修改的文件
+   - write_file 写入修改
+   - git_commit 提交
+   - build_project("android") 重新编译
+
+=== Android 项目关键文件 ===
+- settings.gradle           → 应用名称
+- app/build.gradle          → 包名(applicationId)、SDK版本、依赖
+- app/src/main/AndroidManifest.xml → 权限、Activity 声明
+- app/src/main/kotlin/...   → Kotlin 代码（主要写这里）
+- app/src/main/res/layout/  → XML 布局文件
+- app/src/main/res/values/  → strings.xml, colors.xml
+
+=== 规则 ===
+- 修改文件前必须先 read_file 读取原内容
+- 每完成一个功能点就 git_commit（中文描述）
+- build_project 失败时分析错误，最多修复 3 次
+- 回复用户用简洁中文，告知进度
+- 编译成功后系统会自动生成下载链接给用户"#,
+        workspace = workspace
     )
 }
 
@@ -176,7 +206,8 @@ async fn run_inner(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    let agent = state.get_agent(agent_name);
+    // 提前获取并 clone 代理配置，避免持有 RwLock guard 跨越 await 点
+    let agent = state.agents_config.read().await.get_agent(agent_name).clone();
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
     // 确保用户工作区存在
@@ -218,9 +249,12 @@ async fn run_inner(
         message: "AI 正在理解需求...".into(),
     }.to_json());
 
+    // 追踪 APK 下载链接（build_project 成功后填入）
+    let mut apk_url: Option<String> = None;
+
     // 工具调用循环（最多 20 轮，防止死循环）
     for _round in 0..20 {
-        let response = call_llm(state, agent_name, &messages).await?;
+        let response = call_llm(state, &agent, &messages).await?;
 
         let choice = &response["choices"][0];
         let finish_reason = choice["finish_reason"].as_str().unwrap_or("");
@@ -238,7 +272,7 @@ async fn run_inner(
 
             let _ = tx.send(WsMessage::Done {
                 message: final_text,
-                apk_url: None, // TODO: 编译完成后填入 APK 下载链接
+                apk_url: apk_url.clone(),
             }.to_json());
             return Ok(());
         }
@@ -267,7 +301,21 @@ async fn run_inner(
                 let result = execute_tool(state, &workspace, &tool_name, &args);
 
                 let result_str = match result {
-                    Ok(r) => r,
+                    Ok(r) => {
+                        // build_project 成功后提取 APK 文件名，生成下载链接
+                        if tool_name == "build_project" {
+                            if let Some(line) = r.lines().find(|l| l.starts_with("##APK_FILE:")) {
+                                let apk_name = line.trim_start_matches("##APK_FILE:").trim();
+                                let base_url = std::env::var("PUBLIC_URL")
+                                    .unwrap_or_else(|_| "http://182.254.168.75:8080".into());
+                                apk_url = Some(format!("{}/download/{}/{}", base_url, user_id, apk_name));
+                                let _ = tx.send(WsMessage::Progress {
+                                    message: format!("APK 编译成功，正在生成下载链接..."),
+                                }.to_json());
+                            }
+                        }
+                        r
+                    }
                     Err(e) => format!("错误: {}", e),
                 };
 
@@ -292,7 +340,7 @@ async fn run_inner(
 
     let _ = tx.send(WsMessage::Done {
         message: "任务执行完毕".into(),
-        apk_url: None,
+        apk_url,
     }.to_json());
 
     Ok(())
@@ -301,10 +349,9 @@ async fn run_inner(
 /// 调用 LLM API（OpenAI 兼容接口）
 async fn call_llm(
     state: &Arc<AppState>,
-    agent_name: Option<&str>,
+    agent: &AgentConfig,
     messages: &[Value],
 ) -> Result<Value> {
-    let agent = state.get_agent(agent_name);
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -339,6 +386,10 @@ fn execute_tool(
     args: &Value,
 ) -> Result<String> {
     match tool_name {
+        "init_project" => {
+            let project_type = args["project_type"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 project_type 参数"))?;
+            tools::init_project(workspace, project_type)
+        }
         "read_file" => {
             let path = args["path"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
             tools::read_file(workspace, path)

@@ -1,8 +1,10 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tokio::sync::RwLock;
 
 /// 单个 AI 代理的配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
     pub name: String,
     pub api_base: String,
@@ -11,7 +13,6 @@ pub struct AgentConfig {
 }
 
 impl AgentConfig {
-    /// 从环境变量前缀加载，如 AGENT_OPENAI_KEY / AGENT_OPENAI_MODEL
     fn from_env(prefix: &str, default_base: &str, default_model: &str) -> Option<Self> {
         let key = std::env::var(format!("AGENT_{}_KEY", prefix)).ok()?;
         Some(Self {
@@ -25,23 +26,60 @@ impl AgentConfig {
     }
 }
 
+/// 可动态修改的 AI 代理配置集合（被 RwLock 包裹，支持运行时热更新）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentsConfig {
+    pub agents: HashMap<String, AgentConfig>,
+    pub default_agent: String,
+}
+
+impl AgentsConfig {
+    /// 获取指定名称的代理，不存在则返回默认代理
+    pub fn get_agent(&self, name: Option<&str>) -> &AgentConfig {
+        let key = name.unwrap_or(&self.default_agent);
+        self.agents
+            .get(key)
+            .or_else(|| self.agents.get(&self.default_agent))
+            .or_else(|| self.agents.values().next())
+            .expect("至少有一个 AI 代理")
+    }
+
+    /// 从 JSON 文件加载配置
+    pub fn load_from_file(path: &std::path::Path) -> Option<Self> {
+        let content = std::fs::read_to_string(path).ok()?;
+        serde_json::from_str(&content).ok()
+    }
+
+    /// 持久化配置到 JSON 文件
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<()> {
+        let content = serde_json::to_string_pretty(self)?;
+        std::fs::write(path, content)?;
+        Ok(())
+    }
+}
+
 /// 全局状态，在各路由间共享
 pub struct AppState {
-    /// 已注册的 AI 代理，key 为代理名称（openai / deepseek / claude）
-    pub agents: HashMap<String, AgentConfig>,
-    /// 默认使用的代理名称
-    pub default_agent: String,
-    /// 项目根目录（AI 代理操作文件的沙箱目录）
+    /// AI 代理配置（RwLock 支持运行时通过管理后台修改，无需重启）
+    pub agents_config: RwLock<AgentsConfig>,
+    /// 用户工作区根目录（每个用户在此独立目录开发自己的项目）
     pub project_root: std::path::PathBuf,
+    /// 用户工作区根目录字符串（冗余保存，方便直接传给工具层）
+    pub workspace_root: String,
+    /// 服务器对外公开的 URL（用于生成 APK 下载链接）
+    pub public_url: String,
     /// HTTP 客户端（复用连接）
     pub http_client: reqwest::Client,
+    /// 管理后台访问令牌（对应 .env 中的 ADMIN_TOKEN）
+    pub admin_token: String,
+    /// agents.json 持久化路径
+    pub config_path: std::path::PathBuf,
 }
 
 impl AppState {
     pub fn new() -> Result<Self> {
         let mut agents: HashMap<String, AgentConfig> = HashMap::new();
 
-        // 按优先级依次尝试加载各 AI 代理配置
         let providers = [
             ("OPENAI",   "https://api.openai.com/v1",                    "gpt-4o"),
             ("DEEPSEEK", "https://api.deepseek.com/v1",                  "deepseek-chat"),
@@ -57,49 +95,72 @@ impl AppState {
             }
         }
 
-        if agents.is_empty() {
-            anyhow::bail!("至少需要配置一个 AI 代理，请设置 AGENT_OPENAI_KEY 或 AGENT_DEEPSEEK_KEY 等环境变量");
-        }
+        let config_path = std::path::PathBuf::from(
+            std::env::var("CONFIG_PATH").unwrap_or_else(|_| "./agents.json".into()),
+        );
 
-        // 默认代理：优先用环境变量指定，否则取第一个
-        let default_agent = std::env::var("DEFAULT_AGENT")
-            .unwrap_or_else(|_| agents.keys().next().unwrap().clone());
+        // 优先从 agents.json 加载（管理后台保存的配置），否则用 .env
+        let agents_config = if let Some(mut saved) = AgentsConfig::load_from_file(&config_path) {
+            tracing::info!("从 {} 加载代理配置", config_path.display());
+            // 将 .env 中有但 agents.json 没有的代理补充进来
+            for (k, v) in &agents {
+                saved.agents.entry(k.clone()).or_insert_with(|| v.clone());
+            }
+            saved
+        } else {
+            if agents.is_empty() {
+                anyhow::bail!(
+                    "至少需要配置一个 AI 代理，请设置 AGENT_OPENAI_KEY / AGENT_DEEPSEEK_KEY / AGENT_HUNYUAN_KEY 等"
+                );
+            }
+            let default_agent = std::env::var("DEFAULT_AGENT")
+                .unwrap_or_else(|_| agents.keys().next().unwrap().clone());
+            AgentsConfig { agents, default_agent }
+        };
 
-        let project_root = std::env::var("WORKSPACE_ROOT")
+        let project_root_str = std::env::var("WORKSPACE_ROOT")
             .unwrap_or_else(|_| "/home/ubuntu/workspaces".into());
 
-        tracing::info!("默认 AI 代理: {}", default_agent);
-        tracing::info!("用户工作区根目录: {}", project_root);
+        let public_url = std::env::var("PUBLIC_URL")
+            .unwrap_or_else(|_| "http://182.254.168.75:8080".into());
+
+        let admin_token = std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| {
+            tracing::warn!("未设置 ADMIN_TOKEN，使用默认值 'elon-admin'，生产环境请修改！");
+            "elon-admin".into()
+        });
+
+        tracing::info!("默认 AI 代理: {}", agents_config.default_agent);
+        tracing::info!("用户工作区根目录: {}", project_root_str);
+        tracing::info!("公开 URL: {}", public_url);
 
         Ok(Self {
-            agents,
-            default_agent,
-            project_root: std::path::PathBuf::from(project_root),
+            agents_config: RwLock::new(agents_config),
+            project_root: std::path::PathBuf::from(&project_root_str),
+            workspace_root: project_root_str,
+            public_url,
             http_client: reqwest::Client::new(),
+            admin_token,
+            config_path,
         })
     }
 
-    /// 获取指定名称的代理配置，不存在则返回默认代理
-    pub fn get_agent(&self, name: Option<&str>) -> &AgentConfig {
-        let key = name.unwrap_or(&self.default_agent);
-        self.agents.get(key)
-            .or_else(|| self.agents.get(&self.default_agent))
-            .unwrap() // agents 非空已在 new() 中保证
-    }
-
-    /// 获取某个用户的工作区目录
-    /// 路径格式： {workspace_root}/{user_id}/
-    /// 每个用户在这里开发自己的项目，不与其他用户共享
+    /// 获取某个用户的工作区目录（路径: {workspace_root}/{user_id}/）
     pub fn get_user_workspace(&self, user_id: &str) -> std::path::PathBuf {
-        // 用户 ID 只允许字母数字和下划线，防止路径穿越
-        let safe_id: String = user_id
-            .chars()
-            .filter(|c| c.is_alphanumeric() || *c == '_')
-            .take(32)
-            .collect();
-        self.project_root.join(if safe_id.is_empty() { "default".into() } else { safe_id })
+        get_user_workspace(&self.workspace_root, user_id)
     }
 }
+
+/// 独立辅助函数：根据 workspace_root 和 user_id 计算用户工作区路径
+pub fn get_user_workspace(workspace_root: &str, user_id: &str) -> std::path::PathBuf {
+    let safe_id: String = user_id
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_')
+        .take(32)
+        .collect();
+    std::path::PathBuf::from(workspace_root)
+        .join(if safe_id.is_empty() { "default".into() } else { safe_id })
+}
+
 
 /// WebSocket 消息格式（发给 APK）
 #[derive(serde::Serialize)]

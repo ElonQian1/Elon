@@ -1,11 +1,13 @@
 use anyhow::Result;
 use axum::{
+    body::Body,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Path, State,
     },
+    http::{header, StatusCode},
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use dotenvy::dotenv;
@@ -13,6 +15,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
+mod admin;
 mod agent;
 mod api;
 mod tools;
@@ -46,6 +49,15 @@ async fn main() -> Result<()> {
         .route("/ws", get(ws_handler))
         // REST API（备用）
         .route("/api/chat", post(api::chat))
+        // APK 下载
+        .route("/download/{user_id}/{filename}", get(download_apk))
+        // 管理后台：web 页面
+        .route("/admin", get(admin::admin_page))
+        // 管理后台：REST API
+        .route("/api/admin/agents", get(admin::list_agents).post(admin::upsert_agent))
+        .route("/api/admin/agents/:name", delete(admin::delete_agent))
+        .route("/api/admin/agents/:name/key", get(admin::get_agent_key))
+        .route("/api/admin/default/:name", post(admin::set_default_agent))
         .layer(cors)
         .with_state(state);
 
@@ -110,4 +122,47 @@ fn parse_ws_message(raw: &str) -> (String, String, Option<String>) {
     } else {
         ("default".to_string(), raw.to_string(), None)
     }
+}
+
+/// APK 下载端点 — GET /download/:user_id/:filename
+async fn download_apk(
+    Path((user_id, filename)): Path<(String, String)>,
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    // 安全检查：文件名不允许路径穿越
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return Err((StatusCode::BAD_REQUEST, "非法文件名".into()));
+    }
+    if !filename.ends_with(".apk") {
+        return Err((StatusCode::BAD_REQUEST, "仅允许下载 APK 文件".into()));
+    }
+
+    let workspace = types::get_user_workspace(&state.workspace_root, &user_id);
+
+    // 在常见的输出目录中查找 APK
+    let candidates = [
+        workspace.join("app/build/outputs/apk/debug").join(&filename),
+        workspace.join("app/build/outputs/apk/release").join(&filename),
+    ];
+
+    let apk_path = candidates
+        .iter()
+        .find(|p| p.exists())
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("APK 文件 {} 不存在", filename)))?;
+
+    let data = tokio::fs::read(apk_path).await.map_err(|e| {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("读取文件失败: {}", e))
+    })?;
+
+    let response = axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/vnd.android.package-archive")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", filename),
+        )
+        .body(Body::from(data))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(response)
 }
