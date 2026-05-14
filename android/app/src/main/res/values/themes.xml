@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ElonApp" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.ElonApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#2196F3</item>
         <item name="colorPrimaryVariant">#1565C0</item>
         <item name="colorOnPrimary">#FFFFFF</item>
