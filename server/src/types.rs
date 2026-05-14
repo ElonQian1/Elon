@@ -162,6 +162,61 @@ pub fn get_user_workspace(workspace_root: &str, user_id: &str) -> std::path::Pat
 }
 
 
+/// 用户自定义 AI 代理配置（存储在用户工作区 agent_config.json）
+/// 各字段均可为 None，表示回退到全局配置对应的值
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserAgentConfig {
+    /// 使用指定名称的全局代理（None = 使用服务器默认）
+    pub use_agent: Option<String>,
+    /// 自定义 API 地址（None = 使用所选全局代理的地址）
+    pub api_base: Option<String>,
+    /// 自定义 API 密钥（None = 使用所选全局代理的密钥）
+    pub api_key: Option<String>,
+    /// 自定义模型名（None = 使用所选全局代理的模型）
+    pub model: Option<String>,
+    /// 用户昵称（可选，仅用于管理后台展示）
+    pub nickname: Option<String>,
+    /// 最后更新时间
+    pub updated_at: Option<String>,
+}
+
+impl UserAgentConfig {
+    /// 从用户工作区加载配置
+    pub fn load(workspace: &std::path::Path) -> Option<Self> {
+        let content = std::fs::read_to_string(workspace.join("agent_config.json")).ok()?;
+        serde_json::from_str(&content).ok()
+    }
+
+    /// 持久化到用户工作区
+    pub fn save(&self, workspace: &std::path::Path) -> Result<()> {
+        std::fs::create_dir_all(workspace)?;
+        std::fs::write(
+            workspace.join("agent_config.json"),
+            serde_json::to_string_pretty(self)?,
+        )?;
+        Ok(())
+    }
+
+    /// 用户是否设置了任何自定义配置
+    pub fn has_config(&self) -> bool {
+        self.use_agent.is_some()
+            || self.api_base.is_some()
+            || self.api_key.is_some()
+            || self.model.is_some()
+    }
+
+    /// 解析为实际可使用的 AgentConfig（以全局代理为基础，用自定义值覆盖）
+    pub fn resolve(&self, global: &AgentsConfig) -> AgentConfig {
+        let base = global.get_agent(self.use_agent.as_deref()).clone();
+        AgentConfig {
+            name: format!("{}(用户自定义)", base.name),
+            api_base: self.api_base.clone().unwrap_or(base.api_base),
+            api_key: self.api_key.clone().unwrap_or(base.api_key),
+            model: self.model.clone().unwrap_or(base.model),
+        }
+    }
+}
+
 /// WebSocket 消息格式（发给 APK）
 #[derive(serde::Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

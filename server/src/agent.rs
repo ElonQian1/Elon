@@ -6,7 +6,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     tools,
-    types::{AgentConfig, AppState, WsMessage},
+    types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
 };
 
 /// AI 代理工具定义列表（告诉 LLM 它可以用哪些工具）
@@ -206,10 +206,17 @@ async fn run_inner(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    // 提前获取并 clone 代理配置，避免持有 RwLock guard 跨越 await 点
-    let agent = state.agents_config.read().await.get_agent(agent_name).clone();
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
+
+    // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理
+    let agent: AgentConfig = {
+        let global = state.agents_config.read().await;
+        match UserAgentConfig::load(&workspace) {
+            Some(cfg) if cfg.has_config() => cfg.resolve(&global),
+            _ => global.get_agent(agent_name).clone(),
+        }
+    };
     // 确保用户工作区存在
     std::fs::create_dir_all(&workspace)?;
     // 初始化 git（如果还未初始化）

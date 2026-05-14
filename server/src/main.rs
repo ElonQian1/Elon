@@ -20,6 +20,7 @@ mod agent;
 mod api;
 mod tools;
 mod types;
+mod user_api;
 
 pub use types::AppState;
 
@@ -58,6 +59,9 @@ async fn main() -> Result<()> {
         .route("/api/admin/agents/:name", delete(admin::delete_agent))
         .route("/api/admin/agents/:name/key", get(admin::get_agent_key))
         .route("/api/admin/default/:name", post(admin::set_default_agent))
+        .route("/api/admin/users", get(admin::list_users))
+        // 用户端：AI 代理配置（APK 使用，无需管理员权限）
+        .route("/api/user/:user_id/agent", get(user_api::get_user_agent).put(user_api::set_user_agent))
         .layer(cors)
         .with_state(state);
 

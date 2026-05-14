@@ -268,6 +268,46 @@ pub async fn get_agent_key(
     }
 }
 
+/// 列出所有用户及其 AI 代理配置（仅管理员）
+pub async fn list_users(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return auth_error();
+    }
+
+    let workspace_root = &state.project_root;
+    let mut users: Vec<serde_json::Value> = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(workspace_root) {
+        for entry in entries.flatten() {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let user_id = entry.file_name().to_string_lossy().to_string();
+            let workspace = entry.path();
+            let cfg = crate::types::UserAgentConfig::load(&workspace);
+
+            users.push(serde_json::json!({
+                "user_id": user_id,
+                "has_custom_config": cfg.is_some(),
+                "use_agent": cfg.as_ref().and_then(|c| c.use_agent.as_deref()),
+                "has_custom_key": cfg.as_ref().and_then(|c| c.api_key.as_deref()).is_some(),
+                "model": cfg.as_ref().and_then(|c| c.model.as_deref()),
+                "nickname": cfg.as_ref().and_then(|c| c.nickname.as_deref()),
+                "updated_at": cfg.as_ref().and_then(|c| c.updated_at.as_deref()),
+            }));
+        }
+    }
+
+    users.sort_by(|a, b| {
+        a["user_id"].as_str().unwrap_or("").cmp(b["user_id"].as_str().unwrap_or(""))
+    });
+
+    Json(serde_json::json!({ "users": users, "total": users.len() })).into_response()
+}
+
 // ─────────────────────────────────────────────
 // 内嵌管理后台 HTML（无需任何外部 CDN）
 // ─────────────────────────────────────────────
@@ -357,6 +397,21 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
   .loader { border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; width: 36px; height: 36px; animation: spin .7s linear infinite; margin: 60px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .empty { text-align: center; color: var(--text-dim); padding: 60px 0; font-size: 15px; }
+  /* Tabs */
+  .tab-bar { display: flex; gap: 4px; background: var(--card); border-bottom: 1px solid var(--border); padding: 0 32px; }
+  .tab-btn { padding: 12px 20px; font-size: 14px; font-weight: 500; color: var(--text-dim); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color .15s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+  /* User cards */
+  .user-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .user-card:hover { border-color: var(--accent); }
+  .user-id { font-size: 14px; font-weight: 700; min-width: 160px; }
+  .user-tag { font-size: 11px; padding: 3px 10px; border-radius: 20px; }
+  .tag-custom { background: rgba(108,99,255,.2); color: var(--accent); }
+  .tag-default { background: var(--border); color: var(--text-dim); }
+  .user-detail { font-size: 12px; color: var(--text-dim); margin-left: auto; }
 </style>
 </head>
 <body>
@@ -370,12 +425,31 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
   </div>
 </header>
 
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('agents',this)">🤖 AI 代理</button>
+  <button class="tab-btn" onclick="switchTab('users',this)">👥 用户列表</button>
+</div>
+
+<!-- ── AI 代理标签页 ──────────────────────── -->
+<div id="tab-agents" class="tab-pane active">
 <div class="container">
   <div class="toolbar">
     <h2 id="agentCount">已配置 0 个 AI 代理</h2>
     <button class="btn btn-primary" onclick="openAddModal()">＋ 添加代理</button>
   </div>
   <div id="agentGrid" class="grid"><div class="loader"></div></div>
+</div>
+</div>
+
+<!-- ── 用户列表标签页 ─────────────────────── -->
+<div id="tab-users" class="tab-pane">
+<div class="container">
+  <div class="toolbar">
+    <h2 id="userCount">用户列表</h2>
+    <button class="btn btn-ghost" onclick="loadUsers()">↻ 刷新</button>
+  </div>
+  <div id="userList" style="display:flex;flex-direction:column;gap:10px"><div class="loader"></div></div>
+</div>
 </div>
 
 <!-- 编辑/新增 Modal -->
@@ -670,6 +744,57 @@ document.addEventListener('keydown', e => {
     document.getElementById('tokenModal').classList.remove('open');
   }
 });
+
+// ─── 标签切换 ────────────────────────────
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'users') loadUsers();
+}
+
+// ─── 用户列表 ────────────────────────────
+async function loadUsers() {
+  const list = document.getElementById('userList');
+  list.innerHTML = '<div class="loader"></div>';
+  try {
+    const res = await apiFetch('GET', '/api/admin/users');
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      list.innerHTML = `<p class="empty">${j.error || '加载失败'}</p>`;
+      return;
+    }
+    const data = await res.json();
+    renderUsers(data);
+  } catch(e) {
+    list.innerHTML = `<p class="empty">网络错误: ${e.message}</p>`;
+  }
+}
+
+function renderUsers(data) {
+  const list = document.getElementById('userList');
+  const users = data.users || [];
+  document.getElementById('userCount').textContent = `共 ${users.length} 个用户`;
+  if (users.length === 0) {
+    list.innerHTML = '<p class="empty">暂无用户（用户通过 APK 连接后会在此显示）</p>';
+    return;
+  }
+  list.innerHTML = users.map(u => {
+    const agentText = u.has_custom_config
+      ? (u.use_agent ? `使用代理: ${esc(u.use_agent)}` : '自定义配置')
+      : '使用服务器默认';
+    const modelText = u.model ? ` · ${esc(u.model)}` : '';
+    const keyText = u.has_custom_key ? ' · 已配置自有API Key🔑' : '';
+    const nicknameText = u.nickname ? ` <span style="color:var(--accent)">${esc(u.nickname)}</span>` : '';
+    const updatedText = u.updated_at ? `最后更新: ${esc(u.updated_at)}` : '从未配置';
+    return `<div class="user-card">
+      <span class="user-id">${esc(u.user_id)}${nicknameText}</span>
+      <span class="user-tag ${u.has_custom_config ? 'tag-custom' : 'tag-default'}">${agentText}${modelText}${keyText}</span>
+      <span class="user-detail">${updatedText}</span>
+    </div>`;
+  }).join('');
+}
 </script>
 </body>
 </html>"#;
