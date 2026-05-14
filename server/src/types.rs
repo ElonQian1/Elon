@@ -43,10 +43,11 @@ impl AppState {
 
         // 按优先级依次尝试加载各 AI 代理配置
         let providers = [
-            ("OPENAI",   "https://api.openai.com/v1",     "gpt-4o"),
-            ("DEEPSEEK", "https://api.deepseek.com/v1",   "deepseek-chat"),
-            ("CLAUDE",   "https://api.anthropic.com/v1",  "claude-3-5-sonnet-20241022"),
-            ("CUSTOM",   "",                               ""),
+            ("OPENAI",   "https://api.openai.com/v1",                    "gpt-4o"),
+            ("DEEPSEEK", "https://api.deepseek.com/v1",                  "deepseek-chat"),
+            ("CLAUDE",   "https://api.anthropic.com/v1",                 "claude-3-5-sonnet-20241022"),
+            ("HUNYUAN",  "https://api.hunyuan.cloud.tencent.com/v1",     "hunyuan-turbo"),
+            ("CUSTOM",   "",                                              ""),
         ];
 
         for (prefix, default_base, default_model) in providers {
