@@ -65,45 +65,139 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
     Ok(format!("git commit 成功: {}", stdout.trim()))
 }
 
-/// 构建项目
-/// target: "rust" | "android" | "frontend"
+/// 构建项目（自动检测项目类型，从工作区根目录开始）
+/// target: "android" | "rust" | "frontend"
+/// 成功时返回值中若包含 ##APK_FILE:<name>，表示有 APK 可供下载
 pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
     info!("[工具] 构建项目: {}", target);
-    let (cmd, args, work_dir) = match target {
-        "rust" => (
-            "cargo",
-            vec!["build", "--release"],
-            project_root.join("server"),
-        ),
-        "android" => (
-            "bash",
-            vec!["./gradlew", "assembleRelease"],
-            project_root.join("android"),
-        ),
-        "frontend" => (
-            "bash",
-            vec!["-c", "npm run build"],
-            project_root.join("frontend"),
-        ),
-        _ => return Err(anyhow!("未知构建目标: {}，支持: rust/android/frontend", target)),
+
+    let (work_dir, cmd) = match target {
+        "android" => {
+            // 优先检查工作区根目录，再检查 android/ 子目录
+            let work_dir = if project_root.join("gradlew").exists() {
+                project_root.to_path_buf()
+            } else if project_root.join("android").join("gradlew").exists() {
+                project_root.join("android")
+            } else {
+                return Err(anyhow!(
+                    "未找到 gradlew。请先调用 init_project 工具初始化 Android 项目模板"
+                ));
+            };
+            (work_dir, "chmod +x gradlew && ./gradlew assembleDebug 2>&1")
+        }
+        "rust" => {
+            let work_dir = if project_root.join("Cargo.toml").exists() {
+                project_root.to_path_buf()
+            } else if project_root.join("server").join("Cargo.toml").exists() {
+                project_root.join("server")
+            } else {
+                return Err(anyhow!("未找到 Cargo.toml"));
+            };
+            (work_dir, "cargo build --release 2>&1")
+        }
+        "frontend" => {
+            let work_dir = if project_root.join("package.json").exists() {
+                project_root.to_path_buf()
+            } else {
+                project_root.join("frontend")
+            };
+            if !work_dir.join("package.json").exists() {
+                return Err(anyhow!("未找到 package.json"));
+            }
+            (work_dir, "npm run build 2>&1")
+        }
+        _ => return Err(anyhow!("未知构建目标: {}，支持: android/rust/frontend", target)),
     };
 
-    if !work_dir.exists() {
-        return Err(anyhow!("目录不存在: {}，该模块尚未创建", work_dir.display()));
-    }
-
-    let output = Command::new(cmd)
-        .args(&args)
+    let output = Command::new("bash")
+        .args(["-c", cmd])
         .current_dir(&work_dir)
         .output()?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     if !output.status.success() {
-        return Err(anyhow!("构建失败:\nstdout: {}\nstderr: {}", stdout, stderr));
+        return Err(anyhow!("构建失败:\n{}", &combined[..combined.len().min(2000)]));
     }
-    Ok(format!("{} 构建成功\n{}", target, stdout.trim()))
+
+    // Android 构建成功后找到 APK 文件，嵌入特殊标记
+    if target == "android" {
+        if let Some(apk_path) = find_latest_apk(&work_dir) {
+            let apk_name = apk_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            return Ok(format!(
+                "android 构建成功\n##APK_FILE:{}\n\n构建日志:\n{}",
+                apk_name,
+                &combined[..combined.len().min(800)]
+            ));
+        }
+    }
+
+    Ok(format!("{} 构建成功\n{}", target, &combined[..combined.len().min(500)]))
+}
+
+/// 在用户工作区初始化项目模板（复制服务器上预置的模板）
+pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
+    info!("[工具] 初始化项目模板: {}", project_type);
+    match project_type {
+        "android" => {
+            let template_dir = std::path::Path::new("/home/ubuntu/templates/android");
+            if !template_dir.exists() {
+                return Err(anyhow!(
+                    "服务器上尚未设置 Android 模板 (/home/ubuntu/templates/android)"
+                ));
+            }
+            copy_dir_all(template_dir, project_root)?;
+            Ok("Android 项目模板已初始化。\n\
+                 现在请用 write_file 修改以下文件实现具体功能:\n\
+                 - app/src/main/kotlin/com/template/app/MainActivity.kt\n\
+                 - app/src/main/res/layout/activity_main.xml\n\
+                 - app/src/main/AndroidManifest.xml\n\
+                 - settings.gradle（修改应用名）\n\
+                 - app/build.gradle（修改包名 applicationId）".into())
+        }
+        _ => Err(anyhow!("未知模板类型: {}，目前支持: android", project_type)),
+    }
+}
+
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_all(&entry.path(), &dst_path)?;
+        } else {
+            std::fs::copy(entry.path(), &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
+    let dirs = [
+        "app/build/outputs/apk/debug",
+        "app/build/outputs/apk/release",
+        "build/outputs/apk/debug",
+    ];
+    for rel in &dirs {
+        if let Ok(entries) = std::fs::read_dir(work_dir.join(rel)) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.extension().and_then(|e| e.to_str()) == Some("apk") {
+                    return Some(p);
+                }
+            }
+        }
+    }
+    None
 }
 
 /// 执行受限 shell 命令（只允许白名单命令）
@@ -120,6 +214,7 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
         "cat",
         "find",
         "grep",
+        "./gradlew",
     ];
 
     let is_allowed = ALLOWED_PREFIXES.iter().any(|prefix| command.starts_with(prefix));
