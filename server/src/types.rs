@@ -1,16 +1,6 @@
 use anyhow::Result;
 use std::collections::HashMap;
 
-/// 支持的 AI 代理提供商
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum AiProvider {
-    OpenAI,
-    DeepSeek,
-    Claude,
-    Custom,
-}
-
 /// 单个 AI 代理的配置
 #[derive(Debug, Clone)]
 pub struct AgentConfig {

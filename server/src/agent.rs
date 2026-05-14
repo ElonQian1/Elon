@@ -219,7 +219,7 @@ async fn run_inner(
     }.to_json());
 
     // 工具调用循环（最多 20 轮，防止死循环）
-    for round in 0..20 {
+    for _round in 0..20 {
         let response = call_llm(state, agent_name, &messages).await?;
 
         let choice = &response["choices"][0];
@@ -333,7 +333,7 @@ async fn call_llm(
 
 /// 根据工具名和参数，调用对应的工具函数
 fn execute_tool(
-    state: &Arc<AppState>,
+    _state: &Arc<AppState>,
     workspace: &std::path::Path,
     tool_name: &str,
     args: &Value,

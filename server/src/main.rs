@@ -6,11 +6,10 @@ use axum::{
     },
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use dotenvy::dotenv;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 

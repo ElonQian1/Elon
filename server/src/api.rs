@@ -1,7 +1,6 @@
 use axum::{extract::State, Json};
 use std::sync::Arc;
-use crate::types::{AppState, WsMessage};
-use tokio::sync::mpsc::UnboundedSender;
+use crate::types::AppState;
 
 /// 健康检查
 pub async fn health() -> &'static str {
