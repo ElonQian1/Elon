@@ -3,14 +3,21 @@ package com.elon.app
 import android.os.Bundle
 import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import com.elon.app.databinding.ActivityMainBinding
-import kotlinx.coroutines.launch
+import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var wsClient: ElonWsClient
+
+    /** 每次安装 APP 生成的唯一用户 ID，存入 SharedPreferences 持久化 */
+    private val userId: String by lazy {
+        val prefs = getSharedPreferences("elon", MODE_PRIVATE)
+        prefs.getString("user_id", null) ?: UUID.randomUUID().toString().replace("-", "").also {
+            prefs.edit().putString("user_id", it).apply()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,8 +57,9 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.text.clear()
         binding.sendButton.isEnabled = false
 
-        // 通过 WebSocket 发送
-        wsClient.send(text)
+        // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
+        val payload = """{"user_id":"$userId","message":${com.google.gson.JsonPrimitive(text)}}"""
+        wsClient.send(payload)
     }
 
     private fun appendMessage(raw: String) {
