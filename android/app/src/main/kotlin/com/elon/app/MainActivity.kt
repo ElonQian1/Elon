@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
             val type = json.get("type")?.asString ?: return
             val msg = when (type) {
                 "progress"    -> ChatMessage("ai-progress", json.get("message")?.asString ?: "")
-                "tool_call"   -> ChatMessage("ai-tool", "🔧 ${json.get("tool")?.asString}")
+                "tool_call"   -> return // 内部工具调用不直接展示给用户
                 "tool_result" -> return // 不显示工具结果，减少噪音
                 "done"        -> {
                     binding.sendButton.isEnabled = true

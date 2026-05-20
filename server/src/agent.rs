@@ -173,6 +173,8 @@ fn system_prompt(workspace: &str) -> String {
 - app/src/main/res/values/  → strings.xml, colors.xml
 
 === 规则 ===
+- 如果用户需求不是“修改/生成/构建 Android APK 或项目代码”，不要调用工具。请直接用简洁中文回复用户，说明当前平台主要用于应用开发；例如图片、壁纸、闲聊、资料查询等需求，应直接回答能做什么/不能做什么。
+- 只有在确实需要读取、修改、提交或构建用户项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
 - 每完成一个功能点就 git_commit（中文描述）
 - build_project 失败时分析错误，最多修复 3 次
