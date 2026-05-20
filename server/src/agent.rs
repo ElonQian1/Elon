@@ -203,10 +203,8 @@ pub async fn run(
 
 fn is_standalone_image_request(message: &str) -> bool {
     let image_words = ["壁纸", "图片", "照片", "头像", "插画", "海报", "卡通", "山水画", "生成图"];
-    let dev_words = ["app", "apk", "应用", "功能", "页面", "按钮", "代码", "开发", "修改", "添加", "生成一个应用"];
 
     image_words.iter().any(|word| message.contains(word))
-        && !dev_words.iter().any(|word| message.to_lowercase().contains(word))
 }
 
 async fn run_inner(
