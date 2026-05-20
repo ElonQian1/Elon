@@ -207,6 +207,47 @@ fn is_standalone_image_request(message: &str) -> bool {
     image_words.iter().any(|word| message.contains(word))
 }
 
+fn looks_like_development_request(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let dev_words = [
+        "app", "apk", "android", "应用", "功能", "页面", "界面", "按钮", "代码", "开发",
+        "修改", "添加", "新增", "生成", "做一个", "做个", "编译", "打包", "安装", "发布",
+        "登录", "注册", "首页", "设置", "接口", "后端", "服务端", "数据库",
+    ];
+
+    dev_words.iter().any(|word| lower.contains(word))
+}
+
+fn quick_chat_reply(message: &str) -> Option<String> {
+    let trimmed = message.trim();
+    let lower = trimmed.to_lowercase();
+    let is_development_request = looks_like_development_request(trimmed);
+
+    if trimmed.is_empty() {
+        return Some("我在。你可以直接描述想让 App 增加或修改什么功能。".into());
+    }
+
+    if is_standalone_image_request(trimmed) && !is_development_request {
+        return Some("我现在主要负责帮你开发和修改 Android APK，还没有接入直接生成手机壁纸图片的能力。你可以这样说：帮我做一个能生成卡通壁纸的 App 功能，或者帮我把应用首页改成卡通壁纸风格。".into());
+    }
+
+    if is_development_request {
+        return None;
+    }
+
+    let greeting_words = ["你好", "您好", "hello", "hi", "在吗", "在不在"];
+    if greeting_words.iter().any(|word| lower.contains(word)) {
+        return Some("我在。你直接说想让这个 App 改成什么样，我会帮你分析并执行。".into());
+    }
+
+    let thanks_words = ["谢谢", "感谢", "辛苦", "thanks"];
+    if thanks_words.iter().any(|word| lower.contains(word)) {
+        return Some("不客气。你继续发需求就行，我会按项目流程处理。".into());
+    }
+
+    Some("收到。这个入口主要用于开发和修改 Android App；如果你要改功能、页面或打包 APK，直接描述需求就可以。".into())
+}
+
 async fn run_inner(
     user_id: &str,
     user_message: &str,
@@ -217,9 +258,9 @@ async fn run_inner(
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
 
-    if is_standalone_image_request(user_message) {
+    if let Some(reply) = quick_chat_reply(user_message) {
         let _ = tx.send(WsMessage::Done {
-            message: "我现在主要负责帮你开发和修改 Android APK，还没有接入直接生成手机壁纸图片的能力。你可以这样说：帮我做一个能生成卡通壁纸的 App 功能，或者帮我把应用首页改成卡通壁纸风格。".into(),
+            message: reply,
             apk_url: None,
         }.to_json());
         return Ok(());
