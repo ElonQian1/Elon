@@ -204,6 +204,7 @@ fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
 pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
     // 白名单：只允许安全的只读或构建相关命令
     const ALLOWED_PREFIXES: &[&str] = &[
+        "echo",
         "cargo check",
         "cargo test",
         "cargo clippy",
