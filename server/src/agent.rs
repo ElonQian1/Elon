@@ -217,6 +217,12 @@ async fn run_inner(
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
 
+    info!(
+        "收到用户消息: {:?}, image_request={}",
+        user_message,
+        is_standalone_image_request(user_message)
+    );
+
     if is_standalone_image_request(user_message) {
         let _ = tx.send(WsMessage::Done {
             message: "我现在主要负责帮你开发和修改 Android APK，还没有接入直接生成手机壁纸图片的能力。你可以这样说：帮我做一个能生成卡通壁纸的 App 功能，或者帮我把应用首页改成卡通壁纸风格。".into(),
