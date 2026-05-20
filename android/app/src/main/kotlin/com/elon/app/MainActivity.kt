@@ -62,8 +62,11 @@ class MainActivity : AppCompatActivity() {
         binding.sendButton.isEnabled = false
 
         // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
-        val payload = """{"user_id":"$userId","message":${com.google.gson.JsonPrimitive(text)}}"""
-        wsClient.send(payload)
+        val payload = com.google.gson.JsonObject().apply {
+            addProperty("user_id", userId)
+            addProperty("message", text)
+        }
+        wsClient.send(payload.toString())
     }
 
     private fun appendMessage(raw: String) {
