@@ -201,6 +201,14 @@ pub async fn run(
     }
 }
 
+fn is_standalone_image_request(message: &str) -> bool {
+    let image_words = ["壁纸", "图片", "照片", "头像", "插画", "海报", "卡通", "山水画", "生成图"];
+    let dev_words = ["app", "apk", "应用", "功能", "页面", "按钮", "代码", "开发", "修改", "添加", "生成一个应用"];
+
+    image_words.iter().any(|word| message.contains(word))
+        && !dev_words.iter().any(|word| message.to_lowercase().contains(word))
+}
+
 async fn run_inner(
     user_id: &str,
     user_message: &str,
@@ -210,6 +218,14 @@ async fn run_inner(
 ) -> Result<()> {
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
+
+    if is_standalone_image_request(user_message) {
+        let _ = tx.send(WsMessage::Done {
+            message: "我现在主要负责帮你开发和修改 Android APK，还没有接入直接生成手机壁纸图片的能力。你可以这样说：帮我做一个能生成卡通壁纸的 App 功能，或者帮我把应用首页改成卡通壁纸风格。".into(),
+            apk_url: None,
+        }.to_json());
+        return Ok(());
+    }
 
     // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理
     let agent: AgentConfig = {
