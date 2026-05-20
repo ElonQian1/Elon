@@ -23,7 +23,7 @@ import org.json.JSONArray
  */
 class SettingsActivity : AppCompatActivity() {
 
-    private val SERVER_URL = "http://182.254.168.75:8080"
+    private val SERVER_URL = "http://43.139.149.158:8080"
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val http = OkHttpClient()
 

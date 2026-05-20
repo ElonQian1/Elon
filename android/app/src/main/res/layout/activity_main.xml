@@ -57,6 +57,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="描述你想要的功能..."
+            android:textColor="#212121"
+            android:textColorHint="#9E9E9E"
             android:imeOptions="actionSend"
             android:inputType="textMultiLine|textCapSentences"
             android:maxLines="4"

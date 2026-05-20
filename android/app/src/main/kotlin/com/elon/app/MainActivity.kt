@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
 
         // 连接 WebSocket
         wsClient = ElonWsClient(
-            serverUrl = "ws://182.254.168.75:8080/ws",
+            serverUrl = "ws://43.139.149.158:8080/ws",
             onMessage = { msg -> runOnUiThread { appendMessage(msg) } },
             onConnected = { runOnUiThread { binding.statusText.text = "已连接" } },
             onDisconnected = { runOnUiThread { binding.statusText.text = "未连接，点击重试" } }
