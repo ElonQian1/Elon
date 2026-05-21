@@ -196,6 +196,7 @@ class MainActivity : AppCompatActivity() {
             binding.backButton.visibility = View.GONE
             binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.addButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+            binding.moreButton.visibility = View.GONE
             binding.topTitleText.text = when (tab) {
                 binding.tabProject -> "项目"
                 binding.tabProfile -> "我的"
@@ -213,6 +214,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.addButton.setOnClickListener { showCreateConversationDialog() }
         binding.searchButton.setOnClickListener { updateFirstConversationStatus("搜索功能准备中 · 点击进入开发会话") }
+        binding.moreButton.setOnClickListener { showMoreActions() }
         binding.backButton.setOnClickListener { select(binding.tabChat) }
         select(binding.tabChat)
     }
@@ -227,6 +229,7 @@ class MainActivity : AppCompatActivity() {
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
+        binding.moreButton.visibility = View.VISIBLE
         binding.topTitleText.text = activeConversation().title
         binding.topTitleText.setOnLongClickListener {
             showConversationActions(activeConversationIndex)
@@ -731,8 +734,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupQuickActions() {
         binding.quickPlanButton.setOnClickListener {
-            binding.inputEdit.setText("我想开发一个 App，请先帮我拆解功能、页面和开发计划：")
-            binding.inputEdit.setSelection(binding.inputEdit.text.length)
+            fillPlanPrompt()
         }
         binding.quickContinueButton.setOnClickListener {
             sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。")
@@ -752,6 +754,27 @@ class MainActivity : AppCompatActivity() {
         binding.projectRecordButton.setOnClickListener { binding.tabProject.performClick() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
+    }
+
+    private fun showMoreActions() {
+        val actions = arrayOf("需求规划", "继续开发", "打包 APK", "项目记录", "AI 设置")
+        AlertDialog.Builder(this)
+            .setTitle("更多功能")
+            .setItems(actions) { _, which ->
+                when (actions[which]) {
+                    "需求规划" -> fillPlanPrompt()
+                    "继续开发" -> sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。")
+                    "打包 APK" -> sendQuickCommand("请编译当前项目并生成 APK 下载链接。")
+                    "项目记录" -> binding.tabProject.performClick()
+                    "AI 设置" -> openSettings()
+                }
+            }
+            .show()
+    }
+
+    private fun fillPlanPrompt() {
+        binding.inputEdit.setText("我想开发一个 App，请先帮我拆解功能、页面和开发计划：")
+        binding.inputEdit.setSelection(binding.inputEdit.text.length)
     }
 
     private fun sendQuickCommand(text: String) {

@@ -65,6 +65,21 @@
                 android:padding="9dp"
                 android:src="@drawable/ic_add_circle_simple"
                 app:tint="#D0D0D0" />
+
+            <TextView
+                android:id="@+id/moreButton"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="更多功能"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="⋯"
+                android:textColor="#D0D0D0"
+                android:textSize="28sp"
+                android:visibility="gone" />
         </FrameLayout>
     </androidx.appcompat.widget.Toolbar>
 
@@ -163,7 +178,8 @@
                 android:layout_height="54dp"
                 android:background="#101010"
                 android:overScrollMode="never"
-                android:scrollbars="none">
+                android:scrollbars="none"
+                android:visibility="gone">
 
                 <LinearLayout
                     android:layout_width="wrap_content"
