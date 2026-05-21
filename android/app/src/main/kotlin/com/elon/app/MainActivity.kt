@@ -3,10 +3,14 @@ package com.elon.app
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.text.TextUtils
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -23,10 +27,21 @@ class MainActivity : AppCompatActivity() {
     private var waitingForReply = false
     private var activeRequestIsDevelopment = false
     private val projectEvents = mutableListOf<String>()
+    private val conversations = mutableListOf<AppConversation>()
+    private val gson = com.google.gson.Gson()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
     private var currentProjectTitle = "等待你的第一个开发需求"
     private var currentStage = "待提交需求"
+    private var activeConversationIndex = 0
+
+    private data class AppConversation(
+        val id: String,
+        var title: String,
+        var subtitle: String,
+        var updatedAt: Long,
+        val messages: MutableList<ChatMessage>
+    )
 
     /** 每次安装 APP 生成的唯一用户 ID，存入 SharedPreferences 持久化 */
     private val userId: String by lazy {
@@ -40,13 +55,14 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        chatAdapter = ChatAdapter(mutableListOf())
-        binding.chatList.adapter = chatAdapter
         loadProjectState()
+        loadConversations()
+
+        chatAdapter = ChatAdapter(activeConversation().messages)
+        binding.chatList.adapter = chatAdapter
         setupNavigation()
         setupQuickActions()
         updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
-        appendMessage(ChatMessage("ai", "你可以直接描述想开发的 App 功能；我会把需求分析、开发实现、编译打包和交付记录同步到进度页。"))
 
         // 连接 WebSocket
         wsClient = ElonWsClient(
@@ -54,15 +70,13 @@ class MainActivity : AppCompatActivity() {
             onMessage = { msg -> runOnUiThread { appendMessage(msg) } },
             onConnected = {
                 runOnUiThread {
-                    binding.statusText.text = "已连接 · 点击进入开发会话"
-                    binding.statusText.setTextColor(Color.parseColor("#07C160"))
+                    updateFirstConversationStatus("已连接 · 点击进入开发会话")
                     if (!waitingForReply) setSendEnabled(true)
                 }
             },
             onDisconnected = {
                 runOnUiThread {
-                    binding.statusText.text = "未连接 · 点击重试"
-                    binding.statusText.setTextColor(Color.parseColor("#D93025"))
+                    updateFirstConversationStatus("未连接 · 点击重试")
                     if (waitingForReply) {
                         waitingForReply = false
                         appendMessage(ChatMessage("error", "连接已断开，请重试。"))
@@ -75,7 +89,7 @@ class MainActivity : AppCompatActivity() {
 
         // 重连按钮
         binding.statusText.setOnClickListener {
-            if (wsClient.isConnected()) showChat()
+            if (wsClient.isConnected()) openConversation(0)
             else wsClient.connect()
         }
 
@@ -97,8 +111,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!wsClient.isConnected()) {
             appendMessage(ChatMessage("error", "还没有连接到服务器，请点击上方状态栏重试。"))
-            binding.statusText.text = "未连接 · 点击重试"
-            binding.statusText.setTextColor(Color.parseColor("#D93025"))
+            updateFirstConversationStatus("未连接 · 点击重试")
             wsClient.connect()
             return
         }
@@ -137,7 +150,7 @@ class MainActivity : AppCompatActivity() {
         fun select(tab: TextView) {
             tabs.forEach {
                 it.setTextColor(Color.parseColor(if (it == tab) "#D0D0D0" else "#A5A5A5"))
-                it.textSize = if (it == tab) 18f else 17f
+                it.textSize = if (it == tab) 13f else 12f
             }
             binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.chatPage.visibility = View.GONE
@@ -158,9 +171,9 @@ class MainActivity : AppCompatActivity() {
         binding.tabChat.setOnClickListener { select(binding.tabChat) }
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
-        binding.conversationItem.setOnClickListener { showChat() }
-        binding.addButton.setOnClickListener { showChat() }
-        binding.searchButton.setOnClickListener { binding.statusText.text = "搜索功能准备中 · 点击进入开发会话" }
+        binding.conversationItem.setOnClickListener { openConversation(0) }
+        binding.addButton.setOnClickListener { addConversation() }
+        binding.searchButton.setOnClickListener { updateFirstConversationStatus("搜索功能准备中 · 点击进入开发会话") }
         binding.backButton.setOnClickListener { select(binding.tabChat) }
         select(binding.tabChat)
     }
@@ -175,7 +188,226 @@ class MainActivity : AppCompatActivity() {
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
-        binding.topTitleText.text = "一龙开发助手"
+        binding.topTitleText.text = activeConversation().title
+    }
+
+    private fun addConversation() {
+        val number = conversations.size + 1
+        conversations.add(
+            AppConversation(
+                id = UUID.randomUUID().toString(),
+                title = "新会话 $number",
+                subtitle = "点击进入开发会话",
+                updatedAt = System.currentTimeMillis(),
+                messages = mutableListOf(welcomeMessage())
+            )
+        )
+        saveConversations()
+        renderConversationList()
+    }
+
+    private fun openConversation(index: Int) {
+        if (conversations.isEmpty()) loadConversations()
+        activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
+        chatAdapter = ChatAdapter(activeConversation().messages)
+        binding.chatList.adapter = chatAdapter
+        showChat()
+        if (chatAdapter.itemCount > 0) {
+            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
+        }
+    }
+
+    private fun activeConversation(): AppConversation {
+        if (conversations.isEmpty()) {
+            conversations.add(createDefaultConversation())
+        }
+        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
+        return conversations[activeConversationIndex]
+    }
+
+    private fun createDefaultConversation(): AppConversation {
+        return AppConversation(
+            id = "default",
+            title = "一龙开发助手",
+            subtitle = "连接中...",
+            updatedAt = System.currentTimeMillis(),
+            messages = mutableListOf(welcomeMessage())
+        )
+    }
+
+    private fun welcomeMessage(): ChatMessage {
+        return ChatMessage(
+            "ai",
+            "你可以直接描述想开发的 App 功能；我会把需求分析、开发实现、编译打包和交付记录同步到进度页。"
+        )
+    }
+
+    private fun loadConversations() {
+        conversations.clear()
+        val saved = prefs.getString("conversations_json", null)
+        val loaded = runCatching {
+            if (saved.isNullOrBlank()) null
+            else gson.fromJson(saved, Array<AppConversation>::class.java)?.toMutableList()
+        }.getOrNull()
+
+        loaded.orEmpty()
+            .filter { it.title.isNotBlank() }
+            .forEach {
+                if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
+                conversations.add(it)
+            }
+
+        if (conversations.isEmpty()) {
+            conversations.add(createDefaultConversation())
+        }
+        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
+    }
+
+    private fun saveConversations() {
+        prefs.edit().putString("conversations_json", gson.toJson(conversations)).apply()
+    }
+
+    private fun updateFirstConversationStatus(text: String) {
+        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
+        conversations[0].subtitle = text
+        conversations[0].updatedAt = System.currentTimeMillis()
+        saveConversations()
+        renderConversationList()
+    }
+
+    private fun updateActiveConversationPreview(message: ChatMessage) {
+        val conversation = activeConversation()
+        conversation.updatedAt = System.currentTimeMillis()
+        when (message.role) {
+            "user" -> {
+                conversation.subtitle = summarize(message.content, 30)
+                if (conversation.title.startsWith("新会话")) {
+                    conversation.title = summarize(message.content, 12)
+                    binding.topTitleText.text = conversation.title
+                }
+            }
+            "ai", "ai-progress", "ai-tool", "error" -> {
+                conversation.subtitle = summarize(message.content, 30)
+            }
+        }
+        saveConversations()
+        renderConversationList()
+    }
+
+    private fun renderConversationList() {
+        if (conversations.isEmpty()) return
+
+        val first = conversations[0]
+        binding.projectStatusText.text = first.title
+        binding.statusText.text = first.subtitle
+        binding.statusText.setTextColor(conversationSubtitleColor(first.subtitle))
+        binding.conversationTimeText.text = timeFormatter.format(Date(first.updatedAt))
+
+        while (binding.conversationPage.childCount > 1) {
+            binding.conversationPage.removeViewAt(1)
+        }
+        for (index in 1 until conversations.size) {
+            binding.conversationPage.addView(createConversationRow(index, conversations[index]))
+        }
+    }
+
+    private fun createConversationRow(index: Int, conversation: AppConversation): View {
+        val row = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(72)
+            )
+            setBackgroundColor(Color.parseColor("#242424"))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), 0, dp(16), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { openConversation(index) }
+        }
+
+        row.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            setBackgroundResource(R.drawable.bg_mock_avatar)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            text = avatarText(conversation.title)
+            setTextColor(Color.parseColor("#333333"))
+            textSize = 19f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        })
+
+        val middle = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(12)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        middle.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = conversation.title
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 17f
+        })
+        middle.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(5)
+            }
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = conversation.subtitle
+            setTextColor(conversationSubtitleColor(conversation.subtitle))
+            textSize = 14f
+        })
+        row.addView(middle)
+
+        row.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP
+                marginStart = dp(8)
+                topMargin = dp(18)
+            }
+            includeFontPadding = false
+            text = timeFormatter.format(Date(conversation.updatedAt))
+            setTextColor(Color.parseColor("#C4C4C4"))
+            textSize = 13f
+        })
+        return row
+    }
+
+    private fun avatarText(title: String): String {
+        return if (title.startsWith("一龙")) "龙" else title.take(1).ifBlank { "新" }
+    }
+
+    private fun conversationSubtitleColor(text: String): Int {
+        return when {
+            text.startsWith("已连接") -> Color.parseColor("#07C160")
+            text.startsWith("未连接") -> Color.parseColor("#D93025")
+            else -> Color.parseColor("#A9A9A9")
+        }
+    }
+
+    private fun selectableForeground() = runCatching {
+        val outValue = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+        getDrawable(outValue.resourceId)
+    }.getOrNull()
+
+    private fun dp(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 
     private fun setupQuickActions() {
@@ -282,6 +514,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun appendMessage(msg: ChatMessage) {
         chatAdapter.addMessage(msg)
+        updateActiveConversationPreview(msg)
         binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
     }
 
@@ -335,6 +568,7 @@ class MainActivity : AppCompatActivity() {
             projectEvents.joinToString("\n")
         }
         updateStageLines()
+        renderConversationList()
     }
 
     private fun updateStageLines() {
@@ -415,6 +649,7 @@ class MainActivity : AppCompatActivity() {
         )
         return words.any { lower.contains(it) }
     }
+
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         return false
