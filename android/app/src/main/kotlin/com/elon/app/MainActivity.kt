@@ -97,26 +97,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun jsonStringOrNull(json: com.google.gson.JsonObject, name: String): String? {
+        val element = json.get(name) ?: return null
+        if (element.isJsonNull) return null
+        return runCatching { element.asString }.getOrNull()
+    }
+
     private fun appendMessage(raw: String) {
         // 解析服务端推送的 JSON 消息
         try {
             val json = com.google.gson.JsonParser.parseString(raw).asJsonObject
-            val type = json.get("type")?.asString ?: return
+            val type = jsonStringOrNull(json, "type") ?: return
             val msg = when (type) {
-                "progress"    -> ChatMessage("ai-progress", json.get("message")?.asString ?: "")
+                "progress"    -> ChatMessage("ai-progress", jsonStringOrNull(json, "message") ?: "")
                 "tool_call"   -> return // 内部工具调用不直接展示给用户
                 "tool_result" -> return // 不显示工具结果，减少噪音
                 "done"        -> {
                     waitingForReply = false
                     binding.sendButton.isEnabled = true
-                    val content = json.get("message")?.asString ?: ""
-                    val apkUrl  = json.get("apk_url")?.asString
+                    val content = jsonStringOrNull(json, "message") ?: ""
+                    val apkUrl  = jsonStringOrNull(json, "apk_url")
                     ChatMessage("ai", content + (apkUrl?.let { "\n\n📦 下载新APK: $it" } ?: ""))
                 }
                 "error" -> {
                     waitingForReply = false
                     binding.sendButton.isEnabled = true
-                    ChatMessage("error", "❌ ${json.get("message")?.asString}")
+                    ChatMessage("error", "❌ ${jsonStringOrNull(json, "message") ?: "未知错误"}")
                 }
                 else -> return
             }
