@@ -201,12 +201,6 @@ pub async fn run(
     }
 }
 
-fn is_standalone_image_request(message: &str) -> bool {
-    let image_words = ["壁纸", "图片", "照片", "头像", "插画", "海报", "卡通", "山水画", "生成图"];
-
-    image_words.iter().any(|word| message.contains(word))
-}
-
 fn looks_like_development_request(message: &str) -> bool {
     let lower = message.to_lowercase();
     let dev_words = [
@@ -218,36 +212,61 @@ fn looks_like_development_request(message: &str) -> bool {
     dev_words.iter().any(|word| lower.contains(word))
 }
 
-fn quick_chat_reply(message: &str) -> Option<String> {
-    let trimmed = message.trim();
-    let lower = trimmed.to_lowercase();
-    let is_development_request = looks_like_development_request(trimmed);
+fn casual_chat_prompt() -> &'static str {
+    r#"你是「一龙开发助手」，也是用户身边一个有经验、有温度的产品与开发搭档。
+用户可能只是闲聊、犹豫、没想好要做什么，或者想让你给灵感。
 
-    if trimmed.is_empty() {
-        return Some("我在。你可以直接描述想让 App 增加或修改什么功能。".into());
-    }
+你的回复要自然、有生命力，不要像客服模板，也不要一直重复“这里只能开发 App”。
+你可以正常聊天、共情、追问，也可以帮用户把模糊想法整理成 App 方向。
 
-    if is_standalone_image_request(trimmed) && !is_development_request {
-        return Some("我现在主要负责帮你开发和修改 Android APK，还没有接入直接生成手机壁纸图片的能力。你可以这样说：帮我做一个能生成卡通壁纸的 App 功能，或者帮我把应用首页改成卡通壁纸风格。".into());
-    }
-
-    if is_development_request {
-        return None;
-    }
-
-    let greeting_words = ["你好", "您好", "hello", "hi", "在吗", "在不在"];
-    if greeting_words.iter().any(|word| lower.contains(word)) {
-        return Some("我在。你直接说想让这个 App 改成什么样，我会帮你分析并执行。".into());
-    }
-
-    let thanks_words = ["谢谢", "感谢", "辛苦", "thanks"];
-    if thanks_words.iter().any(|word| lower.contains(word)) {
-        return Some("不客气。你继续发需求就行，我会按项目流程处理。".into());
-    }
-
-    Some("收到。这个入口主要用于开发和修改 Android App；如果你要改功能、页面或打包 APK，直接描述需求就可以。".into())
+重要边界：
+- 这一次是普通聊天模式，不能声称你已经修改代码、执行工具、打包 APK。
+- 如果用户还没想好，主动给 2-4 个具体方向，让用户容易继续说下去。
+- 如果用户明显想开始开发，引导他补充目标用户、核心功能、界面风格或优先级。
+- 回复以中文为主，简洁但有内容。"#
 }
 
+async fn resolve_agent(
+    state: &Arc<AppState>,
+    workspace: &std::path::Path,
+    agent_name: Option<&str>,
+) -> AgentConfig {
+    let global = state.agents_config.read().await;
+    match UserAgentConfig::load(workspace) {
+        Some(cfg) if cfg.has_config() => cfg.resolve(&global),
+        _ => global.get_agent(agent_name).clone(),
+    }
+}
+
+async fn run_casual_chat(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    user_message: &str,
+) -> Result<String> {
+    let messages = vec![
+        json!({
+            "role": "system",
+            "content": casual_chat_prompt()
+        }),
+        json!({
+            "role": "user",
+            "content": user_message
+        }),
+    ];
+
+    let response = call_chat_llm(state, agent, &messages).await?;
+    let reply = response["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("我在，你可以继续说。")
+        .trim()
+        .to_string();
+
+    Ok(if reply.is_empty() {
+        "我在，你可以继续说。".into()
+    } else {
+        reply
+    })
+}
 async fn run_inner(
     user_id: &str,
     user_message: &str,
@@ -258,22 +277,22 @@ async fn run_inner(
     // 每个用户操作自己的工作区，不能访问其他用户目录
     let workspace = state.get_user_workspace(user_id);
 
-    if let Some(reply) = quick_chat_reply(user_message) {
+    // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理。
+    // 普通聊天也要走模型，否则体验会像固定话术。
+    let agent = resolve_agent(state, &workspace, agent_name).await;
+
+    if !looks_like_development_request(user_message) {
+        let _ = tx.send(WsMessage::Progress {
+            message: format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model),
+        }.to_json());
+
+        let reply = run_casual_chat(state, &agent, user_message).await?;
         let _ = tx.send(WsMessage::Done {
             message: reply,
             apk_url: None,
         }.to_json());
         return Ok(());
     }
-
-    // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理
-    let agent: AgentConfig = {
-        let global = state.agents_config.read().await;
-        match UserAgentConfig::load(&workspace) {
-            Some(cfg) if cfg.has_config() => cfg.resolve(&global),
-            _ => global.get_agent(agent_name).clone(),
-        }
-    };
     // 确保用户工作区存在
     std::fs::create_dir_all(&workspace)?;
     // 初始化 git（如果还未初始化）
@@ -443,12 +462,79 @@ async fn call_llm(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await?;
-        return Err(anyhow::anyhow!("AI API 返回错误 {}: {}", status, text));
+        return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
     }
 
     Ok(resp.json::<Value>().await?)
 }
 
+
+async fn call_chat_llm(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+) -> Result<Value> {
+    let url = format!("{}/chat/completions", agent.api_base);
+
+    let body = json!({
+        "model": agent.model,
+        "messages": messages,
+        "stream": false,
+        "temperature": 0.8,
+        "max_tokens": 700,
+    });
+
+    let resp = state
+        .http_client
+        .post(&url)
+        .bearer_auth(&agent.api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| {
+            if e.is_timeout() {
+                anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
+            } else {
+                anyhow::anyhow!("AI 请求失败: {}", e)
+            }
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await?;
+        return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
+    }
+
+    Ok(resp.json::<Value>().await?)
+}
+
+fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {
+    let lower = body.to_lowercase();
+    if status.as_u16() == 402
+        || lower.contains("free_quota_exhausted")
+        || lower.contains("payment required")
+        || lower.contains("endpoint is inactive")
+    {
+        return "当前 AI 模型额度已用尽或接口不可用，请切换可用模型，或联系管理员补充额度后重试".into();
+    }
+    if status.as_u16() == 401 || lower.contains("unauthorized") || lower.contains("invalid api key") {
+        return "当前 AI 模型密钥无效或权限不足，请检查 AI 设置或切换可用模型".into();
+    }
+    if status.as_u16() == 429 || lower.contains("rate limit") || lower.contains("too many requests") {
+        return "当前 AI 模型请求过于频繁，请稍后重试或切换可用模型".into();
+    }
+    if status.as_u16() >= 500 {
+        return "AI 服务暂时不可用，请稍后重试".into();
+    }
+
+    let compact = body.lines().collect::<Vec<_>>().join(" ");
+    let visible = compact.chars().take(120).collect::<String>();
+    if visible.trim().is_empty() {
+        format!("AI 服务返回错误 {}", status)
+    } else {
+        format!("AI 服务返回错误 {}：{}", status, visible)
+    }
+}
 /// 根据工具名和参数，调用对应的工具函数
 fn execute_tool(
     _state: &Arc<AppState>,
