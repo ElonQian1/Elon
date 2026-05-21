@@ -431,7 +431,14 @@ async fn call_llm(
         .bearer_auth(&agent.api_key)
         .json(&body)
         .send()
-        .await?;
+        .await
+        .map_err(|e| {
+            if e.is_timeout() {
+                anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
+            } else {
+                anyhow::anyhow!("AI 请求失败: {}", e)
+            }
+        })?;
 
     if !resp.status().is_success() {
         let status = resp.status();

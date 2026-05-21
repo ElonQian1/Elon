@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 use tokio::sync::RwLock;
 
 /// 单个 AI 代理的配置
@@ -133,12 +133,17 @@ impl AppState {
         tracing::info!("用户工作区根目录: {}", project_root_str);
         tracing::info!("公开 URL: {}", public_url);
 
+        let http_client = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(120))
+            .build()?;
+
         Ok(Self {
             agents_config: RwLock::new(agents_config),
             project_root: std::path::PathBuf::from(&project_root_str),
             workspace_root: project_root_str,
             public_url,
-            http_client: reqwest::Client::new(),
+            http_client,
             admin_token,
             config_path,
         })

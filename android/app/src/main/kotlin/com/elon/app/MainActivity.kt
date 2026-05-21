@@ -13,6 +13,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var wsClient: ElonWsClient
+    private var waitingForReply = false
 
     /** 每次安装 APP 生成的唯一用户 ID，存入 SharedPreferences 持久化 */
     private val userId: String by lazy {
@@ -32,8 +33,22 @@ class MainActivity : AppCompatActivity() {
         wsClient = ElonWsClient(
             serverUrl = "ws://43.139.149.158:8080/ws",
             onMessage = { msg -> runOnUiThread { appendMessage(msg) } },
-            onConnected = { runOnUiThread { binding.statusText.text = "已连接" } },
-            onDisconnected = { runOnUiThread { binding.statusText.text = "未连接，点击重试" } }
+            onConnected = {
+                runOnUiThread {
+                    binding.statusText.text = "已连接"
+                    if (!waitingForReply) binding.sendButton.isEnabled = true
+                }
+            },
+            onDisconnected = {
+                runOnUiThread {
+                    binding.statusText.text = "未连接，点击重试"
+                    if (waitingForReply) {
+                        waitingForReply = false
+                        appendMessage(ChatMessage("error", "连接已断开，请重试。"))
+                    }
+                    binding.sendButton.isEnabled = true
+                }
+            }
         )
         wsClient.connect()
 
@@ -56,17 +71,30 @@ class MainActivity : AppCompatActivity() {
         val text = binding.inputEdit.text.toString().trim()
         if (text.isEmpty()) return
 
-        // 显示用户消息
-        appendMessage(ChatMessage(role = "user", content = text))
-        binding.inputEdit.text.clear()
-        binding.sendButton.isEnabled = false
+        if (!wsClient.isConnected()) {
+            appendMessage(ChatMessage("error", "还没有连接到服务器，请点击上方状态栏重试。"))
+            binding.statusText.text = "未连接，点击重试"
+            wsClient.connect()
+            return
+        }
 
-        // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
             addProperty("message", text)
         }
-        wsClient.send(payload.toString())
+
+        // 显示用户消息
+        appendMessage(ChatMessage(role = "user", content = text))
+        binding.inputEdit.text.clear()
+        binding.sendButton.isEnabled = false
+        waitingForReply = true
+
+        // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
+        if (!wsClient.send(payload.toString())) {
+            waitingForReply = false
+            binding.sendButton.isEnabled = true
+            appendMessage(ChatMessage("error", "消息发送失败，请检查网络后重试。"))
+        }
     }
 
     private fun appendMessage(raw: String) {
@@ -79,19 +107,25 @@ class MainActivity : AppCompatActivity() {
                 "tool_call"   -> return // 内部工具调用不直接展示给用户
                 "tool_result" -> return // 不显示工具结果，减少噪音
                 "done"        -> {
+                    waitingForReply = false
                     binding.sendButton.isEnabled = true
                     val content = json.get("message")?.asString ?: ""
                     val apkUrl  = json.get("apk_url")?.asString
                     ChatMessage("ai", content + (apkUrl?.let { "\n\n📦 下载新APK: $it" } ?: ""))
                 }
                 "error" -> {
+                    waitingForReply = false
                     binding.sendButton.isEnabled = true
                     ChatMessage("error", "❌ ${json.get("message")?.asString}")
                 }
                 else -> return
             }
             appendMessage(msg)
-        } catch (_: Exception) { }
+        } catch (_: Exception) {
+            waitingForReply = false
+            binding.sendButton.isEnabled = true
+            appendMessage(ChatMessage("error", "服务端返回异常，无法解析。"))
+        }
     }
 
     private fun appendMessage(msg: ChatMessage) {
