@@ -1,19 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 用户消息气泡（右对齐） -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:baselineAligned="false"
     android:gravity="end"
-    android:padding="4dp">
+    android:orientation="horizontal"
+    android:paddingStart="52dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="6dp">
 
     <TextView
         android:id="@+id/messageText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="48dp"
         android:background="@drawable/bg_bubble_user"
-        android:padding="12dp"
-        android:textColor="#FFFFFF"
+        android:lineSpacingExtra="2dp"
+        android:paddingStart="12dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="9dp"
+        android:textColor="#111111"
         android:textSize="15sp" />
+
+    <TextView
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_avatar_user"
+        android:gravity="center"
+        android:text="我"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
 </LinearLayout>

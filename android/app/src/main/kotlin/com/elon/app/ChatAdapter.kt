@@ -27,6 +27,7 @@ class ChatAdapter(private val messages: MutableList<ChatMessage>) :
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val layout = when (viewType) {
             0    -> R.layout.item_message_user
+            2    -> R.layout.item_message_progress
             3    -> R.layout.item_message_error
             else -> R.layout.item_message_ai
         }
