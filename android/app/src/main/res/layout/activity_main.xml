@@ -44,27 +44,27 @@
 
             <ImageButton
                 android:id="@+id/searchButton"
-                android:layout_width="48dp"
+                android:layout_width="44dp"
                 android:layout_height="match_parent"
                 android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="56dp"
+                android:layout_marginEnd="52dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="搜索"
-                android:padding="10dp"
+                android:padding="9dp"
                 android:src="@drawable/ic_search_simple"
-                app:tint="#D0D0D0" />
+                app:tint="#B8B8B8" />
 
             <ImageButton
                 android:id="@+id/addButton"
-                android:layout_width="48dp"
+                android:layout_width="44dp"
                 android:layout_height="match_parent"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="新增"
-                android:padding="9dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_add_circle_simple"
-                app:tint="#D0D0D0" />
+                app:tint="#B8B8B8" />
 
             <TextView
                 android:id="@+id/moreButton"
@@ -108,16 +108,12 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp">
 
-                <TextView
+                <ImageView
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:background="@drawable/bg_mock_avatar"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:text="龙"
-                    android:textColor="#333333"
-                    android:textSize="19sp"
-                    android:textStyle="bold" />
+                    android:contentDescription="@string/app_name"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_app_brand" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -252,6 +248,7 @@
             android:visibility="gone">
 
             <LinearLayout
+                android:id="@+id/projectContentLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
@@ -470,19 +467,19 @@
         <TextView
             android:id="@+id/tabChat"
             style="@style/MainTabText"
-            android:drawableTop="@drawable/ic_tab_square"
+            android:drawableTop="@drawable/ic_tab_chat_edit"
             android:text="会话" />
 
         <TextView
             android:id="@+id/tabProject"
             style="@style/MainTabText"
-            android:drawableTop="@drawable/ic_tab_square"
+            android:drawableTop="@drawable/ic_tab_project_stack"
             android:text="项目" />
 
         <TextView
             android:id="@+id/tabProfile"
             style="@style/MainTabText"
-            android:drawableTop="@drawable/ic_tab_square"
+            android:drawableTop="@drawable/ic_tab_profile_user"
             android:text="我的" />
     </LinearLayout>
 </LinearLayout>

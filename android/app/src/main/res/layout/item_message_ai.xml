@@ -10,15 +10,12 @@
     android:paddingEnd="52dp"
     android:paddingBottom="6dp">
 
-    <TextView
+    <ImageView
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:background="@drawable/bg_avatar_ai"
-        android:gravity="center"
-        android:text="龙"
-        android:textColor="#FFFFFF"
-        android:textSize="15sp"
-        android:textStyle="bold" />
+        android:contentDescription="@string/app_name"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_app_brand" />
 
     <TextView
         android:id="@+id/messageText"
@@ -31,7 +28,7 @@
         android:paddingTop="9dp"
         android:paddingEnd="12dp"
         android:paddingBottom="9dp"
-        android:textColor="#111111"
+        android:textColor="#F4F4F4"
         android:textSize="15sp" />
 
 </LinearLayout>

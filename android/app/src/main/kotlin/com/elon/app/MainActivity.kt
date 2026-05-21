@@ -1,7 +1,12 @@
 package com.elon.app
 
 import android.content.Intent
+import android.animation.ValueAnimator
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Matrix
+import android.graphics.Shader
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.text.TextUtils
@@ -10,11 +15,15 @@ import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -28,6 +37,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.sin
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,19 +46,38 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatAdapter: ChatAdapter
     private var waitingForReply = false
     private var activeRequestIsDevelopment = false
-    private val projectEvents = mutableListOf<String>()
-    private val conversations = mutableListOf<AppConversation>()
+    private val projects = mutableListOf<AppProject>()
     private val gson = com.google.gson.Gson()
     private val http = OkHttpClient()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
     private val serverUrl = "http://43.139.149.158:8080"
-    private var currentProjectTitle = "等待你的第一个开发需求"
-    private var currentStage = "待提交需求"
-    private var activeConversationIndex = 0
+    private var activeProjectIndex = 0
+    private val conversations: MutableList<AppConversation> get() = activeProject().conversations
+    private val projectEvents: MutableList<String> get() = activeProject().events
+    private var currentProjectTitle: String
+        get() = activeProject().title
+        set(value) {
+            activeProject().title = value
+            activeProject().updatedAt = System.currentTimeMillis()
+        }
+    private var currentStage: String
+        get() = activeProject().stage
+        set(value) {
+            activeProject().stage = value
+            activeProject().updatedAt = System.currentTimeMillis()
+        }
+    private var activeConversationIndex: Int
+        get() = activeProject().activeConversationIndex
+        set(value) {
+            activeProject().activeConversationIndex = value
+        }
     private var modelOptions: List<ModelOption> = emptyList()
     private var selectedAgentName: String? = null
     private var currentModelLabel = "默认"
+    private var stageHintAnimator: ValueAnimator? = null
+    private var stageHintShimmerToken = 0
+    private var exitConfirmDialog: AlertDialog? = null
 
     private data class AppConversation(
         val id: String,
@@ -57,6 +86,17 @@ class MainActivity : AppCompatActivity() {
         var updatedAt: Long,
         var ended: Boolean = false,
         val messages: MutableList<ChatMessage>
+    )
+
+    private data class AppProject(
+        val id: String,
+        var title: String,
+        var subtitle: String,
+        var updatedAt: Long,
+        var stage: String = "待提交需求",
+        var activeConversationIndex: Int = 0,
+        val events: MutableList<String> = mutableListOf(),
+        val conversations: MutableList<AppConversation> = mutableListOf()
     )
 
     private data class ModelOption(
@@ -76,13 +116,13 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        loadProjectState()
-        loadConversations()
+        loadProjects()
 
-        chatAdapter = ChatAdapter(activeConversation().messages)
+        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork)
         binding.chatList.adapter = chatAdapter
         setupNavigation()
         setupQuickActions()
+        setupBackHandling()
         updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
 
         // 连接 WebSocket
@@ -100,7 +140,12 @@ class MainActivity : AppCompatActivity() {
                     updateFirstConversationStatus("未连接 · 点击重试")
                     if (waitingForReply) {
                         waitingForReply = false
-                        appendMessage(ChatMessage("error", "连接已断开，请重试。"))
+                        val wasDevelopment = activeRequestIsDevelopment
+                        if (wasDevelopment) {
+                            updateStage("需要处理", "连接已断开，请重试。")
+                        }
+                        appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("连接已断开，请重试。", wasDevelopment)))
+                        activeRequestIsDevelopment = false
                     }
                     setSendEnabled(true)
                 }
@@ -152,6 +197,7 @@ class MainActivity : AppCompatActivity() {
 
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
+            addProperty("project_id", activeProject().id)
             addProperty("message", text)
             selectedAgentName?.let { addProperty("agent", it) }
         }
@@ -161,21 +207,46 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.text.clear()
         setSendEnabled(false)
         waitingForReply = true
-        activeRequestIsDevelopment = looksLikeDevelopmentRequest(text)
+        activeRequestIsDevelopment = looksLikeDevelopmentRequest(text) && !looksLikeDirectImageRequest(text)
         if (activeRequestIsDevelopment) {
-            currentProjectTitle = summarize(text, 24)
+            updateProjectTitleFromRequest(text)
             saveProjectTitle()
             addProjectEvent("提交需求：${summarize(text, 36)}")
             updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
         } else {
             updateProjectViews("普通消息已发送，开发项目记录保持不变。")
         }
+        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(activeRequestIsDevelopment)))
 
         // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
         if (!wsClient.send(payload.toString())) {
             waitingForReply = false
             setSendEnabled(true)
-            appendMessage(ChatMessage("error", "消息发送失败，请检查网络后重试。"))
+            val wasDevelopment = activeRequestIsDevelopment
+            if (wasDevelopment) {
+                updateStage("需要处理", "消息发送失败，请检查网络后重试。")
+            }
+            appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("消息发送失败，请检查网络后重试。", wasDevelopment)))
+            activeRequestIsDevelopment = false
+        }
+    }
+
+    private fun pauseCurrentWork() {
+        if (!waitingForReply) return
+        val wasDevelopment = activeRequestIsDevelopment
+        waitingForReply = false
+        activeRequestIsDevelopment = false
+        setSendEnabled(true)
+        if (wasDevelopment) {
+            updateStage("工作暂停", "你已暂停当前任务，可以调整需求后继续发送。")
+            addProjectEvent("暂停当前工作")
+        } else {
+            updateProjectViews("当前回复已暂停，你可以继续输入新的消息。")
+        }
+        appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("你已暂停当前工作。", wasDevelopment)))
+        if (::wsClient.isInitialized) {
+            wsClient.disconnect()
+            binding.root.postDelayed({ wsClient.connect() }, 500)
         }
     }
 
@@ -195,12 +266,21 @@ class MainActivity : AppCompatActivity() {
             binding.pageTabs.visibility = View.VISIBLE
             binding.backButton.visibility = View.GONE
             binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-            binding.addButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+            binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.moreButton.visibility = View.GONE
+            binding.addButton.setOnClickListener {
+                if (tab == binding.tabProject) showCreateProjectDialog() else showCreateConversationDialog()
+            }
+            binding.topTitleText.setOnLongClickListener(null)
             binding.topTitleText.text = when (tab) {
-                binding.tabProject -> "项目"
+                binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
-                else -> "会话区"
+                else -> compactProjectTitle()
+            }
+            if (tab == binding.tabProject) {
+                renderProjectList()
+            } else if (tab == binding.tabChat) {
+                renderConversationList()
             }
         }
 
@@ -212,11 +292,41 @@ class MainActivity : AppCompatActivity() {
             showConversationActions(0)
             true
         }
-        binding.addButton.setOnClickListener { showCreateConversationDialog() }
         binding.searchButton.setOnClickListener { updateFirstConversationStatus("搜索功能准备中 · 点击进入开发会话") }
         binding.moreButton.setOnClickListener { showMoreActions() }
-        binding.backButton.setOnClickListener { select(binding.tabChat) }
+        binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
+    }
+
+    private fun setupBackHandling() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                navigateBackOneLevel()
+            }
+        })
+    }
+
+    private fun navigateBackOneLevel() {
+        if (binding.chatPage.visibility == View.VISIBLE) {
+            showConversationHome()
+            return
+        }
+        showExitConfirmation()
+    }
+
+    private fun showConversationHome() {
+        binding.tabChat.performClick()
+    }
+
+    private fun showExitConfirmation() {
+        if (exitConfirmDialog?.isShowing == true) return
+        exitConfirmDialog = AlertDialog.Builder(this)
+            .setTitle("退出应用")
+            .setMessage("确定要退出一龙吗？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("退出") { _, _ -> finish() }
+            .create()
+        exitConfirmDialog?.show()
     }
 
     private fun showChat() {
@@ -262,6 +372,30 @@ class MainActivity : AppCompatActivity() {
         input.selectAll()
     }
 
+    private fun showCreateProjectDialog() {
+        val input = titleEditText("新项目 ${projects.size + 1}")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("新建项目")
+            .setView(input)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("创建", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val title = input.text.toString().trim()
+                if (title.isBlank()) {
+                    input.error = "请输入项目名称"
+                    return@setOnClickListener
+                }
+                createProject(title)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+        input.selectAll()
+    }
+
     private fun createConversation(title: String) {
         conversations.add(
             AppConversation(
@@ -272,8 +406,19 @@ class MainActivity : AppCompatActivity() {
                 messages = mutableListOf(welcomeMessage())
             )
         )
+        activeProject().updatedAt = System.currentTimeMillis()
+        activeProject().subtitle = "${conversations.size} 个会话"
         saveConversations()
         renderConversationList()
+    }
+
+    private fun createProject(title: String) {
+        projects.add(createProject(title, "新项目 · 点击进入会话"))
+        activeProjectIndex = projects.lastIndex
+        activeConversationIndex = 0
+        saveProjects()
+        renderProjectList()
+        binding.tabChat.performClick()
     }
 
     private fun showConversationActions(index: Int) {
@@ -345,6 +490,7 @@ class MainActivity : AppCompatActivity() {
         conversation.ended = true
         conversation.subtitle = "会话已结束"
         conversation.updatedAt = System.currentTimeMillis()
+        activeProject().updatedAt = conversation.updatedAt
         conversation.messages.add(ChatMessage("ai", "本会话已结束，可以在会话列表长按删除，或新建会话继续。"))
         saveConversations()
         renderConversationList()
@@ -372,6 +518,8 @@ class MainActivity : AppCompatActivity() {
         if (conversations.isEmpty()) {
             conversations.add(createDefaultConversation())
         }
+        activeProject().subtitle = "${conversations.size} 个会话"
+        activeProject().updatedAt = System.currentTimeMillis()
         activeConversationIndex = activeConversationIndex.coerceAtMost(conversations.lastIndex)
         saveConversations()
         renderConversationList()
@@ -521,14 +669,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openConversation(index: Int) {
-        if (conversations.isEmpty()) loadConversations()
+        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
-        chatAdapter = ChatAdapter(activeConversation().messages)
+        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork)
         binding.chatList.adapter = chatAdapter
         showChat()
         if (chatAdapter.itemCount > 0) {
             binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
+    }
+
+    private fun openProject(index: Int) {
+        if (index !in projects.indices) return
+        activeProjectIndex = index
+        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
+        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
+        saveProjects()
+        binding.tabChat.performClick()
+    }
+
+    private fun activeProject(): AppProject {
+        if (projects.isEmpty()) {
+            projects.add(createProject("一龙开发助手", "默认项目 · 点击进入会话"))
+        }
+        activeProjectIndex = activeProjectIndex.coerceIn(0, projects.lastIndex)
+        val project = projects[activeProjectIndex]
+        if (project.conversations.isEmpty()) project.conversations.add(createDefaultConversation())
+        project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
+        return project
     }
 
     private fun activeConversation(): AppConversation {
@@ -549,6 +717,16 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun createProject(title: String, subtitle: String): AppProject {
+        return AppProject(
+            id = UUID.randomUUID().toString(),
+            title = summarize(title, 24),
+            subtitle = subtitle,
+            updatedAt = System.currentTimeMillis(),
+            conversations = mutableListOf(createDefaultConversation())
+        )
+    }
+
     private fun welcomeMessage(): ChatMessage {
         return ChatMessage(
             "ai",
@@ -556,29 +734,70 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun loadConversations() {
-        conversations.clear()
-        val saved = prefs.getString("conversations_json", null)
-        val loaded = runCatching {
-            if (saved.isNullOrBlank()) null
-            else gson.fromJson(saved, Array<AppConversation>::class.java)?.toMutableList()
+    private fun loadProjects() {
+        projects.clear()
+        val savedProjects = prefs.getString("projects_json", null)
+        val loadedProjects = runCatching {
+            if (savedProjects.isNullOrBlank()) null
+            else gson.fromJson(savedProjects, Array<AppProject>::class.java)?.toMutableList()
         }.getOrNull()
 
-        loaded.orEmpty()
+        loadedProjects.orEmpty()
             .filter { it.title.isNotBlank() }
             .forEach {
-                if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
-                conversations.add(it)
+                normalizeProject(it)
+                projects.add(it)
             }
 
-        if (conversations.isEmpty()) {
-            conversations.add(createDefaultConversation())
+        if (projects.isEmpty()) {
+            projects.add(loadLegacyProject())
         }
-        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
+        activeProjectIndex = prefs.getInt("active_project_index", 0).coerceIn(0, projects.lastIndex)
+        activeProject()
     }
 
     private fun saveConversations() {
-        prefs.edit().putString("conversations_json", gson.toJson(conversations)).apply()
+        saveProjects()
+    }
+
+    private fun saveProjects() {
+        prefs.edit()
+            .putString("projects_json", gson.toJson(projects))
+            .putInt("active_project_index", activeProjectIndex)
+            .apply()
+    }
+
+    private fun normalizeProject(project: AppProject) {
+        if (project.conversations.isEmpty()) project.conversations.add(createDefaultConversation())
+        project.conversations.forEach {
+            if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
+        }
+        if (project.stage.isBlank()) project.stage = "待提交需求"
+        if (project.subtitle.isBlank()) project.subtitle = "点击进入会话"
+        project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
+    }
+
+    private fun loadLegacyProject(): AppProject {
+        val saved = prefs.getString("conversations_json", null)
+        val legacyConversations = runCatching {
+            if (saved.isNullOrBlank()) null
+            else gson.fromJson(saved, Array<AppConversation>::class.java)?.toMutableList()
+        }.getOrNull().orEmpty().filter { it.title.isNotBlank() }.toMutableList()
+        legacyConversations.forEach {
+            if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
+        }
+        if (legacyConversations.isEmpty()) legacyConversations.add(createDefaultConversation())
+
+        val savedEvents = prefs.getString("project_events", "").orEmpty()
+        val title = prefs.getString("project_title", null)?.takeIf { it.isNotBlank() } ?: "一龙开发助手"
+        return AppProject(
+            id = UUID.randomUUID().toString(),
+            title = summarize(title, 24),
+            subtitle = "默认项目 · ${legacyConversations.size} 个会话",
+            updatedAt = legacyConversations.maxOfOrNull { it.updatedAt } ?: System.currentTimeMillis(),
+            conversations = legacyConversations,
+            events = savedEvents.lines().filter { it.isNotBlank() }.toMutableList()
+        )
     }
 
     private fun updateFirstConversationStatus(text: String) {
@@ -592,27 +811,35 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateActiveConversationPreview(message: ChatMessage) {
         val conversation = activeConversation()
+        val project = activeProject()
         conversation.updatedAt = System.currentTimeMillis()
+        project.updatedAt = conversation.updatedAt
         when (message.role) {
             "user" -> {
                 conversation.subtitle = summarize(message.content, 30)
+                project.subtitle = summarize(message.content, 34)
                 if (conversation.title.startsWith("新会话")) {
                     conversation.title = summarize(message.content, 12)
                     binding.topTitleText.text = conversation.title
                 }
             }
-            "ai", "ai-progress", "ai-tool", "error" -> {
+            "ai", "ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped", "error" -> {
                 if (!conversation.ended) {
                     conversation.subtitle = summarize(message.content, 30)
+                    project.subtitle = summarize(message.content, 34)
                 }
             }
         }
         saveConversations()
         renderConversationList()
+        if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
     }
 
     private fun renderConversationList() {
         if (conversations.isEmpty()) return
+        if (binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE) {
+            binding.topTitleText.text = compactProjectTitle()
+        }
 
         val first = conversations[0]
         binding.projectStatusText.text = first.title
@@ -624,8 +851,201 @@ class MainActivity : AppCompatActivity() {
             binding.conversationPage.removeViewAt(1)
         }
         for (index in 1 until conversations.size) {
+            binding.conversationPage.addView(createConversationDivider())
             binding.conversationPage.addView(createConversationRow(index, conversations[index]))
         }
+    }
+
+    private fun renderProjectList() {
+        val container = binding.projectContentLayout
+        container.removeAllViews()
+
+        container.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52)
+            ).apply {
+                bottomMargin = dp(8)
+            }
+            setBackgroundColor(Color.parseColor("#202020"))
+            gravity = Gravity.CENTER_VERTICAL
+            text = "＋ 新建项目"
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 15f
+            setPadding(dp(20), 0, dp(20), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { showCreateProjectDialog() }
+        })
+
+        projects.forEachIndexed { index, project ->
+            container.addView(createProjectRow(index, project))
+        }
+    }
+
+    private fun createProjectRow(index: Int, project: AppProject): View {
+        val wrapper = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(76)
+            ).apply {
+                topMargin = if (index == 0) 0 else 1
+            }
+        }
+
+        val row = LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(Color.parseColor(if (index == activeProjectIndex) "#292929" else "#202020"))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { openProject(index) }
+            setOnLongClickListener {
+                showProjectActions(index)
+                true
+            }
+        }
+
+        row.addView(createAvatarView(project.title, 44, 18f))
+
+        val middle = LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(12)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        middle.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = project.title
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 16f
+        })
+        middle.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(5)
+            }
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = "${project.conversations.size} 个会话 · ${project.stage}"
+            setTextColor(Color.parseColor("#A9A9A9"))
+            textSize = 13f
+        })
+        row.addView(middle)
+
+        row.addView(TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP
+                marginStart = dp(8)
+                topMargin = dp(17)
+            }
+            includeFontPadding = false
+            text = timeFormatter.format(Date(project.updatedAt))
+            setTextColor(Color.parseColor("#C4C4C4"))
+            textSize = 13f
+        })
+        wrapper.addView(row)
+
+        if (index == activeProjectIndex) {
+            wrapper.addView(View(this).apply {
+                layoutParams = FrameLayout.LayoutParams(dp(8), dp(8)).apply {
+                    gravity = Gravity.START or Gravity.TOP
+                    leftMargin = dp(10)
+                    topMargin = dp(10)
+                }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#FF4D4F"))
+                }
+            })
+        }
+
+        return wrapper
+    }
+
+    private fun showProjectActions(index: Int) {
+        if (index !in projects.indices) return
+        val project = projects[index]
+        val actions = if (projects.size <= 1) {
+            arrayOf("编辑项目名称")
+        } else {
+            arrayOf("编辑项目名称", "删除项目")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(project.title)
+            .setItems(actions) { _, which ->
+                when (actions[which]) {
+                    "编辑项目名称" -> showRenameProjectDialog(index)
+                    "删除项目" -> confirmDeleteProject(index)
+                }
+            }
+            .show()
+    }
+
+    private fun showRenameProjectDialog(index: Int) {
+        if (index !in projects.indices) return
+        val project = projects[index]
+        val input = titleEditText(project.title)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("编辑项目名称")
+            .setView(input)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val title = input.text.toString().trim()
+                if (title.isBlank()) {
+                    input.error = "请输入项目名称"
+                    return@setOnClickListener
+                }
+                project.title = summarize(title, 24)
+                project.updatedAt = System.currentTimeMillis()
+                saveProjects()
+                renderProjectList()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+        input.selectAll()
+    }
+
+    private fun confirmDeleteProject(index: Int) {
+        if (index !in projects.indices || projects.size <= 1) return
+        AlertDialog.Builder(this)
+            .setTitle("删除项目")
+            .setMessage("删除后这个项目下的会话和进度记录会从本机移除。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("删除") { _, _ -> deleteProject(index) }
+            .show()
+    }
+
+    private fun deleteProject(index: Int) {
+        if (index !in projects.indices || projects.size <= 1) return
+        projects.removeAt(index)
+        activeProjectIndex = activeProjectIndex.coerceAtMost(projects.lastIndex)
+        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
+        saveProjects()
+        renderProjectList()
     }
 
     private fun createConversationRow(index: Int, conversation: AppConversation): View {
@@ -647,16 +1067,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        row.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
-            setBackgroundResource(R.drawable.bg_mock_avatar)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = avatarText(conversation.title)
-            setTextColor(Color.parseColor("#333333"))
-            textSize = 19f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        })
+        row.addView(createAvatarView(conversation.title, 48, 19f))
 
         val middle = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -709,6 +1120,41 @@ class MainActivity : AppCompatActivity() {
         return row
     }
 
+    private fun createConversationDivider(): View {
+        return View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1
+            ).apply {
+                marginStart = dp(76)
+            }
+            setBackgroundColor(Color.parseColor("#343434"))
+        }
+    }
+
+    private fun createAvatarView(title: String, sizeDp: Int, textSizeSp: Float): View {
+        val size = dp(sizeDp)
+        if (title.startsWith(getString(R.string.app_name))) {
+            return ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(size, size)
+                contentDescription = getString(R.string.app_name)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setImageResource(R.drawable.ic_app_brand)
+            }
+        }
+
+        return TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            setBackgroundResource(R.drawable.bg_mock_avatar)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            text = avatarText(title)
+            setTextColor(Color.parseColor("#333333"))
+            textSize = textSizeSp
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+    }
+
     private fun avatarText(title: String): String {
         return if (title.startsWith("一龙")) "龙" else title.take(1).ifBlank { "新" }
     }
@@ -717,6 +1163,8 @@ class MainActivity : AppCompatActivity() {
         return when {
             text.startsWith("已连接") -> Color.parseColor("#07C160")
             text.startsWith("未连接") -> Color.parseColor("#D93025")
+            text.startsWith("工作完成") -> Color.parseColor("#07C160")
+            text.startsWith("工作停止") -> Color.parseColor("#D93025")
             text.startsWith("会话已结束") -> Color.parseColor("#6E6E6E")
             else -> Color.parseColor("#A9A9A9")
         }
@@ -742,7 +1190,7 @@ class MainActivity : AppCompatActivity() {
         binding.quickBuildButton.setOnClickListener {
             sendQuickCommand("请编译当前项目并生成 APK 下载链接。")
         }
-        binding.quickHistoryButton.setOnClickListener { binding.tabProject.performClick() }
+        binding.quickHistoryButton.setOnClickListener { showProjectRecordDialog() }
         binding.quickSettingsButton.setOnClickListener { openSettings() }
 
         binding.projectContinueButton.setOnClickListener {
@@ -751,7 +1199,7 @@ class MainActivity : AppCompatActivity() {
         binding.projectBuildButton.setOnClickListener {
             sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。")
         }
-        binding.projectRecordButton.setOnClickListener { binding.tabProject.performClick() }
+        binding.projectRecordButton.setOnClickListener { showProjectRecordDialog() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
     }
@@ -765,10 +1213,23 @@ class MainActivity : AppCompatActivity() {
                     "需求规划" -> fillPlanPrompt()
                     "继续开发" -> sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。")
                     "打包 APK" -> sendQuickCommand("请编译当前项目并生成 APK 下载链接。")
-                    "项目记录" -> binding.tabProject.performClick()
+                    "项目记录" -> showProjectRecordDialog()
                     "AI 设置" -> openSettings()
                 }
             }
+            .show()
+    }
+
+    private fun showProjectRecordDialog() {
+        val recent = if (projectEvents.isEmpty()) {
+            "暂无进度记录"
+        } else {
+            projectEvents.take(12).joinToString("\n")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("${currentProjectTitle} · 项目记录")
+            .setMessage("阶段：$currentStage\n会话：${conversations.size} 个\n\n$recent")
+            .setPositiveButton("知道了", null)
             .show()
     }
 
@@ -798,6 +1259,84 @@ class MainActivity : AppCompatActivity() {
         return runCatching { element.asString }.getOrNull()
     }
 
+    private fun initialWorkflowMessage(isDevelopment: Boolean): String {
+        return if (isDevelopment) {
+            "我先看当前项目状态和相关代码，确认从哪里继续。"
+        } else {
+            "我收到消息了，正在整理回复。"
+        }
+    }
+
+    private fun workflowProgressMessage(content: String): String {
+        val progress = content.ifBlank { "正在推进当前任务。" }
+        return "正在处理：$progress\n下一步：${nextWorkflowHint(currentStage)}"
+    }
+
+    private fun toolCallWorkflowMessage(tool: String): String {
+        return "正在执行：${toolLabel(tool)}\n${toolWorkflowDoing(tool)}\n下一步：${toolWorkflowHint(tool)}"
+    }
+
+    private fun toolResultWorkflowMessage(tool: String): String {
+        return "${toolLabel(tool)}已完成，正在判断是否还需要继续修改或验证。"
+    }
+
+    private fun finalReplyMessage(content: String, apkUrl: String?, imageUrl: String?, wasDevelopment: Boolean): String {
+        val main = content.trim().ifBlank {
+            if (wasDevelopment) "本轮开发任务已完成。" else "回复已完成。"
+        }
+        return buildString {
+            append(main)
+            apkUrl?.let { append("\n\n下载新 APK：$it") }
+            imageUrl?.takeIf { !main.contains(it) }?.let { append("\n\n图片链接：$it") }
+        }
+    }
+
+    private fun workflowStoppedMessage(reason: String, wasDevelopment: Boolean = activeRequestIsDevelopment): String {
+        val stage = if (wasDevelopment) "需要处理" else "回复中断"
+        return "工作停止：$stage\n原因：$reason\n可以重试，或调整需求后再发送。"
+    }
+
+    private fun friendlyErrorMessage(raw: String): String {
+        val nestedMessage = nestedApiErrorMessage(raw)
+        val source = listOf(raw, nestedMessage).joinToString(" ").lowercase(Locale.CHINA)
+        return when {
+            source.contains("free_quota_exhausted") ||
+                source.contains("payment required") ||
+                source.contains("endpoint is inactive") ->
+                "当前选择的 AI 模型额度已用尽或接口不可用。请点右下角模型按钮切换可用模型，或联系管理员补充额度后重试。"
+            source.contains("unauthorized") ||
+                source.contains("invalid api key") ||
+                source.contains("api key") && source.contains("invalid") ->
+                "当前 AI 模型密钥无效或权限不足。请在 AI 设置里检查密钥，或切换到可用模型。"
+            source.contains("rate limit") ||
+                source.contains("too many requests") ||
+                source.contains("429") ->
+                "当前 AI 模型请求过于频繁。请稍后重试，或切换到其他可用模型。"
+            source.contains("timeout") || source.contains("超时") ->
+                "AI 请求超时了。请检查网络或稍后重试。"
+            source.contains("connection") || source.contains("network") ->
+                "连接 AI 服务失败。请检查网络、代理地址或稍后重试。"
+            nestedMessage.isNotBlank() ->
+                summarize(nestedMessage, 90)
+            raw.isBlank() ->
+                "AI 服务暂时不可用，请稍后重试。"
+            else ->
+                summarize(raw.replace(Regex("\\{.*"), "").trim().ifBlank { raw }, 90)
+        }
+    }
+
+    private fun nestedApiErrorMessage(raw: String): String {
+        val jsonStart = raw.indexOf('{')
+        if (jsonStart < 0) return ""
+        return runCatching {
+            val root = JSONObject(raw.substring(jsonStart))
+            val error = root.optJSONObject("error")
+            error?.optString("message").orEmpty().ifBlank {
+                root.optString("message").orEmpty()
+            }
+        }.getOrDefault("")
+    }
+
     private fun appendMessage(raw: String) {
         // 解析服务端推送的 JSON 消息
         try {
@@ -807,15 +1346,19 @@ class MainActivity : AppCompatActivity() {
                 "progress"    -> {
                     val content = jsonStringOrNull(json, "message") ?: ""
                     handleProgress(content)
-                    ChatMessage("ai-progress", "进度：$content")
+                    ChatMessage("ai-progress", workflowProgressMessage(content))
                 }
                 "tool_call"   -> {
-                    handleToolCall(jsonStringOrNull(json, "tool") ?: "工具")
+                    val tool = jsonStringOrNull(json, "tool") ?: "工具"
+                    handleToolCall(tool)
+                    appendMessage(ChatMessage("ai-tool", toolCallWorkflowMessage(tool)))
                     return
                 }
                 "tool_result" -> {
                     val tool = jsonStringOrNull(json, "tool") ?: "工具"
+                    updateStage(currentStage, "${toolLabel(tool)} 已完成，正在判断下一步。")
                     addProjectEvent("工具完成：${toolLabel(tool)}")
+                    appendMessage(ChatMessage("ai-progress", toolResultWorkflowMessage(tool)))
                     return
                 }
                 "done"        -> {
@@ -823,25 +1366,28 @@ class MainActivity : AppCompatActivity() {
                     setSendEnabled(true)
                     val content = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl  = jsonStringOrNull(json, "apk_url")
-                    if (activeRequestIsDevelopment) {
+                    val imageUrl = jsonStringOrNull(json, "image_url")
+                    val wasDevelopment = activeRequestIsDevelopment
+                    if (wasDevelopment) {
                         updateStage("交付完成", if (apkUrl != null) "APK 已生成，可以下载安装测试。" else "任务已完成，可以继续提出修改。")
                         addProjectEvent(if (apkUrl != null) "生成 APK 下载链接" else "任务完成")
                     } else {
                         updateProjectViews("普通消息已回复，开发项目记录保持不变。")
                     }
                     activeRequestIsDevelopment = false
-                    ChatMessage("ai", content + (apkUrl?.let { "\n\n下载新 APK：$it" } ?: ""))
+                    ChatMessage("ai", finalReplyMessage(content, apkUrl, imageUrl, wasDevelopment))
                 }
                 "error" -> {
                     waitingForReply = false
                     setSendEnabled(true)
-                    val error = jsonStringOrNull(json, "message") ?: "未知错误"
-                    if (activeRequestIsDevelopment) {
-                        updateStage("需要处理", "开发过程中遇到问题，请根据提示重试或调整需求。")
+                    val error = friendlyErrorMessage(jsonStringOrNull(json, "message") ?: "未知错误")
+                    val wasDevelopment = activeRequestIsDevelopment
+                    if (wasDevelopment) {
+                        updateStage("需要处理", error)
                         addProjectEvent("发生错误：${summarize(error, 30)}")
                     }
                     activeRequestIsDevelopment = false
-                    ChatMessage("error", "错误：$error")
+                    ChatMessage("error", error)
                 }
                 else -> return
             }
@@ -853,6 +1399,7 @@ class MainActivity : AppCompatActivity() {
                 updateStage("需要处理", "服务端返回内容无法识别。")
                 addProjectEvent("服务端返回异常")
             }
+            appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("服务端返回内容无法识别。")))
             activeRequestIsDevelopment = false
             appendMessage(ChatMessage("error", "服务端返回异常，无法解析。"))
         }
@@ -885,8 +1432,117 @@ class MainActivity : AppCompatActivity() {
         addProjectEvent("执行工具：${toolLabel(tool)}")
     }
 
+    private fun nextWorkflowHint(stage: String): String {
+        return when (stage) {
+            "需求分析" -> "定位相关文件。"
+            "开发实现" -> "继续修改并检查结果。"
+            "编译打包" -> "等待编译结果。"
+            "交付完成" -> "整理最终结果。"
+            "需要处理" -> "根据错误判断是否可修复。"
+            else -> "等待下一步结果。"
+        }
+    }
+
+    private fun toolWorkflowDoing(tool: String): String {
+        return when (tool) {
+            "init_project" -> "准备项目结构。"
+            "read_file" -> "读取相关代码，避免凭空修改。"
+            "write_file" -> "写入已确认的改动。"
+            "list_dir" -> "查看目录，确认文件位置。"
+            "run_shell" -> "运行命令获取真实结果。"
+            "git_commit" -> "保存当前版本。"
+            "build_project" -> "编译项目并准备 APK。"
+            else -> "推进当前任务。"
+        }
+    }
+
+    private fun toolWorkflowHint(tool: String): String {
+        return when (tool) {
+            "init_project" -> "开始写入代码。"
+            "read_file", "list_dir" -> "判断修改位置。"
+            "write_file" -> "检查是否需要补充。"
+            "run_shell" -> "读取输出并决定下一步。"
+            "git_commit" -> "准备交付结果。"
+            "build_project" -> "生成下载链接。"
+            else -> "继续推进。"
+        }
+    }
+
+    private fun updateStageHintShimmer() {
+        if (waitingForReply && binding.chatPage.visibility == View.VISIBLE) {
+            startStageHintShimmer()
+        } else {
+            stopStageHintShimmer()
+        }
+    }
+
+    private fun startStageHintShimmer() {
+        stageHintShimmerToken += 1
+        val token = stageHintShimmerToken
+        stageHintAnimator?.cancel()
+        stageHintAnimator = null
+
+        val text = binding.stageHintText
+        text.paint.shader = null
+        text.alpha = 1f
+        text.post {
+            if (token != stageHintShimmerToken || !waitingForReply || binding.chatPage.visibility != View.VISIBLE) {
+                return@post
+            }
+            val width = text.width.coerceAtLeast(text.measuredWidth)
+            if (width <= 0) return@post
+
+            val shader = LinearGradient(
+                0f,
+                0f,
+                width.toFloat(),
+                0f,
+                intArrayOf(
+                    Color.parseColor("#9A9A9A"),
+                    Color.parseColor("#CFCFCF"),
+                    Color.parseColor("#F6F6F6"),
+                    Color.parseColor("#D8D8D8"),
+                    Color.parseColor("#9A9A9A")
+                ),
+                floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            val matrix = Matrix()
+            text.paint.shader = shader
+
+            stageHintAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 1350L
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART
+                interpolator = LinearInterpolator()
+                addUpdateListener { animator ->
+                    val fraction = animator.animatedFraction
+                    matrix.setTranslate(width * (fraction * 2f - 1f), 0f)
+                    shader.setLocalMatrix(matrix)
+                    text.alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
+                    text.invalidate()
+                }
+                start()
+            }
+        }
+    }
+
+    private fun stopStageHintShimmer() {
+        stageHintShimmerToken += 1
+        stageHintAnimator?.cancel()
+        stageHintAnimator = null
+        if (::binding.isInitialized) {
+            binding.stageHintText.paint.shader = null
+            binding.stageHintText.alpha = 1f
+            binding.stageHintText.setTextColor(Color.parseColor("#B8B8B8"))
+            binding.stageHintText.invalidate()
+        }
+    }
+
     private fun updateStage(stage: String, hint: String) {
         currentStage = stage
+        activeProject().subtitle = hint
+        saveProjects()
         updateProjectViews(hint)
     }
 
@@ -915,6 +1571,10 @@ class MainActivity : AppCompatActivity() {
         }
         updateStageLines()
         renderConversationList()
+        if (binding.projectPage.visibility == View.VISIBLE) {
+            renderProjectList()
+        }
+        updateStageHintShimmer()
     }
 
     private fun updateStageLines() {
@@ -942,26 +1602,32 @@ class MainActivity : AppCompatActivity() {
         return "$index. $label：$state"
     }
 
+    private fun compactProjectTitle(): String {
+        return currentProjectTitle.trim().ifBlank { getString(R.string.app_name) }.take(6)
+    }
+
     private fun addProjectEvent(text: String) {
         val line = "${timeFormatter.format(Date())}  $text"
         projectEvents.add(0, line)
         while (projectEvents.size > 40) projectEvents.removeAt(projectEvents.size - 1)
-        prefs.edit().putString("project_events", projectEvents.joinToString("\n")).apply()
+        activeProject().updatedAt = System.currentTimeMillis()
+        saveProjects()
         updateProjectViews(binding.stageHintText.text.toString())
     }
 
-    private fun loadProjectState() {
-        currentProjectTitle = prefs.getString("project_title", currentProjectTitle) ?: currentProjectTitle
-        if (!looksLikeDevelopmentRequest(currentProjectTitle)) {
-            currentProjectTitle = "等待你的第一个开发需求"
-        }
-        val saved = prefs.getString("project_events", "").orEmpty()
-        projectEvents.clear()
-        saved.lines().filter { it.isNotBlank() }.forEach { projectEvents.add(it) }
+    private fun saveProjectTitle() {
+        saveProjects()
     }
 
-    private fun saveProjectTitle() {
-        prefs.edit().putString("project_title", currentProjectTitle).apply()
+    private fun updateProjectTitleFromRequest(text: String) {
+        val project = activeProject()
+        val shouldAutoName = project.title.startsWith("新项目") ||
+            project.title == "一龙开发助手" ||
+            project.title == "等待你的第一个开发需求"
+        if (shouldAutoName) {
+            currentProjectTitle = summarize(text, 24)
+        }
+        project.subtitle = summarize(text, 34)
     }
 
     private fun setSendEnabled(enabled: Boolean) {
@@ -971,6 +1637,7 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.hint = if (conversationEnded) "会话已结束，请新建会话继续" else "描述你想开发的 App 功能"
         binding.sendButton.isEnabled = canSend
         binding.sendButton.alpha = if (canSend) 1f else 0.55f
+        updateStageHintShimmer()
     }
 
     private fun summarize(text: String, maxLength: Int): String {
@@ -1000,6 +1667,19 @@ class MainActivity : AppCompatActivity() {
         return words.any { lower.contains(it) }
     }
 
+    private fun looksLikeDirectImageRequest(text: String): Boolean {
+        val lower = text.lowercase(Locale.CHINA)
+        val appWords = listOf(
+            "app", "apk", "android", "应用", "功能", "页面", "界面", "按钮", "代码", "开发",
+            "修改", "添加", "新增", "编译", "打包", "安装", "发布", "登录", "注册", "首页",
+            "设置", "接口", "后端", "服务端", "数据库", "项目"
+        )
+        if (appWords.any { lower.contains(it) }) return false
+
+        val imageWords = listOf("文生图", "生图", "生成图", "图像", "图片", "壁纸", "照片", "头像", "插画", "海报", "卡通", "山水画")
+        val intentWords = listOf("文生图", "生图", "生成", "画", "绘制", "做一张", "来一张", "出一张", "创作")
+        return imageWords.any { lower.contains(it) } && intentWords.any { lower.contains(it) }
+    }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         return false
@@ -1014,7 +1694,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        stopStageHintShimmer()
         wsClient.disconnect()
+        super.onDestroy()
     }
 }
