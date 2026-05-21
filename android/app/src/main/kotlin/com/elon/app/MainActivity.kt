@@ -39,7 +39,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setSupportActionBar(binding.toolbar)
 
         chatAdapter = ChatAdapter(mutableListOf())
         binding.chatList.adapter = chatAdapter
@@ -55,14 +54,14 @@ class MainActivity : AppCompatActivity() {
             onMessage = { msg -> runOnUiThread { appendMessage(msg) } },
             onConnected = {
                 runOnUiThread {
-                    binding.statusText.text = "已连接"
+                    binding.statusText.text = "已连接 · 点击进入开发会话"
                     binding.statusText.setTextColor(Color.parseColor("#07C160"))
                     if (!waitingForReply) setSendEnabled(true)
                 }
             },
             onDisconnected = {
                 runOnUiThread {
-                    binding.statusText.text = "未连接，点击重试"
+                    binding.statusText.text = "未连接 · 点击重试"
                     binding.statusText.setTextColor(Color.parseColor("#D93025"))
                     if (waitingForReply) {
                         waitingForReply = false
@@ -75,7 +74,10 @@ class MainActivity : AppCompatActivity() {
         wsClient.connect()
 
         // 重连按钮
-        binding.statusText.setOnClickListener { wsClient.connect() }
+        binding.statusText.setOnClickListener {
+            if (wsClient.isConnected()) showChat()
+            else wsClient.connect()
+        }
 
         // 发送按钮
         binding.sendButton.setOnClickListener { sendMessage() }
@@ -95,7 +97,7 @@ class MainActivity : AppCompatActivity() {
 
         if (!wsClient.isConnected()) {
             appendMessage(ChatMessage("error", "还没有连接到服务器，请点击上方状态栏重试。"))
-            binding.statusText.text = "未连接，点击重试"
+            binding.statusText.text = "未连接 · 点击重试"
             binding.statusText.setTextColor(Color.parseColor("#D93025"))
             wsClient.connect()
             return
@@ -130,24 +132,50 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProgress, binding.tabProject, binding.tabProfile)
+        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
 
         fun select(tab: TextView) {
             tabs.forEach {
-                it.setTextColor(Color.parseColor(if (it == tab) "#07C160" else "#555555"))
-                it.textSize = if (it == tab) 16f else 15f
+                it.setTextColor(Color.parseColor(if (it == tab) "#D0D0D0" else "#A5A5A5"))
+                it.textSize = if (it == tab) 18f else 17f
             }
-            binding.chatPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-            binding.progressPage.visibility = if (tab == binding.tabProgress) View.VISIBLE else View.GONE
+            binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+            binding.chatPage.visibility = View.GONE
             binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
+            binding.inputLayout.visibility = View.GONE
+            binding.pageTabs.visibility = View.VISIBLE
+            binding.backButton.visibility = View.GONE
+            binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+            binding.addButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+            binding.topTitleText.text = when (tab) {
+                binding.tabProject -> "项目"
+                binding.tabProfile -> "我的"
+                else -> "会话区"
+            }
         }
 
         binding.tabChat.setOnClickListener { select(binding.tabChat) }
-        binding.tabProgress.setOnClickListener { select(binding.tabProgress) }
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
+        binding.conversationItem.setOnClickListener { showChat() }
+        binding.addButton.setOnClickListener { showChat() }
+        binding.searchButton.setOnClickListener { binding.statusText.text = "搜索功能准备中 · 点击进入开发会话" }
+        binding.backButton.setOnClickListener { select(binding.tabChat) }
         select(binding.tabChat)
+    }
+
+    private fun showChat() {
+        binding.conversationPage.visibility = View.GONE
+        binding.chatPage.visibility = View.VISIBLE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.inputLayout.visibility = View.VISIBLE
+        binding.pageTabs.visibility = View.GONE
+        binding.backButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.GONE
+        binding.topTitleText.text = "一龙开发助手"
     }
 
     private fun setupQuickActions() {
@@ -161,7 +189,7 @@ class MainActivity : AppCompatActivity() {
         binding.quickBuildButton.setOnClickListener {
             sendQuickCommand("请编译当前项目并生成 APK 下载链接。")
         }
-        binding.quickHistoryButton.setOnClickListener { binding.tabProgress.performClick() }
+        binding.quickHistoryButton.setOnClickListener { binding.tabProject.performClick() }
         binding.quickSettingsButton.setOnClickListener { openSettings() }
 
         binding.projectContinueButton.setOnClickListener {
@@ -170,13 +198,13 @@ class MainActivity : AppCompatActivity() {
         binding.projectBuildButton.setOnClickListener {
             sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。")
         }
-        binding.projectRecordButton.setOnClickListener { binding.tabProgress.performClick() }
+        binding.projectRecordButton.setOnClickListener { binding.tabProject.performClick() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
     }
 
     private fun sendQuickCommand(text: String) {
-        binding.tabChat.performClick()
+        showChat()
         binding.inputEdit.setText(text)
         binding.inputEdit.setSelection(binding.inputEdit.text.length)
         sendMessage()
@@ -285,9 +313,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateProjectViews(hint: String) {
         binding.currentStageText.text = currentStage
-        binding.projectStatusText.text = "当前项目：$currentProjectTitle"
+        binding.projectStatusText.text = "一龙开发助手"
         binding.stageHintText.text = hint
         binding.progressTitleText.text = "开发进度：$currentStage"
+        binding.conversationTimeText.text = timeFormatter.format(Date())
         binding.userInfoText.text = "我的开发工作台\n用户 ID：${summarize(userId, 18)}\n服务端模型由管理员统一配置，当前项目记录保存在本机。"
 
         val recent = projectEvents.take(5).joinToString("\n")
@@ -388,8 +417,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
+        return false
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

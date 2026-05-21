@@ -3,67 +3,158 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#EDEDED"
+    android:background="#101010"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="#F7F7F7"
-        android:elevation="1dp"
-        app:title="一龙开发助手"
-        app:titleTextColor="#111111" />
+        android:layout_height="88dp"
+        android:background="#101010"
+        android:contentInsetStart="0dp"
+        android:contentInsetEnd="0dp"
+        android:elevation="0dp"
+        app:contentInsetEnd="0dp"
+        app:contentInsetStart="0dp">
 
-    <LinearLayout
-        android:id="@+id/statusStrip"
-        android:layout_width="match_parent"
-        android:layout_height="38dp"
-        android:background="#FFFFFF"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:text="连接中..."
-            android:textColor="#07C160"
-            android:textSize="13sp" />
+            <TextView
+                android:id="@+id/backButton"
+                android:layout_width="72dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="‹"
+                android:textColor="#D0D0D0"
+                android:textSize="34sp"
+                android:visibility="gone" />
 
-        <TextView
-            android:id="@+id/currentStageText"
-            android:layout_width="wrap_content"
-            android:layout_height="26dp"
-            android:background="@drawable/bg_stage_badge"
-            android:gravity="center"
-            android:minWidth="88dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:text="待提交需求"
-            android:textColor="#1F7A3D"
-            android:textSize="12sp" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/topTitleText"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:text="会话区"
+                android:textColor="#D0D0D0"
+                android:textSize="21sp" />
+
+            <ImageButton
+                android:id="@+id/searchButton"
+                android:layout_width="56dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="74dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="搜索"
+                android:padding="14dp"
+                android:src="@drawable/ic_search_simple"
+                app:tint="#D0D0D0" />
+
+            <ImageButton
+                android:id="@+id/addButton"
+                android:layout_width="56dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="18dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="新增"
+                android:padding="13dp"
+                android:src="@drawable/ic_add_circle_simple"
+                app:tint="#D0D0D0" />
+        </FrameLayout>
+    </androidx.appcompat.widget.Toolbar>
 
     <FrameLayout
+        android:id="@+id/contentContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:background="#101010">
+
+        <LinearLayout
+            android:id="@+id/conversationPage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/conversationItem"
+                android:layout_width="match_parent"
+                android:layout_height="86dp"
+                android:background="#242424"
+                android:clickable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp">
+
+                <TextView
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:background="@drawable/bg_mock_avatar"
+                    android:gravity="center"
+                    android:text="龙"
+                    android:textColor="#333333"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/projectStatusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="一龙开发助手"
+                        android:textColor="#D0D0D0"
+                        android:textSize="20sp" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="连接中..."
+                        android:textColor="#A9A9A9"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/conversationTimeText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="时间"
+                    android:textColor="#C4C4C4"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/chatPage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:background="#101010"
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <HorizontalScrollView
+                android:id="@+id/quickActionStrip"
                 android:layout_width="match_parent"
-                android:layout_height="72dp"
-                android:background="#FFFFFF"
+                android:layout_height="54dp"
+                android:background="#101010"
                 android:overScrollMode="never"
                 android:scrollbars="none">
 
@@ -93,7 +184,7 @@
                     <TextView
                         android:id="@+id/quickHistoryButton"
                         style="@style/QuickActionButton"
-                        android:text="查看记录" />
+                        android:text="项目记录" />
 
                     <TextView
                         android:id="@+id/quickSettingsButton"
@@ -102,35 +193,19 @@
                 </LinearLayout>
             </HorizontalScrollView>
 
-            <LinearLayout
-                android:id="@+id/projectBriefPanel"
+            <TextView
+                android:id="@+id/stageHintText"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#FFFFFF"
-                android:orientation="vertical"
+                android:layout_height="42dp"
+                android:background="#1C1C1C"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxLines="1"
                 android:paddingStart="16dp"
-                android:paddingTop="10dp"
                 android:paddingEnd="16dp"
-                android:paddingBottom="12dp">
-
-                <TextView
-                    android:id="@+id/projectStatusText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="当前项目：等待你的第一个开发需求"
-                    android:textColor="#111111"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/stageHintText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="发一句需求，我会把分析、编码、打包和交付记录在这里。"
-                    android:textColor="#777777"
-                    android:textSize="12sp" />
-            </LinearLayout>
+                android:text="点击输入需求，开发进度会自动记录到项目页。"
+                android:textColor="#B8B8B8"
+                android:textSize="13sp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/chatList"
@@ -146,36 +221,58 @@
         </LinearLayout>
 
         <ScrollView
-            android:id="@+id/progressPage"
+            android:id="@+id/projectPage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="#101010"
             android:fillViewport="true"
             android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/progressTitleText"
+                    android:id="@+id/currentStageText"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:background="#242424"
+                    android:gravity="center_vertical"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
+                    android:text="待提交需求"
+                    android:textColor="#D0D0D0"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/projectOverviewText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_panel"
-                    android:padding="14dp"
-                    android:text="开发进度：等待需求"
-                    android:textColor="#111111"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="1dp"
+                    android:background="#1E1E1E"
+                    android:lineSpacingExtra="5dp"
+                    android:minHeight="104dp"
+                    android:padding="22dp"
+                    android:text="项目管理\n当前没有正在执行的开发任务。"
+                    android:textColor="#D0D0D0"
+                    android:textSize="15sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_panel"
+                    android:background="#1E1E1E"
                     android:orientation="vertical"
-                    android:padding="14dp">
+                    android:padding="18dp">
+
+                    <TextView
+                        android:id="@+id/progressTitleText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="开发进度"
+                        android:textColor="#D0D0D0"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/stagePlanText"
@@ -198,50 +295,13 @@
                         android:text="4. 交付下载：等待" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/projectHistoryText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_panel"
-                    android:lineSpacingExtra="4dp"
-                    android:minHeight="220dp"
-                    android:padding="14dp"
-                    android:text="暂无进度记录"
-                    android:textColor="#333333"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </ScrollView>
-
-        <ScrollView
-            android:id="@+id/projectPage"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:id="@+id/projectOverviewText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_panel"
-                    android:lineSpacingExtra="4dp"
-                    android:padding="14dp"
-                    android:text="项目管理\n当前没有正在执行的开发任务。"
-                    android:textColor="#111111"
-                    android:textSize="15sp" />
-
                 <GridLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:columnCount="2">
+                    android:background="#1E1E1E"
+                    android:columnCount="2"
+                    android:padding="12dp">
 
                     <TextView
                         android:id="@+id/projectContinueButton"
@@ -263,6 +323,19 @@
                         style="@style/ProjectActionButton"
                         android:text="模型设置" />
                 </GridLayout>
+
+                <TextView
+                    android:id="@+id/projectHistoryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="#1E1E1E"
+                    android:lineSpacingExtra="5dp"
+                    android:minHeight="220dp"
+                    android:padding="22dp"
+                    android:text="暂无进度记录"
+                    android:textColor="#B8B8B8"
+                    android:textSize="13sp" />
             </LinearLayout>
         </ScrollView>
 
@@ -270,38 +343,39 @@
             android:id="@+id/profilePage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="#101010"
             android:fillViewport="true"
             android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
+                android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/userInfoText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_panel"
-                    android:lineSpacingExtra="4dp"
-                    android:padding="14dp"
+                    android:background="#242424"
+                    android:lineSpacingExtra="5dp"
+                    android:minHeight="112dp"
+                    android:padding="22dp"
                     android:text="我的开发工作台"
-                    android:textColor="#111111"
+                    android:textColor="#D0D0D0"
                     android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/profileSettingsButton"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_height="64dp"
                     android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_panel"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
                     android:text="AI 代理设置"
-                    android:textColor="#111111"
-                    android:textSize="15sp" />
+                    android:textColor="#D0D0D0"
+                    android:textSize="16sp" />
             </LinearLayout>
         </ScrollView>
     </FrameLayout>
@@ -310,14 +384,14 @@
         android:id="@+id/inputLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#F7F7F7"
-        android:elevation="4dp"
+        android:background="#1E1E1E"
         android:gravity="bottom"
         android:orientation="horizontal"
         android:paddingStart="10dp"
         android:paddingTop="8dp"
         android:paddingEnd="10dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="8dp"
+        android:visibility="gone">
 
         <EditText
             android:id="@+id/inputEdit"
@@ -335,8 +409,8 @@
             android:paddingTop="8dp"
             android:paddingEnd="14dp"
             android:paddingBottom="8dp"
-            android:textColor="#111111"
-            android:textColorHint="#9A9A9A"
+            android:textColor="#EDEDED"
+            android:textColorHint="#8E8E8E"
             android:textSize="15sp" />
 
         <TextView
@@ -354,30 +428,25 @@
     <LinearLayout
         android:id="@+id/pageTabs"
         android:layout_width="match_parent"
-        android:layout_height="54dp"
-        android:background="#FFFFFF"
+        android:layout_height="96dp"
+        android:background="#1E1E1E"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp">
 
         <TextView
             android:id="@+id/tabChat"
             style="@style/MainTabText"
-            android:text="会话" />
-
-        <TextView
-            android:id="@+id/tabProgress"
-            style="@style/MainTabText"
-            android:text="进度" />
+            android:text="□&#10;会话" />
 
         <TextView
             android:id="@+id/tabProject"
             style="@style/MainTabText"
-            android:text="项目" />
+            android:text="□&#10;项目" />
 
         <TextView
             android:id="@+id/tabProfile"
             style="@style/MainTabText"
-            android:text="我的" />
+            android:text="□&#10;我的" />
     </LinearLayout>
 </LinearLayout>
