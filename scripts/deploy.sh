@@ -3,8 +3,8 @@
 
 set -e
 
-SERVER="ubuntu@182.254.168.75"
-REMOTE_DIR="/home/ubuntu/Elon"
+SERVER="root@43.139.149.158"
+REMOTE_DIR="/root/Elon"
 SERVICE_NAME="elon-server"
 
 echo "=== 同步代码到服务器 ==="
@@ -31,11 +31,11 @@ ssh $SERVER "
     pkill -f elon-server 2>/dev/null || true
     sleep 1
     nohup $REMOTE_DIR/server/target/release/elon-server \
-      > /home/ubuntu/elon-server.log 2>&1 &
+      > /root/elon-server.log 2>&1 &
     echo '服务已启动，PID: '$!
   fi
 "
 
 echo "=== 部署完成 ==="
-echo "服务地址: http://182.254.168.75:8080"
-echo "健康检查: curl http://182.254.168.75:8080/health"
+echo "服务地址: http://43.139.149.158:8080"
+echo "健康检查: curl http://43.139.149.158:8080/health"
