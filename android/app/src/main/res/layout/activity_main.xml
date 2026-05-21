@@ -421,6 +421,18 @@
             android:textSize="15sp" />
 
         <TextView
+            android:id="@+id/modelButton"
+            android:layout_width="52dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_quick_button"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="默认"
+            android:textColor="#D0D0D0"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/sendButton"
             android:layout_width="64dp"
             android:layout_height="42dp"

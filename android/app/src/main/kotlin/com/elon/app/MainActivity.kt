@@ -14,9 +14,16 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -32,11 +39,16 @@ class MainActivity : AppCompatActivity() {
     private val projectEvents = mutableListOf<String>()
     private val conversations = mutableListOf<AppConversation>()
     private val gson = com.google.gson.Gson()
+    private val http = OkHttpClient()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
+    private val serverUrl = "http://43.139.149.158:8080"
     private var currentProjectTitle = "等待你的第一个开发需求"
     private var currentStage = "待提交需求"
     private var activeConversationIndex = 0
+    private var modelOptions: List<ModelOption> = emptyList()
+    private var selectedAgentName: String? = null
+    private var currentModelLabel = "默认"
 
     private data class AppConversation(
         val id: String,
@@ -45,6 +57,11 @@ class MainActivity : AppCompatActivity() {
         var updatedAt: Long,
         var ended: Boolean = false,
         val messages: MutableList<ChatMessage>
+    )
+
+    private data class ModelOption(
+        val label: String,
+        val agentName: String?
     )
 
     /** 每次安装 APP 生成的唯一用户 ID，存入 SharedPreferences 持久化 */
@@ -99,6 +116,8 @@ class MainActivity : AppCompatActivity() {
 
         // 发送按钮
         binding.sendButton.setOnClickListener { sendMessage() }
+        binding.modelButton.setOnClickListener { showModelDialog() }
+        loadModelOptions()
 
         // 键盘回车发送
         binding.inputEdit.setOnEditorActionListener { _, actionId, _ ->
@@ -106,6 +125,13 @@ class MainActivity : AppCompatActivity() {
                 sendMessage()
                 true
             } else false
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::binding.isInitialized) {
+            loadModelOptions()
         }
     }
 
@@ -127,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
             addProperty("message", text)
+            selectedAgentName?.let { addProperty("agent", it) }
         }
 
         // 显示用户消息
@@ -358,6 +385,135 @@ class MainActivity : AppCompatActivity() {
             setSingleLine(true)
             setSelectAllOnFocus(true)
             setPadding(dp(18), dp(8), dp(18), dp(8))
+        }
+    }
+
+    private fun loadModelOptions(afterLoad: (() -> Unit)? = null) {
+        Thread {
+            try {
+                val response = http.newCall(
+                    Request.Builder()
+                        .url("$serverUrl/api/user/$userId/agent")
+                        .get()
+                        .build()
+                ).execute()
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
+
+                val json = JSONObject(body)
+                val config = json.optJSONObject("config") ?: JSONObject()
+                val agents = json.optJSONArray("available_agents") ?: JSONArray()
+                val options = mutableListOf(ModelOption("服务器默认", null))
+
+                for (i in 0 until agents.length()) {
+                    val item = agents.getJSONObject(i)
+                    val name = item.optString("name", "")
+                    val model = item.optString("model", "")
+                    if (name.isNotBlank()) {
+                        options.add(ModelOption(modelLabel(name, model), name))
+                    }
+                }
+
+                val useAgent = config.optString("use_agent", "").ifBlank { null }
+                val customModel = config.optString("model", "")
+                val customBase = config.optString("api_base", "")
+                val label = when {
+                    customModel.isNotBlank() || customBase.isNotBlank() -> "自定义模型"
+                    useAgent != null -> options.firstOrNull { it.agentName == useAgent }?.label ?: useAgent
+                    else -> "服务器默认"
+                }
+
+                runOnUiThread {
+                    modelOptions = options
+                    selectedAgentName = useAgent
+                    currentModelLabel = label
+                    updateModelButton()
+                    afterLoad?.invoke()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "模型列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    afterLoad?.invoke()
+                }
+            }
+        }.start()
+    }
+
+    private fun showModelDialog() {
+        if (modelOptions.isEmpty()) {
+            Toast.makeText(this, "正在加载模型列表...", Toast.LENGTH_SHORT).show()
+            loadModelOptions { showModelDialog() }
+            return
+        }
+
+        val labels = modelOptions.map { it.label }.toTypedArray()
+        val checked = if (currentModelLabel.startsWith("自定义")) {
+            -1
+        } else {
+            modelOptions.indexOfFirst { it.agentName == selectedAgentName }.coerceAtLeast(0)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("选择模型")
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                saveModelSelection(modelOptions[which])
+                dialog.dismiss()
+            }
+            .setNeutralButton("自定义") { _, _ -> openSettings() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun saveModelSelection(option: ModelOption) {
+        binding.modelButton.isEnabled = false
+        Thread {
+            try {
+                val payload = JSONObject().apply {
+                    put("use_agent", option.agentName ?: JSONObject.NULL)
+                    put("api_base", JSONObject.NULL)
+                    put("api_key", JSONObject.NULL)
+                    put("model", JSONObject.NULL)
+                }
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+                val response = http.newCall(
+                    Request.Builder()
+                        .url("$serverUrl/api/user/$userId/agent")
+                        .put(body)
+                        .build()
+                ).execute()
+                val responseBody = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error(responseBody.ifBlank { "HTTP ${response.code}" })
+
+                runOnUiThread {
+                    selectedAgentName = option.agentName
+                    currentModelLabel = option.label
+                    updateModelButton()
+                    Toast.makeText(this, "已切换模型: ${option.label}", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "模型切换失败: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                runOnUiThread { binding.modelButton.isEnabled = true }
+            }
+        }.start()
+    }
+
+    private fun updateModelButton() {
+        binding.modelButton.text = shortModelLabel(currentModelLabel)
+        binding.modelButton.contentDescription = "选择模型：$currentModelLabel"
+    }
+
+    private fun modelLabel(name: String, model: String): String {
+        return if (model.isBlank()) name else "$name [$model]"
+    }
+
+    private fun shortModelLabel(label: String): String {
+        return when {
+            label.startsWith("服务器默认") -> "默认"
+            label.startsWith("自定义") -> "自定"
+            label.contains("[") -> label.substringBefore("[").trim().take(4)
+            else -> label.take(4)
         }
     }
 
