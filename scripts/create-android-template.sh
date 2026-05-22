@@ -1,7 +1,9 @@
 #!/bin/bash
 # 在服务器上创建 Android 项目模板
 set -e
-TMPL=/home/ubuntu/templates/android
+TMPL=/root/templates/android
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WRAPPER_JAR="$SCRIPT_DIR/../android/gradle/wrapper/gradle-wrapper.jar"
 
 echo "创建目录结构..."
 mkdir -p $TMPL/app/src/main/kotlin/com/template/app
@@ -91,6 +93,10 @@ org.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8
 kotlin.code.style=official
 GRADLEPROP
 
+cat > $TMPL/local.properties << 'LOCALPROPS'
+sdk.dir=/root/android-sdk
+LOCALPROPS
+
 # ── gradle/wrapper/gradle-wrapper.properties ───────────────────
 cat > $TMPL/gradle/wrapper/gradle-wrapper.properties << 'WRAPPERPROPS'
 distributionBase=GRADLE_USER_HOME
@@ -173,6 +179,13 @@ exec java -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
   org.gradle.wrapper.GradleWrapperMain "$@"
 GRADLEW
 chmod +x $TMPL/gradlew
+
+if [ -f "$WRAPPER_JAR" ]; then
+    cp "$WRAPPER_JAR" $TMPL/gradle/wrapper/gradle-wrapper.jar
+else
+    echo "ERROR: Gradle wrapper jar not found at $WRAPPER_JAR" >&2
+    exit 1
+fi
 
 # ── .gitignore ─────────────────────────────────────────────────
 cat > $TMPL/.gitignore << 'GITIGNORE'

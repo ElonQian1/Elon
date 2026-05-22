@@ -6,7 +6,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     ai_cli, image_generation,
-    intent_router::{self, CapabilityRoute},
+    intent_router::{self, CapabilityRoute, RoutingDecision},
     tools,
     types::{AgentConfig, AiBackend, AppState, UserAgentConfig, WsMessage},
 };
@@ -286,7 +286,40 @@ async fn run_dispatch_with_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    let decision = intent_router::classify(user_message);
+    let resume_command = is_short_resume_command(user_message, workspace);
+    let delivery_request = is_project_delivery_request(user_message, workspace);
+    if resume_command || delivery_request {
+        if let Some(apk_path) = tools::find_latest_apk(workspace) {
+            let apk_name = apk_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            let apk_url = format!("{}/{}", download_base.trim_end_matches('/'), apk_name);
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: "我看了当前项目状态，APK 已经生成了。你现在最需要的是下载安装测试，所以我先把下载链接给你。".into(),
+                    apk_url: Some(apk_url),
+                    image_url: None,
+                }
+                .to_json(),
+            );
+            return Ok(());
+        }
+    }
+
+    let mut decision = intent_router::classify(user_message);
+    if resume_command || delivery_request || is_short_build_command(user_message, workspace) {
+        decision = RoutingDecision {
+            intent: intent_router::UserIntent::AppDevelopment,
+            route: CapabilityRoute::CodeAgent,
+            confidence: 88,
+            needs_image_generation: false,
+            needs_code_change: true,
+            allow_user_agent_preference: true,
+            reason: "project_resume_command",
+        };
+    }
     info!("intent routing decision: {:?}", decision);
 
     match decision.route {
@@ -321,6 +354,69 @@ async fn run_dispatch_with_workspace(
         tx,
     )
     .await
+}
+
+fn is_short_resume_command(user_message: &str, workspace: &Path) -> bool {
+    if !is_project_workspace(workspace) {
+        return false;
+    }
+    let normalized = user_message.trim().to_lowercase();
+    if normalized.contains("继续完成上一次未完成")
+        || (normalized.contains("检查当前项目状态") && normalized.contains("apk"))
+    {
+        return true;
+    }
+    matches!(
+        normalized.as_str(),
+        "继续"
+            | "继续吧"
+            | "继续开发"
+            | "继续做"
+            | "继续完成"
+            | "重试"
+            | "再试一次"
+            | "重新开始"
+            | "再来一次"
+    )
+}
+
+fn is_project_delivery_request(user_message: &str, workspace: &Path) -> bool {
+    if !is_project_workspace(workspace) {
+        return false;
+    }
+    let normalized = user_message.trim().to_lowercase();
+    let asks_for_apk = normalized.contains("apk")
+        || normalized.contains("安装包")
+        || normalized.contains("下载包");
+    let asks_for_delivery = normalized.contains("地址")
+        || normalized.contains("链接")
+        || normalized.contains("下载")
+        || normalized.contains("发给我")
+        || normalized.contains("给我")
+        || normalized.contains("做好")
+        || normalized.contains("做完")
+        || normalized.contains("完成");
+
+    asks_for_apk && asks_for_delivery
+}
+
+fn is_short_build_command(user_message: &str, workspace: &Path) -> bool {
+    if !is_project_workspace(workspace) {
+        return false;
+    }
+    let normalized = user_message.trim().to_lowercase();
+    matches!(
+        normalized.as_str(),
+        "打包" | "编译" | "生成apk" | "生成 apk" | "打包apk" | "打包 apk"
+    )
+}
+
+fn is_project_workspace(workspace: &Path) -> bool {
+    workspace
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.contains("__"))
+        .unwrap_or(false)
 }
 
 async fn run_backend_with_workspace(

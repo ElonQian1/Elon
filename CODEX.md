@@ -81,17 +81,17 @@ Use the command that matches the risk and scope of the change. Do not deploy cod
 
 Server:
 
-- SSH: `ubuntu@182.254.168.75`
-- Project path: `/home/ubuntu/Elon`
-- Binary: `/home/ubuntu/Elon/server/target/release/elon-server`
-- Log: `/home/ubuntu/elon-server.log`
+- SSH: `root@43.139.149.158`
+- Project path: `/root/Elon`
+- Binary: `/root/Elon/server/target/release/elon-server`
+- Log: `/root/elon-server.log`
 - Port: `8080`
-- Health check: `curl http://182.254.168.75:8080/health`
+- Health check: `curl http://43.139.149.158:8080/health`
 
 APK:
 
-- Latest APK path on server: `/home/ubuntu/Elon/app/ElonSpeed-latest.apk`
-- Download URL: `http://182.254.168.75:8080/app/ElonSpeed-latest.apk`
+- Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
+- Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
 
@@ -114,6 +114,13 @@ Android APK builds are allowed in the main workspace when necessary, but still c
 - `scripts/`: setup, Android SDK, deploy, and template helper scripts.
 - `.github/`: project-wide AI and workflow instructions.
 - `.copilot/`: project-specific AI skill instructions.
+
+## Intent Routing / 能力路由
+
+- `server/src/intent_router.rs` is the shared capability router for Web, APK, and future Win clients.
+- Always classify user messages before choosing a backend model. Do not duplicate intent checks inside Web/APK handlers.
+- Routing priority: standalone text-to-image goes to `image_generation`; image asset requests use image generation first and then the code agent; app/web/server development prefers Codex CLI; ordinary chat/model configuration stays in chat.
+- See `docs/intent-routing.md` before adding new capabilities, providers, or low-cost classifier logic.
 
 ## Local Notes
 

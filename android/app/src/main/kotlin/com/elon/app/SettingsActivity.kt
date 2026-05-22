@@ -28,7 +28,8 @@ class SettingsActivity : AppCompatActivity() {
     private val http = OkHttpClient()
 
     private lateinit var userId: String
-    private var availableAgents: List<Pair<String, String>> = emptyList() // name -> model
+    private data class AgentOption(val name: String, val label: String)
+    private var availableAgents: List<AgentOption> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,7 +78,11 @@ class SettingsActivity : AppCompatActivity() {
                 val agentsArr: JSONArray = json.optJSONArray("available_agents") ?: JSONArray()
                 availableAgents = (0 until agentsArr.length()).map { i ->
                     val a = agentsArr.getJSONObject(i)
-                    Pair(a.getString("name"), a.optString("model", ""))
+                    val name = a.getString("name")
+                    val provider = a.optString("provider", name)
+                    val model = a.optString("model", "")
+                    val fallbackLabel = if (model.isNotEmpty()) "$provider  [$model]" else provider
+                    AgentOption(name, a.optString("label", fallbackLabel))
                 }
                 setupSpinner()
 
@@ -93,9 +98,7 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun setupSpinner() {
         val spinner = findViewById<Spinner>(R.id.agentSpinner)
-        val labels = availableAgents.map { (name, model) ->
-            if (model.isNotEmpty()) "$name  [$model]" else name
-        }
+        val labels = availableAgents.map { it.label }
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, labels).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
@@ -119,7 +122,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             useAgent.isNotEmpty() -> {
                 group.check(R.id.modePreset)
-                val idx = availableAgents.indexOfFirst { it.first == useAgent }
+                val idx = availableAgents.indexOfFirst { it.name == useAgent }
                 if (idx >= 0) findViewById<Spinner>(R.id.agentSpinner).setSelection(idx)
             }
             else -> group.check(R.id.modeDefault)
@@ -151,7 +154,7 @@ class SettingsActivity : AppCompatActivity() {
             }
             R.id.modePreset -> {
                 val idx = findViewById<Spinner>(R.id.agentSpinner).selectedItemPosition
-                val selected = availableAgents.getOrNull(idx)?.first ?: ""
+                val selected = availableAgents.getOrNull(idx)?.name ?: ""
                 if (selected.isEmpty()) {
                     Toast.makeText(this, "请选择一个代理", Toast.LENGTH_SHORT).show()
                     btn.isEnabled = true; btn.text = "保存配置"

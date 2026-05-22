@@ -82,7 +82,7 @@ git worktree remove ..\Elon-session-$id --force
 
 ## 🦀 后端部署（Rust → Linux 服务器）
 
-**服务器信息**：`ubuntu@182.254.168.75`，项目路径 `/home/ubuntu/Elon`
+**服务器信息**：`root@43.139.149.158`，项目路径 `/root/Elon`
 
 ### 完整流程
 
@@ -100,21 +100,21 @@ git worktree add --detach $tmp HEAD
 # 3. 从临时工作树 rsync 到服务器（排除 target/ 和 .env）
 rsync -avz --exclude='target/' --exclude='.env' `
   "$tmp/" `
-  "ubuntu@182.254.168.75:/home/ubuntu/Elon/"
+  "root@43.139.149.158:/root/Elon/"
 
 # 4. 在服务器上编译并重启
-ssh ubuntu@182.254.168.75 @"
+ssh root@43.139.149.158 @"
   source ~/.cargo/env
-  cd /home/ubuntu/Elon/server
+  cd /root/Elon/server
   cargo build --release 2>&1 | tail -5
   pkill -f elon-server 2>/dev/null || true
   sleep 1
-  nohup ./target/release/elon-server > /home/ubuntu/elon-server.log 2>&1 &
+  nohup ./target/release/elon-server > /root/elon-server.log 2>&1 &
   echo "已启动 PID: $!"
 "@
 
 # 5. 验证
-ssh ubuntu@182.254.168.75 'curl -s http://localhost:8080/health'
+ssh root@43.139.149.158 'curl -s http://localhost:8080/health'
 
 # 6. 清理临时工作树（必须！）
 git worktree remove $tmp --force
@@ -156,10 +156,10 @@ Set-Location "d:\一龙\一龙参考库\android"
 
 # 4. 上传 APK 到服务器
 $apk = Get-ChildItem "app\build\outputs\apk\release\*.apk" | Select-Object -First 1
-scp $apk.FullName "ubuntu@182.254.168.75:/home/ubuntu/Elon/app/ElonSpeed-latest.apk"
+scp $apk.FullName "root@43.139.149.158:/root/Elon/app/ElonSpeed-latest.apk"
 
 # 5. 验证
-ssh ubuntu@182.254.168.75 'ls -lh /home/ubuntu/Elon/app/ElonSpeed-latest.apk'
+ssh root@43.139.149.158 'ls -lh /root/Elon/app/ElonSpeed-latest.apk'
 ```
 
 ---
@@ -206,10 +206,10 @@ tls/
 |------|----|
 | Git 远端 | `git@github.com:ElonQian1/Elon.git` |
 | 主分支 | `main` |
-| 服务器 SSH | `ubuntu@182.254.168.75` |
-| 服务器项目路径 | `/home/ubuntu/Elon` |
-| Rust 二进制 | `/home/ubuntu/Elon/server/target/release/elon-server` |
-| 服务日志 | `/home/ubuntu/elon-server.log` |
+| 服务器 SSH | `root@43.139.149.158` |
+| 服务器项目路径 | `/root/Elon` |
+| Rust 二进制 | `/root/Elon/server/target/release/elon-server` |
+| 服务日志 | `/root/elon-server.log` |
 | 服务端口 | `8080` |
-| 健康检查 | `curl http://182.254.168.75:8080/health` |
-| APK 下载地址 | `http://182.254.168.75:8080/app/ElonSpeed-latest.apk` |
+| 健康检查 | `curl http://43.139.149.158:8080/health` |
+| APK 下载地址 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |

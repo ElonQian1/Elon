@@ -607,7 +607,7 @@ impl AppState {
 
 /// 独立辅助函数：根据 workspace_root 和 user_id 计算用户工作区路径
 pub fn get_user_workspace(workspace_root: &str, user_id: &str) -> std::path::PathBuf {
-    let safe_id = safe_workspace_part(user_id, 32);
+    let safe_id = safe_workspace_part(user_id, 128);
     std::path::PathBuf::from(workspace_root).join(if safe_id.is_empty() {
         "default".into()
     } else {
@@ -621,6 +621,24 @@ fn safe_workspace_part(value: &str, max_len: usize) -> String {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
         .take(max_len)
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_user_workspace;
+
+    #[test]
+    fn legacy_ws_workspace_keeps_project_suffix() {
+        let workspace = get_user_workspace(
+            "/tmp/elon",
+            "82ee3288e852435c90ed2a609e474aaf__677b1bb2-09c9-419a-b998-960dd0539796",
+        );
+
+        assert_eq!(
+            workspace.file_name().and_then(|name| name.to_str()),
+            Some("82ee3288e852435c90ed2a609e474aaf__677b1bb2-09c9-419a-b998-960dd0539796")
+        );
+    }
 }
 
 /// 用户自定义 AI 代理配置（存储在用户工作区 agent_config.json）

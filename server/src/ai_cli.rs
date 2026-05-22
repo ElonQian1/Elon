@@ -1,6 +1,10 @@
 use anyhow::{anyhow, Result};
-use std::{path::Path, process::Stdio, sync::Arc, time::Duration};
-use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::UnboundedSender};
+use std::{path::Path, path::PathBuf, process::Stdio, sync::Arc, time::Duration};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
+    process::Command,
+    sync::mpsc::UnboundedSender,
+};
 
 use crate::{
     tools,
@@ -27,15 +31,30 @@ pub async fn run_with_workspace(
 
     let _ = tx.send(
         WsMessage::Progress {
-            message: format!("正在调用本地 {} 处理请求...", option.label),
+            message: format!("CLI 工作区已准备：{}", workspace.display()),
+        }
+        .to_json(),
+    );
+    for note in environment_notes(user_message, &option) {
+        let _ = tx.send(WsMessage::Progress { message: note }.to_json());
+    }
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: format!("正在启动本地 CLI：{}", option.command_preview()),
         }
         .to_json(),
     );
 
     let prompt = build_cli_prompt(workspace, user_message, &option);
-    let output = run_cli_command(&option, workspace, &prompt).await?;
+    let output = run_cli_command(&option, workspace, &prompt, tx).await?;
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
 
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: "CLI 已结束，正在查找 APK 构建产物。".into(),
+        }
+        .to_json(),
+    );
     let apk_url = tools::find_latest_apk(workspace).map(|apk| {
         let apk_name = apk
             .file_name()
@@ -44,6 +63,14 @@ pub async fn run_with_workspace(
             .to_string();
         format!("{}/{}", download_base.trim_end_matches('/'), apk_name)
     });
+    if apk_url.is_none() && looks_like_android_task(user_message) {
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "未找到 APK 产物；请查看上面的 CLI 输出确认是否缺少 Java、Android SDK、Gradle 或构建步骤。".into(),
+            }
+            .to_json(),
+        );
+    }
 
     let _ = tx.send(
         WsMessage::Done {
@@ -67,6 +94,7 @@ async fn run_cli_command(
     option: &AiCliOption,
     workspace: &Path,
     prompt: &str,
+    tx: &UnboundedSender<String>,
 ) -> Result<CliOutput> {
     let mut cmd = Command::new(&option.bin);
     cmd.args(&option.args)
@@ -92,6 +120,18 @@ async fn run_cli_command(
             option.id
         )
     })?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("无法读取本地 AI CLI stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow!("无法读取本地 AI CLI stderr"))?;
+
+    let stdout_task = tokio::spawn(read_cli_stream(stdout, "stdout", tx.clone()));
+    let stderr_task = tokio::spawn(read_cli_stream(stderr, "stderr", tx.clone()));
+    let heartbeat_task = tokio::spawn(send_cli_heartbeat(tx.clone()));
 
     if option.prompt_mode == CliPromptMode::Stdin {
         if let Some(mut stdin) = child.stdin.take() {
@@ -99,17 +139,23 @@ async fn run_cli_command(
         }
     }
 
-    let output = tokio::time::timeout(
-        Duration::from_secs(option.timeout_secs),
-        child.wait_with_output(),
-    )
-    .await
-    .map_err(|_| anyhow!("本地 AI CLI 执行超时，请稍后重试或调大对应 TIMEOUT_SECS"))??;
+    let status =
+        match tokio::time::timeout(Duration::from_secs(option.timeout_secs), child.wait()).await {
+            Ok(result) => result?,
+            Err(_) => {
+                heartbeat_task.abort();
+                let _ = child.kill().await;
+                return Err(anyhow!(
+                    "本地 AI CLI 执行超时，请稍后重试或调大对应 TIMEOUT_SECS"
+                ));
+            }
+        };
+    heartbeat_task.abort();
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let stdout = stdout_task.await.unwrap_or_default();
+    let stderr = stderr_task.await.unwrap_or_default();
 
-    if !output.status.success() {
+    if !status.success() {
         return Err(anyhow!(
             "本地 AI CLI 执行失败: {}",
             compact_failure(&stdout, &stderr)
@@ -117,10 +163,81 @@ async fn run_cli_command(
     }
 
     Ok(CliOutput {
-        success: output.status.success(),
+        success: status.success(),
         stdout,
         stderr,
     })
+}
+
+async fn send_cli_heartbeat(tx: UnboundedSender<String>) {
+    loop {
+        tokio::time::sleep(Duration::from_secs(15)).await;
+        if tx
+            .send(
+                WsMessage::Progress {
+                    message: "CLI 仍在运行，正在等待模型或构建结果。".into(),
+                }
+                .to_json(),
+            )
+            .is_err()
+        {
+            break;
+        }
+    }
+}
+
+async fn read_cli_stream<R>(reader: R, label: &'static str, tx: UnboundedSender<String>) -> String
+where
+    R: AsyncRead + Unpin,
+{
+    let mut lines = BufReader::new(reader).lines();
+    let mut collected = String::new();
+    let mut forwarded = 0usize;
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        collected.push_str(&line);
+        collected.push('\n');
+
+        let clean = strip_ansi(&line);
+        let trimmed = clean.trim();
+        if trimmed.is_empty() || !should_forward_cli_line(trimmed) {
+            continue;
+        }
+        if forwarded < 160 {
+            let _ = tx.send(
+                WsMessage::Progress {
+                    message: format!("CLI 输出({}): {}", label, truncate_chars(trimmed, 500)),
+                }
+                .to_json(),
+            );
+            forwarded += 1;
+        } else if forwarded == 160 {
+            let _ = tx.send(
+                WsMessage::Progress {
+                    message: format!("CLI 输出({})较多，后续只保留在最终摘要中。", label),
+                }
+                .to_json(),
+            );
+            forwarded += 1;
+        }
+    }
+
+    collected
+}
+
+fn should_forward_cli_line(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    if lower.starts_with("debug ") || lower.starts_with("trace ") {
+        return false;
+    }
+    let noisy = [
+        "using system root certificates",
+        "models cache:",
+        "otel.",
+        "rpc.",
+        "app_server.",
+    ];
+    !noisy.iter().any(|item| lower.contains(item))
 }
 
 fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
@@ -174,9 +291,89 @@ fn ensure_git(workspace: &Path, user_id: &str) -> Result<()> {
     Ok(())
 }
 
+fn environment_notes(user_message: &str, option: &AiCliOption) -> Vec<String> {
+    let mut notes = Vec::new();
+    if option.bin.contains("codex") && !codex_auth_configured() {
+        notes.push("环境提醒：服务器未检测到 Codex CLI 登录凭据或 OPENAI_API_KEY，本地 Codex CLI 可能会失败并回退到 API 代理。".into());
+    }
+    if !command_available("git") {
+        notes.push("环境提醒：服务器未检测到 git，版本保存和部分 CLI 插件初始化可能失败。".into());
+    }
+    if looks_like_android_task(user_message) {
+        if !command_available("java") {
+            notes.push("环境提醒：服务器未检测到 java，Android Gradle 构建会失败。".into());
+        }
+        if !android_sdk_configured() {
+            notes.push(
+                "环境提醒：服务器未检测到 Android SDK，请先安装 SDK 后再稳定打包 APK。".into(),
+            );
+        }
+    }
+    notes
+}
+
+fn codex_auth_configured() -> bool {
+    if std::env::var("OPENAI_API_KEY")
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+    {
+        return true;
+    }
+
+    let codex_home = std::env::var("CODEX_HOME")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var("HOME")
+                .ok()
+                .map(|home| PathBuf::from(home).join(".codex"))
+        });
+
+    codex_home
+        .map(|home| home.join("auth.json").exists())
+        .unwrap_or(false)
+}
+
+fn command_available(bin: &str) -> bool {
+    std::process::Command::new(bin)
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn android_sdk_configured() -> bool {
+    let candidates = [
+        std::env::var("ANDROID_HOME").ok(),
+        std::env::var("ANDROID_SDK_ROOT").ok(),
+        Some("/root/android-sdk".into()),
+        Some("/opt/android-sdk".into()),
+    ];
+
+    candidates
+        .into_iter()
+        .flatten()
+        .map(PathBuf::from)
+        .any(|path| path.join("platforms").exists() || path.join("cmdline-tools").exists())
+}
+
+fn looks_like_android_task(user_message: &str) -> bool {
+    let lower = user_message.to_ascii_lowercase();
+    lower.contains("apk")
+        || lower.contains("android")
+        || user_message.contains("安卓")
+        || user_message.contains("应用")
+        || user_message.contains("打包")
+        || user_message.contains("编译")
+}
+
 fn format_cli_reply(stdout: &str, stderr: &str, success: bool) -> String {
+    let extracted;
     let primary = if stdout.trim().is_empty() {
-        stderr
+        extracted = extract_codex_answer(stderr);
+        extracted.as_deref().unwrap_or(stderr)
     } else {
         stdout
     };
@@ -191,6 +388,86 @@ fn format_cli_reply(stdout: &str, stderr: &str, success: bool) -> String {
     } else {
         clean
     }
+}
+
+fn extract_codex_answer(stderr: &str) -> Option<String> {
+    let clean = strip_ansi(stderr);
+    let mut answers = Vec::<String>::new();
+    let mut collecting = false;
+    let mut current = Vec::<String>::new();
+
+    for raw in clean.lines() {
+        let line = raw.trim();
+        if line == "codex" {
+            if !current.is_empty() {
+                answers.push(current.join("\n").trim().to_string());
+                current.clear();
+            }
+            collecting = true;
+            continue;
+        }
+
+        if collecting && is_codex_block_boundary(line) {
+            if !current.is_empty() {
+                answers.push(current.join("\n").trim().to_string());
+                current.clear();
+            }
+            collecting = false;
+            continue;
+        }
+
+        if collecting && !is_noisy_codex_answer_line(line) {
+            current.push(line.to_string());
+        }
+    }
+
+    if !current.is_empty() {
+        answers.push(current.join("\n").trim().to_string());
+    }
+
+    answers
+        .into_iter()
+        .rev()
+        .find(|answer| !answer.trim().is_empty())
+}
+
+fn is_codex_block_boundary(line: &str) -> bool {
+    if line.is_empty() {
+        return false;
+    }
+    let lower = line.to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "user" | "exec" | "tokens used" | "tool" | "system" | "assistant" | "output:"
+    ) || lower.starts_with("openai codex")
+        || lower.starts_with("workdir:")
+        || lower.starts_with("model:")
+        || lower.starts_with("provider:")
+        || lower.starts_with("approval:")
+        || lower.starts_with("sandbox:")
+        || lower.starts_with("reasoning")
+        || lower.starts_with("session id:")
+        || lower.starts_with("wall time:")
+        || lower.starts_with("process exited")
+        || lower.starts_with("original token count:")
+        || lower.starts_with("/bin/")
+        || lower.starts_with("succeeded in")
+        || lower.starts_with("failed in")
+        || lower.starts_with("error:")
+        || lower.starts_with("warn")
+        || lower.contains(" event.timestamp=")
+        || lower.contains("mcp_server=")
+}
+
+fn is_noisy_codex_answer_line(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    line.is_empty()
+        || lower.contains("feedback_tags")
+        || lower.contains("model_client.")
+        || lower.contains("responses_websocket")
+        || lower.contains("event.timestamp=")
+        || lower.contains("mcp_server=")
+        || lower.contains("auth_header")
 }
 
 fn compact_failure(stdout: &str, stderr: &str) -> String {
