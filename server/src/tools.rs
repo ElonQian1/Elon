@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use std::{path::Path, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 use tracing::{info, warn};
 
 /// AI 代理可以调用的所有工具
@@ -66,6 +69,43 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         return Err(anyhow!("git commit 失败: {}", stderr));
     }
     Ok(format!("git commit 成功: {}", stdout.trim()))
+}
+
+/// 创建产品级项目工作区：初始化模板、Git 仓库和首个提交。
+pub fn create_project_workspace(
+    project_root: &Path,
+    project_type: &str,
+    project_name: &str,
+    user_id: &str,
+) -> Result<String> {
+    info!("[工具] 创建项目工作区: {}", project_root.display());
+    std::fs::create_dir_all(project_root)?;
+
+    if is_dir_empty(project_root)? {
+        match project_type {
+            "android" => {
+                if let Some(template_dir) = template_dir("android") {
+                    copy_dir_all(&template_dir, project_root)?;
+                } else {
+                    std::fs::write(
+                        project_root.join("README.md"),
+                        format!(
+                            "# {}\n\nAndroid 项目工作区已创建。模板目录尚未配置，AI 可以在后续任务中补齐项目代码。\n",
+                            project_name
+                        ),
+                    )?;
+                }
+            }
+            _ => return Err(anyhow!("未知模板类型: {}，目前支持: android", project_type)),
+        }
+    }
+
+    ensure_git_repo(project_root, user_id)?;
+    let _ = git_commit(project_root, "chore: initialize project")?;
+    Ok(format!(
+        "项目工作区已创建: {}",
+        project_root.to_string_lossy()
+    ))
 }
 
 /// 构建项目（自动检测项目类型，从工作区根目录开始）
@@ -163,13 +203,13 @@ pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
     info!("[工具] 初始化项目模板: {}", project_type);
     match project_type {
         "android" => {
-            let template_dir = std::path::Path::new("/home/ubuntu/templates/android");
-            if !template_dir.exists() {
+            let template_dir = template_dir("android");
+            let Some(template_dir) = template_dir else {
                 return Err(anyhow!(
-                    "服务器上尚未设置 Android 模板 (/home/ubuntu/templates/android)"
+                    "服务器上尚未设置 Android 模板，请配置 ANDROID_TEMPLATE_DIR 或 TEMPLATE_ROOT"
                 ));
-            }
-            copy_dir_all(template_dir, project_root)?;
+            };
+            copy_dir_all(&template_dir, project_root)?;
             Ok("Android 项目模板已初始化。\n\
                  现在请用 write_file 修改以下文件实现具体功能:\n\
                  - app/src/main/kotlin/com/template/app/MainActivity.kt\n\
@@ -181,6 +221,49 @@ pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
         }
         _ => Err(anyhow!("未知模板类型: {}，目前支持: android", project_type)),
     }
+}
+
+fn template_dir(project_type: &str) -> Option<PathBuf> {
+    let specific_key = format!("{}_TEMPLATE_DIR", project_type.to_ascii_uppercase());
+    if let Ok(path) = std::env::var(specific_key) {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+
+    let root = std::env::var("TEMPLATE_ROOT").unwrap_or_else(|_| "/root/templates".into());
+    let path = PathBuf::from(root).join(project_type);
+    path.exists().then_some(path)
+}
+
+fn ensure_git_repo(project_root: &Path, user_id: &str) -> Result<()> {
+    if !project_root.join(".git").exists() {
+        let output = Command::new("git")
+            .args(["init"])
+            .current_dir(project_root)
+            .output()?;
+        if !output.status.success() {
+            return Err(anyhow!(
+                "git init 失败: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+    }
+
+    let _ = Command::new("git")
+        .args(["config", "user.email", &format!("{}@elon.app", user_id)])
+        .current_dir(project_root)
+        .output();
+    let _ = Command::new("git")
+        .args(["config", "user.name", user_id])
+        .current_dir(project_root)
+        .output();
+    Ok(())
+}
+
+fn is_dir_empty(path: &Path) -> Result<bool> {
+    Ok(std::fs::read_dir(path)?.next().is_none())
 }
 
 fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {

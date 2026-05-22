@@ -7,9 +7,10 @@ use crate::{
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
 
-pub async fn run(
+pub async fn run_with_workspace(
     user_id: &str,
-    workspace_user_id: &str,
+    workspace: &Path,
+    download_base: &str,
     user_message: &str,
     option_id: Option<&str>,
     state: &Arc<AppState>,
@@ -21,9 +22,8 @@ pub async fn run(
         .cloned()
         .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
 
-    let workspace = state.get_user_workspace(workspace_user_id);
-    std::fs::create_dir_all(&workspace)?;
-    ensure_git(&workspace, user_id)?;
+    std::fs::create_dir_all(workspace)?;
+    ensure_git(workspace, user_id)?;
 
     let _ = tx.send(
         WsMessage::Progress {
@@ -32,20 +32,17 @@ pub async fn run(
         .to_json(),
     );
 
-    let prompt = build_cli_prompt(&workspace, user_message, &option);
-    let output = run_cli_command(&option, &workspace, &prompt).await?;
+    let prompt = build_cli_prompt(workspace, user_message, &option);
+    let output = run_cli_command(&option, workspace, &prompt).await?;
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
 
-    let apk_url = tools::find_latest_apk(&workspace).map(|apk| {
+    let apk_url = tools::find_latest_apk(workspace).map(|apk| {
         let apk_name = apk
             .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
-        format!(
-            "{}/download/{}/{}",
-            state.public_url, workspace_user_id, apk_name
-        )
+        format!("{}/{}", download_base.trim_end_matches('/'), apk_name)
     });
 
     let _ = tx.send(

@@ -9,7 +9,6 @@
 ///   GET  /api/admin/agents/:name/key  → 查看某代理的完整 API key
 ///
 /// 鉴权：所有 API 需要请求头 `Authorization: Bearer <ADMIN_TOKEN>`
-
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
@@ -62,10 +61,7 @@ pub async fn admin_page() -> Html<&'static str> {
 }
 
 /// 列出所有 AI 代理配置（API key 脱敏）
-pub async fn list_agents(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn list_agents(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     if !check_auth(&headers, &state.admin_token) {
         return auth_error();
     }
@@ -87,7 +83,10 @@ pub async fn list_agents(
 
     // 按名称排序，让 UI 稳定
     agents.sort_by(|a, b| {
-        a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or(""))
+        a["name"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["name"].as_str().unwrap_or(""))
     });
 
     Json(serde_json::json!({
@@ -126,7 +125,10 @@ pub async fn upsert_agent(
             .into_response();
     }
     // 只允许字母、数字、连字符
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+    if !name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({"error": "代理名称只能包含字母、数字、连字符(-_)"})),
@@ -269,43 +271,54 @@ pub async fn get_agent_key(
 }
 
 /// 列出所有用户及其 AI 代理配置（仅管理员）
-pub async fn list_users(
+pub async fn list_users(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return auth_error();
+    }
+
+    match state.store.list_users() {
+        Ok(users) => {
+            Json(serde_json::json!({ "users": users, "total": users.len() })).into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct CreateUserReq {
+    pub account: String,
+    pub password: String,
+    pub nickname: Option<String>,
+    pub role: Option<String>,
+}
+
+/// 管理员创建可登录用户
+pub async fn create_user(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Json(req): Json<CreateUserReq>,
 ) -> Response {
     if !check_auth(&headers, &state.admin_token) {
         return auth_error();
     }
 
-    let workspace_root = &state.project_root;
-    let mut users: Vec<serde_json::Value> = Vec::new();
-
-    if let Ok(entries) = std::fs::read_dir(workspace_root) {
-        for entry in entries.flatten() {
-            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                continue;
-            }
-            let user_id = entry.file_name().to_string_lossy().to_string();
-            let workspace = entry.path();
-            let cfg = crate::types::UserAgentConfig::load(&workspace);
-
-            users.push(serde_json::json!({
-                "user_id": user_id,
-                "has_custom_config": cfg.is_some(),
-                "use_agent": cfg.as_ref().and_then(|c| c.use_agent.as_deref()),
-                "has_custom_key": cfg.as_ref().and_then(|c| c.api_key.as_deref()).is_some(),
-                "model": cfg.as_ref().and_then(|c| c.model.as_deref()),
-                "nickname": cfg.as_ref().and_then(|c| c.nickname.as_deref()),
-                "updated_at": cfg.as_ref().and_then(|c| c.updated_at.as_deref()),
-            }));
-        }
+    match state.store.create_user(
+        &req.account,
+        &req.password,
+        req.nickname.as_deref(),
+        req.role.as_deref(),
+    ) {
+        Ok(user) => Json(serde_json::json!({ "ok": true, "user": user })).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
     }
-
-    users.sort_by(|a, b| {
-        a["user_id"].as_str().unwrap_or("").cmp(b["user_id"].as_str().unwrap_or(""))
-    });
-
-    Json(serde_json::json!({ "users": users, "total": users.len() })).into_response()
 }
 
 // ─────────────────────────────────────────────
@@ -446,7 +459,10 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
 <div class="container">
   <div class="toolbar">
     <h2 id="userCount">用户列表</h2>
-    <button class="btn btn-ghost" onclick="loadUsers()">↻ 刷新</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="openUserModal()">＋ 创建用户</button>
+      <button class="btn btn-ghost" onclick="loadUsers()">↻ 刷新</button>
+    </div>
   </div>
   <div id="userList" style="display:flex;flex-direction:column;gap:10px"><div class="loader"></div></div>
 </div>
@@ -482,6 +498,36 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeEditModal()">取消</button>
       <button class="btn btn-primary" onclick="saveAgent()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 创建用户 Modal -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal">
+    <h3>创建用户</h3>
+    <div class="form-group">
+      <label>账号（手机号或邮箱）</label>
+      <input id="uAccount" placeholder="friend@example.com" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>昵称</label>
+      <input id="uNickname" placeholder="小王" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>初始密码</label>
+      <div class="input-wrap">
+        <input id="uPassword" type="password" placeholder="至少 6 位" autocomplete="new-password" />
+        <button type="button" onclick="toggleKeyVis('uPassword',this)" title="显示/隐藏">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>角色</label>
+      <input id="uRole" value="user" autocomplete="off" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeUserModal()">取消</button>
+      <button class="btn btn-primary" onclick="createUser()">创建</button>
     </div>
   </div>
 </div>
@@ -737,10 +783,12 @@ function esc(s) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     if (document.getElementById('tokenModal').classList.contains('open')) applyToken();
+    else if (document.getElementById('userModal').classList.contains('open')) createUser();
     else if (document.getElementById('editModal').classList.contains('open')) saveAgent();
   }
   if (e.key === 'Escape') {
     closeEditModal();
+    closeUserModal();
     document.getElementById('tokenModal').classList.remove('open');
   }
 });
@@ -755,6 +803,35 @@ function switchTab(name, btn) {
 }
 
 // ─── 用户列表 ────────────────────────────
+function openUserModal() {
+  document.getElementById('uAccount').value = '';
+  document.getElementById('uNickname').value = '';
+  document.getElementById('uPassword').value = '';
+  document.getElementById('uRole').value = 'user';
+  document.getElementById('userModal').classList.add('open');
+  setTimeout(() => document.getElementById('uAccount').focus(), 100);
+}
+function closeUserModal() {
+  document.getElementById('userModal').classList.remove('open');
+}
+async function createUser() {
+  const account = document.getElementById('uAccount').value.trim();
+  const nickname = document.getElementById('uNickname').value.trim();
+  const password = document.getElementById('uPassword').value;
+  const role = document.getElementById('uRole').value.trim() || 'user';
+  if (!account) return toast('账号不能为空', 'err');
+  if (password.length < 6) return toast('密码至少 6 位', 'err');
+  try {
+    const res = await apiFetch('POST', '/api/admin/users', { account, nickname, password, role });
+    const j = await res.json();
+    if (!res.ok) return toast(j.error || '创建失败', 'err');
+    closeUserModal();
+    toast('用户已创建', 'ok');
+    loadUsers();
+  } catch(e) {
+    toast('网络错误', 'err');
+  }
+}
 async function loadUsers() {
   const list = document.getElementById('userList');
   list.innerHTML = '<div class="loader"></div>';
@@ -777,20 +854,18 @@ function renderUsers(data) {
   const users = data.users || [];
   document.getElementById('userCount').textContent = `共 ${users.length} 个用户`;
   if (users.length === 0) {
-    list.innerHTML = '<p class="empty">暂无用户（用户通过 APK 连接后会在此显示）</p>';
+    list.innerHTML = '<p class="empty">暂无用户，点击「创建用户」添加朋友账号</p>';
     return;
   }
   list.innerHTML = users.map(u => {
-    const agentText = u.has_custom_config
-      ? (u.use_agent ? `使用代理: ${esc(u.use_agent)}` : '自定义配置')
-      : '使用服务器默认';
-    const modelText = u.model ? ` · ${esc(u.model)}` : '';
-    const keyText = u.has_custom_key ? ' · 已配置自有API Key🔑' : '';
     const nicknameText = u.nickname ? ` <span style="color:var(--accent)">${esc(u.nickname)}</span>` : '';
-    const updatedText = u.updated_at ? `最后更新: ${esc(u.updated_at)}` : '从未配置';
+    const updatedText = u.updated_at ? `更新: ${esc(u.updated_at)}` : '';
+    const projectText = `${Number(u.project_count || 0)} 个项目`;
+    const roleText = `${esc(u.role || 'user')} · ${esc(u.status || '')}`;
     return `<div class="user-card">
-      <span class="user-id">${esc(u.user_id)}${nicknameText}</span>
-      <span class="user-tag ${u.has_custom_config ? 'tag-custom' : 'tag-default'}">${agentText}${modelText}${keyText}</span>
+      <span class="user-id">${esc(u.account || u.id)}${nicknameText}</span>
+      <span class="user-tag tag-custom">${projectText}</span>
+      <span class="user-tag tag-default">${roleText}</span>
       <span class="user-detail">${updatedText}</span>
     </div>`;
   }).join('');

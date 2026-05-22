@@ -1,11 +1,13 @@
 use anyhow::Result;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
 use crate::{
-    ai_cli, image_generation, tools,
+    ai_cli, image_generation,
+    intent_router::{self, CapabilityRoute},
+    tools,
     types::{AgentConfig, AiBackend, AppState, UserAgentConfig, WsMessage},
 };
 
@@ -216,6 +218,40 @@ pub async fn run(
     }
 }
 
+pub async fn run_for_project(
+    user_id: &str,
+    project_id: &str,
+    workspace_key: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let workspace = state.get_project_workspace(workspace_key);
+    let user_config_workspace = state.get_user_workspace(user_id);
+    let download_base = format!("{}/api/projects/{}/download", state.public_url, project_id);
+    if let Err(e) = run_dispatch_with_workspace(
+        user_id,
+        &workspace,
+        &user_config_workspace,
+        &download_base,
+        user_message,
+        agent_name,
+        state,
+        &tx,
+    )
+    .await
+    {
+        error!("项目级 AI 代理运行出错: {}", e);
+        let _ = tx.send(
+            WsMessage::Error {
+                message: e.to_string(),
+            }
+            .to_json(),
+        );
+    }
+}
+
 async fn run_dispatch(
     user_id: &str,
     workspace_user_id: &str,
@@ -224,28 +260,89 @@ async fn run_dispatch(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    // 文生图是原有独立能力。配置存在时继续直接处理，避免 Codex CLI 只能返回文字说明。
-    if state.image_model.is_some() && should_generate_image_directly(user_message) {
-        return run_api_inner(
-            user_id,
-            workspace_user_id,
-            user_message,
-            agent_name,
-            state,
-            tx,
-        )
-        .await;
+    let workspace = state.get_user_workspace(workspace_user_id);
+    let user_config_workspace = state.get_user_workspace(user_id);
+    let download_base = format!("{}/download/{}", state.public_url, workspace_user_id);
+    run_dispatch_with_workspace(
+        user_id,
+        &workspace,
+        &user_config_workspace,
+        &download_base,
+        user_message,
+        agent_name,
+        state,
+        tx,
+    )
+    .await
+}
+
+async fn run_dispatch_with_workspace(
+    user_id: &str,
+    workspace: &Path,
+    user_config_workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    let decision = intent_router::classify(user_message);
+    info!("intent routing decision: {:?}", decision);
+
+    match decision.route {
+        CapabilityRoute::TextToImage => {
+            return run_text_to_image_only(user_message, state, tx).await;
+        }
+        CapabilityRoute::ImageThenCode => {
+            return run_image_then_code(
+                user_id,
+                workspace,
+                user_config_workspace,
+                download_base,
+                user_message,
+                agent_name,
+                state,
+                tx,
+            )
+            .await;
+        }
+        CapabilityRoute::ChatAgent | CapabilityRoute::CodeAgent => {}
     }
 
-    let user_config_workspace = state.get_user_workspace(user_id);
+    run_backend_with_workspace(
+        user_id,
+        workspace,
+        user_config_workspace,
+        download_base,
+        user_message,
+        agent_name,
+        decision.route,
+        state,
+        tx,
+    )
+    .await
+}
+
+async fn run_backend_with_workspace(
+    user_id: &str,
+    workspace: &Path,
+    user_config_workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    route: CapabilityRoute,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
     let user_config = UserAgentConfig::load(&user_config_workspace);
-    let backend = choose_backend(state, user_config.as_ref(), agent_name);
+    let backend = choose_backend(state, user_config.as_ref(), agent_name, route);
 
     match backend {
         AiBackend::LocalCli => {
-            match ai_cli::run(
+            match ai_cli::run_with_workspace(
                 user_id,
-                workspace_user_id,
+                workspace,
+                download_base,
                 user_message,
                 cli_option_id(agent_name),
                 state,
@@ -262,9 +359,11 @@ async fn run_dispatch(
                         }
                         .to_json(),
                     );
-                    run_api_inner(
+                    run_api_inner_with_workspace(
                         user_id,
-                        workspace_user_id,
+                        workspace,
+                        user_config_workspace,
+                        download_base,
                         user_message,
                         api_agent_name(state, agent_name),
                         state,
@@ -276,9 +375,11 @@ async fn run_dispatch(
             }
         }
         AiBackend::Api => {
-            run_api_inner(
+            run_api_inner_with_workspace(
                 user_id,
-                workspace_user_id,
+                workspace,
+                user_config_workspace,
+                download_base,
                 user_message,
                 api_agent_name(state, agent_name),
                 state,
@@ -289,6 +390,106 @@ async fn run_dispatch(
     }
 }
 
+async fn run_text_to_image_only(
+    user_message: &str,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    let (prompt, image) = generate_image_for_message(user_message, state, tx).await?;
+    let image_url = image.url.clone();
+    let message = format!(
+        "图片已生成。\n\n提示词：{}\n图片链接：{}",
+        prompt, image_url
+    );
+
+    let _ = tx.send(
+        WsMessage::Done {
+            message,
+            apk_url: None,
+            image_url: Some(image_url),
+        }
+        .to_json(),
+    );
+
+    Ok(())
+}
+
+async fn run_image_then_code(
+    user_id: &str,
+    workspace: &Path,
+    user_config_workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    let (prompt, image) = generate_image_for_message(user_message, state, tx).await?;
+    let image_url = image.url.clone();
+
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: format!(
+                "图片素材已生成，正在交给代码代理处理项目集成: {}",
+                image_url
+            ),
+        }
+        .to_json(),
+    );
+
+    let augmented_message = format!(
+        "用户请求包含图片素材生成和项目代码集成。\n\
+         原始需求：{}\n\
+         已生成图片 URL：{}\n\
+         图片提示词：{}\n\n\
+         请根据原始需求把该素材用于项目。若当前环境可以下载该 URL，请保存到合适的资源目录并更新代码；\
+         若无法直接下载，请在最终回复中明确告诉用户图片 URL 和建议放置路径。",
+        user_message, image_url, prompt
+    );
+
+    run_backend_with_workspace(
+        user_id,
+        workspace,
+        user_config_workspace,
+        download_base,
+        &augmented_message,
+        agent_name,
+        CapabilityRoute::CodeAgent,
+        state,
+        tx,
+    )
+    .await
+}
+
+async fn generate_image_for_message(
+    user_message: &str,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<(String, image_generation::GeneratedImage)> {
+    if state.image_model.is_none() {
+        return Err(anyhow::anyhow!(
+            "文生图模型未配置，请在 server/.env 设置 IMAGE_API_KEY 后再使用图片生成能力"
+        ));
+    }
+
+    let prompt = intent_router::image_prompt_from_message(user_message);
+    let model = state
+        .image_model
+        .as_ref()
+        .map(|cfg| cfg.model.as_str())
+        .unwrap_or("未配置");
+
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: format!("识别为文生图任务，正在调用模型: {}", model),
+        }
+        .to_json(),
+    );
+
+    let image = image_generation::generate_text_to_image(state, &prompt).await?;
+    Ok((prompt, image))
+}
+
 async fn has_api_agents(state: &Arc<AppState>) -> bool {
     !state.agents_config.read().await.agents.is_empty()
 }
@@ -297,6 +498,7 @@ fn choose_backend(
     state: &Arc<AppState>,
     user_config: Option<&UserAgentConfig>,
     agent_name: Option<&str>,
+    route: CapabilityRoute,
 ) -> AiBackend {
     if let Some(name) = agent_name {
         if is_local_cli_option(state, name) {
@@ -306,6 +508,10 @@ fn choose_backend(
             return AiBackend::Api;
         }
         return AiBackend::Api;
+    }
+
+    if route == CapabilityRoute::CodeAgent && state.ai_cli.enabled {
+        return AiBackend::LocalCli;
     }
 
     if let Some(cfg) = user_config {
@@ -353,144 +559,6 @@ fn is_api_backend_alias(name: &str) -> bool {
         name.trim().to_ascii_lowercase().as_str(),
         "api" | "llm" | "remote"
     )
-}
-
-fn is_standalone_image_request(message: &str) -> bool {
-    let image_words = [
-        "文生图",
-        "生图",
-        "生成图",
-        "图像",
-        "图片",
-        "壁纸",
-        "照片",
-        "头像",
-        "插画",
-        "海报",
-        "卡通",
-        "山水画",
-    ];
-
-    image_words.iter().any(|word| message.contains(word))
-}
-
-fn looks_like_app_development_request(message: &str) -> bool {
-    let lower = message.to_lowercase();
-    let app_words = [
-        "app",
-        "apk",
-        "android",
-        "应用",
-        "功能",
-        "页面",
-        "界面",
-        "按钮",
-        "代码",
-        "开发",
-        "修改",
-        "添加",
-        "新增",
-        "编译",
-        "打包",
-        "安装",
-        "发布",
-        "登录",
-        "注册",
-        "首页",
-        "设置",
-        "接口",
-        "后端",
-        "服务端",
-        "数据库",
-        "项目",
-    ];
-
-    app_words.iter().any(|word| lower.contains(word))
-}
-
-fn should_generate_image_directly(message: &str) -> bool {
-    if looks_like_app_development_request(message) {
-        return false;
-    }
-
-    let intent_words = [
-        "文生图",
-        "生图",
-        "生成",
-        "画",
-        "绘制",
-        "做一张",
-        "来一张",
-        "出一张",
-        "创作",
-    ];
-    is_standalone_image_request(message) && intent_words.iter().any(|word| message.contains(word))
-}
-
-fn image_prompt_from_message(message: &str) -> String {
-    let trimmed = message.trim();
-    let prefixes = [
-        "请帮我生成一张",
-        "帮我生成一张",
-        "帮我生成",
-        "请生成一张",
-        "请生成",
-        "生成一张",
-        "生成",
-        "画一张",
-        "画",
-        "绘制一张",
-        "绘制",
-        "来一张",
-        "做一张",
-    ];
-
-    for prefix in prefixes {
-        if let Some(rest) = trimmed.strip_prefix(prefix) {
-            let prompt = rest.trim_start_matches(['：', ':', '，', ',', ' ']).trim();
-            if !prompt.is_empty() {
-                return prompt.to_string();
-            }
-        }
-    }
-
-    trimmed.to_string()
-}
-
-fn looks_like_development_request(message: &str) -> bool {
-    let lower = message.to_lowercase();
-    let dev_words = [
-        "app",
-        "apk",
-        "android",
-        "应用",
-        "功能",
-        "页面",
-        "界面",
-        "按钮",
-        "代码",
-        "开发",
-        "修改",
-        "添加",
-        "新增",
-        "生成",
-        "做一个",
-        "做个",
-        "编译",
-        "打包",
-        "安装",
-        "发布",
-        "登录",
-        "注册",
-        "首页",
-        "设置",
-        "接口",
-        "后端",
-        "服务端",
-        "数据库",
-    ];
-
-    dev_words.iter().any(|word| lower.contains(word))
 }
 
 fn casual_chat_prompt() -> &'static str {
@@ -562,55 +630,23 @@ async fn run_casual_chat(
     })
 }
 
-async fn run_api_inner(
+async fn run_api_inner_with_workspace(
     user_id: &str,
-    workspace_user_id: &str,
+    workspace: &Path,
+    user_config_workspace: &Path,
+    download_base: &str,
     user_message: &str,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     // 每个用户操作自己的工作区，不能访问其他用户目录
-    let workspace = state.get_user_workspace(workspace_user_id);
-    let user_config_workspace = state.get_user_workspace(user_id);
-
-    if should_generate_image_directly(user_message) {
-        let prompt = image_prompt_from_message(user_message);
-        let model = state
-            .image_model
-            .as_ref()
-            .map(|cfg| cfg.model.as_str())
-            .unwrap_or("未配置");
-
-        let _ = tx.send(
-            WsMessage::Progress {
-                message: format!("正在调用文生图模型: {}", model),
-            }
-            .to_json(),
-        );
-
-        let image = image_generation::generate_text_to_image(state, &prompt).await?;
-        let message = format!(
-            "图片已生成。\n\n提示词：{}\n图片链接：{}",
-            prompt, image.url
-        );
-
-        let _ = tx.send(
-            WsMessage::Done {
-                message,
-                apk_url: None,
-                image_url: Some(image.url),
-            }
-            .to_json(),
-        );
-        return Ok(());
-    }
 
     // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理。
     // 普通聊天也要走模型，否则体验会像固定话术。
     let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
 
-    if !looks_like_development_request(user_message) {
+    if !intent_router::looks_like_development_request(user_message) {
         let _ = tx.send(
             WsMessage::Progress {
                 message: format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model),
@@ -742,11 +778,10 @@ async fn run_api_inner(
                         if tool_name == "build_project" {
                             if let Some(line) = r.lines().find(|l| l.starts_with("##APK_FILE:")) {
                                 let apk_name = line.trim_start_matches("##APK_FILE:").trim();
-                                let base_url = std::env::var("PUBLIC_URL")
-                                    .unwrap_or_else(|_| "http://182.254.168.75:8080".into());
                                 apk_url = Some(format!(
-                                    "{}/download/{}/{}",
-                                    base_url, workspace_user_id, apk_name
+                                    "{}/{}",
+                                    download_base.trim_end_matches('/'),
+                                    apk_name
                                 ));
                                 let _ = tx.send(
                                     WsMessage::Progress {

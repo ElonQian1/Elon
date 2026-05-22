@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::RwLock;
 
+use crate::store::Store;
+
 /// 单个 AI 代理的配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -408,6 +410,10 @@ impl AgentsConfig {
 
 /// 全局状态，在各路由间共享
 pub struct AppState {
+    /// SQLite 数据层，保存用户、会话、项目、任务等产品级状态
+    pub store: Store,
+    /// 数据目录（默认 /opt/elon/data）
+    pub data_dir: std::path::PathBuf,
     /// 默认用户消息后端
     pub default_backend: AiBackend,
     /// 本地 AI CLI 配置
@@ -514,11 +520,22 @@ impl AppState {
             }
         }
 
+        let data_dir = std::path::PathBuf::from(
+            std::env::var("DATA_DIR").unwrap_or_else(|_| "/opt/elon/data".into()),
+        );
+        let database_path = std::path::PathBuf::from(
+            std::env::var("DATABASE_PATH")
+                .ok()
+                .filter(|v| !v.trim().is_empty())
+                .unwrap_or_else(|| data_dir.join("elon.db").to_string_lossy().to_string()),
+        );
+        let store = Store::open(&database_path)?;
+
         let project_root_str =
-            std::env::var("WORKSPACE_ROOT").unwrap_or_else(|_| "/home/ubuntu/workspaces".into());
+            std::env::var("WORKSPACE_ROOT").unwrap_or_else(|_| "/opt/elon/workspaces".into());
 
         let public_url =
-            std::env::var("PUBLIC_URL").unwrap_or_else(|_| "http://182.254.168.75:8080".into());
+            std::env::var("PUBLIC_URL").unwrap_or_else(|_| "http://43.139.149.158:8080".into());
 
         let admin_token = std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| {
             tracing::warn!("未设置 ADMIN_TOKEN，使用默认值 'elon-admin'，生产环境请修改！");
@@ -560,6 +577,8 @@ impl AppState {
         }
 
         Ok(Self {
+            store,
+            data_dir,
             default_backend,
             ai_cli,
             agents_config: RwLock::new(agents_config),
@@ -577,20 +596,31 @@ impl AppState {
     pub fn get_user_workspace(&self, user_id: &str) -> std::path::PathBuf {
         get_user_workspace(&self.workspace_root, user_id)
     }
+
+    /// 获取项目级工作区目录（路径: {workspace_root}/projects/{workspace_key}/）
+    pub fn get_project_workspace(&self, workspace_key: &str) -> std::path::PathBuf {
+        self.project_root
+            .join("projects")
+            .join(safe_workspace_part(workspace_key, 64))
+    }
 }
 
 /// 独立辅助函数：根据 workspace_root 和 user_id 计算用户工作区路径
 pub fn get_user_workspace(workspace_root: &str, user_id: &str) -> std::path::PathBuf {
-    let safe_id: String = user_id
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .take(32)
-        .collect();
+    let safe_id = safe_workspace_part(user_id, 32);
     std::path::PathBuf::from(workspace_root).join(if safe_id.is_empty() {
         "default".into()
     } else {
         safe_id
     })
+}
+
+fn safe_workspace_part(value: &str, max_len: usize) -> String {
+    value
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(max_len)
+        .collect()
 }
 
 /// 用户自定义 AI 代理配置（存储在用户工作区 agent_config.json）
