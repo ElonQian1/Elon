@@ -136,7 +136,7 @@ impl AiCliConfig {
             "codex",
             "Codex CLI",
             "codex",
-            "exec --full-auto",
+            "exec --sandbox workspace-write --skip-git-repo-check",
             true,
             "-m",
         ));
