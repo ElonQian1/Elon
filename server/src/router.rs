@@ -25,7 +25,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/chat", post(api::chat))
         .route("/api/image/generate", post(api::generate_image))
         .route(
-            "/download/{user_id}/{filename}",
+            "/download/:user_id/:filename",
             get(client_gateway::download_apk),
         )
         .route("/admin", get(admin::admin_page))
@@ -33,12 +33,12 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/admin/agents",
             get(admin::list_agents).post(admin::upsert_agent),
         )
-        .route("/api/admin/agents/{name}", delete(admin::delete_agent))
-        .route("/api/admin/agents/{name}/key", get(admin::get_agent_key))
-        .route("/api/admin/default/{name}", post(admin::set_default_agent))
+        .route("/api/admin/agents/:name", delete(admin::delete_agent))
+        .route("/api/admin/agents/:name/key", get(admin::get_agent_key))
+        .route("/api/admin/default/:name", post(admin::set_default_agent))
         .route("/api/admin/users", get(admin::list_users))
         .route(
-            "/api/user/{user_id}/agent",
+            "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )
         .layer(cors)
