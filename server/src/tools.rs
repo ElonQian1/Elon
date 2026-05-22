@@ -45,7 +45,10 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         .current_dir(project_root)
         .output()?;
     if !output.status.success() {
-        return Err(anyhow!("git add 失败: {}", String::from_utf8_lossy(&output.stderr)));
+        return Err(anyhow!(
+            "git add 失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
     }
 
     let output = Command::new("git")
@@ -106,7 +109,12 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
             }
             (work_dir, "npm run build 2>&1")
         }
-        _ => return Err(anyhow!("未知构建目标: {}，支持: android/rust/frontend", target)),
+        _ => {
+            return Err(anyhow!(
+                "未知构建目标: {}，支持: android/rust/frontend",
+                target
+            ))
+        }
     };
 
     let output = Command::new("bash")
@@ -121,7 +129,10 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
     );
 
     if !output.status.success() {
-        return Err(anyhow!("构建失败:\n{}", &combined[..combined.len().min(2000)]));
+        return Err(anyhow!(
+            "构建失败:\n{}",
+            &combined[..combined.len().min(2000)]
+        ));
     }
 
     // Android 构建成功后找到 APK 文件，嵌入特殊标记
@@ -140,7 +151,11 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
         }
     }
 
-    Ok(format!("{} 构建成功\n{}", target, &combined[..combined.len().min(500)]))
+    Ok(format!(
+        "{} 构建成功\n{}",
+        target,
+        &combined[..combined.len().min(500)]
+    ))
 }
 
 /// 在用户工作区初始化项目模板（复制服务器上预置的模板）
@@ -161,7 +176,8 @@ pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
                  - app/src/main/res/layout/activity_main.xml\n\
                  - app/src/main/AndroidManifest.xml\n\
                  - settings.gradle（修改应用名）\n\
-                 - app/build.gradle（修改包名 applicationId）".into())
+                 - app/build.gradle（修改包名 applicationId）"
+                .into())
         }
         _ => Err(anyhow!("未知模板类型: {}，目前支持: android", project_type)),
     }
@@ -181,23 +197,31 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
+pub fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
     let dirs = [
         "app/build/outputs/apk/debug",
         "app/build/outputs/apk/release",
+        "android/app/build/outputs/apk/debug",
+        "android/app/build/outputs/apk/release",
         "build/outputs/apk/debug",
+        "build/outputs/apk/release",
     ];
+    let mut matches = Vec::new();
     for rel in &dirs {
         if let Ok(entries) = std::fs::read_dir(work_dir.join(rel)) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if p.extension().and_then(|e| e.to_str()) == Some("apk") {
-                    return Some(p);
+                    matches.push(p);
                 }
             }
         }
     }
-    None
+    matches.into_iter().max_by_key(|p| {
+        p.metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+    })
 }
 
 /// 执行受限 shell 命令（只允许白名单命令）
@@ -218,7 +242,9 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
         "./gradlew",
     ];
 
-    let is_allowed = ALLOWED_PREFIXES.iter().any(|prefix| command.starts_with(prefix));
+    let is_allowed = ALLOWED_PREFIXES
+        .iter()
+        .any(|prefix| command.starts_with(prefix));
     if !is_allowed {
         warn!("[工具] 拒绝执行命令: {}", command);
         return Err(anyhow!(
@@ -236,7 +262,9 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    Ok(format!("{}\n{}", stdout.trim(), stderr.trim()).trim().to_string())
+    Ok(format!("{}\n{}", stdout.trim(), stderr.trim())
+        .trim()
+        .to_string())
 }
 
 /// 安全路径：确保路径不会逃出 project_root
@@ -247,7 +275,9 @@ fn safe_path(project_root: &Path, relative_path: &str) -> Result<std::path::Path
     }
     let full = project_root.join(relative_path);
     // 规范化后再检查是否仍在 project_root 内
-    let canonical_root = project_root.canonicalize().unwrap_or(project_root.to_path_buf());
+    let canonical_root = project_root
+        .canonicalize()
+        .unwrap_or(project_root.to_path_buf());
     // 注意：文件可能还不存在，无法 canonicalize，用前缀检查
     let full_str = full.to_string_lossy();
     let root_str = canonical_root.to_string_lossy();

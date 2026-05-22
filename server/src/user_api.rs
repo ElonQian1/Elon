@@ -7,7 +7,6 @@
 /// 路由（无需管理员权限，user_id 即身份标识）：
 ///   GET /api/user/:user_id/agent   → 获取当前配置 + 可用全局代理列表
 ///   PUT /api/user/:user_id/agent   → 保存配置
-
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -17,7 +16,7 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::types::{AppState, UserAgentConfig};
+use crate::types::{AiBackend, AppState, UserAgentConfig};
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
 pub async fn get_user_agent(
@@ -37,18 +36,45 @@ pub async fn get_user_agent(
                 "name": a.name,
                 "model": a.model,
                 "api_base": a.api_base,
+                "backend": "api",
+                "provider": a.name,
+                "label": format!("{} / {}", a.name, a.model),
             })
         })
         .collect();
+    if state.ai_cli.enabled {
+        available_agents.extend(state.ai_cli.options.iter().map(|opt| {
+            serde_json::json!({
+                "name": opt.id,
+                "model": opt.model.as_deref().unwrap_or("default"),
+                "api_base": "local",
+                "backend": "cli",
+                "provider": opt.provider,
+                "label": opt.label,
+            })
+        }));
+    }
     available_agents.sort_by(|a, b| {
-        a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or(""))
+        a["name"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["name"].as_str().unwrap_or(""))
     });
+    let default_agent = if state.default_backend == AiBackend::LocalCli && state.ai_cli.enabled {
+        state
+            .ai_cli
+            .default_option
+            .as_deref()
+            .unwrap_or("local_cli")
+    } else {
+        global.default_agent.as_str()
+    };
 
     Json(serde_json::json!({
         "user_id": user_id,
         "config": config,
         "available_agents": available_agents,
-        "default_agent": global.default_agent,
+        "default_agent": default_agent,
     }))
     .into_response()
 }
@@ -79,12 +105,23 @@ pub async fn set_user_agent(
     // 校验：如果指定了全局代理名，必须存在
     let use_agent = req.use_agent.and_then(|s| {
         let s = s.trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     });
 
     if let Some(ref name) = use_agent {
         let global = state.agents_config.read().await;
-        if !global.agents.contains_key(name.as_str()) {
+        if is_cli_selection(&state, name) && !state.ai_cli.enabled {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "本地 AI CLI 未启用" })),
+            )
+                .into_response();
+        }
+        if !is_cli_selection(&state, name) && !global.agents.contains_key(name.as_str()) {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(serde_json::json!({
@@ -104,10 +141,38 @@ pub async fn set_user_agent(
 
     let cfg = UserAgentConfig {
         use_agent,
-        api_base:  req.api_base.and_then(|s| { let s = s.trim().to_string(); if s.is_empty() { None } else { Some(s) } }),
-        api_key:   req.api_key.and_then(|s|  { let s = s.trim().to_string(); if s.is_empty() { None } else { Some(s) } }),
-        model:     req.model.and_then(|s|    { let s = s.trim().to_string(); if s.is_empty() { None } else { Some(s) } }),
-        nickname:  req.nickname.and_then(|s| { let s = s.trim().to_string(); if s.is_empty() { None } else { Some(s) } }),
+        api_base: req.api_base.and_then(|s| {
+            let s = s.trim().to_string();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        }),
+        api_key: req.api_key.and_then(|s| {
+            let s = s.trim().to_string();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        }),
+        model: req.model.and_then(|s| {
+            let s = s.trim().to_string();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        }),
+        nickname: req.nickname.and_then(|s| {
+            let s = s.trim().to_string();
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
+        }),
         updated_at: Some(now),
     };
 
@@ -121,4 +186,15 @@ pub async fn set_user_agent(
 
     tracing::info!("用户 '{}' 更新了 AI 代理配置: {:?}", user_id, cfg.use_agent);
     Json(serde_json::json!({ "ok": true })).into_response()
+}
+
+fn is_cli_selection(state: &AppState, name: &str) -> bool {
+    is_cli_alias(name) || state.ai_cli.has_option(name)
+}
+
+fn is_cli_alias(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "codex" | "codex_cli" | "cli" | "local" | "local_cli"
+    )
 }

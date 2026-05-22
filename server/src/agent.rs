@@ -5,8 +5,8 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
 use crate::{
-    tools,
-    types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
+    ai_cli, image_generation, tools,
+    types::{AgentConfig, AiBackend, AppState, UserAgentConfig, WsMessage},
 };
 
 /// AI 代理工具定义列表（告诉 LLM 它可以用哪些工具）
@@ -190,23 +190,304 @@ fn system_prompt(workspace: &str) -> String {
 /// - agent_name:   可选，指定使用哪个 AI 代理
 pub async fn run(
     user_id: &str,
+    workspace_user_id: &str,
     user_message: &str,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Err(e) = run_inner(user_id, user_message, agent_name, state, &tx).await {
+    if let Err(e) = run_dispatch(
+        user_id,
+        workspace_user_id,
+        user_message,
+        agent_name,
+        state,
+        &tx,
+    )
+    .await
+    {
         error!("AI 代理运行出错: {}", e);
-        let _ = tx.send(WsMessage::Error { message: e.to_string() }.to_json());
+        let _ = tx.send(
+            WsMessage::Error {
+                message: e.to_string(),
+            }
+            .to_json(),
+        );
     }
+}
+
+async fn run_dispatch(
+    user_id: &str,
+    workspace_user_id: &str,
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    // 文生图是原有独立能力。配置存在时继续直接处理，避免 Codex CLI 只能返回文字说明。
+    if state.image_model.is_some() && should_generate_image_directly(user_message) {
+        return run_api_inner(
+            user_id,
+            workspace_user_id,
+            user_message,
+            agent_name,
+            state,
+            tx,
+        )
+        .await;
+    }
+
+    let user_config_workspace = state.get_user_workspace(user_id);
+    let user_config = UserAgentConfig::load(&user_config_workspace);
+    let backend = choose_backend(state, user_config.as_ref(), agent_name);
+
+    match backend {
+        AiBackend::LocalCli => {
+            match ai_cli::run(
+                user_id,
+                workspace_user_id,
+                user_message,
+                cli_option_id(agent_name),
+                state,
+                tx,
+            )
+            .await
+            {
+                Ok(()) => Ok(()),
+                Err(e) if state.ai_cli.fallback_to_api && has_api_agents(state).await => {
+                    warn!("本地 AI CLI 执行失败，回退到 API 代理: {}", e);
+                    let _ = tx.send(
+                        WsMessage::Progress {
+                            message: format!("本地 AI CLI 暂不可用，正在切换原 API 代理: {}", e),
+                        }
+                        .to_json(),
+                    );
+                    run_api_inner(
+                        user_id,
+                        workspace_user_id,
+                        user_message,
+                        api_agent_name(state, agent_name),
+                        state,
+                        tx,
+                    )
+                    .await
+                }
+                Err(e) => Err(e),
+            }
+        }
+        AiBackend::Api => {
+            run_api_inner(
+                user_id,
+                workspace_user_id,
+                user_message,
+                api_agent_name(state, agent_name),
+                state,
+                tx,
+            )
+            .await
+        }
+    }
+}
+
+async fn has_api_agents(state: &Arc<AppState>) -> bool {
+    !state.agents_config.read().await.agents.is_empty()
+}
+
+fn choose_backend(
+    state: &Arc<AppState>,
+    user_config: Option<&UserAgentConfig>,
+    agent_name: Option<&str>,
+) -> AiBackend {
+    if let Some(name) = agent_name {
+        if is_local_cli_option(state, name) {
+            return AiBackend::LocalCli;
+        }
+        if is_api_backend_alias(name) {
+            return AiBackend::Api;
+        }
+        return AiBackend::Api;
+    }
+
+    if let Some(cfg) = user_config {
+        if cfg.has_config() {
+            if cfg
+                .use_agent
+                .as_deref()
+                .map(|name| is_local_cli_option(state, name))
+                .unwrap_or(false)
+            {
+                return AiBackend::LocalCli;
+            }
+            return AiBackend::Api;
+        }
+    }
+
+    if state.default_backend == AiBackend::LocalCli && state.ai_cli.enabled {
+        AiBackend::LocalCli
+    } else {
+        AiBackend::Api
+    }
+}
+
+fn api_agent_name<'a>(state: &Arc<AppState>, agent_name: Option<&'a str>) -> Option<&'a str> {
+    agent_name.filter(|name| !is_local_cli_option(state, name) && !is_api_backend_alias(name))
+}
+
+fn cli_option_id(agent_name: Option<&str>) -> Option<&str> {
+    agent_name.filter(|name| !is_cli_alias(name))
+}
+
+fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
+    is_cli_alias(name) || state.ai_cli.has_option(name)
+}
+
+fn is_cli_alias(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "codex" | "codex_cli" | "cli" | "local" | "local_cli"
+    )
+}
+
+fn is_api_backend_alias(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "api" | "llm" | "remote"
+    )
+}
+
+fn is_standalone_image_request(message: &str) -> bool {
+    let image_words = [
+        "文生图",
+        "生图",
+        "生成图",
+        "图像",
+        "图片",
+        "壁纸",
+        "照片",
+        "头像",
+        "插画",
+        "海报",
+        "卡通",
+        "山水画",
+    ];
+
+    image_words.iter().any(|word| message.contains(word))
+}
+
+fn looks_like_app_development_request(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let app_words = [
+        "app",
+        "apk",
+        "android",
+        "应用",
+        "功能",
+        "页面",
+        "界面",
+        "按钮",
+        "代码",
+        "开发",
+        "修改",
+        "添加",
+        "新增",
+        "编译",
+        "打包",
+        "安装",
+        "发布",
+        "登录",
+        "注册",
+        "首页",
+        "设置",
+        "接口",
+        "后端",
+        "服务端",
+        "数据库",
+        "项目",
+    ];
+
+    app_words.iter().any(|word| lower.contains(word))
+}
+
+fn should_generate_image_directly(message: &str) -> bool {
+    if looks_like_app_development_request(message) {
+        return false;
+    }
+
+    let intent_words = [
+        "文生图",
+        "生图",
+        "生成",
+        "画",
+        "绘制",
+        "做一张",
+        "来一张",
+        "出一张",
+        "创作",
+    ];
+    is_standalone_image_request(message) && intent_words.iter().any(|word| message.contains(word))
+}
+
+fn image_prompt_from_message(message: &str) -> String {
+    let trimmed = message.trim();
+    let prefixes = [
+        "请帮我生成一张",
+        "帮我生成一张",
+        "帮我生成",
+        "请生成一张",
+        "请生成",
+        "生成一张",
+        "生成",
+        "画一张",
+        "画",
+        "绘制一张",
+        "绘制",
+        "来一张",
+        "做一张",
+    ];
+
+    for prefix in prefixes {
+        if let Some(rest) = trimmed.strip_prefix(prefix) {
+            let prompt = rest.trim_start_matches(['：', ':', '，', ',', ' ']).trim();
+            if !prompt.is_empty() {
+                return prompt.to_string();
+            }
+        }
+    }
+
+    trimmed.to_string()
 }
 
 fn looks_like_development_request(message: &str) -> bool {
     let lower = message.to_lowercase();
     let dev_words = [
-        "app", "apk", "android", "应用", "功能", "页面", "界面", "按钮", "代码", "开发",
-        "修改", "添加", "新增", "生成", "做一个", "做个", "编译", "打包", "安装", "发布",
-        "登录", "注册", "首页", "设置", "接口", "后端", "服务端", "数据库",
+        "app",
+        "apk",
+        "android",
+        "应用",
+        "功能",
+        "页面",
+        "界面",
+        "按钮",
+        "代码",
+        "开发",
+        "修改",
+        "添加",
+        "新增",
+        "生成",
+        "做一个",
+        "做个",
+        "编译",
+        "打包",
+        "安装",
+        "发布",
+        "登录",
+        "注册",
+        "首页",
+        "设置",
+        "接口",
+        "后端",
+        "服务端",
+        "数据库",
     ];
 
     dev_words.iter().any(|word| lower.contains(word))
@@ -230,12 +511,25 @@ async fn resolve_agent(
     state: &Arc<AppState>,
     workspace: &std::path::Path,
     agent_name: Option<&str>,
-) -> AgentConfig {
+) -> Result<AgentConfig> {
     let global = state.agents_config.read().await;
-    match UserAgentConfig::load(workspace) {
-        Some(cfg) if cfg.has_config() => cfg.resolve(&global),
-        _ => global.get_agent(agent_name).clone(),
+    if let Some(cfg) = UserAgentConfig::load(workspace) {
+        let uses_local_cli = cfg
+            .use_agent
+            .as_deref()
+            .map(|name| is_local_cli_option(state, name))
+            .unwrap_or(false);
+        if cfg.has_config() && !uses_local_cli {
+            return cfg.resolve(&global).ok_or_else(|| {
+                anyhow::anyhow!("未找到可用 API 代理，请在后台配置 AGENT_* 或切回 Codex CLI")
+            });
+        }
     }
+
+    global
+        .get_agent(agent_name)
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("未配置 API 代理，请设置 AGENT_* 或使用 Codex CLI"))
 }
 
 async fn run_casual_chat(
@@ -267,32 +561,75 @@ async fn run_casual_chat(
         reply
     })
 }
-async fn run_inner(
+
+async fn run_api_inner(
     user_id: &str,
+    workspace_user_id: &str,
     user_message: &str,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     // 每个用户操作自己的工作区，不能访问其他用户目录
-    let workspace = state.get_user_workspace(user_id);
+    let workspace = state.get_user_workspace(workspace_user_id);
+    let user_config_workspace = state.get_user_workspace(user_id);
+
+    if should_generate_image_directly(user_message) {
+        let prompt = image_prompt_from_message(user_message);
+        let model = state
+            .image_model
+            .as_ref()
+            .map(|cfg| cfg.model.as_str())
+            .unwrap_or("未配置");
+
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: format!("正在调用文生图模型: {}", model),
+            }
+            .to_json(),
+        );
+
+        let image = image_generation::generate_text_to_image(state, &prompt).await?;
+        let message = format!(
+            "图片已生成。\n\n提示词：{}\n图片链接：{}",
+            prompt, image.url
+        );
+
+        let _ = tx.send(
+            WsMessage::Done {
+                message,
+                apk_url: None,
+                image_url: Some(image.url),
+            }
+            .to_json(),
+        );
+        return Ok(());
+    }
 
     // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理。
     // 普通聊天也要走模型，否则体验会像固定话术。
-    let agent = resolve_agent(state, &workspace, agent_name).await;
+    let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
 
     if !looks_like_development_request(user_message) {
-        let _ = tx.send(WsMessage::Progress {
-            message: format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model),
-        }.to_json());
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model),
+            }
+            .to_json(),
+        );
 
         let reply = run_casual_chat(state, &agent, user_message).await?;
-        let _ = tx.send(WsMessage::Done {
-            message: reply,
-            apk_url: None,
-        }.to_json());
+        let _ = tx.send(
+            WsMessage::Done {
+                message: reply,
+                apk_url: None,
+                image_url: None,
+            }
+            .to_json(),
+        );
         return Ok(());
     }
+
     // 确保用户工作区存在
     std::fs::create_dir_all(&workspace)?;
     // 初始化 git（如果还未初始化）
@@ -312,9 +649,12 @@ async fn run_inner(
     }
     let workspace_str = workspace.to_string_lossy().to_string();
 
-    let _ = tx.send(WsMessage::Progress {
-        message: format!("正在使用 AI 代理: {} ({})", agent.name, agent.model),
-    }.to_json());
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: format!("正在使用 AI 代理: {} ({})", agent.name, agent.model),
+        }
+        .to_json(),
+    );
 
     // 初始化对话历史
     let mut messages = vec![
@@ -328,9 +668,12 @@ async fn run_inner(
         }),
     ];
 
-    let _ = tx.send(WsMessage::Progress {
-        message: "AI 正在理解需求...".into(),
-    }.to_json());
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: "AI 正在理解需求...".into(),
+        }
+        .to_json(),
+    );
 
     // 追踪 APK 下载链接（build_project 成功后填入）
     let mut apk_url: Option<String> = None;
@@ -353,10 +696,14 @@ async fn run_inner(
                 .unwrap_or("完成")
                 .to_string();
 
-            let _ = tx.send(WsMessage::Done {
-                message: final_text,
-                apk_url: apk_url.clone(),
-            }.to_json());
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: final_text,
+                    apk_url: apk_url.clone(),
+                    image_url: None,
+                }
+                .to_json(),
+            );
             return Ok(());
         }
 
@@ -369,16 +716,22 @@ async fn run_inner(
 
             for tool_call in &tool_calls {
                 let tool_id = tool_call["id"].as_str().unwrap_or("").to_string();
-                let tool_name = tool_call["function"]["name"].as_str().unwrap_or("").to_string();
+                let tool_name = tool_call["function"]["name"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
                 let args_str = tool_call["function"]["arguments"].as_str().unwrap_or("{}");
                 let args: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
 
                 info!("工具调用: {} {:?}", tool_name, args);
 
-                let _ = tx.send(WsMessage::ToolCall {
-                    tool: tool_name.clone(),
-                    args: args.clone(),
-                }.to_json());
+                let _ = tx.send(
+                    WsMessage::ToolCall {
+                        tool: tool_name.clone(),
+                        args: args.clone(),
+                    }
+                    .to_json(),
+                );
 
                 // 执行工具
                 let result = execute_tool(state, &workspace, &tool_name, &args);
@@ -391,10 +744,16 @@ async fn run_inner(
                                 let apk_name = line.trim_start_matches("##APK_FILE:").trim();
                                 let base_url = std::env::var("PUBLIC_URL")
                                     .unwrap_or_else(|_| "http://182.254.168.75:8080".into());
-                                apk_url = Some(format!("{}/download/{}/{}", base_url, user_id, apk_name));
-                                let _ = tx.send(WsMessage::Progress {
-                                    message: format!("APK 编译成功，正在生成下载链接..."),
-                                }.to_json());
+                                apk_url = Some(format!(
+                                    "{}/download/{}/{}",
+                                    base_url, workspace_user_id, apk_name
+                                ));
+                                let _ = tx.send(
+                                    WsMessage::Progress {
+                                        message: format!("APK 编译成功，正在生成下载链接..."),
+                                    }
+                                    .to_json(),
+                                );
                             }
                         }
                         r
@@ -402,10 +761,13 @@ async fn run_inner(
                     Err(e) => format!("错误: {}", e),
                 };
 
-                let _ = tx.send(WsMessage::ToolResult {
-                    tool: tool_name.clone(),
-                    result: result_str[..result_str.len().min(500)].to_string(),
-                }.to_json());
+                let _ = tx.send(
+                    WsMessage::ToolResult {
+                        tool: tool_name.clone(),
+                        result: result_str.chars().take(500).collect(),
+                    }
+                    .to_json(),
+                );
 
                 // 把工具结果加入对话历史
                 messages.push(json!({
@@ -421,20 +783,20 @@ async fn run_inner(
         }
     }
 
-    let _ = tx.send(WsMessage::Done {
-        message: "任务执行完毕".into(),
-        apk_url,
-    }.to_json());
+    let _ = tx.send(
+        WsMessage::Done {
+            message: "任务执行完毕".into(),
+            apk_url,
+            image_url: None,
+        }
+        .to_json(),
+    );
 
     Ok(())
 }
 
 /// 调用 LLM API（OpenAI 兼容接口）
-async fn call_llm(
-    state: &Arc<AppState>,
-    agent: &AgentConfig,
-    messages: &[Value],
-) -> Result<Value> {
+async fn call_llm(state: &Arc<AppState>, agent: &AgentConfig, messages: &[Value]) -> Result<Value> {
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -467,7 +829,6 @@ async fn call_llm(
 
     Ok(resp.json::<Value>().await?)
 }
-
 
 async fn call_chat_llm(
     state: &Arc<AppState>,
@@ -515,12 +876,15 @@ fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {
         || lower.contains("payment required")
         || lower.contains("endpoint is inactive")
     {
-        return "当前 AI 模型额度已用尽或接口不可用，请切换可用模型，或联系管理员补充额度后重试".into();
+        return "当前 AI 模型额度已用尽或接口不可用，请切换可用模型，或联系管理员补充额度后重试"
+            .into();
     }
-    if status.as_u16() == 401 || lower.contains("unauthorized") || lower.contains("invalid api key") {
+    if status.as_u16() == 401 || lower.contains("unauthorized") || lower.contains("invalid api key")
+    {
         return "当前 AI 模型密钥无效或权限不足，请检查 AI 设置或切换可用模型".into();
     }
-    if status.as_u16() == 429 || lower.contains("rate limit") || lower.contains("too many requests") {
+    if status.as_u16() == 429 || lower.contains("rate limit") || lower.contains("too many requests")
+    {
         return "当前 AI 模型请求过于频繁，请稍后重试或切换可用模型".into();
     }
     if status.as_u16() >= 500 {
@@ -535,6 +899,7 @@ fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {
         format!("AI 服务返回错误 {}：{}", status, visible)
     }
 }
+
 /// 根据工具名和参数，调用对应的工具函数
 fn execute_tool(
     _state: &Arc<AppState>,
@@ -544,16 +909,24 @@ fn execute_tool(
 ) -> Result<String> {
     match tool_name {
         "init_project" => {
-            let project_type = args["project_type"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 project_type 参数"))?;
+            let project_type = args["project_type"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 project_type 参数"))?;
             tools::init_project(workspace, project_type)
         }
         "read_file" => {
-            let path = args["path"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
+            let path = args["path"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
             tools::read_file(workspace, path)
         }
         "write_file" => {
-            let path = args["path"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
-            let content = args["content"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 content 参数"))?;
+            let path = args["path"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 path 参数"))?;
+            let content = args["content"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 content 参数"))?;
             tools::write_file(workspace, path, content)
         }
         "list_dir" => {
@@ -561,15 +934,21 @@ fn execute_tool(
             tools::list_dir(workspace, path)
         }
         "run_shell" => {
-            let command = args["command"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 command 参数"))?;
+            let command = args["command"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 command 参数"))?;
             tools::run_shell(workspace, command)
         }
         "git_commit" => {
-            let message = args["message"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 message 参数"))?;
+            let message = args["message"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 message 参数"))?;
             tools::git_commit(workspace, message)
         }
         "build_project" => {
-            let target = args["target"].as_str().ok_or_else(|| anyhow::anyhow!("缺少 target 参数"))?;
+            let target = args["target"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 target 参数"))?;
             tools::build_project(workspace, target)
         }
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
