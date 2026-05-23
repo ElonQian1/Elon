@@ -203,6 +203,34 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "   ✅ 上传完成" -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────
+# 4.5  SHA 顺序检查（防止旧版编译慢覆盖新版）
+# ─────────────────────────────────────────────────────────────
+if (-not $Force) {
+    $deployedShaFile = "$RemoteDir/.deployed-sha"
+    $serverSha = (ssh @SshOpts $Server "cat $deployedShaFile 2>/dev/null || echo ''").Trim()
+    if ($serverSha -and $serverSha -ne $ShaBig) {
+        # 检查服务器的 SHA 是否是我们的祖先（即我们更新）
+        git -C $RepoRoot merge-base --is-ancestor $serverSha $ShaBig 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            # 服务器 SHA 不是我们的祖先 → 服务器已有更新版本，拒绝回退
+            ssh @SshOpts $Server "rm -f $stagingPath" 2>$null
+            Remove-Worktree
+            $shortServer = $serverSha.Substring(0, [Math]::Min(8, $serverSha.Length))
+            Write-Host ""
+            Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Host "   ⚠️  部署已中止：服务器版本更新" -ForegroundColor Yellow
+            Write-Host "   服务器当前: $shortServer（比本次 $Sha 更新）" -ForegroundColor Yellow
+            Write-Host "   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。" -ForegroundColor Yellow
+            Write-Host "   解决：git pull --rebase 后重新编译部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+            Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Host ""
+            exit 0
+        }
+    }
+    Write-Host "   ✅ SHA 顺序检查通过（本次 $Sha 是最新版本）" -ForegroundColor Green
+}
+
+# ─────────────────────────────────────────────────────────────
 # 5. 替换 binary + 重启服务
 # ─────────────────────────────────────────────────────────────
 Write-Host "5⃣  替换 binary 并重启服务..." -ForegroundColor Yellow
@@ -220,6 +248,9 @@ $restartCmd = $restartCmdTemplate -f $RemoteDir, $RemoteBin
 ssh @SshOpts $Server $restartCmd
 
 Write-Host "   ✅ 服务重启指令已发送" -ForegroundColor Green
+# 记录本次部署的 SHA（用于下次部署时的顺序检查）
+ssh @SshOpts $Server "echo '$ShaBig' > $RemoteDir/.deployed-sha" 2>$null
+Write-Host "   ✅ SHA 记录已写入服务器 (.deployed-sha = $Sha)" -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────
 # 6. 验证

@@ -45,6 +45,32 @@ applyTo: "**"
 4. 发现其他代理未提交改动 → **不回退、不覆盖**，只提交自己的文件
 5. **每次 commit 后必须立即 `git push origin main`**
 
+### ⚠️ 新建文件必须显式 `git add`（血泪教训）
+
+`git add server/src/main.rs` **不会自动包含同目录下新建的 `.rs` 文件**。  
+新建文件是 `untracked` 状态，必须单独加：
+
+```powershell
+# 提交前必须执行，检查是否有未跟踪的新文件
+git status --short | Select-String "^\?\?"
+# 有输出 → 有新建文件，逐一确认是否需要 git add
+```
+
+新建 Rust 模块文件时，标准操作：
+```powershell
+git add server/src/<new-file>.rs   # 新文件必须显式添加
+git add server/src/main.rs         # 以及引用它的文件
+git add server/Cargo.toml          # 以及 Cargo.toml（如有新依赖）
+```
+
+**反例（导致构建断裂）**：
+```powershell
+# ❌ 只 add 了修改的文件，漏掉了新建的 homecli_agent.rs
+git add server/src/main.rs   # main.rs 里有 mod homecli_agent;
+git commit                   # 提交后，homecli_agent.rs 不在仓库里
+# → 其他开发者 pull 后构建：error[E0583]: file not found for module `homecli_agent`
+```
+
 > 分支名是 `main`（不是 `master`）。
 
 ### local_path / GitHub 项目
