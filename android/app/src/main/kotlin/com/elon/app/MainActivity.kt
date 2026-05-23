@@ -14,6 +14,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Canvas
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
@@ -57,6 +58,7 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -73,6 +75,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
@@ -153,7 +156,7 @@ class MainActivity : AppCompatActivity() {
     private val speechPermissionRequest = 4301
     private val notificationPermissionRequest = 4302
     private lateinit var cameraAttachmentLauncher: ActivityResultLauncher<Uri>
-    private lateinit var photoAttachmentLauncher: ActivityResultLauncher<String>
+    private lateinit var photoAttachmentLauncher: ActivityResultLauncher<PickVisualMediaRequest>
     private lateinit var documentAttachmentLauncher: ActivityResultLauncher<Array<String>>
     private var pendingCameraUri: Uri? = null
     private var pendingCameraName: String? = null
@@ -657,7 +660,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "已取消拍摄", Toast.LENGTH_SHORT).show()
             }
         }
-        photoAttachmentLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        photoAttachmentLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) {
                 attachPickedFile("相册图片", uri)
             } else {
@@ -763,7 +766,9 @@ class MainActivity : AppCompatActivity() {
     private fun openPhotoAttachment() {
         if (activeConversation().ended) return
         runCatching {
-            photoAttachmentLauncher.launch("image/*")
+            photoAttachmentLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
         }.onFailure {
             Toast.makeText(this, "无法打开相册", Toast.LENGTH_SHORT).show()
         }
@@ -817,6 +822,9 @@ class MainActivity : AppCompatActivity() {
                     total += read
                     if (total > MAX_ATTACHMENT_BYTES) {
                         target.delete()
+                        if (isPhotoAttachment(kind, mimeType)) {
+                            return compressPhotoAttachmentToCache(kind, uri, displayName)
+                        }
                         throw IllegalArgumentException("Attachment too large")
                     }
                     output.write(buffer, 0, read)
@@ -830,6 +838,64 @@ class MainActivity : AppCompatActivity() {
             mimeType = mimeType,
             file = target
         )
+    }
+
+    private fun isPhotoAttachment(kind: String, mimeType: String): Boolean {
+        return kind.contains("相册") && mimeType.startsWith("image/")
+    }
+
+    private fun compressPhotoAttachmentToCache(kind: String, uri: Uri, displayName: String): PendingAttachment {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Cannot open selected photo" }
+            BitmapFactory.decodeStream(input, null, bounds)
+        }
+        require(bounds.outWidth > 0 && bounds.outHeight > 0) { "Cannot decode selected photo" }
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = photoSampleSize(bounds.outWidth, bounds.outHeight)
+        }
+        val bitmap = contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Cannot open selected photo" }
+            BitmapFactory.decodeStream(input, null, decodeOptions)
+        } ?: throw IllegalArgumentException("Cannot decode selected photo")
+
+        val bytes = ByteArrayOutputStream()
+        var selectedBytes: ByteArray? = null
+        for (quality in PHOTO_COMPRESS_QUALITIES) {
+            bytes.reset()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, bytes)
+            if (bytes.size() <= MAX_ATTACHMENT_BYTES) {
+                selectedBytes = bytes.toByteArray()
+                break
+            }
+        }
+        if (selectedBytes == null) {
+            selectedBytes = bytes.toByteArray()
+        }
+        bitmap.recycle()
+        require(selectedBytes.size <= MAX_ATTACHMENT_BYTES) { "Compressed photo is still too large" }
+
+        val safeName = displayName.substringBeforeLast('.', displayName).ifBlank { "photo" }
+        val attachmentDir = File(cacheDir, "pending_attachments").apply { mkdirs() }
+        val fileName = "attachment_${System.currentTimeMillis()}_${pendingAttachments.size + 1}.jpg"
+        val target = File(attachmentDir, fileName)
+        target.writeBytes(selectedBytes)
+        return PendingAttachment(
+            kind = kind,
+            displayName = "$safeName.jpg",
+            fileName = fileName,
+            mimeType = "image/jpeg",
+            file = target
+        )
+    }
+
+    private fun photoSampleSize(width: Int, height: Int): Int {
+        var sample = 1
+        while ((width / sample) * (height / sample) > PHOTO_MAX_PIXELS) {
+            sample *= 2
+        }
+        return sample
     }
 
     private fun appendAttachmentLabel(kind: String, name: String) {
@@ -4341,6 +4407,8 @@ class MainActivity : AppCompatActivity() {
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401
         const val PENDING_WORK_TTL_MS = 6 * 60 * 60 * 1000L
         const val MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+        const val PHOTO_MAX_PIXELS = 4_000_000
+        val PHOTO_COMPRESS_QUALITIES = intArrayOf(88, 78, 68, 58, 48, 38)
         val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
