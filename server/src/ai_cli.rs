@@ -7,7 +7,7 @@ use tokio::{
 };
 
 use crate::{
-    tools,
+    intent_router, tools,
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
 
@@ -29,9 +29,15 @@ pub async fn run_with_workspace(
     std::fs::create_dir_all(workspace)?;
     ensure_git(workspace, user_id)?;
 
+    let android_task = looks_like_android_task(user_message);
+    let development_task = intent_router::looks_like_development_request(user_message);
     let _ = tx.send(
         WsMessage::Progress {
-            message: format!("CLI 工作区已准备：{}", workspace.display()),
+            message: if development_task {
+                "正在准备项目工作区。".into()
+            } else {
+                "正在思考。".into()
+            },
         }
         .to_json(),
     );
@@ -40,7 +46,7 @@ pub async fn run_with_workspace(
     }
     let _ = tx.send(
         WsMessage::Progress {
-            message: format!("正在启动本地 CLI：{}", option.command_preview()),
+            message: "AI 助手正在处理你的请求。".into(),
         }
         .to_json(),
     );
@@ -49,28 +55,34 @@ pub async fn run_with_workspace(
     let output = run_cli_command(&option, workspace, &prompt, tx).await?;
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
 
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: "CLI 已结束，正在查找 APK 构建产物。".into(),
-        }
-        .to_json(),
-    );
-    let apk_url = tools::find_latest_apk(workspace).map(|apk| {
-        let apk_name = apk
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        format!("{}/{}", download_base.trim_end_matches('/'), apk_name)
-    });
-    if apk_url.is_none() && looks_like_android_task(user_message) {
+    let apk_url = if android_task {
         let _ = tx.send(
             WsMessage::Progress {
-                message: "未找到 APK 产物；请查看上面的 CLI 输出确认是否缺少 Java、Android SDK、Gradle 或构建步骤。".into(),
+                message: "AI 已完成处理，正在查找 APK 安装包。".into(),
             }
             .to_json(),
         );
-    }
+        let apk_url = tools::find_latest_apk(workspace).map(|apk| {
+            let apk_name = apk
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            format!("{}/{}", download_base.trim_end_matches('/'), apk_name)
+        });
+        if apk_url.is_none() {
+            let _ = tx.send(
+                WsMessage::Progress {
+                    message: "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
+                        .into(),
+                }
+                .to_json(),
+            );
+        }
+        apk_url
+    } else {
+        None
+    };
 
     let _ = tx.send(
         WsMessage::Done {
@@ -129,8 +141,8 @@ async fn run_cli_command(
         .take()
         .ok_or_else(|| anyhow!("无法读取本地 AI CLI stderr"))?;
 
-    let stdout_task = tokio::spawn(read_cli_stream(stdout, "stdout", tx.clone()));
-    let stderr_task = tokio::spawn(read_cli_stream(stderr, "stderr", tx.clone()));
+    let stdout_task = tokio::spawn(read_cli_stream(stdout));
+    let stderr_task = tokio::spawn(read_cli_stream(stderr));
     let heartbeat_task = tokio::spawn(send_cli_heartbeat(tx.clone()));
 
     if option.prompt_mode == CliPromptMode::Stdin {
@@ -175,7 +187,7 @@ async fn send_cli_heartbeat(tx: UnboundedSender<String>) {
         if tx
             .send(
                 WsMessage::Progress {
-                    message: "CLI 仍在运行，正在等待模型或构建结果。".into(),
+                    message: "AI 还在处理，请稍候。".into(),
                 }
                 .to_json(),
             )
@@ -186,58 +198,19 @@ async fn send_cli_heartbeat(tx: UnboundedSender<String>) {
     }
 }
 
-async fn read_cli_stream<R>(reader: R, label: &'static str, tx: UnboundedSender<String>) -> String
+async fn read_cli_stream<R>(reader: R) -> String
 where
     R: AsyncRead + Unpin,
 {
     let mut lines = BufReader::new(reader).lines();
     let mut collected = String::new();
-    let mut forwarded = 0usize;
 
     while let Ok(Some(line)) = lines.next_line().await {
         collected.push_str(&line);
         collected.push('\n');
-
-        let clean = strip_ansi(&line);
-        let trimmed = clean.trim();
-        if trimmed.is_empty() || !should_forward_cli_line(trimmed) {
-            continue;
-        }
-        if forwarded < 160 {
-            let _ = tx.send(
-                WsMessage::Progress {
-                    message: format!("CLI 输出({}): {}", label, truncate_chars(trimmed, 500)),
-                }
-                .to_json(),
-            );
-            forwarded += 1;
-        } else if forwarded == 160 {
-            let _ = tx.send(
-                WsMessage::Progress {
-                    message: format!("CLI 输出({})较多，后续只保留在最终摘要中。", label),
-                }
-                .to_json(),
-            );
-            forwarded += 1;
-        }
     }
 
     collected
-}
-
-fn should_forward_cli_line(line: &str) -> bool {
-    let lower = line.to_ascii_lowercase();
-    if lower.starts_with("debug ") || lower.starts_with("trace ") {
-        return false;
-    }
-    let noisy = [
-        "using system root certificates",
-        "models cache:",
-        "otel.",
-        "rpc.",
-        "app_server.",
-    ];
-    !noisy.iter().any(|item| lower.contains(item))
 }
 
 fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
@@ -293,13 +266,13 @@ fn ensure_git(workspace: &Path, user_id: &str) -> Result<()> {
 
 fn environment_notes(user_message: &str, option: &AiCliOption) -> Vec<String> {
     let mut notes = Vec::new();
-    if option.bin.contains("codex") && !codex_auth_configured() {
-        notes.push("环境提醒：服务器未检测到 Codex CLI 登录凭据或 OPENAI_API_KEY，本地 Codex CLI 可能会失败并回退到 API 代理。".into());
-    }
-    if !command_available("git") {
-        notes.push("环境提醒：服务器未检测到 git，版本保存和部分 CLI 插件初始化可能失败。".into());
-    }
     if looks_like_android_task(user_message) {
+        if option.bin.contains("codex") && !codex_auth_configured() {
+            notes.push("环境提醒：AI CLI 登录状态异常，可能会自动切换备用代理。".into());
+        }
+        if !command_available("git") {
+            notes.push("环境提醒：服务器未检测到 git，项目保存可能失败。".into());
+        }
         if !command_available("java") {
             notes.push("环境提醒：服务器未检测到 java，Android Gradle 构建会失败。".into());
         }
