@@ -61,6 +61,7 @@
 - 把 VS Code Copilot 理解为 agent loop：先组装上下文，再用工具读取/编辑/运行命令，工具结果回到上下文后继续迭代，最后验证和交付。
 - 上下文来自系统指令、customizations、用户消息、会话历史、隐式编辑器/Git 状态、显式 `#` 引用和工具输出；没有进入上下文的内容对模型不可见。
 - 项目级稳定规则放在 `.github/copilot-instructions.md`；局部规则放在 `.github/instructions/*.instructions.md`；重复任务放在 `.github/prompts/*.prompt.md`；角色和工具受限的流程放在 `.github/agents/*.agent.md`。
+- VS Code 也会识别 `AGENTS.md`、`CLAUDE.md` 和组织级 instructions；管理入口优先使用 `Chat: Open Customizations`，避免多处复制长规则。
 - 复杂任务先用 Plan/规划思路做 discovery、alignment、design、refinement；计划确认后再进入实现。
 - 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
 

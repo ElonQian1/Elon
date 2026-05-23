@@ -33,9 +33,15 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 要点:
 
 - `.github/copilot-instructions.md` 适合短而稳定的项目级规则。
+- VS Code 还会识别 workspace 根目录的 `AGENTS.md`、`CLAUDE.md`，以及组织级 instructions；多个 instruction 文件会被合并进 chat context，但不保证顺序。
+- `AGENTS.md` 可通过 `chat.useAgentsMdFile` 启用或禁用；嵌套 `AGENTS.md` 仍是实验能力，适合 monorepo 子目录规则。
+- `CLAUDE.md` 可放在 workspace 根目录、`.claude/CLAUDE.md`、用户 home，`CLAUDE.local.md` 适合本地私有规则，不应提交。
 - `*.instructions.md` 适合带 `applyTo` 的局部规则，不要把所有细节塞进全局文件。
-- `*.prompt.md` 是 slash command。它可以声明 `description`、`name`、`argument-hint`、`agent`、`model`、`tools`。
-- `*.agent.md` 可以声明 `tools`、`agents`、`model`、`handoffs`、`hooks` 等。规划 agent 应限制为只读工具；实现 agent 才开放编辑和验证工具。
+- `*.prompt.md` 是 slash command。它可以声明 `description`、`name`、`argument-hint`、`agent`、`model`、`tools`；不可用工具会被忽略，正文可以用相对 Markdown 链接引用 workspace 文件。
+- `*.agent.md` 可以声明 `tools`、`agents`、`model`、`handoffs`、`hooks`、`user-invocable`、`disable-model-invocation` 等。规划 agent 应限制为只读工具；实现 agent 才开放编辑和验证工具。
+- `.github/agents` 下的 `.md` 文件会被当作 custom agents；默认位置还包括 `.claude/agents` 和用户级 `~/.copilot/agents`。
+- `infer` 已弃用，使用 `user-invocable` 控制是否出现在 agent 下拉框，使用 `disable-model-invocation` 控制是否能被其他 agent 作为 subagent 调用。
+- Agent Customizations editor 是统一发现、创建、管理 instructions、prompt files、agents 的入口，可从 Command Palette 运行 `Chat: Open Customizations`。
 - 同时存在 prompt tools 和 custom agent tools 时，prompt 文件里的 tools 优先。
 - VS Code 1.102 起，面向代码生成和测试生成的 settings-based instructions 已弃用，应使用文件型 instructions；代码审查、commit message、PR 描述仍可用 settings 指令。
 
@@ -52,12 +58,15 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 ## Planning、Subagents、Memory
 
 - Plan agent 用于复杂任务的先研究后计划: discovery、alignment、design、refinement。计划确认前不写代码。
+- 可用 `/plan` 直接切到 Plan agent；计划完成后可继续实现或交给 Copilot CLI / background agent。
+- Plan agent 会把计划保存到 session memory 文件 `/memories/session/plan.md`；session 结束后该计划不会自动保留到后续会话。
 - Subagents 拥有独立上下文，只返回最终结论，适合并行做安全、性能、可访问性或代码模式研究。
 - Memory 分两类: 本地 memory tool 和 GitHub-hosted Copilot Memory。前者有 user/repository/session scope；后者跨 Copilot surfaces 共享，但需要显式启用，并且要验证记忆是否仍符合当前代码。
 
 ## 本项目采用方式
 
 - 仓库级总原则继续放在 `.github/copilot-instructions.md`。
+- 如需让多个 AI 工具共享同一套规则，可新增根目录 `AGENTS.md`，但要链接现有文档，避免复制整份长规则。
 - Git、部署、并发工作树等强制流程继续放在 `.github/instructions/git-deploy-workflow.instructions.md`，通过 `applyTo: "**"` 自动注入。
 - 若以后出现高频任务，优先放进 `.github/prompts/*.prompt.md`，例如生成 APK 发布说明、准备部署检查单、修复失败构建。
 - 若要分离角色，使用 `.github/agents/*.agent.md`: planner 只读，implementer 可编辑和验证，reviewer 只读审查。
