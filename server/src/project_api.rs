@@ -27,6 +27,14 @@ pub struct LoginRequest {
 }
 
 #[derive(Deserialize)]
+pub struct RegisterRequest {
+    pub account: String,
+    pub password: String,
+    pub nickname: Option<String>,
+    pub device_name: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
@@ -48,6 +56,28 @@ pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequ
         }))
         .into_response(),
         Err(e) => json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    }
+}
+
+pub async fn register(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<RegisterRequest>,
+) -> Response {
+    match register_inner(&state, req) {
+        Ok((token, expires_at, user)) => Json(serde_json::json!({
+            "token": token,
+            "expires_at": expires_at,
+            "user": user,
+        }))
+        .into_response(),
+        Err(e) => {
+            let message = e.to_string();
+            if message.contains("UNIQUE constraint failed") {
+                json_error(StatusCode::BAD_REQUEST, "账号已被注册")
+            } else {
+                json_error(StatusCode::BAD_REQUEST, message)
+            }
+        }
     }
 }
 
@@ -387,6 +417,22 @@ fn login_inner(
     let user = state
         .store
         .authenticate_password(&req.account, &req.password)?;
+    let (token, expires_at) = state
+        .store
+        .create_session(&user.id, req.device_name.as_deref())?;
+    Ok((token, expires_at, user))
+}
+
+fn register_inner(
+    state: &AppState,
+    req: RegisterRequest,
+) -> anyhow::Result<(String, String, PublicUser)> {
+    let user = state.store.create_user(
+        &req.account,
+        &req.password,
+        req.nickname.as_deref(),
+        Some("user"),
+    )?;
     let (token, expires_at) = state
         .store
         .create_session(&user.id, req.device_name.as_deref())?;

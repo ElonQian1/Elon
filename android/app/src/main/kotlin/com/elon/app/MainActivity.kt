@@ -34,6 +34,9 @@ import android.view.animation.LinearInterpolator
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import com.elon.app.BuildConfig
+import com.elon.app.update.AppUpdateManager
+import com.elon.app.update.UpdateCheckWorker
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -222,6 +225,11 @@ class MainActivity : AppCompatActivity() {
                 true
             } else false
         }
+
+        // 自动检查更新（12 小时冷却，静默失败不打扰用户）
+        AppUpdateManager(this).autoCheck()
+        // 注册后台周期检查（APP 关闭时也能推送通知）
+        UpdateCheckWorker.schedule(this)
     }
 
     override fun onResume() {
@@ -1732,6 +1740,11 @@ class MainActivity : AppCompatActivity() {
         binding.projectRecordButton.setOnClickListener { showProjectRecordDialog() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
+        binding.profileCheckUpdateButton.setOnClickListener {
+            AppUpdateManager(this).manualCheck()
+        }
+        binding.profileVersionText.text =
+            "一龙 v${BuildConfig.VERSION_NAME}  (build ${BuildConfig.VERSION_CODE})"
     }
 
     private fun showMoreActions() {
