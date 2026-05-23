@@ -11,6 +11,7 @@ mod client_gateway;
 mod client_protocol;
 mod image_generation;
 mod intent_router;
+mod peer_relay;
 mod project_api;
 mod router;
 mod store;

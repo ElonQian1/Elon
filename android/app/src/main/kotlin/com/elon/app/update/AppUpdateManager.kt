@@ -16,6 +16,7 @@ import androidx.core.content.FileProvider
 import com.elon.app.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -55,7 +56,19 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    // ── 数据类 ──────────────────────────────────────────────────────────────
+    /** 对同WiFi 种子节点使用较短连接超时（对方可能不在线，快速失败即可） */
+    private val mirrorHttp = OkHttpClient.Builder()
+        .connectTimeout(4, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
+
+    // ── 数据类 ──────────────────────────────────────────────
+
+    private data class MirrorSource(
+        val url: String,
+        val type: String,
+        val priority: Int
+    )
 
     private data class VersionInfo(
         val versionCode: Int,
@@ -63,7 +76,8 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
         val downloadUrl: String,
         val changelog: String,
         val forceUpdate: Boolean,
-        val fileSize: Long
+        val fileSize: Long,
+        val mirrors: List<MirrorSource> = emptyList()
     )
 
     // ── 公共 API ────────────────────────────────────────────────────────────
@@ -130,13 +144,31 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
             if (!resp.isSuccessful) return null
             val body = resp.body?.string() ?: return null
             val json = JSONObject(body)
+
+            // 解析同WiFi 种子的 mirrors 数组
+            val mirrors = mutableListOf<MirrorSource>()
+            val mirrorsArr = json.optJSONArray("mirrors")
+            if (mirrorsArr != null) {
+                for (i in 0 until mirrorsArr.length()) {
+                    val m = mirrorsArr.optJSONObject(i) ?: continue
+                    mirrors.add(
+                        MirrorSource(
+                            url = m.optString("url", ""),
+                            type = m.optString("type", "server"),
+                            priority = m.optInt("priority", 0)
+                        )
+                    )
+                }
+            }
+
             VersionInfo(
                 versionCode = json.optInt("versionCode", 0),
                 versionName = json.optString("versionName", ""),
                 downloadUrl = json.optString("downloadUrl", ""),
                 changelog = json.optString("changelog", ""),
                 forceUpdate = json.optBoolean("forceUpdate", false),
-                fileSize = json.optLong("fileSize", 0)
+                fileSize = json.optLong("fileSize", 0),
+                mirrors = mirrors
             )
         }
     } catch (e: Exception) {
@@ -197,37 +229,62 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
 
         Thread {
             try {
-                val request = Request.Builder().url(info.downloadUrl).build()
-                http.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
-                    val body = resp.body ?: throw Exception("空响应体")
-                    val totalBytes = body.contentLength()
-                    val apkFile = File(activity.getExternalFilesDir(null), "elon_update.apk")
+                // 优先尝试同WiFi 种子节点（按 priority 降序，连接失败则回落到服务器）
+                val candidates: List<Pair<OkHttpClient, String>> =
+                    info.mirrors
+                        .filter { it.url.isNotEmpty() }
+                        .sortedByDescending { it.priority }
+                        .map { Pair(mirrorHttp, it.url) } +
+                    listOf(Pair(http, info.downloadUrl))
 
-                    var downloaded = 0L
-                    body.byteStream().use { input ->
-                        apkFile.outputStream().use { output ->
-                            val buf = ByteArray(8192)
-                            var n: Int
-                            while (input.read(buf).also { n = it } != -1) {
-                                output.write(buf, 0, n)
-                                downloaded += n
-                                if (totalBytes > 0) {
-                                    val pct = (downloaded * 100 / totalBytes).toInt()
-                                    activity.runOnUiThread {
-                                        progressBar.progress = pct
-                                        progressText.text = "$pct%  (${"%.1f".format(downloaded / 1_048_576.0)} MB)"
+                var lastError: Exception? = null
+                for ((httpClient, url) in candidates) {
+                    try {
+                        val isMirror = httpClient === mirrorHttp
+                        activity.runOnUiThread {
+                            progressText.text = if (isMirror) "正在从同WiFi设备获取..." else "正在从服务器下载..."
+                        }
+                        val request = Request.Builder().url(url).build()
+                        httpClient.newCall(request).execute().use { resp ->
+                            if (!resp.isSuccessful) throw Exception("HTTP ${resp.code}")
+                            val body = resp.body ?: throw Exception("空响应体")
+                            val totalBytes = body.contentLength()
+                            val apkFile = File(activity.getExternalFilesDir(null), "elon_update.apk")
+
+                            var downloaded = 0L
+                            body.byteStream().use { input ->
+                                apkFile.outputStream().use { output ->
+                                    val buf = ByteArray(8192)
+                                    var n: Int
+                                    while (input.read(buf).also { n = it } != -1) {
+                                        output.write(buf, 0, n)
+                                        downloaded += n
+                                        if (totalBytes > 0) {
+                                            val pct = (downloaded * 100 / totalBytes).toInt()
+                                            activity.runOnUiThread {
+                                                progressBar.progress = pct
+                                                progressText.text = "$pct%  (${"%.1f".format(downloaded / 1_048_576.0)} MB)"
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
 
-                    activity.runOnUiThread {
-                        progressDialog.dismiss()
-                        installApk(apkFile)
+                            activity.runOnUiThread {
+                                progressDialog.dismiss()
+                                installApk(apkFile)
+                            }
+                            return@Thread // 下载成功，退出循环
+                        }
+                    } catch (e: Exception) {
+                        lastError = e
+                        // 尝试下一个候选
                     }
                 }
+
+                // 所有候选全部失败
+                throw lastError ?: Exception("未知错误")
+
             } catch (e: Exception) {
                 activity.runOnUiThread {
                     progressDialog.dismiss()

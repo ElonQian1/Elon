@@ -7,7 +7,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
-use crate::{admin, api, client_gateway, project_api, user_api, web};
+use crate::{admin, api, client_gateway, peer_relay, project_api, user_api, web};
 
 pub fn build_app(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
@@ -15,9 +15,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 应用自身 APK 更新文件目录（由 publish-apk.ps1 部署后填充）
+    // 应用自身 APK 更新文件目录（由发布脚本部署后填充）
     let app_dir = state.data_dir.join("app");
-    let version_json = app_dir.join("version.json");
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
     Router::new()
@@ -52,8 +51,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(client_gateway::download_apk),
         )
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
-        .route_service("/app/version.json", ServeFile::new(version_json))
+        // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
+        .route("/app/version.json", get(peer_relay::version_json))
         .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
+        // ── P2P 同WiFi 中继 ──────────────────────────────────────────────
+        // Seeder 设备连接 WS 注册自己为种子
+        .route("/app/peer/ws", get(peer_relay::peer_ws_handler))
+        // 下载方通过服务器中继获取对应 seeder 的 APK
+        .route("/app/relay/peer/:peer_id/apk", get(peer_relay::relay_apk))
         .route("/admin", get(admin::admin_page))
         .route(
             "/api/admin/agents",

@@ -1,9 +1,25 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
-use tokio::sync::RwLock;
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::sync::{mpsc, oneshot, RwLock};
 
 use crate::store::Store;
+
+// ── P2P 同WiFi中继 ──────────────────────────────────────────────
+
+/// 下载方向 seeder 发起的传输请求
+pub struct PeerRequest {
+    /// Seeder 把 APK 数据通过此通道回传给中继 handler
+    pub response_tx: oneshot::Sender<Result<Vec<u8>, String>>,
+}
+
+/// 已注册的 seeder 节点信息
+pub struct PeerEntry {
+    /// 该 seeder 当前安装的 APK versionCode
+    pub version_code: i64,
+    /// 向该 seeder 发送传输请求的通道
+    pub tx: mpsc::Sender<PeerRequest>,
+}
 
 /// 单个 AI 代理的配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -434,6 +450,8 @@ pub struct AppState {
     pub config_path: std::path::PathBuf,
     /// 可选文生图模型配置
     pub image_model: Option<ImageModelConfig>,
+    /// 已注册的同WiFi种子节点（peer_id → PeerEntry）
+    pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
 }
 
 impl AppState {
@@ -589,6 +607,7 @@ impl AppState {
             admin_token,
             config_path,
             image_model,
+            peer_registry: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 

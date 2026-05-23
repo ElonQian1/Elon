@@ -230,6 +230,8 @@ class MainActivity : AppCompatActivity() {
         AppUpdateManager(this).autoCheck()
         // 注册后台周期检查（APP 关闭时也能推送通知）
         UpdateCheckWorker.schedule(this)
+        // 注册本机为同WiFi APK 种子节点（已安装用户帮助其他用户加速下载）
+        com.elon.app.update.PeerSeederManager.start(this)
     }
 
     override fun onResume() {
