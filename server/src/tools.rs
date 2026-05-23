@@ -113,7 +113,15 @@ fn bump_android_version(work_dir: &Path) -> String {
     if !gradle_path.exists() {
         return "（未找到 app/build.gradle，跳过版本号递增）".into();
     }
-    let content = match std::fs::read_to_string(&gradle_path) {
+    // 幂等性守卫：5 分钟内如果已递增过版本号，跳过（防止服务器重启后重复递增）
+    let bump_marker = work_dir.join(".version_bumped_at");
+    if let Ok(meta) = std::fs::metadata(&bump_marker) {
+        if let Ok(modified) = meta.modified() {
+            if modified.elapsed().unwrap_or_default() < std::time::Duration::from_secs(300) {
+                return "(5分钟内已递增过版本号，跳过重复递增)".into();
+            }
+        }
+    }    let content = match std::fs::read_to_string(&gradle_path) {
         Ok(c) => c,
         Err(e) => return format!("（读取 build.gradle 失败: {}）", e),
     };
@@ -173,8 +181,8 @@ fn bump_android_version(work_dir: &Path) -> String {
         return "（未找到 versionCode，跳过版本号递增）".into();
     }
     match std::fs::write(&gradle_path, &new_content) {
-        Ok(_) => {
-            if version_name_new.is_empty() {
+        Ok(_) => {            // 写入成功后更新幂等性标记文件
+            let _ = std::fs::write(&bump_marker, "");            if version_name_new.is_empty() {
                 format!("版本号已递增: versionCode {} → {}", version_code_old, version_code_new)
             } else {
                 format!(

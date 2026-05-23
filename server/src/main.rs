@@ -9,6 +9,7 @@ mod ai_cli;
 mod api;
 mod client_gateway;
 mod client_protocol;
+mod homecli_agent;
 mod image_generation;
 mod intent_router;
 mod peer_relay;
@@ -33,6 +34,13 @@ async fn main() -> Result<()> {
         .init();
 
     let state = Arc::new(AppState::new()?);
+
+    // 服务启动时：将上次运行中的任务标记为已中断
+    let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
+    if interrupted > 0 {
+        info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);
+    }
+
     let app = router::build_app(state);
 
     let addr: SocketAddr = std::env::var("LISTEN_ADDR")

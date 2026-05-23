@@ -593,6 +593,47 @@ impl Store {
         Ok(())
     }
 
+    /// 标记当前用户任务为 running（服务启动时或任务开始时调用）
+    pub fn ws_task_started(&self, workspace_user_id: &str, message: &str) -> Result<()> {
+        self.conn()?.execute(
+            "INSERT OR REPLACE INTO ws_task_log (workspace_user_id, message, status, started_at, finished_at)
+             VALUES (?1, ?2, 'running', ?3, NULL)",
+            params![workspace_user_id, message, now()],
+        )?;
+        Ok(())
+    }
+
+    /// 标记任务完成（status: done / error）
+    pub fn ws_task_finished(&self, workspace_user_id: &str, status: &str) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE ws_task_log SET status = ?1, finished_at = ?2 WHERE workspace_user_id = ?3",
+            params![status, now(), workspace_user_id],
+        )?;
+        Ok(())
+    }
+
+    /// 查询该用户是否有被中断的任务，返回中断时的消息内容
+    pub fn get_interrupted_ws_task(&self, workspace_user_id: &str) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        let msg: Option<String> = conn
+            .query_row(
+                "SELECT message FROM ws_task_log WHERE workspace_user_id = ?1 AND status = 'interrupted'",
+                params![workspace_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(msg)
+    }
+
+    /// 服务器启动时：将所有 running 状态的任务标记为 interrupted
+    pub fn mark_interrupted_running_ws_tasks(&self) -> Result<usize> {
+        let n = self.conn()?.execute(
+            "UPDATE ws_task_log SET status = 'interrupted', finished_at = ?1 WHERE status = 'running'",
+            params![now()],
+        )?;
+        Ok(n)
+    }
+
     fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
@@ -700,6 +741,14 @@ fn init_schema(conn: &Connection) -> Result<()> {
           created_at TEXT NOT NULL,
           FOREIGN KEY (project_id) REFERENCES projects(id),
           FOREIGN KEY (task_id) REFERENCES tasks(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS ws_task_log (
+          workspace_user_id TEXT PRIMARY KEY,
+          message TEXT NOT NULL,
+          status TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          finished_at TEXT
         );
         "#,
     )?;

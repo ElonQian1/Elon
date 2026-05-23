@@ -311,6 +311,32 @@ async fn get_or_start_legacy_job(request: AgentRequest, state: Arc<AppState>) ->
 }
 
 async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<LegacyWsJob>) {
+    // 检查是否有被服务器重启中断的任务
+    let was_interrupted = state
+        .store
+        .get_interrupted_ws_task(&request.workspace_user_id)
+        .ok()
+        .flatten()
+        .is_some();
+
+    // 标记当前任务为 running
+    let _ = state
+        .store
+        .ws_task_started(&request.workspace_user_id, &request.content);
+
+    // 如果上次任务被服务器重启中断，提前通知用户
+    if was_interrupted {
+        let warning = types::WsMessage::Progress {
+            message: "⚠️ 上次任务被服务器重启中断，正在重新处理，请稍候...".into(),
+        }
+        .to_json();
+        {
+            let mut backlog = job.backlog.lock().await;
+            backlog.push(warning.clone());
+        }
+        let _ = job.broadcaster.send(warning);
+    }
+
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let state_clone = state.clone();
     let request_for_agent = request.clone();
@@ -327,6 +353,7 @@ async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<Le
         .await;
     });
 
+    let mut final_status = "done";
     while let Some(progress) = rx.recv().await {
         {
             let mut backlog = job.backlog.lock().await;
@@ -337,6 +364,9 @@ async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<Le
             }
         }
         let terminal = is_terminal_ws_message(&progress);
+        if terminal && is_error_ws_message(&progress) {
+            final_status = "error";
+        }
         let _ = job.broadcaster.send(progress);
         if terminal {
             job.finished.store(true, Ordering::SeqCst);
@@ -346,6 +376,11 @@ async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<Le
 
     let _ = agent_task.await;
     job.finished.store(true, Ordering::SeqCst);
+
+    // 任务完成，更新 DB 状态
+    let _ = state
+        .store
+        .ws_task_finished(&request.workspace_user_id, final_status);
 
     let cleanup_key = job.key.clone();
     let cleanup_job = job.clone();
@@ -379,6 +414,13 @@ fn is_terminal_ws_message(raw: &str) -> bool {
                 .and_then(|message_type| message_type.as_str())
                 .map(|message_type| message_type == "done" || message_type == "error")
         })
+        .unwrap_or(false)
+}
+
+fn is_error_ws_message(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(|t| t == "error"))
         .unwrap_or(false)
 }
 
