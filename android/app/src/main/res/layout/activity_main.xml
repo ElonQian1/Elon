@@ -411,6 +411,19 @@
                     android:textSize="16sp" />
 
                 <TextView
+                    android:id="@+id/profileShareButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="1dp"
+                    android:background="#1E1E1E"
+                    android:gravity="center_vertical"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
+                    android:text="分享推广"
+                    android:textColor="#D0D0D0"
+                    android:textSize="16sp" />
+
+                <TextView
                     android:id="@+id/profileVersionText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

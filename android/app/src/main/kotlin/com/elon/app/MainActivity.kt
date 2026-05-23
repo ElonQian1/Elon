@@ -106,6 +106,8 @@ class MainActivity : AppCompatActivity() {
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
     private val serverUrl = "http://43.139.149.158:8080"
+    private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
+    private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private var activeProjectIndex = 0
     private val conversations: MutableList<AppConversation> get() = activeProject().conversations
     private val projectEvents: MutableList<String> get() = activeProject().events
@@ -2454,6 +2456,7 @@ class MainActivity : AppCompatActivity() {
         binding.profileCheckUpdateButton.setOnClickListener {
             AppUpdateManager(this).manualCheck()
         }
+        binding.profileShareButton.setOnClickListener { showPromotionDialog() }
         binding.profileVersionText.text =
             "一龙 v${BuildConfig.VERSION_NAME}  (build ${BuildConfig.VERSION_CODE})"
     }
@@ -2792,6 +2795,53 @@ class MainActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("一龙聊天内容", text))
         Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showPromotionDialog() {
+        val text = promotionText()
+        val content = TextView(this).apply {
+            setText(text)
+            setTextIsSelectable(true)
+            setPadding(dp(22), dp(8), dp(22), dp(2))
+            setTextColor(Color.parseColor("#333333"))
+            textSize = 14f
+            setLineSpacing(dp(3).toFloat(), 1.0f)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("分享推广")
+            .setView(content)
+            .setPositiveButton("复制推广语") { _, _ -> copyPromotionText(text) }
+            .setNeutralButton("系统分享") { _, _ -> sharePromotionText(text) }
+            .setNegativeButton("打开下载页") { _, _ -> openApkDownloadPage() }
+            .show()
+    }
+
+    private fun promotionText(): String {
+        return buildString {
+            append("我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。")
+            append("\n\n")
+            append("下载地址：")
+            append(apkDownloadUrl)
+        }
+    }
+
+    private fun copyPromotionText(text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("一龙推广语", text))
+        Toast.makeText(this, "推广语已复制", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun sharePromotionText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(intent, "分享一龙 APK"))
+    }
+
+    private fun openApkDownloadPage() {
+        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkDownloadPageUrl)))
     }
 
     private fun forwardMessageText(text: String) {

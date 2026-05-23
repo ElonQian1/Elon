@@ -214,6 +214,11 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
         }
     };
 
+    let public_url = state.public_url.trim_end_matches('/');
+    json["downloadUrl"] =
+        serde_json::Value::String(format!("{public_url}/app/ElonSpeed-latest.apk"));
+    json["downloadPageUrl"] = serde_json::Value::String(format!("{public_url}/app/download"));
+
     // 注入 mirrors：仅包含 versionCode >= 当前发布版本的 seeder
     let reg = state.peer_registry.read().await;
     if !reg.is_empty() {

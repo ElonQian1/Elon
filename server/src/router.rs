@@ -65,6 +65,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(client_gateway::download_apk),
         )
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
+        .route("/app/download", get(web::download_page))
+        .route("/download", get(web::download_page))
         // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
         .route("/app/version.json", get(peer_relay::version_json))
         .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
