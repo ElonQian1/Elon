@@ -3,16 +3,54 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def signingValue = { name, fallback = "" ->
+    def envValue = System.getenv(name)
+    if (envValue != null && !envValue.trim().isEmpty()) return envValue.trim()
+    def gradleValue = project.findProperty(name)
+    if (gradleValue != null && !gradleValue.toString().trim().isEmpty()) return gradleValue.toString().trim()
+    def localValue = localProperties.getProperty(name)
+    if (localValue != null && !localValue.trim().isEmpty()) return localValue.trim()
+    return fallback
+}
+
+def defaultKeystorePath = new File(System.getProperty("user.home"), ".elon/signing/elon-release.jks").absolutePath
+def releaseKeystorePath = signingValue("ELON_RELEASE_KEYSTORE", defaultKeystorePath)
+def releaseStorePassword = signingValue("ELON_RELEASE_STORE_PASSWORD")
+def releaseKeyAlias = signingValue("ELON_RELEASE_KEY_ALIAS", "elon")
+def releaseKeyPassword = signingValue("ELON_RELEASE_KEY_PASSWORD")
+def releaseKeystoreFile = file(releaseKeystorePath)
+
+gradle.taskGraph.whenReady { graph ->
+    def needsReleaseSigning = graph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains("release") }
+    if (needsReleaseSigning) {
+        def missing = []
+        if (!releaseKeystorePath) missing << "ELON_RELEASE_KEYSTORE"
+        if (!releaseKeystoreFile.exists()) missing << "ELON_RELEASE_KEYSTORE(file not found: ${releaseKeystorePath})"
+        if (!releaseStorePassword) missing << "ELON_RELEASE_STORE_PASSWORD"
+        if (!releaseKeyAlias) missing << "ELON_RELEASE_KEY_ALIAS"
+        if (!releaseKeyPassword) missing << "ELON_RELEASE_KEY_PASSWORD"
+        if (!missing.isEmpty()) {
+            throw new GradleException("缺少 APK 发布签名配置: ${missing.join(', ')}。请把 elon-release.jks 放到 ${defaultKeystorePath}，并通过用户环境变量、~/.gradle/gradle.properties 或 android/local.properties 配置签名密码。")
+        }
+    }
+}
+
 android {
     namespace 'com.elon.app'
     compileSdk 34
 
     signingConfigs {
         release {
-            storeFile     file("elon-release.jks")
-            storePassword "elon123456"
-            keyAlias      "elon"
-            keyPassword   "elon123456"
+            storeFile     releaseKeystoreFile
+            storePassword releaseStorePassword
+            keyAlias      releaseKeyAlias
+            keyPassword   releaseKeyPassword
         }
     }
 
@@ -57,7 +95,7 @@ dependencies {
     // WorkManager（后台定期检查更新）
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
 
-    // WebSocket 客户�?
+    // WebSocket 客户端
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 
     // JSON 解析

@@ -35,16 +35,83 @@ $ServerHost = "root@43.139.149.158"
 $ServerDir  = "/opt/elon/data/app"
 $ServerUrl  = "http://43.139.149.158:8080"
 
+$DefaultKeystore = Join-Path $env:USERPROFILE ".elon\signing\elon-release.jks"
+$LegacyKeystore  = Join-Path $AndroidDir "app\elon-release.jks"
+
+function Use-ReleaseSigningConfig {
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEYSTORE)) {
+        if (Test-Path $DefaultKeystore) {
+            $env:ELON_RELEASE_KEYSTORE = $DefaultKeystore
+        } elseif (Test-Path $LegacyKeystore) {
+            $env:ELON_RELEASE_KEYSTORE = $LegacyKeystore
+        }
+    }
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEY_ALIAS)) {
+        $env:ELON_RELEASE_KEY_ALIAS = "elon"
+    }
+}
+
+function Assert-ReleaseSigningConfig {
+    Use-ReleaseSigningConfig
+
+    $missing = @()
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEYSTORE)) {
+        $missing += "ELON_RELEASE_KEYSTORE（默认路径：$DefaultKeystore）"
+    } elseif (-not (Test-Path $env:ELON_RELEASE_KEYSTORE)) {
+        $missing += "ELON_RELEASE_KEYSTORE 文件不存在：$env:ELON_RELEASE_KEYSTORE"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_STORE_PASSWORD)) {
+        $missing += "ELON_RELEASE_STORE_PASSWORD"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEY_ALIAS)) {
+        $missing += "ELON_RELEASE_KEY_ALIAS"
+    }
+    if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEY_PASSWORD)) {
+        $missing += "ELON_RELEASE_KEY_PASSWORD"
+    }
+
+    if ($missing.Count -gt 0) {
+        Write-Host ""
+        Write-Host "缺少 APK 签名配置：" -ForegroundColor Yellow
+        $missing | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+        Write-Host ""
+        Write-Host "一次性推荐设置：" -ForegroundColor Cyan
+        Write-Host "  1. 将 elon-release.jks 放到 $DefaultKeystore" -ForegroundColor Cyan
+        Write-Host "  2. 在用户环境变量或 ~/.gradle/gradle.properties 中配置：" -ForegroundColor Cyan
+        Write-Host "     ELON_RELEASE_KEYSTORE=$DefaultKeystore" -ForegroundColor Cyan
+        Write-Host "     ELON_RELEASE_STORE_PASSWORD=<不要提交到 git>" -ForegroundColor Cyan
+        Write-Host "     ELON_RELEASE_KEY_ALIAS=elon" -ForegroundColor Cyan
+        Write-Host "     ELON_RELEASE_KEY_PASSWORD=<不要提交到 git>" -ForegroundColor Cyan
+        Write-Error "APK 签名配置不完整，已停止发布。"
+    }
+}
+
+function Push-HeadToMain {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        git -C $RepoRoot push origin HEAD:main
+        if ($LASTEXITCODE -eq 0) { return }
+
+        Write-Warning "push 被拒绝，正在 fetch + rebase 后重试（第 $attempt 次）..."
+        git -C $RepoRoot fetch origin
+        if ($LASTEXITCODE -ne 0) { Write-Error "git fetch 失败" }
+        git -C $RepoRoot rebase origin/main
+        if ($LASTEXITCODE -ne 0) { Write-Error "git rebase 失败，请解决冲突后重试发布。" }
+    }
+
+    Write-Error "重试 3 次后仍无法推送，已停止上传 APK。"
+}
+
 # ── Step 0: Git pull（防止 push 冲突） ────────────────────────────────────────
 
 Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
 git -C $RepoRoot pull --rebase origin main
+if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 
 # ── Step 1: 递增 versionCode，确认 versionName ────────────────────────────────
 
 Write-Host "📝 更新版本号..." -ForegroundColor Cyan
 
-$content = Get-Content $GradlePath -Raw
+$content = Get-Content $GradlePath -Encoding UTF8 -Raw
 
 $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
 $newCode = $oldCode + 1
@@ -57,7 +124,11 @@ if ($parts.Count -eq 2) { $parts += "0" }   # "1.0" → ["1","0","0"]
 $parts[-1] = [string]([int]$parts[-1] + 1)   # 递增 PATCH
 $newName = $parts -join '.'
 $content = $content -replace "versionName\s+`"$([regex]::Escape($oldName))`"", "versionName `"$newName`""
-Set-Content $GradlePath $content -NoNewline
+[System.IO.File]::WriteAllText(
+    $GradlePath,
+    $content,
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 $versionName = $newName
 
@@ -67,6 +138,7 @@ Write-Host "   versionName: $oldName → $newName" -ForegroundColor Green
 # ── Step 2: 编译 APK ─────────────────────────────────────────────────────────
 
 if (-not $SkipBuild) {
+    Assert-ReleaseSigningConfig
     Write-Host "🔨 编译 Release APK..." -ForegroundColor Cyan
     Push-Location $AndroidDir
     try {
@@ -100,7 +172,8 @@ if ($rs) { rustfmt $rs }
 
 git -C $RepoRoot add android/app/build.gradle
 git -C $RepoRoot commit -m "release(android): v$versionName (build $newCode) - $Changelog"
-git -C $RepoRoot push origin HEAD:main
+if ($LASTEXITCODE -ne 0) { Write-Error "git commit 失败" }
+Push-HeadToMain
 
 $sha = git -C $RepoRoot rev-parse --short HEAD
 Write-Host "   Commit SHA: $sha" -ForegroundColor Green
@@ -159,9 +232,9 @@ try {
 # ── 汇报 ──────────────────────────────────────────────────────────────────────
 
 Write-Host ""
-Write-Host "=" * 60 -ForegroundColor Cyan
+Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host "✅ 发布完成！" -ForegroundColor Green
 Write-Host "   版本: v$versionName (build $newCode)" -ForegroundColor White
 Write-Host "   SHA:  $sha" -ForegroundColor White
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
-Write-Host "=" * 60 -ForegroundColor Cyan
+Write-Host ("=" * 60) -ForegroundColor Cyan
