@@ -211,8 +211,7 @@ if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
     Write-Error "❌ binary 替换失败"
 }
-ssh @SshOpts $Server "pkill -f elon-server 2>/dev/null; sleep 1; nohup $RemoteBin >> /root/elon-server.log 2>&1 & echo \$!"
-# nohup 在后台运行，SSH 退出码不代表服务失败，这里不检查
+ssh @SshOpts $Server "pkill -f elon-server 2>/dev/null; sleep 1; cd $RemoteDir && nohup $RemoteBin </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; echo started"
 
 Write-Host "   ✅ 服务重启指令已发送" -ForegroundColor Green
 

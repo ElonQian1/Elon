@@ -204,6 +204,9 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
         }
     };
 
+    // 去除 UTF-8 BOM（PowerShell Set-Content 可能写入 EF BB BF 前缀）
+    let content = content.trim_start_matches('\u{FEFF}').to_owned();
+
     let mut json: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
         Err(_) => {
