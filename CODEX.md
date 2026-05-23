@@ -8,8 +8,11 @@ Use the repository directory that contains `server/`, `android/`, `docs/`, `scri
 
 ## Source Documents To Respect
 
+- `AGENTS.md`: shared entry point for VS Code Copilot, Codex, Claude Code, and other AI agents.
 - `.github/copilot-instructions.md`: global project positioning and agent principles.
 - `.github/instructions/git-deploy-workflow.instructions.md`: mandatory Git, push, worktree, deploy, and report workflow.
+- `.github/prompts/*.prompt.md`: VS Code slash-command prompts for recurring project workflows.
+- `.github/agents/*.agent.md`: VS Code custom agents for planning, implementation, and review roles.
 - `.copilot/skills/cloud-apk-dev/SKILL.md`: cloud APK development and deployment workflow.
 - `docs/ai-agent-workflow.md`: full AI agent workflow from request analysis through code change, verification, commit, build, deploy, and feedback.
 - `docs/system-architecture.md`: architecture, data flow, module responsibilities, and security constraints.

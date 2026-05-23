@@ -65,11 +65,25 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 
 ## 本项目采用方式
 
-- 仓库级总原则继续放在 `.github/copilot-instructions.md`。
-- 如需让多个 AI 工具共享同一套规则，可新增根目录 `AGENTS.md`，但要链接现有文档，避免复制整份长规则。
-- Git、部署、并发工作树等强制流程继续放在 `.github/instructions/git-deploy-workflow.instructions.md`，通过 `applyTo: "**"` 自动注入。
-- 若以后出现高频任务，优先放进 `.github/prompts/*.prompt.md`，例如生成 APK 发布说明、准备部署检查单、修复失败构建。
-- 若要分离角色，使用 `.github/agents/*.agent.md`: planner 只读，implementer 可编辑和验证，reviewer 只读审查。
+本项目把工作流映射到 VS Code 官方 customization 目录：
+
+| 层级 | 文件 | 本项目用途 |
+|---|---|---|
+| Always-on instructions | `.github/copilot-instructions.md` | 项目定位、全局原则、Copilot 工作方式记忆 |
+| 多 AI 共享入口 | `AGENTS.md` | 给 VS Code Copilot、Codex、Claude Code 等工具提供统一索引 |
+| File-based instructions | `.github/instructions/git-deploy-workflow.instructions.md` | 通过 `applyTo: "**"` 自动注入 Git、push、worktree、部署、版本号规则 |
+| Prompt files | `.github/prompts/elon-dev-task.prompt.md` | 常规代码/文档任务的 slash command：`/elon-dev-task` |
+| Prompt files | `.github/prompts/elon-apk-release.prompt.md` | APK 发布 slash command：`/elon-apk-release` |
+| Custom agents | `.github/agents/elon-planner.agent.md` | 只规划，不直接改代码 |
+| Custom agents | `.github/agents/elon-implementer.agent.md` | 执行实现、验证、commit、push、部署 |
+| Custom agents | `.github/agents/elon-reviewer.agent.md` | 审查 bug、风险、验证缺口和工作流违规 |
+
+日常使用建议：
+
+- 普通功能/修复/文档任务：在 VS Code Chat 输入 `/elon-dev-task <需求>`。
+- APK 构建发布：输入 `/elon-apk-release <发布原因>`。
+- 复杂任务：先选 `elon-planner` 或使用 `/plan`，确认计划后 handoff 到 `elon-implementer`。
+- 提交前：选 `elon-reviewer` 做一次风险审查。
 - 修改 AI customization 时，先检查文件名、frontmatter 和默认目录是否符合 VS Code 约定，再提交。
 
 ## 官方资料
