@@ -10,8 +10,9 @@ import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONObject
+import com.elon.app.update.AppUpdateManager
 
 /**
  * 用户 AI 代理设置页面
@@ -48,6 +49,9 @@ class SettingsActivity : AppCompatActivity() {
         loadCurrentConfig()
 
         findViewById<Button>(R.id.saveButton).setOnClickListener { saveConfig() }
+        findViewById<Button>(R.id.checkUpdateButton).setOnClickListener {
+            AppUpdateManager(this).manualCheck()
+        }
     }
 
     // ── 模式切换 ──────────────────────────────

@@ -4,6 +4,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{admin, api, client_gateway, project_api, user_api, web};
@@ -13,6 +14,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
+
+    // 应用自身 APK 更新文件目录（由 publish-apk.ps1 部署后填充）
+    let app_dir = state.data_dir.join("app");
+    let version_json = app_dir.join("version.json");
+    let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
     Router::new()
         .route("/", get(web::web_page))
@@ -45,6 +51,9 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/download/:user_id/:filename",
             get(client_gateway::download_apk),
         )
+        // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
+        .route_service("/app/version.json", ServeFile::new(version_json))
+        .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
         .route("/admin", get(admin::admin_page))
         .route(
             "/api/admin/agents",

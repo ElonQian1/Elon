@@ -7,6 +7,8 @@ android/.gradle/
 android/app/build/
 android/local.properties
 android/*.apk
+android/app/*.jks
+android/app/*.keystore
 
 # Environment secrets
 server/.env

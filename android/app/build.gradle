@@ -7,6 +7,15 @@ android {
     namespace 'com.elon.app'
     compileSdk 34
 
+    signingConfigs {
+        release {
+            storeFile     file("elon-release.jks")
+            storePassword "elon123456"
+            keyAlias      "elon"
+            keyPassword   "elon123456"
+        }
+    }
+
     defaultConfig {
         applicationId "com.elon.app"
         minSdk 26
@@ -18,12 +27,13 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            // 签名配置在 CI/CD 环境中通过环境变量注入
+            signingConfig signingConfigs.release
         }
     }
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     compileOptions {
@@ -43,6 +53,9 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+
+    // WorkManager（后台定期检查更新）
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
 
     // WebSocket 客户端
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
