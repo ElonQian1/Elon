@@ -1,682 +1,1234 @@
+// 网页版（APK 桌面投影）
+//
+// 设计原则：APK 是真理来源，网页只是把 APK 投影到浏览器上。
+// 视觉、交互、文案对齐 android/app/src/main/res/layout/activity_main.xml。
+// 响应式断点：< 720 手机、720~1100 平板、>= 1100 桌面（左侧栏 Tab）。
+
+use std::sync::OnceLock;
+
 use axum::response::Html;
 
+const BRAND_PNG_B64: &str = include_str!("assets/ic_app_brand.b64");
+const TAB_CHAT_PNG_B64: &str = include_str!("assets/ic_tab_chat_edit.b64");
+const TAB_PROJECT_PNG_B64: &str = include_str!("assets/ic_tab_project_stack.b64");
+
 pub async fn web_page() -> Html<&'static str> {
-    Html(WEB_HTML)
+    static HTML: OnceLock<String> = OnceLock::new();
+    Html(HTML.get_or_init(build_html).as_str())
 }
 
-const WEB_HTML: &str = r###"<!doctype html>
+fn build_html() -> String {
+    WEB_HTML_TEMPLATE
+        .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
+        .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
+        .replace("__TAB_PROJECT_PNG_B64__", TAB_PROJECT_PNG_B64.trim())
+}
+
+const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>lodex 项目工作台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101010" />
+  <title>一龙 · 云端开发</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f5f7f9;
-      --panel: #ffffff;
-      --ink: #17211f;
-      --muted: #64716d;
-      --line: #d7dfdb;
-      --brand: #0a7b6d;
-      --brand-strong: #065f55;
-      --accent: #d89232;
-      --blue: #1f6feb;
-      --soft: #edf7f4;
-      --warn: #8a5a0a;
-      --warn-bg: #fff7e6;
-      --danger: #a61b13;
-      --danger-bg: #fff0ed;
-      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      color-scheme: dark;
+      --bg: #101010;
+      --bg-hint: #1c1c1c;
+      --panel: #1e1e1e;
+      --panel-2: #242424;
+      --panel-3: #2a2a2a;
+      --line: #343434;
+      --ink: #d0d0d0;
+      --ink-strong: #ededed;
+      --ink-soft: #b8b8b8;
+      --ink-muted: #a9a9a9;
+      --ink-faint: #8e8e8e;
+      --ink-dim: #505050;
+      --brand: #07c160;
+      --brand-hover: #06ad55;
+      --bubble-user: #95ec69;
+      --bubble-user-ink: #111111;
+      --bubble-ai-bg: rgba(255,255,255,0.19);
+      --bubble-ai-border: rgba(255,255,255,0.18);
+      --bubble-ai-ink: #f4f4f4;
+      --bubble-progress-bg: rgba(255,255,255,0.15);
+      --bubble-progress-border: rgba(255,255,255,0.2);
+      --bubble-progress-ink: #9a9a9a;
+      --bubble-error-bg: #fff1f0;
+      --bubble-error-border: #ffd6d2;
+      --bubble-error-ink: #c62828;
+      --tab-icon: #b8b8b8;
+      --tab-active: #d0d0d0;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); }
-    button, input, select, textarea { font: inherit; }
-    button {
-      height: 38px;
-      border: 1px solid transparent;
-      border-radius: 8px;
-      padding: 0 13px;
-      background: var(--brand);
-      color: white;
-      font-weight: 740;
-      cursor: pointer;
-    }
-    button.secondary { background: white; color: var(--ink); border-color: var(--line); }
-    button.ghost { background: transparent; color: var(--brand-strong); border-color: transparent; }
-    button:disabled { opacity: .55; cursor: not-allowed; }
-    input, select, textarea {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: white;
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%;
+      background: var(--bg);
       color: var(--ink);
-      outline: none;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
     }
-    input, select { height: 40px; padding: 0 11px; }
-    textarea { min-height: 92px; resize: none; padding: 12px; line-height: 1.5; }
-    input:focus, select:focus, textarea:focus {
-      border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(10,112,102,.12);
-    }
-    label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 760; }
-    .login {
+    button, input, textarea, select { font: inherit; color: inherit; }
+    a { color: var(--brand); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .hidden { display: none !important; }
+
+    /* ===== 整体布局 ===== */
+    .app {
+      display: grid;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 28px;
-      background:
-        linear-gradient(90deg, rgba(255,255,255,.9), rgba(255,255,255,.62)),
-        repeating-linear-gradient(135deg, rgba(10,123,109,.08) 0 1px, transparent 1px 24px),
-        #f2f6f5;
+      grid-template-rows: 50px 1fr auto 52px;
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "toolbar"
+        "content"
+        "input"
+        "tabs";
     }
-    .auth-shell {
-      width: min(940px, 100%);
-      min-height: 560px;
-      background: rgba(255,255,255,.92);
-      border: 1px solid rgba(190,202,197,.88);
-      border-radius: 8px;
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
-      box-shadow: 0 24px 70px rgba(23, 33, 31, .13);
-      overflow: hidden;
+    /* 平板：限定宽度，居中模拟手机外观 */
+    @media (min-width: 720px) and (max-width: 1099.98px) {
+      .app { max-width: 720px; margin: 0 auto; box-shadow: 0 0 0 1px #1a1a1a; }
     }
-    .auth-visual {
-      padding: 34px;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 28px;
-      border-right: 1px solid var(--line);
-      background:
-        linear-gradient(155deg, rgba(10,123,109,.13), rgba(31,111,235,.08) 46%, rgba(216,146,50,.12)),
-        #fbfcfb;
+    /* 桌面：左侧 Tab 侧栏 + 右侧主体 */
+    @media (min-width: 1100px) {
+      .app {
+        max-width: 1100px;
+        margin: 0 auto;
+        grid-template-rows: 50px 1fr auto;
+        grid-template-columns: 96px 1fr;
+        grid-template-areas:
+          "tabs toolbar"
+          "tabs content"
+          "tabs input";
+        box-shadow: 0 0 0 1px #1a1a1a;
+      }
     }
-    .auth-copy { align-self: center; display: grid; gap: 15px; max-width: 420px; }
-    .auth-copy h1 { font-size: 34px; line-height: 1.12; margin: 0; }
-    .auth-copy p { margin: 0; color: var(--muted); line-height: 1.7; }
-    .auth-preview {
-      border: 1px solid rgba(10,123,109,.18);
-      border-radius: 8px;
-      background: rgba(255,255,255,.76);
-      padding: 16px;
-      display: grid;
-      gap: 12px;
-    }
-    .preview-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .preview-title { font-weight: 850; }
-    .preview-pill { border: 1px solid #c6ddd7; color: var(--brand-strong); background: #edf8f5; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
-    .preview-line { height: 9px; border-radius: 999px; background: #e2e9e6; }
-    .preview-line.short { width: 68%; background: #d2e7e1; }
-    .login-panel {
-      padding: 34px;
-      display: grid;
-      align-content: center;
-      gap: 17px;
-      background: white;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 850; letter-spacing: 0; }
-    .mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: grid;
-      place-items: center;
-      background: linear-gradient(135deg, var(--brand), var(--blue));
-      color: white;
-      font-weight: 950;
-      font-size: 14px;
-    }
-    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: #f7faf8; }
-    .mode-switch button { height: 34px; background: transparent; color: var(--muted); border-color: transparent; }
-    .mode-switch button.active { background: white; color: var(--brand-strong); border-color: #cfe1dc; box-shadow: 0 5px 14px rgba(23,33,31,.08); }
-    .field-stack { display: grid; gap: 13px; }
-    .auth-footer { display: flex; justify-content: center; gap: 6px; color: var(--muted); font-size: 13px; }
-    .auth-footer button { height: auto; padding: 0; color: var(--brand-strong); background: transparent; border: 0; font-weight: 850; }
-    .muted { color: var(--muted); font-size: 13px; line-height: 1.5; }
-    .error-line { min-height: 18px; color: var(--danger); font-size: 13px; }
-    .shell { min-height: 100vh; display: grid; grid-template-columns: 310px minmax(0, 1fr); }
-    aside {
-      border-right: 1px solid var(--line);
-      background: #fbfcfa;
-      padding: 20px;
-      display: grid;
-      grid-template-rows: auto auto minmax(0, 1fr) auto;
-      gap: 16px;
-    }
-    .user-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .user-name { min-width: 0; }
-    .user-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .user-name span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
-    .project-tools { display: grid; gap: 10px; }
-    .project-list { overflow: auto; display: grid; align-content: start; gap: 9px; }
-    .project-card {
-      width: 100%;
-      text-align: left;
-      border: 1px solid var(--line);
-      background: white;
-      color: var(--ink);
-      height: auto;
-      min-height: 86px;
-      padding: 12px;
-      display: grid;
-      gap: 6px;
-    }
-    .project-card.active { border-color: var(--brand); background: var(--soft); }
-    .project-title { font-weight: 800; overflow-wrap: anywhere; }
-    .project-meta { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-    main { min-height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
-    header {
-      min-height: 74px;
-      padding: 17px 24px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,.86);
+
+    /* ===== Toolbar ===== */
+    .toolbar {
+      grid-area: toolbar;
+      height: 50px;
+      background: var(--bg);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
+      padding: 0 4px;
     }
-    h1 { margin: 0; font-size: 19px; letter-spacing: 0; }
-    .header-sub { margin-top: 4px; color: var(--muted); font-size: 13px; }
-    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-    .messages {
-      overflow: auto;
-      padding: 22px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .empty {
-      margin: auto;
-      max-width: 480px;
+    .toolbar h1 {
+      flex: 1;
       text-align: center;
-      color: var(--muted);
-      line-height: 1.6;
+      margin: 0;
+      font-size: 17px;
+      font-weight: normal;
+      color: var(--ink);
     }
-    .message {
-      width: min(820px, 100%);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 13px 14px;
+    .icon-btn {
+      width: 44px; height: 44px;
+      background: transparent;
+      border: 0;
+      padding: 9px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      border-radius: 22px;
+    }
+    .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
+    .icon-btn svg { width: 100%; height: 100%; display: block; }
+
+    /* ===== Content ===== */
+    .content {
+      grid-area: content;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .page {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      display: none;
+      flex-direction: column;
+    }
+    .page.active { display: flex; }
+
+    /* ===== 会话页 ===== */
+    .conversation-list { flex: 0 0 auto; }
+    .conversation-item {
+      height: 66px;
+      background: var(--panel-2);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      cursor: pointer;
+      border: 0;
+      width: 100%;
+      text-align: left;
+      color: inherit;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    .conversation-item:hover { background: #2c2c2c; }
+    .conversation-item.active { background: #2f2f2f; }
+    .conversation-item .brand {
+      width: 44px; height: 44px;
+      flex: 0 0 44px;
+      border-radius: 6px;
+      overflow: hidden;
       background: var(--panel);
-      line-height: 1.55;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+      display: flex; align-items: center; justify-content: center;
     }
-    .message.user { align-self: flex-end; background: #e9f4f1; border-color: #c7ded8; }
-    .message.progress { background: var(--warn-bg); border-color: #efd7a6; color: var(--warn); }
-    .message.error { background: var(--danger-bg); border-color: #f0b6ae; color: var(--danger); }
-    .meta { display: block; margin-bottom: 5px; color: var(--muted); font-size: 12px; font-weight: 800; }
-    .composer {
-      border-top: 1px solid var(--line);
-      background: white;
-      padding: 15px 24px 18px;
-      display: grid;
+    .conversation-item .brand img { width: 100%; height: 100%; object-fit: cover; }
+    .conversation-item .text { flex: 1; min-width: 0; }
+    .conversation-item .title {
+      font-size: 16px; color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .conversation-item .sub {
+      font-size: 13px; color: var(--ink-muted);
+      margin-top: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .conversation-item .time {
+      font-size: 12px; color: #c4c4c4;
+      align-self: flex-start; margin-top: 16px;
+      flex-shrink: 0; padding-left: 6px;
+    }
+    .empty-tip {
+      padding: 80px 24px;
+      text-align: center;
+      color: var(--ink-muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .empty-tip button {
+      margin-top: 16px;
+      height: 38px; padding: 0 18px;
+      background: var(--brand); color: #fff;
+      border: 0; border-radius: 6px; cursor: pointer;
+    }
+
+    /* ===== 聊天视图 ===== */
+    .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .stage-hint {
+      flex: 0 0 auto;
+      min-height: 42px;
+      background: var(--bg-hint);
+      color: var(--ink-soft);
+      font-size: 13px;
+      padding: 0 16px;
+      display: flex; align-items: center;
+    }
+    .chat-list {
+      flex: 1; overflow-y: auto;
+      padding: 10px 10px;
+      display: flex; flex-direction: column;
       gap: 10px;
     }
-    .composer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
-    a { color: var(--brand-strong); font-weight: 800; }
-    dialog {
-      width: min(470px, calc(100vw - 28px));
-      border: 1px solid var(--line);
+    .bubble-row { display: flex; align-items: flex-end; gap: 8px; }
+    .bubble-row.user { justify-content: flex-end; }
+    .bubble {
+      max-width: 76%;
+      padding: 10px 14px;
+      font-size: 15px;
+      line-height: 1.55;
       border-radius: 8px;
-      padding: 0;
-      box-shadow: 0 22px 70px rgba(25, 35, 30, .22);
+      word-wrap: break-word;
+      white-space: pre-wrap;
     }
-    dialog::backdrop { background: rgba(20,28,24,.42); }
-    .modal-body { padding: 22px; display: grid; gap: 14px; }
-    .modal-title { font-weight: 820; font-size: 18px; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 6px; }
-    .hidden { display: none !important; }
-    @media (max-width: 860px) {
-      .login { padding: 16px; align-items: start; }
-      .auth-shell { grid-template-columns: 1fr; min-height: 0; }
-      .auth-visual { border-right: 0; border-bottom: 1px solid var(--line); padding: 24px; }
-      .auth-copy h1 { font-size: 28px; }
-      .login-panel { padding: 24px; }
-      .shell { grid-template-columns: 1fr; }
-      aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 44vh; }
-      main { min-height: 56vh; }
-      header, .messages, .composer { padding-left: 16px; padding-right: 16px; }
-      .composer-row { grid-template-columns: 1fr; }
-      .composer-row button { width: 100%; }
+    .bubble.user {
+      background: var(--bubble-user);
+      color: var(--bubble-user-ink);
+      border-top-right-radius: 2px;
     }
+    .bubble.ai {
+      background: var(--bubble-ai-bg);
+      color: var(--bubble-ai-ink);
+      border: 1px solid var(--bubble-ai-border);
+      border-top-left-radius: 2px;
+    }
+    .bubble.progress {
+      background: var(--bubble-progress-bg);
+      color: var(--bubble-progress-ink);
+      border: 1px solid var(--bubble-progress-border);
+      font-size: 13px;
+      max-width: 86%;
+    }
+    .bubble.error {
+      background: var(--bubble-error-bg);
+      color: var(--bubble-error-ink);
+      border: 1px solid var(--bubble-error-border);
+    }
+    .bubble .meta { display: block; font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+    .bubble a { color: inherit; text-decoration: underline; }
+
+    @media (min-width: 720px) {
+      .bubble { max-width: 70%; }
+    }
+
+    /* ===== 项目页 ===== */
+    .project-page > * + * { margin-top: 1px; }
+    .project-stage {
+      min-height: 64px;
+      background: var(--panel-2);
+      display: flex; align-items: center;
+      padding: 12px 22px;
+      font-size: 18px; color: var(--ink);
+    }
+    .project-overview {
+      background: var(--panel);
+      padding: 22px;
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      min-height: 104px;
+    }
+    .project-block {
+      background: var(--panel);
+      padding: 18px 22px;
+      margin-top: 10px !important;
+    }
+    .project-block h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); font-weight: normal; }
+    .stage-line { padding: 8px 0; font-size: 14px; color: var(--ink-soft); }
+    .project-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      background: var(--panel);
+      padding: 12px;
+      margin-top: 10px !important;
+    }
+    .project-grid button {
+      height: 54px;
+      background: var(--panel-3);
+      color: var(--ink);
+      border: 0; border-radius: 6px;
+      font-size: 15px; cursor: pointer;
+    }
+    .project-grid button:hover { background: #353535; }
+    .project-history {
+      background: var(--panel);
+      padding: 22px;
+      margin-top: 10px !important;
+      color: var(--ink-soft);
+      font-size: 13px;
+      min-height: 160px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+    }
+
+    /* ===== 我的页 ===== */
+    .profile-header {
+      background: var(--panel-2);
+      padding: 22px;
+      color: var(--ink);
+      font-size: 15px;
+      line-height: 1.75;
+      min-height: 112px;
+      white-space: pre-wrap;
+    }
+    .profile-row {
+      min-height: 64px;
+      background: var(--panel);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 22px;
+      color: var(--ink);
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 1px;
+      border: 0; width: 100%; text-align: left;
+    }
+    .profile-row:first-of-type { margin-top: 10px; }
+    .profile-row:hover { background: #252525; }
+    .profile-row .arrow { color: var(--ink-faint); font-size: 18px; }
+    .profile-row.danger { color: #d97a7a; }
+    .profile-version {
+      text-align: center;
+      color: var(--ink-dim);
+      font-size: 12px;
+      padding: 20px 0 32px;
+    }
+
+    /* ===== 输入栏 ===== */
+    .input-bar {
+      grid-area: input;
+      background: var(--panel);
+      display: none;
+      padding: 8px 10px;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .input-bar.active { display: flex; }
+    .input-bar textarea {
+      flex: 1;
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink-strong);
+      padding: 8px 14px;
+      font-size: 15px;
+      min-height: 42px;
+      max-height: 120px;
+      resize: none;
+      outline: none;
+      line-height: 1.4;
+    }
+    .input-bar textarea::placeholder { color: var(--ink-faint); }
+    .input-bar .model-btn {
+      width: 52px; height: 42px;
+      background: var(--panel-3);
+      border: 0;
+      color: var(--ink);
+      font-size: 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .input-bar .model-btn:hover { background: #353535; }
+    .input-bar .send-btn {
+      width: 64px; height: 42px;
+      background: var(--brand);
+      border: 0;
+      color: #fff;
+      font-size: 15px;
+      border-radius: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .input-bar .send-btn:hover { background: var(--brand-hover); }
+    .input-bar .send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ===== Tab 栏 ===== */
+    .tabs-bar {
+      grid-area: tabs;
+      background: var(--panel);
+      display: flex;
+      align-items: stretch;
+    }
+    .tab {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      color: var(--tab-icon);
+      font-size: 11px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 2px;
+      padding: 5px 0 4px;
+      cursor: pointer;
+    }
+    .tab.active { color: var(--tab-active); }
+    .tab .ic { width: 24px; height: 24px; display: block; }
+    .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
+    .tab .ic svg { width: 100%; height: 100%; }
+    @media (min-width: 1100px) {
+      .tabs-bar { flex-direction: column; padding: 12px 0; }
+      .tab { padding: 16px 0; font-size: 13px; gap: 6px; }
+      .tab .ic { width: 30px; height: 30px; }
+    }
+
+    /* ===== 模态对话框 ===== */
+    .modal-mask {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center; justify-content: center;
+      padding: 24px;
+      z-index: 100;
+    }
+    .modal-mask.active { display: flex; }
+    .modal {
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 24px 22px;
+      width: 100%; max-width: 420px;
+      display: grid; gap: 14px;
+    }
+    .modal h2 { margin: 0; font-size: 17px; color: var(--ink); font-weight: normal; }
+    .modal label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+    .modal input, .modal textarea, .modal select {
+      width: 100%;
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink-strong);
+      padding: 9px 12px;
+      outline: none;
+      font-size: 14px;
+    }
+    .modal textarea { min-height: 72px; resize: vertical; }
+    .modal .actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal .btn-cancel, .modal .btn-confirm {
+      height: 38px; padding: 0 16px;
+      border: 0; border-radius: 6px;
+      font-size: 14px; cursor: pointer;
+    }
+    .modal .btn-cancel { background: var(--panel-3); color: var(--ink); }
+    .modal .btn-confirm { background: var(--brand); color: #fff; }
+    .modal .btn-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
+    .modal .error-text { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+
+    /* ===== 登录页 ===== */
+    .login {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      background: var(--bg);
+    }
+    .login-card {
+      width: 100%; max-width: 380px;
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 28px 24px;
+      display: grid; gap: 14px;
+    }
+    .login-card .brand-row { display: flex; align-items: center; gap: 12px; }
+    .login-card .brand-row .icon { width: 44px; height: 44px; border-radius: 8px; overflow: hidden; }
+    .login-card .brand-row .icon img { width: 100%; height: 100%; }
+    .login-card .brand-row .name { font-size: 18px; color: var(--ink); }
+    .login-card .brand-row .name small { display: block; font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+    .auth-tabs { display: flex; background: var(--panel-3); border-radius: 6px; padding: 3px; }
+    .auth-tab {
+      flex: 1; height: 36px;
+      background: transparent;
+      border: 0;
+      color: var(--ink-soft);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .auth-tab.active { background: var(--panel-2); color: var(--ink-strong); }
+    .login-card label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+    .login-card input {
+      width: 100%; height: 40px;
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink-strong);
+      padding: 0 12px;
+      outline: none;
+    }
+    .login-card input::placeholder { color: var(--ink-faint); }
+    .login-card .submit {
+      height: 42px;
+      background: var(--brand);
+      border: 0; color: #fff;
+      font-size: 15px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .login-card .submit:disabled { opacity: 0.55; }
+    .login-card .error { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+    .login-card .hint { font-size: 12px; color: var(--ink-faint); text-align: center; }
   </style>
 </head>
 <body>
-  <section id="loginView" class="login">
-    <div class="auth-shell">
-      <div class="auth-visual">
-        <div class="brand"><div class="mark">lo</div><div>lodex</div></div>
-        <div class="auth-copy">
-          <h1>项目工作台</h1>
-          <p>登录或创建账号后，继续管理项目、连接 AI 开发流程，并获取最新 APK 构建结果。</p>
-        </div>
-        <div class="auth-preview" aria-hidden="true">
-          <div class="preview-row"><span class="preview-title">Android APK 项目</span><span class="preview-pill">ready</span></div>
-          <div class="preview-line"></div>
-          <div class="preview-line short"></div>
-        </div>
-      </div>
-      <form id="loginForm" class="login-panel">
-        <div class="brand"><div class="mark">lo</div><div>lodex 项目工作台</div></div>
-        <div class="mode-switch" aria-label="账号操作">
-          <button class="active" type="button" data-auth-mode="login">登录</button>
-          <button type="button" data-auth-mode="register">注册</button>
-        </div>
-        <div id="authHint" class="muted">使用已有账号进入项目工作台。</div>
-        <div class="field-stack">
-          <div><label for="accountInput">账号</label><input id="accountInput" autocomplete="username" placeholder="手机号或邮箱" /></div>
-          <div id="nicknameField" class="hidden"><label for="nicknameInput">昵称</label><input id="nicknameInput" autocomplete="nickname" placeholder="可选" /></div>
-          <div><label for="passwordInput">密码</label><input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 位" /></div>
-        </div>
-        <div id="loginError" class="error-line"></div>
-        <button id="loginBtn" type="submit">登录</button>
-        <div class="auth-footer"><span id="authSwitchText">还没有账号？</span><button id="authSwitchBtn" type="button">立即注册</button></div>
-      </form>
+
+<!-- ============ 登录视图 ============ -->
+<section id="loginView" class="login">
+  <form id="loginForm" class="login-card">
+    <div class="brand-row">
+      <div class="icon"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" /></div>
+      <div class="name">一龙<small>云端 APK 开发平台</small></div>
     </div>
+    <div class="auth-tabs">
+      <button type="button" class="auth-tab active" data-auth-mode="login">登录</button>
+      <button type="button" class="auth-tab" data-auth-mode="register">注册</button>
+    </div>
+    <div>
+      <label for="accountInput">账号</label>
+      <input id="accountInput" autocomplete="username" placeholder="手机号、邮箱或账号 ID" />
+    </div>
+    <div id="nicknameField" class="hidden">
+      <label for="nicknameInput">昵称</label>
+      <input id="nicknameInput" autocomplete="nickname" placeholder="工作台展示名" />
+    </div>
+    <div>
+      <label for="passwordInput">密码</label>
+      <input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 位" />
+    </div>
+    <div id="loginError" class="error"></div>
+    <button id="loginBtn" class="submit" type="submit">登录</button>
+    <div class="hint">网页版是 APK 版在电脑上的体现，所有数据与 APK 互通。</div>
+  </form>
+</section>
+
+<!-- ============ 主视图 ============ -->
+<main id="appView" class="app hidden">
+  <header class="toolbar">
+    <button class="icon-btn" id="backBtn" title="返回" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <h1 id="topTitle">会话区</h1>
+    <button class="icon-btn" id="searchBtn" title="搜索">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M11.6 5.8a5.8 5.8 0 1 0 0.01 0"/><path d="M16.1 16.1 L21.8 21.8"/></svg>
+    </button>
+    <button class="icon-btn" id="addBtn" title="新建项目">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="13" cy="13" r="9.4"/><path d="M13 8.5 L13 17.5 M8.5 13 L17.5 13"/></svg>
+    </button>
+  </header>
+
+  <section class="content">
+
+    <!-- 会话页：会话列表（默认）/ 进入项目后切到聊天视图 -->
+    <div id="chatPage" class="page active">
+      <!-- 列表状态 -->
+      <div id="conversationList" class="conversation-list"></div>
+      <!-- 项目内聊天视图 -->
+      <div id="chatView" class="chat-view hidden">
+        <div class="stage-hint" id="stageHint">点击输入需求，开发进度会自动记录到项目页。</div>
+        <div class="chat-list" id="chatList"></div>
+      </div>
+    </div>
+
+    <!-- 项目页 -->
+    <div id="projectPage" class="page project-page">
+      <div class="project-stage" id="currentStageText">待提交需求</div>
+      <div class="project-overview" id="projectOverviewText">项目管理
+当前没有正在执行的开发任务。</div>
+      <div class="project-block">
+        <h3>开发进度</h3>
+        <div class="stage-line" id="stagePlanText">1. 需求分析：等待</div>
+        <div class="stage-line" id="stageCodeText">2. 开发实现：等待</div>
+        <div class="stage-line" id="stageBuildText">3. 编译打包：等待</div>
+        <div class="stage-line" id="stageDeliverText">4. 交付下载：等待</div>
+      </div>
+      <div class="project-grid">
+        <button id="projectContinueBtn">继续开发</button>
+        <button id="projectBuildBtn">生成 APK</button>
+        <button id="projectRecordBtn">进度记录</button>
+        <button id="projectSettingsBtn">模型设置</button>
+      </div>
+      <div class="project-history" id="projectHistoryText">暂无进度记录</div>
+    </div>
+
+    <!-- 我的页 -->
+    <div id="profilePage" class="page">
+      <div class="profile-header" id="userInfoText">我的开发工作台</div>
+      <button class="profile-row" id="aiSettingsRow">
+        <span>AI 代理设置</span><span class="arrow">›</span>
+      </button>
+      <button class="profile-row" id="checkUpdateRow">
+        <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
+      </button>
+      <button class="profile-row danger" id="logoutRow">
+        <span>退出登录</span><span class="arrow">›</span>
+      </button>
+      <div class="profile-version" id="versionText">一龙网页版</div>
+    </div>
+
   </section>
 
-  <section id="appView" class="shell hidden">
-    <aside>
-      <div class="brand"><div class="mark">lo</div><div>lodex</div></div>
-      <div class="user-row">
-        <div class="user-name"><strong id="userName">未登录</strong><span id="userAccount"></span></div>
-        <button id="logoutBtn" class="ghost" type="button">退出</button>
-      </div>
-      <div class="project-tools">
-        <button id="newProjectBtn" type="button">新建项目</button>
-        <button id="refreshProjectsBtn" class="secondary" type="button">刷新项目</button>
-      </div>
-      <div id="projectList" class="project-list"></div>
-      <div class="muted" id="runtimeText">连接服务中</div>
-    </aside>
-    <main>
-      <header>
-        <div>
-          <h1 id="projectTitle">选择项目</h1>
-          <div id="projectSub" class="header-sub">登录后可找回已有项目，也可以新建项目</div>
-        </div>
-        <div class="header-actions">
-          <select id="agentSelect"><option value="">默认模型</option></select>
-          <button id="reconnectBtn" class="secondary" type="button">重连</button>
-        </div>
-      </header>
-      <section id="messages" class="messages" aria-live="polite">
-        <div class="empty">请选择左侧项目，或新建一个项目。</div>
-      </section>
-      <form id="composer" class="composer">
-        <div class="composer-row">
-          <textarea id="messageInput" placeholder="描述要开发或修改的 APK"></textarea>
-          <button id="sendBtn" type="submit">发送</button>
-        </div>
-      </form>
-    </main>
-  </section>
+  <form id="inputBar" class="input-bar">
+    <textarea id="messageInput" placeholder="描述你想开发的 App 功能" rows="1"></textarea>
+    <button class="model-btn" type="button" id="modelBtn" title="选择模型">默认</button>
+    <button class="send-btn" type="submit" id="sendBtn">发送</button>
+  </form>
 
-  <dialog id="newProjectDialog">
-    <form id="newProjectForm" class="modal-body" method="dialog">
-      <div class="modal-title">新建项目</div>
-      <div><label for="projectNameInput">项目名称</label><input id="projectNameInput" /></div>
-      <div><label for="projectDescInput">项目描述</label><textarea id="projectDescInput"></textarea></div>
-      <div><label for="templateSelect">模板</label><select id="templateSelect"><option value="android">Android APK</option></select></div>
-      <div id="newProjectError" class="error-line"></div>
-      <div class="modal-actions">
-        <button id="cancelNewProjectBtn" class="secondary" type="button">取消</button>
-        <button id="createProjectBtn" type="submit">创建</button>
-      </div>
-    </form>
-  </dialog>
+  <nav class="tabs-bar">
+    <button class="tab active" data-tab="chatPage" data-title="会话区">
+      <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
+      <span>会话</span>
+    </button>
+    <button class="tab" data-tab="projectPage" data-title="项目">
+      <span class="ic"><img src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" /></span>
+      <span>项目</span>
+    </button>
+    <button class="tab" data-tab="profilePage" data-title="我的">
+      <span class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="10.3" r="4.1"/>
+          <path d="M5.5 20c0.7 -3.2 3 -5 6.5 -5s5.8 1.8 6.5 5"/>
+        </svg>
+      </span>
+      <span>我的</span>
+    </button>
+  </nav>
+</main>
 
-  <script>
-    const loginView = document.getElementById("loginView");
-    const appView = document.getElementById("appView");
-    const loginForm = document.getElementById("loginForm");
-    const accountInput = document.getElementById("accountInput");
-    const nicknameInput = document.getElementById("nicknameInput");
-    const nicknameField = document.getElementById("nicknameField");
-    const passwordInput = document.getElementById("passwordInput");
-    const loginBtn = document.getElementById("loginBtn");
-    const loginError = document.getElementById("loginError");
-    const authHint = document.getElementById("authHint");
-    const authSwitchText = document.getElementById("authSwitchText");
-    const authSwitchBtn = document.getElementById("authSwitchBtn");
-    const authModeButtons = document.querySelectorAll("[data-auth-mode]");
-    const userName = document.getElementById("userName");
-    const userAccount = document.getElementById("userAccount");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const projectList = document.getElementById("projectList");
-    const newProjectBtn = document.getElementById("newProjectBtn");
-    const refreshProjectsBtn = document.getElementById("refreshProjectsBtn");
-    const newProjectDialog = document.getElementById("newProjectDialog");
-    const newProjectForm = document.getElementById("newProjectForm");
-    const cancelNewProjectBtn = document.getElementById("cancelNewProjectBtn");
-    const createProjectBtn = document.getElementById("createProjectBtn");
-    const projectNameInput = document.getElementById("projectNameInput");
-    const projectDescInput = document.getElementById("projectDescInput");
-    const templateSelect = document.getElementById("templateSelect");
-    const newProjectError = document.getElementById("newProjectError");
-    const projectTitle = document.getElementById("projectTitle");
-    const projectSub = document.getElementById("projectSub");
-    const runtimeText = document.getElementById("runtimeText");
-    const messages = document.getElementById("messages");
-    const agentSelect = document.getElementById("agentSelect");
-    const reconnectBtn = document.getElementById("reconnectBtn");
-    const composer = document.getElementById("composer");
-    const messageInput = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
+<!-- ============ 新建项目对话框 ============ -->
+<div class="modal-mask" id="newProjectMask">
+  <form class="modal" id="newProjectForm">
+    <h2>新建项目</h2>
+    <div>
+      <label for="projectNameInput">项目名</label>
+      <input id="projectNameInput" placeholder="例如：记账小助手" required maxlength="40" />
+    </div>
+    <div>
+      <label for="projectDescInput">一句话描述（可选）</label>
+      <textarea id="projectDescInput" placeholder="想做什么样的 App？给 AI 一点上下文"></textarea>
+    </div>
+    <div>
+      <label for="templateSelect">起步模板</label>
+      <select id="templateSelect">
+        <option value="android_kotlin">Android（Kotlin）</option>
+        <option value="android_compose">Android（Compose）</option>
+        <option value="empty">空白项目</option>
+      </select>
+    </div>
+    <div class="error-text" id="newProjectError"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="cancelNewProjectBtn">取消</button>
+      <button type="submit" class="btn-confirm" id="createProjectBtn">创建</button>
+    </div>
+  </form>
+</div>
 
-    let token = localStorage.getItem("lodex_token") || localStorage.getItem("elon_token") || "";
-    let authMode = "login";
-    let currentUser = null;
-    let projects = [];
-    let currentProject = null;
-    let socket = null;
-    let busy = false;
+<!-- ============ AI 代理设置对话框 ============ -->
+<div class="modal-mask" id="agentMask">
+  <form class="modal" id="agentForm">
+    <h2>AI 代理设置</h2>
+    <div>
+      <label for="agentSelect">模型</label>
+      <select id="agentSelect"><option value="">默认模型</option></select>
+    </div>
+    <div class="error-text" id="agentError"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="cancelAgentBtn">关闭</button>
+    </div>
+  </form>
+</div>
 
-    function showLogin() {
-      loginView.classList.remove("hidden");
-      appView.classList.add("hidden");
-      if (socket) socket.close();
-    }
-    function showApp() {
-      loginView.classList.add("hidden");
-      appView.classList.remove("hidden");
-    }
-    function api(path, options = {}) {
-      const headers = { ...(options.headers || {}) };
-      if (token) headers.Authorization = `Bearer ${token}`;
-      if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
-      return fetch(path, { ...options, headers });
-    }
-    function setBusy(value) {
-      busy = value;
-      sendBtn.disabled = value || !currentProject;
-    }
-    function setAuthMode(mode) {
-      authMode = mode === "register" ? "register" : "login";
-      const registering = authMode === "register";
-      for (const button of authModeButtons) {
-        button.classList.toggle("active", button.dataset.authMode === authMode);
+<script>
+(function () {
+  'use strict';
+
+  // ====== DOM 引用 ======
+  const $ = (id) => document.getElementById(id);
+  const loginView = $('loginView');
+  const appView = $('appView');
+  const loginForm = $('loginForm');
+  const loginBtn = $('loginBtn');
+  const loginError = $('loginError');
+  const accountInput = $('accountInput');
+  const nicknameInput = $('nicknameInput');
+  const nicknameField = $('nicknameField');
+  const passwordInput = $('passwordInput');
+  const authModeButtons = document.querySelectorAll('[data-auth-mode]');
+
+  const topTitle = $('topTitle');
+  const backBtn = $('backBtn');
+  const addBtn = $('addBtn');
+  const searchBtn = $('searchBtn');
+
+  const conversationList = $('conversationList');
+  const chatView = $('chatView');
+  const chatList = $('chatList');
+  const stageHint = $('stageHint');
+
+  const projectOverviewText = $('projectOverviewText');
+  const currentStageText = $('currentStageText');
+  const stagePlanText = $('stagePlanText');
+  const stageCodeText = $('stageCodeText');
+  const stageBuildText = $('stageBuildText');
+  const stageDeliverText = $('stageDeliverText');
+  const projectHistoryText = $('projectHistoryText');
+  const projectContinueBtn = $('projectContinueBtn');
+  const projectBuildBtn = $('projectBuildBtn');
+  const projectRecordBtn = $('projectRecordBtn');
+  const projectSettingsBtn = $('projectSettingsBtn');
+
+  const userInfoText = $('userInfoText');
+  const versionText = $('versionText');
+  const aiSettingsRow = $('aiSettingsRow');
+  const checkUpdateRow = $('checkUpdateRow');
+  const updateArrow = $('updateArrow');
+  const logoutRow = $('logoutRow');
+
+  const inputBar = $('inputBar');
+  const messageInput = $('messageInput');
+  const sendBtn = $('sendBtn');
+  const modelBtn = $('modelBtn');
+
+  const tabs = document.querySelectorAll('.tab');
+  const pages = document.querySelectorAll('.page');
+
+  const newProjectMask = $('newProjectMask');
+  const newProjectForm = $('newProjectForm');
+  const projectNameInput = $('projectNameInput');
+  const projectDescInput = $('projectDescInput');
+  const templateSelect = $('templateSelect');
+  const newProjectError = $('newProjectError');
+  const createProjectBtn = $('createProjectBtn');
+  const cancelNewProjectBtn = $('cancelNewProjectBtn');
+
+  const agentMask = $('agentMask');
+  const agentSelect = $('agentSelect');
+  const cancelAgentBtn = $('cancelAgentBtn');
+
+  // ====== 状态 ======
+  const TOKEN_KEY = 'lodex_token';
+  let token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
+  let authMode = 'login';
+  let currentUser = null;
+  let projects = [];
+  let currentProject = null;
+  let currentTab = 'chatPage';
+  let socket = null;
+  let busy = false;
+  let selectedAgent = '';
+
+  // ====== 工具 ======
+  function api(path, options = {}) {
+    const headers = Object.assign({}, options.headers || {});
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    return fetch(path, Object.assign({}, options, { headers }));
+  }
+  function escapeHtml(v) {
+    return String(v == null ? '' : v)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function withToken(href) {
+    try {
+      const url = new URL(href, location.origin);
+      if (url.pathname.indexOf('/api/projects/') !== -1 && !url.searchParams.has('token')) {
+        url.searchParams.set('token', token);
       }
-      nicknameField.classList.toggle("hidden", !registering);
-      passwordInput.autocomplete = registering ? "new-password" : "current-password";
-      authHint.textContent = registering ? "创建账号后会自动登录，并进入 lodex 项目工作台。" : "使用已有账号进入项目工作台。";
-      loginBtn.textContent = registering ? "创建账号" : "登录";
-      authSwitchText.textContent = registering ? "已有账号？" : "还没有账号？";
-      authSwitchBtn.textContent = registering ? "返回登录" : "立即注册";
-      loginError.textContent = "";
-    }
-    function append(role, title, text, links = []) {
-      const node = document.createElement("div");
-      node.className = `message ${role || ""}`.trim();
-      const meta = document.createElement("span");
-      meta.className = "meta";
-      meta.textContent = title;
-      node.appendChild(meta);
-      node.appendChild(document.createTextNode(text || ""));
-      for (const link of links) {
-        const line = document.createElement("div");
-        const a = document.createElement("a");
-        a.href = withToken(link.href);
-        a.target = "_blank";
-        a.rel = "noreferrer";
-        a.textContent = link.label;
-        line.appendChild(a);
-        node.appendChild(line);
+      return url.toString();
+    } catch { return href; }
+  }
+  function setBusy(value) {
+    busy = !!value;
+    sendBtn.disabled = busy || !currentProject;
+  }
+  function formatTime(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      if (d.toDateString() === now.toDateString()) {
+        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
       }
-      messages.appendChild(node);
-      messages.scrollTop = messages.scrollHeight;
-    }
-    function withToken(href) {
-      try {
-        const url = new URL(href, location.origin);
-        if (url.pathname.includes("/api/projects/") && !url.searchParams.has("token")) {
-          url.searchParams.set("token", token);
-        }
-        return url.toString();
-      } catch {
-        return href;
-      }
-    }
-    function renderProjects() {
-      if (!projects.length) {
-        projectList.innerHTML = '<div class="muted">暂无项目</div>';
-        return;
-      }
-      projectList.innerHTML = "";
-      for (const project of projects) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `project-card ${currentProject && currentProject.id === project.id ? "active" : ""}`;
-        btn.innerHTML = `
-          <span class="project-title"></span>
-          <span class="project-meta">
-            <span>${escapeHtml(project.role || "")}</span>
-            <span>${escapeHtml(project.template || "")}</span>
-            <span>${escapeHtml(project.last_task_status || project.status || "")}</span>
-          </span>
-        `;
-        btn.querySelector(".project-title").textContent = project.name;
-        btn.addEventListener("click", () => selectProject(project));
-        projectList.appendChild(btn);
-      }
-    }
-    function selectProject(project) {
-      currentProject = project;
-      projectTitle.textContent = project.name;
-      projectSub.textContent = `${project.role} · ${project.status} · ${project.updated_at || ""}`;
-      messages.innerHTML = "";
-      append("progress", "项目", "已进入项目工作区。");
-      renderProjects();
-      connectProjectSocket();
-      setBusy(false);
-    }
-    async function loadMe() {
-      const res = await api("/api/me");
-      if (!res.ok) throw new Error("登录已过期");
-      const data = await res.json();
+      return (d.getMonth() + 1) + '/' + d.getDate();
+    } catch { return ''; }
+  }
+
+  // ====== 登录/注册 ======
+  function setAuthMode(mode) {
+    authMode = mode === 'register' ? 'register' : 'login';
+    const reg = authMode === 'register';
+    authModeButtons.forEach((b) => b.classList.toggle('active', b.dataset.authMode === authMode));
+    nicknameField.classList.toggle('hidden', !reg);
+    passwordInput.autocomplete = reg ? 'new-password' : 'current-password';
+    loginBtn.textContent = reg ? '创建账号' : '登录';
+    loginError.textContent = '';
+  }
+  authModeButtons.forEach((b) => b.addEventListener('click', () => setAuthMode(b.dataset.authMode)));
+
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginBtn.disabled = true;
+    loginError.textContent = '';
+    try {
+      const payload = {
+        account: accountInput.value.trim(),
+        password: passwordInput.value,
+        device_name: 'web'
+      };
+      if (authMode === 'register') payload.nickname = nicknameInput.value.trim();
+      const res = await fetch(authMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || (authMode === 'register' ? '注册失败' : '登录失败'));
+      token = data.token;
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.removeItem('elon_token');
       currentUser = data.user;
-      userName.textContent = currentUser.nickname || currentUser.id;
-      userAccount.textContent = currentUser.account || currentUser.id;
+      await boot();
+    } catch (err) {
+      loginError.textContent = err.message;
+    } finally {
+      loginBtn.disabled = false;
     }
-    async function loadProjects() {
-      const res = await api("/api/me/projects");
-      if (!res.ok) throw new Error("项目加载失败");
-      const data = await res.json();
-      projects = data.projects || [];
-      if (currentProject) {
-        currentProject = projects.find(p => p.id === currentProject.id) || null;
-      }
-      renderProjects();
-      if (!currentProject && projects.length) selectProject(projects[0]);
-      if (!projects.length) {
-        messages.innerHTML = '<div class="empty">还没有项目。</div>';
-        projectTitle.textContent = "项目工作台";
-        projectSub.textContent = "新建项目后就可以开始对话开发";
-      }
+  });
+
+  function showLogin() {
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    appView.classList.add('hidden');
+    loginView.classList.remove('hidden');
+  }
+  function showApp() {
+    loginView.classList.add('hidden');
+    appView.classList.remove('hidden');
+  }
+
+  // ====== Tab 切换 ======
+  function switchTab(tabId) {
+    currentTab = tabId;
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabId));
+    pages.forEach((p) => p.classList.toggle('active', p.id === tabId));
+    // 顶栏标题
+    const t = Array.prototype.find.call(tabs, (x) => x.dataset.tab === tabId);
+    topTitle.textContent = t ? t.dataset.title : '';
+    // 输入栏：仅"会话"页且已进入项目时显示
+    const inChat = tabId === 'chatPage' && currentProject;
+    inputBar.classList.toggle('active', !!inChat);
+    // 返回按钮：仅"会话"页进入项目后显示
+    backBtn.style.display = inChat ? '' : 'none';
+    // 新建按钮：仅会话页显示
+    addBtn.style.display = tabId === 'chatPage' ? '' : 'none';
+    searchBtn.style.display = tabId === 'chatPage' ? '' : 'none';
+  }
+  tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+  backBtn.addEventListener('click', () => {
+    // 退出当前项目，回到会话列表
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    currentProject = null;
+    chatView.classList.add('hidden');
+    conversationList.classList.remove('hidden');
+    inputBar.classList.remove('active');
+    backBtn.style.display = 'none';
+    resetProjectPage();
+    renderConversationList();
+  });
+
+  // ====== 会话/项目列表 ======
+  function renderConversationList() {
+    if (!projects.length) {
+      conversationList.innerHTML =
+        '<div class="empty-tip">还没有项目<br/>点击右上角 ＋ 新建你的第一个 App'
+        + '<br/><button id="emptyCreateBtn">新建项目</button></div>';
+      const b = $('emptyCreateBtn');
+      if (b) b.addEventListener('click', openNewProject);
+      return;
     }
-    async function loadAgents() {
-      if (!currentUser) return;
-      try {
-        const res = await fetch(`/api/user/${encodeURIComponent(currentUser.id)}/agent`);
-        const data = await res.json();
-        const selected = agentSelect.value;
-        agentSelect.innerHTML = '<option value="">默认模型</option>';
-        for (const item of data.available_agents || []) {
-          const option = document.createElement("option");
-          option.value = item.name || "";
-          option.textContent = item.label || item.name || "unknown";
-          agentSelect.appendChild(option);
-        }
-        agentSelect.value = [...agentSelect.options].some(opt => opt.value === selected) ? selected : "";
-      } catch {
-        agentSelect.innerHTML = '<option value="">默认模型</option>';
-      }
-    }
-    async function refreshRuntime() {
-      try {
-        const res = await fetch("/readyz");
-        const data = await res.json();
-        runtimeText.textContent = `${data.backend} · ${data.cli_options.length} CLI · ${data.api_agents} API`;
-      } catch {
-        runtimeText.textContent = "服务未连接";
-      }
-    }
-    async function boot() {
-      if (!token) return showLogin();
-      try {
-        await loadMe();
-        showApp();
-        await Promise.all([loadProjects(), loadAgents(), refreshRuntime()]);
-      } catch {
-        localStorage.removeItem("elon_token");
-        localStorage.removeItem("lodex_token");
-        token = "";
-        showLogin();
-      }
-    }
-    function connectProjectSocket() {
-      if (socket) socket.close();
-      if (!currentProject || !token) return;
-      const scheme = location.protocol === "https:" ? "wss" : "ws";
-      socket = new WebSocket(`${scheme}://${location.host}/ws/projects/${encodeURIComponent(currentProject.id)}?token=${encodeURIComponent(token)}`);
-      socket.addEventListener("open", () => append("progress", "连接", "项目通道已连接。"));
-      socket.addEventListener("close", () => setBusy(false));
-      socket.addEventListener("error", () => append("error", "连接", "项目通道连接失败。"));
-      socket.addEventListener("message", event => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === "progress") append("progress", "进度", data.message || "");
-          else if (data.type === "tool_call") append("progress", "工具", data.tool || "");
-          else if (data.type === "tool_result") append("progress", "结果", `${data.tool || "tool"}\n${data.result || ""}`);
-          else if (data.type === "done") {
-            setBusy(false);
-            const links = [];
-            if (data.apk_url) links.push({ href: data.apk_url, label: "下载 APK" });
-            if (data.image_url) links.push({ href: data.image_url, label: "查看图片" });
-            append("", "完成", data.message || "", links);
-            loadProjects();
-          } else if (data.type === "error") {
-            setBusy(false);
-            append("error", "错误", data.message || "unknown error");
-            loadProjects();
-          }
-        } catch {
-          append("error", "解析失败", event.data);
-        }
+    conversationList.innerHTML = '';
+    projects.forEach((p) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'conversation-item' + (currentProject && currentProject.id === p.id ? ' active' : '');
+      const status = p.last_task_status || p.status || '准备就绪';
+      item.innerHTML =
+        '<span class="brand"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" /></span>'
+        + '<span class="text">'
+        + '<span class="title"></span>'
+        + '<span class="sub"></span>'
+        + '</span>'
+        + '<span class="time"></span>';
+      item.querySelector('.title').textContent = p.name || '未命名项目';
+      item.querySelector('.sub').textContent = status;
+      item.querySelector('.time').textContent = formatTime(p.updated_at);
+      item.addEventListener('click', () => selectProject(p));
+      conversationList.appendChild(item);
+    });
+  }
+
+  function selectProject(project) {
+    currentProject = project;
+    conversationList.classList.add('hidden');
+    chatView.classList.remove('hidden');
+    chatList.innerHTML = '';
+    appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
+    inputBar.classList.add('active');
+    backBtn.style.display = '';
+    topTitle.textContent = project.name || '会话';
+    renderProjectPage(project);
+    connectSocket();
+    setBusy(false);
+  }
+
+  // ====== 项目页渲染 ======
+  function resetProjectPage() {
+    currentStageText.textContent = '待提交需求';
+    projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
+    stagePlanText.textContent = '1. 需求分析：等待';
+    stageCodeText.textContent = '2. 开发实现：等待';
+    stageBuildText.textContent = '3. 编译打包：等待';
+    stageDeliverText.textContent = '4. 交付下载：等待';
+    projectHistoryText.textContent = '暂无进度记录';
+  }
+  function renderProjectPage(p) {
+    if (!p) { resetProjectPage(); return; }
+    currentStageText.textContent = p.last_task_status || p.status || '准备就绪';
+    const overview = [
+      '项目：' + (p.name || ''),
+      p.description ? '描述：' + p.description : '',
+      '模板：' + (p.template || ''),
+      '角色：' + (p.role || ''),
+      '更新：' + (p.updated_at || '')
+    ].filter(Boolean).join('\n');
+    projectOverviewText.textContent = overview;
+  }
+
+  // ====== 聊天气泡 ======
+  function appendBubble(kind, text, links) {
+    const row = document.createElement('div');
+    row.className = 'bubble-row' + (kind === 'user' ? ' user' : '');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (kind === 'user' ? 'user' :
+      kind === 'progress' ? 'progress' :
+      kind === 'error' ? 'error' : 'ai');
+    bubble.textContent = text || '';
+    if (links && links.length) {
+      links.forEach((lk) => {
+        const a = document.createElement('a');
+        a.href = withToken(lk.href);
+        a.target = '_blank';
+        a.rel = 'noreferrer';
+        a.textContent = '\n' + lk.label;
+        bubble.appendChild(a);
       });
     }
-    loginForm.addEventListener("submit", async event => {
-      event.preventDefault();
-      loginBtn.disabled = true;
-      loginError.textContent = "";
-      try {
-        const payload = {
-          account: accountInput.value.trim(),
-          password: passwordInput.value,
-          device_name: "web"
-        };
-        if (authMode === "register") payload.nickname = nicknameInput.value.trim();
-        const res = await fetch(authMode === "register" ? "/api/auth/register" : "/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || (authMode === "register" ? "注册失败" : "登录失败"));
-        token = data.token;
-        localStorage.setItem("lodex_token", token);
-        localStorage.removeItem("elon_token");
-        currentUser = data.user;
-        await boot();
-      } catch (err) {
-        loginError.textContent = err.message;
-      } finally {
-        loginBtn.disabled = false;
-      }
-    });
-    logoutBtn.addEventListener("click", () => {
-      localStorage.removeItem("elon_token");
-      localStorage.removeItem("lodex_token");
-      token = "";
-      currentUser = null;
-      currentProject = null;
-      projects = [];
-      showLogin();
-    });
-    for (const button of authModeButtons) {
-      button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+    row.appendChild(bubble);
+    chatList.appendChild(row);
+    chatList.scrollTop = chatList.scrollHeight;
+  }
+
+  // ====== WebSocket ======
+  function connectSocket() {
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    if (!currentProject || !token) return;
+    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    const url = scheme + '://' + location.host + '/ws/projects/' +
+      encodeURIComponent(currentProject.id) + '?token=' + encodeURIComponent(token);
+    try {
+      socket = new WebSocket(url);
+    } catch (e) {
+      appendBubble('error', '连接失败：' + e.message);
+      return;
     }
-    authSwitchBtn.addEventListener("click", () => setAuthMode(authMode === "register" ? "login" : "register"));
-    refreshProjectsBtn.addEventListener("click", () => loadProjects());
-    newProjectBtn.addEventListener("click", () => {
-      newProjectError.textContent = "";
-      projectNameInput.value = "";
-      projectDescInput.value = "";
-      newProjectDialog.showModal();
-      setTimeout(() => projectNameInput.focus(), 50);
-    });
-    cancelNewProjectBtn.addEventListener("click", () => newProjectDialog.close());
-    newProjectForm.addEventListener("submit", async event => {
-      event.preventDefault();
-      createProjectBtn.disabled = true;
-      newProjectError.textContent = "";
+    socket.addEventListener('open', () => appendBubble('progress', '项目通道已连接。'));
+    socket.addEventListener('close', () => setBusy(false));
+    socket.addEventListener('error', () => appendBubble('error', '项目通道连接异常。'));
+    socket.addEventListener('message', (ev) => {
       try {
-        const res = await api("/api/projects", {
-          method: "POST",
-          body: JSON.stringify({
-            name: projectNameInput.value.trim(),
-            description: projectDescInput.value.trim(),
-            template: templateSelect.value
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "创建失败");
-        newProjectDialog.close();
-        await loadProjects();
-        const project = projects.find(p => p.id === data.project.id) || data.project;
-        selectProject(project);
-      } catch (err) {
-        newProjectError.textContent = err.message;
-      } finally {
-        createProjectBtn.disabled = false;
+        const data = JSON.parse(ev.data);
+        if (data.type === 'progress') appendBubble('progress', data.message || '');
+        else if (data.type === 'tool_call') appendBubble('progress', '工具：' + (data.tool || ''));
+        else if (data.type === 'tool_result') appendBubble('progress', (data.tool || 'tool') + '\n' + (data.result || ''));
+        else if (data.type === 'done') {
+          setBusy(false);
+          const links = [];
+          if (data.apk_url) links.push({ href: data.apk_url, label: '下载 APK' });
+          if (data.image_url) links.push({ href: data.image_url, label: '查看图片' });
+          appendBubble('ai', data.message || '已完成。', links);
+          loadProjects();
+        } else if (data.type === 'error') {
+          setBusy(false);
+          appendBubble('error', data.message || 'unknown error');
+          loadProjects();
+        }
+      } catch {
+        appendBubble('error', '解析失败：' + ev.data);
       }
     });
-    reconnectBtn.addEventListener("click", () => {
-      refreshRuntime();
+  }
+
+  inputBar.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = messageInput.value.trim();
+    if (!text || busy) return;
+    if (!currentProject) { appendBubble('error', '请先选择或新建项目。'); return; }
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      appendBubble('error', '项目通道未连接，正在重连…');
+      connectSocket();
+      return;
+    }
+    const payload = { message: text };
+    if (selectedAgent) payload.agent = selectedAgent;
+    socket.send(JSON.stringify(payload));
+    appendBubble('user', text);
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+    setBusy(true);
+  });
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      inputBar.requestSubmit();
+    }
+  });
+  messageInput.addEventListener('input', () => {
+    messageInput.style.height = 'auto';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+  });
+
+  // ====== 加载用户/项目 ======
+  async function loadMe() {
+    const res = await api('/api/me');
+    if (!res.ok) throw new Error('登录已过期');
+    const data = await res.json();
+    currentUser = data.user;
+    const lines = [
+      '用户：' + (currentUser.nickname || currentUser.id),
+      '账号：' + (currentUser.account || currentUser.id),
+      '用户 ID：' + currentUser.id
+    ];
+    userInfoText.textContent = lines.join('\n');
+  }
+  async function loadProjects() {
+    const res = await api('/api/me/projects');
+    if (!res.ok) throw new Error('项目加载失败');
+    const data = await res.json();
+    projects = data.projects || [];
+    if (currentProject) {
+      const refreshed = projects.find((p) => p.id === currentProject.id);
+      if (refreshed) {
+        currentProject = refreshed;
+        renderProjectPage(refreshed);
+      }
+    }
+    renderConversationList();
+  }
+  async function loadAgents() {
+    if (!currentUser) return;
+    try {
+      const res = await fetch('/api/user/' + encodeURIComponent(currentUser.id) + '/agent');
+      const data = await res.json();
+      agentSelect.innerHTML = '<option value="">默认模型</option>';
+      (data.available_agents || []).forEach((it) => {
+        const opt = document.createElement('option');
+        opt.value = it.name || '';
+        opt.textContent = it.label || it.name || 'unknown';
+        agentSelect.appendChild(opt);
+      });
+      agentSelect.value = selectedAgent;
+    } catch {
+      agentSelect.innerHTML = '<option value="">默认模型</option>';
+    }
+  }
+  agentSelect.addEventListener('change', () => {
+    selectedAgent = agentSelect.value;
+    modelBtn.textContent = selectedAgent ? (agentSelect.selectedOptions[0].textContent || '已选') : '默认';
+  });
+  async function loadVersion() {
+    try {
+      const res = await fetch('/app/version.json');
+      const data = await res.json();
+      versionText.textContent = '一龙 · 当前版本 v' + (data.version_name || data.version || '?') +
+        ' (build ' + (data.version_code || data.build || '?') + ')';
+    } catch {
+      versionText.textContent = '一龙网页版';
+    }
+  }
+
+  // ====== 新建项目 ======
+  function openNewProject() {
+    newProjectError.textContent = '';
+    projectNameInput.value = '';
+    projectDescInput.value = '';
+    newProjectMask.classList.add('active');
+    setTimeout(() => projectNameInput.focus(), 50);
+  }
+  function closeNewProject() { newProjectMask.classList.remove('active'); }
+  addBtn.addEventListener('click', openNewProject);
+  cancelNewProjectBtn.addEventListener('click', closeNewProject);
+  newProjectMask.addEventListener('click', (e) => { if (e.target === newProjectMask) closeNewProject(); });
+  newProjectForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    createProjectBtn.disabled = true;
+    newProjectError.textContent = '';
+    try {
+      const res = await api('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: projectNameInput.value.trim(),
+          description: projectDescInput.value.trim(),
+          template: templateSelect.value
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '创建失败');
+      closeNewProject();
+      await loadProjects();
+      const created = projects.find((p) => p.id === data.project.id) || data.project;
+      if (created) selectProject(created);
+    } catch (err) {
+      newProjectError.textContent = err.message;
+    } finally {
+      createProjectBtn.disabled = false;
+    }
+  });
+
+  // ====== AI 代理设置弹窗 ======
+  function openAgentDialog() {
+    loadAgents();
+    agentMask.classList.add('active');
+  }
+  aiSettingsRow.addEventListener('click', openAgentDialog);
+  modelBtn.addEventListener('click', openAgentDialog);
+  cancelAgentBtn.addEventListener('click', () => agentMask.classList.remove('active'));
+  agentMask.addEventListener('click', (e) => { if (e.target === agentMask) agentMask.classList.remove('active'); });
+
+  // ====== 检查更新 ======
+  checkUpdateRow.addEventListener('click', async () => {
+    updateArrow.textContent = '检查中…';
+    try {
+      const res = await fetch('/app/version.json');
+      const data = await res.json();
+      const v = data.version_name || data.version || '?';
+      const b = data.version_code || data.build || '?';
+      updateArrow.textContent = '最新 v' + v + ' (' + b + ')';
+    } catch {
+      updateArrow.textContent = '检查失败';
+    }
+  });
+
+  // ====== 退出登录 ======
+  logoutRow.addEventListener('click', () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('elon_token');
+    token = '';
+    currentUser = null;
+    currentProject = null;
+    projects = [];
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    switchTab('chatPage');
+    showLogin();
+  });
+
+  // ====== 其他按钮（占位） ======
+  searchBtn.addEventListener('click', () => {
+    appendBubble('progress', '搜索功能开发中。');
+  });
+  projectContinueBtn.addEventListener('click', () => {
+    if (!currentProject) { switchTab('chatPage'); return; }
+    switchTab('chatPage');
+    messageInput.focus();
+  });
+  projectBuildBtn.addEventListener('click', () => {
+    if (!currentProject || !socket || socket.readyState !== WebSocket.OPEN) {
+      switchTab('chatPage');
+      appendBubble('error', '请先进入项目并等待通道连接。');
+      return;
+    }
+    socket.send(JSON.stringify({ message: '请执行打包，生成最新 APK 下载链接。' }));
+    appendBubble('user', '请执行打包，生成最新 APK 下载链接。');
+    switchTab('chatPage');
+    setBusy(true);
+  });
+  projectRecordBtn.addEventListener('click', () => switchTab('chatPage'));
+  projectSettingsBtn.addEventListener('click', openAgentDialog);
+
+  // ====== 启动 ======
+  async function boot() {
+    if (!token) { showLogin(); return; }
+    try {
+      await loadMe();
+      showApp();
+      await Promise.all([loadProjects(), loadVersion()]);
       loadAgents();
-      connectProjectSocket();
-    });
-    composer.addEventListener("submit", event => {
-      event.preventDefault();
-      const text = messageInput.value.trim();
-      if (!text || busy) return;
-      if (!currentProject) {
-        append("error", "项目", "请先选择或新建项目。");
-        return;
-      }
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        append("error", "连接", "项目通道未连接，正在重连。");
-        connectProjectSocket();
-        return;
-      }
-      const payload = { message: text };
-      if (agentSelect.value) payload.agent = agentSelect.value;
-      socket.send(JSON.stringify(payload));
-      append("user", "你", text);
-      messageInput.value = "";
-      setBusy(true);
-    });
-    function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+      switchTab('chatPage');
+    } catch {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem('elon_token');
+      token = '';
+      showLogin();
     }
-    setAuthMode("login");
-    boot();
-  </script>
+  }
+  setAuthMode('login');
+  boot();
+})();
+</script>
 </body>
-</html>"###;
+</html>
+"###;
