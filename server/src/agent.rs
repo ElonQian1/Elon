@@ -175,6 +175,8 @@ fn elon_self_system_prompt() -> String {
 === 规则 ===
 - 修改任何文件前必须先 read_file 读取原内容，严禁盲目覆写
 - 改完所有相关文件后才 git_commit（中文描述用户需求）
+- git_commit 会自动执行 git push 推送到 GitHub（origin/main）
+- build_project("android") 会在编译前自动递增 versionCode 和 versionName，无需手动修改版本号
 - build_project 失败时分析错误日志，最多自动修复 3 次
 - 用简洁中文告知用户每步进度
 - android 编译成功后会自动生成 APK 下载链接，直接发给用户"#
@@ -223,6 +225,8 @@ fn system_prompt(workspace: &str) -> String {
 - 只有在确实需要读取、修改、提交或构建用户项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
 - 每完成一个功能点就 git_commit（中文描述）
+- git_commit 会自动执行 git push（如工作区有配置 origin）
+- build_project("android") 会自动递增 versionCode 和 versionName，无需手动改版本号
 - build_project 失败时分析错误，最多修复 3 次
 - 回复用户用简洁中文，告知进度
 - 编译成功后系统会自动生成下载链接给用户"#,
@@ -1078,6 +1082,16 @@ pub async fn run_for_elon_self(
     let user_config_workspace = workspace.clone();
     // APK 下载地址指向专用路由
     let download_base = format!("{}/api/elon/download", state.public_url);
+
+    // 开始前同步最新代码（非致命，失败时继续在本地操作）
+    match tools::git_pull_rebase(&workspace) {
+        Ok(msg) => {
+            let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
+        }
+        Err(e) => {
+            warn!("git pull --rebase 失败: {}", e);
+        }
+    }
 
     if let Err(e) = run_api_inner_with_workspace(
         "elon-system",

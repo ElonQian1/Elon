@@ -68,7 +68,123 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         }
         return Err(anyhow!("git commit 失败: {}", stderr));
     }
-    Ok(format!("git commit 成功: {}", stdout.trim()))
+    // 尝试推送到远程（用户隔离工作区可能无远程，失败时非致命）
+    let push_output = Command::new("git")
+        .args(["push", "origin", "main"])
+        .current_dir(project_root)
+        .output();
+    let push_note = match push_output {
+        Ok(out) if out.status.success() => " 并已推送到 origin/main".to_string(),
+        Ok(out) => {
+            let err = String::from_utf8_lossy(&out.stderr);
+            warn!("[工具] git push 失败（非致命）: {}", err.trim());
+            " (无远程或 push 失败，仅本地提交)".to_string()
+        }
+        Err(e) => {
+            warn!("[工具] git push 命令出错: {}", e);
+            " (push 命令出错，仅本地提交)".to_string()
+        }
+    };
+    Ok(format!("git commit 成功: {}{}", stdout.trim(), push_note))
+}
+
+/// git pull --rebase origin main（同步最新代码，非致命）
+pub fn git_pull_rebase(project_root: &Path) -> Result<String> {
+    info!("[工具] git pull --rebase origin main");
+    let output = Command::new("git")
+        .args(["pull", "--rebase", "origin", "main"])
+        .current_dir(project_root)
+        .output()?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if !output.status.success() {
+        warn!("[工具] git pull --rebase 失败（非致命）: {}", stderr.trim());
+        return Ok(format!(
+            "git pull 未成功（{}），在本地代码继续操作",
+            stderr.trim()
+        ));
+    }
+    Ok(format!("已同步最新代码: {}", stdout.trim()))
+}
+
+/// Android build.gradle 版本号自动递增（versionCode +1，versionName PATCH +1）
+fn bump_android_version(work_dir: &Path) -> String {
+    let gradle_path = work_dir.join("app").join("build.gradle");
+    if !gradle_path.exists() {
+        return "（未找到 app/build.gradle，跳过版本号递增）".into();
+    }
+    let content = match std::fs::read_to_string(&gradle_path) {
+        Ok(c) => c,
+        Err(e) => return format!("（读取 build.gradle 失败: {}）", e),
+    };
+    let mut new_lines: Vec<String> = Vec::new();
+    let mut version_code_old = 0u32;
+    let mut version_code_new = 0u32;
+    let mut version_name_old = String::new();
+    let mut version_name_new = String::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("versionCode ") {
+            if let Some(num_str) = trimmed.split_whitespace().nth(1) {
+                if let Ok(n) = num_str.parse::<u32>() {
+                    version_code_old = n;
+                    version_code_new = n + 1;
+                    new_lines.push(line.replacen(
+                        &format!("versionCode {}", n),
+                        &format!("versionCode {}", version_code_new),
+                        1,
+                    ));
+                    continue;
+                }
+            }
+        } else if trimmed.starts_with("versionName ") {
+            if let Some(s) = trimmed.find('"') {
+                if let Some(e) = trimmed[s + 1..].find('"') {
+                    let ver = &trimmed[s + 1..s + 1 + e];
+                    let parts: Vec<&str> = ver.split('.').collect();
+                    if parts.len() == 3 {
+                        if let (Ok(maj), Ok(min), Ok(pat)) = (
+                            parts[0].parse::<u32>(),
+                            parts[1].parse::<u32>(),
+                            parts[2].parse::<u32>(),
+                        ) {
+                            version_name_old = ver.to_string();
+                            version_name_new = format!("{}.{}.{}", maj, min, pat + 1);
+                            new_lines.push(line.replacen(
+                                &format!("versionName \"{}\"", version_name_old),
+                                &format!("versionName \"{}\"", version_name_new),
+                                1,
+                            ));
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        new_lines.push(line.to_string());
+    }
+
+    let mut new_content = new_lines.join("\n");
+    if content.ends_with('\n') {
+        new_content.push('\n');
+    }
+    if version_code_new == 0 {
+        return "（未找到 versionCode，跳过版本号递增）".into();
+    }
+    match std::fs::write(&gradle_path, &new_content) {
+        Ok(_) => {
+            if version_name_new.is_empty() {
+                format!("版本号已递增: versionCode {} → {}", version_code_old, version_code_new)
+            } else {
+                format!(
+                    "版本号已递增: versionCode {} → {}，versionName {} → {}",
+                    version_code_old, version_code_new, version_name_old, version_name_new
+                )
+            }
+        }
+        Err(e) => format!("（写入 build.gradle 失败: {}）", e),
+    }
 }
 
 /// 创建产品级项目工作区：初始化模板、Git 仓库和首个提交。
@@ -157,6 +273,16 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
         }
     };
 
+    // Android 构建前自动递增版本号（versionCode +1，versionName PATCH +1）
+    let version_note = if target == "android" {
+        bump_android_version(&work_dir)
+    } else {
+        String::new()
+    };
+    if !version_note.is_empty() {
+        info!("[工具] {}", version_note);
+    }
+
     let output = Command::new("bash")
         .args(["-c", cmd])
         .current_dir(&work_dir)
@@ -184,7 +310,8 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
                 .to_string_lossy()
                 .to_string();
             return Ok(format!(
-                "android 构建成功\n##APK_FILE:{}\n\n构建日志:\n{}",
+                "android 构建成功\n{}\n##APK_FILE:{}\n\n构建日志:\n{}",
+                version_note,
                 apk_name,
                 &combined[..combined.len().min(800)]
             ));
