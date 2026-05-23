@@ -280,6 +280,16 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
+pub const STABLE_APK_FILENAME: &str = "latest.apk";
+
+pub fn stable_apk_url(download_base: &str) -> String {
+    format!(
+        "{}/{}",
+        download_base.trim_end_matches('/'),
+        STABLE_APK_FILENAME
+    )
+}
+
 pub fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
     let matches = collect_apks(work_dir);
     matches.into_iter().max_by_key(|p| {
@@ -298,6 +308,14 @@ pub fn find_apk_by_filename(work_dir: &Path, filename: &str) -> Option<std::path
                 .and_then(|m| m.modified())
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
         })
+}
+
+pub fn find_download_apk(work_dir: &Path, filename: &str) -> Option<std::path::PathBuf> {
+    if filename == STABLE_APK_FILENAME {
+        find_latest_apk(work_dir)
+    } else {
+        find_apk_by_filename(work_dir, filename)
+    }
 }
 
 fn collect_apks(work_dir: &Path) -> Vec<std::path::PathBuf> {

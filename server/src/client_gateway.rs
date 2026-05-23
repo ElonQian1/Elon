@@ -402,12 +402,11 @@ async fn quick_apk_delivery_response(request: &AgentRequest, state: &AppState) -
         } else {
             (
                 "APK 已生成，可以下载安装测试。".into(),
-                Some(format!(
-                    "{}/download/{}/{}",
+                Some(tools::stable_apk_url(&format!(
+                    "{}/download/{}",
                     state.public_url.trim_end_matches('/'),
-                    request.workspace_user_id,
-                    apk_name
-                )),
+                    request.workspace_user_id
+                ))),
             )
         }
     } else {
@@ -451,12 +450,16 @@ pub async fn download_apk(
     }
 
     let workspace = types::get_user_workspace(&state.workspace_root, &user_id);
-    let apk_path = tools::find_apk_by_filename(&workspace, &filename).ok_or_else(|| {
+    let apk_path = tools::find_download_apk(&workspace, &filename).ok_or_else(|| {
         (
             StatusCode::NOT_FOUND,
             format!("APK file {} does not exist", filename),
         )
     })?;
+    let download_name = apk_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(&filename);
 
     let data = tokio::fs::read(&apk_path).await.map_err(|e| {
         (
@@ -473,7 +476,7 @@ pub async fn download_apk(
         )
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", filename),
+            format!("attachment; filename=\"{}\"", download_name),
         )
         .body(Body::from(data))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

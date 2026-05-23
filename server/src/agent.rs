@@ -289,13 +289,8 @@ async fn run_dispatch_with_workspace(
     let resume_command = is_short_resume_command(user_message, workspace);
     let delivery_request = is_project_delivery_request(user_message, workspace);
     if delivery_request && !resume_command {
-        if let Some(apk_path) = tools::find_latest_apk(workspace) {
-            let apk_name = apk_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            let apk_url = format!("{}/{}", download_base.trim_end_matches('/'), apk_name);
+        if tools::find_latest_apk(workspace).is_some() {
+            let apk_url = tools::stable_apk_url(download_base);
             let _ = tx.send(
                 WsMessage::Done {
                     message: "我看了当前项目状态，APK 已经生成了。你现在最需要的是下载安装测试，所以我先把下载链接给你。".into(),
@@ -819,12 +814,8 @@ async fn run_api_inner_with_workspace(
                         // build_project 成功后提取 APK 文件名，生成下载链接
                         if tool_name == "build_project" {
                             if let Some(line) = r.lines().find(|l| l.starts_with("##APK_FILE:")) {
-                                let apk_name = line.trim_start_matches("##APK_FILE:").trim();
-                                apk_url = Some(format!(
-                                    "{}/{}",
-                                    download_base.trim_end_matches('/'),
-                                    apk_name
-                                ));
+                                let _apk_name = line.trim_start_matches("##APK_FILE:").trim();
+                                apk_url = Some(tools::stable_apk_url(download_base));
                                 let _ = tx.send(
                                     WsMessage::Progress {
                                         message: format!("APK 编译成功，正在生成下载链接..."),

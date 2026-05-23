@@ -255,9 +255,13 @@ pub async fn download_project_apk(
     }
 
     let workspace = state.get_project_workspace(&project.workspace_key);
-    let Some(apk_path) = tools::find_apk_by_filename(&workspace, &filename) else {
+    let Some(apk_path) = tools::find_download_apk(&workspace, &filename) else {
         return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
     };
+    let download_name = apk_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(&filename);
     let data = match tokio::fs::read(&apk_path).await {
         Ok(data) => data,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -271,7 +275,7 @@ pub async fn download_project_apk(
         )
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", filename),
+            format!("attachment; filename=\"{}\"", download_name),
         )
         .body(Body::from(data))
         .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

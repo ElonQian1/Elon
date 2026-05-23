@@ -62,14 +62,8 @@ pub async fn run_with_workspace(
             }
             .to_json(),
         );
-        let apk_url = tools::find_latest_apk(workspace).map(|apk| {
-            let apk_name = apk
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            format!("{}/{}", download_base.trim_end_matches('/'), apk_name)
-        });
+        let apk_url = tools::find_latest_apk(workspace)
+            .map(|_| tools::stable_apk_url(download_base));
         if apk_url.is_none() {
             let _ = tx.send(
                 WsMessage::Progress {
