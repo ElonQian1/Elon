@@ -214,14 +214,24 @@ ssh root@43.139.149.158 'ls -lh /root/Elon/app/ElonSpeed-latest.apk'
 **AI 代理执行 APK 发布时必须**：
 
 ```powershell
-# 1. 读取当前版本号（先读文件，再决定如何递增）
+# 1. 自动读取并递增 versionCode（脚本化，不依赖 AI 手动计算）
 $repoRoot = git rev-parse --show-toplevel
-$gradle = Get-Content "$repoRoot\android\app\build.gradle" -Raw
+$gradlePath = "$repoRoot\android\app\build.gradle"
+$content = Get-Content $gradlePath -Raw
 
-# 2. 根据本次改动类型决定递增哪位（bug fix → PATCH；新功能 → MINOR）
-# 3. 更新 build.gradle：versionCode +1，versionName 按规则递增
-# 4. 将版本号写入 commit message
-git commit -m "release(android): vX.X.X (build XXX) - <改动描述>"
+$oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
+$newCode = $oldCode + 1
+$content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
+Set-Content $gradlePath $content -NoNewline
+Write-Host "versionCode: $oldCode → $newCode"
+
+# 2. 根据本次改动类型手动决定 versionName 递增哪位（见上方规则表）
+#    bug fix → PATCH；新功能 → MINOR；破坏性变更 → MAJOR
+$oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
+# 手动替换 $content 里的 versionName 为新版本号，再次 Set-Content
+
+# 3. 将版本号写入 commit message（格式固定）
+git commit -m "release(android): vNEW_VERSION (build $newCode) - <改动描述>"
 ```
 
 **禁止**：
