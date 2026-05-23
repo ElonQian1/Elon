@@ -388,26 +388,38 @@ async fn quick_apk_delivery_response(request: &AgentRequest, state: &AppState) -
     }
 
     let workspace = state.get_user_workspace(&request.workspace_user_id);
-    let apk_path = tools::find_latest_apk(&workspace)?;
-    let apk_name = apk_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-    if apk_name.is_empty() {
-        return None;
-    }
-
-    let apk_url = format!(
-        "{}/download/{}/{}",
-        state.public_url.trim_end_matches('/'),
-        request.workspace_user_id,
-        apk_name
-    );
+    let (message, apk_url) = if let Some(apk_path) = tools::find_latest_apk(&workspace) {
+        let apk_name = apk_path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        if apk_name.is_empty() {
+            (
+                "当前没有找到可下载的 APK。需要先重新打包，完成后我再给你下载链接。".into(),
+                None,
+            )
+        } else {
+            (
+                "APK 已生成，可以下载安装测试。".into(),
+                Some(format!(
+                    "{}/download/{}/{}",
+                    state.public_url.trim_end_matches('/'),
+                    request.workspace_user_id,
+                    apk_name
+                )),
+            )
+        }
+    } else {
+        (
+            "当前没有找到可下载的 APK。需要先重新打包，完成后我再给你下载链接。".into(),
+            None,
+        )
+    };
     Some(
         types::WsMessage::Done {
-            message: "APK 已生成，可以下载安装测试。".into(),
-            apk_url: Some(apk_url),
+            message,
+            apk_url,
             image_url: None,
         }
         .to_json(),
