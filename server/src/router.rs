@@ -75,6 +75,12 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/app/peer/ws", get(peer_relay::peer_ws_handler))
         // 下载方通过服务器中继获取对应 seeder 的 APK
         .route("/app/relay/peer/:peer_id/apk", get(peer_relay::relay_apk))
+        // ── homecli PC agent 反向 WSS 通道 ────────────────────────────
+        .route("/agent/ws", get(crate::homecli_agent::agent_ws_handler))
+        .route(
+            "/api/_test_dispatch",
+            post(crate::homecli_agent::test_dispatch),
+        )
         .route("/admin", get(admin::admin_page))
         .route(
             "/api/admin/agents",

@@ -9,6 +9,7 @@ mod ai_cli;
 mod api;
 mod client_gateway;
 mod client_protocol;
+mod homecli_agent;
 mod image_generation;
 mod intent_router;
 mod peer_relay;

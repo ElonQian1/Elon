@@ -452,6 +452,8 @@ pub struct AppState {
     pub image_model: Option<ImageModelConfig>,
     /// 已注册的同WiFi种子节点（peer_id → PeerEntry）
     pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
+    /// 反向 WSS 通道接入的 homecli PC agents（agent_id → AgentEntry）
+    pub agent_manager: Arc<crate::homecli_agent::AgentManager>,
 }
 
 impl AppState {
@@ -608,6 +610,7 @@ impl AppState {
             config_path,
             image_model,
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
+            agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
         })
     }
 
