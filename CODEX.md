@@ -39,6 +39,30 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 - For user-facing code tasks, prefer Chinese commit descriptions that identify the user request when possible.
 - Do not use destructive Git commands such as `git reset --hard` or `git checkout --` in the main workspace.
 
+### ⚠️ New files must be explicitly staged (critical lesson)
+
+`git add server/src/main.rs` does NOT automatically include newly created `.rs` files in the same directory.
+New files are `untracked` and must be staged separately. Omitting them causes build failures for other developers.
+
+Required check before every commit:
+```powershell
+# Check for untracked new files — any output means there are files NOT staged
+git status --short | Select-String "^\?\?"
+# If any output: review and git add each new file that belongs to this task
+```
+
+Example of the mistake that breaks builds:
+```powershell
+# ❌ Added mod homecli_agent; in main.rs but forgot to stage the new file
+git add server/src/main.rs
+git commit   # homecli_agent.rs not in repo → other devs get: error[E0583]: file not found
+
+# ✅ Correct:
+git add server/src/homecli_agent.rs  # new file must be explicit
+git add server/src/main.rs
+git commit
+```
+
 ## Concurrent Work Rule
 
 If the main workspace has unrelated uncommitted changes, avoid editing code in the main workspace. Use a temporary Git worktree for isolated code changes, then integrate the finished commit back into `main` with `cherry-pick` and push.
@@ -111,6 +135,16 @@ APK:
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
+
+### ⚠️ Concurrent deployment protection (SHA ordering)
+
+`scripts/publish-server.ps1` automatically protects against a slow build overwriting a newer deployment:
+- After compilation, before binary swap, the script reads `/root/Elon/.deployed-sha` from the server
+- If the server already runs a commit that is **newer** than this build, the deploy is aborted
+- After a successful deploy, the script writes the current SHA to `/root/Elon/.deployed-sha`
+
+This means: if PC-B deploys v2 while PC-A is still compiling v1, PC-A's deploy will be rejected automatically.
+Use `-Force` flag only when you intentionally want to overwrite a newer deployment.
 
 Android APK builds are allowed in the main workspace when necessary, but still commit and push the intended Android changes before building/releasing.
 
