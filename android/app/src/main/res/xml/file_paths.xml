@@ -3,4 +3,7 @@
     <cache-path
         name="attachment_cache"
         path="attachments/" />
+    <external-files-path
+        name="elon_updates"
+        path="." />
 </paths>

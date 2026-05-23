@@ -73,6 +73,12 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
             request.agent,
             request.content.chars().count()
         );
+        if let Some(response) = quick_apk_delivery_response(&request, &state).await {
+            if sender.send(Message::Text(response)).await.is_err() {
+                break;
+            }
+            continue;
+        }
         let job = get_or_start_legacy_job(request, state.clone()).await;
         let mut job_rx = job.broadcaster.subscribe();
         let backlog = job.backlog.lock().await.clone();
@@ -374,6 +380,48 @@ fn is_terminal_ws_message(raw: &str) -> bool {
                 .map(|message_type| message_type == "done" || message_type == "error")
         })
         .unwrap_or(false)
+}
+
+async fn quick_apk_delivery_response(request: &AgentRequest, state: &AppState) -> Option<String> {
+    if !looks_like_apk_delivery_request(&request.content) {
+        return None;
+    }
+
+    let workspace = state.get_user_workspace(&request.workspace_user_id);
+    let apk_path = tools::find_latest_apk(&workspace)?;
+    let apk_name = apk_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    if apk_name.is_empty() {
+        return None;
+    }
+
+    let apk_url = format!(
+        "{}/download/{}/{}",
+        state.public_url.trim_end_matches('/'),
+        request.workspace_user_id,
+        apk_name
+    );
+    Some(
+        types::WsMessage::Done {
+            message: "APK 已生成，可以下载安装测试。".into(),
+            apk_url: Some(apk_url),
+            image_url: None,
+        }
+        .to_json(),
+    )
+}
+
+fn looks_like_apk_delivery_request(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let asks_for_apk =
+        lower.contains("apk") || lower.contains("安装包") || lower.contains("下载包");
+    let asks_for_delivery = ["地址", "链接", "下载", "发给我", "给我", "做好", "做完", "完成"]
+        .iter()
+        .any(|word| lower.contains(word));
+    asks_for_apk && asks_for_delivery
 }
 
 pub async fn download_apk(

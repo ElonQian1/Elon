@@ -272,7 +272,6 @@ class MainActivity : AppCompatActivity() {
                     pendingReconnectForActiveWork = true
                     updateStage(currentStage, "正在恢复连接，回来后会自动继续本轮任务。")
                     recordEvidence("connection", "连接恢复中，正在继续上次任务")
-                    appendMessage(ChatMessage("ai-cli-log", "连接恢复中 · 正在继续上次任务"))
                 }
                 startTaskWorkService(
                     if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
@@ -350,17 +349,12 @@ class MainActivity : AppCompatActivity() {
         // 通过前台任务服务发送 JSON（包含 user_id，服务端据此隔离工作区）
         val responseToken = ++serverResponseToken
         if (!startTaskWorkService(TaskWorkService.ACTION_START_WORK, payload.toString(), activeRequestIsDevelopment)) {
-            waitingForReply = false
-            setSendEnabled(true)
-            pendingRequestPayload = null
-            pendingReconnectForActiveWork = false
-            clearPersistedActiveWork()
-            val wasDevelopment = activeRequestIsDevelopment
-            if (wasDevelopment) {
-                updateStage("需要处理", "消息发送失败，请检查网络后重试。")
+            pendingReconnectForActiveWork = true
+            persistActiveWork()
+            if (activeRequestIsDevelopment) {
+                updateStage("连接恢复", "任务请求已保留，正在重新连接服务器。")
             }
-            appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("消息发送失败，请检查网络后重试。", wasDevelopment)))
-            activeRequestIsDevelopment = false
+            scheduleFirstServerResponseWatchdog(responseToken)
         } else {
             clearPendingAttachments()
             scheduleFirstServerResponseWatchdog(responseToken)
@@ -398,7 +392,6 @@ class MainActivity : AppCompatActivity() {
             updateStage(currentStage, "连接暂时断开，正在保留本轮任务并准备自动恢复。")
             recordEvidence("connection", "连接暂时断开，正在自动恢复任务")
         }
-        appendMessage(ChatMessage("ai-cli-log", "连接暂时断开 · 正在自动恢复任务"))
 
         scheduleReconnectForActiveWork()
     }
@@ -428,7 +421,6 @@ class MainActivity : AppCompatActivity() {
 
         pendingReconnectForActiveWork = false
         recordEvidence("connection", "连接已恢复，已自动继续上次任务")
-        appendMessage(ChatMessage("ai-cli-log", "连接已恢复 · 已自动继续上次任务"))
         if (activeRequestIsDevelopment) {
             updateStage(currentStage, "连接已恢复，正在继续本轮开发任务。")
             addProjectEvent("连接恢复，自动继续任务")
@@ -1729,7 +1721,6 @@ class MainActivity : AppCompatActivity() {
                         if (waitingForReply && pendingReconnectForActiveWork) {
                             pendingReconnectForActiveWork = false
                             recordEvidence("connection", "连接已恢复，后台任务继续运行")
-                            appendMessage(ChatMessage("ai-cli-log", "连接已恢复 · 后台任务继续运行"))
                         }
                         if (!waitingForReply) setSendEnabled(true)
                     }
@@ -1779,6 +1770,8 @@ class MainActivity : AppCompatActivity() {
             } else {
                 startService(intent)
             }
+        }.recoverCatching {
+            startService(intent)
         }.isSuccess
     }
 
@@ -3325,6 +3318,9 @@ class MainActivity : AppCompatActivity() {
             trimmed.startsWith("启动助手：") ||
             trimmed.startsWith("准备项目：") ||
             trimmed.startsWith("处理中：") ||
+            trimmed.startsWith("暂时没有收到服务器进度") ||
+            trimmed.startsWith("连接恢复中") ||
+            trimmed.startsWith("连接已恢复") ||
             trimmed.startsWith("检查结果：开发处理已结束") ||
             trimmed.contains("开发助手已启动，正在处理你的需求") ||
             trimmed.contains("项目环境已准备好，正在进入开发流程") ||
@@ -3542,12 +3538,7 @@ class MainActivity : AppCompatActivity() {
     private fun closeStaleWorkflowMessages(messages: MutableList<ChatMessage>) {
         val lastRole = messages.lastOrNull()?.role ?: return
         if (lastRole !in staleWorkflowRoles) return
-        messages.add(
-            ChatMessage(
-                "ai-stopped",
-                "工作停止：没有收到服务器进度\n原因：上次请求只停在本地发送或后台日志阶段，未收到最终回包。\n下一步：请重新发送需求，我会重新连接服务器执行。"
-            )
-        )
+        messages.removeAt(messages.lastIndex)
     }
 
     private fun scheduleFirstServerResponseWatchdog(token: Int) {
@@ -3557,9 +3548,7 @@ class MainActivity : AppCompatActivity() {
             if (activeRequestIsDevelopment) {
                 updateStage(currentStage, "暂时没有收到服务器进度，正在自动恢复连接。")
                 addProjectEvent("服务端暂未返回进度，自动恢复连接")
-                recordEvidence("connection", "暂时没有收到服务器进度，正在自动恢复连接")
             }
-            appendMessage(ChatMessage("ai-cli-log", "暂时没有收到服务器进度 · 正在自动恢复"))
             startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)
         }, 20_000L)
     }
