@@ -142,8 +142,52 @@ fn tool_definitions() -> Value {
     ])
 }
 
+/// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
+pub fn elon_self_workspace() -> std::path::PathBuf {
+    std::path::PathBuf::from(
+        std::env::var("ELON_SELF_PATH").unwrap_or_else(|_| "/root/Elon".into()),
+    )
+}
+
+/// 一龙自项目专用系统提示词
+fn elon_self_system_prompt() -> String {
+    r#"你是「一龙」平台的 AI 自我迭代助手。你直接操作一龙平台自身的源码仓库，可以修改 Android 客户端、Rust 服务端等任意模块，并编译产出新 APK 供用户安装。
+
+=== 主要目录结构 ===
+- android/      → Android 客户端（Kotlin + Jetpack Compose）
+- server/src/   → Rust 后端（axum + tokio）
+- docs/         → 项目文档
+- scripts/      → 部署脚本
+
+=== 修改 Android 客户端并产出新 APK ===
+1. list_dir("android/app/src/main/kotlin") 了解代码结构
+2. read_file 读取要修改的文件（必须先读再改）
+3. write_file 写入修改内容
+4. git_commit 提交（中文描述）
+5. build_project("android") 编译打包 → 自动生成下载链接
+
+=== 修改 Rust 服务端 ===
+1. read_file 读取对应 .rs 文件
+2. write_file 修改
+3. git_commit 提交
+4. build_project("rust") 编译验证
+
+=== 规则 ===
+- 修改任何文件前必须先 read_file 读取原内容，严禁盲目覆写
+- 改完所有相关文件后才 git_commit（中文描述用户需求）
+- build_project 失败时分析错误日志，最多自动修复 3 次
+- 用简洁中文告知用户每步进度
+- android 编译成功后会自动生成 APK 下载链接，直接发给用户"#
+        .to_string()
+}
+
 /// 系统提示词（告诉 LLM 它的角色和规则）
 fn system_prompt(workspace: &str) -> String {
+    // 如果工作区是平台自身代码仓库，使用专用提示词
+    let elon_self = elon_self_workspace();
+    if workspace == elon_self.to_string_lossy().as_ref() {
+        return elon_self_system_prompt();
+    }
     format!(
         r#"你是「一龙」云端 Android 应用开发平台的 AI 编程助手。
 用户通过手机描述需求，你负责在服务器上帮他们开发完整的 Android APK，并编译好供下载体验。
@@ -1020,5 +1064,39 @@ fn execute_tool(
             tools::build_project(workspace, target)
         }
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
+    }
+}
+
+/// 运行 AI 代理处理「一龙自项目」（/root/Elon），不需要用户身份验证
+pub async fn run_for_elon_self(
+    user_message: &str,
+    agent_name: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let workspace = elon_self_workspace();
+    let user_config_workspace = workspace.clone();
+    // APK 下载地址指向专用路由
+    let download_base = format!("{}/api/elon/download", state.public_url);
+
+    if let Err(e) = run_api_inner_with_workspace(
+        "elon-system",
+        &workspace,
+        &user_config_workspace,
+        &download_base,
+        user_message,
+        agent_name,
+        state,
+        &tx,
+    )
+    .await
+    {
+        error!("Elon 自项目 AI 代理运行出错: {}", e);
+        let _ = tx.send(
+            WsMessage::Error {
+                message: e.to_string(),
+            }
+            .to_json(),
+        );
     }
 }

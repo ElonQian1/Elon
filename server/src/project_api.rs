@@ -414,6 +414,114 @@ fn parse_project_message(raw: &str) -> ProjectChatRequest {
     })
 }
 
+// ── 一龙自项目：无需登录，工作区固定为 ELON_SELF_PATH（默认 /root/Elon）──────
+
+/// WebSocket 入口：`GET /ws/elon`，无需 token
+pub async fn ws_elon_self_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    ws.on_upgrade(move |socket| handle_elon_self_ws(socket, state))
+        .into_response()
+}
+
+async fn handle_elon_self_ws(socket: WebSocket, state: Arc<AppState>) {
+    let (mut sender, mut receiver) = socket.split();
+
+    while let Some(Ok(msg)) = receiver.next().await {
+        let text = match msg {
+            Message::Text(text) => text,
+            Message::Ping(payload) => {
+                if sender.send(Message::Pong(payload)).await.is_err() {
+                    break;
+                }
+                continue;
+            }
+            Message::Pong(_) => continue,
+            Message::Close(_) => break,
+            Message::Binary(_) => continue,
+        };
+
+        let request = parse_project_message(&text);
+        let message = request.message.trim().to_string();
+        if message.is_empty() {
+            continue;
+        }
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let state_clone = state.clone();
+        let agent_task = tokio::spawn(async move {
+            agent::run_for_elon_self(&message, request.agent.as_deref(), &state_clone, tx).await;
+        });
+
+        let mut client_disconnected = false;
+        loop {
+            tokio::select! {
+                progress = rx.recv() => {
+                    let Some(progress) = progress else { break; };
+                    if sender.send(Message::Text(progress)).await.is_err() {
+                        client_disconnected = true;
+                        break;
+                    }
+                }
+                incoming = receiver.next() => {
+                    match incoming {
+                        Some(Ok(Message::Ping(payload))) => {
+                            if sender.send(Message::Pong(payload)).await.is_err() {
+                                client_disconnected = true;
+                                break;
+                            }
+                        }
+                        Some(Ok(Message::Pong(_))) => {}
+                        Some(Ok(Message::Close(_))) | None => {
+                            client_disconnected = true;
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        if client_disconnected {
+            agent_task.abort();
+            let _ = agent_task.await;
+            break;
+        }
+        let _ = agent_task.await;
+    }
+}
+
+/// APK 下载：`GET /api/elon/download/:filename`
+pub async fn download_elon_self_apk(
+    AxumPath(filename): AxumPath<String>,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
+    }
+    if !filename.ends_with(".apk") {
+        return json_error(StatusCode::BAD_REQUEST, "only APK downloads are allowed");
+    }
+
+    let workspace = agent::elon_self_workspace();
+    let Some(apk_path) = tools::find_apk_by_filename(&workspace.join("android"), &filename) else {
+        return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
+    };
+    let data = match tokio::fs::read(&apk_path).await {
+        Ok(data) => data,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/vnd.android.package-archive")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", filename),
+        )
+        .body(Body::from(data))
+        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
 fn login_inner(
     state: &AppState,
     req: LoginRequest,

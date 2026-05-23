@@ -99,7 +99,7 @@ class TaskWorkService : Service() {
         val existing = wsClient
         if (existing != null) return existing
         val created = ElonWsClient(
-            serverUrl = "ws://43.139.149.158:8080/ws",
+            serverUrl = "ws://43.139.149.158:8080/ws/elon",
             onMessage = { raw -> handleServerMessage(raw) },
             onConnected = {
                 reconnectAttempts = 0

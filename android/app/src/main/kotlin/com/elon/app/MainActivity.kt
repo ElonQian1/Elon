@@ -1635,6 +1635,29 @@ class MainActivity : AppCompatActivity() {
         if (projects.isEmpty()) {
             projects.add(loadLegacyProject())
         }
+
+        // 确保「一龙项目」（平台自身源码）始终作为第一个项目存在
+        val elonSelfId = "elon-self"
+        if (projects.none { it.id == elonSelfId }) {
+            val elonProject = AppProject(
+                id = elonSelfId,
+                title = "一龙项目",
+                subtitle = "修改平台自身 · AI 云端迭代",
+                updatedAt = 0L,
+                conversations = mutableListOf(AppConversation(
+                    id = "elon-self-default",
+                    title = "一龙项目",
+                    subtitle = "连接中...",
+                    updatedAt = 0L,
+                    messages = mutableListOf(ChatMessage(
+                        "ai",
+                        "你可以直接告诉我想给 APK 加什么功能，例如「加一个深色模式切换」——我会修改服务器上的源码、重新编译并把新 APK 发给你。"
+                    ))
+                ))
+            )
+            projects.add(0, elonProject)
+        }
+
         activeProjectIndex = prefs.getInt("active_project_index", 0).coerceIn(0, projects.lastIndex)
         activeProject()
         saveProjects()
