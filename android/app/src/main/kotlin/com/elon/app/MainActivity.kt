@@ -74,6 +74,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -185,6 +186,17 @@ class MainActivity : AppCompatActivity() {
     private data class ModelOption(
         val label: String,
         val agentName: String?
+    )
+
+    private data class GitProjectStatus(
+        val hasGit: Boolean,
+        val origin: String?,
+        val branch: String?,
+        val remoteOk: Boolean?,
+        val remoteMessage: String?,
+        val deployKeyExists: Boolean,
+        val publicKey: String?,
+        val deployKeysUrl: String
     )
 
     private data class PendingAttachment(
@@ -2161,9 +2173,9 @@ class MainActivity : AppCompatActivity() {
         if (index !in projects.indices) return
         val project = projects[index]
         val actions = if (projects.size <= 1) {
-            arrayOf("编辑项目名称")
+            arrayOf("编辑项目名称", "Git 仓库")
         } else {
-            arrayOf("编辑项目名称", "删除项目")
+            arrayOf("编辑项目名称", "Git 仓库", "删除项目")
         }
 
         AlertDialog.Builder(this)
@@ -2171,6 +2183,10 @@ class MainActivity : AppCompatActivity() {
             .setItems(actions) { _, which ->
                 when (actions[which]) {
                     "编辑项目名称" -> showRenameProjectDialog(index)
+                    "Git 仓库" -> {
+                        openProject(index)
+                        showGitProjectDialog()
+                    }
                     "删除项目" -> confirmDeleteProject(index)
                 }
             }
@@ -2451,6 +2467,7 @@ class MainActivity : AppCompatActivity() {
             sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。")
         }
         binding.projectRecordButton.setOnClickListener { showProjectRecordDialog() }
+        binding.projectGitButton.setOnClickListener { showGitProjectDialog() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
         binding.profileCheckUpdateButton.setOnClickListener {
@@ -2470,6 +2487,7 @@ class MainActivity : AppCompatActivity() {
             listOf(
                 TopAction("新建项目", R.drawable.ic_popup_project) { showCreateProjectDialog() },
                 TopAction("项目记录", R.drawable.ic_popup_history) { showProjectRecordDialog() },
+                TopAction("Git 仓库", R.drawable.ic_popup_settings) { showGitProjectDialog() },
                 TopAction("打包 APK", R.drawable.ic_popup_build) { sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。") },
                 TopAction("AI 设置", R.drawable.ic_popup_settings) { openSettings() }
             )
@@ -2625,6 +2643,233 @@ class MainActivity : AppCompatActivity() {
             .setMessage("阶段：$currentStage\n会话：${conversations.size} 个\n\n$recent")
             .setPositiveButton("知道了", null)
             .show()
+    }
+
+    private fun showGitProjectDialog() {
+        val actions = arrayOf("查看同步状态", "配置 GitHub 仓库", "生成并复制 Deploy Key", "打开 GitHub Deploy Keys", "授权说明")
+        AlertDialog.Builder(this)
+            .setTitle("${currentProjectTitle} · Git 仓库")
+            .setItems(actions) { _, which ->
+                when (actions[which]) {
+                    "查看同步状态" -> loadGitProjectStatus { status -> showGitStatusDialog(status) }
+                    "配置 GitHub 仓库" -> showConfigureGitDialog()
+                    "生成并复制 Deploy Key" -> generateDeployKey()
+                    "打开 GitHub Deploy Keys" -> loadGitProjectStatus { status -> openUrl(status.deployKeysUrl) }
+                    "授权说明" -> showGitAuthHelpDialog()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showGitStatusDialog(status: GitProjectStatus) {
+        val remoteLine = when (status.remoteOk) {
+            true -> "远端权限：正常"
+            false -> "远端权限：未通过\n${status.remoteMessage.orEmpty().ifBlank { "请检查 Deploy Key 是否已加到 GitHub，并勾选写权限。" }}"
+            null -> "远端权限：尚未配置远端"
+        }
+        AlertDialog.Builder(this)
+            .setTitle("${currentProjectTitle} · Git 状态")
+            .setMessage(
+                buildString {
+                    append("Git 工作区：${if (status.hasGit) "已准备" else "未初始化"}\n")
+                    append("远端：${status.origin ?: "未配置"}\n")
+                    append("分支：${status.branch ?: "未设置"}\n")
+                    append("Deploy Key：${if (status.deployKeyExists) "已生成" else "未生成"}\n")
+                    append(remoteLine)
+                }
+            )
+            .setPositiveButton("知道了", null)
+            .show()
+    }
+
+    private fun showConfigureGitDialog() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(6), dp(18), 0)
+        }
+        val repoInput = EditText(this).apply {
+            hint = "git@github.com:owner/repo.git"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        val branchInput = EditText(this).apply {
+            hint = "main"
+            setText("main")
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+        }
+        root.addView(TextView(this).apply {
+            text = "仓库地址"
+            setTextColor(Color.parseColor("#444444"))
+            textSize = 13f
+        })
+        root.addView(repoInput)
+        root.addView(TextView(this).apply {
+            text = "分支"
+            setTextColor(Color.parseColor("#444444"))
+            textSize = 13f
+        })
+        root.addView(branchInput)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("配置 GitHub 仓库")
+            .setView(root)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val repo = repoInput.text.toString().trim()
+                val branch = branchInput.text.toString().trim().ifBlank { "main" }
+                if (repo.isBlank()) {
+                    repoInput.error = "请输入 GitHub 仓库地址"
+                    return@setOnClickListener
+                }
+                saveGitConfig(repo, branch)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun showGitAuthHelpDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("GitHub 授权说明")
+            .setMessage(
+                "当前版本使用每项目 Deploy Key：先生成公钥，在 GitHub 仓库 Settings → Deploy keys 添加，并勾选写权限。\n\n" +
+                    "正式多用户版会接入 GitHub App，用户只需要在 GitHub 授权指定仓库，服务器再用短期 token 读写代码。"
+            )
+            .setPositiveButton("知道了", null)
+            .show()
+    }
+
+    private fun loadGitProjectStatus(onLoaded: (GitProjectStatus) -> Unit) {
+        Thread {
+            try {
+                val response = http.newCall(
+                    Request.Builder()
+                        .url(projectGitUrl("status"))
+                        .get()
+                        .build()
+                ).execute()
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
+                val status = parseGitProjectStatus(JSONObject(body))
+                runOnUiThread { onLoaded(status) }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Git 状态读取失败: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun generateDeployKey() {
+        Thread {
+            try {
+                val emptyBody = "{}".toRequestBody("application/json".toMediaType())
+                val response = http.newCall(
+                    Request.Builder()
+                        .url(projectGitUrl("deploy-key"))
+                        .post(emptyBody)
+                        .build()
+                ).execute()
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
+                val json = JSONObject(body)
+                val publicKey = json.optString("public_key", "")
+                val status = parseGitProjectStatus(json.optJSONObject("status") ?: JSONObject())
+                runOnUiThread {
+                    copyText("GitHub Deploy Key", publicKey)
+                    AlertDialog.Builder(this)
+                        .setTitle("Deploy Key 已复制")
+                        .setMessage(
+                            "已复制公钥。请到 GitHub 仓库 Settings → Deploy keys 添加它，并勾选写权限。\n\n$publicKey"
+                        )
+                        .setPositiveButton("打开 GitHub") { _, _ -> openUrl(status.deployKeysUrl) }
+                        .setNegativeButton("知道了", null)
+                        .show()
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Deploy Key 生成失败: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun saveGitConfig(repoUrl: String, branch: String) {
+        Thread {
+            try {
+                val payload = JSONObject().apply {
+                    put("repo_url", repoUrl)
+                    put("branch", branch)
+                    put("auth_type", "deploy_key")
+                }
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+                val response = http.newCall(
+                    Request.Builder()
+                        .url(projectGitUrl("config"))
+                        .post(body)
+                        .build()
+                ).execute()
+                val responseBody = response.body?.string().orEmpty()
+                if (!response.isSuccessful) error(responseBody.ifBlank { "HTTP ${response.code}" })
+                val status = parseGitProjectStatus(JSONObject(responseBody))
+                runOnUiThread {
+                    activeProject().subtitle = if (status.remoteOk == true) {
+                        "GitHub 仓库已连接"
+                    } else {
+                        "GitHub 仓库待授权"
+                    }
+                    addProjectEvent("Git 仓库配置：${summarize(repoUrl, 30)}")
+                    showGitStatusDialog(status)
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "Git 配置失败: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun parseGitProjectStatus(json: JSONObject): GitProjectStatus {
+        val git = json.optJSONObject("git") ?: JSONObject()
+        val deployKey = json.optJSONObject("deploy_key") ?: JSONObject()
+        val remoteCheck = git.optJSONObject("remote_check")
+        return GitProjectStatus(
+            hasGit = git.optBoolean("has_git", false),
+            origin = git.optString("origin", "").takeIf { it.isNotBlank() && it != "null" },
+            branch = git.optString("branch", "").takeIf { it.isNotBlank() && it != "null" },
+            remoteOk = remoteCheck?.optBoolean("ok"),
+            remoteMessage = remoteCheck?.optString("message"),
+            deployKeyExists = deployKey.optBoolean("exists", false),
+            publicKey = deployKey.optString("public_key", "").takeIf { it.isNotBlank() && it != "null" },
+            deployKeysUrl = deployKey.optString("github_deploy_keys_url", "https://github.com/settings/keys")
+        )
+    }
+
+    private fun projectGitUrl(action: String): String {
+        return "$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(activeProject().id)}/git/$action?title=${urlPart(activeProject().title)}"
+    }
+
+    private fun urlPart(value: String): String {
+        return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+    }
+
+    private fun copyText(label: String, text: String) {
+        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+        Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun openUrl(url: String) {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            Toast.makeText(this, "无法打开链接: ${it.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun fillPlanPrompt() {

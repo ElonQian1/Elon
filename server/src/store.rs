@@ -419,8 +419,14 @@ impl Store {
         )?;
         tx.execute(
             "UPDATE projects
-             SET source_type = ?2,
-                 template = ?3,
+             SET source_type = CASE
+                     WHEN ?2 != 'template' OR source_type = 'template' THEN ?2
+                     ELSE source_type
+                 END,
+                 template = CASE
+                     WHEN ?2 != 'template' OR source_type = 'template' THEN ?3
+                     ELSE template
+                 END,
                  workspace_path = COALESCE(?4, workspace_path)
              WHERE id = ?1",
             params![id, source_type, template, clean_optional(workspace_path)],
@@ -507,6 +513,48 @@ impl Store {
             )
             .optional()?
             .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))
+    }
+
+    pub fn update_project_git_config(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        repo_url: &str,
+        branch: &str,
+    ) -> Result<ProjectAccess> {
+        let repo_url = repo_url.trim();
+        if repo_url.is_empty() {
+            return Err(anyhow!("Git 仓库地址不能为空"));
+        }
+        let branch = branch.trim();
+        if branch.is_empty() {
+            return Err(anyhow!("Git 分支不能为空"));
+        }
+
+        let now = now();
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE projects
+             SET source_type = 'github',
+                 template = 'github',
+                 repo_url = ?1,
+                 branch = ?2,
+                 updated_at = ?3
+             WHERE id = ?4
+               AND EXISTS (
+                 SELECT 1 FROM project_members
+                 WHERE project_id = ?4
+                   AND user_id = ?5
+                   AND role IN ('owner', 'editor')
+               )",
+            params![repo_url, branch, now, project_id, user_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("项目不存在，或当前用户无权配置 Git"));
+        }
+        drop(conn);
+
+        self.get_project_access(user_id, project_id)
     }
 
     pub fn create_task(&self, project_id: &str, user_id: &str, message: &str) -> Result<String> {

@@ -339,6 +339,11 @@
                         android:text="进度记录" />
 
                     <TextView
+                        android:id="@+id/projectGitButton"
+                        style="@style/ProjectActionButton"
+                        android:text="Git 仓库" />
+
+                    <TextView
                         android:id="@+id/projectSettingsButton"
                         style="@style/ProjectActionButton"
                         android:text="模型设置" />

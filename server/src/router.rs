@@ -1,6 +1,6 @@
 use axum::{
-    Router,
     routing::{delete, get, post},
+    Router,
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -45,6 +45,18 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/ws/user/:user_id/projects/:project_id",
             get(project_api::ws_user_project_handler),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/git/status",
+            get(project_api::user_project_git_status),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/git/deploy-key",
+            post(project_api::user_project_deploy_key),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/git/config",
+            post(project_api::user_project_git_config),
         )
         // ── 旧 APK 兼容入口：内部映射到普通项目 elon-self ───────────────────
         .route("/ws/elon", get(project_api::ws_elon_self_handler))
