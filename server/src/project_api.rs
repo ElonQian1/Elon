@@ -1,12 +1,12 @@
 use axum::{
+    Json,
     body::Body,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Path as AxumPath, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::{header, HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
-    Json,
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -93,6 +93,9 @@ pub async fn list_my_projects(State(state): State<Arc<AppState>>, headers: Heade
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
+    if let Err(e) = ensure_mobile_project(&state, &user.id, "elon-self", Some("一龙项目")) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+    }
 
     match state.store.list_projects_for_user(&user.id) {
         Ok(projects) => Json(serde_json::json!({ "projects": projects })).into_response(),
@@ -158,10 +161,11 @@ pub async fn chat_project(
     };
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
     agent::run_for_project(
         &user.id,
-        &project.id,
-        &project.workspace_key,
+        &project,
+        &download_base,
         &message,
         req.agent.as_deref(),
         &state,
@@ -228,7 +232,31 @@ pub async fn ws_project_handler(
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
 
-    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project))
+    let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
+    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
+        .into_response()
+}
+
+pub async fn ws_user_project_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_mobile_project(
+        &state,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    let download_base = format!(
+        "{}/api/user/{}/projects/{}/download",
+        state.public_url, user.id, project.id
+    );
+    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
         .into_response()
 }
 
@@ -247,38 +275,22 @@ pub async fn download_project_apk(
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
 
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
-    }
-    if !filename.ends_with(".apk") {
-        return json_error(StatusCode::BAD_REQUEST, "only APK downloads are allowed");
-    }
+    serve_project_apk(&state, &project, &filename).await
+}
 
-    let workspace = state.get_project_workspace(&project.workspace_key);
-    let Some(apk_path) = tools::find_download_apk(&workspace, &filename) else {
-        return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
+pub async fn download_user_project_apk(
+    State(state): State<Arc<AppState>>,
+    AxumPath((user_id, project_id, filename)): AxumPath<(String, String, String)>,
+) -> Response {
+    let user = match state.store.ensure_device_user(&user_id) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
-    let download_name = apk_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(&filename);
-    let data = match tokio::fs::read(&apk_path).await {
-        Ok(data) => data,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
-
-    axum::response::Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            header::CONTENT_TYPE,
-            "application/vnd.android.package-archive",
-        )
-        .header(
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", download_name),
-        )
-        .body(Body::from(data))
-        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    serve_project_apk(&state, &project, &filename).await
 }
 
 async fn handle_project_ws(
@@ -286,6 +298,7 @@ async fn handle_project_ws(
     state: Arc<AppState>,
     user: PublicUser,
     project: ProjectAccess,
+    download_base: String,
 ) {
     let (mut sender, mut receiver) = socket.split();
 
@@ -315,13 +328,13 @@ async fn handle_project_ws(
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let state_clone = state.clone();
         let user_id = user.id.clone();
-        let project_id = project.id.clone();
-        let workspace_key = project.workspace_key.clone();
+        let project_for_task = project.clone();
+        let download_base_for_task = download_base.clone();
         let agent_task = tokio::spawn(async move {
             agent::run_for_project(
                 &user_id,
-                &project_id,
-                &workspace_key,
+                &project_for_task,
+                &download_base_for_task,
                 &message,
                 request.agent.as_deref(),
                 &state_clone,
@@ -414,87 +427,28 @@ fn parse_project_message(raw: &str) -> ProjectChatRequest {
     })
 }
 
-// ── 一龙自项目：无需登录，工作区固定为 ELON_SELF_PATH（默认 /root/Elon）──────
+// ── 兼容旧 APK：旧入口会被映射到普通项目 elon-self ───────────────────────
 
-/// WebSocket 入口：`GET /ws/elon`，无需 token
+/// WebSocket 入口：`GET /ws/elon`，无需 token。新客户端应使用
+/// `/ws/user/:user_id/projects/:project_id`。
 pub async fn ws_elon_self_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    ws.on_upgrade(move |socket| handle_elon_self_ws(socket, state))
+    let (user, project) = match ensure_mobile_project(&state, "elon-system", "elon-self", None) {
+        Ok(pair) => pair,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    let download_base = format!(
+        "{}/api/user/{}/projects/{}/download",
+        state.public_url, user.id, project.id
+    );
+    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
         .into_response()
 }
 
-async fn handle_elon_self_ws(socket: WebSocket, state: Arc<AppState>) {
-    let (mut sender, mut receiver) = socket.split();
-
-    while let Some(Ok(msg)) = receiver.next().await {
-        let text = match msg {
-            Message::Text(text) => text,
-            Message::Ping(payload) => {
-                if sender.send(Message::Pong(payload)).await.is_err() {
-                    break;
-                }
-                continue;
-            }
-            Message::Pong(_) => continue,
-            Message::Close(_) => break,
-            Message::Binary(_) => continue,
-        };
-
-        let request = parse_project_message(&text);
-        let message = request.message.trim().to_string();
-        if message.is_empty() {
-            continue;
-        }
-
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-        let state_clone = state.clone();
-        let agent_task = tokio::spawn(async move {
-            agent::run_for_elon_self(&message, request.agent.as_deref(), &state_clone, tx).await;
-        });
-
-        let mut client_disconnected = false;
-        loop {
-            tokio::select! {
-                progress = rx.recv() => {
-                    let Some(progress) = progress else { break; };
-                    if sender.send(Message::Text(progress)).await.is_err() {
-                        client_disconnected = true;
-                        break;
-                    }
-                }
-                incoming = receiver.next() => {
-                    match incoming {
-                        Some(Ok(Message::Ping(payload))) => {
-                            if sender.send(Message::Pong(payload)).await.is_err() {
-                                client_disconnected = true;
-                                break;
-                            }
-                        }
-                        Some(Ok(Message::Pong(_))) => {}
-                        Some(Ok(Message::Close(_))) | None => {
-                            client_disconnected = true;
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-        if client_disconnected {
-            agent_task.abort();
-            let _ = agent_task.await;
-            break;
-        }
-        let _ = agent_task.await;
-    }
-}
-
 /// APK 下载：`GET /api/elon/download/:filename`
-pub async fn download_elon_self_apk(
-    AxumPath(filename): AxumPath<String>,
-) -> Response {
+pub async fn download_elon_self_apk(AxumPath(filename): AxumPath<String>) -> Response {
     if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
         return json_error(StatusCode::BAD_REQUEST, "invalid filename");
     }
@@ -513,13 +467,99 @@ pub async fn download_elon_self_apk(
 
     axum::response::Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/vnd.android.package-archive")
+        .header(
+            header::CONTENT_TYPE,
+            "application/vnd.android.package-archive",
+        )
         .header(
             header::CONTENT_DISPOSITION,
             format!("attachment; filename=\"{}\"", filename),
         )
         .body(Body::from(data))
         .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: &str) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
+    }
+    if !filename.ends_with(".apk") {
+        return json_error(StatusCode::BAD_REQUEST, "only APK downloads are allowed");
+    }
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let Some(apk_path) = tools::find_download_apk(&workspace, filename) else {
+        return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
+    };
+    let download_name = apk_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(filename);
+    let data = match tokio::fs::read(&apk_path).await {
+        Ok(data) => data,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(
+            header::CONTENT_TYPE,
+            "application/vnd.android.package-archive",
+        )
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", download_name),
+        )
+        .body(Body::from(data))
+        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+fn ensure_mobile_project(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+    project_title: Option<&str>,
+) -> anyhow::Result<(PublicUser, ProjectAccess)> {
+    let user = state.store.ensure_device_user(user_id)?;
+    let is_self_project = project_id == "elon-self";
+    let name = project_title
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(if is_self_project {
+            "一龙项目"
+        } else {
+            "移动端项目"
+        });
+    let workspace_path = if is_self_project {
+        Some(agent::elon_self_workspace().to_string_lossy().to_string())
+    } else {
+        None
+    };
+    let project = state.store.ensure_project_for_user(
+        &user.id,
+        project_id,
+        name,
+        if is_self_project {
+            Some("平台自身源码")
+        } else {
+            Some("APK 创建的项目")
+        },
+        if is_self_project {
+            "local_path"
+        } else {
+            "template"
+        },
+        if is_self_project { "self" } else { "android" },
+        workspace_path.as_deref(),
+    )?;
+
+    if project.source_type != "local_path" {
+        let workspace = state
+            .resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+        tools::create_project_workspace(&workspace, "android", &project.name, &user.id)?;
+    }
+
+    Ok((user, project))
 }
 
 fn login_inner(

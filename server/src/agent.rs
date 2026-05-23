@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -7,6 +7,7 @@ use tracing::{error, info, warn};
 use crate::{
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
+    store::ProjectAccess,
     tools,
     types::{AgentConfig, AiBackend, AppState, UserAgentConfig, WsMessage},
 };
@@ -149,53 +150,23 @@ pub fn elon_self_workspace() -> std::path::PathBuf {
     )
 }
 
-/// 一龙自项目专用系统提示词
-fn elon_self_system_prompt() -> String {
-    r#"你是「一龙」平台的 AI 自我迭代助手。你直接操作一龙平台自身的源码仓库，可以修改 Android 客户端、Rust 服务端等任意模块，并编译产出新 APK 供用户安装。
-
-=== 主要目录结构 ===
-- android/      → Android 客户端（Kotlin + Jetpack Compose）
-- server/src/   → Rust 后端（axum + tokio）
-- docs/         → 项目文档
-- scripts/      → 部署脚本
-
-=== 修改 Android 客户端并产出新 APK ===
-1. list_dir("android/app/src/main/kotlin") 了解代码结构
-2. read_file 读取要修改的文件（必须先读再改）
-3. write_file 写入修改内容
-4. git_commit 提交（中文描述）
-5. build_project("android") 编译打包 → 自动生成下载链接
-
-=== 修改 Rust 服务端 ===
-1. read_file 读取对应 .rs 文件
-2. write_file 修改
-3. git_commit 提交
-4. build_project("rust") 编译验证
-
-=== 规则 ===
-- 修改任何文件前必须先 read_file 读取原内容，严禁盲目覆写
-- 改完所有相关文件后才 git_commit（中文描述用户需求）
-- git_commit 会自动执行 git push 推送到 GitHub（origin/main）
-- build_project("android") 会在编译前自动递增 versionCode 和 versionName，无需手动修改版本号
-- build_project 失败时分析错误日志，最多自动修复 3 次
-- 用简洁中文告知用户每步进度
-- android 编译成功后会自动生成 APK 下载链接，直接发给用户"#
-        .to_string()
-}
-
 /// 系统提示词（告诉 LLM 它的角色和规则）
 fn system_prompt(workspace: &str) -> String {
-    // 如果工作区是平台自身代码仓库，使用专用提示词
-    let elon_self = elon_self_workspace();
-    if workspace == elon_self.to_string_lossy().as_ref() {
-        return elon_self_system_prompt();
-    }
     format!(
-        r#"你是「一龙」云端 Android 应用开发平台的 AI 编程助手。
-用户通过手机描述需求，你负责在服务器上帮他们开发完整的 Android APK，并编译好供下载体验。
+        r#"你是「一龙」云端 Git 项目开发平台的 AI 编程助手。
+用户通过手机描述需求，你负责在服务器上的项目工作区里读取说明、修改代码、验证、提交，并在需要时编译 APK 或服务端。
 
 用户工作区: {workspace}
-（这是用户自己的项目目录，与平台代码完全隔离）
+（这是当前项目目录。它可能是模板项目、GitHub 导入项目，也可能是平台自身源码；不要用特殊旁路处理，先按普通 Git 项目理解。）
+
+=== 项目说明读取顺序 ===
+进入任何项目后，优先 list_dir(".") 观察结构；如果存在以下文件，先读取再行动：
+- AGENTS.md
+- CODEX.md
+- .github/copilot-instructions.md
+- .github/instructions/*.md
+- README.md
+- docs/ 中与任务相关的文档
 
 === 开发流程 ===
 1. **新项目**（工作区为空时）:
@@ -205,12 +176,13 @@ fn system_prompt(workspace: &str) -> String {
    - git_commit 提交
    - build_project("android") 编译打包
 
-2. **已有项目**（继续迭代）:
+2. **已有 Git 项目**（继续迭代）:
    - list_dir(".") 查看当前结构
+   - 读取项目说明文档和目标文件
    - read_file 读取要修改的文件
    - write_file 写入修改
    - git_commit 提交
-   - build_project("android") 重新编译
+   - 按项目类型运行 build_project("android" / "rust" / "frontend") 或必要检查
 
 === Android 项目关键文件 ===
 - settings.gradle           → 应用名称
@@ -221,8 +193,8 @@ fn system_prompt(workspace: &str) -> String {
 - app/src/main/res/values/  → strings.xml, colors.xml
 
 === 规则 ===
-- 如果用户需求不是“修改/生成/构建 Android APK 或项目代码”，不要调用工具。请直接用简洁中文回复用户，说明当前平台主要用于应用开发；例如图片、壁纸、闲聊、资料查询等需求，应直接回答能做什么/不能做什么。
-- 只有在确实需要读取、修改、提交或构建用户项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
+- 如果用户需求不是“修改/生成/构建项目代码”，不要调用工具。请直接用简洁中文回复。
+- 只有在确实需要读取、修改、提交或构建项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
 - 每完成一个功能点就 git_commit（中文描述）
 - git_commit 会自动执行 git push（如工作区有配置 origin）
@@ -268,21 +240,31 @@ pub async fn run(
 
 pub async fn run_for_project(
     user_id: &str,
-    project_id: &str,
-    workspace_key: &str,
+    project: &ProjectAccess,
+    download_base: &str,
     user_message: &str,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    let workspace = state.get_project_workspace(workspace_key);
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let user_config_workspace = state.get_user_workspace(user_id);
-    let download_base = format!("{}/api/projects/{}/download", state.public_url, project_id);
+    if matches!(project.source_type.as_str(), "local_path" | "github") {
+        match tools::git_pull_rebase(&workspace) {
+            Ok(msg) => {
+                let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
+            }
+            Err(e) => {
+                warn!("git pull --rebase 失败: {}", e);
+            }
+        }
+    }
     if let Err(e) = run_dispatch_with_workspace(
         user_id,
         &workspace,
         &user_config_workspace,
-        &download_base,
+        download_base,
         user_message,
         agent_name,
         state,
@@ -640,10 +622,12 @@ fn casual_chat_prompt() -> &'static str {
 
 fn quick_casual_reply(user_message: &str) -> Option<&'static str> {
     match user_message.trim().to_lowercase().as_str() {
-        "你好" | "你好呀" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => Some(
-            "你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。",
-        ),
-        "谢谢" | "谢谢你" | "辛苦了" => Some("不客气，我在这边。你继续说下一步想怎么改就行。"),
+        "你好" | "你好呀" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => {
+            Some("你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。")
+        }
+        "谢谢" | "谢谢你" | "辛苦了" => {
+            Some("不客气，我在这边。你继续说下一步想怎么改就行。")
+        }
         _ => None,
     }
 }
@@ -1068,49 +1052,5 @@ fn execute_tool(
             tools::build_project(workspace, target)
         }
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
-    }
-}
-
-/// 运行 AI 代理处理「一龙自项目」（/root/Elon），不需要用户身份验证
-pub async fn run_for_elon_self(
-    user_message: &str,
-    agent_name: Option<&str>,
-    state: &Arc<AppState>,
-    tx: UnboundedSender<String>,
-) {
-    let workspace = elon_self_workspace();
-    let user_config_workspace = workspace.clone();
-    // APK 下载地址指向专用路由
-    let download_base = format!("{}/api/elon/download", state.public_url);
-
-    // 开始前同步最新代码（非致命，失败时继续在本地操作）
-    match tools::git_pull_rebase(&workspace) {
-        Ok(msg) => {
-            let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
-        }
-        Err(e) => {
-            warn!("git pull --rebase 失败: {}", e);
-        }
-    }
-
-    if let Err(e) = run_api_inner_with_workspace(
-        "elon-system",
-        &workspace,
-        &user_config_workspace,
-        &download_base,
-        user_message,
-        agent_name,
-        state,
-        &tx,
-    )
-    .await
-    {
-        error!("Elon 自项目 AI 代理运行出错: {}", e);
-        let _ = tx.send(
-            WsMessage::Error {
-                message: e.to_string(),
-            }
-            .to_json(),
-        );
     }
 }

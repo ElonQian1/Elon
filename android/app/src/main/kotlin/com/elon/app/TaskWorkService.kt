@@ -18,6 +18,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 
 class TaskWorkService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -28,6 +29,7 @@ class TaskWorkService : Service() {
     private var waitingForReply = false
     private var payloadSentForCurrentConnection = false
     private var reconnectAttempts = 0
+    private var activeServerUrl: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -96,10 +98,13 @@ class TaskWorkService : Service() {
     }
 
     private fun ensureClient(): ElonWsClient {
+        val serverUrl = buildProjectWsUrl(pendingPayload)
         val existing = wsClient
-        if (existing != null) return existing
+        if (existing != null && activeServerUrl == serverUrl) return existing
+        existing?.disconnect()
+        activeServerUrl = serverUrl
         val created = ElonWsClient(
-            serverUrl = "ws://43.139.149.158:8080/ws/elon",
+            serverUrl = serverUrl,
             onMessage = { raw -> handleServerMessage(raw) },
             onConnected = {
                 reconnectAttempts = 0
@@ -114,6 +119,30 @@ class TaskWorkService : Service() {
         )
         wsClient = created
         return created
+    }
+
+    private fun buildProjectWsUrl(payload: String?): String {
+        val json = payload
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+        val userId = json
+            ?.optString("user_id")
+            ?.takeIf { it.isNotBlank() }
+            ?: prefs.getString(PREF_USER_ID, null)
+            ?: "default"
+        val projectId = json
+            ?.optString("project_id")
+            ?.takeIf { it.isNotBlank() }
+            ?: prefs.getString(PREF_ACTIVE_PROJECT_ID, null)
+            ?: "elon-self"
+        val projectTitle = json
+            ?.optString("project_title")
+            ?.takeIf { it.isNotBlank() }
+        val titleQuery = projectTitle?.let { "?title=${pathPart(it)}" }.orEmpty()
+        return "ws://43.139.149.158:8080/ws/user/${pathPart(userId)}/projects/${pathPart(projectId)}$titleQuery"
+    }
+
+    private fun pathPart(value: String): String {
+        return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
     }
 
     private fun connect() {
@@ -412,6 +441,8 @@ class TaskWorkService : Service() {
         const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
         const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
         const val PREF_PENDING_WORK_TIME = "pending_work_time"
+        const val PREF_ACTIVE_PROJECT_ID = "active_project_id"
+        const val PREF_USER_ID = "user_id"
         const val PREF_COMPLETED_TASK_BADGE_COUNT = "completed_task_badge_count"
         const val PREF_APP_IN_FOREGROUND = "app_in_foreground"
         const val PREF_QUEUED_TASK_EVENTS = "queued_task_events"

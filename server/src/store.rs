@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Duration, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -41,6 +41,10 @@ pub struct ProjectSummary {
     pub description: Option<String>,
     pub workspace_key: String,
     pub template: String,
+    pub source_type: String,
+    pub repo_url: Option<String>,
+    pub branch: Option<String>,
+    pub workspace_path: Option<String>,
     pub status: String,
     pub role: String,
     pub last_task_status: Option<String>,
@@ -53,6 +57,8 @@ pub struct ProjectAccess {
     pub id: String,
     pub name: String,
     pub workspace_key: String,
+    pub source_type: String,
+    pub workspace_path: Option<String>,
     pub role: String,
     pub status: String,
 }
@@ -275,9 +281,20 @@ impl Store {
         let conn = self.conn()?;
         let tx = conn.unchecked_transaction()?;
         tx.execute(
-            "INSERT INTO projects (id, name, description, workspace_key, template, status, created_by, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, 'active', ?6, ?7, ?7)",
-            params![id, name, clean_optional(description), workspace_key, template, user_id, now],
+            "INSERT INTO projects (
+                id, name, description, workspace_key, template, source_type,
+                status, created_by, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, 'template', 'active', ?6, ?7, ?7)",
+            params![
+                id,
+                name,
+                clean_optional(description),
+                workspace_key,
+                template,
+                user_id,
+                now
+            ],
         )?;
         tx.execute(
             "INSERT INTO project_members (project_id, user_id, role, created_at)
@@ -303,6 +320,10 @@ impl Store {
             description: clean_optional(description).map(ToOwned::to_owned),
             workspace_key,
             template: template.to_string(),
+            source_type: "template".into(),
+            repo_url: None,
+            branch: None,
+            workspace_path: None,
             status: "active".into(),
             role: "owner".into(),
             last_task_status: None,
@@ -311,10 +332,115 @@ impl Store {
         })
     }
 
+    pub fn ensure_device_user(&self, user_id: &str) -> Result<PublicUser> {
+        let id = safe_external_id(user_id, "default");
+        let now = now();
+        let conn = self.conn()?;
+        conn.execute(
+            "INSERT OR IGNORE INTO users (
+                id, phone, email, password_hash, nickname, role, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, NULL, 'device-user', 'APK 用户', 'user', 'active', ?3, ?3)",
+            params![
+                id,
+                format!("device-{}", safe_external_id(user_id, "default")),
+                now
+            ],
+        )?;
+
+        conn.query_row(
+            "SELECT id, phone, email, nickname, role, status FROM users WHERE id = ?1",
+            params![safe_external_id(user_id, "default")],
+            |row| {
+                let phone: Option<String> = row.get(1)?;
+                let email: Option<String> = row.get(2)?;
+                Ok(PublicUser {
+                    id: row.get(0)?,
+                    account: email
+                        .or(phone)
+                        .unwrap_or_else(|| row.get(0).unwrap_or_default()),
+                    nickname: row.get(3)?,
+                    role: row.get(4)?,
+                    status: row.get(5)?,
+                })
+            },
+        )
+        .map_err(Into::into)
+    }
+
+    pub fn ensure_project_for_user(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        name: &str,
+        description: Option<&str>,
+        source_type: &str,
+        template: &str,
+        workspace_path: Option<&str>,
+    ) -> Result<ProjectAccess> {
+        let user = self.ensure_device_user(user_id)?;
+        let id = safe_external_id(project_id, "project");
+        let name = name.trim();
+        let name = if name.is_empty() {
+            "移动端项目"
+        } else {
+            name
+        };
+        let source_type = match source_type.trim() {
+            "local_path" => "local_path",
+            "github" => "github",
+            _ => "template",
+        };
+        let template = match template.trim() {
+            "self" => "self",
+            "github" => "github",
+            _ => "android",
+        };
+        let now = now();
+
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT OR IGNORE INTO projects (
+                id, name, description, workspace_key, template, source_type, workspace_path,
+                status, created_by, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?1, ?4, ?5, ?6, 'active', ?7, ?8, ?8)",
+            params![
+                id,
+                name,
+                clean_optional(description),
+                template,
+                source_type,
+                clean_optional(workspace_path),
+                user.id,
+                now
+            ],
+        )?;
+        tx.execute(
+            "UPDATE projects
+             SET source_type = ?2,
+                 template = ?3,
+                 workspace_path = COALESCE(?4, workspace_path)
+             WHERE id = ?1",
+            params![id, source_type, template, clean_optional(workspace_path)],
+        )?;
+        tx.execute(
+            "INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, 'owner', ?3)",
+            params![id, user.id, now],
+        )?;
+        tx.commit()?;
+        drop(conn);
+
+        self.get_project_access(&user.id, &id)
+    }
+
     pub fn list_projects_for_user(&self, user_id: &str) -> Result<Vec<ProjectSummary>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.description, p.workspace_key, p.template, p.status,
+            "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.status,
                     pm.role,
                     (
                         SELECT t.status FROM tasks t
@@ -332,7 +458,9 @@ impl Store {
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE pm.user_id = ?1 AND p.status != 'deleted'
-             ORDER BY p.updated_at DESC",
+             ORDER BY
+                    CASE WHEN p.id = 'elon-self' THEN 0 ELSE 1 END,
+                    p.updated_at DESC",
         )?;
 
         let projects = stmt
@@ -343,11 +471,15 @@ impl Store {
                     description: row.get(2)?,
                     workspace_key: row.get(3)?,
                     template: row.get(4)?,
-                    status: row.get(5)?,
-                    role: row.get(6)?,
-                    last_task_status: row.get(7)?,
-                    last_apk_url: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    source_type: row.get(5)?,
+                    repo_url: row.get(6)?,
+                    branch: row.get(7)?,
+                    workspace_path: row.get(8)?,
+                    status: row.get(9)?,
+                    role: row.get(10)?,
+                    last_task_status: row.get(11)?,
+                    last_apk_url: row.get(12)?,
+                    updated_at: row.get(13)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -358,7 +490,7 @@ impl Store {
     pub fn get_project_access(&self, user_id: &str, project_id: &str) -> Result<ProjectAccess> {
         self.conn()?
             .query_row(
-                "SELECT p.id, p.name, p.workspace_key, pm.role, p.status
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, pm.role, p.status
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -368,8 +500,10 @@ impl Store {
                         id: row.get(0)?,
                         name: row.get(1)?,
                         workspace_key: row.get(2)?,
-                        role: row.get(3)?,
-                        status: row.get(4)?,
+                        source_type: row.get(3)?,
+                        workspace_path: row.get(4)?,
+                        role: row.get(5)?,
+                        status: row.get(6)?,
                     })
                 },
             )
@@ -495,6 +629,10 @@ fn init_schema(conn: &Connection) -> Result<()> {
           description TEXT,
           workspace_key TEXT NOT NULL UNIQUE,
           template TEXT NOT NULL DEFAULT 'android',
+          source_type TEXT NOT NULL DEFAULT 'template',
+          repo_url TEXT,
+          branch TEXT,
+          workspace_path TEXT,
           status TEXT NOT NULL DEFAULT 'active',
           created_by TEXT NOT NULL,
           created_at TEXT NOT NULL,
@@ -565,7 +703,50 @@ fn init_schema(conn: &Connection) -> Result<()> {
         );
         "#,
     )?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "source_type",
+        "source_type TEXT NOT NULL DEFAULT 'template'",
+    )?;
+    add_column_if_missing(conn, "projects", "repo_url", "repo_url TEXT")?;
+    add_column_if_missing(conn, "projects", "branch", "branch TEXT")?;
+    add_column_if_missing(conn, "projects", "workspace_path", "workspace_path TEXT")?;
     Ok(())
+}
+
+fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<()> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let exists = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?
+        .into_iter()
+        .any(|name| name == column);
+    if !exists {
+        conn.execute(
+            &format!("ALTER TABLE {} ADD COLUMN {}", table, definition),
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+fn safe_external_id(value: &str, fallback: &str) -> String {
+    let safe = value
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(64)
+        .collect::<String>();
+    if safe.is_empty() {
+        fallback.into()
+    } else {
+        safe
+    }
 }
 
 fn normalize_account(account: &str) -> Result<String> {

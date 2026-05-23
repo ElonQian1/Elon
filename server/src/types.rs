@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::sync::{RwLock, mpsc, oneshot};
 
 use crate::store::Store;
 
@@ -621,6 +621,20 @@ impl AppState {
         self.project_root
             .join("projects")
             .join(safe_workspace_part(workspace_key, 64))
+    }
+
+    /// 解析项目实际工作区。GitHub/模板项目默认落在 workspace_root/projects 下；
+    /// local_path 项目（例如一龙自身仓库）可以由项目记录指向固定路径。
+    pub fn resolve_project_workspace(
+        &self,
+        workspace_key: &str,
+        workspace_path: Option<&str>,
+    ) -> std::path::PathBuf {
+        workspace_path
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| self.get_project_workspace(workspace_key))
     }
 }
 

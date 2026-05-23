@@ -1,6 +1,6 @@
 use axum::{
-    routing::{delete, get, post},
     Router,
+    routing::{delete, get, post},
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -42,11 +42,19 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/ws/projects/:project_id",
             get(project_api::ws_project_handler),
         )
-        // ── 一龙自项目：无需登录，直接对接本平台源码 ──────────────────────────
+        .route(
+            "/ws/user/:user_id/projects/:project_id",
+            get(project_api::ws_user_project_handler),
+        )
+        // ── 旧 APK 兼容入口：内部映射到普通项目 elon-self ───────────────────
         .route("/ws/elon", get(project_api::ws_elon_self_handler))
         .route(
             "/api/elon/download/:filename",
             get(project_api::download_elon_self_apk),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/download/:filename",
+            get(project_api::download_user_project_apk),
         )
         .route(
             "/api/projects/:project_id/download/:filename",

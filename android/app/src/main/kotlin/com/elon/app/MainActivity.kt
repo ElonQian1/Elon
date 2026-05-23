@@ -316,6 +316,7 @@ class MainActivity : AppCompatActivity() {
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
             addProperty("project_id", activeProject().id)
+            addProperty("project_title", activeProject().title)
             addProperty("message", outgoingText)
             selectedAgentName?.let { addProperty("agent", it) }
             if (attachmentPayload.size() > 0) add("attachments", attachmentPayload)
@@ -1671,6 +1672,7 @@ class MainActivity : AppCompatActivity() {
         prefs.edit()
             .putString("projects_json", gson.toJson(projects))
             .putInt("active_project_index", activeProjectIndex)
+            .putString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, activeProject().id)
             .apply()
     }
 
