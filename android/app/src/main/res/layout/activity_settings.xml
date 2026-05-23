@@ -17,7 +17,7 @@
             android:layout_marginBottom="16dp"
             android:background="#E3F2FD"
             android:padding="12dp"
-            android:text="配置你专属的 AI 后端和模型。\n• 选择「服务器默认」则使用平台默认 CLI/API\n• 选择预设模型可切换 Codex、Copilot 或 API 模型\n• 填写自定义参数可使用自己的 API Key（流量由自己承担）"
+            android:text="当前测试阶段已锁定 Codex CLI。\n• 聊天、意图分析和代码协作统一走 Codex CLI\n• 暂不切换到其他 AI 代理或自定义 API 模型\n• 恢复多模型前会同步更新服务端和 APK 设置"
             android:textColor="#1565C0"
             android:textSize="13sp" />
 

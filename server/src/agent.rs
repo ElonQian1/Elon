@@ -381,6 +381,7 @@ async fn run_dispatch_with_workspace(
     }
     info!("intent routing decision: {:?}", decision);
 
+    let codex_cli_only = state.ai_cli.codex_cli_only;
     let image_cli_only = matches!(
         decision.intent,
         intent_router::UserIntent::TextToImage | intent_router::UserIntent::ImageAssetForApp
@@ -388,7 +389,26 @@ async fn run_dispatch_with_workspace(
         decision.route,
         CapabilityRoute::TextToImage | CapabilityRoute::ImageThenCode
     );
-    let backend_route = if image_cli_only {
+    let backend_route = if codex_cli_only {
+        if !state.ai_cli.enabled {
+            return Err(anyhow::anyhow!(
+                "当前已锁定只使用 Codex CLI，但服务端没有可用的 Codex CLI 选项"
+            ));
+        }
+        if agent_name
+            .map(|name| !is_local_cli_option(state, name))
+            .unwrap_or(false)
+            || decision.route == CapabilityRoute::ChatAgent
+        {
+            let _ = tx.send(
+                WsMessage::Progress {
+                    message: "当前已锁定使用 Codex CLI，不切换到其他 AI 代理。".into(),
+                }
+                .to_json(),
+            );
+        }
+        CapabilityRoute::CodeAgent
+    } else if image_cli_only {
         if !state.ai_cli.enabled {
             return Err(anyhow::anyhow!(
                 "图片处理测试模式仅使用 Codex CLI，但本地 AI CLI 未启用"
@@ -404,7 +424,9 @@ async fn run_dispatch_with_workspace(
     } else {
         decision.route
     };
-    let backend_agent_name = if image_cli_only {
+    let backend_agent_name = if codex_cli_only {
+        Some("codex_cli")
+    } else if image_cli_only {
         match agent_name {
             Some(name) if is_local_cli_option(state, name) => agent_name,
             _ => Some("codex_cli"),
@@ -421,7 +443,7 @@ async fn run_dispatch_with_workspace(
         user_message,
         backend_agent_name,
         backend_route,
-        !image_cli_only,
+        !(codex_cli_only || image_cli_only),
         require_existing_git,
         state,
         tx,
@@ -593,6 +615,10 @@ fn choose_backend(
     agent_name: Option<&str>,
     route: CapabilityRoute,
 ) -> AiBackend {
+    if state.ai_cli.codex_cli_only {
+        return AiBackend::LocalCli;
+    }
+
     if route == CapabilityRoute::ChatAgent {
         return AiBackend::Api;
     }

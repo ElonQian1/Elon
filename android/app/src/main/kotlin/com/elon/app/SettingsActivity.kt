@@ -32,6 +32,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var userId: String
     private data class AgentOption(val name: String, val label: String)
     private var availableAgents: List<AgentOption> = emptyList()
+    private var codexCliOnly = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +78,15 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 val body = resp.body?.string() ?: return@launch
                 val json = JSONObject(body)
+                codexCliOnly = json.optBoolean("codex_cli_only", false)
+
+                if (codexCliOnly) {
+                    availableAgents = listOf(AgentOption("codex_cli", "Codex CLI"))
+                    setupSpinner()
+                    applyCodexOnlyUi()
+                    cacheModelSelection(null, "Codex CLI")
+                    return@launch
+                }
 
                 // 解析可用代理列表
                 val agentsArr: JSONArray = json.optJSONArray("available_agents") ?: JSONArray()
@@ -97,6 +107,23 @@ class SettingsActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(this@SettingsActivity, "加载配置失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun applyCodexOnlyUi() {
+        val group = findViewById<RadioGroup>(R.id.modeGroup)
+        group.check(R.id.modeDefault)
+        findViewById<RadioButton>(R.id.modeDefault).apply {
+            text = "Codex CLI（已锁定）"
+            isEnabled = false
+        }
+        findViewById<RadioButton>(R.id.modePreset).isEnabled = false
+        findViewById<RadioButton>(R.id.modeCustom).isEnabled = false
+        findViewById<LinearLayout>(R.id.presetLayout).visibility = View.GONE
+        findViewById<LinearLayout>(R.id.customLayout).visibility = View.GONE
+        findViewById<Button>(R.id.saveButton).apply {
+            text = "已锁定 Codex CLI"
+            isEnabled = false
         }
     }
 
@@ -139,6 +166,10 @@ class SettingsActivity : AppCompatActivity() {
 
     // ── 保存配置 ──────────────────────────────
     private fun saveConfig() {
+        if (codexCliOnly) {
+            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+            return
+        }
         val btn = findViewById<Button>(R.id.saveButton)
         btn.isEnabled = false
         btn.text = "保存中..."

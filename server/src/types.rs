@@ -144,10 +144,13 @@ pub struct AiCliConfig {
     pub options: Vec<AiCliOption>,
     pub default_option: Option<String>,
     pub fallback_to_api: bool,
+    /// 临时单通道模式：用户侧聊天、意图分析后的执行、代码协作都只走 Codex CLI。
+    pub codex_cli_only: bool,
 }
 
 impl AiCliConfig {
     fn from_env() -> Self {
+        let codex_cli_only = env_bool("AI_CODEX_CLI_ONLY", true);
         let mut options = cli_options_from_json_env();
         options.extend(provider_cli_options(
             "CODEX",
@@ -167,6 +170,9 @@ impl AiCliConfig {
             false,
             "--model",
         ));
+        if codex_cli_only {
+            options.retain(is_codex_cli_option);
+        }
 
         let enabled = env_bool("AI_CLI_ENABLED", true) && !options.is_empty();
         let default_option = std::env::var("AI_CLI_DEFAULT")
@@ -178,10 +184,12 @@ impl AiCliConfig {
             enabled,
             options,
             default_option,
-            fallback_to_api: env_bool(
-                "AI_CLI_FALLBACK_TO_API",
-                env_bool("CODEX_CLI_FALLBACK_TO_API", true),
-            ),
+            fallback_to_api: !codex_cli_only
+                && env_bool(
+                    "AI_CLI_FALLBACK_TO_API",
+                    env_bool("CODEX_CLI_FALLBACK_TO_API", true),
+                ),
+            codex_cli_only,
         }
     }
 
@@ -200,6 +208,13 @@ impl AiCliConfig {
             .iter()
             .any(|opt| opt.id.eq_ignore_ascii_case(id))
     }
+}
+
+fn is_codex_cli_option(option: &AiCliOption) -> bool {
+    let id = option.id.to_ascii_lowercase();
+    let provider = option.provider.to_ascii_lowercase();
+    let bin = option.bin.to_ascii_lowercase();
+    id.contains("codex") || provider.contains("codex") || bin.contains("codex")
 }
 
 #[derive(Debug, Deserialize)]

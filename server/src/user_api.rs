@@ -1,8 +1,8 @@
 /// 用户端 AI 代理配置 API
 ///
-/// 每个用户可以通过 APK 的「设置」页面配置自己专属的 AI 代理：
-///   - 选择服务器预设的代理（OpenAI / DeepSeek / Hunyuan ...）
-///   - 或填写自己的 API Key + 地址 + 模型（完全自定义）
+/// 每个用户可以通过 APK 的「设置」页面配置自己专属的 AI 代理。
+/// 当前默认 `AI_CODEX_CLI_ONLY=true`，用户侧会被锁定到 Codex CLI；
+/// 显式关闭该模式后，才恢复预设 API 代理或自定义 API 模型选择。
 ///
 /// 路由（无需管理员权限，user_id 即身份标识）：
 ///   GET /api/user/:user_id/agent   → 获取当前配置 + 可用全局代理列表
@@ -25,23 +25,34 @@ pub async fn get_user_agent(
 ) -> Response {
     let workspace = state.get_user_workspace(&user_id);
     let config = UserAgentConfig::load(&workspace).unwrap_or_default();
+    let mut response_config = config.clone();
+    if state.ai_cli.codex_cli_only {
+        response_config.use_agent = None;
+        response_config.api_base = None;
+        response_config.api_key = None;
+        response_config.model = None;
+    }
 
     // 列出管理员配置的全局代理名称（供 APK 下拉选择）
     let global = state.agents_config.read().await;
-    let mut available_agents: Vec<serde_json::Value> = global
-        .agents
-        .values()
-        .map(|a| {
-            serde_json::json!({
-                "name": a.name,
-                "model": a.model,
-                "api_base": a.api_base,
-                "backend": "api",
-                "provider": a.name,
-                "label": format!("{} / {}", a.name, a.model),
+    let mut available_agents: Vec<serde_json::Value> = if state.ai_cli.codex_cli_only {
+        Vec::new()
+    } else {
+        global
+            .agents
+            .values()
+            .map(|a| {
+                serde_json::json!({
+                    "name": a.name,
+                    "model": a.model,
+                    "api_base": a.api_base,
+                    "backend": "api",
+                    "provider": a.name,
+                    "label": format!("{} / {}", a.name, a.model),
+                })
             })
-        })
-        .collect();
+            .collect()
+    };
     if state.ai_cli.enabled {
         available_agents.extend(state.ai_cli.options.iter().map(|opt| {
             serde_json::json!({
@@ -72,9 +83,10 @@ pub async fn get_user_agent(
 
     Json(serde_json::json!({
         "user_id": user_id,
-        "config": config,
+        "config": response_config,
         "available_agents": available_agents,
         "default_agent": default_agent,
+        "codex_cli_only": state.ai_cli.codex_cli_only,
     }))
     .into_response()
 }
@@ -111,6 +123,30 @@ pub async fn set_user_agent(
             Some(s)
         }
     });
+    let api_base = req.api_base.and_then(|s| {
+        let s = s.trim().to_string();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    });
+    let api_key = req.api_key.and_then(|s| {
+        let s = s.trim().to_string();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    });
+    let model = req.model.and_then(|s| {
+        let s = s.trim().to_string();
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
+    });
 
     if let Some(ref name) = use_agent {
         let global = state.agents_config.read().await;
@@ -134,6 +170,23 @@ pub async fn set_user_agent(
                 .into_response();
         }
     }
+    if state.ai_cli.codex_cli_only
+        && (use_agent
+            .as_deref()
+            .map(|name| !is_cli_selection(&state, name))
+            .unwrap_or(false)
+            || api_base.is_some()
+            || api_key.is_some()
+            || model.is_some())
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "当前已锁定使用 Codex CLI，暂不允许切换到其他 AI 代理或自定义 API 模型"
+            })),
+        )
+            .into_response();
+    }
 
     let now = chrono::Utc::now()
         .format("%Y-%m-%d %H:%M:%S UTC")
@@ -141,30 +194,9 @@ pub async fn set_user_agent(
 
     let cfg = UserAgentConfig {
         use_agent,
-        api_base: req.api_base.and_then(|s| {
-            let s = s.trim().to_string();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s)
-            }
-        }),
-        api_key: req.api_key.and_then(|s| {
-            let s = s.trim().to_string();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s)
-            }
-        }),
-        model: req.model.and_then(|s| {
-            let s = s.trim().to_string();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s)
-            }
-        }),
+        api_base,
+        api_key,
+        model,
         nickname: req.nickname.and_then(|s| {
             let s = s.trim().to_string();
             if s.is_empty() {

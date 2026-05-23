@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity() {
             activeProject().activeConversationIndex = value
         }
     private var modelOptions: List<ModelOption> = emptyList()
+    private var codexCliOnly = true
     private var selectedAgentName: String? = null
     private var currentModelLabel = "默认"
     private var stageHintAnimator: ValueAnimator? = null
@@ -336,7 +337,9 @@ class MainActivity : AppCompatActivity() {
             addProperty("project_id", activeProject().id)
             addProperty("project_title", activeProject().title)
             addProperty("message", outgoingText)
-            selectedAgentName?.let { addProperty("agent", it) }
+            if (!codexCliOnly) {
+                selectedAgentName?.let { addProperty("agent", it) }
+            }
             if (attachmentPayload.size() > 0) add("attachments", attachmentPayload)
         }
 
@@ -1438,6 +1441,20 @@ class MainActivity : AppCompatActivity() {
                 if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
 
                 val json = JSONObject(body)
+                val serverCodexCliOnly = json.optBoolean("codex_cli_only", false)
+                if (serverCodexCliOnly) {
+                    runOnUiThread {
+                        codexCliOnly = true
+                        modelOptions = listOf(ModelOption("Codex CLI", null))
+                        selectedAgentName = null
+                        currentModelLabel = "Codex CLI"
+                        cacheModelSelection(null, currentModelLabel)
+                        updateModelButton()
+                        afterLoad?.invoke()
+                    }
+                    return@Thread
+                }
+
                 val config = json.optJSONObject("config") ?: JSONObject()
                 val agents = json.optJSONArray("available_agents") ?: JSONArray()
                 val options = mutableListOf(ModelOption("服务器默认", null))
@@ -1472,6 +1489,7 @@ class MainActivity : AppCompatActivity() {
                     effectiveUseAgent == null
 
                 runOnUiThread {
+                    codexCliOnly = false
                     modelOptions = options
                     selectedAgentName = effectiveUseAgent
                     currentModelLabel = label
@@ -1491,6 +1509,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showModelDialog() {
+        if (codexCliOnly) {
+            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (modelOptions.isEmpty()) {
             Toast.makeText(this, "正在加载模型列表...", Toast.LENGTH_SHORT).show()
             loadModelOptions { showModelDialog() }
@@ -1515,6 +1537,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveModelSelection(option: ModelOption) {
+        if (codexCliOnly) {
+            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+            return
+        }
         binding.modelButton.isEnabled = false
         Thread {
             try {
@@ -1562,6 +1588,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun shortModelLabel(label: String): String {
         return when {
+            label.startsWith("Codex", ignoreCase = true) -> "Codex"
             label.startsWith("服务器默认") -> "默认"
             label.startsWith("自定义") -> "自定"
             label.contains("/") -> label.substringBefore("/").trim().take(4)

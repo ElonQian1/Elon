@@ -10,8 +10,8 @@
 
 | 能力路线 | 代码枚举 | 主要执行者 | 适合请求 |
 | --- | --- | --- | --- |
-| 普通聊天 | `CapabilityRoute::ChatAgent` | API chat agent | 闲聊、解释、配置问题、模型选择说明 |
-| 代码/项目开发 | `CapabilityRoute::CodeAgent` | Codex CLI 优先，失败可回退 API agent | App、Web、服务端、APK、部署、修复、重构 |
+| 普通聊天 | `CapabilityRoute::ChatAgent` | Codex CLI only（当前测试期强制） | 闲聊、解释、配置问题、模型选择说明 |
+| 代码/项目开发 | `CapabilityRoute::CodeAgent` | Codex CLI only（当前测试期强制） | App、Web、服务端、APK、部署、修复、重构 |
 | 图片处理（测试期） | `CapabilityRoute::CodeAgent` | Codex CLI only | “画一张图”“生成头像/海报/壁纸”“生成 App 图标并替换” |
 
 ## 意图类型
@@ -30,9 +30,9 @@
 ## 运行顺序
 
 1. `agent::run_dispatch_with_workspace` 先调用 `intent_router::classify(user_message)`。
-2. 测试期如果是 `TextToImage` 或 `ImageAssetForApp`，不调用 `image_generation`，直接交给 Codex CLI；这条路径禁用 API fallback，避免切到其他模型。
-3. 其他开发类请求优先走 Codex CLI；只有用户显式指定 API agent，或 CLI 不可用并允许 fallback 时，才进入 API agent。
-4. 普通聊天和配置解释请求走 API chat agent，不触发项目工具。
+2. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路由结果是普通聊天、模型配置、图片处理还是项目开发，最终执行后端都会被锁定为 Codex CLI。
+3. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型。
+4. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
 
 ## 测试期图片处理策略
 
@@ -65,7 +65,7 @@
 - 新增能力时，优先扩展 `server/src/intent_router.rs`，不要在 `agent.rs`、Web handler 或 APK handler 里复制分流逻辑。
 - 新增意图必须添加单元测试，至少覆盖正例、近似反例、和混合意图。
 - Web、APK、未来 Win 端都只负责采集用户输入和展示结果，不承担核心能力分流。
-- 用户历史保存的聊天模型配置不能覆盖开发类能力路线；开发类默认走 Codex CLI，显式选择某个 agent 时才按用户选择执行。
+- 当前 Codex CLI only 模式下，用户历史保存的聊天模型配置不能覆盖任何能力路线；普通聊天、意图后的执行和开发协作都只走 Codex CLI。
 - 测试期图片请求必须继续走 Codex CLI；恢复独立图片模型前，需要同步更新路由、测试和本文档。
 - 如果新增低价分类模型，请把它放在 `intent_router` 的低置信度补充层，并保留确定性规则作为第一道门。
 
