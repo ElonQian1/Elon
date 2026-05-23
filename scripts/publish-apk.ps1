@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     一龙 Android APK 发布脚本
 
@@ -100,7 +100,7 @@ if ($rs) { rustfmt $rs }
 
 git -C $RepoRoot add android/app/build.gradle
 git -C $RepoRoot commit -m "release(android): v$versionName (build $newCode) - $Changelog"
-git -C $RepoRoot push origin main
+git -C $RepoRoot push origin HEAD:main
 
 $sha = git -C $RepoRoot rev-parse --short HEAD
 Write-Host "   Commit SHA: $sha" -ForegroundColor Green
