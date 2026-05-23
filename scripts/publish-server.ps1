@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     elon cli 服务端 — 本地交叉编译 → 部署
 .DESCRIPTION
@@ -206,13 +206,17 @@ Write-Host "   ✅ 上传完成" -ForegroundColor Green
 # 5. 替换 binary + 重启服务
 # ─────────────────────────────────────────────────────────────
 Write-Host "5⃣  替换 binary 并重启服务..." -ForegroundColor Yellow
-ssh @SshOpts $Server "mkdir -p $(Split-Path $RemoteBin -Parent) 2>/dev/null; mv $stagingPath $RemoteBin; chmod +x $RemoteBin"
+$remoteBinDir = Split-Path $RemoteBin -Parent
+ssh @SshOpts $Server "mkdir -p $remoteBinDir 2>/dev/null; mv $stagingPath $RemoteBin; chmod +x $RemoteBin"
 if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
     Write-Error "❌ binary 替换失败"
 }
 # 优先用 systemctl；若服务不存在则 fallback 到 pkill+nohup
-$restartCmd = "if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd $RemoteDir && nohup $RemoteBin </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi"
+$restartCmdTemplate = @'
+if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd {0} && nohup {1} </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi
+'@
+$restartCmd = $restartCmdTemplate -f $RemoteDir, $RemoteBin
 ssh @SshOpts $Server $restartCmd
 
 Write-Host "   ✅ 服务重启指令已发送" -ForegroundColor Green
