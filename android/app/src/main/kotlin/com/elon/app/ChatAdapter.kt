@@ -10,7 +10,13 @@ import android.widget.ImageButton
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-data class ChatMessage(val role: String, val content: String)
+data class ChatMessage(
+    val role: String,
+    val content: String,
+    var evidenceTitle: String? = null,
+    var evidenceDetails: String? = null,
+    var evidenceExpanded: Boolean = false
+)
 
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
@@ -20,6 +26,8 @@ class ChatAdapter(
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val text: TextView = view.findViewById(R.id.messageText)
+        val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
+        val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
     }
 
@@ -28,6 +36,7 @@ class ChatAdapter(
         "ai"          -> 1
         "ai-working"  -> 2
         "ai-progress" -> 2
+        "ai-cli-log"  -> 2
         "ai-tool"     -> 2
         "ai-complete" -> 2
         "ai-stopped"  -> 2
@@ -54,7 +63,8 @@ class ChatAdapter(
         holder.text.setTextColor(messageTextColor(message.role))
         Linkify.addLinks(holder.text, Linkify.WEB_URLS)
         holder.text.movementMethod = LinkMovementMethod.getInstance()
-        val canPause = message.role in activeWorkflowRoles && onPauseWork != null
+        bindEvidence(holder, message, position)
+        val canPause = position == messages.lastIndex && message.role in activeWorkflowRoles && onPauseWork != null
         holder.pauseButton?.visibility = if (canPause) View.VISIBLE else View.GONE
         holder.pauseButton?.setOnClickListener {
             if (message.role in activeWorkflowRoles) onPauseWork?.invoke()
@@ -63,32 +73,75 @@ class ChatAdapter(
 
     override fun getItemCount() = messages.size
 
+    fun notifyMessageUpdated(index: Int) {
+        if (index in messages.indices) notifyItemChanged(index)
+    }
+
     fun addMessage(msg: ChatMessage) {
-        if (shouldReplaceLastMessage(msg)) {
-            messages[messages.size - 1] = msg
-            notifyItemChanged(messages.size - 1)
-        } else {
-            messages.add(msg)
-            notifyItemInserted(messages.size - 1)
+        if (messages.isNotEmpty() && shouldDropLastTransientBefore(msg)) {
+            val lastIndex = messages.lastIndex
+            messages.removeAt(lastIndex)
+            notifyItemRemoved(lastIndex)
         }
+
+        if (shouldReplaceLastMessage(msg)) {
+            val lastIndex = messages.lastIndex
+            messages[lastIndex] = msg
+            notifyItemChanged(lastIndex)
+            return
+        }
+
+        messages.add(msg)
+        notifyItemInserted(messages.size - 1)
     }
 
     private fun messageTextColor(role: String): Int = when (role) {
         "ai" -> Color.parseColor("#F4F4F4")
-        "ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped" -> Color.WHITE
+        "ai-stopped" -> Color.parseColor("#D9B66B")
+        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#9A9A9A")
         "error" -> Color.parseColor("#C62828")
         else -> Color.parseColor("#111111")
+    }
+
+    private fun bindEvidence(holder: VH, message: ChatMessage, position: Int) {
+        val summary = holder.evidenceSummary ?: return
+        val details = holder.evidenceDetails ?: return
+        val hasEvidence = message.role == "ai" &&
+            !message.evidenceTitle.isNullOrBlank() &&
+            !message.evidenceDetails.isNullOrBlank()
+
+        if (!hasEvidence) {
+            summary.visibility = View.GONE
+            details.visibility = View.GONE
+            return
+        }
+
+        val marker = if (message.evidenceExpanded) "⌄" else "›"
+        summary.text = "$marker ${message.evidenceTitle}"
+        summary.visibility = View.VISIBLE
+        details.text = message.evidenceDetails
+        details.visibility = if (message.evidenceExpanded) View.VISIBLE else View.GONE
+        summary.setOnClickListener {
+            message.evidenceExpanded = !message.evidenceExpanded
+            notifyItemChanged(position)
+        }
     }
 
     private fun shouldReplaceLastMessage(msg: ChatMessage): Boolean {
         if (messages.isEmpty()) return false
         val lastRole = messages.last().role
-        if (lastRole !in workflowRoles) return false
-        return msg.role in workflowRoles || msg.role == "ai" || msg.role == "error"
+        return lastRole in transientWorkflowRoles && msg.role in workflowStatusRoles
+    }
+
+    private fun shouldDropLastTransientBefore(msg: ChatMessage): Boolean {
+        val lastRole = messages.lastOrNull()?.role ?: return false
+        return lastRole in transientWorkflowRoles && msg.role in terminalRoles
     }
 
     private companion object {
-        val workflowRoles = setOf("ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped")
         val activeWorkflowRoles = setOf("ai-working", "ai-progress", "ai-tool")
+        val transientWorkflowRoles = setOf("ai-working", "ai-progress", "ai-tool", "ai-cli-log")
+        val workflowStatusRoles = setOf("ai-working", "ai-progress", "ai-tool", "ai-cli-log", "ai-complete", "ai-stopped")
+        val terminalRoles = setOf("ai", "error")
     }
 }

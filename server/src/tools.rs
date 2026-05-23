@@ -281,30 +281,51 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
 }
 
 pub fn find_latest_apk(work_dir: &Path) -> Option<std::path::PathBuf> {
-    let dirs = [
-        "app/build/outputs/apk/debug",
-        "app/build/outputs/apk/release",
-        "android/app/build/outputs/apk/debug",
-        "android/app/build/outputs/apk/release",
-        "build/outputs/apk/debug",
-        "build/outputs/apk/release",
-    ];
-    let mut matches = Vec::new();
-    for rel in &dirs {
-        if let Ok(entries) = std::fs::read_dir(work_dir.join(rel)) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if p.extension().and_then(|e| e.to_str()) == Some("apk") {
-                    matches.push(p);
-                }
-            }
-        }
-    }
+    let matches = collect_apks(work_dir);
     matches.into_iter().max_by_key(|p| {
         p.metadata()
             .and_then(|m| m.modified())
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
     })
+}
+
+pub fn find_apk_by_filename(work_dir: &Path, filename: &str) -> Option<std::path::PathBuf> {
+    collect_apks(work_dir)
+        .into_iter()
+        .filter(|path| path.file_name().and_then(|name| name.to_str()) == Some(filename))
+        .max_by_key(|p| {
+            p.metadata()
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+        })
+}
+
+fn collect_apks(work_dir: &Path) -> Vec<std::path::PathBuf> {
+    let dirs = [
+        "app/build/outputs/apk",
+        "android/app/build/outputs/apk",
+        "build",
+        "artifacts",
+    ];
+    let mut matches = Vec::new();
+    for rel in &dirs {
+        collect_apks_from_dir(&work_dir.join(rel), &mut matches);
+    }
+    matches
+}
+
+fn collect_apks_from_dir(dir: &Path, matches: &mut Vec<std::path::PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_apks_from_dir(&path, matches);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("apk") {
+            matches.push(path);
+        }
+    }
 }
 
 /// 执行受限 shell 命令（只允许白名单命令）

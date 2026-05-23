@@ -225,28 +225,10 @@ pub async fn download_project_apk(
     }
 
     let workspace = state.get_project_workspace(&project.workspace_key);
-    let candidates = [
-        workspace
-            .join("app/build/outputs/apk/debug")
-            .join(&filename),
-        workspace
-            .join("app/build/outputs/apk/release")
-            .join(&filename),
-        workspace
-            .join("android/app/build/outputs/apk/debug")
-            .join(&filename),
-        workspace
-            .join("android/app/build/outputs/apk/release")
-            .join(&filename),
-        workspace.join("build/outputs/apk/debug").join(&filename),
-        workspace.join("build/outputs/apk/release").join(&filename),
-        workspace.join("artifacts").join(&filename),
-    ];
-
-    let Some(apk_path) = candidates.iter().find(|path| path.exists()) else {
+    let Some(apk_path) = tools::find_apk_by_filename(&workspace, &filename) else {
         return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
     };
-    let data = match tokio::fs::read(apk_path).await {
+    let data = match tokio::fs::read(&apk_path).await {
         Ok(data) => data,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
@@ -274,8 +256,17 @@ async fn handle_project_ws(
     let (mut sender, mut receiver) = socket.split();
 
     while let Some(Ok(msg)) = receiver.next().await {
-        let Message::Text(text) = msg else {
-            continue;
+        let text = match msg {
+            Message::Text(text) => text,
+            Message::Ping(payload) => {
+                if sender.send(Message::Pong(payload)).await.is_err() {
+                    break;
+                }
+                continue;
+            }
+            Message::Pong(_) => continue,
+            Message::Close(_) => break,
+            Message::Binary(_) => continue,
         };
         let request = parse_project_message(&text);
         let message = request.message.trim().to_string();
@@ -292,7 +283,7 @@ async fn handle_project_ws(
         let user_id = user.id.clone();
         let project_id = project.id.clone();
         let workspace_key = project.workspace_key.clone();
-        tokio::spawn(async move {
+        let agent_task = tokio::spawn(async move {
             agent::run_for_project(
                 &user_id,
                 &project_id,
@@ -308,25 +299,68 @@ async fn handle_project_ws(
         let mut reply = String::new();
         let mut apk_url = None;
         let mut error = None;
-        while let Some(progress) = rx.recv().await {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
-                match value.get("type").and_then(|t| t.as_str()) {
-                    Some("done") => {
-                        reply = value["message"].as_str().unwrap_or("完成").to_string();
-                        apk_url = value["apk_url"].as_str().map(ToOwned::to_owned);
+        let mut client_disconnected = false;
+        loop {
+            tokio::select! {
+                progress = rx.recv() => {
+                    let Some(progress) = progress else {
+                        break;
+                    };
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
+                        match value.get("type").and_then(|t| t.as_str()) {
+                            Some("done") => {
+                                reply = value["message"].as_str().unwrap_or("完成").to_string();
+                                apk_url = value["apk_url"].as_str().map(ToOwned::to_owned);
+                            }
+                            Some("error") => {
+                                let msg = value["message"].as_str().unwrap_or("发生错误").to_string();
+                                reply = msg.clone();
+                                error = Some(msg);
+                            }
+                            _ => {}
+                        }
                     }
-                    Some("error") => {
-                        let msg = value["message"].as_str().unwrap_or("发生错误").to_string();
-                        reply = msg.clone();
-                        error = Some(msg);
+                    if sender.send(Message::Text(progress)).await.is_err() {
+                        client_disconnected = true;
+                        break;
                     }
-                    _ => {}
+                }
+                incoming = receiver.next() => {
+                    match incoming {
+                        Some(Ok(Message::Ping(payload))) => {
+                            if sender.send(Message::Pong(payload)).await.is_err() {
+                                client_disconnected = true;
+                                break;
+                            }
+                        }
+                        Some(Ok(Message::Pong(_))) => {}
+                        Some(Ok(Message::Close(_))) | None => {
+                            client_disconnected = true;
+                            break;
+                        }
+                        Some(Ok(Message::Text(_))) => {}
+                        Some(Ok(Message::Binary(_))) => {}
+                        Some(Err(_)) => {
+                            client_disconnected = true;
+                            break;
+                        }
+                    }
                 }
             }
-            if sender.send(Message::Text(progress)).await.is_err() {
-                break;
-            }
         }
+        if client_disconnected {
+            agent_task.abort();
+            let _ = agent_task.await;
+            let _ = state.store.finish_task(
+                &task_id,
+                "failed",
+                Some("连接已断开"),
+                None,
+                Some("client disconnected"),
+            );
+            break;
+        }
+        let _ = agent_task.await;
 
         let status = if error.is_some() { "failed" } else { "done" };
         let _ = state.store.finish_task(

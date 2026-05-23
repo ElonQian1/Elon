@@ -2,53 +2,33 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:baselineAligned="false"
-    android:gravity="start"
+    android:gravity="center"
     android:orientation="horizontal"
-    android:paddingStart="4dp"
-    android:paddingTop="6dp"
-    android:paddingEnd="52dp"
-    android:paddingBottom="6dp">
+    android:paddingStart="36dp"
+    android:paddingTop="5dp"
+    android:paddingEnd="36dp"
+    android:paddingBottom="5dp">
 
-    <ImageView
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:contentDescription="@string/app_name"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_app_brand" />
-
-    <FrameLayout
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/messageText"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:gravity="center"
+        android:lineSpacingExtra="1dp"
+        android:maxWidth="280dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="2dp"
+        android:textColor="#9A9A9A"
+        android:textSize="12sp" />
+
+    <ImageButton
+        android:id="@+id/pauseWorkButton"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
         android:layout_marginStart="8dp"
-        android:layout_weight="1"
-        android:background="@drawable/bg_progress_message"
-        android:minHeight="44dp">
-
-        <TextView
-            android:id="@+id/messageText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:gravity="center_vertical"
-            android:lineSpacingExtra="2dp"
-            android:paddingStart="12dp"
-            android:paddingTop="9dp"
-            android:paddingEnd="40dp"
-            android:paddingBottom="12dp"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp" />
-
-        <ImageButton
-            android:id="@+id/pauseWorkButton"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_gravity="end|bottom"
-            android:layout_marginEnd="3dp"
-            android:layout_marginBottom="3dp"
-            android:background="@drawable/bg_pause_work_button"
-            android:contentDescription="暂停当前工作"
-            android:padding="9dp"
-            android:src="@drawable/ic_work_pause_square" />
-    </FrameLayout>
+        android:background="@drawable/bg_pause_work_button"
+        android:contentDescription="暂停当前工作"
+        android:padding="8dp"
+        android:src="@drawable/ic_work_pause_square"
+        android:visibility="gone" />
 </LinearLayout>

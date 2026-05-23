@@ -115,6 +115,13 @@ Android APK builds are allowed in the main workspace when necessary, but still c
 - `.github/`: project-wide AI and workflow instructions.
 - `.copilot/`: project-specific AI skill instructions.
 
+## Intent Routing / 能力路由
+
+- `server/src/intent_router.rs` is the shared capability router for Web, APK, and future Win clients.
+- Always classify user messages before choosing a backend model. Do not duplicate intent checks inside Web/APK handlers.
+- Routing priority: standalone text-to-image goes to `image_generation`; image asset requests use image generation first and then the code agent; app/web/server development prefers Codex CLI; ordinary chat/model configuration stays in chat.
+- See `docs/intent-routing.md` before adding new capabilities, providers, or low-cost classifier logic.
+
 ## Local Notes
 
 - Chinese docs may display as mojibake in some PowerShell output due to terminal encoding. Inspect carefully before rewriting text-heavy files.

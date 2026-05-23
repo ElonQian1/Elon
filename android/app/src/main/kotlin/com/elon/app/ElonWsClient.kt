@@ -14,6 +14,7 @@ class ElonWsClient(
     private val TAG = "ElonWsClient"
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)  // WebSocket 不设超时
+        .pingInterval(20, TimeUnit.SECONDS)
         .build()
     private var ws: WebSocket? = null
     private val connected = AtomicBoolean(false)
