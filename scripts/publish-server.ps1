@@ -231,25 +231,71 @@ if (-not $Force) {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 5. 替换 binary + 重启服务
+# 5. 替换 binary + 重启服务（flock 互斥锁 + CAS 原子化）
 # ─────────────────────────────────────────────────────────────
-Write-Host "5⃣  替换 binary 并重启服务..." -ForegroundColor Yellow
+# 锁保护范围：CAS 校验 .deployed-sha + mv + restart + 写新 SHA。
+# 即使两台 PC 都通过了步骤 4.5 的祖先检查，在锁内仍会重新比对
+# .deployed-sha == EXPECTED（客户端进入锁前看到的服务器 SHA），
+# 任何中途被别人抢先部署 → 退出码 42 → 本端拒绝覆盖。
+Write-Host "5⃣  替换 binary 并重启服务（flock 互斥锁保护）..." -ForegroundColor Yellow
 $remoteBinDir = Split-Path $RemoteBin -Parent
-ssh @SshOpts $Server "mkdir -p $remoteBinDir 2>/dev/null; mv $stagingPath $RemoteBin; chmod +x $RemoteBin"
-if ($LASTEXITCODE -ne 0) {
-    Remove-Worktree
-    Write-Error "❌ binary 替换失败"
-}
-# 优先用 systemctl；若服务不存在则 fallback 到 pkill+nohup
-$restartCmdTemplate = @'
-if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd {0} && nohup {1} </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi
+$expectedSha = if ($Force) { '__FORCE__' } elseif ($serverSha) { $serverSha } else { '' }
+$lockScriptTemplate = @'
+set -e
+EXPECTED='__EXPECTED__'
+NEW='__NEW__'
+STAGING='__STAGING__'
+DEST='__DEST__'
+DEST_DIR='__DESTDIR__'
+SHA_FILE='__SHAFILE__'
+REMOTE_DIR='__REMOTEDIR__'
+CURRENT=$(cat "$SHA_FILE" 2>/dev/null || echo '')
+if [ "$EXPECTED" != "__FORCE__" ] && [ -n "$CURRENT" ] && [ "$CURRENT" != "$EXPECTED" ]; then
+  echo "CAS_CONFLICT current=$CURRENT expected=$EXPECTED" >&2
+  rm -f "$STAGING" 2>/dev/null || true
+  exit 42
+fi
+mkdir -p "$DEST_DIR"
+mv "$STAGING" "$DEST"
+chmod +x "$DEST"
+if systemctl is-enabled elon-server >/dev/null 2>&1; then
+  systemctl restart elon-server
+else
+  pkill -f elon-server 2>/dev/null || true
+  sleep 1
+  fuser -k 8080/tcp 2>/dev/null || true
+  sleep 1
+  cd "$REMOTE_DIR" && nohup "$DEST" </dev/null >> /root/elon-server.log 2>&1 & disown
+  sleep 2
+fi
+echo "$NEW" > "$SHA_FILE"
+echo OK
 '@
-$restartCmd = $restartCmdTemplate -f $RemoteDir, $RemoteBin
-ssh @SshOpts $Server $restartCmd
+$lockScript = $lockScriptTemplate.
+    Replace('__EXPECTED__', $expectedSha).
+    Replace('__NEW__', $ShaBig).
+    Replace('__STAGING__', $stagingPath).
+    Replace('__DEST__', $RemoteBin).
+    Replace('__DESTDIR__', $remoteBinDir).
+    Replace('__SHAFILE__', "$RemoteDir/.deployed-sha").
+    Replace('__REMOTEDIR__', $RemoteDir)
 
-Write-Host "   ✅ 服务重启指令已发送" -ForegroundColor Green
-# 记录本次部署的 SHA（用于下次部署时的顺序检查）
-ssh @SshOpts $Server "echo '$ShaBig' > $RemoteDir/.deployed-sha" 2>$null
+$lockResult = $lockScript | ssh @SshOpts $Server "flock -x -w 120 /tmp/elon-deploy.lock bash -s" 2>&1
+$lockExit = $LASTEXITCODE
+if ($lockExit -eq 42) {
+    Remove-Worktree
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+    Write-Host "   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）" -ForegroundColor Yellow
+    Write-Host "   $lockResult" -ForegroundColor Yellow
+    Write-Host "   解决：git pull --rebase 后重新部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+    exit 0
+} elseif ($lockExit -ne 0) {
+    Remove-Worktree
+    Write-Error "❌ 锁内部署失败（exit=$lockExit）: $lockResult"
+}
+Write-Host "   ✅ 服务重启指令已发送（锁内完成 mv + restart + 写 SHA）" -ForegroundColor Green
 Write-Host "   ✅ SHA 记录已写入服务器 (.deployed-sha = $Sha)" -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────

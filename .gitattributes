@@ -1,0 +1,4 @@
+# 强制 bash 脚本和 git hook 保持 LF 行尾（Windows clone 时不被 autocrlf 转 CRLF）
+# CRLF 会导致 bash 在 Linux/macOS 报 "syntax error near unexpected token `$'do\r''"
+*.sh         text eol=lf
+.githooks/*  text eol=lf

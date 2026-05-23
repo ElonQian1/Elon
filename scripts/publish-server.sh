@@ -180,21 +180,70 @@ if [ "$FORCE" -eq 0 ]; then
   echo -e "${GREEN}   ✅ SHA 顺序检查通过（本次 $SHA 是最新版本）${NC}"
 fi
 
-# ── 5. 替换 binary + 重启服务 ────────────────────────────────
-echo -e "${YELLOW}5⃣  替换 binary 并重启服务...${NC}"
+# ── 5. 替换 binary + 重启服务（flock 互斥锁 + CAS 原子化）─────
+# 锁保护范围：CAS 校验 .deployed-sha + mv + restart + 写新 SHA。
+# 即使两台 PC 都通过了步骤 4.5 祖先检查，锁内仍会重新比对
+# .deployed-sha == EXPECTED，任何中途被别人抢先 → 退出码 42 → 拒绝覆盖。
+echo -e "${YELLOW}5⃣  替换 binary 并重启服务（flock 互斥锁保护）...${NC}"
 REMOTE_BIN_DIR=$(dirname "$REMOTE_BIN")
-# shellcheck disable=SC2086
-ssh $SSH_OPTS "$SERVER" "mkdir -p $REMOTE_BIN_DIR && mv $STAGING_PATH $REMOTE_BIN && chmod +x $REMOTE_BIN"
+if [ "$FORCE" -eq 1 ]; then
+  EXPECTED_SHA='__FORCE__'
+else
+  EXPECTED_SHA="${SERVER_SHA:-}"
+fi
 
-RESTART_CMD="if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd $REMOTE_DIR && nohup $REMOTE_BIN </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi"
-# shellcheck disable=SC2086
-ssh $SSH_OPTS "$SERVER" "$RESTART_CMD"
+LOCK_SCRIPT=$(cat <<EOF
+set -e
+EXPECTED='${EXPECTED_SHA}'
+NEW='${SHA_BIG}'
+STAGING='${STAGING_PATH}'
+DEST='${REMOTE_BIN}'
+DEST_DIR='${REMOTE_BIN_DIR}'
+SHA_FILE='${REMOTE_DIR}/.deployed-sha'
+REMOTE_DIR_INNER='${REMOTE_DIR}'
+CURRENT=\$(cat "\$SHA_FILE" 2>/dev/null || echo '')
+if [ "\$EXPECTED" != "__FORCE__" ] && [ -n "\$CURRENT" ] && [ "\$CURRENT" != "\$EXPECTED" ]; then
+  echo "CAS_CONFLICT current=\$CURRENT expected=\$EXPECTED" >&2
+  rm -f "\$STAGING" 2>/dev/null || true
+  exit 42
+fi
+mkdir -p "\$DEST_DIR"
+mv "\$STAGING" "\$DEST"
+chmod +x "\$DEST"
+if systemctl is-enabled elon-server >/dev/null 2>&1; then
+  systemctl restart elon-server
+else
+  pkill -f elon-server 2>/dev/null || true
+  sleep 1
+  fuser -k 8080/tcp 2>/dev/null || true
+  sleep 1
+  cd "\$REMOTE_DIR_INNER" && nohup "\$DEST" </dev/null >> /root/elon-server.log 2>&1 & disown
+  sleep 2
+fi
+echo "\$NEW" > "\$SHA_FILE"
+echo OK
+EOF
+)
 
-echo -e "${GREEN}   ✅ 服务重启指令已发送${NC}"
-
-# 记录本次部署 SHA（供下次部署顺序检查）
+set +e
 # shellcheck disable=SC2086
-ssh $SSH_OPTS "$SERVER" "echo '$SHA_BIG' > $REMOTE_DIR/.deployed-sha" 2>/dev/null || true
+LOCK_OUT=$(echo "$LOCK_SCRIPT" | ssh $SSH_OPTS "$SERVER" "flock -x -w 120 /tmp/elon-deploy.lock bash -s" 2>&1)
+LOCK_EXIT=$?
+set -e
+if [ "$LOCK_EXIT" -eq 42 ]; then
+  echo ""
+  echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
+  echo -e "${YELLOW}   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）${NC}"
+  echo -e "${YELLOW}   $LOCK_OUT${NC}"
+  echo -e "${YELLOW}   解决：git pull --rebase 后重新部署，或用 --force 强制覆盖。${NC}"
+  echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
+  exit 0
+elif [ "$LOCK_EXIT" -ne 0 ]; then
+  echo -e "${RED}❌ 锁内部署失败（exit=$LOCK_EXIT）: $LOCK_OUT${NC}" >&2
+  exit 1
+fi
+
+echo -e "${GREEN}   ✅ 服务重启指令已发送（锁内完成 mv + restart + 写 SHA）${NC}"
 echo -e "${GREEN}   ✅ SHA 记录已写入服务器 (.deployed-sha = $SHA)${NC}"
 
 # ── 6. 验证 ──────────────────────────────────────────────────

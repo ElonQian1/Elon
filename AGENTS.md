@@ -13,6 +13,22 @@ git pull --rebase origin main   # 同步最新代码
 git status --short              # 检查是否有其他 AI 未提交的改动
 ```
 
+### 🛡️ 新 clone 必须装一次 git hook（无论 Windows / Linux / 服务器 codex CLI）
+
+```powershell
+# Windows
+pwsh scripts/install-hooks.ps1
+```
+```bash
+# Linux / macOS / 服务器 codex CLI
+bash scripts/install-hooks.sh
+```
+
+> 不依赖 AI 是否阅读文档：装好后，`git push` 会被 hook 自动拦截
+> ——cargo check 失败或有未 add 的 `.rs` 文件时**直接拒绝 push**。
+> 这是机器强制的防漏 add 守门（修复 56bad51 类事故）。
+> 部署侧由服务器 flock 互斥锁 + CAS（compare-and-swap）保证不会并发覆盖。
+
 ---
 
 ## 🚀 服务端改动部署流程（铁律：先 git 再 deploy）
