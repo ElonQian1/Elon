@@ -190,10 +190,11 @@ if ($SkipUpload) {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 4. 上传到服务器（staging 路径，原子替换）
+# 4. 上传到服务器（staging 路径用 SHA 命名，避免并发部署互相覆盖）
 # ─────────────────────────────────────────────────────────────
 Write-Host "4⃣  上传 binary 到服务器..." -ForegroundColor Yellow
-$stagingPath = "/tmp/elon-server-new"
+# 每次部署 staging 路径唯一（含 SHA），两个开发者同时部署不会互相覆盖 binary
+$stagingPath = "/tmp/elon-server-$Sha"
 scp @SshOpts $Binary "${Server}:${stagingPath}"
 if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
@@ -205,7 +206,6 @@ Write-Host "   ✅ 上传完成" -ForegroundColor Green
 # 5. 替换 binary + 重启服务
 # ─────────────────────────────────────────────────────────────
 Write-Host "5⃣  替换 binary 并重启服务..." -ForegroundColor Yellow
-# 分步执行（避免 && 因 pkill 无进程时返回 1 导致整条命令失败）
 ssh @SshOpts $Server "mkdir -p $(Split-Path $RemoteBin -Parent) 2>/dev/null; mv $stagingPath $RemoteBin; chmod +x $RemoteBin"
 if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
