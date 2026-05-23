@@ -47,6 +47,12 @@ applyTo: "**"
 
 > 分支名是 `main`（不是 `master`）。
 
+### local_path / GitHub 项目
+
+- `local_path` 和 GitHub 导入项目必须是真实 Git 仓库，不能在非 Git 目录里临时 `git init` 伪装成项目。
+- 一龙项目只是一个默认 `local_path` 项目；执行流程和其他 GitHub/本地项目相同。
+- 如果服务器工作区缺少 `.git` 或远端不可用，先修复项目挂载/clone/SSH 权限，再继续修改。
+
 ---
 
 ## 🔁 push 被拒绝时的处理（non-fast-forward）

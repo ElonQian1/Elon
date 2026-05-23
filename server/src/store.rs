@@ -1,6 +1,6 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::{Duration, Utc};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
@@ -392,7 +392,7 @@ impl Store {
             _ => "template",
         };
         let template = match template.trim() {
-            "self" => "self",
+            "local" => "local",
             "github" => "github",
             _ => "android",
         };
@@ -458,9 +458,7 @@ impl Store {
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE pm.user_id = ?1 AND p.status != 'deleted'
-             ORDER BY
-                    CASE WHEN p.id = 'elon-self' THEN 0 ELSE 1 END,
-                    p.updated_at DESC",
+             ORDER BY p.updated_at DESC",
         )?;
 
         let projects = stmt

@@ -17,6 +17,7 @@ pub async fn run_with_workspace(
     download_base: &str,
     user_message: &str,
     option_id: Option<&str>,
+    require_existing_git: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -27,7 +28,7 @@ pub async fn run_with_workspace(
         .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
 
     std::fs::create_dir_all(workspace)?;
-    ensure_git(workspace, user_id)?;
+    ensure_git(workspace, user_id, require_existing_git)?;
 
     let android_task = looks_like_android_task(user_message);
     let development_task = intent_router::looks_like_development_request(user_message);
@@ -62,8 +63,8 @@ pub async fn run_with_workspace(
             }
             .to_json(),
         );
-        let apk_url = tools::find_latest_apk(workspace)
-            .map(|_| tools::stable_apk_url(download_base));
+        let apk_url =
+            tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
         if apk_url.is_none() {
             let _ = tx.send(
                 WsMessage::Progress {
@@ -217,13 +218,18 @@ fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) 
         r#"你是「一龙」平台服务器上的本地 AI CLI 编程助手。
 
 当前 CLI：{provider}{model_text}
-当前工作目录是用户隔离工作区：
+当前工作目录是当前项目工作区：
 {workspace}
 
 请直接处理用户请求。规则：
-- 只在当前工作目录内读写用户项目文件，不要修改平台服务端源码，也不要访问其他用户工作区。
+- 只在当前项目工作区内读写文件，不要访问其他用户工作区。当前项目可能是模板项目、GitHub 导入项目，也可能是一龙平台自身源码；一律按普通项目处理，不要使用特殊旁路。
 - 如果只是普通问答或咨询，不需要改文件，请直接用简洁中文回复。
-- 如果需要创建或修改项目代码，请自主阅读目录、编辑文件、运行必要检查或构建。
+- 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
+- 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
+- 对已有 Git 项目或 local_path/GitHub 项目：修改前先同步远端（通常是 git pull --rebase origin main）；修改后运行必要检查，git add 仅加入本次任务文件，git commit，并在配置 origin 时 git push origin main。push 被拒绝时先 rebase 再 push，不要 force push。
+- 如果改动影响服务器运行，必须在 commit/push 后按项目文档部署服务器并验证健康检查。
+- 如果改动影响 Android APK 发布给用户，必须递增 android/app/build.gradle 里的 versionCode 和 versionName，构建签名 release APK，上传最新 APK 和 version.json，再验证下载地址。签名文件应来自项目本机配置（例如 android/app/elon-release.jks 或环境变量），不得提交密钥。
+- 对普通用户项目，遵循该项目自己的 README/AGENTS/CODEX/文档；不要把一龙自项目的服务器发布规则套到无关项目，除非该项目文档要求。
 - 开始执行前，先用 1-2 句自然中文回应用户：说清楚你理解到的具体需求，以及接下来会先检查或修改哪里。为了让客户端识别，这一行必须以「用户可见：」开头。不要使用固定模板，不要提“CLI/后台/工作区”，不要承诺还没有完成的结果。
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。
 - 除了真正要展示给用户的自然说明外，不要在其他位置输出「用户可见：」。
@@ -240,9 +246,16 @@ fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) 
     )
 }
 
-fn ensure_git(workspace: &Path, user_id: &str) -> Result<()> {
+fn ensure_git(workspace: &Path, user_id: &str, require_existing_git: bool) -> Result<()> {
     if workspace.join(".git").exists() {
         return Ok(());
+    }
+
+    if require_existing_git {
+        return Err(anyhow!(
+            "当前项目被标记为 Git/local_path 项目，但工作目录 {} 不是 Git 仓库。请先把它设置成真实 git clone（包含 .git 和 origin/main），再让 AI 修改。",
+            workspace.display()
+        ));
     }
 
     let _ = std::process::Command::new("git")

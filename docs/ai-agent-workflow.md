@@ -9,6 +9,16 @@
 
 ---
 
+## 项目进入规则（APK / Web / 服务器 Codex CLI 通用）
+
+1. 每次进入项目先观察目录结构和 `git status --short --branch`。
+2. 如果存在 `AGENTS.md`、`CODEX.md`、`.github/copilot-instructions.md`、`.github/instructions/*.md`、`README.md` 或任务相关 `docs/`，必须先阅读，再决定修改方案。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理，修改前同步远端，修改后验证、commit、push。
+4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
+5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
+
+---
+
 ## 总体流程
 
 ```

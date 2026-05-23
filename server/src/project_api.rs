@@ -1,12 +1,12 @@
 use axum::{
-    Json,
     body::Body,
     extract::{
-        Path as AxumPath, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
+        Path as AxumPath, Query, State,
     },
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -521,36 +521,15 @@ fn ensure_mobile_project(
     project_title: Option<&str>,
 ) -> anyhow::Result<(PublicUser, ProjectAccess)> {
     let user = state.store.ensure_device_user(user_id)?;
-    let is_self_project = project_id == "elon-self";
-    let name = project_title
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or(if is_self_project {
-            "一龙项目"
-        } else {
-            "移动端项目"
-        });
-    let workspace_path = if is_self_project {
-        Some(agent::elon_self_workspace().to_string_lossy().to_string())
-    } else {
-        None
-    };
+    let spec = mobile_project_spec(project_id, project_title);
     let project = state.store.ensure_project_for_user(
         &user.id,
         project_id,
-        name,
-        if is_self_project {
-            Some("平台自身源码")
-        } else {
-            Some("APK 创建的项目")
-        },
-        if is_self_project {
-            "local_path"
-        } else {
-            "template"
-        },
-        if is_self_project { "self" } else { "android" },
-        workspace_path.as_deref(),
+        &spec.name,
+        Some(spec.description),
+        spec.source_type,
+        spec.template,
+        spec.workspace_path.as_deref(),
     )?;
 
     if project.source_type != "local_path" {
@@ -560,6 +539,77 @@ fn ensure_mobile_project(
     }
 
     Ok((user, project))
+}
+
+struct MobileProjectSpec {
+    name: String,
+    description: &'static str,
+    source_type: &'static str,
+    template: &'static str,
+    workspace_path: Option<String>,
+}
+
+fn mobile_project_spec(project_id: &str, project_title: Option<&str>) -> MobileProjectSpec {
+    let workspace_path = configured_local_project_workspace(project_id)
+        .map(|path| path.to_string_lossy().to_string());
+    let name = project_title
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| {
+            if project_id == "elon-self" {
+                "一龙项目".into()
+            } else {
+                "移动端项目".into()
+            }
+        });
+
+    if workspace_path.is_some() {
+        MobileProjectSpec {
+            name,
+            description: "本地 Git 项目",
+            source_type: "local_path",
+            template: "local",
+            workspace_path,
+        }
+    } else {
+        MobileProjectSpec {
+            name,
+            description: "APK 创建的项目",
+            source_type: "template",
+            template: "android",
+            workspace_path: None,
+        }
+    }
+}
+
+fn configured_local_project_workspace(project_id: &str) -> Option<std::path::PathBuf> {
+    let env_key = format!("ELON_PROJECT_{}_PATH", env_key_suffix(project_id));
+    if let Ok(path) = std::env::var(env_key) {
+        let path = path.trim();
+        if !path.is_empty() {
+            return Some(path.into());
+        }
+    }
+
+    if project_id == "elon-self" {
+        return Some(agent::elon_self_workspace());
+    }
+
+    None
+}
+
+fn env_key_suffix(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 fn login_inner(

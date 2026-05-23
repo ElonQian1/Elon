@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -250,7 +250,20 @@ pub async fn run_for_project(
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let user_config_workspace = state.get_user_workspace(user_id);
-    if matches!(project.source_type.as_str(), "local_path" | "github") {
+    let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
+    if require_existing_git && !workspace.join(".git").exists() {
+        let _ = tx.send(
+            WsMessage::Error {
+                message: format!(
+                    "当前项目被标记为 Git/local_path 项目，但 {} 不是 Git 仓库。请先把它设置成真实 git clone，并配置可用远端后再继续。",
+                    workspace.display()
+                ),
+            }
+            .to_json(),
+        );
+        return;
+    }
+    if require_existing_git {
         match tools::git_pull_rebase(&workspace) {
             Ok(msg) => {
                 let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
@@ -267,6 +280,7 @@ pub async fn run_for_project(
         download_base,
         user_message,
         agent_name,
+        require_existing_git,
         state,
         &tx,
     )
@@ -300,6 +314,7 @@ async fn run_dispatch(
         &download_base,
         user_message,
         agent_name,
+        false,
         state,
         tx,
     )
@@ -313,6 +328,7 @@ async fn run_dispatch_with_workspace(
     download_base: &str,
     user_message: &str,
     agent_name: Option<&str>,
+    require_existing_git: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -388,6 +404,7 @@ async fn run_dispatch_with_workspace(
         backend_agent_name,
         backend_route,
         !image_cli_only,
+        require_existing_git,
         state,
         tx,
     )
@@ -452,11 +469,17 @@ fn is_short_build_command(user_message: &str, workspace: &Path) -> bool {
 }
 
 fn is_project_workspace(workspace: &Path) -> bool {
-    workspace
-        .file_name()
-        .and_then(|name| name.to_str())
-        .map(|name| name.contains("__"))
-        .unwrap_or(false)
+    workspace.join(".git").exists()
+        || workspace.join("gradlew").exists()
+        || workspace.join("android").join("gradlew").exists()
+        || workspace.join("Cargo.toml").exists()
+        || workspace.join("server").join("Cargo.toml").exists()
+        || workspace.join("package.json").exists()
+        || workspace
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| name.contains("__"))
+            .unwrap_or(false)
 }
 
 async fn run_backend_with_workspace(
@@ -468,6 +491,7 @@ async fn run_backend_with_workspace(
     agent_name: Option<&str>,
     route: CapabilityRoute,
     allow_api_fallback: bool,
+    require_existing_git: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -482,6 +506,7 @@ async fn run_backend_with_workspace(
                 download_base,
                 user_message,
                 cli_option_id(agent_name),
+                require_existing_git,
                 state,
                 tx,
             )

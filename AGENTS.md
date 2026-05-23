@@ -1,7 +1,7 @@
 # 一龙项目 AI 工作入口
 
 本文件是 VS Code Copilot、Codex、Claude Code 等多 AI 工具共享的工作入口。  
-**最后更新：2026-05-23**
+**最后更新：2026-05-24**
 
 ---
 
@@ -52,6 +52,16 @@ git status --short              # 检查是否有其他 AI 未提交的改动
 2. `.github/instructions/git-deploy-workflow.instructions.md`：多 AI 并发、worktree 隔离、push 冲突处理。
 3. `docs/ai-agent-workflow.md`：需求分析→代码修改→编译→部署完整流程。
 4. `docs/system-architecture.md`：架构、模块边界、数据流。
+
+---
+
+## 🤖 服务器 Codex CLI 记忆规则
+
+- Codex CLI 不会天然“记住”本项目流程；它每次进入项目时，必须先读取当前仓库里的 `AGENTS.md`、`CODEX.md`、`.github/instructions/*.md` 和相关 `docs/`。
+- 本仓库把流程记忆固化在文件里；以后修改 Git、构建、部署、发布规则时，必须同步更新这些说明文件并提交。
+- APK 里的一龙项目只是一个默认登记的 `local_path` 项目，和其他本地/GitHub 项目走同一条项目通道，不使用隐藏旁路。
+- 任意本地项目都可以通过服务器环境变量 `ELON_PROJECT_<项目ID大写并把非字母数字替换为_>_PATH` 指向真实 Git 工作区。
+- `local_path` / GitHub 项目必须是真实 Git 仓库，包含 `.git` 和可用远端；服务器不会为这类项目偷偷 `git init`。
 
 ---
 

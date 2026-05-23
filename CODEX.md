@@ -6,6 +6,16 @@ This project is a cloud APK development platform. Users describe app changes in 
 
 Use the repository directory that contains `server/`, `android/`, `docs/`, `scripts/`, `.github/`, and `.copilot/` as the project root.
 
+## Server Codex CLI Memory
+
+Codex CLI on the server does not have reliable cross-task memory by itself. Treat repository files as the durable memory layer. At the start of a development task, read this file, `AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/*.md`, and task-relevant files in `docs/`.
+
+If a workflow rule changes, update the relevant documentation in the same commit as the code change. Future APK-triggered tasks depend on these files being accurate.
+
+The built-in "一龙项目" is not a special execution path. It is a normal `local_path` project record that points at a real Git workspace. Any other local project can be configured the same way with `ELON_PROJECT_<PROJECT_ID>_PATH`, where the project id is uppercased and non-alphanumeric characters become `_`.
+
+For `local_path` and GitHub projects, the workspace must already be a real Git repository with `.git` and a usable remote. Do not silently initialize a new Git repository for these projects; failing clearly is safer than creating an unpushable local history.
+
 ## Source Documents To Respect
 
 - `AGENTS.md`: shared entry point for VS Code Copilot, Codex, Claude Code, and other AI agents.
