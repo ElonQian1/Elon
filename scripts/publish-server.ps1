@@ -120,7 +120,7 @@ if (-not $SkipBuild) {
 # ─────────────────────────────────────────────────────────────
 # 把编译产物放在临时工作树内的 target/，与其他项目完全隔离
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
-$BuildBinDir  = Join-Path $TmpWorktree "server" "target" $Target "release"
+$BuildBinDir  = [System.IO.Path]::Combine($TmpWorktree, "server", "target", $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
 
 function Remove-Worktree {
@@ -173,7 +173,7 @@ if (-not $SkipBuild) {
     if (-not (Test-Path $Binary)) {
         # SkipBuild 时找不到临时工作树的 binary，尝试从工作区 target 中找
         $cargoTargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ServerDir "target" }
-        $Binary = Join-Path $cargoTargetDir $Target "release" "elon-server"
+        $Binary = [System.IO.Path]::Combine($cargoTargetDir, $Target, "release", "elon-server")
         if (-not (Test-Path $Binary)) {
             Write-Error "❌ 找不到编译产物。请先不带 -SkipBuild 运行一次。"
         }
