@@ -247,13 +247,13 @@ fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) 
 }
 
 fn ensure_git(workspace: &Path, user_id: &str, require_existing_git: bool) -> Result<()> {
-    if workspace.join(".git").exists() {
+    if workspace.join(".git").exists() && has_origin_remote(workspace) {
         return Ok(());
     }
 
     if require_existing_git {
         return Err(anyhow!(
-            "当前项目被标记为 Git/local_path 项目，但工作目录 {} 不是 Git 仓库。请先把它设置成真实 git clone（包含 .git 和 origin/main），再让 AI 修改。",
+            "当前项目被标记为 Git/local_path 项目，但工作目录 {} 不是带 origin 远端的 Git 仓库。请先把它设置成真实 git clone（包含 .git 和 origin/main），再让 AI 修改。",
             workspace.display()
         ));
     }
@@ -272,6 +272,15 @@ fn ensure_git(workspace: &Path, user_id: &str, require_existing_git: bool) -> Re
         .output();
 
     Ok(())
+}
+
+fn has_origin_remote(workspace: &Path) -> bool {
+    std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(workspace)
+        .output()
+        .map(|output| output.status.success() && !output.stdout.is_empty())
+        .unwrap_or(false)
 }
 
 fn environment_notes(user_message: &str, option: &AiCliOption) -> Vec<String> {

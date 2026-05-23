@@ -251,11 +251,12 @@ pub async fn run_for_project(
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
-    if require_existing_git && !workspace.join(".git").exists() {
+    if require_existing_git && (!workspace.join(".git").exists() || !has_origin_remote(&workspace))
+    {
         let _ = tx.send(
             WsMessage::Error {
                 message: format!(
-                    "当前项目被标记为 Git/local_path 项目，但 {} 不是 Git 仓库。请先把它设置成真实 git clone，并配置可用远端后再继续。",
+                    "当前项目被标记为 Git/local_path 项目，但 {} 不是带 origin 远端的 Git 仓库。请先把它设置成真实 git clone，并配置可用远端后再继续。",
                     workspace.display()
                 ),
             }
@@ -480,6 +481,15 @@ fn is_project_workspace(workspace: &Path) -> bool {
             .and_then(|name| name.to_str())
             .map(|name| name.contains("__"))
             .unwrap_or(false)
+}
+
+fn has_origin_remote(workspace: &Path) -> bool {
+    std::process::Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(workspace)
+        .output()
+        .map(|output| output.status.success() && !output.stdout.is_empty())
+        .unwrap_or(false)
 }
 
 async fn run_backend_with_workspace(

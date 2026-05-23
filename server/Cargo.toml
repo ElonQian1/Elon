@@ -12,7 +12,7 @@ path = "src/main.rs"
 tokio = { version = "1", features = ["full"] }
 
 # 共享协议（homecli PC agent ↔ 本服务的反向 WSS 长连接）
-homecli-proto = { path = "../../cli/proto" }
+homecli-proto = { path = "homecli-proto" }
 
 # Web 框架
 axum = { version = "0.7", features = ["ws", "macros"] }

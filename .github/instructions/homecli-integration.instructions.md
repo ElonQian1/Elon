@@ -5,7 +5,7 @@ applyTo: "server/src/homecli_agent.rs,server/src/router.rs,server/src/types.rs,s
 # elon-cli ↔ homecli 反向通道集成规则
 
 > AI 代理在云端修改 shell/build 执行链路时必读。
-> 共享协议位于 `D:\rust\active-projects\cli\proto\`（crate 名 `homecli-proto`）。
+> 共享协议已 vendored 到 `server/homecli-proto/`（crate 名 `homecli-proto`）。
 
 ## 角色与边界
 
@@ -15,7 +15,7 @@ applyTo: "server/src/homecli_agent.rs,server/src/router.rs,server/src/types.rs,s
 
 ## 协议契约
 
-- 改 wire format ⇒ 改 `D:\rust\active-projects\cli\proto\src\lib.rs` ⇒ 同步 `PROTO_VERSION`。
+- 改 wire format ⇒ 改 `server/homecli-proto/src/lib.rs` ⇒ 同步 `PROTO_VERSION`，并同步 PC 端 agent。
 - 禁止在 `homecli_agent.rs` 中手写 `serde_json::json!` 构造 `ServerToAgent`/`AgentToServer`。
 - WS 帧只用 `Message::Text(serde_json::to_string(...))`。二进制走 base64 字符串。
 
@@ -27,11 +27,8 @@ applyTo: "server/src/homecli_agent.rs,server/src/router.rs,server/src/types.rs,s
 
 ## 部署提醒
 
-- 本仓 `server/Cargo.toml` 通过 path 依赖 `../../cli/proto`。**部署到服务器时这条 path 会断**（worktree/CI 没有 homecli 仓库）。
-- Phase 1 **只本机联调，不部署**。Phase 2 部署前必须改为：
-  - 方案 A：把 `homecli-proto` 复制成 vendored sub-crate（脚本化）。
-  - 方案 B：发布 `homecli-proto` 到内部 registry / git crate 引用。
-- 在改为部署形态前，禁止跑 `scripts/publish-server.ps1`。
+- `server/Cargo.toml` 依赖仓库内 `server/homecli-proto`，临时 worktree 和服务器部署都必须带上这个目录。
+- 发布服务端前必须先在干净提交上跑 `cargo check`，确认 vendored 协议 crate 能被解析。
 
 ## 与 bb64a 的隔离
 
