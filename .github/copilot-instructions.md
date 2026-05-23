@@ -79,6 +79,26 @@
 
 ---
 
+## 🚀 部署速查（服务端改动后必看）
+
+```
+改代码 → git add → git commit → git push origin main → 运行 scripts/publish-server.ps1
+```
+
+| 项目 | 值 |
+|---|---|
+| Git 远端 | `git@github.com:ElonQian1/Elon.git` |
+| 主分支 | `main` |
+| 服务器 SSH | `root@43.139.149.158`（需加 `-o ProxyCommand=none` 绕代理） |
+| 服务器端口 | `8080` |
+| 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
+| 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| APK 下载 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
+| 部署脚本 | `scripts/publish-server.ps1`（自动 worktree 隔离，SHA staging，并发安全） |
+| 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
+
+> ⚠️ **绝对禁止**：改完代码不 commit 直接运行脚本部署——脚本基于 git HEAD，未提交内容不会进入部署。
+
 ## 参考文档（按需读取）
 
 | 文档 | 内容 |
@@ -90,13 +110,16 @@
 
 ---
 
-## 当前开发状态
+## 当前开发状态（2026-05-23 更新）
 
-- [ ] 项目整体架构设计
-- [ ] Rust 服务端基础框架
-- [ ] Android APK 基础框架
-- [ ] AI 对话后端集成
-- [ ] 自动化编译部署流水线
-- [ ] APK 分发机制
+- [x] 项目整体架构设计
+- [x] Rust 服务端基础框架（axum + tokio，运行中）
+- [x] Android APK 基础框架（Kotlin + Jetpack Compose）
+- [x] 本地交叉编译部署脚本（`scripts/publish-server.ps1`）
+- [x] 服务器 systemd 服务（自动重启，日志 `/root/elon-server.log`）
+- [x] P2P 同 WiFi APK 中继（`server/src/peer_relay.rs` + Android `PeerSeederManager.kt`）
+- [x] APK 分发机制（P2P mirrors + 直链回退）
+- [ ] AI 对话后端集成（待实现）
+- [ ] 用户项目隔离系统（待实现）
 
-> AI 代理在修改任何代码时，请先确认该模块的当前完成状态。
+> AI 代理在修改任何代码时，请先 `git pull --rebase origin main` 拉取最新状态。

@@ -1,28 +1,74 @@
 # 一龙项目 AI 工作入口
 
-本文件是 VS Code Copilot、Codex、Claude Code 等多 AI 工具共享的工作入口。仓库级规则以 `.github` 下的 VS Code Copilot customization 文件为准，本文件只做索引，避免多处复制长规则。
+本文件是 VS Code Copilot、Codex、Claude Code 等多 AI 工具共享的工作入口。  
+**最后更新：2026-05-23**
 
-## 必读顺序
+---
 
-1. `.github/copilot-instructions.md`：项目定位、全局 AI 原则、VS Code Copilot 工作方式记忆。
-2. `.github/instructions/git-deploy-workflow.instructions.md`：Git、push、worktree、部署、版本号、交付汇报强制流程。
-3. `docs/vscode-copilot-working-model.md`：本仓库如何采用 VS Code instructions / prompts / agents。
-4. `docs/ai-agent-workflow.md`：需求分析、代码定位、修改、验证、部署的完整业务流程。
-5. `docs/system-architecture.md`：架构、模块边界、数据流和安全约束。
+## ⚡ 任务开始前必做（无论哪台 PC）
+
+```powershell
+cd "d:\rust\active-projects\elon cli"
+git pull --rebase origin main   # 同步最新代码
+git status --short              # 检查是否有其他 AI 未提交的改动
+```
+
+---
+
+## 🚀 服务端改动部署流程（铁律：先 git 再 deploy）
+
+```
+改代码
+  → git add <只加自己改的文件>
+  → git commit -m "type(scope): 描述"
+  → git push origin main
+  → cd scripts; .\publish-server.ps1    ← 脚本自动 worktree 构建 + 上传 + 重启
+  → 验证: curl --noproxy '*' http://43.139.149.158:8080/health
+```
+
+> **绝对禁止**：改完代码不 commit 直接运行 publish-server.ps1 ——  
+> 脚本基于 git HEAD 打包，未提交的代码**不会**进入部署。
+
+---
+
+## 🔑 关键信息速查
+
+| 项目 | 值 |
+|---|---|
+| Git 远端 | `git@github.com:ElonQian1/Elon.git` |
+| 主分支 | `main` |
+| 服务器 SSH | `root@43.139.149.158`（加 `-o ProxyCommand=none` 绕代理） |
+| 服务器端口 | `8080` |
+| 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
+| 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| APK 下载 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
+| 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
+
+---
+
+## 📂 必读文件顺序
+
+1. `.github/copilot-instructions.md`：项目定位、当前状态、部署速查、全局 AI 原则。
+2. `.github/instructions/git-deploy-workflow.instructions.md`：多 AI 并发、worktree 隔离、push 冲突处理。
+3. `docs/ai-agent-workflow.md`：需求分析→代码修改→编译→部署完整流程。
+4. `docs/system-architecture.md`：架构、模块边界、数据流。
+
+---
 
 ## VS Code 快捷入口
 
 - 常规代码任务：运行 `/elon-dev-task`。
 - APK 发布任务：运行 `/elon-apk-release`。
-- 只做规划：选择 `elon-planner` agent，或运行 VS Code 内置 `/plan`。
+- 只做规划：选择 `elon-planner` agent。
 - 执行实现：选择 `elon-implementer` agent。
 - 提交前审查：选择 `elon-reviewer` agent。
 
+---
+
 ## 工作原则
 
-- 先读上下文，再改文件。
-- 有未提交并发改动时，用临时 worktree 隔离。
-- 只 stage 当前任务文件。
-- 每次任务必须 commit，并按要求 push 到 `origin/main`。
-- 部署必须基于干净、已提交、已推送的 SHA。
+- 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
+- 只 stage 当前任务文件，不夹带其他 AI 的改动。
+- 每次任务必须 commit + push，部署必须基于已推送的 SHA。
 - 不提交密钥、`.env`、APK 签名材料或任何敏感信息。
+- push 被拒绝（non-fast-forward）→ `git pull --rebase` 解决后再 push，禁止 `--force`。
