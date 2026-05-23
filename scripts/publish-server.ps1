@@ -280,7 +280,11 @@ $lockScript = $lockScriptTemplate.
     Replace('__SHAFILE__', "$RemoteDir/.deployed-sha").
     Replace('__REMOTEDIR__', $RemoteDir)
 
-$lockResult = $lockScript | ssh @SshOpts $Server "flock -x -w 120 /tmp/elon-deploy.lock bash -s" 2>&1
+# 强制 LF 行尾，并用 base64 绕过 PowerShell stdin 自动加 \r\n 的问题
+# （否则远端 bash 看到 "set -e\r" → "set: - : invalid option"）
+$lockScriptLF = $lockScript -replace "`r`n", "`n"
+$lockB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($lockScriptLF))
+$lockResult = ssh @SshOpts $Server "flock -x -w 120 /tmp/elon-deploy.lock bash -c 'echo $lockB64 | base64 -d | bash'" 2>&1
 $lockExit = $LASTEXITCODE
 if ($lockExit -eq 42) {
     Remove-Worktree
