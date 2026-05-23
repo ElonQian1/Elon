@@ -56,6 +56,16 @@
 
 ---
 
+## VS Code Copilot 工作方式记忆
+
+- 把 VS Code Copilot 理解为 agent loop：先组装上下文，再用工具读取/编辑/运行命令，工具结果回到上下文后继续迭代，最后验证和交付。
+- 上下文来自系统指令、customizations、用户消息、会话历史、隐式编辑器/Git 状态、显式 `#` 引用和工具输出；没有进入上下文的内容对模型不可见。
+- 项目级稳定规则放在 `.github/copilot-instructions.md`；局部规则放在 `.github/instructions/*.instructions.md`；重复任务放在 `.github/prompts/*.prompt.md`；角色和工具受限的流程放在 `.github/agents/*.agent.md`。
+- 复杂任务先用 Plan/规划思路做 discovery、alignment、design、refinement；计划确认后再进入实现。
+- 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
+
+---
+
 ## 关键原则（AI 代理必须遵守）
 
 - **每次修改都要 git commit**，commit message 用中文描述用户的需求
@@ -73,6 +83,7 @@
 |---|---|
 | `docs/system-architecture.md` | 系统架构详细设计、组件交互、数据流 |
 | `docs/ai-agent-workflow.md` | AI代理如何执行代码修改→编译→部署的完整流程 |
+| `docs/vscode-copilot-working-model.md` | VS Code Copilot 最新 agent / instructions / prompt files / custom agents 工作方式速记 |
 
 ---
 
