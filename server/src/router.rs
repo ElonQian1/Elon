@@ -25,6 +25,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/chat", post(api::chat))
         .route("/api/image/generate", post(api::generate_image))
         .route("/api/auth/login", post(project_api::login))
+        .route("/api/auth/register", post(project_api::register))
         .route("/api/me", get(project_api::me))
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))

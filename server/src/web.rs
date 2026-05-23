@@ -9,18 +9,20 @@ const WEB_HTML: &str = r###"<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>一龙项目工作台</title>
+  <title>lodex 项目工作台</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8f5;
+      --bg: #f5f7f9;
       --panel: #ffffff;
-      --ink: #1c241f;
-      --muted: #68726c;
-      --line: #d9ded7;
-      --brand: #0a7066;
-      --brand-strong: #07584f;
-      --soft: #eef5f2;
+      --ink: #17211f;
+      --muted: #64716d;
+      --line: #d7dfdb;
+      --brand: #0a7b6d;
+      --brand-strong: #065f55;
+      --accent: #d89232;
+      --blue: #1f6feb;
+      --soft: #edf7f4;
       --warn: #8a5a0a;
       --warn-bg: #fff7e6;
       --danger: #a61b13;
@@ -62,29 +64,74 @@ const WEB_HTML: &str = r###"<!doctype html>
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 24px;
+      padding: 28px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.9), rgba(255,255,255,.62)),
+        repeating-linear-gradient(135deg, rgba(10,123,109,.08) 0 1px, transparent 1px 24px),
+        #f2f6f5;
     }
-    .login-panel {
-      width: min(420px, 100%);
-      background: var(--panel);
-      border: 1px solid var(--line);
+    .auth-shell {
+      width: min(940px, 100%);
+      min-height: 560px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(190,202,197,.88);
       border-radius: 8px;
-      padding: 26px;
       display: grid;
-      gap: 16px;
-      box-shadow: 0 14px 36px rgba(26, 35, 30, .08);
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, .95fr);
+      box-shadow: 0 24px 70px rgba(23, 33, 31, .13);
+      overflow: hidden;
     }
-    .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; }
+    .auth-visual {
+      padding: 34px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 28px;
+      border-right: 1px solid var(--line);
+      background:
+        linear-gradient(155deg, rgba(10,123,109,.13), rgba(31,111,235,.08) 46%, rgba(216,146,50,.12)),
+        #fbfcfb;
+    }
+    .auth-copy { align-self: center; display: grid; gap: 15px; max-width: 420px; }
+    .auth-copy h1 { font-size: 34px; line-height: 1.12; margin: 0; }
+    .auth-copy p { margin: 0; color: var(--muted); line-height: 1.7; }
+    .auth-preview {
+      border: 1px solid rgba(10,123,109,.18);
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .preview-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .preview-title { font-weight: 850; }
+    .preview-pill { border: 1px solid #c6ddd7; color: var(--brand-strong); background: #edf8f5; border-radius: 999px; padding: 5px 9px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .preview-line { height: 9px; border-radius: 999px; background: #e2e9e6; }
+    .preview-line.short { width: 68%; background: #d2e7e1; }
+    .login-panel {
+      padding: 34px;
+      display: grid;
+      align-content: center;
+      gap: 17px;
+      background: white;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 850; letter-spacing: 0; }
     .mark {
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       border-radius: 8px;
       display: grid;
       place-items: center;
-      background: linear-gradient(135deg, var(--brand), #d09031);
+      background: linear-gradient(135deg, var(--brand), var(--blue));
       color: white;
-      font-weight: 900;
+      font-weight: 950;
+      font-size: 14px;
     }
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: #f7faf8; }
+    .mode-switch button { height: 34px; background: transparent; color: var(--muted); border-color: transparent; }
+    .mode-switch button.active { background: white; color: var(--brand-strong); border-color: #cfe1dc; box-shadow: 0 5px 14px rgba(23,33,31,.08); }
+    .field-stack { display: grid; gap: 13px; }
+    .auth-footer { display: flex; justify-content: center; gap: 6px; color: var(--muted); font-size: 13px; }
+    .auth-footer button { height: auto; padding: 0; color: var(--brand-strong); background: transparent; border: 0; font-weight: 850; }
     .muted { color: var(--muted); font-size: 13px; line-height: 1.5; }
     .error-line { min-height: 18px; color: var(--danger); font-size: 13px; }
     .shell { min-height: 100vh; display: grid; grid-template-columns: 310px minmax(0, 1fr); }
@@ -181,6 +228,11 @@ const WEB_HTML: &str = r###"<!doctype html>
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 6px; }
     .hidden { display: none !important; }
     @media (max-width: 860px) {
+      .login { padding: 16px; align-items: start; }
+      .auth-shell { grid-template-columns: 1fr; min-height: 0; }
+      .auth-visual { border-right: 0; border-bottom: 1px solid var(--line); padding: 24px; }
+      .auth-copy h1 { font-size: 28px; }
+      .login-panel { padding: 24px; }
       .shell { grid-template-columns: 1fr; }
       aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 44vh; }
       main { min-height: 56vh; }
@@ -192,19 +244,41 @@ const WEB_HTML: &str = r###"<!doctype html>
 </head>
 <body>
   <section id="loginView" class="login">
-    <form id="loginForm" class="login-panel">
-      <div class="brand"><div class="mark">龙</div><div>一龙项目工作台</div></div>
-      <div class="muted">使用管理员创建的账号登录。</div>
-      <div><label for="accountInput">账号</label><input id="accountInput" autocomplete="username" /></div>
-      <div><label for="passwordInput">密码</label><input id="passwordInput" type="password" autocomplete="current-password" /></div>
-      <div id="loginError" class="error-line"></div>
-      <button id="loginBtn" type="submit">登录</button>
-    </form>
+    <div class="auth-shell">
+      <div class="auth-visual">
+        <div class="brand"><div class="mark">lo</div><div>lodex</div></div>
+        <div class="auth-copy">
+          <h1>项目工作台</h1>
+          <p>登录或创建账号后，继续管理项目、连接 AI 开发流程，并获取最新 APK 构建结果。</p>
+        </div>
+        <div class="auth-preview" aria-hidden="true">
+          <div class="preview-row"><span class="preview-title">Android APK 项目</span><span class="preview-pill">ready</span></div>
+          <div class="preview-line"></div>
+          <div class="preview-line short"></div>
+        </div>
+      </div>
+      <form id="loginForm" class="login-panel">
+        <div class="brand"><div class="mark">lo</div><div>lodex 项目工作台</div></div>
+        <div class="mode-switch" aria-label="账号操作">
+          <button class="active" type="button" data-auth-mode="login">登录</button>
+          <button type="button" data-auth-mode="register">注册</button>
+        </div>
+        <div id="authHint" class="muted">使用已有账号进入项目工作台。</div>
+        <div class="field-stack">
+          <div><label for="accountInput">账号</label><input id="accountInput" autocomplete="username" placeholder="手机号或邮箱" /></div>
+          <div id="nicknameField" class="hidden"><label for="nicknameInput">昵称</label><input id="nicknameInput" autocomplete="nickname" placeholder="可选" /></div>
+          <div><label for="passwordInput">密码</label><input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 位" /></div>
+        </div>
+        <div id="loginError" class="error-line"></div>
+        <button id="loginBtn" type="submit">登录</button>
+        <div class="auth-footer"><span id="authSwitchText">还没有账号？</span><button id="authSwitchBtn" type="button">立即注册</button></div>
+      </form>
+    </div>
   </section>
 
   <section id="appView" class="shell hidden">
     <aside>
-      <div class="brand"><div class="mark">龙</div><div>项目</div></div>
+      <div class="brand"><div class="mark">lo</div><div>lodex</div></div>
       <div class="user-row">
         <div class="user-name"><strong id="userName">未登录</strong><span id="userAccount"></span></div>
         <button id="logoutBtn" class="ghost" type="button">退出</button>
@@ -258,9 +332,15 @@ const WEB_HTML: &str = r###"<!doctype html>
     const appView = document.getElementById("appView");
     const loginForm = document.getElementById("loginForm");
     const accountInput = document.getElementById("accountInput");
+    const nicknameInput = document.getElementById("nicknameInput");
+    const nicknameField = document.getElementById("nicknameField");
     const passwordInput = document.getElementById("passwordInput");
     const loginBtn = document.getElementById("loginBtn");
     const loginError = document.getElementById("loginError");
+    const authHint = document.getElementById("authHint");
+    const authSwitchText = document.getElementById("authSwitchText");
+    const authSwitchBtn = document.getElementById("authSwitchBtn");
+    const authModeButtons = document.querySelectorAll("[data-auth-mode]");
     const userName = document.getElementById("userName");
     const userAccount = document.getElementById("userAccount");
     const logoutBtn = document.getElementById("logoutBtn");
@@ -285,7 +365,8 @@ const WEB_HTML: &str = r###"<!doctype html>
     const messageInput = document.getElementById("messageInput");
     const sendBtn = document.getElementById("sendBtn");
 
-    let token = localStorage.getItem("elon_token") || "";
+    let token = localStorage.getItem("lodex_token") || localStorage.getItem("elon_token") || "";
+    let authMode = "login";
     let currentUser = null;
     let projects = [];
     let currentProject = null;
@@ -310,6 +391,20 @@ const WEB_HTML: &str = r###"<!doctype html>
     function setBusy(value) {
       busy = value;
       sendBtn.disabled = value || !currentProject;
+    }
+    function setAuthMode(mode) {
+      authMode = mode === "register" ? "register" : "login";
+      const registering = authMode === "register";
+      for (const button of authModeButtons) {
+        button.classList.toggle("active", button.dataset.authMode === authMode);
+      }
+      nicknameField.classList.toggle("hidden", !registering);
+      passwordInput.autocomplete = registering ? "new-password" : "current-password";
+      authHint.textContent = registering ? "创建账号后会自动登录，并进入 lodex 项目工作台。" : "使用已有账号进入项目工作台。";
+      loginBtn.textContent = registering ? "创建账号" : "登录";
+      authSwitchText.textContent = registering ? "已有账号？" : "还没有账号？";
+      authSwitchBtn.textContent = registering ? "返回登录" : "立即注册";
+      loginError.textContent = "";
     }
     function append(role, title, text, links = []) {
       const node = document.createElement("div");
@@ -435,6 +530,7 @@ const WEB_HTML: &str = r###"<!doctype html>
         await Promise.all([loadProjects(), loadAgents(), refreshRuntime()]);
       } catch {
         localStorage.removeItem("elon_token");
+        localStorage.removeItem("lodex_token");
         token = "";
         showLogin();
       }
@@ -475,19 +571,22 @@ const WEB_HTML: &str = r###"<!doctype html>
       loginBtn.disabled = true;
       loginError.textContent = "";
       try {
-        const res = await fetch("/api/auth/login", {
+        const payload = {
+          account: accountInput.value.trim(),
+          password: passwordInput.value,
+          device_name: "web"
+        };
+        if (authMode === "register") payload.nickname = nicknameInput.value.trim();
+        const res = await fetch(authMode === "register" ? "/api/auth/register" : "/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            account: accountInput.value.trim(),
-            password: passwordInput.value,
-            device_name: "web"
-          })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "登录失败");
+        if (!res.ok) throw new Error(data.error || (authMode === "register" ? "注册失败" : "登录失败"));
         token = data.token;
-        localStorage.setItem("elon_token", token);
+        localStorage.setItem("lodex_token", token);
+        localStorage.removeItem("elon_token");
         currentUser = data.user;
         await boot();
       } catch (err) {
@@ -498,12 +597,17 @@ const WEB_HTML: &str = r###"<!doctype html>
     });
     logoutBtn.addEventListener("click", () => {
       localStorage.removeItem("elon_token");
+      localStorage.removeItem("lodex_token");
       token = "";
       currentUser = null;
       currentProject = null;
       projects = [];
       showLogin();
     });
+    for (const button of authModeButtons) {
+      button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
+    }
+    authSwitchBtn.addEventListener("click", () => setAuthMode(authMode === "register" ? "login" : "register"));
     refreshProjectsBtn.addEventListener("click", () => loadProjects());
     newProjectBtn.addEventListener("click", () => {
       newProjectError.textContent = "";
@@ -571,6 +675,7 @@ const WEB_HTML: &str = r###"<!doctype html>
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
     }
+    setAuthMode("login");
     boot();
   </script>
 </body>
