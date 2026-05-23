@@ -557,15 +557,77 @@ impl Store {
         self.get_project_access(user_id, project_id)
     }
 
-    pub fn create_task(&self, project_id: &str, user_id: &str, message: &str) -> Result<String> {
-        let id = new_id("tsk");
+    pub fn ensure_conversation(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        title: Option<&str>,
+    ) -> Result<String> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
         let now = now();
         self.conn()?.execute(
-            "INSERT INTO tasks (id, project_id, user_id, message, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, 'running', ?5, ?5)",
-            params![id, project_id, user_id, message, now],
+            "INSERT INTO conversations (
+                project_id, user_id, id, title, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?5)
+             ON CONFLICT(project_id, user_id, id) DO UPDATE SET
+                title = COALESCE(excluded.title, conversations.title),
+                updated_at = excluded.updated_at",
+            params![
+                project_id,
+                user_id,
+                conversation_id,
+                clean_optional(title),
+                now
+            ],
         )?;
-        self.add_message(project_id, Some(&id), Some(user_id), "user", message)?;
+        Ok(conversation_id)
+    }
+
+    pub fn create_task(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        message: &str,
+    ) -> Result<String> {
+        let id = new_id("tsk");
+        let now = now();
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO conversations (
+                project_id, user_id, id, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, 'active', ?4, ?4)
+             ON CONFLICT(project_id, user_id, id) DO UPDATE SET updated_at = excluded.updated_at",
+            params![project_id, user_id, conversation_id, now],
+        )?;
+        tx.execute(
+            "INSERT INTO tasks (
+                id, project_id, user_id, conversation_id, message, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, 'running', ?6, ?6)",
+            params![id, project_id, user_id, conversation_id, message, now],
+        )?;
+        tx.execute(
+            "INSERT INTO messages (
+                id, project_id, conversation_id, task_id, user_id, role, content, created_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, 'user', ?6, ?7)",
+            params![
+                new_id("msg"),
+                project_id,
+                conversation_id,
+                id,
+                user_id,
+                message,
+                now
+            ],
+        )?;
+        tx.commit()?;
         Ok(id)
     }
 
@@ -599,16 +661,23 @@ impl Store {
         )?;
 
         if let Some(reply) = clean_optional(reply) {
-            let project_id: Option<String> = conn
+            let task_context: Option<(String, String, Option<String>)> = conn
                 .query_row(
-                    "SELECT project_id FROM tasks WHERE id = ?1",
+                    "SELECT project_id, user_id, conversation_id FROM tasks WHERE id = ?1",
                     params![task_id],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )
                 .optional()?;
-            if let Some(project_id) = project_id {
+            if let Some((project_id, user_id, conversation_id)) = task_context {
                 drop(conn);
-                self.add_message(&project_id, Some(task_id), None, "assistant", reply)?;
+                self.add_message(
+                    &project_id,
+                    conversation_id.as_deref(),
+                    Some(task_id),
+                    Some(&user_id),
+                    "assistant",
+                    reply,
+                )?;
             }
         }
 
@@ -618,22 +687,102 @@ impl Store {
     pub fn add_message(
         &self,
         project_id: &str,
+        conversation_id: Option<&str>,
         task_id: Option<&str>,
         user_id: Option<&str>,
         role: &str,
         content: &str,
     ) -> Result<()> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
         self.conn()?.execute(
-            "INSERT INTO messages (id, project_id, task_id, user_id, role, content, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO messages (
+                id, project_id, conversation_id, task_id, user_id, role, content, created_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 new_id("msg"),
                 project_id,
+                conversation_id,
                 clean_optional(task_id),
                 clean_optional(user_id),
                 role,
                 content,
                 now()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_native_agent_session(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+    ) -> Result<Option<String>> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        self.conn()?
+            .query_row(
+                "SELECT native_session_id
+                 FROM agent_native_sessions
+                 WHERE project_id = ?1
+                   AND user_id = ?2
+                   AND conversation_id = ?3
+                   AND provider = ?4
+                   AND agent_id = ?5
+                   AND workspace_path = ?6
+                   AND status = 'active'
+                 ORDER BY updated_at DESC
+                 LIMIT 1",
+                params![
+                    project_id,
+                    user_id,
+                    conversation_id,
+                    provider,
+                    agent_id,
+                    workspace_path
+                ],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn upsert_native_agent_session(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+        native_session_id: &str,
+    ) -> Result<()> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let now = now();
+        self.conn()?.execute(
+            "INSERT INTO agent_native_sessions (
+                id, project_id, user_id, conversation_id, provider, agent_id,
+                workspace_path, native_session_id, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?9)
+             ON CONFLICT(project_id, user_id, conversation_id, provider, agent_id, workspace_path)
+             DO UPDATE SET
+                native_session_id = excluded.native_session_id,
+                status = 'active',
+                updated_at = excluded.updated_at",
+            params![
+                new_id("ans"),
+                project_id,
+                user_id,
+                conversation_id,
+                provider,
+                agent_id,
+                workspace_path,
+                native_session_id,
+                now
             ],
         )?;
         Ok(())
@@ -737,10 +886,24 @@ fn init_schema(conn: &Connection) -> Result<()> {
           FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
+        CREATE TABLE IF NOT EXISTS conversations (
+          project_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          id TEXT NOT NULL,
+          title TEXT,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (project_id, user_id, id),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
         CREATE TABLE IF NOT EXISTS tasks (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
           user_id TEXT NOT NULL,
+          conversation_id TEXT,
           message TEXT NOT NULL,
           status TEXT NOT NULL,
           git_branch TEXT,
@@ -780,6 +943,7 @@ fn init_schema(conn: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS messages (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
+          conversation_id TEXT,
           task_id TEXT,
           user_id TEXT,
           role TEXT NOT NULL,
@@ -787,6 +951,23 @@ fn init_schema(conn: &Connection) -> Result<()> {
           created_at TEXT NOT NULL,
           FOREIGN KEY (project_id) REFERENCES projects(id),
           FOREIGN KEY (task_id) REFERENCES tasks(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_native_sessions (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          conversation_id TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          agent_id TEXT NOT NULL,
+          workspace_path TEXT NOT NULL,
+          native_session_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, user_id, conversation_id, provider, agent_id, workspace_path),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS ws_task_log (
@@ -807,6 +988,8 @@ fn init_schema(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "projects", "repo_url", "repo_url TEXT")?;
     add_column_if_missing(conn, "projects", "branch", "branch TEXT")?;
     add_column_if_missing(conn, "projects", "workspace_path", "workspace_path TEXT")?;
+    add_column_if_missing(conn, "tasks", "conversation_id", "conversation_id TEXT")?;
+    add_column_if_missing(conn, "messages", "conversation_id", "conversation_id TEXT")?;
     Ok(())
 }
 

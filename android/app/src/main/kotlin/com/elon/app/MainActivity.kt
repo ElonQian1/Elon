@@ -323,19 +323,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val outgoingText = expandShortDevelopmentCommand(text)
-        quickLocalChatReply(outgoingText)?.let { reply ->
-            appendMessage(ChatMessage(role = "user", content = text))
-            binding.inputEdit.text.clear()
-            updateProjectViews("普通消息已回复，开发项目记录保持不变。")
-            appendMessage(ChatMessage(role = "ai", content = reply))
-            return
-        }
         val attachmentPayload = attachmentPayloadJsonOrNull() ?: return
 
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
             addProperty("project_id", activeProject().id)
             addProperty("project_title", activeProject().title)
+            addProperty("conversation_id", activeConversation().id)
+            addProperty("conversation_title", activeConversation().title)
             addProperty("message", outgoingText)
             if (!codexCliOnly) {
                 selectedAgentName?.let { addProperty("agent", it) }
@@ -1471,6 +1466,7 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val serverUseAgent = jsonStringOrNull(config, "use_agent")
+                    ?.takeIf { configured -> options.any { it.agentName == configured } }
                 val customModel = jsonStringOrNull(config, "model").orEmpty()
                 val customBase = jsonStringOrNull(config, "api_base").orEmpty()
                 val cachedAgent = cachedModelAgentName()

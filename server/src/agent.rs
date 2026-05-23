@@ -249,6 +249,7 @@ pub async fn run_for_project(
     user_id: &str,
     project: &ProjectAccess,
     download_base: &str,
+    conversation_id: Option<&str>,
     user_message: &str,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
@@ -296,6 +297,11 @@ pub async fn run_for_project(
         &workspace,
         &user_config_workspace,
         download_base,
+        Some(ai_cli::NativeSessionScope {
+            project_id: project.id.clone(),
+            user_id: user_id.to_string(),
+            conversation_id: conversation_id.unwrap_or("default").to_string(),
+        }),
         user_message,
         agent_name,
         require_existing_git,
@@ -330,6 +336,7 @@ async fn run_dispatch(
         &workspace,
         &user_config_workspace,
         &download_base,
+        None,
         user_message,
         agent_name,
         false,
@@ -344,6 +351,7 @@ async fn run_dispatch_with_workspace(
     workspace: &Path,
     user_config_workspace: &Path,
     download_base: &str,
+    native_session_scope: Option<ai_cli::NativeSessionScope>,
     user_message: &str,
     agent_name: Option<&str>,
     require_existing_git: bool,
@@ -426,6 +434,8 @@ async fn run_dispatch_with_workspace(
     };
     let backend_agent_name = if codex_cli_only {
         Some("codex_cli")
+    } else if state.ai_cli.enabled {
+        agent_name.filter(|name| is_local_cli_option(state, name))
     } else if image_cli_only {
         match agent_name {
             Some(name) if is_local_cli_option(state, name) => agent_name,
@@ -440,6 +450,7 @@ async fn run_dispatch_with_workspace(
         workspace,
         user_config_workspace,
         download_base,
+        native_session_scope,
         user_message,
         backend_agent_name,
         backend_route,
@@ -536,6 +547,7 @@ async fn run_backend_with_workspace(
     workspace: &Path,
     user_config_workspace: &Path,
     download_base: &str,
+    native_session_scope: Option<ai_cli::NativeSessionScope>,
     user_message: &str,
     agent_name: Option<&str>,
     route: CapabilityRoute,
@@ -556,6 +568,7 @@ async fn run_backend_with_workspace(
                 user_message,
                 cli_option_id(agent_name),
                 require_existing_git,
+                native_session_scope.clone(),
                 state,
                 tx,
             )
@@ -620,7 +633,14 @@ fn choose_backend(
     }
 
     if route == CapabilityRoute::ChatAgent {
+        if state.ai_cli.enabled {
+            return AiBackend::LocalCli;
+        }
         return AiBackend::Api;
+    }
+
+    if state.ai_cli.enabled {
+        return AiBackend::LocalCli;
     }
 
     if let Some(name) = agent_name {

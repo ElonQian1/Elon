@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use serde_json::Value;
 use std::{path::Path, path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
@@ -11,6 +12,13 @@ use crate::{
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
 
+#[derive(Debug, Clone)]
+pub struct NativeSessionScope {
+    pub project_id: String,
+    pub user_id: String,
+    pub conversation_id: String,
+}
+
 pub async fn run_with_workspace(
     user_id: &str,
     workspace: &Path,
@@ -18,6 +26,7 @@ pub async fn run_with_workspace(
     user_message: &str,
     option_id: Option<&str>,
     require_existing_git: bool,
+    native_session_scope: Option<NativeSessionScope>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -52,8 +61,59 @@ pub async fn run_with_workspace(
         .to_json(),
     );
 
+    let workspace_key = workspace.display().to_string();
+    let native_session_id = if supports_codex_sessions(&option) {
+        native_session_scope.as_ref().and_then(|scope| {
+            state
+                .store
+                .get_native_agent_session(
+                    &scope.project_id,
+                    &scope.user_id,
+                    Some(&scope.conversation_id),
+                    &option.provider,
+                    &option.id,
+                    &workspace_key,
+                )
+                .ok()
+                .flatten()
+        })
+    } else {
+        None
+    };
+    if native_session_id.is_some() {
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "Restoring Codex CLI context for this conversation.".into(),
+            }
+            .to_json(),
+        );
+    }
+
     let prompt = build_cli_prompt(workspace, user_message, &option);
-    let output = run_cli_command(&option, workspace, &prompt, tx).await?;
+    let output = run_cli_command(
+        &option,
+        workspace,
+        &prompt,
+        native_session_id.as_deref(),
+        tx,
+    )
+    .await?;
+    if let (Some(scope), Some(thread_id)) = (
+        native_session_scope
+            .as_ref()
+            .filter(|_| supports_codex_sessions(&option)),
+        extract_thread_id(&output.stdout),
+    ) {
+        let _ = state.store.upsert_native_agent_session(
+            &scope.project_id,
+            &scope.user_id,
+            Some(&scope.conversation_id),
+            &option.provider,
+            &option.id,
+            &workspace_key,
+            &thread_id,
+        );
+    }
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
 
     let apk_url = if android_task {
@@ -97,14 +157,89 @@ struct CliOutput {
     stderr: String,
 }
 
+fn supports_codex_sessions(option: &AiCliOption) -> bool {
+    option.provider.eq_ignore_ascii_case("codex")
+        || option.id.to_ascii_lowercase().contains("codex")
+        || option
+            .bin
+            .rsplit(|c| c == '/' || c == '\\')
+            .next()
+            .map(|bin| bin.eq_ignore_ascii_case("codex"))
+            .unwrap_or(false)
+}
+
+fn cli_args_for_run(option: &AiCliOption, native_session_id: Option<&str>) -> Vec<String> {
+    if !supports_codex_sessions(option) {
+        return option.args.clone();
+    }
+    if let Some(session_id) = native_session_id {
+        if let Some(args) = codex_resume_args(&option.args, session_id) {
+            return args;
+        }
+    }
+    codex_exec_json_args(&option.args)
+}
+
+fn codex_exec_json_args(raw_args: &[String]) -> Vec<String> {
+    let mut args = raw_args.to_vec();
+    if args.iter().any(|arg| arg == "--json") {
+        return args;
+    }
+    if let Some(exec_index) = args.iter().position(|arg| arg == "exec" || arg == "e") {
+        args.insert(exec_index + 1, "--json".into());
+    }
+    args
+}
+
+fn codex_resume_args(raw_args: &[String], session_id: &str) -> Option<Vec<String>> {
+    let exec_index = raw_args
+        .iter()
+        .position(|arg| arg == "exec" || arg == "e")?;
+    let mut args = raw_args[..exec_index].to_vec();
+    args.push("exec".into());
+    args.push("resume".into());
+
+    let mut has_json = false;
+    let mut iter = raw_args[exec_index + 1..].iter().peekable();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--json" => {
+                has_json = true;
+                args.push(arg.clone());
+            }
+            "--skip-git-repo-check"
+            | "--ignore-user-config"
+            | "--ignore-rules"
+            | "--strict-config"
+            | "--dangerously-bypass-approvals-and-sandbox"
+            | "--dangerously-bypass-hook-trust" => args.push(arg.clone()),
+            "-m" | "--model" | "-c" | "--config" | "-p" | "--profile" | "--profile-v2"
+            | "--output-schema" => {
+                args.push(arg.clone());
+                if let Some(value) = iter.next() {
+                    args.push(value.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    if !has_json {
+        args.push("--json".into());
+    }
+    args.push(session_id.to_string());
+    Some(args)
+}
+
 async fn run_cli_command(
     option: &AiCliOption,
     workspace: &Path,
     prompt: &str,
+    native_session_id: Option<&str>,
     tx: &UnboundedSender<String>,
 ) -> Result<CliOutput> {
     let mut cmd = Command::new(&option.bin);
-    cmd.args(&option.args)
+    let args = cli_args_for_run(option, native_session_id);
+    cmd.args(&args)
         .current_dir(workspace)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -190,6 +325,66 @@ async fn send_cli_heartbeat(tx: UnboundedSender<String>) {
         {
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_exec_args_enable_json_output() {
+        let args = vec![
+            "exec".to_string(),
+            "--sandbox".to_string(),
+            "workspace-write".to_string(),
+            "--skip-git-repo-check".to_string(),
+        ];
+
+        assert_eq!(
+            codex_exec_json_args(&args),
+            vec![
+                "exec",
+                "--json",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check"
+            ]
+        );
+    }
+
+    #[test]
+    fn codex_resume_args_keep_supported_options() {
+        let args = vec![
+            "-m".to_string(),
+            "gpt-5".to_string(),
+            "exec".to_string(),
+            "--sandbox".to_string(),
+            "workspace-write".to_string(),
+            "--skip-git-repo-check".to_string(),
+        ];
+
+        assert_eq!(
+            codex_resume_args(&args, "thread-1").unwrap(),
+            vec![
+                "-m",
+                "gpt-5",
+                "exec",
+                "resume",
+                "--skip-git-repo-check",
+                "--json",
+                "thread-1"
+            ]
+        );
+    }
+
+    #[test]
+    fn extracts_codex_json_thread_and_answer() {
+        let stdout = r#"{"type":"thread.started","thread_id":"thread-1"}
+{"type":"item.completed","item":{"type":"agent_message","text":"hello"}}"#;
+
+        assert_eq!(extract_thread_id(stdout).as_deref(), Some("thread-1"));
+        assert_eq!(extract_json_agent_message(stdout).as_deref(), Some("hello"));
     }
 }
 
@@ -368,6 +563,9 @@ fn format_cli_reply(stdout: &str, stderr: &str, success: bool) -> String {
     let primary = if stdout.trim().is_empty() {
         extracted = extract_codex_answer(stderr);
         extracted.as_deref().unwrap_or(stderr)
+    } else if let Some(answer) = extract_json_agent_message(stdout) {
+        extracted = Some(answer);
+        extracted.as_deref().unwrap_or(stdout)
     } else {
         stdout
     };
@@ -382,6 +580,42 @@ fn format_cli_reply(stdout: &str, stderr: &str, success: bool) -> String {
     } else {
         clean
     }
+}
+
+fn extract_thread_id(stdout: &str) -> Option<String> {
+    stdout.lines().find_map(|line| {
+        let value: Value = serde_json::from_str(line).ok()?;
+        if value.get("type").and_then(Value::as_str) == Some("thread.started") {
+            value
+                .get("thread_id")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned)
+        } else {
+            None
+        }
+    })
+}
+
+fn extract_json_agent_message(stdout: &str) -> Option<String> {
+    let mut latest = None;
+    for line in stdout.lines() {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if value.get("type").and_then(Value::as_str) != Some("item.completed") {
+            continue;
+        }
+        let Some(item) = value.get("item") else {
+            continue;
+        };
+        if item.get("type").and_then(Value::as_str) != Some("agent_message") {
+            continue;
+        }
+        if let Some(text) = item.get("text").and_then(Value::as_str) {
+            latest = Some(text.to_string());
+        }
+    }
+    latest
 }
 
 fn extract_codex_answer(stderr: &str) -> Option<String> {

@@ -46,6 +46,8 @@ pub struct CreateProjectRequest {
 pub struct ProjectChatRequest {
     pub message: String,
     pub agent: Option<String>,
+    pub conversation_id: Option<String>,
+    pub conversation_title: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -163,10 +165,24 @@ pub async fn chat_project(
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
 
-    let task_id = match state.store.create_task(&project.id, &user.id, &message) {
+    let conversation_id = match state.store.ensure_conversation(
+        &project.id,
+        &user.id,
+        req.conversation_id.as_deref(),
+        req.conversation_title.as_deref(),
+    ) {
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+
+    let task_id =
+        match state
+            .store
+            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
+        {
+            Ok(id) => id,
+            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
@@ -175,6 +191,7 @@ pub async fn chat_project(
         user.id.clone(),
         project,
         download_base,
+        conversation_id.clone(),
         message,
         req.agent,
         tx,
@@ -214,6 +231,7 @@ pub async fn chat_project(
 
     Json(serde_json::json!({
         "task_id": task_id,
+        "conversation_id": conversation_id,
         "reply": reply,
         "apk_url": apk_url,
         "image_url": image_url,
@@ -226,6 +244,7 @@ async fn run_project_agent_with_scheduler(
     user_id: String,
     project: ProjectAccess,
     download_base: String,
+    conversation_id: String,
     message: String,
     agent_name: Option<String>,
     tx: UnboundedSender<String>,
@@ -268,6 +287,7 @@ async fn run_project_agent_with_scheduler(
         &user_id,
         &project,
         &download_base,
+        Some(&conversation_id),
         &message,
         agent_name.as_deref(),
         &state,
@@ -476,9 +496,19 @@ async fn handle_project_ws(
             continue;
         }
 
+        let conversation_id = state
+            .store
+            .ensure_conversation(
+                &project.id,
+                &user.id,
+                request.conversation_id.as_deref(),
+                request.conversation_title.as_deref(),
+            )
+            .unwrap_or_else(|_| "default".into());
+
         let task_id = state
             .store
-            .create_task(&project.id, &user.id, &message)
+            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
             .unwrap_or_else(|_| "tsk_unknown".into());
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let state_clone = state.clone();
@@ -491,6 +521,7 @@ async fn handle_project_ws(
                 user_id,
                 project_for_task,
                 download_base_for_task,
+                conversation_id,
                 message,
                 request.agent,
                 tx,
@@ -579,6 +610,8 @@ fn parse_project_message(raw: &str) -> ProjectChatRequest {
     serde_json::from_str::<ProjectChatRequest>(raw).unwrap_or_else(|_| ProjectChatRequest {
         message: raw.to_string(),
         agent: None,
+        conversation_id: None,
+        conversation_title: None,
     })
 }
 
