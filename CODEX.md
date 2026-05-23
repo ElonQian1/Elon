@@ -125,6 +125,9 @@ Server:
 - Log: `/root/elon-server.log`
 - Port: `8080`
 - Health check: `curl http://43.139.149.158:8080/health`
+- Deploy script (Windows):     `cd scripts && .\publish-server.ps1`
+- Deploy script (Linux/macOS): `bash scripts/publish-server.sh`
+- Both scripts are functionally identical: git pull → worktree → cross-compile → SHA check → upload → restart → verify
 
 APK:
 

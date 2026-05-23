@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# ================================================================
+#  elon cli 服务端 — 本地交叉编译 → 部署 (Linux/macOS 版)
+#  等效于 publish-server.ps1，支持 Ubuntu / macOS 开发机
+#
+#  依赖（首次运行前安装一次）：
+#    1. zig:           https://ziglang.org/download/ 或 snap install zig --classic
+#    2. cargo-zigbuild: cargo install cargo-zigbuild
+#    3. musl target:   rustup target add x86_64-unknown-linux-musl
+#    4. ssh + scp（系统自带）
+#
+#  用法：
+#    ./scripts/publish-server.sh                 # 正常流程
+#    ./scripts/publish-server.sh --skip-build    # 跳过编译，用上次产物重新部署
+#    ./scripts/publish-server.sh --skip-upload   # 只本地编译，不部署
+#    ./scripts/publish-server.sh --force         # 强制部署，即使服务器已有更新版本
+# ================================================================
+set -euo pipefail
+
+# ── ANSI 颜色 ──────────────────────────────────────────────────
+RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'
+CYAN='\033[0;36m'; GRAY='\033[0;37m'; NC='\033[0m'
+
+# ── 参数解析 ──────────────────────────────────────────────────
+SKIP_BUILD=0; SKIP_UPLOAD=0; FORCE=0
+for arg in "$@"; do
+  case "$arg" in
+    --skip-build)   SKIP_BUILD=1 ;;
+    --skip-upload)  SKIP_UPLOAD=1 ;;
+    --force)        FORCE=1 ;;
+    *) echo -e "${RED}未知参数: $arg${NC}" >&2; exit 1 ;;
+  esac
+done
+
+# ── 配置 ───────────────────────────────────────────────────────
+TARGET="x86_64-unknown-linux-musl"
+SERVER="root@43.139.149.158"
+REMOTE_DIR="/root/Elon"
+REMOTE_BIN="$REMOTE_DIR/server/target/release/elon-server"
+SSH_OPTS="-o ProxyCommand=none"
+
+# ── 路径推导（兼容任意 PC、任意路径）──────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
+if [ -z "$REPO_ROOT" ]; then
+  echo -e "${RED}❌ 当前目录不在 git 仓库中${NC}" >&2; exit 1
+fi
+SERVER_DIR="$REPO_ROOT/server"
+if [ ! -f "$SERVER_DIR/Cargo.toml" ]; then
+  echo -e "${RED}❌ 找不到 $SERVER_DIR/Cargo.toml${NC}" >&2; exit 1
+fi
+
+echo ""
+echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
+echo -e "${CYAN}   elon cli 服务端  交叉编译 + 部署${NC}"
+echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
+echo -e "${GRAY}  仓库根: $REPO_ROOT${NC}"
+echo -e "${GRAY}  目标:   $TARGET${NC}"
+echo -e "${GRAY}  服务器: $SERVER${NC}"
+echo ""
+
+# ── cleanup worktree ──────────────────────────────────────────
+TMP_WORKTREE=""
+cleanup_worktree() {
+  if [ -n "$TMP_WORKTREE" ] && [ -d "$TMP_WORKTREE" ]; then
+    echo -e "${GRAY}   🧹 清理临时工作树...${NC}"
+    git -C "$REPO_ROOT" worktree remove "$TMP_WORKTREE" --force 2>/dev/null || true
+  fi
+}
+trap cleanup_worktree EXIT
+
+# ── 1. git pull --rebase ──────────────────────────────────────
+echo -e "${YELLOW}1⃣  同步最新代码...${NC}"
+git -C "$REPO_ROOT" pull --rebase origin main
+SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
+SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
+echo -e "${GREEN}   ✅ 最新 SHA: $SHA${NC}"
+
+# ── 2. 环境检查 ───────────────────────────────────────────────
+if [ "$SKIP_BUILD" -eq 0 ]; then
+  if ! command -v zig &>/dev/null; then
+    echo -e "${RED}❌ 未找到 zig！请先安装：${NC}"
+    echo -e "${YELLOW}   Ubuntu: sudo snap install zig --classic --channel=latest/stable${NC}"
+    echo -e "${YELLOW}   或访问: https://ziglang.org/download/${NC}"
+    exit 1
+  fi
+  ZIG_VER=$(zig version 2>&1 | head -1)
+  echo -e "${GRAY}   zig: $ZIG_VER${NC}"
+
+  if ! cargo zigbuild --version &>/dev/null 2>&1; then
+    echo -e "${YELLOW}📦 安装 cargo-zigbuild...${NC}"
+    cargo install cargo-zigbuild
+  fi
+
+  if ! rustup target list --installed 2>/dev/null | grep -q "$TARGET"; then
+    echo -e "${YELLOW}📦 添加 rustup target $TARGET...${NC}"
+    rustup target add "$TARGET"
+  fi
+fi
+
+# ── 3. 编译（临时工作树）─────────────────────────────────────
+TMP_WORKTREE="$(dirname "$REPO_ROOT")/elon-build-$SHA"
+BUILD_BIN="$TMP_WORKTREE/server/target/$TARGET/release/elon-server"
+BINARY="$BUILD_BIN"
+
+if [ "$SKIP_BUILD" -eq 0 ]; then
+  # 清理残留工作树
+  if [ -d "$TMP_WORKTREE" ]; then
+    git -C "$REPO_ROOT" worktree remove "$TMP_WORKTREE" --force 2>/dev/null || true
+  fi
+
+  echo -e "${YELLOW}2⃣  创建临时工作树（$SHA）...${NC}"
+  git -C "$REPO_ROOT" worktree add --detach "$TMP_WORKTREE" HEAD
+
+  echo -e "${YELLOW}3⃣  交叉编译 → $TARGET...${NC}"
+  TMP_SERVER_DIR="$TMP_WORKTREE/server"
+  export CARGO_TARGET_DIR="$TMP_SERVER_DIR/target"
+  (
+    cd "$TMP_SERVER_DIR"
+    cargo zigbuild --release --target "$TARGET"
+  )
+  unset CARGO_TARGET_DIR
+
+  if [ ! -f "$BINARY" ]; then
+    echo -e "${RED}❌ 编译产物不存在: $BINARY${NC}" >&2; exit 1
+  fi
+
+  SIZE_MB=$(awk "BEGIN {printf \"%.1f\", $(stat -c%s "$BINARY" 2>/dev/null || stat -f%z "$BINARY") / 1048576}")
+  echo -e "${GREEN}   ✅ 编译成功！产物 ${SIZE_MB} MB${NC}"
+
+else
+  echo -e "${YELLOW}2⃣  ⏩ 跳过编译（--skip-build）${NC}"
+  if [ ! -f "$BINARY" ]; then
+    FALLBACK_TARGET_DIR="${CARGO_TARGET_DIR:-$SERVER_DIR/target}"
+    BINARY="$FALLBACK_TARGET_DIR/$TARGET/release/elon-server"
+    if [ ! -f "$BINARY" ]; then
+      echo -e "${RED}❌ 找不到编译产物，请先不带 --skip-build 运行一次${NC}" >&2; exit 1
+    fi
+    echo -e "${GRAY}   使用已有产物: $BINARY${NC}"
+  fi
+fi
+
+if [ "$SKIP_UPLOAD" -eq 1 ]; then
+  echo ""
+  echo -e "${GREEN}✅ 本地编译完成（--skip-upload，未部署）${NC}"
+  echo -e "${GRAY}   产物: $BINARY${NC}"
+  exit 0
+fi
+
+# ── 4. 上传到服务器（staging 路径含 SHA，避免并发覆盖）────────
+echo -e "${YELLOW}4⃣  上传 binary 到服务器...${NC}"
+STAGING_PATH="/tmp/elon-server-$SHA"
+# shellcheck disable=SC2086
+scp $SSH_OPTS "$BINARY" "${SERVER}:${STAGING_PATH}"
+echo -e "${GREEN}   ✅ 上传完成${NC}"
+
+# ── 4.5 SHA 顺序检查（防止旧版编译慢覆盖新版）───────────────
+if [ "$FORCE" -eq 0 ]; then
+  DEPLOYED_SHA_FILE="$REMOTE_DIR/.deployed-sha"
+  # shellcheck disable=SC2086
+  SERVER_SHA=$(ssh $SSH_OPTS "$SERVER" "cat $DEPLOYED_SHA_FILE 2>/dev/null || echo ''" | tr -d '[:space:]')
+  if [ -n "$SERVER_SHA" ] && [ "$SERVER_SHA" != "$SHA_BIG" ]; then
+    # 检查服务器 SHA 是否是我们的祖先（是祖先 = 我们更新）
+    if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SERVER_SHA" "$SHA_BIG" 2>/dev/null; then
+      # 服务器已有更新版本，拒绝回退
+      # shellcheck disable=SC2086
+      ssh $SSH_OPTS "$SERVER" "rm -f $STAGING_PATH" 2>/dev/null || true
+      SHORT_SERVER="${SERVER_SHA:0:8}"
+      echo ""
+      echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
+      echo -e "${YELLOW}   ⚠️  部署已中止：服务器版本更新${NC}"
+      echo -e "${YELLOW}   服务器当前: $SHORT_SERVER（比本次 $SHA 更新）${NC}"
+      echo -e "${YELLOW}   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。${NC}"
+      echo -e "${YELLOW}   解决：git pull --rebase 后重新编译部署，或用 --force 强制覆盖。${NC}"
+      echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
+      echo ""
+      exit 0
+    fi
+  fi
+  echo -e "${GREEN}   ✅ SHA 顺序检查通过（本次 $SHA 是最新版本）${NC}"
+fi
+
+# ── 5. 替换 binary + 重启服务 ────────────────────────────────
+echo -e "${YELLOW}5⃣  替换 binary 并重启服务...${NC}"
+REMOTE_BIN_DIR=$(dirname "$REMOTE_BIN")
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$SERVER" "mkdir -p $REMOTE_BIN_DIR && mv $STAGING_PATH $REMOTE_BIN && chmod +x $REMOTE_BIN"
+
+RESTART_CMD="if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd $REMOTE_DIR && nohup $REMOTE_BIN </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi"
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$SERVER" "$RESTART_CMD"
+
+echo -e "${GREEN}   ✅ 服务重启指令已发送${NC}"
+
+# 记录本次部署 SHA（供下次部署顺序检查）
+# shellcheck disable=SC2086
+ssh $SSH_OPTS "$SERVER" "echo '$SHA_BIG' > $REMOTE_DIR/.deployed-sha" 2>/dev/null || true
+echo -e "${GREEN}   ✅ SHA 记录已写入服务器 (.deployed-sha = $SHA)${NC}"
+
+# ── 6. 验证 ──────────────────────────────────────────────────
+echo -e "${YELLOW}6⃣  等待服务启动（3 秒）...${NC}"
+sleep 3
+
+HEALTH=$(curl --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/health" 2>&1 || true)
+if [ -n "$HEALTH" ]; then
+  echo -e "${GREEN}   ✅ 健康检查: $HEALTH${NC}"
+else
+  echo -e "${YELLOW}   ⚠️  健康检查无响应（服务可能还在启动中）${NC}"
+  echo -e "${YELLOW}      手动确认：curl --noproxy '*' http://43.139.149.158:8080/health${NC}"
+fi
+
+# ── 7. 清理工作树（由 trap EXIT 自动执行）────────────────────
+echo ""
+echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}   ✅ 部署完成！${NC}"
+echo -e "${GRAY}   SHA:    $SHA${NC}"
+echo -e "${GRAY}   服务:   http://43.139.149.158:8080/health${NC}"
+echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
+echo ""

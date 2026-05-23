@@ -23,15 +23,17 @@ git status --short              # 检查是否有其他 AI 未提交的改动
   → git add <只加自己改的文件，含新建 .rs 文件>
   → git commit -m "type(scope): 描述"
   → git push origin main
-  → cd scripts; .\publish-server.ps1    ← 脚本自动 worktree 构建 + 上传 + 重启
+  → 根据系统选择部署脚本：
+       Windows:       cd scripts; .\publish-server.ps1
+       Linux/macOS:   bash scripts/publish-server.sh
   → 验证: curl --noproxy '*' http://43.139.149.158:8080/health
 ```
 
-> **绝对禁止**：改完代码不 commit 直接运行 publish-server.ps1 ——  
+> **绝对禁止**：改完代码不 commit 直接运行部署脚本 ——  
 > 脚本基于 git HEAD 打包，未提交的代码**不会**进入部署。
 
-> **并发保护**：publish-server.ps1 内置 SHA 顺序检查。如果另一台 PC 已部署更新版本，
-> 本机旧版编译完成后**会自动中止**，不会回退服务器版本。用 `-Force` 强制覆盖。
+> **并发保护**：两个脚本都内置 SHA 顺序检查。如果另一台 PC 已部署更新版本，
+> 本机旧版编译完成后**会自动中止**，不会回退服务器版本。用 `-Force`/`--force` 强制覆盖。
 
 ---
 
