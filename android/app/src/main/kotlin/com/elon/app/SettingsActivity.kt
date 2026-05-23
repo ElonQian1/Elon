@@ -27,6 +27,7 @@ class SettingsActivity : AppCompatActivity() {
     private val SERVER_URL = "http://43.139.149.158:8080"
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val http = OkHttpClient()
+    private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
 
     private lateinit var userId: String
     private data class AgentOption(val name: String, val label: String)
@@ -40,8 +41,7 @@ class SettingsActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
         }
 
-        userId = getSharedPreferences("elon", MODE_PRIVATE)
-            .getString("user_id", "") ?: ""
+        userId = prefs.getString("user_id", "") ?: ""
 
         findViewById<TextView>(R.id.userIdText).text = "用户 ID: $userId"
 
@@ -109,11 +109,11 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun applyConfig(cfg: JSONObject) {
-        val useAgent = cfg.optString("use_agent", "")
-        val apiBase  = cfg.optString("api_base", "")
-        val apiKey   = cfg.optString("api_key", "")
-        val model    = cfg.optString("model", "")
-        val nickname = cfg.optString("nickname", "")
+        val useAgent = jsonStringOrNull(cfg, "use_agent").orEmpty()
+        val apiBase  = jsonStringOrNull(cfg, "api_base").orEmpty()
+        val apiKey   = jsonStringOrNull(cfg, "api_key").orEmpty()
+        val model    = jsonStringOrNull(cfg, "model").orEmpty()
+        val nickname = jsonStringOrNull(cfg, "nickname").orEmpty()
 
         val group = findViewById<RadioGroup>(R.id.modeGroup)
 
@@ -147,6 +147,8 @@ class SettingsActivity : AppCompatActivity() {
         val nickname = findViewById<EditText>(R.id.nicknameEdit).text.toString().trim()
 
         val payload = JSONObject()
+        var cachedAgentName: String? = null
+        var cachedModelLabel = "服务器默认"
 
         when (group.checkedRadioButtonId) {
             R.id.modeDefault -> {
@@ -158,13 +160,15 @@ class SettingsActivity : AppCompatActivity() {
             }
             R.id.modePreset -> {
                 val idx = findViewById<Spinner>(R.id.agentSpinner).selectedItemPosition
-                val selected = availableAgents.getOrNull(idx)?.name ?: ""
-                if (selected.isEmpty()) {
+                val selected = availableAgents.getOrNull(idx)
+                if (selected == null) {
                     Toast.makeText(this, "请选择一个代理", Toast.LENGTH_SHORT).show()
                     btn.isEnabled = true; btn.text = "保存配置"
                     return
                 }
-                payload.put("use_agent", selected)
+                cachedAgentName = selected.name
+                cachedModelLabel = selected.label
+                payload.put("use_agent", selected.name)
                 payload.put("api_base",  JSONObject.NULL)
                 payload.put("api_key",   JSONObject.NULL)
                 payload.put("model",     JSONObject.NULL)
@@ -178,6 +182,7 @@ class SettingsActivity : AppCompatActivity() {
                     btn.isEnabled = true; btn.text = "保存配置"
                     return
                 }
+                cachedModelLabel = "自定义模型"
                 payload.put("use_agent", JSONObject.NULL)
                 payload.put("api_base",  base)
                 // 密钥为空则不修改服务端已保存的密钥
@@ -198,6 +203,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 val respBody = resp.body?.string() ?: ""
                 if (resp.isSuccessful) {
+                    cacheModelSelection(cachedAgentName, cachedModelLabel)
                     Toast.makeText(this@SettingsActivity, "✅ 配置已保存", Toast.LENGTH_SHORT).show()
                     setResult(Activity.RESULT_OK)
                     finish()
@@ -211,6 +217,21 @@ class SettingsActivity : AppCompatActivity() {
                 btn.isEnabled = true; btn.text = "保存配置"
             }
         }
+    }
+
+    private fun jsonStringOrNull(json: JSONObject, name: String): String? {
+        if (!json.has(name) || json.isNull(name)) return null
+        return json.optString(name, "")
+            .trim()
+            .takeIf { it.isNotBlank() && it != "null" }
+    }
+
+    private fun cacheModelSelection(agentName: String?, label: String) {
+        prefs.edit().apply {
+            if (agentName.isNullOrBlank()) remove("selected_agent_name")
+            else putString("selected_agent_name", agentName)
+            putString("selected_model_label", label)
+        }.apply()
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

@@ -5,7 +5,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
 use crate::{
-    ai_cli, image_generation,
+    ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     tools,
     types::{AgentConfig, AiBackend, AppState, UserAgentConfig, WsMessage},
@@ -288,7 +288,7 @@ async fn run_dispatch_with_workspace(
 ) -> Result<()> {
     let resume_command = is_short_resume_command(user_message, workspace);
     let delivery_request = is_project_delivery_request(user_message, workspace);
-    if resume_command || delivery_request {
+    if delivery_request && !resume_command {
         if let Some(apk_path) = tools::find_latest_apk(workspace) {
             let apk_name = apk_path
                 .file_name()
@@ -322,25 +322,37 @@ async fn run_dispatch_with_workspace(
     }
     info!("intent routing decision: {:?}", decision);
 
-    match decision.route {
-        CapabilityRoute::TextToImage => {
-            return run_text_to_image_only(user_message, state, tx).await;
+    let image_cli_only = matches!(
+        decision.intent,
+        intent_router::UserIntent::TextToImage | intent_router::UserIntent::ImageAssetForApp
+    ) || matches!(
+        decision.route,
+        CapabilityRoute::TextToImage | CapabilityRoute::ImageThenCode
+    );
+    let backend_route = if image_cli_only {
+        if !state.ai_cli.enabled {
+            return Err(anyhow::anyhow!(
+                "图片处理测试模式仅使用 Codex CLI，但本地 AI CLI 未启用"
+            ));
         }
-        CapabilityRoute::ImageThenCode => {
-            return run_image_then_code(
-                user_id,
-                workspace,
-                user_config_workspace,
-                download_base,
-                user_message,
-                agent_name,
-                state,
-                tx,
-            )
-            .await;
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "图片处理已切换为 Codex CLI，不调用独立图片模型。".into(),
+            }
+            .to_json(),
+        );
+        CapabilityRoute::CodeAgent
+    } else {
+        decision.route
+    };
+    let backend_agent_name = if image_cli_only {
+        match agent_name {
+            Some(name) if is_local_cli_option(state, name) => agent_name,
+            _ => Some("codex_cli"),
         }
-        CapabilityRoute::ChatAgent | CapabilityRoute::CodeAgent => {}
-    }
+    } else {
+        agent_name
+    };
 
     run_backend_with_workspace(
         user_id,
@@ -348,8 +360,9 @@ async fn run_dispatch_with_workspace(
         user_config_workspace,
         download_base,
         user_message,
-        agent_name,
-        decision.route,
+        backend_agent_name,
+        backend_route,
+        !image_cli_only,
         state,
         tx,
     )
@@ -362,6 +375,8 @@ fn is_short_resume_command(user_message: &str, workspace: &Path) -> bool {
     }
     let normalized = user_message.trim().to_lowercase();
     if normalized.contains("继续完成上一次未完成")
+        || normalized.contains("未完成的开发任务")
+        || normalized.contains("继续当前项目")
         || (normalized.contains("检查当前项目状态") && normalized.contains("apk"))
     {
         return true;
@@ -427,6 +442,7 @@ async fn run_backend_with_workspace(
     user_message: &str,
     agent_name: Option<&str>,
     route: CapabilityRoute,
+    allow_api_fallback: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -447,7 +463,11 @@ async fn run_backend_with_workspace(
             .await
             {
                 Ok(()) => Ok(()),
-                Err(e) if state.ai_cli.fallback_to_api && has_api_agents(state).await => {
+                Err(e)
+                    if allow_api_fallback
+                        && state.ai_cli.fallback_to_api
+                        && has_api_agents(state).await =>
+                {
                     warn!("本地 AI CLI 执行失败，回退到 API 代理: {}", e);
                     let _ = tx.send(
                         WsMessage::Progress {
@@ -486,106 +506,6 @@ async fn run_backend_with_workspace(
     }
 }
 
-async fn run_text_to_image_only(
-    user_message: &str,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-) -> Result<()> {
-    let (prompt, image) = generate_image_for_message(user_message, state, tx).await?;
-    let image_url = image.url.clone();
-    let message = format!(
-        "图片已生成。\n\n提示词：{}\n图片链接：{}",
-        prompt, image_url
-    );
-
-    let _ = tx.send(
-        WsMessage::Done {
-            message,
-            apk_url: None,
-            image_url: Some(image_url),
-        }
-        .to_json(),
-    );
-
-    Ok(())
-}
-
-async fn run_image_then_code(
-    user_id: &str,
-    workspace: &Path,
-    user_config_workspace: &Path,
-    download_base: &str,
-    user_message: &str,
-    agent_name: Option<&str>,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-) -> Result<()> {
-    let (prompt, image) = generate_image_for_message(user_message, state, tx).await?;
-    let image_url = image.url.clone();
-
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: format!(
-                "图片素材已生成，正在交给代码代理处理项目集成: {}",
-                image_url
-            ),
-        }
-        .to_json(),
-    );
-
-    let augmented_message = format!(
-        "用户请求包含图片素材生成和项目代码集成。\n\
-         原始需求：{}\n\
-         已生成图片 URL：{}\n\
-         图片提示词：{}\n\n\
-         请根据原始需求把该素材用于项目。若当前环境可以下载该 URL，请保存到合适的资源目录并更新代码；\
-         若无法直接下载，请在最终回复中明确告诉用户图片 URL 和建议放置路径。",
-        user_message, image_url, prompt
-    );
-
-    run_backend_with_workspace(
-        user_id,
-        workspace,
-        user_config_workspace,
-        download_base,
-        &augmented_message,
-        agent_name,
-        CapabilityRoute::CodeAgent,
-        state,
-        tx,
-    )
-    .await
-}
-
-async fn generate_image_for_message(
-    user_message: &str,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-) -> Result<(String, image_generation::GeneratedImage)> {
-    if state.image_model.is_none() {
-        return Err(anyhow::anyhow!(
-            "文生图模型未配置，请在 server/.env 设置 IMAGE_API_KEY 后再使用图片生成能力"
-        ));
-    }
-
-    let prompt = intent_router::image_prompt_from_message(user_message);
-    let model = state
-        .image_model
-        .as_ref()
-        .map(|cfg| cfg.model.as_str())
-        .unwrap_or("未配置");
-
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: format!("识别为文生图任务，正在调用模型: {}", model),
-        }
-        .to_json(),
-    );
-
-    let image = image_generation::generate_text_to_image(state, &prompt).await?;
-    Ok((prompt, image))
-}
-
 async fn has_api_agents(state: &Arc<AppState>) -> bool {
     !state.agents_config.read().await.agents.is_empty()
 }
@@ -596,6 +516,10 @@ fn choose_backend(
     agent_name: Option<&str>,
     route: CapabilityRoute,
 ) -> AiBackend {
+    if route == CapabilityRoute::ChatAgent {
+        return AiBackend::Api;
+    }
+
     if let Some(name) = agent_name {
         if is_local_cli_option(state, name) {
             return AiBackend::LocalCli;
@@ -671,6 +595,16 @@ fn casual_chat_prompt() -> &'static str {
 - 回复以中文为主，简洁但有内容。"#
 }
 
+fn quick_casual_reply(user_message: &str) -> Option<&'static str> {
+    match user_message.trim().to_lowercase().as_str() {
+        "你好" | "你好呀" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => Some(
+            "你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。",
+        ),
+        "谢谢" | "谢谢你" | "辛苦了" => Some("不客气，我在这边。你继续说下一步想怎么改就行。"),
+        _ => None,
+    }
+}
+
 async fn resolve_agent(
     state: &Arc<AppState>,
     workspace: &std::path::Path,
@@ -740,9 +674,20 @@ async fn run_api_inner_with_workspace(
 
     // 优先使用用户在 APP 里配置的专属代理；否则用管理员指定/默认全局代理。
     // 普通聊天也要走模型，否则体验会像固定话术。
-    let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
-
     if !intent_router::looks_like_development_request(user_message) {
+        if let Some(reply) = quick_casual_reply(user_message) {
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply.to_string(),
+                    apk_url: None,
+                    image_url: None,
+                }
+                .to_json(),
+            );
+            return Ok(());
+        }
+
+        let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
         let _ = tx.send(
             WsMessage::Progress {
                 message: format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model),
@@ -779,6 +724,7 @@ async fn run_api_inner_with_workspace(
             .current_dir(&workspace)
             .output();
     }
+    let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
     let workspace_str = workspace.to_string_lossy().to_string();
 
     let _ = tx.send(

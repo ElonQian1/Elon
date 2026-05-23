@@ -7,11 +7,35 @@ use axum::{
     http::{header, StatusCode},
     response::IntoResponse,
 };
-use std::sync::Arc;
+use base64::{engine::general_purpose, Engine as _};
+use std::{
+    collections::HashMap,
+    path::Path as FsPath,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock,
+    },
+    time::Duration,
+};
+use tokio::sync::{broadcast, Mutex};
 use tracing::info;
 
 use crate::{agent, client_protocol, tools, types};
+use client_protocol::AgentRequest;
 use types::AppState;
+
+static LEGACY_WS_JOBS: LazyLock<Mutex<HashMap<String, Arc<LegacyWsJob>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+const MAX_ATTACHMENTS_PER_MESSAGE: usize = 6;
+const MAX_ATTACHMENT_BYTES: usize = 12 * 1024 * 1024;
+
+struct LegacyWsJob {
+    key: String,
+    fingerprint: String,
+    backlog: Mutex<Vec<String>>,
+    broadcaster: broadcast::Sender<String>,
+    finished: AtomicBool,
+}
 
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
@@ -41,8 +65,7 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
         };
 
         info!("received WebSocket message: {} bytes", text.len());
-        let state_clone = state.clone();
-        let request = client_protocol::parse_client_message(&text);
+        let request = materialize_attachments(client_protocol::parse_client_message(&text), &state).await;
         info!(
             "dispatching request: user_id={} workspace_user_id={} agent={:?} chars={}",
             request.user_id,
@@ -50,32 +73,44 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
             request.agent,
             request.content.chars().count()
         );
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-
-        let agent_task = tokio::spawn(async move {
-            agent::run(
-                &request.user_id,
-                &request.workspace_user_id,
-                &request.content,
-                request.agent.as_deref(),
-                &state_clone,
-                tx,
-            )
-            .await;
-        });
+        let job = get_or_start_legacy_job(request, state.clone()).await;
+        let mut job_rx = job.broadcaster.subscribe();
+        let backlog = job.backlog.lock().await.clone();
+        let mut replayed_terminal = false;
+        let mut replay_failed = false;
+        for progress in backlog {
+            if sender.send(Message::Text(progress.clone())).await.is_err() {
+                replay_failed = true;
+                break;
+            }
+            if is_terminal_ws_message(&progress) {
+                replayed_terminal = true;
+                break;
+            }
+        }
+        if replay_failed {
+            break;
+        }
+        if replayed_terminal {
+            continue;
+        }
 
         let mut client_disconnected = false;
         loop {
             tokio::select! {
-                progress = rx.recv() => {
+                progress = job_rx.recv() => {
                     match progress {
-                        Some(progress) => {
+                        Ok(progress) => {
                             if sender.send(Message::Text(progress)).await.is_err() {
                                 client_disconnected = true;
                                 break;
                             }
+                            if job.finished.load(Ordering::SeqCst) {
+                                break;
+                            }
                         }
-                        None => break,
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(broadcast::error::RecvError::Closed) => break,
                     }
                 }
                 incoming = receiver.next() => {
@@ -108,15 +143,237 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
             }
         }
         if client_disconnected {
-            info!("client disconnected while request was running; aborting agent task");
-            agent_task.abort();
-            let _ = agent_task.await;
+            info!(
+                "client disconnected while request was running; keeping background job alive"
+            );
             break;
         }
-        let _ = agent_task.await;
     }
 
     info!("WebSocket connection closed");
+}
+
+async fn materialize_attachments(mut request: AgentRequest, state: &AppState) -> AgentRequest {
+    if request.attachments.is_empty() {
+        return request;
+    }
+
+    let workspace = state.get_user_workspace(&request.workspace_user_id);
+    let attachments_dir = workspace.join("attachments");
+    if let Err(error) = tokio::fs::create_dir_all(&attachments_dir).await {
+        request.content = format!(
+            "{}\n\n附件处理失败：无法创建附件目录 {}：{}",
+            request.content,
+            attachments_dir.display(),
+            error
+        );
+        request.attachments.clear();
+        return request;
+    }
+
+    let mut notes = Vec::new();
+    for (index, attachment) in request.attachments.iter().take(MAX_ATTACHMENTS_PER_MESSAGE).enumerate()
+    {
+        let decoded = match general_purpose::STANDARD.decode(attachment.data_base64.trim()) {
+            Ok(bytes) if bytes.len() <= MAX_ATTACHMENT_BYTES => bytes,
+            Ok(_) => {
+                notes.push(format!(
+                    "- {}：附件过大，已跳过。",
+                    attachment.display_name
+                ));
+                continue;
+            }
+            Err(error) => {
+                notes.push(format!(
+                    "- {}：Base64 解析失败，已跳过：{}",
+                    attachment.display_name, error
+                ));
+                continue;
+            }
+        };
+        let file_name = unique_attachment_name(&attachments_dir, index, &attachment.file_name);
+        let path = attachments_dir.join(&file_name);
+        match tokio::fs::write(&path, decoded).await {
+            Ok(()) => notes.push(format!(
+                "- {} [{}; {}] -> {}",
+                attachment.display_name,
+                attachment.kind,
+                attachment.mime_type,
+                path.display()
+            )),
+            Err(error) => notes.push(format!(
+                "- {}：写入失败，已跳过：{}",
+                attachment.display_name, error
+            )),
+        }
+    }
+
+    if request.attachments.len() > MAX_ATTACHMENTS_PER_MESSAGE {
+        notes.push(format!(
+            "- 其余 {} 个附件超过本次上限，已忽略。",
+            request.attachments.len() - MAX_ATTACHMENTS_PER_MESSAGE
+        ));
+    }
+
+    if !notes.is_empty() {
+        request.content = format!(
+            "{}\n\n用户本次随消息上传了真实附件。附件已保存到当前工作目录，请直接读取这些路径，不要只按原文件名在项目根目录查找：\n{}",
+            request.content,
+            notes.join("\n")
+        );
+    }
+    request.attachments.clear();
+    request
+}
+
+fn unique_attachment_name(dir: &FsPath, index: usize, original: &str) -> String {
+    let safe = safe_attachment_name(original);
+    let mut candidate = format!("{:02}_{}", index + 1, safe);
+    let mut suffix = 1;
+    while dir.join(&candidate).exists() {
+        candidate = format!("{:02}_{}_{}", index + 1, suffix, safe);
+        suffix += 1;
+    }
+    candidate
+}
+
+fn safe_attachment_name(original: &str) -> String {
+    let mut safe = original
+        .chars()
+        .filter_map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                Some(ch)
+            } else if ch.is_whitespace() {
+                Some('_')
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+    if safe.is_empty() || safe == "." || safe == ".." {
+        safe = "attachment.bin".into();
+    }
+    if safe.len() > 80 {
+        let ext = safe
+            .rsplit_once('.')
+            .map(|(_, ext)| format!(".{}", ext))
+            .unwrap_or_default();
+        safe = format!("attachment{}", ext);
+    }
+    safe
+}
+
+async fn get_or_start_legacy_job(request: AgentRequest, state: Arc<AppState>) -> Arc<LegacyWsJob> {
+    let key = request.workspace_user_id.clone();
+    let fingerprint = legacy_job_fingerprint(&request);
+
+    {
+        let mut jobs = LEGACY_WS_JOBS.lock().await;
+        if let Some(existing) = jobs.get(&key) {
+            if existing.fingerprint == fingerprint {
+                return existing.clone();
+            }
+            if !existing.finished.load(Ordering::SeqCst) {
+                let _ = existing.broadcaster.send(
+                    types::WsMessage::Progress {
+                        message: "上一轮任务仍在继续，正在保持后台处理。".into(),
+                    }
+                    .to_json(),
+                );
+                return existing.clone();
+            }
+            jobs.remove(&key);
+        }
+
+        let (broadcast_tx, _) = broadcast::channel::<String>(256);
+        let job = Arc::new(LegacyWsJob {
+            key: key.clone(),
+            fingerprint: fingerprint.clone(),
+            backlog: Mutex::new(Vec::new()),
+            broadcaster: broadcast_tx,
+            finished: AtomicBool::new(false),
+        });
+        jobs.insert(key.clone(), job.clone());
+
+        let job_for_task = job.clone();
+        tokio::spawn(async move {
+            run_legacy_job(request, state, job_for_task).await;
+        });
+
+        job
+    }
+}
+
+async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<LegacyWsJob>) {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let state_clone = state.clone();
+    let request_for_agent = request.clone();
+
+    let agent_task = tokio::spawn(async move {
+        agent::run(
+            &request_for_agent.user_id,
+            &request_for_agent.workspace_user_id,
+            &request_for_agent.content,
+            request_for_agent.agent.as_deref(),
+            &state_clone,
+            tx,
+        )
+        .await;
+    });
+
+    while let Some(progress) = rx.recv().await {
+        {
+            let mut backlog = job.backlog.lock().await;
+            backlog.push(progress.clone());
+            if backlog.len() > 512 {
+                let overflow = backlog.len() - 512;
+                backlog.drain(0..overflow);
+            }
+        }
+        let terminal = is_terminal_ws_message(&progress);
+        let _ = job.broadcaster.send(progress);
+        if terminal {
+            job.finished.store(true, Ordering::SeqCst);
+            break;
+        }
+    }
+
+    let _ = agent_task.await;
+    job.finished.store(true, Ordering::SeqCst);
+
+    let cleanup_key = job.key.clone();
+    let cleanup_job = job.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+        let mut jobs = LEGACY_WS_JOBS.lock().await;
+        if jobs
+            .get(&cleanup_key)
+            .map(|existing| Arc::ptr_eq(existing, &cleanup_job))
+            .unwrap_or(false)
+        {
+            jobs.remove(&cleanup_key);
+        }
+    });
+}
+
+fn legacy_job_fingerprint(request: &AgentRequest) -> String {
+    format!(
+        "{}\u{1f}{}",
+        request.agent.as_deref().unwrap_or(""),
+        request.content
+    )
+}
+
+fn is_terminal_ws_message(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("type")
+                .and_then(|message_type| message_type.as_str())
+                .map(|message_type| message_type == "done" || message_type == "error")
+        })
+        .unwrap_or(false)
 }
 
 pub async fn download_apk(

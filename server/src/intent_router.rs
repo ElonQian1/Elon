@@ -12,7 +12,9 @@ pub enum UserIntent {
 pub enum CapabilityRoute {
     ChatAgent,
     CodeAgent,
+    #[allow(dead_code)]
     TextToImage,
+    #[allow(dead_code)]
     ImageThenCode,
 }
 
@@ -231,18 +233,18 @@ pub fn classify(message: &str) -> RoutingDecision {
     {
         return RoutingDecision::new(
             UserIntent::ImageAssetForApp,
-            CapabilityRoute::ImageThenCode,
+            CapabilityRoute::CodeAgent,
             86,
-            "image_asset_for_app",
+            "image_asset_for_app_cli_testing",
         );
     }
 
     if has_image_object && has_image_action && !has_app_context {
         return RoutingDecision::new(
             UserIntent::TextToImage,
-            CapabilityRoute::TextToImage,
+            CapabilityRoute::CodeAgent,
             90,
-            "standalone_text_to_image",
+            "standalone_image_cli_testing",
         );
     }
 
@@ -267,9 +269,9 @@ pub fn classify(message: &str) -> RoutingDecision {
     if has_image_object {
         return RoutingDecision::new(
             UserIntent::TextToImage,
-            CapabilityRoute::TextToImage,
+            CapabilityRoute::CodeAgent,
             68,
-            "weak_image_request",
+            "weak_image_cli_testing",
         );
     }
 
@@ -281,6 +283,7 @@ pub fn classify(message: &str) -> RoutingDecision {
     )
 }
 
+#[allow(dead_code)]
 pub fn image_prompt_from_message(message: &str) -> String {
     let trimmed = message.trim();
     let prefixes = [
@@ -368,18 +371,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn routes_standalone_image_generation() {
+    fn routes_standalone_image_requests_to_codex_cli() {
         let decision = classify("帮我生成一张山水画");
         assert_eq!(decision.intent, UserIntent::TextToImage);
-        assert_eq!(decision.route, CapabilityRoute::TextToImage);
-        assert!(decision.needs_image_generation);
-        assert!(!decision.needs_code_change);
+        assert_eq!(decision.route, CapabilityRoute::CodeAgent);
+        assert!(!decision.needs_image_generation);
+        assert!(decision.needs_code_change);
     }
 
     #[test]
     fn routes_short_image_prompt() {
         let decision = classify("画一个头像");
-        assert_eq!(decision.route, CapabilityRoute::TextToImage);
+        assert_eq!(decision.route, CapabilityRoute::CodeAgent);
     }
 
     #[test]
@@ -399,8 +402,8 @@ mod tests {
     fn routes_image_asset_for_app() {
         let decision = classify("给 App 生成一个猫咪图标并替换启动图标");
         assert_eq!(decision.intent, UserIntent::ImageAssetForApp);
-        assert_eq!(decision.route, CapabilityRoute::ImageThenCode);
-        assert!(decision.needs_image_generation);
+        assert_eq!(decision.route, CapabilityRoute::CodeAgent);
+        assert!(!decision.needs_image_generation);
         assert!(decision.needs_code_change);
     }
 

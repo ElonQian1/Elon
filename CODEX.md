@@ -95,6 +95,9 @@ APK:
 
 - Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
 - Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
+- Release signing keystore is local-only at `D:\一龙\elon-release(1).jks`; do not commit it.
+- Keystore type: `PKCS12`; key alias: `elon`.
+- For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
 
@@ -122,7 +125,7 @@ Android APK builds are allowed in the main workspace when necessary, but still c
 
 - `server/src/intent_router.rs` is the shared capability router for Web, APK, and future Win clients.
 - Always classify user messages before choosing a backend model. Do not duplicate intent checks inside Web/APK handlers.
-- Routing priority: standalone text-to-image goes to `image_generation`; image asset requests use image generation first and then the code agent; app/web/server development prefers Codex CLI; ordinary chat/model configuration stays in chat.
+- Testing-stage routing: image-related chat/project requests go directly to Codex CLI and must not auto-call `image_generation` or API fallback; app/web/server development prefers Codex CLI; ordinary chat/model configuration stays in chat.
 - See `docs/intent-routing.md` before adding new capabilities, providers, or low-cost classifier logic.
 
 ## Local Notes

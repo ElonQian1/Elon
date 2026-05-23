@@ -6,6 +6,25 @@ pub struct ClientChatPayload {
     pub project_id: Option<String>,
     pub message: Option<String>,
     pub agent: Option<String>,
+    pub attachments: Option<Vec<ClientAttachmentPayload>>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ClientAttachmentPayload {
+    pub kind: Option<String>,
+    pub display_name: Option<String>,
+    pub file_name: Option<String>,
+    pub mime_type: Option<String>,
+    pub data_base64: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClientAttachment {
+    pub kind: String,
+    pub display_name: String,
+    pub file_name: String,
+    pub mime_type: String,
+    pub data_base64: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +33,7 @@ pub struct AgentRequest {
     pub workspace_user_id: String,
     pub content: String,
     pub agent: Option<String>,
+    pub attachments: Vec<ClientAttachment>,
 }
 
 pub fn parse_client_message(raw: &str) -> AgentRequest {
@@ -28,12 +48,19 @@ pub fn parse_client_message(raw: &str) -> AgentRequest {
             .agent
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
+        let attachments = payload
+            .attachments
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(clean_attachment)
+            .collect();
 
         AgentRequest {
             user_id,
             workspace_user_id,
             content,
             agent,
+            attachments,
         }
     } else {
         AgentRequest {
@@ -41,8 +68,27 @@ pub fn parse_client_message(raw: &str) -> AgentRequest {
             workspace_user_id: "default".to_string(),
             content: raw.to_string(),
             agent: None,
+            attachments: Vec::new(),
         }
     }
+}
+
+fn clean_attachment(input: ClientAttachmentPayload) -> Option<ClientAttachment> {
+    let data_base64 = input
+        .data_base64
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())?;
+    let file_name = input
+        .file_name
+        .or(input.display_name.clone())
+        .unwrap_or_else(|| "attachment.bin".into());
+    Some(ClientAttachment {
+        kind: input.kind.unwrap_or_else(|| "附件".into()),
+        display_name: input.display_name.unwrap_or_else(|| file_name.clone()),
+        file_name,
+        mime_type: input.mime_type.unwrap_or_else(|| "application/octet-stream".into()),
+        data_base64,
+    })
 }
 
 pub fn workspace_user_id(user_id: &str, project_id: Option<&str>) -> String {
@@ -76,6 +122,7 @@ mod tests {
         assert_eq!(req.workspace_user_id, "default");
         assert_eq!(req.content, "hello");
         assert_eq!(req.agent, None);
+        assert!(req.attachments.is_empty());
     }
 
     #[test]
@@ -88,5 +135,6 @@ mod tests {
         assert_eq!(req.workspace_user_id, "u1__myappbad");
         assert_eq!(req.content, "build");
         assert_eq!(req.agent.as_deref(), Some("codex_cli"));
+        assert!(req.attachments.is_empty());
     }
 }

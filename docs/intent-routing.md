@@ -12,8 +12,7 @@
 | --- | --- | --- | --- |
 | 普通聊天 | `CapabilityRoute::ChatAgent` | API chat agent | 闲聊、解释、配置问题、模型选择说明 |
 | 代码/项目开发 | `CapabilityRoute::CodeAgent` | Codex CLI 优先，失败可回退 API agent | App、Web、服务端、APK、部署、修复、重构 |
-| 文生图 | `CapabilityRoute::TextToImage` | `image_generation` | “画一张图”“生成头像/海报/壁纸” |
-| 先文生图再代码 | `CapabilityRoute::ImageThenCode` | 文生图模型 + 代码代理 | “生成 App 图标并替换”“做启动图并放进项目” |
+| 图片处理（测试期） | `CapabilityRoute::CodeAgent` | Codex CLI only | “画一张图”“生成头像/海报/壁纸”“生成 App 图标并替换” |
 
 ## 意图类型
 
@@ -24,23 +23,21 @@
 | `NormalChat` | `ChatAgent` | 否 | 否 |
 | `ModelConfig` | `ChatAgent` | 否 | 否 |
 | `AppDevelopment` | `CodeAgent` | 否 | 是 |
-| `TextToImage` | `TextToImage` | 是 | 否 |
-| `ImageAssetForApp` | `ImageThenCode` | 是 | 是 |
+| `TextToImage` | `CodeAgent` | 否 | 是 |
+| `ImageAssetForApp` | `CodeAgent` | 否 | 是 |
 | `Unknown` | `ChatAgent` | 否 | 否 |
 
 ## 运行顺序
 
 1. `agent::run_dispatch_with_workspace` 先调用 `intent_router::classify(user_message)`。
-2. 如果是 `TextToImage`，直接调用 `image_generation::generate_text_to_image`，不受用户当前选择的 Codex CLI/API 聊天模型影响。
-3. 如果是 `ImageThenCode`，先生成图片，拿到 `image_url` 后，把原始需求、图片 URL、图片提示词一起交给代码代理。
-4. 其他开发类请求优先走 Codex CLI；只有用户显式指定 API agent，或 CLI 不可用并允许 fallback 时，才进入 API agent。
-5. 普通聊天和配置解释请求走 API chat agent，不触发项目工具。
+2. 测试期如果是 `TextToImage` 或 `ImageAssetForApp`，不调用 `image_generation`，直接交给 Codex CLI；这条路径禁用 API fallback，避免切到其他模型。
+3. 其他开发类请求优先走 Codex CLI；只有用户显式指定 API agent，或 CLI 不可用并允许 fallback 时，才进入 API agent。
+4. 普通聊天和配置解释请求走 API chat agent，不触发项目工具。
 
-## 为什么不让 Codex CLI 直接处理文生图
+## 测试期图片处理策略
 
-当前 Codex CLI 是代码代理能力，不能稳定返回真实图片文件。文生图属于独立能力，需要走配置了 `IMAGE_API_KEY` 的图片模型。
-
-因此路由规则是：只要意图明确需要真实图片，就先使用图片模型；如果还需要修改 App/Web/项目资源，再把图片结果交给代码代理。
+当前测试阶段，图片相关请求统一交给 Codex CLI 处理完成，服务端聊天链路不再自动调用独立文生图模型。
+保留 `TextToImage` / `ImageAssetForApp` 意图，是为了后续恢复独立图片模型时不需要重做语义分类。
 
 ## 关于低价 AI 分类器
 
@@ -57,7 +54,7 @@
 {
   "intent": "image_asset_for_app",
   "confidence": 0.86,
-  "needs_image_generation": true,
+  "needs_image_generation": false,
   "needs_code_change": true,
   "reason": "用户要求生成图标并替换 App 启动图标"
 }
@@ -69,11 +66,10 @@
 - 新增意图必须添加单元测试，至少覆盖正例、近似反例、和混合意图。
 - Web、APK、未来 Win 端都只负责采集用户输入和展示结果，不承担核心能力分流。
 - 用户历史保存的聊天模型配置不能覆盖开发类能力路线；开发类默认走 Codex CLI，显式选择某个 agent 时才按用户选择执行。
-- 如果新增图片下载/资源落盘能力，应优先补齐 `ImageThenCode` 的资产导入链路，而不是让代码代理猜测图片来源。
+- 测试期图片请求必须继续走 Codex CLI；恢复独立图片模型前，需要同步更新路由、测试和本文档。
 - 如果新增低价分类模型，请把它放在 `intent_router` 的低置信度补充层，并保留确定性规则作为第一道门。
 
 ## 当前限制
 
-- `ImageThenCode` 当前是“图片 URL 桥接”：服务端先生成图片 URL，再把 URL 交给代码代理。代码代理是否能下载并保存图片，取决于运行环境和网络权限。
-- 文生图依赖 `IMAGE_API_KEY`、`IMAGE_API_BASE`、`IMAGE_MODEL` 等环境变量；未配置时会返回明确错误。
+- `/api/image/generate` 仍是独立图片接口；但聊天/项目请求链路在测试期不会自动调用它。
 - 路由现在是启发式关键词和上下文判断，适合当前产品阶段；复杂语义后续可接低价分类模型增强。

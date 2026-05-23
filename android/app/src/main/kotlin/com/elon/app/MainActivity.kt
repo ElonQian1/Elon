@@ -2,9 +2,16 @@ package com.elon.app
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.Intent
 import android.animation.ValueAnimator
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
@@ -15,7 +22,10 @@ import android.graphics.Path
 import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -23,6 +33,7 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextUtils
 import android.text.TextWatcher
+import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.Menu
@@ -38,6 +49,7 @@ import com.elon.app.BuildConfig
 import com.elon.app.update.AppUpdateManager
 import com.elon.app.update.UpdateCheckWorker
 import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -45,10 +57,15 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -56,6 +73,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -65,7 +83,6 @@ import kotlin.math.sin
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var wsClient: ElonWsClient
     private lateinit var chatAdapter: ChatAdapter
     private var waitingForReply = false
     private var activeRequestIsDevelopment = false
@@ -74,12 +91,15 @@ class MainActivity : AppCompatActivity() {
     private val foldedCliLogSamples = ArrayDeque<String>()
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
     private val currentEvidenceEntries = mutableListOf<EvidenceEntry>()
-    private val emittedNarrationMilestones = linkedSetOf<String>()
+    private val emittedProgressSignals = linkedSetOf<String>()
+    private var visibleAssistantUpdateCount = 0
     private var serverResponseToken = 0
     private var appInForeground = false
     private var pendingRequestPayload: String? = null
     private var pendingReconnectForActiveWork = false
     private var reconnectAttempts = 0
+    private var backendConnected = false
+    private var taskWorkReceiverRegistered = false
     private val projects = mutableListOf<AppProject>()
     private val gson = com.google.gson.Gson()
     private val http = OkHttpClient()
@@ -111,18 +131,34 @@ class MainActivity : AppCompatActivity() {
     private var currentModelLabel = "默认"
     private var stageHintAnimator: ValueAnimator? = null
     private var stageHintShimmerToken = 0
+    private var conversationHomeRowAnimator: ValueAnimator? = null
     private var exitConfirmDialog: AlertDialog? = null
     private var actionPopup: PopupWindow? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
     private lateinit var voiceHoldButton: TextView
+    private lateinit var inputBarContainer: LinearLayout
+    private lateinit var inputCenterContainer: FrameLayout
     private lateinit var attachmentPanel: LinearLayout
     private var attachmentPanelOpen = false
+    private var attachmentIconAnimationToken = 0
     private var voiceMode = false
     private var inputCanSend = true
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListeningForSpeech = false
     private val speechPermissionRequest = 4301
+    private val notificationPermissionRequest = 4302
+    private lateinit var cameraAttachmentLauncher: ActivityResultLauncher<Uri>
+    private lateinit var photoAttachmentLauncher: ActivityResultLauncher<String>
+    private lateinit var documentAttachmentLauncher: ActivityResultLauncher<Array<String>>
+    private var pendingCameraUri: Uri? = null
+    private var pendingCameraName: String? = null
+    private val pendingAttachments = mutableListOf<PendingAttachment>()
+    private val taskWorkReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            handleTaskWorkEvent(intent)
+        }
+    }
 
     private data class AppConversation(
         val id: String,
@@ -149,6 +185,14 @@ class MainActivity : AppCompatActivity() {
         val agentName: String?
     )
 
+    private data class PendingAttachment(
+        val kind: String,
+        val displayName: String,
+        val fileName: String,
+        val mimeType: String,
+        val file: File
+    )
+
     private data class EvidenceEntry(
         val kind: String,
         val text: String
@@ -171,49 +215,30 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        setupTaskCompletionAlerts()
 
         loadProjects()
 
-        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork)
+        setupAttachmentLaunchers()
+        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
         binding.chatList.adapter = chatAdapter
         setupNavigation()
         setupQuickActions()
         setupBackHandling()
         setupInputComposer()
+        restoreCachedModelSelection()
         updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
-
-        // 连接 WebSocket
-        wsClient = ElonWsClient(
-            serverUrl = "ws://43.139.149.158:8080/ws",
-            onMessage = { msg -> runOnUiThread { appendMessage(msg) } },
-            onConnected = {
-                runOnUiThread {
-                    reconnectAttempts = 0
-                    updateFirstConversationStatus("已连接 · 点击进入开发会话")
-                    if (waitingForReply && pendingReconnectForActiveWork) {
-                        resumePendingWorkAfterReconnect()
-                        return@runOnUiThread
-                    }
-                    if (!waitingForReply) setSendEnabled(true)
-                }
-            },
-            onDisconnected = {
-                runOnUiThread {
-                    updateFirstConversationStatus("未连接 · 点击重试")
-                    if (waitingForReply) {
-                        handleActiveWorkDisconnected()
-                        return@runOnUiThread
-                    }
-                    setSendEnabled(true)
-                }
-            }
+        setTaskAppForeground(true)
+        registerTaskWorkReceiver()
+        restorePendingActiveWork()
+        startTaskWorkService(
+            if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
         )
-        wsClient.connect()
 
         // 重连按钮
         binding.statusText.setOnClickListener {
-            if (wsClient.isConnected()) openConversation(0)
-            else wsClient.connect()
+            if (backendConnected) openConversation(0)
+            else startTaskWorkService(TaskWorkService.ACTION_CONNECT)
         }
 
         loadModelOptions()
@@ -237,22 +262,36 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         appInForeground = true
+        setTaskAppForeground(true)
+        drainQueuedTaskEvents()
+        clearCompletedTaskBadge()
         if (::binding.isInitialized) {
             loadModelOptions()
-            if (::wsClient.isInitialized && !wsClient.isConnected()) {
-                if (waitingForReply) {
+            if (!backendConnected) {
+                if (waitingForReply && !pendingReconnectForActiveWork) {
                     pendingReconnectForActiveWork = true
                     updateStage(currentStage, "正在恢复连接，回来后会自动继续本轮任务。")
                     recordEvidence("connection", "连接恢复中，正在继续上次任务")
                     appendMessage(ChatMessage("ai-cli-log", "连接恢复中 · 正在继续上次任务"))
                 }
-                wsClient.connect()
+                startTaskWorkService(
+                    if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
+                )
+            } else if (!waitingForReply) {
+                setSendEnabled(true)
             }
         }
     }
 
+    override fun onPause() {
+        appInForeground = false
+        setTaskAppForeground(false)
+        super.onPause()
+    }
+
     override fun onStop() {
         appInForeground = false
+        setTaskAppForeground(false)
         saveProjects()
         super.onStop()
     }
@@ -266,19 +305,21 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val outgoingText = expandShortDevelopmentCommand(text)
-
-        if (!wsClient.isConnected()) {
-            appendMessage(ChatMessage("error", "还没有连接到服务器，请点击上方状态栏重试。"))
-            updateFirstConversationStatus("未连接 · 点击重试")
-            wsClient.connect()
+        quickLocalChatReply(outgoingText)?.let { reply ->
+            appendMessage(ChatMessage(role = "user", content = text))
+            binding.inputEdit.text.clear()
+            updateProjectViews("普通消息已回复，开发项目记录保持不变。")
+            appendMessage(ChatMessage(role = "ai", content = reply))
             return
         }
+        val attachmentPayload = attachmentPayloadJsonOrNull() ?: return
 
         val payload = com.google.gson.JsonObject().apply {
             addProperty("user_id", userId)
             addProperty("project_id", activeProject().id)
             addProperty("message", outgoingText)
             selectedAgentName?.let { addProperty("agent", it) }
+            if (attachmentPayload.size() > 0) add("attachments", attachmentPayload)
         }
 
         // 显示用户消息
@@ -290,28 +331,30 @@ class MainActivity : AppCompatActivity() {
         pendingRequestPayload = payload.toString()
         pendingReconnectForActiveWork = false
         reconnectAttempts = 0
+        persistActiveWork()
         workflowStepIndex = 0
         resetFoldedCliLog()
         currentEvidenceEntries.clear()
-        emittedNarrationMilestones.clear()
+        emittedProgressSignals.clear()
+        visibleAssistantUpdateCount = 0
         if (activeRequestIsDevelopment) {
             updateProjectTitleFromRequest(text)
             saveProjectTitle()
             addProjectEvent("提交需求：${summarize(text, 36)}")
             updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
-            appendMessage(ChatMessage("ai", initialNarrationMessage(outgoingText)))
         } else {
             updateProjectViews("普通消息已发送，开发项目记录保持不变。")
         }
-        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(activeRequestIsDevelopment, outgoingText)))
+        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(activeRequestIsDevelopment)))
 
-        // 通过 WebSocket 发送 JSON（包含 user_id，服务端据此隔离工作区）
+        // 通过前台任务服务发送 JSON（包含 user_id，服务端据此隔离工作区）
         val responseToken = ++serverResponseToken
-        if (!wsClient.send(payload.toString())) {
+        if (!startTaskWorkService(TaskWorkService.ACTION_START_WORK, payload.toString(), activeRequestIsDevelopment)) {
             waitingForReply = false
             setSendEnabled(true)
             pendingRequestPayload = null
             pendingReconnectForActiveWork = false
+            clearPersistedActiveWork()
             val wasDevelopment = activeRequestIsDevelopment
             if (wasDevelopment) {
                 updateStage("需要处理", "消息发送失败，请检查网络后重试。")
@@ -319,6 +362,7 @@ class MainActivity : AppCompatActivity() {
             appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("消息发送失败，请检查网络后重试。", wasDevelopment)))
             activeRequestIsDevelopment = false
         } else {
+            clearPendingAttachments()
             scheduleFirstServerResponseWatchdog(responseToken)
         }
     }
@@ -331,6 +375,8 @@ class MainActivity : AppCompatActivity() {
         pendingRequestPayload = null
         pendingReconnectForActiveWork = false
         reconnectAttempts = 0
+        clearPersistedActiveWork()
+        stopWorkingEvidenceForActiveConversation()
         currentEvidenceEntries.clear()
         setSendEnabled(true)
         if (wasDevelopment) {
@@ -340,14 +386,12 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews("当前回复已暂停，你可以继续输入新的消息。")
         }
         appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("你已暂停当前工作。", wasDevelopment)))
-        if (::wsClient.isInitialized) {
-            wsClient.disconnect()
-            binding.root.postDelayed({ wsClient.connect() }, 500)
-        }
+        startTaskWorkService(TaskWorkService.ACTION_PAUSE)
     }
 
     private fun handleActiveWorkDisconnected() {
         pendingReconnectForActiveWork = true
+        persistActiveWork()
         setSendEnabled(false)
         updateFirstConversationStatus("连接恢复中 · 回来后继续")
         if (activeRequestIsDevelopment) {
@@ -356,9 +400,7 @@ class MainActivity : AppCompatActivity() {
         }
         appendMessage(ChatMessage("ai-cli-log", "连接暂时断开 · 正在自动恢复任务"))
 
-        if (appInForeground) {
-            scheduleReconnectForActiveWork()
-        }
+        scheduleReconnectForActiveWork()
     }
 
     private fun scheduleReconnectForActiveWork() {
@@ -366,8 +408,8 @@ class MainActivity : AppCompatActivity() {
         reconnectAttempts += 1
         val delay = (800L * reconnectAttempts).coerceAtMost(5_000L)
         binding.root.postDelayed({
-            if (!waitingForReply || !pendingReconnectForActiveWork || wsClient.isConnected()) return@postDelayed
-            wsClient.connect()
+            if (!waitingForReply || !pendingReconnectForActiveWork || backendConnected) return@postDelayed
+            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)
         }, delay)
     }
 
@@ -377,6 +419,8 @@ class MainActivity : AppCompatActivity() {
             pendingReconnectForActiveWork = false
             waitingForReply = false
             activeRequestIsDevelopment = false
+            stopWorkingEvidenceForActiveConversation()
+            clearPersistedActiveWork()
             setSendEnabled(true)
             appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("连接已恢复，但没有找到可继续的请求。请重新发送一次。")))
             return
@@ -391,8 +435,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val responseToken = ++serverResponseToken
-        if (!wsClient.send(payload)) {
+        if (!startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)) {
             pendingReconnectForActiveWork = true
+            persistActiveWork()
             scheduleReconnectForActiveWork()
         } else {
             scheduleFirstServerResponseWatchdog(responseToken)
@@ -414,12 +459,13 @@ class MainActivity : AppCompatActivity() {
         root.setPadding(0, 0, 0, 0)
         root.setBackgroundColor(Color.parseColor("#1E1E1E"))
 
-        val inputBar = LinearLayout(this).apply {
+        inputBarContainer = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(62)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(62)
+            gravity = Gravity.BOTTOM
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(4), dp(7), dp(4), dp(7))
         }
@@ -435,7 +481,7 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { toggleVoiceMode() }
         }
 
-        val center = FrameLayout(this).apply {
+        inputCenterContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 dp(40),
@@ -445,6 +491,7 @@ class MainActivity : AppCompatActivity() {
                 marginEnd = dp(4)
             }
             setBackgroundResource(R.drawable.bg_input_pill)
+            minimumHeight = dp(40)
         }
 
         inputEdit.apply {
@@ -456,8 +503,15 @@ class MainActivity : AppCompatActivity() {
             }
             background = ColorDrawable(Color.TRANSPARENT)
             hint = "描述你想开发的 App 功能"
-            maxLines = 2
-            setPadding(dp(14), dp(6), dp(8), dp(6))
+            minLines = 1
+            maxLines = 4
+            setSingleLine(false)
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            isVerticalScrollBarEnabled = false
+            includeFontPadding = true
+            setHorizontallyScrolling(false)
+            setPadding(dp(14), dp(8), dp(8), dp(8))
             textSize = 14f
         }
 
@@ -496,9 +550,9 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { showModelDialog() }
         }
 
-        center.addView(inputEdit)
-        center.addView(voiceHoldButton)
-        center.addView(modelButton)
+        inputCenterContainer.addView(inputEdit)
+        inputCenterContainer.addView(voiceHoldButton)
+        inputCenterContainer.addView(modelButton)
 
         val rightControls = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
@@ -521,20 +575,21 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { sendMessage() }
         }
 
-        inputBar.addView(inputModeButton)
-        inputBar.addView(center)
+        inputBarContainer.addView(inputModeButton)
+        inputBarContainer.addView(inputCenterContainer)
         rightControls.addView(attachmentButton)
         rightControls.addView(sendButton)
-        inputBar.addView(rightControls)
+        inputBarContainer.addView(rightControls)
 
         attachmentPanel = buildAttachmentPanel()
-        root.addView(inputBar)
+        root.addView(inputBarContainer)
         root.addView(attachmentPanel)
 
         inputEdit.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 updateSendButtonVisual()
+                updateAdaptiveInputHeight()
             }
             override fun afterTextChanged(s: Editable?) = Unit
         })
@@ -548,6 +603,68 @@ class MainActivity : AppCompatActivity() {
         binding.stageHintText.setOnClickListener { collapseAttachmentPanel() }
         applyVoiceMode()
         updateSendButtonVisual()
+        updateAdaptiveInputHeight()
+    }
+
+    private fun updateAdaptiveInputHeight() {
+        if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return
+        val inputEdit = binding.inputEdit
+        inputEdit.post {
+            if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return@post
+            val minHeight = dp(40)
+            val maxHeight = dp(122)
+            val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
+            val desiredHeight = if (voiceMode) {
+                minHeight
+            } else {
+                val multilineTopGuard = if (rawLineCount > 1) dp(8) else 0
+                (rawLineCount.coerceAtMost(4) * inputEdit.lineHeight +
+                    inputEdit.paddingTop +
+                    inputEdit.paddingBottom +
+                    multilineTopGuard).coerceIn(minHeight, maxHeight)
+            }
+
+            val centerParams = inputCenterContainer.layoutParams as LinearLayout.LayoutParams
+            if (centerParams.height != desiredHeight) {
+                centerParams.height = desiredHeight
+                inputCenterContainer.layoutParams = centerParams
+            }
+
+            val multiline = !voiceMode && desiredHeight > minHeight
+            inputEdit.gravity = (if (multiline) Gravity.TOP else Gravity.CENTER_VERTICAL) or Gravity.START
+            inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > 4
+        }
+    }
+
+    private fun setupAttachmentLaunchers() {
+        cameraAttachmentLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri
+            val name = pendingCameraName
+            pendingCameraUri = null
+            pendingCameraName = null
+            if (success && uri != null) {
+                attachPickedFile("相机照片", uri, name)
+            } else {
+                Toast.makeText(this, "已取消拍摄", Toast.LENGTH_SHORT).show()
+            }
+        }
+        photoAttachmentLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) {
+                attachPickedFile("相册图片", uri)
+            } else {
+                Toast.makeText(this, "已取消选择相册", Toast.LENGTH_SHORT).show()
+            }
+        }
+        documentAttachmentLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                runCatching {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                attachPickedFile("文档", uri)
+            } else {
+                Toast.makeText(this, "已取消选择文档", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun buildAttachmentPanel(): LinearLayout {
@@ -556,24 +673,20 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(104)
             )
-            setBackgroundColor(Color.parseColor("#222222"))
+            background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.CENTER
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setPadding(dp(18), dp(8), dp(18), dp(8))
             visibility = View.GONE
 
-            addView(createAttachmentAction("相机", R.drawable.ic_attach_camera) {
-                Toast.makeText(this@MainActivity, "相机入口准备中", Toast.LENGTH_SHORT).show()
+            addView(createAttachmentAction("相机", R.drawable.ic_attach_camera, addEndMargin = true) {
+                openCameraAttachment()
             })
-            addView(createAttachmentAction("相册", R.drawable.ic_attach_photos) {
-                Toast.makeText(this@MainActivity, "相册入口准备中", Toast.LENGTH_SHORT).show()
+            addView(createAttachmentAction("相册", R.drawable.ic_attach_photos, addEndMargin = true) {
+                openPhotoAttachment()
             })
-            addView(createAttachmentAction("文档", R.drawable.ic_attach_files) {
-                Toast.makeText(this@MainActivity, "文档入口准备中", Toast.LENGTH_SHORT).show()
-            })
-            addView(createAttachmentAction("功能", R.drawable.ic_attach_function, false) {
-                collapseAttachmentPanel()
-                showChatActionPopup(binding.moreButton)
+            addView(createAttachmentAction("文档", R.drawable.ic_attach_files, addEndMargin = false) {
+                openDocumentAttachment()
             })
         }
     }
@@ -586,7 +699,7 @@ class MainActivity : AppCompatActivity() {
     ): View {
         return LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                if (addEndMargin) marginEnd = dp(6)
+                if (addEndMargin) marginEnd = dp(8)
             }
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
@@ -599,7 +712,7 @@ class MainActivity : AppCompatActivity() {
             foreground = selectableForeground()
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(26), dp(26))
+                layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
                 setImageResource(iconRes)
             })
             addView(TextView(context).apply {
@@ -621,6 +734,164 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openCameraAttachment() {
+        if (activeConversation().ended) return
+        val attachmentDir = File(cacheDir, "attachments").apply { mkdirs() }
+        val fileName = "camera_${System.currentTimeMillis()}.jpg"
+        val file = File(attachmentDir, fileName)
+        val uri = FileProvider.getUriForFile(this, "com.elon.app.fileprovider", file)
+        pendingCameraUri = uri
+        pendingCameraName = fileName
+        runCatching {
+            cameraAttachmentLauncher.launch(uri)
+        }.onFailure {
+            pendingCameraUri = null
+            pendingCameraName = null
+            Toast.makeText(this, "无法打开相机", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openPhotoAttachment() {
+        if (activeConversation().ended) return
+        runCatching {
+            photoAttachmentLauncher.launch("image/*")
+        }.onFailure {
+            Toast.makeText(this, "无法打开相册", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openDocumentAttachment() {
+        if (activeConversation().ended) return
+        runCatching {
+            documentAttachmentLauncher.launch(arrayOf("*/*"))
+        }.onFailure {
+            Toast.makeText(this, "无法打开文档选择器", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
+        val name = fallbackName ?: displayNameForUri(uri) ?: uri.lastPathSegment ?: kind
+        val attachment = runCatching {
+            copyAttachmentToCache(kind, uri, name)
+        }.onFailure {
+            Toast.makeText(this, "附件读取失败，请重新选择", Toast.LENGTH_SHORT).show()
+        }.getOrNull() ?: return
+
+        pendingAttachments.add(attachment)
+        appendAttachmentLabel(kind, attachment.displayName)
+        Toast.makeText(this, "已添加${kind}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun displayNameForUri(uri: Uri): String? {
+        return runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+            }
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun copyAttachmentToCache(kind: String, uri: Uri, displayName: String): PendingAttachment {
+        val mimeType = contentResolver.getType(uri) ?: guessMimeType(displayName)
+        val extension = extensionForAttachment(displayName, mimeType)
+        val fileName = "attachment_${System.currentTimeMillis()}_${pendingAttachments.size + 1}.$extension"
+        val attachmentDir = File(cacheDir, "pending_attachments").apply { mkdirs() }
+        val target = File(attachmentDir, fileName)
+        var total = 0L
+        contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Cannot open selected file" }
+            target.outputStream().use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    total += read
+                    if (total > MAX_ATTACHMENT_BYTES) {
+                        target.delete()
+                        throw IllegalArgumentException("Attachment too large")
+                    }
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+        return PendingAttachment(
+            kind = kind,
+            displayName = displayName,
+            fileName = fileName,
+            mimeType = mimeType,
+            file = target
+        )
+    }
+
+    private fun appendAttachmentLabel(kind: String, name: String) {
+        if (voiceMode) {
+            voiceMode = false
+            applyVoiceMode()
+        }
+        val current = binding.inputEdit.text.toString()
+        val prefix = if (current.isBlank()) "" else "\n"
+        binding.inputEdit.append("${prefix}[$kind] $name")
+        binding.inputEdit.setSelection(binding.inputEdit.text.length)
+        updateSendButtonVisual()
+    }
+
+    private fun attachmentPayloadJsonOrNull(): com.google.gson.JsonArray? {
+        val array = com.google.gson.JsonArray()
+        for (attachment in pendingAttachments) {
+            val bytes = runCatching { attachment.file.readBytes() }.getOrElse {
+                Toast.makeText(this, "附件已失效，请重新选择：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+                return null
+            }
+            if (bytes.size > MAX_ATTACHMENT_BYTES) {
+                Toast.makeText(this, "附件过大，请重新选择较小文件：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+                return null
+            }
+            array.add(com.google.gson.JsonObject().apply {
+                addProperty("kind", attachment.kind)
+                addProperty("display_name", attachment.displayName)
+                addProperty("file_name", attachment.fileName)
+                addProperty("mime_type", attachment.mimeType)
+                addProperty("data_base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
+            })
+        }
+        return array
+    }
+
+    private fun clearPendingAttachments() {
+        pendingAttachments.forEach { attachment ->
+            runCatching { attachment.file.delete() }
+        }
+        pendingAttachments.clear()
+    }
+
+    private fun guessMimeType(name: String): String {
+        return when (name.substringAfterLast('.', "").lowercase(Locale.CHINA)) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            "pdf" -> "application/pdf"
+            "txt" -> "text/plain"
+            else -> "application/octet-stream"
+        }
+    }
+
+    private fun extensionForAttachment(name: String, mimeType: String): String {
+        val fromName = name.substringAfterLast('.', "").lowercase(Locale.CHINA)
+            .filter { it.isLetterOrDigit() }
+            .take(8)
+        if (fromName.isNotBlank()) return fromName
+        return when (mimeType) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            "application/pdf" -> "pdf"
+            "text/plain" -> "txt"
+            else -> "bin"
+        }
+    }
+
     private fun handleSendOrAttachment() {
         if (!voiceMode && binding.inputEdit.text.toString().trim().isNotEmpty()) {
             sendMessage()
@@ -636,14 +907,52 @@ class MainActivity : AppCompatActivity() {
     private fun expandAttachmentPanel() {
         if (activeConversation().ended) return
         hideKeyboard()
+        if (attachmentPanelOpen) return
         attachmentPanelOpen = true
         attachmentPanel.visibility = View.VISIBLE
+        animateAttachmentButtonIcon(expanded = true)
     }
 
     private fun collapseAttachmentPanel() {
         if (!::attachmentPanel.isInitialized) return
+        val wasOpen = attachmentPanelOpen || attachmentPanel.visibility == View.VISIBLE
         attachmentPanelOpen = false
         attachmentPanel.visibility = View.GONE
+        if (wasOpen) {
+            animateAttachmentButtonIcon(expanded = false)
+        } else {
+            updateAttachmentButtonIcon(expanded = false)
+        }
+    }
+
+    private fun animateAttachmentButtonIcon(expanded: Boolean) {
+        if (!::attachmentButton.isInitialized) return
+        val token = ++attachmentIconAnimationToken
+        val targetAlpha = if (activeConversation().ended) 0.55f else 1f
+        attachmentButton.animate().cancel()
+        attachmentButton.rotation = 0f
+        attachmentButton.scaleX = 1f
+        attachmentButton.scaleY = 1f
+        attachmentButton.animate()
+            .alpha(0.55f)
+            .setDuration(70L)
+            .withEndAction {
+                if (token != attachmentIconAnimationToken) return@withEndAction
+                updateAttachmentButtonIcon(expanded)
+                attachmentButton.animate()
+                    .alpha(targetAlpha)
+                    .setDuration(90L)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun updateAttachmentButtonIcon(expanded: Boolean) {
+        if (!::attachmentButton.isInitialized) return
+        attachmentButton.setImageResource(
+            if (expanded) R.drawable.ic_input_chevron_down_circle else R.drawable.ic_add_circle_simple
+        )
+        attachmentButton.contentDescription = if (expanded) "收起更多输入功能" else "展开更多输入功能"
     }
 
     private fun toggleVoiceMode() {
@@ -667,6 +976,7 @@ class MainActivity : AppCompatActivity() {
             voiceHoldButton.visibility = View.GONE
         }
         updateSendButtonVisual()
+        updateAdaptiveInputHeight()
     }
 
     private fun updateSendButtonVisual() {
@@ -804,6 +1114,9 @@ class MainActivity : AppCompatActivity() {
                 binding.tabProfile -> "我的"
                 else -> compactProjectTitle()
             }
+            if (tab != binding.tabChat) {
+                renderConversationList()
+            }
             if (tab == binding.tabProject) {
                 renderProjectList()
             } else if (tab == binding.tabChat) {
@@ -867,12 +1180,13 @@ class MainActivity : AppCompatActivity() {
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.moreButton.visibility = View.VISIBLE
+        renderConversationList()
         binding.topTitleText.text = activeConversation().title
         binding.topTitleText.setOnLongClickListener {
             showConversationActions(activeConversationIndex)
             true
         }
-        setSendEnabled(wsClient.isConnected() && !waitingForReply)
+        setSendEnabled(backendConnected && !waitingForReply)
     }
 
     private fun showCreateConversationDialog() {
@@ -1066,6 +1380,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun restoreCachedModelSelection() {
+        val label = cachedModelLabel() ?: return
+        selectedAgentName = cachedModelAgentName()
+        currentModelLabel = label
+        updateModelButton()
+    }
+
+    private fun cacheModelSelection(agentName: String?, label: String) {
+        prefs.edit().apply {
+            if (agentName.isNullOrBlank()) remove(PREF_SELECTED_AGENT)
+            else putString(PREF_SELECTED_AGENT, agentName)
+            putString(PREF_SELECTED_MODEL_LABEL, label)
+        }.apply()
+    }
+
+    private fun cachedModelAgentName(): String? {
+        return prefs.getString(PREF_SELECTED_AGENT, null)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" }
+    }
+
+    private fun cachedModelLabel(): String? {
+        return prefs.getString(PREF_SELECTED_MODEL_LABEL, null)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" }
+    }
+
+    private fun jsonStringOrNull(json: JSONObject, name: String): String? {
+        if (!json.has(name) || json.isNull(name)) return null
+        return json.optString(name, "")
+            .trim()
+            .takeIf { it.isNotBlank() && it != "null" }
+    }
+
     private fun loadModelOptions(afterLoad: (() -> Unit)? = null) {
         Thread {
             try {
@@ -1094,19 +1442,31 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                val useAgent = config.optString("use_agent", "").ifBlank { null }
-                val customModel = config.optString("model", "")
-                val customBase = config.optString("api_base", "")
+                val serverUseAgent = jsonStringOrNull(config, "use_agent")
+                val customModel = jsonStringOrNull(config, "model").orEmpty()
+                val customBase = jsonStringOrNull(config, "api_base").orEmpty()
+                val cachedAgent = cachedModelAgentName()
+                val effectiveUseAgent = serverUseAgent ?: cachedAgent?.takeIf { cached ->
+                    options.any { it.agentName == cached }
+                }
+                val hasCustomConfig = customModel.isNotBlank() || customBase.isNotBlank()
                 val label = when {
-                    customModel.isNotBlank() || customBase.isNotBlank() -> "自定义模型"
-                    useAgent != null -> options.firstOrNull { it.agentName == useAgent }?.label ?: useAgent
+                    hasCustomConfig -> "自定义模型"
+                    effectiveUseAgent != null -> options.firstOrNull { it.agentName == effectiveUseAgent }?.label ?: effectiveUseAgent
                     else -> "服务器默认"
                 }
+                val shouldSyncCache = serverUseAgent != null ||
+                    hasCustomConfig ||
+                    cachedAgent == null ||
+                    effectiveUseAgent == null
 
                 runOnUiThread {
                     modelOptions = options
-                    selectedAgentName = useAgent
+                    selectedAgentName = effectiveUseAgent
                     currentModelLabel = label
+                    if (shouldSyncCache) {
+                        cacheModelSelection(effectiveUseAgent, label)
+                    }
                     updateModelButton()
                     afterLoad?.invoke()
                 }
@@ -1166,6 +1526,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     selectedAgentName = option.agentName
                     currentModelLabel = option.label
+                    cacheModelSelection(option.agentName, option.label)
                     updateModelButton()
                     Toast.makeText(this, "已切换模型: ${option.label}", Toast.LENGTH_SHORT).show()
                 }
@@ -1201,7 +1562,7 @@ class MainActivity : AppCompatActivity() {
     private fun openConversation(index: Int) {
         if (conversations.isEmpty()) conversations.add(createDefaultConversation())
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
-        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork)
+        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
         binding.chatList.adapter = chatAdapter
         showChat()
         if (chatAdapter.itemCount > 0) {
@@ -1298,12 +1659,270 @@ class MainActivity : AppCompatActivity() {
             .apply()
     }
 
+    private fun persistActiveWork() {
+        val payload = pendingRequestPayload
+        if (!waitingForReply || payload.isNullOrBlank()) {
+            clearPersistedActiveWork()
+            return
+        }
+        prefs.edit()
+            .putString(PREF_PENDING_WORK_PAYLOAD, payload)
+            .putBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, activeRequestIsDevelopment)
+            .putLong(PREF_PENDING_WORK_TIME, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun clearPersistedActiveWork() {
+        prefs.edit()
+            .remove(PREF_PENDING_WORK_PAYLOAD)
+            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
+            .remove(PREF_PENDING_WORK_TIME)
+            .apply()
+    }
+
+    private fun restorePendingActiveWork() {
+        val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
+            ?: return
+        val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
+        val tooOld = savedAt <= 0L || System.currentTimeMillis() - savedAt > PENDING_WORK_TTL_MS
+        if (tooOld) {
+            clearPersistedActiveWork()
+            return
+        }
+
+        waitingForReply = true
+        activeRequestIsDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true)
+        pendingRequestPayload = payload
+        pendingReconnectForActiveWork = true
+        reconnectAttempts = 0
+        setSendEnabled(false)
+        if (activeRequestIsDevelopment) {
+            updateStage("后台继续", "任务仍在服务器继续处理，连接恢复后会同步最新进度。")
+        } else {
+            updateProjectViews("上一条回复仍在处理，连接恢复后会同步结果。")
+        }
+    }
+
+    private fun registerTaskWorkReceiver() {
+        if (taskWorkReceiverRegistered) return
+        val filter = IntentFilter().apply {
+            addAction(TaskWorkService.ACTION_EVENT)
+            addAction(TaskWorkService.ACTION_STATE)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            taskWorkReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        taskWorkReceiverRegistered = true
+    }
+
+    private fun handleTaskWorkEvent(intent: Intent) {
+        when (intent.action) {
+            TaskWorkService.ACTION_EVENT -> {
+                backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
+                when (intent.getStringExtra(TaskWorkService.EXTRA_KIND)) {
+                    "connected" -> {
+                        reconnectAttempts = 0
+                        updateFirstConversationStatus("已连接 · 点击进入开发会话")
+                        if (waitingForReply && pendingReconnectForActiveWork) {
+                            pendingReconnectForActiveWork = false
+                            recordEvidence("connection", "连接已恢复，后台任务继续运行")
+                            appendMessage(ChatMessage("ai-cli-log", "连接已恢复 · 后台任务继续运行"))
+                        }
+                        if (!waitingForReply) setSendEnabled(true)
+                    }
+                    "disconnected" -> {
+                        backendConnected = false
+                        if (waitingForReply) {
+                            if (!pendingReconnectForActiveWork) handleActiveWorkDisconnected()
+                        } else {
+                            updateFirstConversationStatus("未连接 · 点击重试")
+                            setSendEnabled(true)
+                        }
+                    }
+                    "message" -> {
+                        intent.getStringExtra(TaskWorkService.EXTRA_RAW_MESSAGE)?.let { raw ->
+                            appendMessage(raw)
+                        }
+                    }
+                    "paused" -> {
+                        backendConnected = false
+                        setSendEnabled(true)
+                    }
+                }
+            }
+            TaskWorkService.ACTION_STATE -> {
+                backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
+                val serviceWaiting = intent.getBooleanExtra(TaskWorkService.EXTRA_WAITING, waitingForReply)
+                if (!serviceWaiting && !waitingForReply) {
+                    setSendEnabled(backendConnected)
+                }
+            }
+        }
+    }
+
+    private fun startTaskWorkService(
+        action: String,
+        payload: String? = null,
+        isDevelopment: Boolean = activeRequestIsDevelopment
+    ): Boolean {
+        val intent = Intent(this, TaskWorkService::class.java).apply {
+            this.action = action
+            payload?.let { putExtra(TaskWorkService.EXTRA_PAYLOAD, it) }
+            putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
+        }
+        return runCatching {
+            if (action == TaskWorkService.ACTION_START_WORK || action == TaskWorkService.ACTION_RESUME_PENDING) {
+                ContextCompat.startForegroundService(this, intent)
+            } else {
+                startService(intent)
+            }
+        }.isSuccess
+    }
+
+    private fun setTaskAppForeground(foreground: Boolean) {
+        prefs.edit().putBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, foreground).apply()
+    }
+
+    private fun drainQueuedTaskEvents() {
+        val queued = prefs.getString(TaskWorkService.PREF_QUEUED_TASK_EVENTS, null)?.takeIf { it.isNotBlank() }
+            ?: return
+        prefs.edit().remove(TaskWorkService.PREF_QUEUED_TASK_EVENTS).apply()
+        runCatching {
+            val array = JSONArray(queued)
+            for (index in 0 until array.length()) {
+                array.optString(index).takeIf { it.isNotBlank() }?.let { appendMessage(it) }
+            }
+        }
+    }
+
+    private fun setupTaskCompletionAlerts() {
+        createTaskCompletionChannel()
+        requestTaskNotificationPermissionIfNeeded()
+    }
+
+    private fun createTaskCompletionChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val channel = NotificationChannel(
+            TASK_COMPLETE_CHANNEL_ID,
+            "任务完成提醒",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "后台任务完成后显示桌面角标"
+            setShowBadge(true)
+        }
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+    }
+
+    private fun requestTaskNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        if (prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, false)) return
+        prefs.edit().putBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, true).apply()
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            notificationPermissionRequest
+        )
+    }
+
+    private fun notifyBackgroundTaskCompleted(wasDevelopment: Boolean, apkUrl: String?) {
+        val count = completedTaskBadgeCount() + 1
+        prefs.edit().putInt(PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
+        updateLauncherBadgeCount(count)
+        showTaskCompletedNotification(count, wasDevelopment, apkUrl)
+    }
+
+    private fun completedTaskBadgeCount(): Int {
+        return prefs.getInt(PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0)
+    }
+
+    private fun clearCompletedTaskBadge() {
+        prefs.edit().putInt(PREF_COMPLETED_TASK_BADGE_COUNT, 0).apply()
+        NotificationManagerCompat.from(this).cancel(TASK_COMPLETE_NOTIFICATION_ID)
+        updateLauncherBadgeCount(0)
+    }
+
+    private fun updateLauncherBadgeCount(count: Int) {
+        updateHuaweiLauncherBadgeCount(count)
+    }
+
+    private fun shouldNotifyTaskCompletion(): Boolean {
+        return !appInForeground || !hasWindowFocus()
+    }
+
+    private fun updateHuaweiLauncherBadgeCount(count: Int) {
+        val badge = count.coerceAtLeast(0)
+        val payload = Bundle().apply {
+            putString("package", packageName)
+            putString("class", MainActivity::class.java.name)
+            putInt("badgenumber", badge)
+        }
+        listOf(
+            "content://com.huawei.android.launcher.settings/badge/",
+            "content://com.hihonor.android.launcher.settings/badge/"
+        ).forEach { badgeUri ->
+            runCatching {
+                contentResolver.call(Uri.parse(badgeUri), "change_badge", null, payload)
+            }
+        }
+    }
+
+    private fun showTaskCompletedNotification(count: Int, wasDevelopment: Boolean, apkUrl: String?) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val title = if (wasDevelopment) "开发任务已完成" else "任务已完成"
+        val text = if (apkUrl != null) {
+            "已有 $count 个任务完成，APK 可以下载测试。"
+        } else {
+            "已有 $count 个任务完成，点击查看结果。"
+        }
+        val notification = NotificationCompat.Builder(this, TASK_COMPLETE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_task_done)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setNumber(count)
+            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(this).notify(TASK_COMPLETE_NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun normalizeProject(project: AppProject) {
         if (project.conversations.isEmpty()) project.conversations.add(createDefaultConversation())
         project.conversations.forEach {
             if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
+            it.messages.forEach { message -> message.evidenceWorking = false }
             compactCliTranscriptMessages(it.messages)
             sanitizeExistingCliLogMessages(it.messages)
+            sanitizeExistingUserVisibleMessages(it.messages)
+            removeLeakedAndRoutineWorkflowMessages(it.messages)
             compactWorkflowStatusMessages(it.messages)
             closeStaleWorkflowMessages(it.messages)
         }
@@ -1359,7 +1978,7 @@ class MainActivity : AppCompatActivity() {
                     binding.topTitleText.text = conversation.title
                 }
             }
-            "ai", "ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped", "error" -> {
+            "ai", "ai-intent", "ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped", "error" -> {
                 if (!conversation.ended) {
                     conversation.subtitle = summarize(message.content, 30)
                     project.subtitle = summarize(message.content, 34)
@@ -1373,7 +1992,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderConversationList() {
         if (conversations.isEmpty()) return
-        if (binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE) {
+        val listVisible = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE
+        if (listVisible) {
             binding.topTitleText.text = compactProjectTitle()
         }
 
@@ -1382,13 +2002,14 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = first.subtitle
         binding.statusText.setTextColor(conversationSubtitleColor(first.subtitle))
         binding.conversationTimeText.text = timeFormatter.format(Date(first.updatedAt))
+        updateConversationRowShimmer(binding.conversationItem, listVisible && isConversationWorking(0), true)
 
         while (binding.conversationPage.childCount > 1) {
             binding.conversationPage.removeViewAt(1)
         }
         for (index in 1 until conversations.size) {
             binding.conversationPage.addView(createConversationDivider())
-            binding.conversationPage.addView(createConversationRow(index, conversations[index]))
+            binding.conversationPage.addView(createConversationRow(index, conversations[index], listVisible))
         }
     }
 
@@ -1584,7 +2205,7 @@ class MainActivity : AppCompatActivity() {
         renderProjectList()
     }
 
-    private fun createConversationRow(index: Int, conversation: AppConversation): View {
+    private fun createConversationRow(index: Int, conversation: AppConversation, listVisible: Boolean): View {
         val row = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -1653,7 +2274,77 @@ class MainActivity : AppCompatActivity() {
             setTextColor(Color.parseColor("#C4C4C4"))
             textSize = 12f
         })
+        updateConversationRowShimmer(row, listVisible && isConversationWorking(index), false)
         return row
+    }
+
+    private fun updateConversationRowShimmer(row: View, active: Boolean, homeRow: Boolean) {
+        if (active) {
+            startConversationRowShimmer(row, homeRow)
+        } else {
+            stopConversationRowShimmer(row, homeRow)
+        }
+    }
+
+    private fun startConversationRowShimmer(row: View, homeRow: Boolean) {
+        if (homeRow && conversationHomeRowAnimator?.isRunning == true) {
+            return
+        }
+        if (homeRow) {
+            conversationHomeRowAnimator?.cancel()
+        }
+
+        val baseColor = Color.parseColor("#242424")
+        val highlightColor = Color.parseColor("#303030")
+        row.setBackgroundColor(baseColor)
+
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1350L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            interpolator = LinearInterpolator()
+            addUpdateListener { valueAnimator ->
+                val fraction = valueAnimator.animatedFraction
+                val pulse = sin(Math.PI * fraction).toFloat()
+                row.setBackgroundColor(blendColor(baseColor, highlightColor, pulse))
+            }
+        }
+
+        if (homeRow) {
+            conversationHomeRowAnimator = animator
+        } else {
+            row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) = Unit
+                override fun onViewDetachedFromWindow(v: View) {
+                    animator.cancel()
+                }
+            })
+        }
+        animator.start()
+    }
+
+    private fun stopConversationRowShimmer(row: View, homeRow: Boolean) {
+        if (homeRow) {
+            conversationHomeRowAnimator?.cancel()
+            conversationHomeRowAnimator = null
+        }
+        row.setBackgroundColor(Color.parseColor("#242424"))
+    }
+
+    private fun blendColor(startColor: Int, endColor: Int, fraction: Float): Int {
+        val clamped = fraction.coerceIn(0f, 1f)
+        val alpha = (Color.alpha(startColor) + (Color.alpha(endColor) - Color.alpha(startColor)) * clamped).toInt()
+        val red = (Color.red(startColor) + (Color.red(endColor) - Color.red(startColor)) * clamped).toInt()
+        val green = (Color.green(startColor) + (Color.green(endColor) - Color.green(startColor)) * clamped).toInt()
+        val blue = (Color.blue(startColor) + (Color.blue(endColor) - Color.blue(startColor)) * clamped).toInt()
+        return Color.argb(alpha, red, green, blue)
+    }
+
+    private fun isConversationWorking(index: Int): Boolean {
+        return waitingForReply &&
+            index == activeConversationIndex &&
+            index in conversations.indices &&
+            !conversations[index].ended
     }
 
     private fun createConversationDivider(): View {
@@ -1877,7 +2568,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createPopupArrowView(): View {
+    private fun createPopupArrowView(pointsUp: Boolean = true): View {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#3D3D3D")
             style = Paint.Style.FILL
@@ -1886,9 +2577,15 @@ class MainActivity : AppCompatActivity() {
             override fun onDraw(canvas: Canvas) {
                 super.onDraw(canvas)
                 val path = Path().apply {
-                    moveTo(width / 2f, 0f)
-                    lineTo(width.toFloat(), height.toFloat())
-                    lineTo(0f, height.toFloat())
+                    if (pointsUp) {
+                        moveTo(width / 2f, 0f)
+                        lineTo(width.toFloat(), height.toFloat())
+                        lineTo(0f, height.toFloat())
+                    } else {
+                        moveTo(0f, 0f)
+                        lineTo(width.toFloat(), 0f)
+                        lineTo(width / 2f, height.toFloat())
+                    }
                     close()
                 }
                 canvas.drawPath(path, paint)
@@ -1929,6 +2626,179 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
+    private fun showMessageActions(anchor: View, message: ChatMessage) {
+        val text = shareableMessageText(message)
+        if (text.isBlank()) return
+        showMessageActionPopup(anchor, message, text)
+    }
+
+    private fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
+        actionPopup?.dismiss()
+
+        val actions = listOf(
+            TopAction("复制", R.drawable.ic_msg_copy) { copyMessageText(text) },
+            TopAction("转发", R.drawable.ic_msg_forward) { forwardMessageText(text) },
+            TopAction("收藏", R.drawable.ic_msg_favorite) { toastMessageAction("已收藏") },
+            TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) },
+            TopAction("多选", R.drawable.ic_msg_multi) { toastMessageAction("多选准备中") },
+            TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) },
+            TopAction("提醒", R.drawable.ic_msg_remind) { toastMessageAction("提醒准备中") },
+            TopAction("搜一搜", R.drawable.ic_msg_search) { searchMessageText(text) },
+            TopAction("从当前听", R.drawable.ic_msg_listen) { toastMessageAction("从当前听准备中") }
+        )
+
+        val popupWidth = minOf(resources.displayMetrics.widthPixels - dp(24), dp(282))
+        val arrowHeight = dp(8)
+        val panelHeight = dp(132)
+        val totalHeight = panelHeight + arrowHeight
+        val root = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
+            alpha = 0f
+            scaleX = 0.96f
+            scaleY = 0.96f
+        }
+
+        val panel = GridLayout(this).apply {
+            columnCount = 5
+            rowCount = 2
+            background = GradientDrawable().apply {
+                cornerRadius = dp(4).toFloat()
+                setColor(Color.parseColor("#3D3D3D"))
+            }
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        root.addView(panel, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            panelHeight
+        ))
+
+        actions.forEach { action ->
+            panel.addView(createMessageActionCell(action), GridLayout.LayoutParams().apply {
+                width = (popupWidth - dp(20)) / 5
+                height = dp(58)
+            })
+        }
+
+        val anchorLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        val anchorCenterX = anchorLocation[0] + anchor.width / 2
+        val aboveY = anchorLocation[1] - totalHeight - dp(8)
+        val showAbove = aboveY > dp(76)
+        val popupX = (anchorCenterX - popupWidth / 2)
+            .coerceIn(dp(12), resources.displayMetrics.widthPixels - popupWidth - dp(12))
+        val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
+        val arrowX = (anchorCenterX - popupX - dp(9)).coerceIn(dp(18), popupWidth - dp(36))
+
+        root.addView(createPopupArrowView(pointsUp = !showAbove), FrameLayout.LayoutParams(dp(18), arrowHeight).apply {
+            gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
+            leftMargin = arrowX
+        })
+        if (!showAbove) {
+            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
+        }
+
+        actionPopup = PopupWindow(
+            root,
+            popupWidth,
+            totalHeight,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            elevation = dp(8).toFloat()
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
+        }
+        root.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(120L)
+            .start()
+    }
+
+    private fun createMessageActionCell(action: TopAction): View {
+        return LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.VERTICAL
+            isClickable = true
+            foreground = selectableForeground()
+
+            addView(ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
+                setImageResource(action.iconRes)
+            })
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(4)
+                }
+                includeFontPadding = false
+                text = action.title
+                setTextColor(Color.parseColor("#EAEAEA"))
+                textSize = 13f
+            })
+            setOnClickListener {
+                actionPopup?.dismiss()
+                action.action()
+            }
+        }
+    }
+
+    private fun deleteMessage(message: ChatMessage) {
+        val index = activeConversation().messages.indexOf(message)
+        if (index < 0) return
+        activeConversation().messages.removeAt(index)
+        chatAdapter.notifyItemRemoved(index)
+        saveConversations()
+        renderConversationList()
+        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun quoteMessage(text: String) {
+        showChat()
+        binding.inputEdit.setText("> ${summarize(text, 40)}\n")
+        binding.inputEdit.setSelection(binding.inputEdit.text.length)
+    }
+
+    private fun searchMessageText(text: String) {
+        Toast.makeText(this, "搜一搜：${summarize(text, 12)}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun toastMessageAction(text: String) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun copyMessageText(text: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("一龙聊天内容", text))
+        Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun forwardMessageText(text: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(intent, "转发聊天内容"))
+    }
+
+    private fun shareableMessageText(message: ChatMessage): String {
+        return buildString {
+            append(message.content.trim())
+            val details = message.evidenceDetails?.trim().orEmpty()
+            if (details.isNotBlank()) {
+                append("\n\n")
+                message.evidenceTitle?.trim()?.takeIf { it.isNotBlank() }?.let {
+                    append(it)
+                    append('\n')
+                }
+                append(details)
+            }
+        }.trim()
+    }
+
     private fun jsonStringOrNull(json: com.google.gson.JsonObject, name: String): String? {
         val element = json.get(name) ?: return null
         if (element.isJsonNull) return null
@@ -1959,40 +2829,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun initialWorkflowMessage(isDevelopment: Boolean, requestText: String = ""): String {
-        return if (isDevelopment) {
-            if (looksLikeApkDeliveryRequest(requestText)) {
-                "检查 APK 产物中。"
-            } else {
-                "确认项目状态中。"
-            }
-        } else {
-            "正在整理回复。"
-        }
-    }
-
-    private fun initialNarrationMessage(requestText: String): String {
-        if (looksLikeApkDeliveryRequest(requestText)) {
-            return "我先检查当前项目有没有已经生成的 APK。\n\n如果有，我直接把下载地址给你；如果没有，我会继续打包，并告诉你是缺文件、编译失败，还是还在处理中。"
-        }
-
-        val lower = requestText.lowercase(Locale.CHINA)
-        val goal = when {
-            lower.contains("hello") || requestText.contains("欢迎") ->
-                "目标很清楚：做一个打开后显示指定文字的最小 Android APK。"
-            requestText.contains("图片") || requestText.contains("相册") ->
-                "我先把它当作图片类 Android App 来处理，重点看图片选择、保存和隐私保护这些核心路径。"
-            requestText.contains("简单") ->
-                "我会先按最小可运行 APK 来做，避免加太多不必要的功能。"
-            else ->
-                "我先把你的描述整理成一个 Android 开发任务，再看当前项目应该从哪里继续。"
-        }
-
-        return "$goal\n\n接下来我会按 Codex 这种节奏推进：先确认项目结构，再实现关键功能，最后编译 APK 并给出可下载结果。后台命令和 CLI 日志会折叠成灰色提示，不占用聊天正文。"
+    private fun initialWorkflowMessage(isDevelopment: Boolean): String {
+        return if (isDevelopment) "正在思考" else "正在整理回复。"
     }
 
     private fun workflowProgressMessage(content: String): String {
         val progress = userFacingProgress(content.ifBlank { "正在推进当前任务。" })
+        if (progress == "正在思考") return progress
         return "${progressStepLabel(progress)}：$progress"
     }
 
@@ -2003,7 +2846,7 @@ class MainActivity : AppCompatActivity() {
             content.startsWith("正在启动本地 CLI") ->
                 "开发助手已启动，正在处理你的需求。"
             content.startsWith("CLI 仍在运行") ->
-                "开发助手仍在运行，正在等待模型或编译结果。"
+                "正在思考"
             content.startsWith("CLI 已结束") ->
                 "开发处理已结束，正在检查 APK 文件。"
             content.startsWith("未找到 APK") ->
@@ -2020,36 +2863,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toolCallWorkflowMessage(tool: String): String {
-        return "后台动作：${toolLabel(tool)}。${toolWorkflowDoing(tool)}"
-    }
-
-    private fun toolResultWorkflowMessage(tool: String): String {
-        return "已完成：${toolLabel(tool)}。正在判断下一步。"
-    }
-
     private fun finalReplyMessage(content: String, apkUrl: String?, imageUrl: String?, wasDevelopment: Boolean): String {
-        val main = cleanFinalReplyForUser(content, wasDevelopment, apkUrl).ifBlank {
-            if (wasDevelopment) "本轮开发任务已完成。" else "回复已完成。"
+        val cleanAsDevelopment = shouldCleanFinalAsDevelopment(content, wasDevelopment, apkUrl)
+        val main = cleanFinalReplyForUser(content, cleanAsDevelopment, apkUrl).ifBlank {
+            if (cleanAsDevelopment) "本轮开发任务已完成。" else "回复已完成。"
         }
         return buildString {
             append(main)
-            apkUrl?.let { append("\n\n下载新 APK：$it") }
+            if (wasDevelopment) apkUrl?.let { append("\n\n下载新 APK：$it") }
             imageUrl?.takeIf { !main.contains(it) }?.let { append("\n\n图片链接：$it") }
         }
+    }
+
+    private fun shouldCleanFinalAsDevelopment(content: String, wasDevelopment: Boolean, apkUrl: String?): Boolean {
+        if (wasDevelopment || apkUrl != null) return true
+        val lower = content.lowercase(Locale.CHINA)
+        val strongSignals = listOf(
+            "/root/workspaces/",
+            "build/android/",
+            "src/main/",
+            "androidmanifest",
+            "mainactivity.",
+            ".java:",
+            ".kt:",
+            ".xml:",
+            "gradle",
+            "assemble",
+            "apksigner",
+            "aapt dump",
+            "已处理：",
+            "改动：",
+            "验证情况：",
+            "apk 已生成"
+        )
+        return strongSignals.any { lower.contains(it) }
     }
 
     private fun cleanFinalReplyForUser(content: String, wasDevelopment: Boolean, apkUrl: String?): String {
         if (!wasDevelopment) return content.trim()
 
         val cleanedLines = content
+            .replace(Regex("\\[([^\\]]+)]\\s*\\(/root/workspaces/[^)]*\\)"), "$1")
+            .replace(Regex("\\s*\\(/root/workspaces/[^)]*\\)"), "")
+            .replace(Regex("/root/workspaces/\\S+"), "项目文件")
             .replace(Regex("\\[[^\\]]+\\.apk]\\([^)]*\\)"), "APK 已生成")
             .lineSequence()
-            .map { it.trimEnd() }
+            .map { sanitizeFinalReplyLine(it.trimEnd()) }
             .filterNot { line ->
                 val lower = line.lowercase(Locale.CHINA)
-                line.contains("/root/workspaces/") ||
+                    line.contains("/root/workspaces/") ||
                     line.contains("build/android/") ||
+                    isLeakedPlatformPromptLine(line) ||
+                    line.startsWith("用户可见：") ||
+                    line.startsWith("用户可见:") ||
                     lower.contains("apksigner") ||
                     lower.contains("aapt dump") ||
                     lower.contains("sha256") ||
@@ -2078,6 +2944,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         return result
+    }
+
+    private fun sanitizeFinalReplyLine(line: String): String {
+        return line
+            .replace("已处理：", "已完成：")
+            .replace(Regex("在\\s+[^\\s，。；：]+\\.(kt|java|xml)(:\\d+)?\\s*的"), "")
+            .replace(Regex("`([^`]+)`"), "$1")
+            .trimEnd()
     }
 
     private fun workflowStoppedMessage(reason: String, wasDevelopment: Boolean = activeRequestIsDevelopment): String {
@@ -2134,9 +3008,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun recordEvidence(kind: String, detail: String) {
         if (!activeRequestIsDevelopment) return
-        val clean = detail
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val clean = sanitizeEvidenceDetail(detail)
         if (clean.isBlank()) return
 
         currentEvidenceEntries.add(EvidenceEntry(kind, summarize(clean, 96)))
@@ -2149,10 +3021,24 @@ class MainActivity : AppCompatActivity() {
     private fun attachEvidenceToLatestAi() {
         if (currentEvidenceEntries.isEmpty()) return
         val messages = activeConversation().messages
-        val index = messages.indexOfLast { it.role == "ai" }
-        if (index < 0) return
+        val latestUserIndex = messages.indexOfLast { it.role == "user" }
+        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+            ?: return
 
-        applyEvidenceToMessage(messages[index], currentEvidenceEntries)
+        applyEvidenceToMessage(messages[index], currentEvidenceEntries, working = true)
+        chatAdapter.notifyMessageUpdated(index)
+        saveConversations()
+    }
+
+    private fun finalizeEvidenceForLatestAssistant() {
+        if (currentEvidenceEntries.isEmpty()) return
+        val messages = activeConversation().messages
+        val latestUserIndex = messages.indexOfLast { it.role == "user" }
+        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+            ?: return
+
+        applyEvidenceToMessage(messages[index], currentEvidenceEntries, working = false)
+        currentEvidenceEntries.clear()
         chatAdapter.notifyMessageUpdated(index)
         saveConversations()
     }
@@ -2160,15 +3046,29 @@ class MainActivity : AppCompatActivity() {
     private fun aiMessageWithCurrentEvidence(content: String): ChatMessage {
         val message = ChatMessage("ai", content)
         if (currentEvidenceEntries.isNotEmpty()) {
-            applyEvidenceToMessage(message, currentEvidenceEntries)
+            stopWorkingEvidenceForActiveConversation()
+            applyEvidenceToMessage(message, currentEvidenceEntries, working = false)
             currentEvidenceEntries.clear()
         }
         return message
     }
 
-    private fun applyEvidenceToMessage(message: ChatMessage, entries: List<EvidenceEntry>) {
+    private fun applyEvidenceToMessage(message: ChatMessage, entries: List<EvidenceEntry>, working: Boolean) {
         message.evidenceTitle = evidenceTitle(entries)
         message.evidenceDetails = evidenceDetails(entries)
+        message.evidenceWorking = working
+    }
+
+    private fun stopWorkingEvidenceForActiveConversation() {
+        var changed = false
+        activeConversation().messages.forEachIndexed { index, message ->
+            if (message.evidenceWorking) {
+                message.evidenceWorking = false
+                chatAdapter.notifyMessageUpdated(index)
+                changed = true
+            }
+        }
+        if (changed) saveConversations()
     }
 
     private fun evidenceTitle(entries: List<EvidenceEntry>): String {
@@ -2204,6 +3104,33 @@ class MainActivity : AppCompatActivity() {
             "result" -> "结果"
             else -> "进度"
         }
+    }
+
+    private fun sanitizeEvidenceDetail(detail: String): String {
+        val cleaned = detail
+            .replace(Regex("\\[([^\\]]+)]\\s*\\(/root/workspaces/[^)]*\\)"), "$1")
+            .replace(Regex("\\s*\\(/root/workspaces/[^)]*\\)"), "")
+            .replace(Regex("/root/workspaces/\\S+"), "项目文件")
+            .replace("用户可见：", "")
+            .replace("用户可见:", "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        if (cleaned.isBlank()) return ""
+        if (isLeakedPlatformPromptMessage(cleaned) || isTechnicalLeakMessage(cleaned)) return ""
+        val lower = cleaned.lowercase(Locale.CHINA)
+        val noisy = listOf(
+            "tokens used",
+            "feedback_tags",
+            "codex_analytics",
+            "original token count",
+            "reading additional input",
+            "openai codex v",
+            "session id:",
+            "auth_header"
+        )
+        if (noisy.any { lower.contains(it) }) return ""
+        return cleaned
     }
 
     private fun evidenceKindForCliCategory(category: String): String {
@@ -2251,8 +3178,10 @@ class MainActivity : AppCompatActivity() {
             else -> "开发实现"
         }
         updateStage(stage, hint)
-        maybeAppendNarrationForCliCategory(category)
-        recordEvidence(evidenceKindForCliCategory(category), line)
+        maybeAppendVisibleCliSignal(category, line)
+        if (category != "模型回复") {
+            recordEvidence(evidenceKindForCliCategory(category), line)
+        }
     }
 
     private fun foldedCliLogSummary(): String {
@@ -2367,6 +3296,69 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun removeLeakedAndRoutineWorkflowMessages(messages: MutableList<ChatMessage>) {
+        messages.removeAll { message ->
+            isLeakedPlatformPromptMessage(message.content) ||
+                isTechnicalLeakMessage(message.content) ||
+                (message.role in workflowHistoryStatusRoles && isRoutineWorkflowMessage(message.content))
+        }
+    }
+
+    private fun sanitizeExistingUserVisibleMessages(messages: MutableList<ChatMessage>) {
+        val roles = setOf("ai", "ai-intent")
+        messages.indices.forEach { index ->
+            val message = messages[index]
+            if (message.role !in roles) return@forEach
+            if (!shouldCleanFinalAsDevelopment(message.content, wasDevelopment = false, apkUrl = null)) return@forEach
+            val cleaned = cleanFinalReplyForUser(message.content, wasDevelopment = true, apkUrl = null)
+            messages[index] = if (cleaned.isBlank()) {
+                message.copy(content = "本轮开发任务已完成。")
+            } else {
+                message.copy(content = cleaned)
+            }
+        }
+    }
+
+    private fun isRoutineWorkflowMessage(content: String): Boolean {
+        val trimmed = content.trim()
+        return trimmed == "正在思考" ||
+            trimmed.startsWith("启动助手：") ||
+            trimmed.startsWith("准备项目：") ||
+            trimmed.startsWith("处理中：") ||
+            trimmed.startsWith("检查结果：开发处理已结束") ||
+            trimmed.contains("开发助手已启动，正在处理你的需求") ||
+            trimmed.contains("项目环境已准备好，正在进入开发流程") ||
+            trimmed.contains("开发助手仍在运行")
+    }
+
+    private fun isLeakedPlatformPromptMessage(content: String): Boolean {
+        return content
+            .lineSequence()
+            .map { it.trim() }
+            .any { isLeakedPlatformPromptLine(it) }
+    }
+
+    private fun isTechnicalLeakMessage(content: String): Boolean {
+        val lower = content.lowercase(Locale.CHINA)
+        return lower.contains("rmcp::") ||
+            lower.contains("worker quit with fatal") ||
+            lower.contains("http request failed") ||
+            lower.contains("client error:") ||
+            lower.contains("event.timestamp=") ||
+            lower.contains("mcp_server=")
+    }
+
+    private fun isLeakedPlatformPromptLine(line: String): Boolean {
+        return line.contains("你是「一龙」平台服务器上的本地 AI CLI 编程助手") ||
+            line.startsWith("当前 CLI") ||
+            line.startsWith("当前工作目录") ||
+            line.contains("用户隔离工作区") ||
+            line.contains("不要使用固定模板") ||
+            line.contains("不要提“CLI/后台/工作区”") ||
+            line.startsWith("请直接处理用户请求") ||
+            line.startsWith("用户请求：")
+    }
+
     private fun compactWorkflowStatusMessages(messages: MutableList<ChatMessage>) {
         if (messages.none { it.role in workflowHistoryStatusRoles }) return
 
@@ -2428,66 +3420,104 @@ class MainActivity : AppCompatActivity() {
         return "后台开发日志已收起$suffix · $friendly"
     }
 
-    private fun appendNarrationOnce(key: String, message: String) {
+    private fun maybeAppendVisibleCliSignal(category: String, line: String) {
         if (!activeRequestIsDevelopment) return
-        if (!emittedNarrationMilestones.add(key)) return
-        currentEvidenceEntries.clear()
-        appendMessage(ChatMessage("ai", message))
+        if (category != "模型回复") return
+        val signal = visibleCliSignal(category, line) ?: return
+        val (key, message) = signal
+        if (!emittedProgressSignals.add(key)) return
+        finalizeEvidenceForLatestAssistant()
+        visibleAssistantUpdateCount += 1
+        appendMessage(ChatMessage("ai-intent", message))
+        attachEvidenceToLatestAi()
     }
 
-    private fun maybeAppendNarrationForCliCategory(category: String) {
-        when (category) {
-            "执行命令", "模型回复" -> appendNarrationOnce(
-                "implementation",
-                "我已经进入实现阶段了。现在会根据项目里的真实文件继续处理，尽量只改和这次需求相关的部分，避免把无关代码弄乱。"
-            )
-            "编译打包" -> appendNarrationOnce(
-                "build",
-                "现在开始进入编译和 APK 检查阶段。这里看的不是聊天回复，而是服务器真实的打包结果；如果编译失败，我会先根据错误继续修。"
-            )
-            "环境提示" -> appendNarrationOnce(
-                "environment",
-                "后台发现了环境提示。我会先判断它是不是影响本次开发的真实问题；如果只是技术日志，会继续折叠起来。"
-            )
+    private fun visibleCliSignal(category: String, line: String): Pair<String, String>? {
+        val lower = line.lowercase(Locale.CHINA)
+        val clean = userSafeCliLine(line)
+        return when (category) {
+            "模型回复" -> {
+                val userVisible = extractUserVisibleCliMessage(clean) ?: return null
+                if (!shouldExposeAssistantCliLine(userVisible)) return null
+                "assistant:${userVisible.take(64)}" to userVisible
+            }
+            "编译打包" -> when {
+                lower.contains("build successful") ->
+                    "build_success" to "编译结果：APK 构建通过，正在查找可安装文件。"
+                lower.contains("build failed") ->
+                    "build_failed" to "编译结果：打包失败。我会先根据失败原因继续修复。"
+                lower.contains("exception") || lower.contains("error") || lower.contains("failed") ->
+                    "build_issue:${clean.take(48)}" to "编译遇到问题：$clean\n我会优先判断是代码、依赖还是构建配置导致。"
+                lower.contains("assemble") || lower.contains("gradle") || line.contains("APK") ->
+                    "build_started" to "正在进入 APK 编译检查。接下来会看构建是否能通过，以及失败点是否需要继续修。"
+                else -> null
+            }
+            "环境提示" -> when {
+                lower.contains("java") ->
+                    "env_java" to "环境检查：服务器 Java 环境可能影响打包，我会先确认它是不是本次失败原因。"
+                lower.contains("android sdk") || line.contains("Android SDK") ->
+                    "env_android_sdk" to "环境检查：Android SDK 配置可能影响 APK 构建，我会优先确认构建环境。"
+                lower.contains("gradle") ->
+                    "env_gradle" to "环境检查：Gradle 构建环境有提示，我会判断它是否需要修复。"
+                else -> null
+            }
+            else -> null
         }
     }
 
-    private fun maybeAppendNarrationForProgress(content: String, stage: String) {
-        when {
-            content.contains("CLI 工作区") || content.contains("项目环境已准备好") -> appendNarrationOnce(
-                "workspace",
-                "我已经连到服务器工作区。下一步会看项目里现有文件，而不是凭空猜；这样能避免重复建错项目或覆盖已有内容。"
-            )
-            stage == "开发实现" -> appendNarrationOnce(
-                "implementation",
-                "我已经进入实现阶段了。现在会根据项目里的真实文件继续处理，尽量只改和这次需求相关的部分，避免把无关代码弄乱。"
-            )
-            stage == "编译打包" -> appendNarrationOnce(
-                "build",
-                "现在开始进入编译和 APK 检查阶段。这里看的不是聊天回复，而是服务器真实的打包结果；如果编译失败，我会先根据错误继续修。"
-            )
-        }
+    private fun shouldExposeAssistantCliLine(line: String): Boolean {
+        if (visibleAssistantUpdateCount >= 3) return false
+        if (!shouldKeepCliSample(line)) return false
+        if (line.length !in 10..260) return false
+        val lower = line.lowercase(Locale.CHINA)
+        val finalLike = listOf(
+            "已完成",
+            "完成了",
+            "apk 已生成",
+            "下载链接",
+            "本轮",
+            "验证结果",
+            "改动："
+        )
+        if (finalLike.any { lower.contains(it) }) return false
+        val technical = listOf(
+            "```",
+            "/root/",
+            "/home/",
+            "http://",
+            "https://",
+            "build.gradle",
+            "androidmanifest",
+            ".kt",
+            ".xml",
+            "gradle",
+            "assemble",
+            "tokens used",
+            "不要使用固定模板",
+            "不要提",
+            "cli/后台/工作区",
+            "工作区"
+        )
+        return technical.none { lower.contains(it) }
     }
 
-    private fun maybeAppendNarrationForTool(tool: String) {
-        when (tool) {
-            "init_project" -> appendNarrationOnce(
-                "workspace",
-                "当前项目需要先准备 Android 工程。我会先建立最小可运行结构，再把你的功能放进去。"
-            )
-            "read_file", "list_dir" -> appendNarrationOnce(
-                "workspace",
-                "我正在查看项目结构和关键文件。先读清楚再改，比直接写代码更稳。"
-            )
-            "write_file" -> appendNarrationOnce(
-                "implementation",
-                "我已经开始写入代码了。接下来会检查这些改动能不能真的编译运行。"
-            )
-            "build_project" -> appendNarrationOnce(
-                "build",
-                "现在开始打包 APK。打包结果会决定这轮能不能交付下载链接。"
-            )
+    private fun extractUserVisibleCliMessage(line: String): String? {
+        val trimmed = line.trim()
+        val marker = when {
+            trimmed.startsWith("用户可见：") -> "用户可见："
+            trimmed.startsWith("用户可见:") -> "用户可见:"
+            else -> return null
         }
+        return trimmed.substringAfter(marker).trim().takeIf { it.isNotBlank() }
+    }
+
+    private fun userSafeCliLine(line: String): String {
+        return summarize(
+            line
+                .replace(Regex("\\s+"), " ")
+                .trim(),
+            120
+        )
     }
 
     private fun compactCliProjectEvents(events: MutableList<String>) {
@@ -2530,9 +3560,7 @@ class MainActivity : AppCompatActivity() {
                 recordEvidence("connection", "暂时没有收到服务器进度，正在自动恢复连接")
             }
             appendMessage(ChatMessage("ai-cli-log", "暂时没有收到服务器进度 · 正在自动恢复"))
-            if (!appInForeground) return@postDelayed
-            wsClient.disconnect()
-            binding.root.postDelayed({ wsClient.connect() }, 500)
+            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)
         }, 20_000L)
     }
 
@@ -2550,12 +3578,15 @@ class MainActivity : AppCompatActivity() {
                         return
                     }
                     handleProgress(content)
-                    ChatMessage("ai-progress", workflowProgressMessage(content))
+                    if (shouldShowProgressBubble(content)) {
+                        ChatMessage("ai-progress", workflowProgressMessage(content))
+                    } else {
+                        return
+                    }
                 }
                 "tool_call"   -> {
                     val tool = jsonStringOrNull(json, "tool") ?: "工具"
                     handleToolCall(tool)
-                    appendMessage(ChatMessage("ai-tool", toolCallWorkflowMessage(tool)))
                     return
                 }
                 "tool_result" -> {
@@ -2569,7 +3600,6 @@ class MainActivity : AppCompatActivity() {
                     recordEvidence(toolEvidenceKind(tool), evidence)
                     updateStage(currentStage, "${toolLabel(tool)} 已完成，正在判断下一步。")
                     addProjectEvent("工具完成：${toolLabel(tool)}")
-                    appendMessage(ChatMessage("ai-progress", toolResultWorkflowMessage(tool)))
                     return
                 }
                 "done"        -> {
@@ -2578,6 +3608,7 @@ class MainActivity : AppCompatActivity() {
                     pendingRequestPayload = null
                     pendingReconnectForActiveWork = false
                     reconnectAttempts = 0
+                    clearPersistedActiveWork()
                     val content = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl  = jsonStringOrNull(json, "apk_url")
                     val imageUrl = jsonStringOrNull(json, "image_url")
@@ -2590,8 +3621,11 @@ class MainActivity : AppCompatActivity() {
                         updateProjectViews("普通消息已回复，开发项目记录保持不变。")
                     }
                     activeRequestIsDevelopment = false
+                    stopWorkingEvidenceForActiveConversation()
                     resetFoldedCliLog()
-                    aiMessageWithCurrentEvidence(finalReplyMessage(content, apkUrl, imageUrl, wasDevelopment))
+                    val visibleApkUrl = if (wasDevelopment) apkUrl else null
+                    val finalMessage = aiMessageWithCurrentEvidence(finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment))
+                    finalMessage
                 }
                 "error" -> {
                     waitingForReply = false
@@ -2599,6 +3633,7 @@ class MainActivity : AppCompatActivity() {
                     pendingRequestPayload = null
                     pendingReconnectForActiveWork = false
                     reconnectAttempts = 0
+                    clearPersistedActiveWork()
                     val error = friendlyErrorMessage(jsonStringOrNull(json, "message") ?: "未知错误")
                     val wasDevelopment = activeRequestIsDevelopment
                     if (wasDevelopment) {
@@ -2607,6 +3642,7 @@ class MainActivity : AppCompatActivity() {
                         recordEvidence("result", "发生错误：$error")
                     }
                     activeRequestIsDevelopment = false
+                    stopWorkingEvidenceForActiveConversation()
                     currentEvidenceEntries.clear()
                     ChatMessage("error", error)
                 }
@@ -2619,58 +3655,91 @@ class MainActivity : AppCompatActivity() {
             pendingRequestPayload = null
             pendingReconnectForActiveWork = false
             reconnectAttempts = 0
+            clearPersistedActiveWork()
             if (activeRequestIsDevelopment) {
                 updateStage("需要处理", "服务端返回内容无法识别。")
                 addProjectEvent("服务端返回异常")
             }
             appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("服务端返回内容无法识别。")))
             activeRequestIsDevelopment = false
+            stopWorkingEvidenceForActiveConversation()
+            currentEvidenceEntries.clear()
             appendMessage(ChatMessage("error", "服务端返回异常，无法解析。"))
         }
     }
 
     private fun appendMessage(msg: ChatMessage) {
+        if (msg.role in workflowTerminalRoles) {
+            removeTransientWorkflowMessagesAfterLatestUser()
+        }
         chatAdapter.addMessage(msg)
         updateActiveConversationPreview(msg)
         binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
     }
 
+    private fun removeTransientWorkflowMessagesAfterLatestUser() {
+        val messages = activeConversation().messages
+        val latestUserIndex = messages.indexOfLast { it.role == "user" }
+        if (latestUserIndex < 0) return
+        var removed = false
+        for (index in messages.lastIndex downTo latestUserIndex + 1) {
+            if (messages[index].role in staleWorkflowRoles) {
+                messages.removeAt(index)
+                removed = true
+            }
+        }
+        if (removed) {
+            chatAdapter.notifyDataSetChanged()
+            saveConversations()
+        }
+    }
+
     private fun handleProgress(content: String) {
         val lower = content.lowercase(Locale.CHINA)
+        val facing = userFacingProgress(content)
         when {
             content.contains("未找到 APK") ||
                 content.contains("未检测到 java") ||
                 content.contains("未检测到 Android SDK") ->
-                updateStage("需要处理", content)
+                updateStage("需要处理", facing)
             content.contains("编译") ||
                 content.contains("APK") ||
                 content.contains("下载链接") ||
                 lower.contains("gradle") ||
                 lower.contains("assemble") ->
-                updateStage("编译打包", content)
+                updateStage("编译打包", facing)
             content.contains("CLI 输出") ||
                 content.contains("写入") ||
                 content.contains("读取") ||
                 content.contains("修改") ||
                 content.contains("工具") ->
-                updateStage("开发实现", content)
+                updateStage("开发实现", facing)
             content.contains("理解需求") ||
                 content.contains("AI 代理") ||
                 content.contains("CLI 工作区") ||
                 content.contains("启动本地 CLI") ->
-                updateStage("需求分析", content)
+                updateStage("需求分析", facing)
             else ->
-                updateStage("开发实现", content)
+                updateStage("开发实现", facing)
         }
-        maybeAppendNarrationForProgress(content, currentStage)
         if (!content.startsWith("CLI 仍在运行")) {
             recordEvidence("progress", userFacingProgress(content))
         }
         addProjectEvent("进度更新：${summarize(content, 30)}")
     }
 
+    private fun shouldShowProgressBubble(content: String): Boolean {
+        val progress = userFacingProgress(content)
+        return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
+            !isRoutineWorkflowMessage(progress) &&
+            (content.startsWith("环境提醒") ||
+                content.startsWith("未找到 APK") ||
+                content.contains("失败") ||
+                content.contains("错误") ||
+                content.contains("不可用"))
+    }
+
     private fun handleToolCall(tool: String) {
-        maybeAppendNarrationForTool(tool)
         recordEvidence(toolEvidenceKind(tool), "开始：${toolLabel(tool)}")
         when (tool) {
             "build_project" -> updateStage("编译打包", "正在编译项目并准备 APK。")
@@ -2688,31 +3757,6 @@ class MainActivity : AppCompatActivity() {
             "交付完成" -> "整理最终结果。"
             "需要处理" -> "根据错误判断是否可修复。"
             else -> "等待下一步结果。"
-        }
-    }
-
-    private fun toolWorkflowDoing(tool: String): String {
-        return when (tool) {
-            "init_project" -> "准备项目结构。"
-            "read_file" -> "读取相关代码，避免凭空修改。"
-            "write_file" -> "写入已确认的改动。"
-            "list_dir" -> "查看目录，确认文件位置。"
-            "run_shell" -> "运行命令获取真实结果。"
-            "git_commit" -> "保存当前版本。"
-            "build_project" -> "编译项目并准备 APK。"
-            else -> "推进当前任务。"
-        }
-    }
-
-    private fun toolWorkflowHint(tool: String): String {
-        return when (tool) {
-            "init_project" -> "开始写入代码。"
-            "read_file", "list_dir" -> "判断修改位置。"
-            "write_file" -> "检查是否需要补充。"
-            "run_shell" -> "读取输出并决定下一步。"
-            "git_commit" -> "准备交付结果。"
-            "build_project" -> "生成下载链接。"
-            else -> "继续推进。"
         }
     }
 
@@ -2855,9 +3899,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
+        const val PREF_SELECTED_AGENT = "selected_agent_name"
+        const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
+        const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
+        const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
+        const val PREF_PENDING_WORK_TIME = "pending_work_time"
+        const val PREF_COMPLETED_TASK_BADGE_COUNT = "completed_task_badge_count"
+        const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+        const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
+        const val TASK_COMPLETE_NOTIFICATION_ID = 2401
+        const val PENDING_WORK_TTL_MS = 6 * 60 * 60 * 1000L
+        const val MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
+        val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
-        val workflowTerminalRoles = setOf("ai", "error", "ai-stopped")
+        val workflowTerminalRoles = setOf("ai", "ai-intent", "error", "ai-stopped")
     }
 
     private fun addProjectEvent(text: String) {
@@ -2920,25 +3976,110 @@ class MainActivity : AppCompatActivity() {
         else -> tool
     }
 
+    private fun quickLocalChatReply(text: String): String? {
+        if (pendingAttachments.isNotEmpty()) return null
+        if (looksLikeDevelopmentRequest(text) || looksLikeDirectImageRequest(text)) return null
+        return when (text.trim().lowercase(Locale.CHINA)) {
+            "你好", "你好呀", "在吗", "你在吗", "在不在", "hi", "hello" ->
+                "你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。"
+            "谢谢", "谢谢你", "辛苦了" ->
+                "不客气，我在这边。你继续说下一步想怎么改就行。"
+            else -> null
+        }
+    }
+
     private fun looksLikeDevelopmentRequest(text: String): Boolean {
         val lower = text.lowercase(Locale.CHINA)
-        val words = listOf(
+        val directWords = listOf(
             "app", "apk", "android", "应用", "功能", "页面", "界面", "按钮", "代码", "开发",
             "修改", "添加", "新增", "生成", "做一个", "做个", "编译", "打包", "安装", "发布",
             "登录", "注册", "首页", "设置", "接口", "后端", "服务端", "数据库", "继续", "项目"
         )
-        return words.any { lower.contains(it) }
+        if (directWords.any { lower.contains(it) }) return true
+
+        val actionWords = listOf(
+            "改", "改成", "修改", "调整", "优化", "美化", "添加", "新增", "增加", "加上",
+            "删掉", "删除", "去掉", "替换", "做成", "变成", "接入", "修复", "处理"
+        )
+        val uiWords = listOf(
+            "点击", "屏幕", "中间", "文字", "字体", "动画", "闪烁", "按钮", "菜单",
+            "页面", "界面", "弹窗", "提示", "显示", "隐藏", "颜色", "图标", "布局",
+            "输入框", "底部", "顶部", "气泡", "回复", "折叠"
+        )
+        return actionWords.any { lower.contains(it) } && uiWords.any { lower.contains(it) }
     }
 
     private fun expandShortDevelopmentCommand(text: String): String {
         val normalized = text.trim().lowercase(Locale.CHINA)
-        return when (normalized) {
-            "继续", "继续吧", "继续开发", "继续做", "继续完成", "重试", "再试一次", "重新开始", "再来一次" ->
-                "请继续完成上一次未完成的开发任务。先检查当前项目状态和是否已经生成 APK；如果已生成，请直接给出下载链接；如果未生成，请继续开发、编译并说明结果。"
-            "打包", "编译", "生成apk", "生成 apk", "打包apk", "打包 apk" ->
+        return when {
+            looksLikeResumeCommand(normalized) -> buildResumeDevelopmentCommand(text)
+            normalized in setOf("打包", "编译", "生成apk", "生成 apk", "打包apk", "打包 apk") ->
                 "请编译当前项目并生成可以下载安装到手机的 APK 下载链接。"
             else -> text
         }
+    }
+
+    private fun looksLikeResumeCommand(normalized: String): Boolean {
+        if (normalized in setOf(
+                "继续",
+                "继续吧",
+                "继续开发",
+                "继续做",
+                "继续完成",
+                "重试",
+                "再试一次",
+                "重新开始",
+                "再来一次"
+            )
+        ) {
+            return true
+        }
+        return (normalized.contains("继续") || normalized.contains("重试") || normalized.contains("再试")) &&
+            (normalized.contains("上一次") ||
+                normalized.contains("未完成") ||
+                normalized.contains("当前项目的开发") ||
+                normalized.contains("当前进度"))
+    }
+
+    private fun buildResumeDevelopmentCommand(originalText: String): String {
+        val lastRequest = lastActionableUserRequest()
+        val latestFailure = latestFailureMessage()
+        return buildString {
+            append("请继续完成上一次未完成的开发任务，不要只返回之前已经生成过的 APK。")
+            if (!lastRequest.isNullOrBlank()) {
+                append("\n\n上一条未完成的用户需求：")
+                append(lastRequest)
+            }
+            if (!latestFailure.isNullOrBlank()) {
+                append("\n\n最近一次中断或错误：")
+                append(latestFailure)
+            }
+            append("\n\n当前用户补充：")
+            append(originalText.trim())
+            append("\n\n请结合当前项目文件、上一条用户需求和最近错误继续完成开发；只有确认该需求已经实现，并重新检查或构建后，才返回新的 APK 下载链接和当前进度。")
+        }
+    }
+
+    private fun lastActionableUserRequest(): String? {
+        return activeConversation().messages
+            .asReversed()
+            .firstOrNull { message ->
+                message.role == "user" &&
+                    message.content.isNotBlank() &&
+                    !looksLikeResumeCommand(message.content.trim().lowercase(Locale.CHINA)) &&
+                    !looksLikeApkDeliveryRequest(message.content)
+            }
+            ?.content
+            ?.trim()
+    }
+
+    private fun latestFailureMessage(): String? {
+        return activeConversation().messages
+            .asReversed()
+            .firstOrNull { it.role == "error" || it.role == "ai-stopped" }
+            ?.content
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
     }
 
     private fun looksLikeApkDeliveryRequest(text: String): Boolean {
@@ -2988,15 +4129,23 @@ class MainActivity : AppCompatActivity() {
                 if (granted) "已开启语音权限，请按住说话" else "需要麦克风权限才能语音转文字",
                 Toast.LENGTH_SHORT
             ).show()
+        } else if (requestCode == notificationPermissionRequest) {
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                Toast.makeText(this, "需要通知权限才能显示桌面任务角标", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     override fun onDestroy() {
         stopStageHintShimmer()
+        conversationHomeRowAnimator?.cancel()
+        conversationHomeRowAnimator = null
         speechRecognizer?.destroy()
         speechRecognizer = null
-        if (::wsClient.isInitialized && (!waitingForReply || isFinishing)) {
-            wsClient.disconnect()
+        if (taskWorkReceiverRegistered) {
+            unregisterReceiver(taskWorkReceiver)
+            taskWorkReceiverRegistered = false
         }
         super.onDestroy()
     }
