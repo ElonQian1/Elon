@@ -267,10 +267,20 @@ pub async fn run_for_project(
     if require_existing_git {
         match tools::git_pull_rebase(&workspace) {
             Ok(msg) => {
+                if msg.starts_with("git pull 未成功") {
+                    let _ = tx.send(WsMessage::Error { message: msg }.to_json());
+                    return;
+                }
                 let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
             }
             Err(e) => {
-                warn!("git pull --rebase 失败: {}", e);
+                let _ = tx.send(
+                    WsMessage::Error {
+                        message: format!("git pull --rebase 失败: {}", e),
+                    }
+                    .to_json(),
+                );
+                return;
             }
         }
     }
