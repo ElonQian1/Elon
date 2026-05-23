@@ -16,9 +16,9 @@
     ▼
 [AI 对话后端]  ←─── 理解需求，规划代码修改
     │
-    ├─► [Rust 服务端代码]   (d:\一龙\server\)
-    ├─► [Android APK 代码]  (d:\一龙\android\)
-    └─► [前端 Web 代码]      (d:\一龙\frontend\)
+    ├─► [Rust 服务端代码]   (server/)
+    ├─► [Android APK 代码]  (android/)
+    └─► [前端 Web 代码]      (frontend/)
     │
     ▼
 [自动化流水线]

@@ -178,7 +178,7 @@ git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
 ```powershell
 cd server
 cargo build --release
-# 编译产物: server/target/release/server.exe (Windows) 或 server (Linux)
+# 编译产物: server/target/release/elon-server （Linux 服务器上运行）
 ```
 
 ### 7.2 Android APK 编译打包
