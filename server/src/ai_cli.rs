@@ -421,6 +421,7 @@ fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) 
 - 如果只是普通问答或咨询，不需要改文件，请直接用简洁中文回复。
 - 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
+- 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
 - 对已有 Git 项目或 local_path/GitHub 项目：修改前先同步远端（通常是 git pull --rebase origin main）；修改后运行必要检查，git add 仅加入本次任务文件，git commit，并在配置 origin 时 git push origin main。push 被拒绝时先 rebase 再 push，不要 force push。
 - 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit、push；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。

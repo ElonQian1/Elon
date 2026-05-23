@@ -96,6 +96,7 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 
 - Before calling Codex CLI, the backend performs hard checks: project identity, workspace path, Git/origin readiness, permissions, queue/lock state, and user-selected model.
 - The backend sends Codex CLI a structured task brief every time. The brief must include the user's request, project path, mandatory document-read order, Git rules, validation expectations, and the rule that shared release/deploy steps are serialized.
+- Future non-Codex models may only act as sidecar helpers for lightweight classification, summarization, image/special analysis, or other narrow tasks. They must not become the primary conversation owner. Their output must be summarized back into the same APK conversation's native Codex CLI session so the Codex context remains continuous.
 - Codex CLI must inspect the repository and read project documents instead of relying on memory. Unknown projects are handled by reading `AGENTS.md`, `CODEX.md`, `README.md`, `.github/instructions`, and relevant `docs/`; if those files do not exist, use the platform default workflow and recommend adding them.
 - After Codex CLI finishes, the backend remains responsible for observable status, task records, download links, release metadata, and any shared locking around merge/version/release/deploy.
 - Do not rely on Codex CLI alone for concurrency safety, version ordering, or release publishing. These must be enforced by backend code and scripts.
@@ -194,6 +195,7 @@ Android APK builds are allowed in the main workspace when necessary, but still c
 - `server/src/intent_router.rs` is the shared capability router for Web, APK, and future Win clients.
 - Always classify user messages before choosing a backend model. Do not duplicate intent checks inside Web/APK handlers.
 - Current testing-stage routing defaults to `AI_CODEX_CLI_ONLY=true`: ordinary chat, model configuration discussion, intent-routed execution, image requests, and project/code collaboration all go through Codex CLI. The server ignores non-Codex agent selections and disables API fallback in this mode.
+- When multi-model routing returns later, Codex CLI remains the conversation spine: helper model outputs are treated as sidecar evidence and are injected back into the bound Codex CLI session instead of starting a separate long-running assistant context.
 - See `docs/intent-routing.md` before adding new capabilities, providers, or low-cost classifier logic.
 
 ## Local Notes

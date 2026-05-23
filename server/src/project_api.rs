@@ -853,11 +853,12 @@ fn project_workflow_json() -> serde_json::Value {
         "steps": [
             "项目准备：确认项目路径、Git 仓库、远端和写权限。",
             "读取文档：优先读取 AGENTS.md、CODEX.md、README.md、.github/instructions 和任务相关 docs。",
+            "会话连续：其他 AI 模型以后只能作为旁路分析，结论必须回灌到当前 Codex CLI 原生 session。",
             "执行任务：按项目自己的技术栈修改代码，不把一龙自项目规则套到普通项目。",
             "验证保存：运行必要检查，commit；有可用远端时 push。",
             "共享动作：合并 main、版本号递增、APK 发布、服务器部署必须串行。"
         ],
-        "codex_memory": "Codex CLI 不依赖长期记忆；服务器每次任务都会在提示词中注入这套通用流程，同时要求它读取当前项目仓库内的说明文档。"
+        "codex_memory": "Codex CLI 不依赖长期记忆；服务器每次任务都会在提示词中注入这套通用流程，同时要求它读取当前项目仓库内的说明文档。以后接入的其他模型只能做旁路分析，结论会被整理后回灌到当前会话绑定的 Codex CLI 原生 session。"
     })
 }
 
