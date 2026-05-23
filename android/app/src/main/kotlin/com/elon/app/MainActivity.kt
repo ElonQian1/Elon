@@ -2948,6 +2948,8 @@ class MainActivity : AppCompatActivity() {
         val lower = content.lowercase(Locale.CHINA)
         val strongSignals = listOf(
             "/root/workspaces/",
+            "/opt/elon/data/projects/",
+            "/root/Elon/",
             "build/android/",
             "src/main/",
             "androidmanifest",
@@ -2970,16 +2972,13 @@ class MainActivity : AppCompatActivity() {
     private fun cleanFinalReplyForUser(content: String, wasDevelopment: Boolean, apkUrl: String?): String {
         if (!wasDevelopment) return content.trim()
 
-        val cleanedLines = content
-            .replace(Regex("\\[([^\\]]+)]\\s*\\(/root/workspaces/[^)]*\\)"), "$1")
-            .replace(Regex("\\s*\\(/root/workspaces/[^)]*\\)"), "")
-            .replace(Regex("/root/workspaces/\\S+"), "项目文件")
+        val cleanedLines = stripServerProjectPaths(content)
             .replace(Regex("\\[[^\\]]+\\.apk]\\([^)]*\\)"), "APK 已生成")
             .lineSequence()
             .map { sanitizeFinalReplyLine(it.trimEnd()) }
             .filterNot { line ->
                 val lower = line.lowercase(Locale.CHINA)
-                    line.contains("/root/workspaces/") ||
+                    containsServerProjectPath(line) ||
                     line.contains("build/android/") ||
                     isLeakedPlatformPromptLine(line) ||
                     line.startsWith("用户可见：") ||
@@ -3012,6 +3011,20 @@ class MainActivity : AppCompatActivity() {
         }
 
         return result
+    }
+
+    private fun containsServerProjectPath(content: String): Boolean {
+        return content.contains("/root/workspaces/") ||
+            content.contains("/opt/elon/data/projects/") ||
+            content.contains("/root/Elon/")
+    }
+
+    private fun stripServerProjectPaths(content: String): String {
+        val pathPrefix = "(?:/root/workspaces|/opt/elon/data/projects|/root/Elon)"
+        return content
+            .replace(Regex("\\[([^\\]]+)]\\s*\\($pathPrefix/[^)]*\\)"), "$1")
+            .replace(Regex("\\s*\\($pathPrefix/[^)]*\\)"), "")
+            .replace(Regex("$pathPrefix/\\S+"), "项目文件")
     }
 
     private fun sanitizeFinalReplyLine(line: String): String {
@@ -3175,10 +3188,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sanitizeEvidenceDetail(detail: String): String {
-        val cleaned = detail
-            .replace(Regex("\\[([^\\]]+)]\\s*\\(/root/workspaces/[^)]*\\)"), "$1")
-            .replace(Regex("\\s*\\(/root/workspaces/[^)]*\\)"), "")
-            .replace(Regex("/root/workspaces/\\S+"), "项目文件")
+        val cleaned = stripServerProjectPaths(detail)
             .replace("用户可见：", "")
             .replace("用户可见:", "")
             .replace(Regex("\\s+"), " ")
@@ -3272,6 +3282,7 @@ class MainActivity : AppCompatActivity() {
         return rawLine
             .substringAfter("):", rawLine)
             .replace("（输出过长，已截断）", "")
+            .let(::stripServerProjectPaths)
             .trim()
     }
 
