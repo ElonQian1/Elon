@@ -49,12 +49,20 @@ $content = Get-Content $GradlePath -Raw
 $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
 $newCode = $oldCode + 1
 $content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
+
+# 自动递增 versionName PATCH（1.0 → 1.0.1，1.0.1 → 1.0.2，1.2 → 1.2.1）
+$oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
+$parts = $oldName.Split('.')
+if ($parts.Count -eq 2) { $parts += "0" }   # "1.0" → ["1","0","0"]
+$parts[-1] = [string]([int]$parts[-1] + 1)   # 递增 PATCH
+$newName = $parts -join '.'
+$content = $content -replace "versionName\s+`"$([regex]::Escape($oldName))`"", "versionName `"$newName`""
 Set-Content $GradlePath $content -NoNewline
 
-$versionName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
+$versionName = $newName
 
 Write-Host "   versionCode: $oldCode → $newCode" -ForegroundColor Green
-Write-Host "   versionName: $versionName" -ForegroundColor Green
+Write-Host "   versionName: $oldName → $newName" -ForegroundColor Green
 
 # ── Step 2: 编译 APK ─────────────────────────────────────────────────────────
 
