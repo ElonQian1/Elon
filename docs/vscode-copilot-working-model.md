@@ -28,7 +28,10 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 | File-based instructions | `.github/instructions/*.instructions.md` | `applyTo` glob 或任务语义匹配 | Android、Rust、测试、部署等分场景规则 |
 | Prompt files | `.github/prompts/*.prompt.md` | 手动 `/prompt-name` 调用 | 重复任务、固定输出格式、轻量工作流 |
 | Custom agents | `.github/agents/*.agent.md` | 在 agent 下拉框选择，或被 prompt/agent 引用 | 固定 persona、工具集、模型、handoff |
-| Skills / plugins / MCP / hooks | 按各自配置 | agent 会话中启用 | 多文件能力、外部系统、生命周期命令 |
+| Agent skills | `.github/skills/*/SKILL.md`、`.claude/skills/*/SKILL.md`、`.agents/skills/*/SKILL.md` | 任务匹配时加载，或作为 slash command 使用 | 可移植的多文件能力、脚本、资源 |
+| MCP | `.vscode/mcp.json`、用户配置、扩展贡献 | 工具匹配时启用 | 连接外部 API、数据库、浏览器、云服务 |
+| Hooks | `.github/hooks/*.json` 或 agent frontmatter `hooks` | agent 生命周期事件触发 | 审计、阻止危险命令、自动格式化/验证 |
+| Agent plugins | 插件市场安装 | 安装后启用 | 打包 prompts、skills、agents、hooks、MCP |
 
 要点:
 
@@ -42,8 +45,14 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 - `.github/agents` 下的 `.md` 文件会被当作 custom agents；默认位置还包括 `.claude/agents` 和用户级 `~/.copilot/agents`。
 - `infer` 已弃用，使用 `user-invocable` 控制是否出现在 agent 下拉框，使用 `disable-model-invocation` 控制是否能被其他 agent 作为 subagent 调用。
 - Agent Customizations editor 是统一发现、创建、管理 instructions、prompt files、agents 的入口，可从 Command Palette 运行 `Chat: Open Customizations`。
+- 可在 Chat 输入 `/instructions`、`/prompts`、`/skills` 快速打开对应配置菜单；也可用 `/init`、`/create-instruction`、`/create-prompt`、`/create-skill`、`/create-agent`、`/create-hook` 生成 customization 文件。
+- Customizations diagnostics view 可查看 VS Code 实际加载了哪些 instructions、prompts、agents、skills、hooks，以及 frontmatter 或路径错误。
+- 如果只在 VS Code 打开仓库子目录，默认发现不到父级 `.github` customization；应启用 `chat.useCustomizationsInParentRepositories`。
+- Instruction 冲突时优先级为 personal/user 最高，其次 repository，organization 最低；因此仓库规则要写得短、自包含、少和个人规则冲突。
 - 同时存在 prompt tools 和 custom agent tools 时，prompt 文件里的 tools 优先。
 - VS Code 1.102 起，面向代码生成和测试生成的 settings-based instructions 已弃用，应使用文件型 instructions；代码审查、commit message、PR 描述仍可用 settings 指令。
+- Agent skills 需要启用 `github.copilot.chat.skillTool.enabled`；项目 skills 默认位置包括 `.github/skills`、`.claude/skills`、`.agents/skills`。
+- Hooks 仍是 Preview，适合确定性审计和拦截危险命令；启用前要确认团队策略，避免在仓库里放会误触发破坏性命令的 hook。
 
 ## Agent Loop
 
@@ -77,21 +86,30 @@ Copilot 能推理的内容只来自当前请求的上下文。VS Code 会把以�
 | Custom agents | `.github/agents/elon-planner.agent.md` | 只规划，不直接改代码 |
 | Custom agents | `.github/agents/elon-implementer.agent.md` | 执行实现、验证、commit、push、部署 |
 | Custom agents | `.github/agents/elon-reviewer.agent.md` | 审查 bug、风险、验证缺口和工作流违规 |
+| Agent skills | `.github/skills/cloud-apk-dev/SKILL.md` | VS Code / Copilot CLI / cloud agent 共享的云端 APK 开发技能入口 |
+| Legacy skills | `.copilot/skills/cloud-apk-dev/SKILL.md` | 旧版 Codex/Copilot skill 兼容入口 |
 
 日常使用建议：
 
+- 在 VS Code 里先运行 `Chat: Open Customizations`，用 diagnostics 确认本仓库的 instructions、prompts、agents、skills 已加载。
+- 如果打开的是 `android/`、`server/` 等子目录，启用 `chat.useCustomizationsInParentRepositories`，否则父级 `.github` 规则可能不会被发现。
 - 普通功能/修复/文档任务：在 VS Code Chat 输入 `/elon-dev-task <需求>`。
 - APK 构建发布：输入 `/elon-apk-release <发布原因>`。
 - 复杂任务：先选 `elon-planner` 或使用 `/plan`，确认计划后 handoff 到 `elon-implementer`。
 - 提交前：选 `elon-reviewer` 做一次风险审查。
+- 需要把发布/部署打包成可移植能力时，优先维护 `.github/skills/cloud-apk-dev/SKILL.md`；真正需要确定性自动执行时，再评估 hooks。
 - 修改 AI customization 时，先检查文件名、frontmatter 和默认目录是否符合 VS Code 约定，再提交。
 
 ## 官方资料
 
 - VS Code Copilot customization overview: https://code.visualstudio.com/docs/copilot/customization/overview
+- VS Code Copilot customization concepts: https://code.visualstudio.com/docs/copilot/concepts/customization
 - Custom instructions: https://code.visualstudio.com/docs/copilot/customization/custom-instructions
 - Prompt files: https://code.visualstudio.com/docs/copilot/customization/prompt-files
 - Custom agents: https://code.visualstudio.com/docs/copilot/customization/custom-agents
+- Agent skills: https://code.visualstudio.com/docs/copilot/customization/agent-skills
+- Hooks: https://code.visualstudio.com/docs/copilot/customization/hooks
+- Agent plugins: https://code.visualstudio.com/docs/copilot/customization/agent-plugins
 - Context: https://code.visualstudio.com/docs/copilot/concepts/context
 - Tools: https://code.visualstudio.com/docs/copilot/concepts/tools
 - Agents: https://code.visualstudio.com/docs/copilot/concepts/agents

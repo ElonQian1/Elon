@@ -62,6 +62,15 @@ git status --short              # 检查是否有其他 AI 未提交的改动
 - 只做规划：选择 `elon-planner` agent。
 - 执行实现：选择 `elon-implementer` agent。
 - 提交前审查：选择 `elon-reviewer` agent。
+- 可移植技能入口：启用 Agent Skills 后使用 `cloud-apk-dev` skill。
+
+## VS Code Customization 检查
+
+- 用 `Chat: Open Customizations` 打开 Agent Customizations editor。
+- 用 diagnostics 视图确认 instructions、prompts、agents、skills 都已加载且没有 frontmatter 错误。
+- 如果只打开了 `android/`、`server/` 等子目录，启用 `chat.useCustomizationsInParentRepositories`，让 VS Code 发现仓库根目录 `.github` 配置。
+- Agent Skills 需要 `github.copilot.chat.skillTool.enabled`；本项目官方路径是 `.github/skills/cloud-apk-dev/SKILL.md`。
+- Hooks 目前是 Preview；没有明确需求前，不在仓库启用会自动执行命令的 hooks。
 
 ---
 
