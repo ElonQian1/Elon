@@ -211,7 +211,9 @@ if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
     Write-Error "❌ binary 替换失败"
 }
-ssh @SshOpts $Server "pkill -f elon-server 2>/dev/null; sleep 1; cd $RemoteDir && nohup $RemoteBin </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; echo started"
+# 优先用 systemctl；若服务不存在则 fallback 到 pkill+nohup
+$restartCmd = "if systemctl is-enabled elon-server >/dev/null 2>&1; then systemctl restart elon-server; else pkill -f elon-server 2>/dev/null; sleep 1; fuser -k 8080/tcp 2>/dev/null; sleep 1; cd $RemoteDir && nohup $RemoteBin </dev/null >> /root/elon-server.log 2>&1 & disown; sleep 2; fi"
+ssh @SshOpts $Server $restartCmd
 
 Write-Host "   ✅ 服务重启指令已发送" -ForegroundColor Green
 
