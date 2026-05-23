@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::sync::{RwLock, mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex, OwnedMutexGuard, RwLock};
 
 use crate::store::Store;
 
@@ -454,6 +454,61 @@ pub struct AppState {
     pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
     /// 反向 WSS 通道接入的 homecli PC agents（agent_id → AgentEntry）
     pub agent_manager: Arc<crate::homecli_agent::AgentManager>,
+    /// Project-scoped execution gates. Different projects can run in parallel; one
+    /// project runs one workspace-mutating task at a time until per-task worktrees
+    /// are introduced.
+    pub project_task_scheduler: Arc<ProjectTaskScheduler>,
+}
+
+pub struct ProjectTaskScheduler {
+    locks: AsyncMutex<HashMap<String, Arc<AsyncMutex<()>>>>,
+}
+
+pub struct ProjectTaskPermit {
+    was_queued: bool,
+    _guard: OwnedMutexGuard<()>,
+}
+
+impl ProjectTaskScheduler {
+    pub fn new() -> Self {
+        Self {
+            locks: AsyncMutex::new(HashMap::new()),
+        }
+    }
+
+    pub async fn acquire<F>(&self, project_id: &str, on_queued: F) -> ProjectTaskPermit
+    where
+        F: FnOnce(),
+    {
+        let lock = {
+            let mut locks = self.locks.lock().await;
+            locks
+                .entry(project_id.to_string())
+                .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+                .clone()
+        };
+
+        match lock.clone().try_lock_owned() {
+            Ok(guard) => ProjectTaskPermit {
+                was_queued: false,
+                _guard: guard,
+            },
+            Err(_) => {
+                on_queued();
+                let guard = lock.lock_owned().await;
+                ProjectTaskPermit {
+                    was_queued: true,
+                    _guard: guard,
+                }
+            }
+        }
+    }
+}
+
+impl ProjectTaskPermit {
+    pub fn was_queued(&self) -> bool {
+        self.was_queued
+    }
 }
 
 impl AppState {
@@ -611,6 +666,7 @@ impl AppState {
             image_model,
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
+            project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
         })
     }
 
@@ -661,7 +717,14 @@ fn safe_workspace_part(value: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::get_user_workspace;
+    use super::{get_user_workspace, ProjectTaskScheduler};
+    use std::{
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
 
     #[test]
     fn legacy_ws_workspace_keeps_project_suffix() {
@@ -674,6 +737,42 @@ mod tests {
             workspace.file_name().and_then(|name| name.to_str()),
             Some("82ee3288e852435c90ed2a609e474aaf__677b1bb2-09c9-419a-b998-960dd0539796")
         );
+    }
+
+    #[tokio::test]
+    async fn project_task_scheduler_queues_same_project() {
+        let scheduler = Arc::new(ProjectTaskScheduler::new());
+        let first = scheduler.acquire("project-a", || {}).await;
+        let queued_notice_sent = Arc::new(AtomicBool::new(false));
+
+        let task_scheduler = scheduler.clone();
+        let task_notice = queued_notice_sent.clone();
+        let waiting_task = tokio::spawn(async move {
+            let permit = task_scheduler
+                .acquire("project-a", || {
+                    task_notice.store(true, Ordering::SeqCst);
+                })
+                .await;
+            permit.was_queued()
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(queued_notice_sent.load(Ordering::SeqCst));
+        assert!(!waiting_task.is_finished());
+
+        drop(first);
+        assert!(waiting_task.await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn project_task_scheduler_allows_different_projects() {
+        let scheduler = ProjectTaskScheduler::new();
+        let _first = scheduler.acquire("project-a", || {}).await;
+        let second = scheduler
+            .acquire("project-b", || panic!("different projects must not queue"))
+            .await;
+
+        assert!(!second.was_queued());
     }
 }
 

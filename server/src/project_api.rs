@@ -11,12 +11,13 @@ use axum::{
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::{collections::HashMap, path::Path, path::PathBuf, process::Command, sync::Arc};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent,
     store::{ProjectAccess, PublicUser},
     tools,
-    types::AppState,
+    types::{AppState, WsMessage},
 };
 
 #[derive(Deserialize)]
@@ -169,13 +170,13 @@ pub async fn chat_project(
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
-    agent::run_for_project(
-        &user.id,
-        &project,
-        &download_base,
-        &message,
-        req.agent.as_deref(),
-        &state,
+    run_project_agent_with_scheduler(
+        state.clone(),
+        user.id.clone(),
+        project,
+        download_base,
+        message,
+        req.agent,
         tx,
     )
     .await;
@@ -218,6 +219,53 @@ pub async fn chat_project(
         "image_url": image_url,
     }))
     .into_response()
+}
+
+async fn run_project_agent_with_scheduler(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    download_base: String,
+    message: String,
+    agent_name: Option<String>,
+    tx: UnboundedSender<String>,
+) {
+    let queued_tx = tx.clone();
+    let permit = state
+        .project_task_scheduler
+        .acquire(&project.id, move || {
+            let _ = queued_tx.send(
+                WsMessage::Progress {
+                    message: "当前项目已有任务在运行，本次任务已进入队列。为了避免多个手机同时修改同一份项目工作区，服务器会按项目顺序执行。"
+                        .into(),
+                }
+                .to_json(),
+            );
+        })
+        .await;
+
+    let message_text = if permit.was_queued() {
+        "已轮到本次任务，开始同步代码并调用 AI 修改项目。"
+    } else {
+        "已获得项目执行权，开始同步代码并调用 AI 修改项目。"
+    };
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: message_text.into(),
+        }
+        .to_json(),
+    );
+
+    agent::run_for_project(
+        &user_id,
+        &project,
+        &download_base,
+        &message,
+        agent_name.as_deref(),
+        &state,
+        tx,
+    )
+    .await;
 }
 
 pub async fn ws_project_handler(
@@ -430,13 +478,13 @@ async fn handle_project_ws(
         let project_for_task = project.clone();
         let download_base_for_task = download_base.clone();
         let agent_task = tokio::spawn(async move {
-            agent::run_for_project(
-                &user_id,
-                &project_for_task,
-                &download_base_for_task,
-                &message,
-                request.agent.as_deref(),
-                &state_clone,
+            run_project_agent_with_scheduler(
+                state_clone,
+                user_id,
+                project_for_task,
+                download_base_for_task,
+                message,
+                request.agent,
                 tx,
             )
             .await;

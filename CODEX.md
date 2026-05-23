@@ -80,6 +80,16 @@ git worktree remove ..\Elon-session-$id --force
 
 For documentation-only changes that are safely isolated by staging a single file, it is still important to avoid touching unrelated modified files.
 
+## APK Project Task Concurrency
+
+APK-triggered project tasks use a project-scoped execution gate on the server:
+
+- Different `project_id` values can run at the same time.
+- The same `project_id` runs one workspace-mutating task at a time and later requests wait in a queue.
+- This protects the current shared workspace from concurrent `git pull`, file edits, commits, and pushes.
+- Task worktrees are still the target model for same-project parallel coding, but merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps.
+- The built-in "一龙项目" follows this exact same rule as any other GitHub or `local_path` project.
+
 ## Code Change Workflow
 
 1. Classify the request: Android UI, Android logic, Rust server logic, full-stack, config/text, deployment, or documentation.

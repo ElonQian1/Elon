@@ -87,6 +87,15 @@ bash scripts/install-hooks.sh
 
 ---
 
+## APK 项目并发规则
+
+- 服务器按 `project_id` 设置项目级执行权：不同项目可以同时运行，同一个项目当前按顺序排队运行。
+- 这个排队只保护同一份项目工作区，避免两个手机同时 `git pull`、改文件、commit、push 造成覆盖或冲突。
+- `worktree` 仍然是推荐的多 AI 并行开发模型；后续实现同项目多任务 worktree 时，也必须把 merge、版本号递增、APK 发布、服务器部署这些共享动作保留为串行。
+- 一龙自项目不走特殊旁路，它与其他 GitHub/local_path 项目遵守同一套并发、Git、构建、发布规则。
+
+---
+
 ## VS Code 快捷入口
 
 - 常规代码任务：运行 `/elon-dev-task`。
