@@ -81,17 +81,17 @@ Use the command that matches the risk and scope of the change. Do not deploy cod
 
 Server:
 
-- SSH: `ubuntu@182.254.168.75`
-- Project path: `/home/ubuntu/Elon`
-- Binary: `/home/ubuntu/Elon/server/target/release/elon-server`
-- Log: `/home/ubuntu/elon-server.log`
+- SSH: `root@43.139.149.158`
+- Project path: `/root/Elon`
+- Binary: `/root/Elon/server/target/release/elon-server`
+- Log: `/root/elon-server.log`
 - Port: `8080`
-- Health check: `curl http://182.254.168.75:8080/health`
+- Health check: `curl http://43.139.149.158:8080/health`
 
 APK:
 
-- Latest APK path on server: `/home/ubuntu/Elon/app/ElonSpeed-latest.apk`
-- Download URL: `http://182.254.168.75:8080/app/ElonSpeed-latest.apk`
+- Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
+- Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
 

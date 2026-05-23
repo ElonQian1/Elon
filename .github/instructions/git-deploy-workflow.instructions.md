@@ -39,12 +39,40 @@ applyTo: "**"
 
 ## ✅ 提交规则
 
-1. 任务开始 **前后** 各执行一次 `git status --short`，识别主工作区是否有其他 AI 的未提交改动
-2. `git add` 只加自己任务相关的文件
-3. 发现其他代理未提交改动 → **不回退、不覆盖**，只提交自己的文件
-4. **每次 commit 后必须立即 `git push origin main`**
+1. **任务开始前**：先执行 `git pull --rebase origin main` 同步最新代码，再开始修改
+2. 任务开始 **前后** 各执行一次 `git status --short`，识别主工作区是否有其他 AI 的未提交改动
+3. `git add` 只加自己任务相关的文件
+4. 发现其他代理未提交改动 → **不回退、不覆盖**，只提交自己的文件
+5. **每次 commit 后必须立即 `git push origin main`**
 
 > 分支名是 `main`（不是 `master`）。
+
+---
+
+## 🔁 push 被拒绝时的处理（non-fast-forward）
+
+> **适用场景**：多台电脑或多个 AI 并行工作，另一方先推送，本次 `git push` 报错。
+> AI 代理遇到此错误必须按以下步骤自动处理，不得放弃任务或要求人工介入。
+
+```powershell
+# 1. 拉取远程最新，把本地 commit 叠加在对方之上
+git fetch origin
+git rebase origin/main
+
+# 2a. 无冲突 → 直接推送
+git push origin main
+
+# 2b. 有冲突 → 逐文件解决后继续
+# 解决冲突（编辑文件，保留正确内容）
+git add <冲突文件>
+git rebase --continue
+git push origin main
+```
+
+**rebase 冲突解决原则**：
+- 自己改的逻辑 + 对方改的逻辑 **都保留**（除非明确互斥）
+- 不允许用 `git rebase --abort` 丢弃自己的修改
+- 解决后在汇报中注明："遇到推送冲突，已 rebase 解决，最终 SHA：xxx"
 
 ---
 
@@ -70,7 +98,8 @@ git add <自己的文件>
 git commit -m "feat(scope): 描述"
 
 # 3. 回到主仓库 cherry-pick 集成到 main
-Set-Location "d:\一龙\一龙参考库"
+  $repoRoot = git rev-parse --show-toplevel
+  Set-Location $repoRoot
 git cherry-pick <session_commit_sha>
 git push origin main
 
@@ -82,7 +111,7 @@ git worktree remove ..\Elon-session-$id --force
 
 ## 🦀 后端部署（Rust → Linux 服务器）
 
-**服务器信息**：`ubuntu@182.254.168.75`，项目路径 `/home/ubuntu/Elon`
+**服务器信息**：`root@43.139.149.158`，项目路径 `/root/Elon`
 
 ### 完整流程
 
@@ -100,21 +129,21 @@ git worktree add --detach $tmp HEAD
 # 3. 从临时工作树 rsync 到服务器（排除 target/ 和 .env）
 rsync -avz --exclude='target/' --exclude='.env' `
   "$tmp/" `
-  "ubuntu@182.254.168.75:/home/ubuntu/Elon/"
+  "root@43.139.149.158:/root/Elon/"
 
 # 4. 在服务器上编译并重启
-ssh ubuntu@182.254.168.75 @"
+ssh root@43.139.149.158 @"
   source ~/.cargo/env
-  cd /home/ubuntu/Elon/server
+  cd /root/Elon/server
   cargo build --release 2>&1 | tail -5
   pkill -f elon-server 2>/dev/null || true
   sleep 1
-  nohup ./target/release/elon-server > /home/ubuntu/elon-server.log 2>&1 &
+  nohup ./target/release/elon-server > /root/elon-server.log 2>&1 &
   echo "已启动 PID: $!"
 "@
 
 # 5. 验证
-ssh ubuntu@182.254.168.75 'curl -s http://localhost:8080/health'
+ssh root@43.139.149.158 'curl -s http://localhost:8080/health'
 
 # 6. 清理临时工作树（必须！）
 git worktree remove $tmp --force
@@ -151,16 +180,54 @@ git commit -m "feat(android): 描述 - vX.X.X"
 git push origin main
 
 # 3. 本地编译 APK
-Set-Location "d:\一龙\一龙参考库\android"
+$repoRoot = git rev-parse --show-toplevel
+Set-Location "$repoRoot\android"
 .\gradlew.bat assembleRelease
 
 # 4. 上传 APK 到服务器
 $apk = Get-ChildItem "app\build\outputs\apk\release\*.apk" | Select-Object -First 1
-scp $apk.FullName "ubuntu@182.254.168.75:/home/ubuntu/Elon/app/ElonSpeed-latest.apk"
+scp $apk.FullName "root@43.139.149.158:/root/Elon/app/ElonSpeed-latest.apk"
 
 # 5. 验证
-ssh ubuntu@182.254.168.75 'ls -lh /home/ubuntu/Elon/app/ElonSpeed-latest.apk'
+ssh root@43.139.149.158 'ls -lh /root/Elon/app/ElonSpeed-latest.apk'
 ```
+
+---
+
+## 🏷️ 版本号管理规则
+
+> 版本号由两个字段组成，均在 `android/app/build.gradle` 维护。
+
+| 字段 | 格式 | 规则 |
+|------|------|------|
+| `versionCode` | 整数，只增不减 | **每次发布 APK 必须 +1** |
+| `versionName` | `MAJOR.MINOR.PATCH` | 按语义版本递增 |
+
+**语义版本递增规则**：
+
+| 情况 | 递增位 | 示例 |
+|------|--------|------|
+| 修复 Bug，无新功能 | PATCH | `1.2.3` → `1.2.4` |
+| 新增功能，向后兼容 | MINOR，PATCH 归零 | `1.2.3` → `1.3.0` |
+| 破坏性变更（API 不兼容） | MAJOR，其余归零 | `1.2.3` → `2.0.0` |
+
+**AI 代理执行 APK 发布时必须**：
+
+```powershell
+# 1. 读取当前版本号（先读文件，再决定如何递增）
+$repoRoot = git rev-parse --show-toplevel
+$gradle = Get-Content "$repoRoot\android\app\build.gradle" -Raw
+
+# 2. 根据本次改动类型决定递增哪位（bug fix → PATCH；新功能 → MINOR）
+# 3. 更新 build.gradle：versionCode +1，versionName 按规则递增
+# 4. 将版本号写入 commit message
+git commit -m "release(android): vX.X.X (build XXX) - <改动描述>"
+```
+
+**禁止**：
+- 发布 APK 时不更新版本号
+- `versionCode` 减小或重复（设备会拒绝安装）
+- 多人同时发布时使用相同 `versionCode`（后推送的一方 push 被拒绝后必须再次 +1 再推）
 
 ---
 
@@ -206,10 +273,10 @@ tls/
 |------|----|
 | Git 远端 | `git@github.com:ElonQian1/Elon.git` |
 | 主分支 | `main` |
-| 服务器 SSH | `ubuntu@182.254.168.75` |
-| 服务器项目路径 | `/home/ubuntu/Elon` |
-| Rust 二进制 | `/home/ubuntu/Elon/server/target/release/elon-server` |
-| 服务日志 | `/home/ubuntu/elon-server.log` |
+| 服务器 SSH | `root@43.139.149.158` |
+| 服务器项目路径 | `/root/Elon` |
+| Rust 二进制 | `/root/Elon/server/target/release/elon-server` |
+| 服务日志 | `/root/elon-server.log` |
 | 服务端口 | `8080` |
-| 健康检查 | `curl http://182.254.168.75:8080/health` |
-| APK 下载地址 | `http://182.254.168.75:8080/app/ElonSpeed-latest.apk` |
+| 健康检查 | `curl http://43.139.149.158:8080/health` |
+| APK 下载地址 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
