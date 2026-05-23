@@ -196,7 +196,11 @@ class MainActivity : AppCompatActivity() {
         val remoteMessage: String?,
         val deployKeyExists: Boolean,
         val publicKey: String?,
-        val deployKeysUrl: String
+        val deployKeysUrl: String,
+        val workflowTitle: String,
+        val workflowSummary: String,
+        val workflowSteps: List<String>,
+        val codexMemory: String
     )
 
     private data class PendingAttachment(
@@ -2646,12 +2650,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showGitProjectDialog() {
-        val actions = arrayOf("查看同步状态", "配置 GitHub 仓库", "生成并复制 Deploy Key", "打开 GitHub Deploy Keys", "授权说明")
+        val actions = arrayOf("查看同步状态", "查看通用工作流", "配置 GitHub 仓库", "生成并复制 Deploy Key", "打开 GitHub Deploy Keys", "授权说明")
         AlertDialog.Builder(this)
             .setTitle("${currentProjectTitle} · Git 仓库")
             .setItems(actions) { _, which ->
                 when (actions[which]) {
                     "查看同步状态" -> loadGitProjectStatus { status -> showGitStatusDialog(status) }
+                    "查看通用工作流" -> loadGitProjectStatus { status -> showProjectWorkflowDialog(status) }
                     "配置 GitHub 仓库" -> showConfigureGitDialog()
                     "生成并复制 Deploy Key" -> generateDeployKey()
                     "打开 GitHub Deploy Keys" -> loadGitProjectStatus { status -> openUrl(status.deployKeysUrl) }
@@ -2681,6 +2686,64 @@ class MainActivity : AppCompatActivity() {
             )
             .setPositiveButton("知道了", null)
             .show()
+    }
+
+    private fun showProjectWorkflowDialog(status: GitProjectStatus) {
+        AlertDialog.Builder(this)
+            .setTitle(status.workflowTitle.ifBlank { "通用项目工作流" })
+            .setMessage(projectWorkflowDialogText(status))
+            .setPositiveButton("知道了", null)
+            .show()
+    }
+
+    private fun projectWorkflowDialogText(status: GitProjectStatus): String {
+        val steps = status.workflowSteps.ifEmpty { defaultWorkflowSteps() }
+        return buildString {
+            append(status.workflowSummary.ifBlank { defaultWorkflowSummary() })
+            append("\n\n")
+            steps.forEachIndexed { index, step ->
+                append(index + 1)
+                append(". ")
+                append(step)
+                append('\n')
+            }
+            val memory = status.codexMemory.ifBlank { defaultCodexMemory() }
+            append("\nCodex CLI 规则\n")
+            append(memory)
+        }.trim()
+    }
+
+    private fun defaultWorkflowSummary(): String {
+        return "所有项目都走同一套流程：先确认 Git/权限，再读取项目文档，然后修改、验证、提交和推送；合并、版本号和发布由服务器串行保护。"
+    }
+
+    private fun defaultWorkflowSteps(): List<String> {
+        return listOf(
+            "项目准备：确认项目路径、Git 仓库、远端和写权限。",
+            "读取文档：优先读取 AGENTS.md、CODEX.md、README.md、.github/instructions 和任务相关 docs。",
+            "执行任务：按项目自己的技术栈修改代码，不把一龙自项目规则套到普通项目。",
+            "验证保存：运行必要检查，commit；有可用远端时 push。",
+            "共享动作：合并 main、版本号递增、APK 发布、服务器部署必须串行。"
+        )
+    }
+
+    private fun defaultCodexMemory(): String {
+        return "Codex CLI 不依赖长期记忆；服务器每次任务都会在提示词中注入通用流程，同时要求它读取当前项目仓库内的说明文档。"
+    }
+
+    private fun projectWorkflowCardText(): String {
+        return buildString {
+            append("通用项目工作流\n")
+            defaultWorkflowSteps().forEachIndexed { index, step ->
+                append(index + 1)
+                append(". ")
+                append(step.substringBefore('：'))
+                append('\n')
+            }
+            append("\n当前阶段：")
+            append(currentStage)
+            append("\nCodex 每次任务都会重新读取项目文档，不靠记忆猜。")
+        }.trim()
     }
 
     private fun showConfigureGitDialog() {
@@ -2838,6 +2901,16 @@ class MainActivity : AppCompatActivity() {
         val git = json.optJSONObject("git") ?: JSONObject()
         val deployKey = json.optJSONObject("deploy_key") ?: JSONObject()
         val remoteCheck = git.optJSONObject("remote_check")
+        val workflow = json.optJSONObject("workflow") ?: JSONObject()
+        val workflowStepsJson = workflow.optJSONArray("steps")
+        val workflowSteps = mutableListOf<String>()
+        if (workflowStepsJson != null) {
+            for (index in 0 until workflowStepsJson.length()) {
+                workflowStepsJson.optString(index).takeIf { it.isNotBlank() }?.let {
+                    workflowSteps.add(it)
+                }
+            }
+        }
         return GitProjectStatus(
             hasGit = git.optBoolean("has_git", false),
             origin = git.optString("origin", "").takeIf { it.isNotBlank() && it != "null" },
@@ -2846,7 +2919,11 @@ class MainActivity : AppCompatActivity() {
             remoteMessage = remoteCheck?.optString("message"),
             deployKeyExists = deployKey.optBoolean("exists", false),
             publicKey = deployKey.optString("public_key", "").takeIf { it.isNotBlank() && it != "null" },
-            deployKeysUrl = deployKey.optString("github_deploy_keys_url", "https://github.com/settings/keys")
+            deployKeysUrl = deployKey.optString("github_deploy_keys_url", "https://github.com/settings/keys"),
+            workflowTitle = workflow.optString("title", "通用项目工作流"),
+            workflowSummary = workflow.optString("summary", defaultWorkflowSummary()),
+            workflowSteps = workflowSteps,
+            codexMemory = workflow.optString("codex_memory", defaultCodexMemory())
         )
     }
 
@@ -4018,6 +4095,13 @@ class MainActivity : AppCompatActivity() {
         val lower = content.lowercase(Locale.CHINA)
         val facing = userFacingProgress(content)
         when {
+            content.contains("进入队列") || content.contains("排队") ->
+                updateStage("任务排队", facing)
+            content.contains("通用项目工作流") ||
+                content.contains("项目文档") ||
+                content.contains("Git/权限") ||
+                content.contains("项目自己的规则") ->
+                updateStage("需求分析", facing)
             content.contains("未找到 APK") ||
                 content.contains("未检测到 java") ||
                 content.contains("未检测到 Android SDK") ->
@@ -4053,6 +4137,8 @@ class MainActivity : AppCompatActivity() {
         return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
             !isRoutineWorkflowMessage(progress) &&
             (content.startsWith("环境提醒") ||
+                content.contains("通用项目工作流") ||
+                content.contains("进入队列") ||
                 content.startsWith("未找到 APK") ||
                 content.contains("失败") ||
                 content.contains("错误") ||
@@ -4181,6 +4267,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             projectEvents.joinToString("\n")
         }
+        binding.projectWorkflowText.text = projectWorkflowCardText()
         updateStageLines()
         renderConversationList()
         if (binding.projectPage.visibility == View.VISIBLE) {
@@ -4191,6 +4278,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStageLines() {
         val active = when (currentStage) {
+            "任务排队" -> 1
             "需求分析" -> 1
             "开发实现" -> 2
             "编译打包" -> 3

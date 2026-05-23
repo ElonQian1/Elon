@@ -90,6 +90,16 @@ APK-triggered project tasks use a project-scoped execution gate on the server:
 - Task worktrees are still the target model for same-project parallel coding, but merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps.
 - The built-in "一龙项目" follows this exact same rule as any other GitHub or `local_path` project.
 
+## Backend And Codex CLI Cooperation
+
+The backend is the workflow orchestrator; Codex CLI is the code executor.
+
+- Before calling Codex CLI, the backend performs hard checks: project identity, workspace path, Git/origin readiness, permissions, queue/lock state, and user-selected model.
+- The backend sends Codex CLI a structured task brief every time. The brief must include the user's request, project path, mandatory document-read order, Git rules, validation expectations, and the rule that shared release/deploy steps are serialized.
+- Codex CLI must inspect the repository and read project documents instead of relying on memory. Unknown projects are handled by reading `AGENTS.md`, `CODEX.md`, `README.md`, `.github/instructions`, and relevant `docs/`; if those files do not exist, use the platform default workflow and recommend adding them.
+- After Codex CLI finishes, the backend remains responsible for observable status, task records, download links, release metadata, and any shared locking around merge/version/release/deploy.
+- Do not rely on Codex CLI alone for concurrency safety, version ordering, or release publishing. These must be enforced by backend code and scripts.
+
 ## Code Change Workflow
 
 1. Classify the request: Android UI, Android logic, Rust server logic, full-stack, config/text, deployment, or documentation.

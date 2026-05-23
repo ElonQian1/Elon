@@ -230,6 +230,14 @@ async fn run_project_agent_with_scheduler(
     agent_name: Option<String>,
     tx: UnboundedSender<String>,
 ) {
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: "通用项目工作流已启用：先确认 Git/权限，再读取项目文档，按项目自己的规则修改；同一项目的共享工作区任务会排队，未来 task worktree 编码可并行，但合并、版本号和发布仍串行。"
+                .into(),
+        }
+        .to_json(),
+    );
+
     let queued_tx = tx.clone();
     let permit = state
         .project_task_scheduler
@@ -800,7 +808,23 @@ fn project_git_status_json(state: &AppState, project: &ProjectAccess) -> serde_j
         "github_app": {
             "enabled": false,
             "message": "GitHub App 授权适合多用户正式版；当前版本先使用每项目 Deploy Key。"
-        }
+        },
+        "workflow": project_workflow_json(),
+    })
+}
+
+fn project_workflow_json() -> serde_json::Value {
+    serde_json::json!({
+        "title": "通用项目工作流",
+        "summary": "所有项目都走同一套流程：先识别项目和授权，再读取项目文档，之后修改、验证、提交、推送；同项目共享动作由服务器排队保护。",
+        "steps": [
+            "项目准备：确认项目路径、Git 仓库、远端和写权限。",
+            "读取文档：优先读取 AGENTS.md、CODEX.md、README.md、.github/instructions 和任务相关 docs。",
+            "执行任务：按项目自己的技术栈修改代码，不把一龙自项目规则套到普通项目。",
+            "验证保存：运行必要检查，commit；有可用远端时 push。",
+            "共享动作：合并 main、版本号递增、APK 发布、服务器部署必须串行。"
+        ],
+        "codex_memory": "Codex CLI 不依赖长期记忆；服务器每次任务都会在提示词中注入这套通用流程，同时要求它读取当前项目仓库内的说明文档。"
     })
 }
 

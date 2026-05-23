@@ -315,6 +315,19 @@
                         android:text="4. 交付下载：等待" />
                 </LinearLayout>
 
+                <TextView
+                    android:id="@+id/projectWorkflowText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="#1E1E1E"
+                    android:lineSpacingExtra="4dp"
+                    android:minHeight="112dp"
+                    android:padding="18dp"
+                    android:text="通用项目工作流\n1. 准备 Git 和权限\n2. 读取项目文档\n3. 修改和验证\n4. 提交推送\n5. 合并发布串行保护"
+                    android:textColor="#B8B8B8"
+                    android:textSize="13sp" />
+
                 <GridLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
