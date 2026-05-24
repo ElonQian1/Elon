@@ -93,16 +93,19 @@ fn summarize_trace(events: &[ServerTraceEvent]) -> Value {
         .iter()
         .filter(|event| event.phase == "codex_cli_start")
         .count();
-    let finish = events.iter().find(|event| {
-        event.phase == "server_done"
-            || event.phase == "server_error"
-            || event.phase == "server_client_disconnected"
-    });
+    let server_terminal = events
+        .iter()
+        .find(|event| event.phase == "server_done" || event.phase == "server_error");
+    let client_disconnect = events
+        .iter()
+        .find(|event| event.phase == "server_client_disconnected");
+    let finish = server_terminal.or(client_disconnect);
     json!({
         "first_phase": first.map(|event| event.phase.as_str()),
         "last_phase": last.map(|event| event.phase.as_str()),
         "first_outgoing_elapsed_from_receive_ms": duration_between(first, first_outgoing),
         "finish_elapsed_from_receive_ms": duration_between(first, finish),
+        "client_disconnect_elapsed_from_receive_ms": duration_between(first, client_disconnect),
         "codex_cli_elapsed_ms": duration_between(first_codex_start, last_codex_terminal),
         "codex_cli_attempts": codex_attempts,
         "terminal": finish.map(|event| event.phase.as_str()),
@@ -170,5 +173,21 @@ mod tests {
         let trace = store.trace_json("trace_a", 10);
         assert_eq!(trace["summary"]["codex_cli_attempts"], 1);
         assert!(trace["summary"]["codex_cli_elapsed_ms"].as_i64().is_some());
+    }
+
+    #[test]
+    fn prefers_server_terminal_over_client_disconnect() {
+        let store = ServerTraceStore::new();
+        store.record("trace_a", "ws_project_message_received", json!({}));
+        store.record("trace_a", "server_client_disconnected", json!({}));
+        store.record("trace_a", "server_done", json!({"type": "done"}));
+
+        let trace = store.trace_json("trace_a", 10);
+        assert_eq!(trace["summary"]["terminal"], "server_done");
+        assert!(
+            trace["summary"]["client_disconnect_elapsed_from_receive_ms"]
+                .as_i64()
+                .is_some()
+        );
     }
 }
