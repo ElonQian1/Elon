@@ -234,6 +234,7 @@ function Invoke-GradleReleaseBuild {
     Write-Host "🔨 编译 Release APK..." -ForegroundColor Cyan
 
     $gradle = Join-Path $AndroidDir "gradlew.bat"
+    $buildStartedAt = Get-Date
     $process = Start-Process -FilePath "cmd.exe" `
         -ArgumentList @("/c", "`"$gradle`"", "assembleRelease") `
         -WorkingDirectory $AndroidDir `
@@ -266,8 +267,21 @@ function Invoke-GradleReleaseBuild {
     }
     $process.WaitForExit()
 
-    if ($process.ExitCode -ne 0) {
-        Write-Error "Gradle assembleRelease 失败，退出码 $($process.ExitCode)。"
+    $exitCode = $process.ExitCode
+    if ($null -eq $exitCode) {
+        $freshApk = Get-ChildItem $ApkPattern -ErrorAction SilentlyContinue |
+            Where-Object { $_.LastWriteTime -ge $buildStartedAt } |
+            Sort-Object LastWriteTime |
+            Select-Object -Last 1
+        if ($freshApk) {
+            Write-Warning "Gradle 进程退出码为空，但本次构建已产出 release APK：$($freshApk.Name)。继续发布。"
+            return
+        }
+        Write-Error "Gradle assembleRelease 结束但无法读取退出码，且未发现本次新 APK。"
+    }
+
+    if ($exitCode -ne 0) {
+        Write-Error "Gradle assembleRelease 失败，退出码 $exitCode。"
     }
 }
 
