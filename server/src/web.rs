@@ -103,23 +103,9 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
         "input"
         "tabs";
     }
-    /* 平板：限定宽度，居中模拟手机外观 */
-    @media (min-width: 720px) and (max-width: 1099.98px) {
+    /* 平板 / 桌面：限定宽度居中，Tab 始终在底部（与 APK 一致） */
+    @media (min-width: 720px) {
       .app { max-width: 720px; margin: 0 auto; box-shadow: 0 0 0 1px #1a1a1a; }
-    }
-    /* 桌面：左侧 Tab 侧栏 + 右侧主体 */
-    @media (min-width: 1100px) {
-      .app {
-        max-width: 1100px;
-        margin: 0 auto;
-        grid-template-rows: 50px 1fr auto;
-        grid-template-columns: 96px 1fr;
-        grid-template-areas:
-          "tabs toolbar"
-          "tabs content"
-          "tabs input";
-        box-shadow: 0 0 0 1px #1a1a1a;
-      }
     }
 
     /* ===== Toolbar ===== */
@@ -438,11 +424,6 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     .tab .ic { width: 24px; height: 24px; display: block; }
     .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
     .tab .ic svg { width: 100%; height: 100%; }
-    @media (min-width: 1100px) {
-      .tabs-bar { flex-direction: column; padding: 12px 0; }
-      .tab { padding: 16px 0; font-size: 13px; gap: 6px; }
-      .tab .ic { width: 30px; height: 30px; }
-    }
 
     /* ===== 模态对话框 ===== */
     .modal-mask {
