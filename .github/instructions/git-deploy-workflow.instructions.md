@@ -217,15 +217,24 @@ bash scripts/publish-server.sh --skip-upload
 
 ### 后端版本号规则
 
-后端运行代码变更包括 `server/src/**` 和 `server/homecli-proto/src/**`。这类改动在部署前必须递增 `server/Cargo.toml` 的 `package.version`：
+**`scripts/publish-server.ps1` 会自动完成 PATCH 递增 → commit → push → 构建 → 部署 → 验证。**  
+通常直接运行脚本即可，无需手动修改版本号。
 
-| 情况 | 递增位 | 示例 |
+| 情况 | 递增位 | 做法 |
 |---|---|---|
-| 修复 Bug，无新接口能力 | PATCH | `0.2.3` → `0.2.4` |
-| 新增后端功能，向后兼容 | MINOR，PATCH 归零 | `0.2.4` → `0.3.0` |
-| 不兼容 API / 协议变更 | MAJOR，其余归零 | `0.3.0` → `1.0.0` |
+| 修复 Bug，无新接口能力 | PATCH（自动） | 直接运行 `.\scripts\publish-server.ps1` |
+| 新增后端功能，向后兼容 | MINOR，PATCH 归零 | 手动改 `server/Cargo.toml` 版本后加 `-SkipVersionBump` |
+| 不兼容 API / 协议变更 | MAJOR，其余归零 | 手动改 `server/Cargo.toml` 版本后加 `-SkipVersionBump` |
 
-`scripts/publish-server.ps1` / `scripts/publish-server.sh` 会在构建时注入 git SHA，服务端通过 `/api/server/version` 返回 `versionName` 和 `gitSha`。APK 个人页动态读取该接口，用户可看到服务器是否更新。
+```powershell
+# 普通部署（自动递增 PATCH）
+.\scripts\publish-server.ps1
+
+# 手动控制 MINOR/MAJOR 时（已在 Cargo.toml 手动改好版本号）
+.\scripts\publish-server.ps1 -SkipVersionBump
+```
+
+脚本会在构建时注入 git SHA，服务端通过 `/api/server/version` 返回 `versionName` 和 `gitSha`，APK 个人页动态读取该接口展示后端版本。
 
 ---
 

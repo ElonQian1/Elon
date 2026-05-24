@@ -18,16 +18,20 @@
     只做本地编译，不上传不重启（用于本地验证 binary）。
 .PARAMETER Force
     强制重新部署，即使检测到服务器上已是相同 SHA。
+.PARAMETER SkipVersionBump
+    跳过自动版本递增（手动已修改 MINOR/MAJOR 版本号时使用）。
 
 .EXAMPLE
-    .\scripts\publish-server.ps1                     # 正常流程
-    .\scripts\publish-server.ps1 -SkipBuild          # 只用上次产物重新部署
-    .\scripts\publish-server.ps1 -SkipUpload         # 只本地编译，不部署
+    .\scripts\publish-server.ps1                          # 正常流程（自动递增 PATCH）
+    .\scripts\publish-server.ps1 -SkipVersionBump         # 跳过版本递增（手动控制版本号时）
+    .\scripts\publish-server.ps1 -SkipBuild               # 只用上次产物重新部署
+    .\scripts\publish-server.ps1 -SkipUpload              # 只本地编译，不部署
 #>
 param(
     [switch]$SkipBuild,
     [switch]$SkipUpload,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipVersionBump
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,12 +81,46 @@ if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 
 $Sha      = (git -C $RepoRoot rev-parse --short HEAD).Trim()
 $ShaBig   = (git -C $RepoRoot rev-parse HEAD).Trim()
+$CargoTomlPath = Join-Path $ServerDir "Cargo.toml"
 $ServerVersion = [regex]::Match(
-    (Get-Content (Join-Path $ServerDir "Cargo.toml") -Encoding UTF8 -Raw),
+    (Get-Content $CargoTomlPath -Encoding UTF8 -Raw),
     '(?m)^version\s*=\s*"([^"]+)"'
 ).Groups[1].Value
 Write-Host "   ✅ 最新 SHA: $Sha" -ForegroundColor Green
 Write-Host "   ✅ 后端版本: v$ServerVersion" -ForegroundColor Green
+
+# ─────────────────────────────────────────────────────────────
+# 1.5  自动递增 PATCH 版本号（仅 Build 且未指定 -SkipVersionBump 时）
+# ─────────────────────────────────────────────────────────────
+if (-not $SkipBuild -and -not $SkipVersionBump) {
+    Write-Host ""
+    Write-Host "1.5⃣  自动递增 PATCH 版本号..." -ForegroundColor Yellow
+    $cargoContent = Get-Content $CargoTomlPath -Raw -Encoding UTF8
+    $oldVersion   = [regex]::Match($cargoContent, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+    $parts        = $oldVersion.Split('.')
+    $parts[2]     = [string]([int]$parts[2] + 1)
+    $newVersion   = $parts -join '.'
+    # 只替换第一个 version = "..." 行（[package] 段，不误改依赖版本）
+    $cargoContent = [regex]::Replace($cargoContent, '(?m)^(version\s*=\s*)"[^"]+"', "`${1}`"$newVersion`"", 1)
+    Set-Content $CargoTomlPath $cargoContent -NoNewline -Encoding UTF8
+
+    Write-Host "   📦 版本号递增: v$oldVersion → v$newVersion" -ForegroundColor Cyan
+
+    git -C $RepoRoot add "server/Cargo.toml"
+    git -C $RepoRoot commit -m "chore(server): bump version to $newVersion"
+    if ($LASTEXITCODE -ne 0) { Write-Error "❌ git commit 版本号失败" }
+
+    git -C $RepoRoot push origin main
+    if ($LASTEXITCODE -ne 0) { Write-Error "❌ git push 版本号失败（存在冲突时请先 git pull --rebase 后重试）" }
+
+    # 版本 commit 后 SHA 变了，重新获取
+    $Sha           = (git -C $RepoRoot rev-parse --short HEAD).Trim()
+    $ShaBig        = (git -C $RepoRoot rev-parse HEAD).Trim()
+    $ServerVersion = $newVersion
+    Write-Host "   ✅ 版本已提交推送 SHA: $Sha  v$ServerVersion" -ForegroundColor Green
+} elseif ($SkipVersionBump) {
+    Write-Host "1.5⃣  ⏩ 跳过版本递增（-SkipVersionBump）" -ForegroundColor Yellow
+}
 
 # ─────────────────────────────────────────────────────────────
 # 2. 环境检查（仅 Build 时做）
@@ -339,7 +377,9 @@ Remove-Worktree
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "   ✅ 部署完成！" -ForegroundColor Green
+Write-Host "   版本:   v$ServerVersion" -ForegroundColor Gray
 Write-Host "   SHA:    $Sha" -ForegroundColor Gray
 Write-Host "   服务:   http://43.139.149.158:8080/health" -ForegroundColor Gray
+Write-Host "   版本接口: http://43.139.149.158:8080/api/server/version" -ForegroundColor Gray
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""

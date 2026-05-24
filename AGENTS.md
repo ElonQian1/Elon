@@ -193,7 +193,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
-- 后端运行代码变更必须递增 `server/Cargo.toml` 的 `version`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
+- 后端运行代码变更只需直接运行 `.\scripts\publish-server.ps1`（自动递增 PATCH、commit、push、构建、部署）；MINOR/MAJOR 变更时手动改好 `server/Cargo.toml` 后加 `-SkipVersionBump`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
 - Android 新功能必须完成 APK 发布闭环，不能只停在 PR、Debug 包或本地验证。
 - 不提交密钥、`.env`、APK 签名材料或任何敏感信息。
 - push 被拒绝（non-fast-forward）→ `git pull --rebase` 解决后再 push，禁止 `--force`。
