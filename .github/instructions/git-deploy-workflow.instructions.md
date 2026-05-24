@@ -480,5 +480,5 @@ tls/
 | Rust 二进制 | `/root/Elon/server/target/release/elon-server` |
 | 服务日志 | `/root/elon-server.log` |
 | 服务端口 | `8080` |
-| 健康检查 | `curl http://43.139.149.158:8080/health` |
+| 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
 | APK 下载地址 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
