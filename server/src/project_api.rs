@@ -360,6 +360,39 @@ pub async fn prewarm_user_project(
     prewarm_project_response(state, user, project, req).await
 }
 
+#[derive(Debug, Clone)]
+struct ProjectConversationWorkspace {
+    base_workspace: PathBuf,
+    active_workspace: PathBuf,
+    branch: Option<String>,
+}
+
+impl ProjectConversationWorkspace {
+    fn shared(base_workspace: PathBuf) -> Self {
+        Self {
+            active_workspace: base_workspace.clone(),
+            base_workspace,
+            branch: None,
+        }
+    }
+
+    fn isolated(base_workspace: PathBuf, active_workspace: PathBuf, branch: String) -> Self {
+        Self {
+            base_workspace,
+            active_workspace,
+            branch: Some(branch),
+        }
+    }
+
+    fn is_isolated(&self) -> bool {
+        self.branch.is_some()
+    }
+
+    fn active_path(&self) -> &Path {
+        &self.active_workspace
+    }
+}
+
 async fn prewarm_project_response(
     state: Arc<AppState>,
     user: PublicUser,
@@ -383,8 +416,22 @@ async fn prewarm_project_response(
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
 
-    let workspace =
+    let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let conversation_workspace =
+        match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                tracing::warn!(
+                    project_id = %project.id,
+                    conversation_id = %conversation_id,
+                    error = %error,
+                    "conversation worktree prewarm fell back to base workspace"
+                );
+                ProjectConversationWorkspace::shared(base_workspace.clone())
+            }
+        };
+    let workspace = conversation_workspace.active_path().to_path_buf();
     let trace_id = req
         .trace_id
         .as_deref()
@@ -541,8 +588,28 @@ async fn run_project_agent_with_scheduler(
             }),
         );
     }
-    let workspace =
+    let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let prepared_execution_workspace = if needs_project_workflow {
+        match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
+            Ok(workspace) => Some(workspace),
+            Err(error) => {
+                let _ = tx.send(
+                    WsMessage::Error {
+                        message: format!("创建会话 worktree 失败: {}", error),
+                    }
+                    .to_json(),
+                );
+                return;
+            }
+        }
+    } else {
+        None
+    };
+    let workspace = prepared_execution_workspace
+        .as_ref()
+        .map(|workspace| workspace.active_path())
+        .unwrap_or(base_workspace.as_path());
     let workspace_key = workspace.display().to_string();
     let prewarm_agent = if state.ai_cli.codex_cli_only {
         None
@@ -585,7 +652,7 @@ async fn run_project_agent_with_scheduler(
         conversation_id: conversation_id.clone(),
     };
     match ai_cli::confirm_project_intent(
-        &workspace,
+        workspace,
         &message,
         agent_name.as_deref(),
         Some(native_session_scope),
@@ -660,7 +727,7 @@ async fn run_project_agent_with_scheduler(
 
     let _ = tx.send(
         WsMessage::Progress {
-            message: "通用项目工作流已启用：先确认 Git/权限，再读取项目文档，按项目自己的规则修改；同一项目的共享工作区任务会排队，未来 task worktree 编码可并行，但合并、版本号和发布仍串行。"
+            message: "通用项目工作流已启用：服务器会为本会话准备独立 worktree/分支；同一会话串行，编码阶段可跨会话并行，最终合并、版本号和发布仍串行。"
                 .into(),
         }
         .to_json(),
@@ -670,19 +737,25 @@ async fn run_project_agent_with_scheduler(
     let trace_state = state.clone();
     let queued_trace_id = trace_id.clone();
     let queued_project_id = project.id.clone();
-    let permit = state
+    let queued_conversation_id = conversation_id.clone();
+    let conversation_execution_key =
+        project_conversation_execution_key(&project.id, &conversation_id);
+    let conversation_permit = state
         .project_task_scheduler
-        .acquire(&project.id, move || {
+        .acquire(&conversation_execution_key, move || {
             if let Some(trace_id) = queued_trace_id.as_deref() {
                 trace_state.server_traces.record(
                     trace_id,
-                    "server_project_queue_wait",
-                    serde_json::json!({ "project_id": &queued_project_id }),
+                    "server_conversation_queue_wait",
+                    serde_json::json!({
+                        "project_id": &queued_project_id,
+                        "conversation_id": &queued_conversation_id,
+                    }),
                 );
             }
             let _ = queued_tx.send(
                 WsMessage::Progress {
-                    message: "当前项目已有任务在运行，本次任务已进入队列。为了避免多个手机同时修改同一份项目工作区，服务器会按项目顺序执行。"
+                    message: "当前会话已有任务在运行，本次任务已进入该会话队列；其他会话仍可使用独立 worktree 并行开发。"
                         .into(),
                 }
                 .to_json(),
@@ -690,18 +763,58 @@ async fn run_project_agent_with_scheduler(
         })
         .await;
 
-    let message_text = if permit.was_queued() {
-        "已轮到本次任务，开始同步代码并调用 AI 修改项目。"
+    let execution_workspace = prepared_execution_workspace.unwrap_or_else(|| {
+        ProjectConversationWorkspace::shared(base_workspace.clone())
+    });
+
+    let shared_project_permit = if execution_workspace.is_isolated() {
+        None
     } else {
-        "已获得项目执行权，开始同步代码并调用 AI 修改项目。"
+        let queued_tx = tx.clone();
+        let trace_state = state.clone();
+        let queued_trace_id = trace_id.clone();
+        let queued_project_id = project.id.clone();
+        let shared_key = project_shared_execution_key(&project.id);
+        Some(
+            state
+                .project_task_scheduler
+                .acquire(&shared_key, move || {
+                    if let Some(trace_id) = queued_trace_id.as_deref() {
+                        trace_state.server_traces.record(
+                            trace_id,
+                            "server_project_queue_wait",
+                            serde_json::json!({ "project_id": &queued_project_id }),
+                        );
+                    }
+                    let _ = queued_tx.send(
+                        WsMessage::Progress {
+                            message: "当前项目无法创建独立 worktree，已退回共享工作区串行执行。"
+                                .into(),
+                        }
+                        .to_json(),
+                    );
+                })
+                .await,
+        )
+    };
+
+    let message_text = if conversation_permit.was_queued() {
+        "已轮到本会话任务，开始在会话 worktree 中调用 AI 修改项目。"
+    } else if execution_workspace.is_isolated() {
+        "已获得本会话执行权，开始在独立 worktree 中调用 AI 修改项目。"
+    } else {
+        "已获得项目执行权，开始在共享工作区中调用 AI 修改项目。"
     };
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,
-            "server_project_execution_granted",
+            "server_conversation_execution_granted",
             serde_json::json!({
                 "project_id": &project.id,
-                "was_queued": permit.was_queued(),
+                "conversation_id": &conversation_id,
+                "was_queued": conversation_permit.was_queued(),
+                "workspace": execution_workspace.active_path().display().to_string(),
+                "isolated": execution_workspace.is_isolated(),
             }),
         );
     }
@@ -712,18 +825,398 @@ async fn run_project_agent_with_scheduler(
         .to_json(),
     );
 
-    agent::run_for_project(
-        &user_id,
-        &project,
-        &download_base,
-        Some(&conversation_id),
-        &message,
-        agent_name.as_deref(),
-        trace_id.as_deref(),
-        &state,
+    let _keep_conversation_permit = conversation_permit;
+    let _keep_shared_project_permit = shared_project_permit;
+    run_project_agent_in_execution_workspace(
+        state,
+        user_id,
+        project,
+        download_base,
+        conversation_id,
+        message,
+        agent_name,
+        trace_id,
+        execution_workspace,
         tx,
     )
     .await;
+}
+
+async fn run_project_agent_in_execution_workspace(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    download_base: String,
+    conversation_id: String,
+    message: String,
+    agent_name: Option<String>,
+    trace_id: Option<String>,
+    execution_workspace: ProjectConversationWorkspace,
+    tx: UnboundedSender<String>,
+) {
+    let (agent_tx, mut agent_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let agent_state = state.clone();
+    let agent_user_id = user_id.clone();
+    let agent_project = project.clone();
+    let agent_download_base = download_base.clone();
+    let agent_conversation_id = conversation_id.clone();
+    let agent_message = message.clone();
+    let agent_name_for_task = agent_name.clone();
+    let agent_trace_id = trace_id.clone();
+    let agent_workspace = execution_workspace.active_workspace.clone();
+
+    let agent_task = tokio::spawn(async move {
+        agent::run_for_project_in_workspace(
+            &agent_user_id,
+            &agent_project,
+            &agent_workspace,
+            &agent_download_base,
+            Some(&agent_conversation_id),
+            &agent_message,
+            agent_name_for_task.as_deref(),
+            agent_trace_id.as_deref(),
+            &agent_state,
+            agent_tx,
+        )
+        .await;
+    });
+
+    let mut terminal_raw = None;
+    let mut terminal_is_done = false;
+    while let Some(raw) = agent_rx.recv().await {
+        if is_terminal_project_ws_message(&raw) {
+            terminal_is_done = is_done_project_ws_message(&raw);
+            terminal_raw = Some(raw);
+            break;
+        }
+        let _ = tx.send(raw);
+    }
+
+    if let Err(error) = agent_task.await {
+        let _ = tx.send(
+            WsMessage::Error {
+                message: format!("AI 任务异常结束: {}", error),
+            }
+            .to_json(),
+        );
+        return;
+    }
+
+    while let Ok(raw) = agent_rx.try_recv() {
+        if is_terminal_project_ws_message(&raw) {
+            terminal_is_done = is_done_project_ws_message(&raw);
+            terminal_raw = Some(raw);
+        } else {
+            let _ = tx.send(raw);
+        }
+    }
+
+    if terminal_is_done && execution_workspace.is_isolated() {
+        let merge_key = project_merge_execution_key(&project.id);
+        let merge_tx = tx.clone();
+        let merge_state = state.clone();
+        let merge_trace_id = trace_id.clone();
+        let merge_project_id = project.id.clone();
+        let merge_permit = state
+            .project_task_scheduler
+            .acquire(&merge_key, move || {
+                if let Some(trace_id) = merge_trace_id.as_deref() {
+                    merge_state.server_traces.record(
+                        trace_id,
+                        "server_project_merge_queue_wait",
+                        serde_json::json!({ "project_id": &merge_project_id }),
+                    );
+                }
+                let _ = merge_tx.send(
+                    WsMessage::Progress {
+                        message: "代码已在会话分支完成，正在等待项目合并锁。".into(),
+                    }
+                    .to_json(),
+                );
+            })
+            .await;
+        let _keep_merge_permit = merge_permit;
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "正在把会话分支串行合并回项目主工作区。".into(),
+            }
+            .to_json(),
+        );
+        match merge_conversation_worktree(&execution_workspace) {
+            Ok(summary) => {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_project_merge_done",
+                        serde_json::json!({
+                            "project_id": &project.id,
+                            "conversation_id": &conversation_id,
+                            "summary": summary,
+                        }),
+                    );
+                }
+                let _ = tx.send(WsMessage::Progress { message: summary }.to_json());
+            }
+            Err(error) => {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_project_merge_failed",
+                        serde_json::json!({
+                            "project_id": &project.id,
+                            "conversation_id": &conversation_id,
+                            "error": error.to_string(),
+                        }),
+                    );
+                }
+                let _ = tx.send(
+                    WsMessage::Error {
+                        message: format!(
+                            "会话代码已完成，但合并回项目主分支失败: {}。请处理冲突后重试。",
+                            error
+                        ),
+                    }
+                    .to_json(),
+                );
+                return;
+            }
+        }
+    }
+
+    if let Some(raw) = terminal_raw {
+        let _ = tx.send(raw);
+    } else {
+        let _ = tx.send(
+            WsMessage::Error {
+                message: "AI 任务结束但没有返回完成状态。".into(),
+            }
+            .to_json(),
+        );
+    }
+}
+
+fn prepare_project_conversation_workspace(
+    state: &AppState,
+    project: &ProjectAccess,
+    conversation_id: &str,
+) -> anyhow::Result<ProjectConversationWorkspace> {
+    let base_workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    if !is_git_work_tree(&base_workspace) {
+        return Ok(ProjectConversationWorkspace::shared(base_workspace));
+    }
+
+    let project_part = safe_project_path_part(&project.id, 64);
+    let conversation_part = safe_project_path_part(conversation_id, 80);
+    let worktree_root = PathBuf::from(&state.workspace_root)
+        .join("conversation-worktrees")
+        .join(&project_part);
+    let worktree_path = worktree_root.join(&conversation_part);
+    std::fs::create_dir_all(&worktree_root)?;
+
+    let branch = conversation_branch_name(&project_part, &conversation_part);
+    let _ = git_fetch_origin(&base_workspace);
+    if is_git_work_tree(&worktree_path) {
+        return Ok(ProjectConversationWorkspace::isolated(
+            base_workspace,
+            worktree_path,
+            branch,
+        ));
+    }
+    if worktree_path.exists() && std::fs::read_dir(&worktree_path)?.next().is_some() {
+        anyhow::bail!(
+            "会话 worktree 路径已存在但不是 Git 工作树: {}",
+            worktree_path.display()
+        );
+    }
+
+    let start_ref = conversation_start_ref(&base_workspace);
+    let mut args = vec!["worktree".to_string(), "add".to_string()];
+    if !local_branch_exists(&base_workspace, &branch) {
+        args.push("-b".into());
+        args.push(branch.clone());
+    }
+    args.push(worktree_path.to_string_lossy().to_string());
+    args.push(if local_branch_exists(&base_workspace, &branch) {
+        branch.clone()
+    } else {
+        start_ref
+    });
+    git_output_owned(&base_workspace, &args)?;
+
+    Ok(ProjectConversationWorkspace::isolated(
+        base_workspace,
+        worktree_path,
+        branch,
+    ))
+}
+
+fn merge_conversation_worktree(workspace: &ProjectConversationWorkspace) -> anyhow::Result<String> {
+    let Some(branch) = workspace.branch.as_deref() else {
+        return Ok("共享工作区任务无需额外合并。".into());
+    };
+    if !worktree_clean(&workspace.active_workspace)? {
+        anyhow::bail!("会话 worktree 仍有未提交或未 add 的改动，请先提交后再合并");
+    }
+    if !tracked_worktree_clean(&workspace.base_workspace)? {
+        anyhow::bail!("项目主工作区仍有未提交的已跟踪改动，暂不能自动合并");
+    }
+
+    let base_branch = current_branch(&workspace.base_workspace).unwrap_or_else(|| "main".into());
+    if has_origin_remote(&workspace.base_workspace) {
+        git_fetch_origin(&workspace.base_workspace)?;
+        git_output_owned(
+            &workspace.base_workspace,
+            &[
+                "pull".into(),
+                "--rebase".into(),
+                "origin".into(),
+                base_branch.clone(),
+            ],
+        )?;
+    }
+
+    let before = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
+    let merge_output = Command::new("git")
+        .args(["merge", "--no-ff", "--no-edit", branch])
+        .current_dir(&workspace.base_workspace)
+        .output()?;
+    if !merge_output.status.success() {
+        let _ = Command::new("git")
+            .args(["merge", "--abort"])
+            .current_dir(&workspace.base_workspace)
+            .output();
+        anyhow::bail!("{}", String::from_utf8_lossy(&merge_output.stderr).trim());
+    }
+    copy_latest_apk_artifact(&workspace.active_workspace, &workspace.base_workspace)?;
+    if has_origin_remote(&workspace.base_workspace) {
+        git_output_owned(
+            &workspace.base_workspace,
+            &["push".into(), "origin".into(), base_branch.clone()],
+        )?;
+    }
+    if tracked_worktree_clean(&workspace.active_workspace)? {
+        let _ = git_output_owned(
+            &workspace.active_workspace,
+            &["reset".into(), "--hard".into(), base_branch],
+        );
+    }
+    let after = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
+    if before == after {
+        Ok("会话分支没有新的提交需要合并。".into())
+    } else {
+        Ok(format!(
+            "会话分支已合并回项目主工作区：{}",
+            short_sha(&after)
+        ))
+    }
+}
+
+fn copy_latest_apk_artifact(
+    source_workspace: &Path,
+    target_workspace: &Path,
+) -> anyhow::Result<()> {
+    let Some(apk_path) = tools::find_latest_apk(source_workspace) else {
+        return Ok(());
+    };
+    let Ok(relative_path) = apk_path.strip_prefix(source_workspace) else {
+        return Ok(());
+    };
+    let target_path = target_workspace.join(relative_path);
+    if let Some(parent) = target_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::copy(&apk_path, &target_path)?;
+    Ok(())
+}
+
+fn project_conversation_execution_key(project_id: &str, conversation_id: &str) -> String {
+    format!("conversation:{}:{}", project_id, conversation_id)
+}
+
+fn project_shared_execution_key(project_id: &str) -> String {
+    format!("shared:{}", project_id)
+}
+
+fn project_merge_execution_key(project_id: &str) -> String {
+    format!("merge:{}", project_id)
+}
+
+fn conversation_branch_name(project_part: &str, conversation_part: &str) -> String {
+    format!("ai/session/{}/{}", project_part, conversation_part)
+}
+
+fn conversation_start_ref(workspace: &Path) -> String {
+    let branch = current_branch(workspace).unwrap_or_else(|| "main".into());
+    let origin_ref = format!("origin/{}", branch);
+    if git_output(workspace, &["rev-parse", "--verify", &origin_ref]).is_ok() {
+        origin_ref
+    } else {
+        branch
+    }
+}
+
+fn is_git_work_tree(workspace: &Path) -> bool {
+    workspace.exists()
+        && git_output(workspace, &["rev-parse", "--is-inside-work-tree"])
+            .map(|value| value == "true")
+            .unwrap_or(false)
+}
+
+fn current_branch(workspace: &Path) -> Option<String> {
+    git_output(workspace, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .ok()
+        .filter(|branch| !branch.is_empty() && branch != "HEAD")
+}
+
+fn local_branch_exists(workspace: &Path, branch: &str) -> bool {
+    git_output(
+        workspace,
+        &["rev-parse", "--verify", &format!("refs/heads/{}", branch)],
+    )
+    .is_ok()
+}
+
+fn has_origin_remote(workspace: &Path) -> bool {
+    git_output(workspace, &["remote", "get-url", "origin"]).is_ok()
+}
+
+fn git_fetch_origin(workspace: &Path) -> anyhow::Result<String> {
+    if has_origin_remote(workspace) {
+        git_output(workspace, &["fetch", "origin"])
+    } else {
+        Ok(String::new())
+    }
+}
+
+fn tracked_worktree_clean(workspace: &Path) -> anyhow::Result<bool> {
+    Ok(git_output(
+        workspace,
+        &["status", "--porcelain", "--untracked-files=no"],
+    )?
+    .trim()
+    .is_empty())
+}
+
+fn worktree_clean(workspace: &Path) -> anyhow::Result<bool> {
+    Ok(git_output(workspace, &["status", "--porcelain"])?
+        .trim()
+        .is_empty())
+}
+
+fn git_output_owned(workspace: &Path, args: &[String]) -> anyhow::Result<String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(workspace)
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr).trim());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn short_sha(sha: &str) -> String {
+    sha.chars().take(12).collect()
 }
 
 fn chat_reply_after_intent_gate(user_message: &str, codex_reply: Option<String>) -> String {
@@ -735,7 +1228,7 @@ fn chat_reply_after_intent_gate(user_message: &str, codex_reply: Option<String>)
     }
 
     if looks_like_multi_device_project_question(user_message) {
-        return "可以分两层理解：多手机同时登录或聊天本身可以并行；但多个手机同时让 AI 修改同一个项目，需要任务会话、worktree/分支、队列和合并保护，否则就可能出现冲突。我先按普通讨论处理，不进入改代码、打包或发布流程。"
+        return "可以分两层理解：多手机同时登录或聊天本身可以并行；同一项目的多个开发会话会使用各自的 worktree/分支并行编码，再由服务器串行合并、打包或发布。我先按普通讨论处理，不进入改代码、打包或发布流程。"
             .into();
     }
 
@@ -1860,6 +2353,18 @@ fn is_terminal_project_ws_message(raw: &str) -> bool {
                 .get("type")
                 .and_then(|message_type| message_type.as_str())
                 .map(|message_type| message_type == "done" || message_type == "error")
+        })
+        .unwrap_or(false)
+}
+
+fn is_done_project_ws_message(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("type")
+                .and_then(|message_type| message_type.as_str())
+                .map(|message_type| message_type == "done")
         })
         .unwrap_or(false)
 }

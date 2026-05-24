@@ -172,7 +172,7 @@ fn system_prompt(workspace: &str) -> String {
 1. 先确认当前目录、Git 状态、origin、当前分支和远端写权限；local_path/GitHub 项目如果不是可读写 Git 仓库，必须明确报错。
 2. 新项目或未知项目必须先读取项目自己的说明文档；如果项目没有说明文档，使用平台默认流程，但不要假装已经拥有项目记忆。
 3. 一龙自项目只是普通项目；不要把它当特殊路径，也不要把它的发布规则套到无关项目，除非该项目文档明确要求。
-4. 同一项目的共享工作区由服务器排队保护；以后 task worktree 可让编码阶段并行，但 merge、版本号递增、APK 发布、服务器部署必须串行。
+4. 服务器会为每个 APK 会话准备独立 Git worktree/分支；当前目录就是本会话工作区。编码阶段可按会话并行，最终 merge、版本号递增、APK 发布、服务器部署仍由服务器串行保护。
 5. 如果本次发现项目缺少必要流程说明，应建议用户补充 AGENTS.md/CODEX.md/README，而不是靠 CLI 记忆。
 6. 以后即使服务端接入其他 AI 模型，它们也只是旁路分析工具；最终用户意图、旁路结论和代码协作都要回到当前 APK 会话绑定的 Codex CLI 原生 session，保持主上下文不断。
 
@@ -205,7 +205,7 @@ fn system_prompt(workspace: &str) -> String {
 - 只有在确实需要读取、修改、提交或构建项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
 - 每完成一个功能点就 git_commit（中文描述）
-- git_commit 会自动执行 git push（如工作区有配置 origin）
+- git_commit 会自动提交并推送当前分支（如工作区有配置 origin）；如果当前目录是会话 worktree，不要手动推 main，服务器会在任务完成后串行合并。
 - build_project("android") 会自动递增 versionCode 和 versionName，无需手动改版本号
 - build_project 失败时分析错误，最多修复 3 次
 - 回复用户用简洁中文，告知进度
@@ -259,6 +259,33 @@ pub async fn run_for_project(
 ) {
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    run_for_project_in_workspace(
+        user_id,
+        project,
+        &workspace,
+        download_base,
+        conversation_id,
+        user_message,
+        agent_name,
+        trace_id,
+        state,
+        tx,
+    )
+    .await;
+}
+
+pub async fn run_for_project_in_workspace(
+    user_id: &str,
+    project: &ProjectAccess,
+    workspace: &Path,
+    download_base: &str,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
     let decision = intent_router::classify(user_message);

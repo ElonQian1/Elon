@@ -505,9 +505,9 @@ pub struct AppState {
     pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
     /// 反向 WSS 通道接入的 homecli PC agents（agent_id → AgentEntry）
     pub agent_manager: Arc<crate::homecli_agent::AgentManager>,
-    /// Project-scoped execution gates. Different projects can run in parallel; one
-    /// project runs one workspace-mutating task at a time until per-task worktrees
-    /// are introduced.
+    /// Short-lived execution gates keyed by project/conversation/merge scope.
+    /// Conversation worktrees allow coding work to run in parallel; merge/publish
+    /// keys still serialize shared project state.
     pub project_task_scheduler: Arc<ProjectTaskScheduler>,
     /// Best-effort Codex CLI native-session prewarm throttle, scoped by project,
     /// user, conversation, agent, and workspace.

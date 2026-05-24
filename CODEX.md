@@ -92,12 +92,13 @@ For documentation-only changes that are safely isolated by staging a single file
 
 ## APK Project Task Concurrency
 
-APK-triggered project tasks use a project-scoped execution gate on the server:
+APK-triggered project tasks use conversation worktrees plus shared-resource gates on the server:
 
 - Different `project_id` values can run at the same time.
-- The same `project_id` runs one workspace-mutating task at a time and later requests wait in a queue.
-- This protects the current shared workspace from concurrent `git pull`, file edits, commits, and pushes.
-- Task worktrees are still the target model for same-project parallel coding, but merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps.
+- Different `conversation_id` values inside the same project can run coding work at the same time.
+- Each development conversation gets its own Git worktree and `ai/session/...` branch; the Codex CLI should work only in that conversation worktree and push the current branch if a remote exists.
+- The same `project_id + conversation_id` still runs one task at a time so one conversation cannot race itself.
+- Merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps. If a project cannot create a worktree, it falls back to project-scoped shared-workspace serialization.
 - The built-in "一龙项目" follows this exact same rule as any other GitHub or `local_path` project.
 - Backend Git preflight failures are not final user failures. Pass them to the Codex CLI task context first; let CLI inspect `git status/diff` and try safe recovery. Only if CLI determines the flow cannot be recovered should the app show a friendly blocker.
 

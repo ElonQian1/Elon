@@ -69,13 +69,15 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         }
         return Err(anyhow!("git commit 失败: {}", stderr));
     }
-    // 尝试推送到远程（用户隔离工作区可能无远程，失败时非致命）
+    // 尝试推送到远程（用户隔离工作区可能无远程，失败时非致命）。
+    // 会话 worktree 会运行在自己的分支上，这里必须推当前分支而不是硬编码 main。
+    let branch = current_branch(project_root).unwrap_or_else(|| "main".into());
     let push_output = Command::new("git")
-        .args(["push", "origin", "main"])
+        .args(["push", "origin", &branch])
         .current_dir(project_root)
         .output();
     let push_note = match push_output {
-        Ok(out) if out.status.success() => " 并已推送到 origin/main".to_string(),
+        Ok(out) if out.status.success() => format!(" 并已推送到 origin/{}", branch),
         Ok(out) => {
             let err = String::from_utf8_lossy(&out.stderr);
             warn!("[工具] git push 失败（非致命）: {}", err.trim());
@@ -87,6 +89,23 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         }
     };
     Ok(format!("git commit 成功: {}{}", stdout.trim(), push_note))
+}
+
+fn current_branch(project_root: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(project_root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if branch.is_empty() || branch == "HEAD" {
+        None
+    } else {
+        Some(branch)
+    }
 }
 
 /// git pull --rebase origin main（同步最新代码，非致命）
@@ -122,7 +141,8 @@ fn bump_android_version(work_dir: &Path) -> String {
                 return "(5分钟内已递增过版本号，跳过重复递增)".into();
             }
         }
-    }    let content = match std::fs::read_to_string(&gradle_path) {
+    }
+    let content = match std::fs::read_to_string(&gradle_path) {
         Ok(c) => c,
         Err(e) => return format!("（读取 build.gradle 失败: {}）", e),
     };
@@ -182,9 +202,14 @@ fn bump_android_version(work_dir: &Path) -> String {
         return "（未找到 versionCode，跳过版本号递增）".into();
     }
     match std::fs::write(&gradle_path, &new_content) {
-        Ok(_) => {            // 写入成功后更新幂等性标记文件
-            let _ = std::fs::write(&bump_marker, "");            if version_name_new.is_empty() {
-                format!("版本号已递增: versionCode {} → {}", version_code_old, version_code_new)
+        Ok(_) => {
+            // 写入成功后更新幂等性标记文件
+            let _ = std::fs::write(&bump_marker, "");
+            if version_name_new.is_empty() {
+                format!(
+                    "版本号已递增: versionCode {} → {}",
+                    version_code_old, version_code_new
+                )
             } else {
                 format!(
                     "版本号已递增: versionCode {} → {}，versionName {} → {}",
@@ -539,9 +564,9 @@ pub async fn exec_via_agent(
     cwd: &str,
     progress_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
 ) -> Result<String> {
+    use crate::types::WsMessage;
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
     use homecli_proto::AgentToServer;
-    use crate::types::WsMessage;
 
     let agents = state.agent_manager.list().await;
     let agent_id = agents

@@ -146,9 +146,9 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ## APK 项目并发规则
 
-- 服务器按 `project_id` 设置项目级执行权：不同项目可以同时运行，同一个项目当前按顺序排队运行。
-- 这个排队只保护同一份项目工作区，避免两个手机同时 `git pull`、改文件、commit、push 造成覆盖或冲突。
-- `worktree` 仍然是推荐的多 AI 并行开发模型；后续实现同项目多任务 worktree 时，也必须把 merge、版本号递增、APK 发布、服务器部署这些共享动作保留为串行。
+- 服务器按 `project_id + conversation_id` 设置会话级执行权：不同项目可以同时运行，同一项目的不同会话也可以并行编码。
+- 每个开发会话使用独立 Git worktree 和 `ai/session/...` 分支，避免两个手机或两个会话同时 `git pull`、改文件、commit、push 到同一份工作区。
+- 同一会话内仍按顺序排队；merge、版本号递增、APK 发布、服务器部署这些共享动作必须保留为串行。无法创建 worktree 的项目退回项目级共享工作区串行执行。
 - 一龙自项目不走特殊旁路，它与其他 GitHub/local_path 项目遵守同一套并发、Git、构建、发布规则。
 
 ## 后端指挥 Codex CLI 的方式
