@@ -1187,6 +1187,21 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     }
     renderConversationList();
   }
+  function shortModelLabel(label) {
+    // 与 APK MainActivity.shortModelLabel 对齐
+    const m = (label || '').replace(/^Copilot \/ /, '');
+    if (/^Codex/i.test(m)) return 'Codex';
+    if (m.startsWith('服务器默认') || m === '默认模型') return '默认';
+    if (m.startsWith('自定义')) return '自定';
+    if (m.startsWith('GPT')) return m.replace(/ /g, '').slice(0, 6);
+    if (m.startsWith('gpt-')) return m.slice(0, 6);
+    if (m.startsWith('o1') || m.startsWith('o3')) return m.replace(/ /g, '').slice(0, 5);
+    if (m.startsWith('Claude')) return 'Cl' + (m.split(' ').pop() || '').slice(0, 3);
+    if (m.startsWith('Gemini')) return 'G' + (m.split(' ').pop() || '').slice(0, 4);
+    if (m.includes('/')) return m.split('/').pop().trim().slice(0, 5);
+    if (m.includes('[')) return m.split('[')[0].trim().slice(0, 4);
+    return m.slice(0, 6);
+  }
   async function loadAgents() {
     if (!currentUser) return;
     try {
@@ -1196,7 +1211,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       (data.available_agents || []).forEach((it) => {
         const opt = document.createElement('option');
         opt.value = it.name || '';
-        opt.textContent = it.label || it.name || 'unknown';
+        const raw = it.label || it.name || 'unknown';
+        opt.textContent = raw.replace(/^Copilot \/ /, '');
         agentSelect.appendChild(opt);
       });
       agentSelect.value = selectedAgent;
@@ -1206,7 +1222,9 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   }
   agentSelect.addEventListener('change', () => {
     selectedAgent = agentSelect.value;
-    modelBtn.textContent = selectedAgent ? (agentSelect.selectedOptions[0].textContent || '已选') : '默认';
+    const raw = selectedAgent ? (agentSelect.selectedOptions[0].textContent || '已选') : '默认';
+    modelBtn.textContent = shortModelLabel(raw);
+    modelBtn.title = '选择模型：' + raw;
   });
   async function loadVersion() {
     try {
