@@ -270,7 +270,8 @@ fn safe_attachment_name(original: &str) -> String {
 }
 
 async fn get_or_start_legacy_job(request: AgentRequest, state: Arc<AppState>) -> Arc<LegacyWsJob> {
-    let key = request.workspace_user_id.clone();
+    // 锁键同时考虑 用户×项目×会话，避免同一用户同项目下不同会话互相阻塞。
+    let key = legacy_job_key(&request.workspace_user_id, &request.conversation_id);
     let fingerprint = legacy_job_fingerprint(&request);
 
     {
@@ -395,6 +396,10 @@ async fn run_legacy_job(request: AgentRequest, state: Arc<AppState>, job: Arc<Le
             jobs.remove(&cleanup_key);
         }
     });
+}
+
+fn legacy_job_key(workspace_user_id: &str, conversation_id: &str) -> String {
+    format!("{}\u{1f}{}", workspace_user_id, conversation_id)
 }
 
 fn legacy_job_fingerprint(request: &AgentRequest) -> String {

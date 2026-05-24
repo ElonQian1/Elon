@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct ClientChatPayload {
     pub user_id: Option<String>,
     pub project_id: Option<String>,
+    pub conversation_id: Option<String>,
     pub message: Option<String>,
     pub agent: Option<String>,
     pub attachments: Option<Vec<ClientAttachmentPayload>>,
@@ -31,6 +32,9 @@ pub struct ClientAttachment {
 pub struct AgentRequest {
     pub user_id: String,
     pub workspace_user_id: String,
+    /// 会话级隔离键。旧客户端未提供时为 "default"，由服务端在锁键里再次和
+    /// `workspace_user_id` 组合，保证每个 (用户, 项目, 会话) 三元组互相不阻塞。
+    pub conversation_id: String,
     pub content: String,
     pub agent: Option<String>,
     pub attachments: Vec<ClientAttachment>,
@@ -43,6 +47,11 @@ pub fn parse_client_message(raw: &str) -> AgentRequest {
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "default".to_string());
         let workspace_user_id = workspace_user_id(&user_id, payload.project_id.as_deref());
+        let conversation_id = payload
+            .conversation_id
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "default".to_string());
         let content = payload.message.unwrap_or_else(|| raw.to_string());
         let agent = payload
             .agent
@@ -58,6 +67,7 @@ pub fn parse_client_message(raw: &str) -> AgentRequest {
         AgentRequest {
             user_id,
             workspace_user_id,
+            conversation_id,
             content,
             agent,
             attachments,
@@ -66,6 +76,7 @@ pub fn parse_client_message(raw: &str) -> AgentRequest {
         AgentRequest {
             user_id: "default".to_string(),
             workspace_user_id: "default".to_string(),
+            conversation_id: "default".to_string(),
             content: raw.to_string(),
             agent: None,
             attachments: Vec::new(),
@@ -120,6 +131,7 @@ mod tests {
 
         assert_eq!(req.user_id, "default");
         assert_eq!(req.workspace_user_id, "default");
+        assert_eq!(req.conversation_id, "default");
         assert_eq!(req.content, "hello");
         assert_eq!(req.agent, None);
         assert!(req.attachments.is_empty());
@@ -133,8 +145,19 @@ mod tests {
 
         assert_eq!(req.user_id, "u1");
         assert_eq!(req.workspace_user_id, "u1__myappbad");
+        assert_eq!(req.conversation_id, "default");
         assert_eq!(req.content, "build");
         assert_eq!(req.agent.as_deref(), Some("codex_cli"));
         assert!(req.attachments.is_empty());
+    }
+
+    #[test]
+    fn json_payload_keeps_conversation_id_when_provided() {
+        let req = parse_client_message(
+            r#"{"user_id":"u1","project_id":"app","conversation_id":" conv-42 ","message":"hi"}"#,
+        );
+
+        assert_eq!(req.workspace_user_id, "u1__app");
+        assert_eq!(req.conversation_id, "conv-42");
     }
 }
