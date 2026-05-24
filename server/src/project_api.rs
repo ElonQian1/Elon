@@ -394,6 +394,9 @@ fn looks_like_clarification_only(reply: &str) -> bool {
         "具体想问",
         "你是想问",
         "你可以直接说",
+        "没能准确识别",
+        "可以直接问",
+        "如果是要我立刻",
         "我先按普通聊天处理",
         "不进入改代码",
     ]
@@ -1261,6 +1264,15 @@ mod tests {
         let reply = chat_reply_after_intent_gate(
             "我们的apk是否支持多个手机同时登录？",
             Some("我先按普通聊天处理，不进入改代码、编译或发布流程。".into()),
+        );
+        assert!(reply.contains("多手机同时登录或聊天本身可以并行"));
+    }
+
+    #[test]
+    fn replaces_recognition_failure_for_multi_device_project_question() {
+        let reply = chat_reply_after_intent_gate(
+            "我们的apk是否支持多个手机同时登录？",
+            Some("我没能准确识别这句话的意思。".into()),
         );
         assert!(reply.contains("多手机同时登录或聊天本身可以并行"));
     }
