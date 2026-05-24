@@ -533,6 +533,7 @@ async fn run_project_agent_with_scheduler(
             Some(&conversation_id),
             &message,
             agent_name.as_deref(),
+            trace_id.as_deref(),
             &state,
             tx,
         )
@@ -556,6 +557,7 @@ async fn run_project_agent_with_scheduler(
         &message,
         agent_name.as_deref(),
         Some(native_session_scope),
+        trace_id.as_deref(),
         &state,
     )
     .await
@@ -685,6 +687,7 @@ async fn run_project_agent_with_scheduler(
         Some(&conversation_id),
         &message,
         agent_name.as_deref(),
+        trace_id.as_deref(),
         &state,
         tx,
     )
