@@ -52,7 +52,7 @@ object McpDebugServer {
     }
 
     private fun serveLoop() {
-        val token = debugToken()
+        debugToken()
         try {
             ServerSocket(PORT, 50, InetAddress.getByName(HOST)).use { server ->
                 serverSocket = server
@@ -61,7 +61,7 @@ object McpDebugServer {
                     mapOf("host" to HOST, "port" to PORT, "token_ready" to true)
                 )
                 Log.i(TAG, "MCP endpoint: adb forward tcp:$PORT tcp:$PORT then http://$HOST:$PORT/mcp")
-                Log.i(TAG, "MCP debug token: $token")
+                Log.i(TAG, "MCP debug token is ready")
                 while (running) {
                     val socket = try {
                         server.accept()
@@ -252,6 +252,7 @@ object McpDebugServer {
         val lines = output
             .lineSequence()
             .filter { regex.containsMatchIn(it) }
+            .map { redactLogLine(it) }
             .toList()
             .takeLast(300)
         val structured = JSONObject()
@@ -640,6 +641,14 @@ object McpDebugServer {
                 connection.disconnect()
             }
         }.getOrNull()
+    }
+
+    private fun redactLogLine(line: String): String {
+        return line
+            .replace(Regex("MCP debug token: [A-Za-z0-9._-]+"), "MCP debug token: <redacted>")
+            .replace(Regex("(?i)(auth[_-]?token[\\\"'=:\\s]+)[A-Za-z0-9._-]+")) {
+                it.groupValues[1] + "<redacted>"
+            }
     }
 
     private fun rpcResult(id: Any, result: JSONObject): JSONObject {
