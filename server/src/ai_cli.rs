@@ -25,11 +25,13 @@ pub async fn run_with_workspace(
     download_base: &str,
     user_message: &str,
     option_id: Option<&str>,
+    route: intent_router::CapabilityRoute,
     require_existing_git: bool,
     native_session_scope: Option<NativeSessionScope>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    let started = std::time::Instant::now();
     let option = state
         .ai_cli
         .find_option(option_id)
@@ -37,29 +39,38 @@ pub async fn run_with_workspace(
         .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
 
     std::fs::create_dir_all(workspace)?;
-    ensure_git(workspace, user_id, require_existing_git)?;
 
-    let android_task = looks_like_android_task(user_message);
-    let development_task = intent_router::looks_like_development_request(user_message);
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: if development_task {
-                "正在准备项目工作区。".into()
-            } else {
-                "正在思考。".into()
-            },
-        }
-        .to_json(),
-    );
-    for note in environment_notes(user_message, &option) {
-        let _ = tx.send(WsMessage::Progress { message: note }.to_json());
+    let development_task = route != intent_router::CapabilityRoute::ChatAgent
+        || intent_router::looks_like_development_request(user_message);
+    if development_task {
+        ensure_git(workspace, user_id, require_existing_git)?;
     }
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: "AI 助手正在处理你的请求。".into(),
+
+    let android_task = development_task && looks_like_android_task(user_message);
+    if development_task {
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "正在准备项目工作区。".into(),
+            }
+            .to_json(),
+        );
+        for note in environment_notes(user_message, &option) {
+            let _ = tx.send(WsMessage::Progress { message: note }.to_json());
         }
-        .to_json(),
-    );
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "AI 助手正在处理你的请求。".into(),
+            }
+            .to_json(),
+        );
+    } else {
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "正在思考。".into(),
+            }
+            .to_json(),
+        );
+    }
 
     let workspace_key = workspace.display().to_string();
     let native_session_id = if supports_codex_sessions(&option) {
@@ -89,7 +100,7 @@ pub async fn run_with_workspace(
         );
     }
 
-    let prompt = build_cli_prompt(workspace, user_message, &option);
+    let prompt = build_cli_prompt(workspace, user_message, &option, route);
     let output = run_cli_command(
         &option,
         workspace,
@@ -115,6 +126,12 @@ pub async fn run_with_workspace(
         );
     }
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
+    tracing::info!(
+        route = ?route,
+        development_task,
+        elapsed_ms = started.elapsed().as_millis(),
+        "local AI CLI request completed"
+    );
 
     let apk_url = if android_task {
         let _ = tx.send(
@@ -386,6 +403,46 @@ mod tests {
         assert_eq!(extract_thread_id(stdout).as_deref(), Some("thread-1"));
         assert_eq!(extract_json_agent_message(stdout).as_deref(), Some("hello"));
     }
+
+    fn test_option() -> AiCliOption {
+        AiCliOption {
+            id: "codex_cli".into(),
+            label: "Codex CLI".into(),
+            provider: "codex".into(),
+            model: None,
+            bin: "codex".into(),
+            args: vec!["exec".into(), "--skip-git-repo-check".into()],
+            prompt_mode: CliPromptMode::Arg,
+            timeout_secs: 60,
+        }
+    }
+
+    #[test]
+    fn chat_prompt_uses_lightweight_mode() {
+        let prompt = build_cli_prompt(
+            Path::new("D:/tmp/project"),
+            "你好，随便聊聊",
+            &test_option(),
+            intent_router::CapabilityRoute::ChatAgent,
+        );
+
+        assert!(prompt.contains("轻量聊天模式"));
+        assert!(!prompt.contains("通用项目工作流必须始终执行"));
+        assert!(!prompt.contains("git pull --rebase"));
+    }
+
+    #[test]
+    fn development_prompt_keeps_project_workflow() {
+        let prompt = build_cli_prompt(
+            Path::new("D:/tmp/project"),
+            "帮我修改 APK 并发布新版",
+            &test_option(),
+            intent_router::CapabilityRoute::CodeAgent,
+        );
+
+        assert!(prompt.contains("通用项目工作流必须始终执行"));
+        assert!(prompt.contains("git pull --rebase"));
+    }
 }
 
 async fn read_cli_stream<R>(reader: R) -> String
@@ -403,7 +460,52 @@ where
     collected
 }
 
-fn build_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
+fn build_cli_prompt(
+    workspace: &Path,
+    user_message: &str,
+    option: &AiCliOption,
+    route: intent_router::CapabilityRoute,
+) -> String {
+    if route == intent_router::CapabilityRoute::ChatAgent {
+        return build_chat_cli_prompt(workspace, user_message, option);
+    }
+
+    build_development_cli_prompt(workspace, user_message, option)
+}
+
+fn build_chat_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!("，当前模型：{}", model))
+        .unwrap_or_default();
+    format!(
+        r#"你是「一龙」平台里的 Codex CLI 对话助手。当前是轻量聊天模式，不是开发执行模式。
+
+当前 CLI：{provider}{model_text}
+当前项目目录：{workspace}
+
+请直接回复用户。规则：
+- 保持同一个 Codex CLI 原生 session 的上下文连续，但本轮不要主动读取文件、检查 Git、运行命令、修改代码或打包 APK。
+- 可以正常聊天、解释概念、帮用户梳理想法、询问下一步，也可以把模糊需求整理成可开发任务。
+- 如果用户明确要求修改代码、读取项目、编译、部署或发布 APK，只做简短确认和需求澄清，不要声称已经执行；下一轮会进入开发流程。
+- 以后服务端可能把其他 AI 模型的旁路分析结论给你；那些只是参考证据，主上下文仍以当前 Codex CLI session 为准。
+- 回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。
+
+用户请求：
+{user_message}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        user_message = user_message
+    )
+}
+
+fn build_development_cli_prompt(
+    workspace: &Path,
+    user_message: &str,
+    option: &AiCliOption,
+) -> String {
     let model_text = option
         .model
         .as_deref()

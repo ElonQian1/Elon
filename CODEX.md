@@ -195,6 +195,7 @@ Android APK builds are allowed in the main workspace when necessary, but still c
 - `server/src/intent_router.rs` is the shared capability router for Web, APK, and future Win clients.
 - Always classify user messages before choosing a backend model. Do not duplicate intent checks inside Web/APK handlers.
 - Current testing-stage routing defaults to `AI_CODEX_CLI_ONLY=true`: ordinary chat, model configuration discussion, intent-routed execution, image requests, and project/code collaboration all go through Codex CLI. The server ignores non-Codex agent selections and disables API fallback in this mode.
+- Codex-only does not mean every message uses the full development workflow. `ChatAgent` requests stay in the same native Codex CLI session but use a lightweight chat prompt that avoids Git checks, document reading, file edits, and release rules. The full project workflow is injected only for `CodeAgent` / development routes.
 - When multi-model routing returns later, Codex CLI remains the conversation spine: helper model outputs are treated as sidecar evidence and are injected back into the bound Codex CLI session instead of starting a separate long-running assistant context.
 - See `docs/intent-routing.md` before adding new capabilities, providers, or low-cost classifier logic.
 

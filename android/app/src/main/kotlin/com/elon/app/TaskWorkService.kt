@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -30,6 +31,9 @@ class TaskWorkService : Service() {
     private var payloadSentForCurrentConnection = false
     private var reconnectAttempts = 0
     private var activeServerUrl: String? = null
+    private var activeRequestStartedAtMs = 0L
+    private var firstServerEventAtMs = 0L
+    private var activeRequestKind = "unknown"
 
     override fun onCreate() {
         super.onCreate()
@@ -92,6 +96,10 @@ class TaskWorkService : Service() {
         waitingForReply = true
         reconnectAttempts = 0
         payloadSentForCurrentConnection = false
+        activeRequestStartedAtMs = System.currentTimeMillis()
+        firstServerEventAtMs = 0L
+        activeRequestKind = if (isDevelopment) "development" else "chat"
+        Log.i(TAG, "request_start kind=$activeRequestKind payload_bytes=${payload.length}")
         persistActiveWork()
         enterForeground()
         connect()
@@ -155,6 +163,12 @@ class TaskWorkService : Service() {
         if (!waitingForReply || payloadSentForCurrentConnection) return
         val sent = ensureClient().send(payload)
         payloadSentForCurrentConnection = sent
+        if (sent) {
+            Log.i(
+                TAG,
+                "request_sent kind=$activeRequestKind elapsed_ms=${elapsedSinceRequestStart()}"
+            )
+        }
         if (!sent) scheduleReconnect()
     }
 
@@ -182,6 +196,13 @@ class TaskWorkService : Service() {
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
+        if (firstServerEventAtMs == 0L) {
+            firstServerEventAtMs = System.currentTimeMillis()
+            Log.i(
+                TAG,
+                "first_server_event kind=$activeRequestKind type=${parsed?.optString("type").orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+            )
+        }
         when (parsed?.optString("type")) {
             "done" -> finishWork(parsed, success = true)
             "error" -> finishWork(parsed, success = false)
@@ -189,6 +210,10 @@ class TaskWorkService : Service() {
     }
 
     private fun finishWork(json: JSONObject, success: Boolean) {
+        Log.i(
+            TAG,
+            "request_finish kind=$activeRequestKind success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart()}"
+        )
         waitingForReply = false
         pendingPayload = null
         payloadSentForCurrentConnection = false
@@ -206,6 +231,11 @@ class TaskWorkService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastState()
         stopSelf()
+    }
+
+    private fun elapsedSinceRequestStart(): Long {
+        if (activeRequestStartedAtMs <= 0L) return 0L
+        return System.currentTimeMillis() - activeRequestStartedAtMs
     }
 
     private fun pauseWork() {
@@ -423,6 +453,7 @@ class TaskWorkService : Service() {
     }
 
     companion object {
+        private const val TAG = "ElonTaskWork"
         const val ACTION_START_WORK = "com.elon.app.task.START_WORK"
         const val ACTION_RESUME_PENDING = "com.elon.app.task.RESUME_PENDING"
         const val ACTION_CONNECT = "com.elon.app.task.CONNECT"

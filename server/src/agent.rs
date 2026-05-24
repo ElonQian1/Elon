@@ -407,7 +407,6 @@ async fn run_dispatch_with_workspace(
         if agent_name
             .map(|name| !is_local_cli_option(state, name))
             .unwrap_or(false)
-            || decision.route == CapabilityRoute::ChatAgent
         {
             let _ = tx.send(
                 WsMessage::Progress {
@@ -416,7 +415,7 @@ async fn run_dispatch_with_workspace(
                 .to_json(),
             );
         }
-        CapabilityRoute::CodeAgent
+        decision.route
     } else if image_cli_only {
         if !state.ai_cli.enabled {
             return Err(anyhow::anyhow!(
@@ -568,6 +567,7 @@ async fn run_backend_with_workspace(
                 download_base,
                 user_message,
                 cli_option_id(agent_name),
+                route,
                 require_existing_git,
                 native_session_scope.clone(),
                 state,
