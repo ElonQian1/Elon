@@ -15,7 +15,7 @@ argument-hint: "<发布原因或用户需求>"
 
 发布要求：
 
-1. 先确认 Git 状态，并保护所有不属于本任务的未提交改动。
+1. 先 `git fetch origin main` 并确认 Git 状态；保护所有不属于本任务的未提交改动，来源不明时从 `origin/main` 新建 worktree。
 2. 使用 `scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"`，不要手工拼接版本号、签名和上传步骤。
 3. 发布脚本必须完成 `versionCode/versionName` 递增、release APK 构建、release commit、`HEAD:main` 推送、APK/version.json 上传和服务器校验。
 4. 发布后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature`。

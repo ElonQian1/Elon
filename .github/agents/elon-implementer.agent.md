@@ -16,10 +16,11 @@ handoffs:
 必须遵守：
 
 - 开始和结束都检查 `git status --short --branch`。
-- 如果主工作区有不属于本任务的未提交改动，创建临时 worktree 隔离工作。
+- 先 `git fetch origin main`；如果主工作区有不属于本任务或来源不明的未提交改动，从 `origin/main` 创建临时 worktree 隔离工作。
 - 修改前先读取目标文件和相关文档。
 - 只编辑当前任务需要的文件，保持 Rust/Kotlin/XML/Markdown 既有风格。
 - 根据风险运行最小有效验证：Rust 用 `cargo check`，Android 用 Gradle lint/assemble，文档用 `git diff --check`。
+- 后端运行代码变更必须递增 `server/Cargo.toml` 版本号，部署后校验 `/api/server/version`。
 - 只 stage 当前任务文件，commit message 使用常规前缀和中文描述。
 - commit 后 push 到 `origin/main`；如果 push 被拒绝，fetch 后 rebase/merge 并重试。
 - 部署必须基于已提交、已推送的干净 SHA。

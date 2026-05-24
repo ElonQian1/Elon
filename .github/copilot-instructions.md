@@ -88,6 +88,8 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **APK 签名密钥不得泄露**，相关操作只走自动化脚本
 - **每个用户的修改是隔离的**，不能让一个用户的操作影响其他用户
 - **代码变更记录用户身份**，commit 信息中包含用户标识
+- **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
+- **后端运行代码变更必须递增 `server/Cargo.toml` 版本号**，部署后校验 `/api/server/version`，APK 会动态展示后端版本
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 
 ---
@@ -95,7 +97,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 ## 🚀 部署速查（服务端改动后必看）
 
 ```
-改代码 → git add → git commit → git push origin main → 运行 scripts/publish-server.ps1
+改后端代码 → 递增 server/Cargo.toml version → git add → git commit → git push origin main → 运行 scripts/publish-server.ps1 → 校验 /api/server/version
 ```
 
 | 项目 | 值 |
@@ -105,7 +107,8 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | 服务器 SSH | `root@43.139.149.158`（需加 `-o ProxyCommand=none` 绕代理） |
 | 服务器端口 | `8080` |
 | 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
-| 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| APK 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| 后端版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/api/server/version` |
 | APK 下载 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
 | 部署脚本 | `scripts/publish-server.ps1`（自动 worktree 隔离，SHA staging，并发安全） |
 | 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
@@ -136,4 +139,4 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - [ ] AI 对话后端集成（待实现）
 - [ ] 用户项目隔离系统（待实现）
 
-> AI 代理在修改任何代码时，请先 `git pull --rebase origin main` 拉取最新状态。
+> AI 代理在修改任何代码时，请先 `git fetch origin main` 和 `git status --short --branch`；工作区干净才 `git pull --rebase origin main`，否则按归属 stash 或使用 `origin/main` 新 worktree。

@@ -77,7 +77,12 @@ if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 
 $Sha      = (git -C $RepoRoot rev-parse --short HEAD).Trim()
 $ShaBig   = (git -C $RepoRoot rev-parse HEAD).Trim()
+$ServerVersion = [regex]::Match(
+    (Get-Content (Join-Path $ServerDir "Cargo.toml") -Encoding UTF8 -Raw),
+    '(?m)^version\s*=\s*"([^"]+)"'
+).Groups[1].Value
 Write-Host "   ✅ 最新 SHA: $Sha" -ForegroundColor Green
+Write-Host "   ✅ 后端版本: v$ServerVersion" -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────
 # 2. 环境检查（仅 Build 时做）
@@ -145,15 +150,19 @@ if (-not $SkipBuild) {
     try {
         # 强制把产物输出到临时工作树内，不污染其他项目的 target 目录
         $env:CARGO_TARGET_DIR = [System.IO.Path]::GetFullPath((Join-Path $TmpServerDir "target"))
+        $env:ELON_SERVER_GIT_SHA = $ShaBig
         cargo zigbuild --release --target $Target
         if ($LASTEXITCODE -ne 0) {
+            Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
             Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
             Pop-Location
             Remove-Worktree
             Write-Error "❌ 编译失败"
         }
+        Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     } catch {
+        Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
         Pop-Location -ErrorAction SilentlyContinue
         Remove-Worktree
@@ -313,6 +322,13 @@ if ($health -and $health.ToString().Trim() -ne "") {
     Write-Host "   ✅ 健康检查: $health" -ForegroundColor Green
 } else {
     Write-Host "   ⚠️  健康检查无响应（服务可能还在启动中，手动确认：curl.exe --noproxy '*' http://43.139.149.158:8080/health）" -ForegroundColor Yellow
+}
+
+$serverVersionResp = curl.exe --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/api/server/version" 2>&1
+if ($serverVersionResp -and $serverVersionResp.ToString().Trim() -ne "") {
+    Write-Host "   ✅ 后端版本接口: $serverVersionResp" -ForegroundColor Green
+} else {
+    Write-Host "   ⚠️  后端版本接口无响应（手动确认：curl.exe --noproxy '*' http://43.139.149.158:8080/api/server/version）" -ForegroundColor Yellow
 }
 
 # ─────────────────────────────────────────────────────────────

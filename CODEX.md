@@ -33,8 +33,10 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 - Remote: `git@github.com:ElonQian1/Elon.git`
 - Main branch: `main`
 - Always check `git status --short --branch` before and after a task.
+- Start by fetching remote state. If the workspace is clean, run `git pull --rebase origin main`. If uncommitted changes belong to the current task, stash with `git stash push -u`, rebase, then pop and resolve conflicts. If uncommitted changes are unrelated or unclear, do not stash or rebase that workspace; create a new worktree from `origin/main`.
 - Only stage files related to the current task. Never stage unrelated user or agent changes.
 - After a task commit, push with `git push origin main` unless the user explicitly says not to.
+- Before pushing, fetch/rebase against `origin/main` again so the task commit is based on the latest remote history.
 - Commit messages should use conventional prefixes such as `feat`, `fix`, `style`, `refactor`, or `docs`.
 - For user-facing code tasks, prefer Chinese commit descriptions that identify the user request when possible.
 - Do not use destructive Git commands such as `git reset --hard` or `git checkout --` in the main workspace.
@@ -71,7 +73,8 @@ Typical isolation flow:
 
 ```powershell
 $id = Get-Random -Maximum 9999
-git worktree add ..\Elon-session-$id -b ai/session-$id main
+git fetch origin main
+git worktree add ..\Elon-session-$id -b codex/session-$id origin/main
 # edit and commit in the temporary worktree
 git cherry-pick <session_commit_sha>
 git push origin main
@@ -148,7 +151,7 @@ Server:
 - Health check: `curl http://43.139.149.158:8080/health`
 - Deploy script (Windows):     `cd scripts && .\publish-server.ps1`
 - Deploy script (Linux/macOS): `bash scripts/publish-server.sh`
-- Both scripts are functionally identical: git pull → worktree → cross-compile → SHA check → upload → restart → verify
+- Both scripts are functionally identical: git pull → worktree → cross-compile with git SHA → SHA check → upload → restart → verify `/health` and `/api/server/version`
 
 APK:
 
@@ -159,6 +162,8 @@ APK:
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
+
+Backend server runtime changes must increment `server/Cargo.toml` `package.version` before commit. Use PATCH for fixes, MINOR for backward-compatible features, and MAJOR for incompatible API changes. The server exposes the deployed version at `GET /api/server/version`; deployment scripts inject the git SHA at build time, and the Android APK displays this server version dynamically on the profile page.
 
 ### ⚠️ Concurrent deployment protection (SHA ordering)
 

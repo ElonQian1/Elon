@@ -74,7 +74,9 @@ echo -e "${YELLOW}1⃣  同步最新代码...${NC}"
 git -C "$REPO_ROOT" pull --rebase origin main
 SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
+SERVER_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$SERVER_DIR/Cargo.toml" | head -1)
 echo -e "${GREEN}   ✅ 最新 SHA: $SHA${NC}"
+echo -e "${GREEN}   ✅ 后端版本: v$SERVER_VERSION${NC}"
 
 # ── 2. 环境检查 ───────────────────────────────────────────────
 if [ "$SKIP_BUILD" -eq 0 ]; then
@@ -117,7 +119,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   export CARGO_TARGET_DIR="$TMP_SERVER_DIR/target"
   (
     cd "$TMP_SERVER_DIR"
-    cargo zigbuild --release --target "$TARGET"
+    ELON_SERVER_GIT_SHA="$SHA_BIG" cargo zigbuild --release --target "$TARGET"
   )
   unset CARGO_TARGET_DIR
 
@@ -256,6 +258,14 @@ if [ -n "$HEALTH" ]; then
 else
   echo -e "${YELLOW}   ⚠️  健康检查无响应（服务可能还在启动中）${NC}"
   echo -e "${YELLOW}      手动确认：curl --noproxy '*' http://43.139.149.158:8080/health${NC}"
+fi
+
+SERVER_VERSION_JSON=$(curl --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/api/server/version" 2>&1 || true)
+if [ -n "$SERVER_VERSION_JSON" ]; then
+  echo -e "${GREEN}   ✅ 后端版本接口: $SERVER_VERSION_JSON${NC}"
+else
+  echo -e "${YELLOW}   ⚠️  后端版本接口无响应${NC}"
+  echo -e "${YELLOW}      手动确认：curl --noproxy '*' http://43.139.149.158:8080/api/server/version${NC}"
 fi
 
 # ── 7. 清理工作树（由 trap EXIT 自动执行）────────────────────

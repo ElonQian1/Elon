@@ -9,9 +9,16 @@
 
 ```powershell
 cd "d:\rust\active-projects\elon cli"
-git pull --rebase origin main   # 同步最新代码
-git status --short              # 检查是否有其他 AI 未提交的改动
+git fetch origin main
+git status --short --branch     # 检查是否有其他 AI 未提交的改动
 ```
+
+同步规则：
+
+- 工作区干净：执行 `git pull --rebase origin main` 后开始任务。
+- 未提交改动属于本任务：先 `git stash push -u -m "wip-before-sync"`，再 `git pull --rebase origin main`，然后 `git stash pop` 并解决冲突。
+- 未提交改动不属于本任务或来源不明：**不要 stash / pull / pop 当前工作区**，必须从 `origin/main` 创建独立 worktree，例如 `git worktree add ..\Elon-task -b codex/task origin/main`。
+- 提交前再执行一次 `git fetch origin main` + `git rebase origin/main`，确认本次提交叠在最新远端之上。
 
 ### 🛡️ 新 clone 必须装一次 git hook（无论 Windows / Linux / 服务器 codex CLI）
 
@@ -29,6 +36,8 @@ bash scripts/install-hooks.sh
 > 这是机器强制的防漏 add 守门（修复 56bad51 类事故）。
 > Android APK 主分支推送也会被 hook 检查：如果改了 APK 运行代码但没有递增
 > `android/app/build.gradle` 里的 `versionCode/versionName`，会拒绝推送到 `main`。
+> 后端运行代码主分支推送也会被 hook 检查：如果改了 `server/src/**`
+> 但没有递增 `server/Cargo.toml` 的 `version`，会拒绝推送。
 > 部署侧由服务器 flock 互斥锁 + CAS（compare-and-swap）保证不会并发覆盖。
 
 ---
@@ -37,6 +46,7 @@ bash scripts/install-hooks.sh
 
 ```
 改代码
+  → 如涉及 server/src/** 后端运行代码：递增 server/Cargo.toml 的 version
   → git status --short | Select-String "^\?\?"  ← ⚠️ 检查是否有新建文件未 add
   → git add <只加自己改的文件，含新建 .rs 文件>
   → git commit -m "type(scope): 描述"
@@ -44,7 +54,8 @@ bash scripts/install-hooks.sh
   → 根据系统选择部署脚本：
        Windows:       cd scripts; .\publish-server.ps1
        Linux/macOS:   bash scripts/publish-server.sh
-  → 验证: curl --noproxy '*' http://43.139.149.158:8080/health
+  → 验证健康: curl --noproxy '*' http://43.139.149.158:8080/health
+  → 验证后端版本: curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
 
 > **绝对禁止**：改完代码不 commit 直接运行部署脚本 ——  
@@ -96,7 +107,8 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | 服务器 SSH | `root@43.139.149.158`（加 `-o ProxyCommand=none` 绕代理） |
 | 服务器端口 | `8080` |
 | 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
-| 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| APK 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
+| 后端版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/api/server/version` |
 | APK 下载 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
 | 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
 
@@ -162,6 +174,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
+- 后端运行代码变更必须递增 `server/Cargo.toml` 的 `version`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
 - Android 新功能必须完成 APK 发布闭环，不能只停在 PR、Debug 包或本地验证。
 - 不提交密钥、`.env`、APK 签名材料或任何敏感信息。
 - push 被拒绝（non-fast-forward）→ `git pull --rebase` 解决后再 push，禁止 `--force`。

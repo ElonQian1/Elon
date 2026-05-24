@@ -39,11 +39,30 @@ applyTo: "**"
 
 ## ✅ 提交规则
 
-1. **任务开始前**：先执行 `git pull --rebase origin main` 同步最新代码，再开始修改
+1. **任务开始前**：先执行 `git fetch origin main` 和 `git status --short --branch`，判断本地是否落后以及工作区是否有未提交改动
 2. 任务开始 **前后** 各执行一次 `git status --short`，识别主工作区是否有其他 AI 的未提交改动
 3. `git add` 只加自己任务相关的文件
 4. 发现其他代理未提交改动 → **不回退、不覆盖**，只提交自己的文件
-5. **每次 commit 后必须立即 `git push origin main`**
+5. 提交前再执行 `git fetch origin main` + `git rebase origin/main`，确保本次提交基于最新远端
+6. **每次 commit 后必须立即 `git push origin main`**
+
+### 本地有未提交改动时如何同步远端
+
+| 场景 | 做法 |
+|---|---|
+| 工作区干净 | `git pull --rebase origin main` |
+| 未提交改动确定属于本任务 | `git stash push -u -m "wip-before-sync"` → `git pull --rebase origin main` → `git stash pop` → 解决冲突 |
+| 未提交改动属于其他 AI / 其他任务 / 来源不明 | 不在当前工作区 pull/rebase；从 `origin/main` 创建独立 worktree |
+
+独立 worktree 示例：
+
+```powershell
+git fetch origin main
+git worktree add ..\Elon-task-$env:USERNAME -b codex/<task-name> origin/main
+Set-Location ..\Elon-task-$env:USERNAME
+```
+
+> 未提交改动不会让本地“自动落后”；落后是因为远端后来进了新提交。未提交改动的问题是会让 `pull --rebase` 不安全，所以必须先判断归属。
 
 ### ⚠️ 新建文件必须显式 `git add`（血泪教训）
 
@@ -119,9 +138,10 @@ git push origin main
 ### 有其他 AI 未提交改动时：独立工作树隔离
 
 ```powershell
-# 1. 基于 main 创建本会话专属工作树
+# 1. 基于 origin/main 创建本会话专属工作树
 $id = Get-Random -Maximum 9999
-git worktree add ..\Elon-session-$id -b ai/session-$id main
+git fetch origin main
+git worktree add ..\Elon-session-$id -b codex/session-$id origin/main
 
 # 2. 在会话工作树中改代码
 Set-Location ..\Elon-session-$id
@@ -149,6 +169,7 @@ git worktree remove ..\Elon-session-$id --force
 
 ```powershell
 # 1. 提交
+git add server/Cargo.toml          # 后端运行代码变化必须递增 package.version
 git add server/src/<file>.rs          # 只加自己改的文件
 git commit -m "fix(server): 描述"
 git push origin main
@@ -176,6 +197,7 @@ ssh root@43.139.149.158 @"
 
 # 5. 验证
 ssh root@43.139.149.158 'curl -s http://localhost:8080/health'
+ssh root@43.139.149.158 'curl -s http://localhost:8080/api/server/version'
 
 # 6. 清理临时工作树（必须！）
 git worktree remove $tmp --force
@@ -185,6 +207,7 @@ git worktree remove $tmp --force
 
 ```powershell
 # 提交
+git add server/Cargo.toml
 git add server/src/<file>.rs
 git commit -m "fix(server): 描述"
 git push origin main
@@ -195,6 +218,18 @@ bash scripts/deploy.sh
 ```
 
 > 如果主工作区有其他 AI 的未提交改动，**必须**用上方临时工作树流程。
+
+### 后端版本号规则
+
+后端运行代码变更包括 `server/src/**` 和 `server/homecli-proto/src/**`。这类改动在部署前必须递增 `server/Cargo.toml` 的 `package.version`：
+
+| 情况 | 递增位 | 示例 |
+|---|---|---|
+| 修复 Bug，无新接口能力 | PATCH | `0.2.3` → `0.2.4` |
+| 新增后端功能，向后兼容 | MINOR，PATCH 归零 | `0.2.4` → `0.3.0` |
+| 不兼容 API / 协议变更 | MAJOR，其余归零 | `0.3.0` → `1.0.0` |
+
+`scripts/publish-server.ps1` / `scripts/publish-server.sh` 会在构建时注入 git SHA，服务端通过 `/api/server/version` 返回 `versionName` 和 `gitSha`。APK 个人页动态读取该接口，用户可看到服务器是否更新。
 
 ---
 
@@ -292,6 +327,7 @@ tls/
 ✅ 基于哪个 SHA 部署：<sha>
 ✅ 临时工作树已清理：是 / 不适用
 ✅ 服务健康验证结果：<curl 输出>
+✅ 后端版本验证结果：<curl /api/server/version 输出>
 ✅ APK 发布状态：已发布 / 未发布（非 Android 任务或用户明确要求）
 ✅ APK 版本与下载地址：<versionName/build/downloadUrl>
 ```

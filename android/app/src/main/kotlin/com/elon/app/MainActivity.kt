@@ -112,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private val serverUrl = "http://43.139.149.158:8080"
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
+    private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
     private var activeProjectIndex = 0
     private val conversations: MutableList<AppConversation> get() = activeProject().conversations
     private val projectEvents: MutableList<String> get() = activeProject().events
@@ -190,6 +191,11 @@ class MainActivity : AppCompatActivity() {
     private data class ModelOption(
         val label: String,
         val agentName: String?
+    )
+
+    private data class ServerVersionInfo(
+        val versionName: String,
+        val gitSha: String?
     )
 
     private data class GitProjectStatus(
@@ -1200,6 +1206,8 @@ class MainActivity : AppCompatActivity() {
                 renderProjectList()
             } else if (tab == binding.tabChat) {
                 renderConversationList()
+            } else if (tab == binding.tabProfile) {
+                refreshServerVersion()
             }
         }
 
@@ -2572,7 +2580,52 @@ class MainActivity : AppCompatActivity() {
         }
         binding.profileShareButton.setOnClickListener { showPromotionDialog() }
         binding.profileVersionText.text =
-            "一龙 v${BuildConfig.VERSION_NAME}  (build ${BuildConfig.VERSION_CODE})"
+            "${localAppVersionLine()}\n服务器版本读取中..."
+        refreshServerVersion()
+    }
+
+    private fun localAppVersionLine(): String =
+        "一龙 v${BuildConfig.VERSION_NAME}  (build ${BuildConfig.VERSION_CODE})"
+
+    private fun refreshServerVersion() {
+        Thread {
+            val info = fetchServerVersionInfo()
+            val serverLine = info?.let { formatServerVersionLine(it) } ?: "服务器版本暂不可用"
+            runOnUiThread {
+                if (::binding.isInitialized) {
+                    binding.profileVersionText.text = "${localAppVersionLine()}\n$serverLine"
+                }
+            }
+        }.start()
+    }
+
+    private fun fetchServerVersionInfo(): ServerVersionInfo? = try {
+        val request = Request.Builder()
+            .url(serverVersionUrl)
+            .addHeader("Cache-Control", "no-cache")
+            .build()
+        http.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) return null
+            val body = resp.body?.string() ?: return null
+            val json = JSONObject(body)
+            val versionName = json.optString("versionName", json.optString("version_name", ""))
+            val gitSha = json.optString("gitSha", json.optString("git_sha", ""))
+            if (versionName.isBlank()) return null
+            ServerVersionInfo(versionName = versionName, gitSha = gitSha.takeIf { it.isNotBlank() })
+        }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun formatServerVersionLine(info: ServerVersionInfo): String {
+        val shortSha = info.gitSha
+            ?.takeIf { it != "dev" }
+            ?.take(8)
+        return if (shortSha.isNullOrBlank()) {
+            "服务器 v${info.versionName}"
+        } else {
+            "服务器 v${info.versionName} ($shortSha)"
+        }
     }
 
     private fun showMoreActions() {

@@ -23,5 +23,5 @@ handoffs:
 - 先读取 `.github/copilot-instructions.md`、`.github/instructions/git-deploy-workflow.instructions.md`、`docs/ai-agent-workflow.md` 和相关源码。
 - 输出计划前要说明任务类型、影响模块、目标文件、验证命令、Git/部署注意事项。
 - 不直接编辑文件，不运行会改变状态的命令。
-- 如果需求涉及部署或 APK 发布，计划必须包含版本号、提交、push、临时 worktree、验证和回滚点。
+- 如果需求涉及部署或 APK 发布，计划必须包含后端/APK 版本号、提交、push、临时 worktree、验证和回滚点。
 - 计划要能交给 `elon-implementer` 直接执行。

@@ -26,6 +26,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/healthz", get(api::health))
         .route("/readyz", get(api::readyz))
         .route("/api/runtime", get(api::readyz))
+        .route("/api/server/version", get(api::server_version))
         .route("/ws", get(client_gateway::ws_handler))
         .route("/api/chat", post(api::chat))
         .route("/api/image/generate", post(api::generate_image))

@@ -13,7 +13,7 @@
 
 1. 每次进入项目先观察目录结构和 `git status --short --branch`。
 2. 如果存在 `AGENTS.md`、`CODEX.md`、`.github/copilot-instructions.md`、`.github/instructions/*.md`、`README.md` 或任务相关 `docs/`，必须先阅读，再决定修改方案。
-3. `local_path` 和 GitHub 项目按已有 Git 仓库处理，修改前同步远端，修改后验证、commit、push。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。修改前先 `git fetch origin main`；工作区干净才直接 `git pull --rebase origin main`，当前任务自己的未提交改动可 stash/rebase/pop，其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. Android APK 新功能的完成定义是“手机可安装到最新 APK”，不是 PR、分支、Debug 包或代码已提交。
@@ -214,6 +214,8 @@ cargo build --release
 # 编译产物: server/target/release/elon-server （Linux 服务器上运行）
 ```
 
+后端运行代码变更必须先递增 `server/Cargo.toml` 的 `package.version`。PATCH 用于修复，MINOR 用于向后兼容的新功能，MAJOR 用于不兼容 API / 协议变更。部署脚本会把 git SHA 注入二进制，服务端通过 `/api/server/version` 暴露 `versionName` 和 `gitSha`，APK 个人页会动态显示该后端版本。
+
 ### 7.2 Android APK 编译打包
 ```powershell
 cd android
@@ -244,6 +246,15 @@ npm run build
 ```powershell
 # 重启 Rust 服务（具体命令根据服务器配置确定）
 scripts/deploy.sh server
+```
+
+当前仓库标准入口是：
+
+```powershell
+cd scripts
+.\publish-server.ps1
+curl --noproxy '*' http://43.139.149.158:8080/health
+curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
 
 ### 8.2 分发 APK
@@ -307,3 +318,4 @@ scripts/deploy.sh apk
 4. **每个用户任务**必须有完整的 git 提交记录，可溯源
 5. **不允许**一次修改范围过大（超过5个文件应拆分为多次任务）
 6. **Android 新功能禁止只交 PR 或 Debug 包**；默认必须完成 APK 发布闭环并校验服务器 `version.json`
+7. **后端运行代码变更必须递增服务端版本号**；默认必须部署后校验服务器 `/api/server/version`

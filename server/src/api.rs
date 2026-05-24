@@ -57,6 +57,24 @@ pub struct ImageGenerateResponse {
     pub revised_prompt: Option<String>,
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerVersionResponse {
+    pub service: &'static str,
+    pub status: &'static str,
+    pub version_name: &'static str,
+    pub git_sha: &'static str,
+}
+
+pub async fn server_version() -> Json<ServerVersionResponse> {
+    Json(ServerVersionResponse {
+        service: "elon-server",
+        status: "ok",
+        version_name: env!("CARGO_PKG_VERSION"),
+        git_sha: option_env!("ELON_SERVER_GIT_SHA").unwrap_or("dev"),
+    })
+}
+
 pub async fn chat(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatRequest>,

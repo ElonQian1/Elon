@@ -10,6 +10,15 @@ ZERO_SHA='0000000000000000000000000000000000000000'
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+semver_to_int() {
+  local version="$1" major=0 minor=0 patch=0
+  IFS=. read -r major minor patch <<EOF
+$version
+EOF
+  major=${major:-0}; minor=${minor:-0}; patch=${patch:-0}
+  echo $((10#$major * 1000000 + 10#$minor * 1000 + 10#$patch))
+}
+
 PUSH_LINES=()
 while read -r local_ref local_sha remote_ref remote_sha; do
   PUSH_LINES+=("$local_ref $local_sha $remote_ref $remote_sha")
@@ -66,7 +75,50 @@ for line in "${PUSH_LINES[@]}"; do
   fi
 done
 
-# 3. cargo check 守门（如果存在 server/Cargo.toml）
+# 3. 后端版本守门：推 main 时，服务端运行代码变化必须递增 server/Cargo.toml version
+for line in "${PUSH_LINES[@]}"; do
+  set -- $line
+  local_ref="$1"
+  local_sha="$2"
+  remote_ref="$3"
+  remote_sha="$4"
+
+  if [ "$remote_ref" != "refs/heads/main" ] || [ "$local_sha" = "$ZERO_SHA" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "$ZERO_SHA" ]; then
+    base_sha="$(git merge-base "$local_sha" origin/main 2>/dev/null || git rev-list --max-parents=0 "$local_sha" | tail -n 1)"
+  else
+    base_sha="$remote_sha"
+  fi
+
+  changed_files="$(git diff --name-only "$base_sha" "$local_sha")"
+  server_runtime_changes="$(echo "$changed_files" | grep -E '^(server/src/|server/homecli-proto/src/)' || true)"
+
+  if [ -z "$server_runtime_changes" ]; then
+    continue
+  fi
+
+  old_server_version="$(git show "$base_sha:server/Cargo.toml" 2>/dev/null | sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' | head -1)"
+  new_server_version="$(git show "$local_sha:server/Cargo.toml" 2>/dev/null | sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' | head -1)"
+
+  if [ -z "$old_server_version" ] || [ -z "$new_server_version" ] || [ "$old_server_version" = "$new_server_version" ]; then
+    echo -e "${RED}❌ pre-push 拒绝：检测到服务端运行代码变更，但没有递增 server/Cargo.toml version。${NC}" >&2
+    echo -e "${YELLOW}   变更范围：${NC}" >&2
+    echo "$server_runtime_changes" | sed 's/^/   /' >&2
+    echo -e "${YELLOW}   规则：后端功能部署前必须递增服务端语义版本，APK 会动态显示该版本。${NC}" >&2
+    exit 1
+  fi
+
+  if [ "$(semver_to_int "$new_server_version")" -le "$(semver_to_int "$old_server_version")" ]; then
+    echo -e "${RED}❌ pre-push 拒绝：server/Cargo.toml version 必须递增。${NC}" >&2
+    echo -e "${YELLOW}   当前变更: v$old_server_version → v$new_server_version${NC}" >&2
+    exit 1
+  fi
+done
+
+# 4. cargo check 守门（如果存在 server/Cargo.toml）
 if [ -f "server/Cargo.toml" ]; then
   echo -e "${YELLOW}🔍 pre-push: cargo check --workspace（server）...${NC}"
   if ! (cd server && cargo check --workspace --quiet 2>&1); then

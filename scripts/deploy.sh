@@ -13,6 +13,7 @@ SERVICE_NAME="elon-server"
 # 获取仓库根目录和当前 HEAD SHA
 REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
+SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
 TMP_WORKTREE="${REPO_ROOT}/../Elon-deploy-temp-${SHA}"
 
 # 注册退出时自动清理临时工作树
@@ -35,7 +36,7 @@ echo "=== 在服务器上编译 Rust ==="
 ssh $SERVER "
   source \$HOME/.cargo/env
   cd $REMOTE_DIR/server
-  cargo build --release 2>&1 | tail -10
+  ELON_SERVER_GIT_SHA='$SHA_BIG' cargo build --release 2>&1 | tail -10
 "
 
 echo "=== 重启服务 ==="
@@ -54,8 +55,10 @@ ssh $SERVER "
 
 echo "=== 验证 ==="
 ssh $SERVER 'curl -s http://localhost:8080/health'
+ssh $SERVER 'curl -s http://localhost:8080/api/server/version'
 
 echo ""
 echo "=== 部署完成，基于 SHA: ${SHA} ==="
 echo "服务地址: http://43.139.149.158:8080"
 echo "健康检查: curl http://43.139.149.158:8080/health"
+echo "后端版本: curl http://43.139.149.158:8080/api/server/version"

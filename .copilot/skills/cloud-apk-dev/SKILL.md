@@ -31,6 +31,8 @@ description: >
 ## 关键规则
 
 - 修改前必须先读文件，不允许盲改
+- 有其他任务或来源不明的未提交改动时，必须从 `origin/main` 新建 worktree，不在脏工作区硬拉远端
+- 服务端运行代码变更必须递增 `server/Cargo.toml` 的 `version`，部署后校验 `/api/server/version`
 - 编译失败最多自动重试3次，否则回滚
 - APK签名密钥只能来自环境变量 `$env:APK_KEYSTORE`
 - 每次任务必须有 git commit 记录

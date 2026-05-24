@@ -5,7 +5,7 @@
 .DESCRIPTION
     Use this before the final AI report. AndroidFeature verifies that local
     HEAD equals origin/main and that server /app/version.json matches the
-    local Android version.
+    local Android version. Server verifies /health and /api/server/version.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
@@ -21,6 +21,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $GradlePath = Join-Path $RepoRoot "android\app\build.gradle"
+$ServerCargoPath = Join-Path $RepoRoot "server\Cargo.toml"
 $ServerUrl = "http://43.139.149.158:8080"
 
 function Stop-Check {
@@ -119,9 +120,29 @@ if ($Kind -eq "Server") {
         Stop-Check "Server health check failed: $_"
     }
 
+    if (-not (Test-Path $ServerCargoPath)) {
+        Stop-Check "server/Cargo.toml was not found: $ServerCargoPath"
+    }
+    $serverCargo = Get-Content $ServerCargoPath -Encoding UTF8 -Raw
+    $localServerVersion = [regex]::Match($serverCargo, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
+    if (-not $localServerVersion) {
+        Stop-Check "Could not read server package version from server/Cargo.toml."
+    }
+
+    try {
+        $serverVersion = Invoke-RestMethod "$ServerUrl/api/server/version" -TimeoutSec 10
+    } catch {
+        Stop-Check "Server version check failed: $_"
+    }
+
+    if ([string]$serverVersion.versionName -ne $localServerVersion) {
+        Stop-Check "Server version mismatch: local v$localServerVersion, server v$($serverVersion.versionName)."
+    }
+
     Write-Host "Server completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  health:      $($health | ConvertTo-Json -Compress)"
+    Write-Host "  version:     v$($serverVersion.versionName) ($($serverVersion.gitSha))"
     exit 0
 }

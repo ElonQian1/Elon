@@ -37,8 +37,41 @@ $ServerUrl  = "http://43.139.149.158:8080"
 
 $DefaultKeystore = Join-Path $env:USERPROFILE ".elon\signing\elon-release.jks"
 $LegacyKeystore  = Join-Path $AndroidDir "app\elon-release.jks"
+$UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
+
+function Get-UserGradleProperty {
+    param([string]$Name)
+
+    if (-not (Test-Path $UserGradleProps)) { return $null }
+    foreach ($line in Get-Content $UserGradleProps -Encoding UTF8) {
+        $trimmed = $line.Trim()
+        if ($trimmed.StartsWith("#") -or -not $trimmed.Contains("=")) { continue }
+        $parts = $trimmed.Split("=", 2)
+        if ($parts[0].Trim() -eq $Name) {
+            return $parts[1].Trim().Trim('"')
+        }
+    }
+    return $null
+}
+
+function Set-EnvFromUserGradleProperty {
+    param([string]$Name)
+
+    if (-not [string]::IsNullOrWhiteSpace((Get-Item "Env:$Name" -ErrorAction SilentlyContinue).Value)) {
+        return
+    }
+    $value = Get-UserGradleProperty $Name
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+        Set-Item "Env:$Name" $value
+    }
+}
 
 function Use-ReleaseSigningConfig {
+    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEYSTORE"
+    Set-EnvFromUserGradleProperty "ELON_RELEASE_STORE_PASSWORD"
+    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEY_ALIAS"
+    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEY_PASSWORD"
+
     if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEYSTORE)) {
         if (Test-Path $DefaultKeystore) {
             $env:ELON_RELEASE_KEYSTORE = $DefaultKeystore
