@@ -1,5 +1,9 @@
 use crate::{client_protocol, types::AppState};
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path as AxumPath, Query, State},
+    http::StatusCode,
+    Json,
+};
 use std::sync::Arc;
 
 /// 健康检查
@@ -73,6 +77,23 @@ pub async fn server_version() -> Json<ServerVersionResponse> {
         version_name: env!("CARGO_PKG_VERSION"),
         git_sha: option_env!("ELON_SERVER_GIT_SHA").unwrap_or("dev"),
     })
+}
+
+#[derive(serde::Deserialize)]
+pub struct ServerTraceQuery {
+    pub limit: Option<usize>,
+}
+
+pub async fn server_trace(
+    State(state): State<Arc<AppState>>,
+    AxumPath(trace_id): AxumPath<String>,
+    Query(query): Query<ServerTraceQuery>,
+) -> Json<serde_json::Value> {
+    Json(
+        state
+            .server_traces
+            .trace_json(&trace_id, query.limit.unwrap_or(120)),
+    )
 }
 
 pub async fn chat(

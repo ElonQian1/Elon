@@ -16,6 +16,7 @@ mod intent_router;
 mod peer_relay;
 mod project_api;
 mod router;
+mod server_trace;
 mod store;
 mod tools;
 mod types;

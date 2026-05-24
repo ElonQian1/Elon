@@ -20,7 +20,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, LazyLock,
     },
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::{broadcast, mpsc::UnboundedSender, Mutex};
 
@@ -42,6 +42,7 @@ struct ProjectWsJob {
     key: String,
     fingerprint: String,
     task_id: String,
+    trace_id: Option<String>,
     backlog: Mutex<Vec<String>>,
     broadcaster: broadcast::Sender<String>,
     finished: AtomicBool,
@@ -229,6 +230,18 @@ pub async fn chat_project(
         message,
         req.attachments.as_deref(),
     );
+    let trace_id = clean_trace_id(req.trace_id.as_deref());
+    state.server_traces.record(
+        &trace_id,
+        "http_project_message_received",
+        serde_json::json!({
+            "project_id": &project.id,
+            "user_id": &user.id,
+            "conversation_id": &conversation_id,
+            "message_chars": message.chars().count(),
+            "agent": req.agent.as_deref(),
+        }),
+    );
 
     let task_id =
         match state
@@ -249,6 +262,7 @@ pub async fn chat_project(
         conversation_id.clone(),
         message,
         req.agent,
+        Some(trace_id.clone()),
         tx,
     )
     .await;
@@ -259,6 +273,7 @@ pub async fn chat_project(
     let mut error = None;
     while let Some(raw) = rx.recv().await {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+            record_server_message(&state, &trace_id, &value, raw.len());
             match value.get("type").and_then(|t| t.as_str()) {
                 Some("done") => {
                     reply = value["message"].as_str().unwrap_or("完成").to_string();
@@ -283,9 +298,24 @@ pub async fn chat_project(
         apk_url.as_deref(),
         error.as_deref(),
     );
+    state.server_traces.record(
+        &trace_id,
+        if error.is_some() {
+            "http_project_task_failed"
+        } else {
+            "http_project_task_done"
+        },
+        serde_json::json!({
+            "task_id": &task_id,
+            "status": status,
+            "has_apk_url": apk_url.is_some(),
+            "has_image_url": image_url.is_some(),
+        }),
+    );
 
     Json(serde_json::json!({
         "task_id": task_id,
+        "trace_id": trace_id,
         "conversation_id": conversation_id,
         "reply": reply,
         "apk_url": apk_url,
@@ -441,10 +471,33 @@ async fn run_project_agent_with_scheduler(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            "server_workflow_start",
+            serde_json::json!({
+                "project_id": &project.id,
+                "user_id": &user_id,
+                "conversation_id": &conversation_id,
+                "message_chars": message.chars().count(),
+                "agent": agent_name.as_deref(),
+            }),
+        );
+    }
     let needs_project_workflow =
         intent_router::classify(&message).route != intent_router::CapabilityRoute::ChatAgent;
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            "server_intent_classified",
+            serde_json::json!({
+                "needs_project_workflow": needs_project_workflow,
+            }),
+        );
+    }
     if !needs_project_workflow {
         agent::run_for_project(
             &user_id,
@@ -483,6 +536,16 @@ async fn run_project_agent_with_scheduler(
     .await
     {
         Ok(gate) if !gate.should_enter_development() => {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "server_intent_kept_chat",
+                    serde_json::json!({
+                        "confidence": gate.confidence,
+                        "reason": gate.reason,
+                    }),
+                );
+            }
             tracing::info!(
                 confidence = gate.confidence,
                 reason = %gate.reason,
@@ -500,6 +563,16 @@ async fn run_project_agent_with_scheduler(
             return;
         }
         Ok(gate) => {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "server_intent_enter_development",
+                    serde_json::json!({
+                        "confidence": gate.confidence,
+                        "reason": gate.reason,
+                    }),
+                );
+            }
             tracing::info!(
                 confidence = gate.confidence,
                 reason = %gate.reason,
@@ -507,6 +580,15 @@ async fn run_project_agent_with_scheduler(
             );
         }
         Err(error) => {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "server_intent_error",
+                    serde_json::json!({
+                        "error": error.to_string(),
+                    }),
+                );
+            }
             let _ = tx.send(
                 WsMessage::Error {
                     message: format!("Codex CLI 意图确认失败: {}", error),
@@ -526,9 +608,19 @@ async fn run_project_agent_with_scheduler(
     );
 
     let queued_tx = tx.clone();
+    let trace_state = state.clone();
+    let queued_trace_id = trace_id.clone();
+    let queued_project_id = project.id.clone();
     let permit = state
         .project_task_scheduler
         .acquire(&project.id, move || {
+            if let Some(trace_id) = queued_trace_id.as_deref() {
+                trace_state.server_traces.record(
+                    trace_id,
+                    "server_project_queue_wait",
+                    serde_json::json!({ "project_id": &queued_project_id }),
+                );
+            }
             let _ = queued_tx.send(
                 WsMessage::Progress {
                     message: "当前项目已有任务在运行，本次任务已进入队列。为了避免多个手机同时修改同一份项目工作区，服务器会按项目顺序执行。"
@@ -544,6 +636,16 @@ async fn run_project_agent_with_scheduler(
     } else {
         "已获得项目执行权，开始同步代码并调用 AI 修改项目。"
     };
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            "server_project_execution_granted",
+            serde_json::json!({
+                "project_id": &project.id,
+                "was_queued": permit.was_queued(),
+            }),
+        );
+    }
     let _ = tx.send(
         WsMessage::Progress {
             message: message_text.into(),
@@ -1011,8 +1113,21 @@ async fn handle_project_ws(
             request.attachments.as_deref(),
         );
 
+        let trace_id = clean_trace_id(request.trace_id.as_deref());
         let client_request_id =
             project_client_request_id(&request, &project.id, &user.id, &conversation_id, &message);
+        state.server_traces.record(
+            &trace_id,
+            "ws_project_message_received",
+            serde_json::json!({
+                "project_id": &project.id,
+                "user_id": &user.id,
+                "conversation_id": &conversation_id,
+                "client_request_id": &client_request_id,
+                "message_chars": message.chars().count(),
+                "agent": request.agent.as_deref(),
+            }),
+        );
         let fingerprint =
             project_ws_fingerprint(&conversation_id, request.agent.as_deref(), &message);
         let job = get_or_start_project_ws_job(
@@ -1023,6 +1138,7 @@ async fn handle_project_ws(
             conversation_id,
             message,
             request.agent,
+            Some(trace_id.clone()),
             client_request_id,
             fingerprint,
         )
@@ -1034,9 +1150,23 @@ async fn handle_project_ws(
         let mut replay_failed = false;
         for progress in backlog {
             if sender.send(Message::Text(progress.clone())).await.is_err() {
+                record_server_transport(
+                    &state,
+                    &trace_id,
+                    "server_replay_to_phone_failed",
+                    &progress,
+                    &job.task_id,
+                );
                 replay_failed = true;
                 break;
             }
+            record_server_transport(
+                &state,
+                &trace_id,
+                "server_message_replayed_to_phone",
+                &progress,
+                &job.task_id,
+            );
             if is_terminal_project_ws_message(&progress) {
                 replayed_terminal = true;
                 break;
@@ -1056,10 +1186,24 @@ async fn handle_project_ws(
                     match progress {
                         Ok(progress) => {
                             let terminal = is_terminal_project_ws_message(&progress);
-                            if sender.send(Message::Text(progress)).await.is_err() {
+                            if sender.send(Message::Text(progress.clone())).await.is_err() {
+                                record_server_transport(
+                                    &state,
+                                    &trace_id,
+                                    "server_send_to_phone_failed",
+                                    &progress,
+                                    &job.task_id,
+                                );
                                 client_disconnected = true;
                                 break;
                             }
+                            record_server_transport(
+                                &state,
+                                &trace_id,
+                                "server_message_forwarded_to_phone",
+                                &progress,
+                                &job.task_id,
+                            );
                             if terminal || job.finished.load(Ordering::SeqCst) {
                                 break;
                             }
@@ -1108,6 +1252,14 @@ async fn handle_project_ws(
             }
         }
         if client_disconnected {
+            state.server_traces.record(
+                &trace_id,
+                "server_client_disconnected",
+                serde_json::json!({
+                    "task_id": &job.task_id,
+                    "background_job_continues": !job.finished.load(Ordering::SeqCst),
+                }),
+            );
             tracing::info!(
                 task_id = %job.task_id,
                 "project WebSocket disconnected while task was running; background job continues"
@@ -1125,6 +1277,7 @@ async fn get_or_start_project_ws_job(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    trace_id: Option<String>,
     client_request_id: String,
     fingerprint: String,
 ) -> Arc<ProjectWsJob> {
@@ -1132,9 +1285,29 @@ async fn get_or_start_project_ws_job(
     let mut jobs = PROJECT_WS_JOBS.lock().await;
     if let Some(existing) = jobs.get(&key) {
         if existing.fingerprint == fingerprint {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "ws_project_join_existing_job",
+                    serde_json::json!({
+                        "task_id": &existing.task_id,
+                        "finished": existing.finished.load(Ordering::SeqCst),
+                    }),
+                );
+            }
             return existing.clone();
         }
         if !existing.finished.load(Ordering::SeqCst) {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "ws_project_attach_running_job",
+                    serde_json::json!({
+                        "task_id": &existing.task_id,
+                        "reason": "different_fingerprint",
+                    }),
+                );
+            }
             let notice = WsMessage::Progress {
                 message: "同一个请求仍在后台处理，正在继续同步已有任务进度。".into(),
             }
@@ -1173,10 +1346,21 @@ async fn get_or_start_project_ws_job(
             key: key.clone(),
             fingerprint,
             task_id: task.id.clone(),
+            trace_id: trace_id.clone(),
             backlog: Mutex::new(backlog),
             broadcaster: broadcast_tx,
             finished: AtomicBool::new(true),
         });
+        if let Some(trace_id) = trace_id.as_deref() {
+            state.server_traces.record(
+                trace_id,
+                "ws_project_restore_terminal_task",
+                serde_json::json!({
+                    "task_id": &task.id,
+                    "status": &task.status,
+                }),
+            );
+        }
         jobs.insert(key.clone(), job.clone());
         schedule_project_job_cleanup(key, job.clone());
         return job;
@@ -1209,6 +1393,7 @@ async fn get_or_start_project_ws_job(
                     key: key.clone(),
                     fingerprint,
                     task_id: "tsk_unknown".into(),
+                    trace_id: trace_id.clone(),
                     backlog: Mutex::new(vec![raw]),
                     broadcaster: broadcast_tx,
                     finished: AtomicBool::new(true),
@@ -1225,6 +1410,7 @@ async fn get_or_start_project_ws_job(
         key: key.clone(),
         fingerprint,
         task_id: task_id.clone(),
+        trace_id: trace_id.clone(),
         backlog: Mutex::new(Vec::new()),
         broadcaster: broadcast_tx,
         finished: AtomicBool::new(false),
@@ -1241,6 +1427,7 @@ async fn get_or_start_project_ws_job(
             conversation_id,
             message,
             agent_name,
+            trace_id,
             task_id,
             job_for_task,
             restart_notice,
@@ -1259,10 +1446,24 @@ async fn run_project_ws_job(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    trace_id: Option<String>,
     task_id: String,
     job: Arc<ProjectWsJob>,
     restart_notice: Option<String>,
 ) {
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            "ws_project_job_start",
+            serde_json::json!({
+                "task_id": &task_id,
+                "project_id": &project.id,
+                "conversation_id": &conversation_id,
+                "message_chars": message.chars().count(),
+                "agent": agent_name.as_deref(),
+            }),
+        );
+    }
     if let Some(message) = restart_notice {
         emit_project_job_event(
             &state,
@@ -1279,6 +1480,7 @@ async fn run_project_ws_job(
     let task_conversation_id = conversation_id.clone();
     let task_message = message.clone();
     let task_agent_name = agent_name.clone();
+    let task_trace_id = trace_id.clone();
     let agent_task = tokio::spawn(async move {
         run_project_agent_with_scheduler(
             state_clone,
@@ -1288,6 +1490,7 @@ async fn run_project_ws_job(
             task_conversation_id,
             task_message,
             task_agent_name,
+            task_trace_id,
             tx,
         )
         .await;
@@ -1341,6 +1544,21 @@ async fn run_project_ws_job(
         apk_url.as_deref(),
         error.as_deref(),
     );
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            if error.is_some() {
+                "ws_project_task_failed"
+            } else {
+                "ws_project_task_done"
+            },
+            serde_json::json!({
+                "task_id": &task_id,
+                "status": status,
+                "has_apk_url": apk_url.is_some(),
+            }),
+        );
+    }
     job.finished.store(true, Ordering::SeqCst);
     schedule_project_job_cleanup(job.key.clone(), job);
 }
@@ -1360,6 +1578,11 @@ async fn emit_project_job_event(
         }
     }
     let _ = state.store.record_task_event(task_id, &raw);
+    if let Some(trace_id) = job.trace_id.as_deref() {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+            record_server_message(state, trace_id, &value, raw.len());
+        }
+    }
     let _ = job.broadcaster.send(raw);
 }
 
@@ -1400,6 +1623,103 @@ fn project_ws_fingerprint(
         agent_name.unwrap_or(""),
         message
     )
+}
+
+fn clean_trace_id(input: Option<&str>) -> String {
+    let cleaned = input
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':'))
+        .take(120)
+        .collect::<String>();
+    if cleaned.is_empty() {
+        format!("srv_{}", current_wall_time_ms())
+    } else {
+        cleaned
+    }
+}
+
+fn record_server_message(
+    state: &AppState,
+    trace_id: &str,
+    value: &serde_json::Value,
+    bytes: usize,
+) {
+    if trace_id.trim().is_empty() {
+        return;
+    }
+    let details = server_message_details(value, bytes);
+    state
+        .server_traces
+        .record(trace_id, "server_message_to_phone", details.clone());
+    match value.get("type").and_then(|kind| kind.as_str()) {
+        Some("done") => state.server_traces.record(trace_id, "server_done", details),
+        Some("error") => state.server_traces.record(trace_id, "server_error", details),
+        _ => {}
+    }
+}
+
+fn record_server_transport(
+    state: &AppState,
+    trace_id: &str,
+    phase: &str,
+    raw: &str,
+    task_id: &str,
+) {
+    if trace_id.trim().is_empty() {
+        return;
+    }
+    let mut details = serde_json::from_str::<serde_json::Value>(raw)
+        .map(|value| server_message_details(&value, raw.len()))
+        .unwrap_or_else(|_| {
+            serde_json::json!({
+                "type": "invalid_json",
+                "bytes": raw.len(),
+            })
+        });
+    if let Some(object) = details.as_object_mut() {
+        object.insert("task_id".into(), serde_json::json!(task_id));
+    }
+    state.server_traces.record(trace_id, phase, details);
+}
+
+fn server_message_details(value: &serde_json::Value, bytes: usize) -> serde_json::Value {
+    let message = value
+        .get("message")
+        .and_then(|message| message.as_str())
+        .unwrap_or_default();
+    serde_json::json!({
+        "type": value.get("type").and_then(|kind| kind.as_str()).unwrap_or("unknown"),
+        "bytes": bytes,
+        "message_chars": message.chars().count(),
+        "message_preview": preview_text(message, 180),
+        "has_apk_url": value
+            .get("apk_url")
+            .and_then(|url| url.as_str())
+            .map(|url| !url.is_empty())
+            .unwrap_or(false),
+        "has_image_url": value
+            .get("image_url")
+            .and_then(|url| url.as_str())
+            .map(|url| !url.is_empty())
+            .unwrap_or(false),
+    })
+}
+
+fn preview_text(value: &str, max_chars: usize) -> String {
+    let mut preview = value.chars().take(max_chars).collect::<String>();
+    if value.chars().count() > max_chars {
+        preview.push_str("...");
+    }
+    preview
+}
+
+fn current_wall_time_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
 }
 
 fn project_client_request_id(

@@ -24,6 +24,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URLEncoder
 import java.net.URL
 import java.util.Locale
 import java.util.TimeZone
@@ -45,6 +46,7 @@ object McpDebugServer {
     private const val MAX_BODY_BYTES = 256 * 1024
     private const val MAX_HEADER_BYTES = 16 * 1024
     private const val SOCKET_TIMEOUT_MS = 5_000
+    private const val DEFAULT_SERVER_BASE_URL = "http://43.139.149.158:8080"
 
     @Volatile private var running = false
     @Volatile private var serverSocket: ServerSocket? = null
@@ -205,6 +207,7 @@ object McpDebugServer {
             "network_check" -> networkCheck(args)
             "background_debug_status" -> backgroundDebugStatus(args)
             "latency_report" -> latencyReport(args)
+            "server_trace" -> serverTrace(args)
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> debugKeepalive(args)
@@ -308,6 +311,8 @@ object McpDebugServer {
         val includeLogcat = if (args.has("include_logcat")) args.optBoolean("include_logcat") else true
         val includeNetworkCheck = if (args.has("include_network_check")) args.optBoolean("include_network_check") else true
         val includeUpdateCheck = args.optBoolean("include_update_check", false)
+        val includeServerTrace = if (args.has("include_server_trace")) args.optBoolean("include_server_trace") else true
+        val serverTraceLimit = args.optInt("server_trace_limit", 120).coerceIn(1, 300)
         val logcatArgs = JSONObject()
             .put("line_count", args.optInt("logcat_line_count", 240).coerceIn(20, 1_000))
             .put(
@@ -335,13 +340,29 @@ object McpDebugServer {
             JSONObject.NULL
         }
         val backgroundRuntime = backgroundDebugStatusJson()
-        val taskStatus = taskStatusJson(JSONObject())
+        val taskStatusArgs = JSONObject()
+        args.optString("trace_id").takeIf { it.isNotBlank() }?.let { taskStatusArgs.put("trace_id", it) }
+        val taskStatus = taskStatusJson(taskStatusArgs)
+        val bundleTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
+            ?: taskStatus.optString("trace_id").takeIf { it.isNotBlank() && it != "null" }
+            ?: latestTraceId(DebugTraceStore.recentEvents(300))
         val latencyArgs = JSONObject()
             .put("timeline_limit", args.optInt("timeline_limit", 80).coerceIn(1, 300))
-        taskStatus.optString("trace_id").takeIf { it.isNotBlank() && it != "null" }?.let {
+        bundleTraceId?.let {
             latencyArgs.put("trace_id", it)
         }
         val latency = latencyReportJson(latencyArgs)
+        val serverTrace = if (includeServerTrace) {
+            JSONObject()
+                .put("trace_id", bundleTraceId ?: "")
+                .put("limit", serverTraceLimit)
+                .apply {
+                    args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
+                }
+                .let { serverTraceJson(it) }
+        } else {
+            JSONObject.NULL
+        }
         val assessment = diagnosticAssessmentJson(
             selfCheck = selfCheck,
             backgroundRuntime = backgroundRuntime,
@@ -349,7 +370,8 @@ object McpDebugServer {
             taskStatus = taskStatus,
             trace = trace,
             logcat = logcat,
-            latency = latency
+            latency = latency,
+            serverTrace = serverTrace
         )
 
         DebugTraceStore.record(
@@ -358,6 +380,7 @@ object McpDebugServer {
                 "debug_session_id" to session.optString("session_id").takeIf { it.isNotBlank() },
                 "include_logcat" to includeLogcat,
                 "include_network_check" to includeNetworkCheck,
+                "include_server_trace" to includeServerTrace,
                 "assessment" to assessment.optString("severity"),
                 "since_wall_time_ms" to sinceWallTimeMs
             )
@@ -374,6 +397,7 @@ object McpDebugServer {
             .put("network_check", network)
             .put("task_status", taskStatus)
             .put("latency_report", latency)
+            .put("server_trace", serverTrace)
             .put("task_events", taskEvents)
             .put("trace_recent", trace)
             .put("logcat_recent", logcat)
@@ -395,6 +419,16 @@ object McpDebugServer {
 
     private fun latencyReport(args: JSONObject): JSONObject {
         return toolResult("Latency report returned.", latencyReportJson(args))
+    }
+
+    private fun serverTrace(args: JSONObject): JSONObject {
+        val structured = serverTraceJson(args)
+        val available = structured.optBoolean("available", false)
+        return toolResult(
+            if (available) "Server trace returned." else "Server trace is not available.",
+            structured,
+            isError = !available
+        )
     }
 
     private fun mcpSelfCheck(args: JSONObject): JSONObject {
@@ -796,6 +830,11 @@ object McpDebugServer {
         } else {
             true
         }
+        val includeServerTrace = if (args.has("include_server_trace")) {
+            args.optBoolean("include_server_trace")
+        } else {
+            true
+        }
 
         if (waitTargetPhases(waitFor) == null) {
             return toolResult(
@@ -850,15 +889,31 @@ object McpDebugServer {
         )
         val latency = latencyReportJson(JSONObject().put("trace_id", traceId).put("timeline_limit", timelineLimit))
         val taskStatus = taskStatusJson(JSONObject().put("trace_id", traceId))
+        val serverTrace = if (includeServerTrace) {
+            JSONObject()
+                .put("trace_id", traceId)
+                .put("limit", args.optInt("server_trace_limit", 120).coerceIn(1, 300))
+                .apply {
+                    args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
+                }
+                .let { serverTraceJson(it) }
+        } else {
+            JSONObject.NULL
+        }
         val diagnostic = if (includeDiagnosticBundle) {
             diagnosticBundle(
                 JSONObject()
                     .put("trace_id", traceId)
                     .put("include_logcat", includeLogcat)
                     .put("include_network_check", includeNetworkCheck)
+                    .put("include_server_trace", includeServerTrace)
+                    .put("server_trace_limit", args.optInt("server_trace_limit", 120).coerceIn(1, 300))
                     .put("trace_limit", timelineLimit)
                     .put("timeline_limit", timelineLimit)
                     .put("since_wall_time_ms", probeStartedAt)
+                    .apply {
+                        args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
+                    }
             ).optJSONObject("structuredContent") ?: JSONObject()
         } else {
             JSONObject.NULL
@@ -883,6 +938,7 @@ object McpDebugServer {
             .put("wait_result", waitResult)
             .put("task_status", taskStatus)
             .put("latency_report", latency)
+            .put("server_trace", serverTrace)
             .put("diagnostic_bundle", diagnostic)
         return toolResult(
             if (waitResult.optBoolean("reached", false)) {
@@ -1078,6 +1134,9 @@ object McpDebugServer {
                             .put("logcat_pattern", stringProperty("Regex filter for logcat. Defaults to Elon/crash/foreground-service tags."))
                             .put("include_network_check", booleanProperty("Include backend network probes. Defaults to true."))
                             .put("include_update_check", booleanProperty("Include server version.json in self-check. Defaults to false."))
+                            .put("include_server_trace", booleanProperty("Fetch backend trace events for the selected trace_id. Defaults to true."))
+                            .put("server_trace_limit", intProperty("Maximum backend trace events to return, 1-300. Defaults to 120."))
+                            .put("server_url", stringProperty("Optional backend base URL. Defaults to http://43.139.149.158:8080."))
                             .put("task_event_limit", intProperty("Maximum queued task events to return, 1-120. Defaults to 20.")),
                         required = JSONArray()
                     )
@@ -1120,6 +1179,18 @@ object McpDebugServer {
                         properties = JSONObject()
                             .put("trace_id", stringProperty("Optional trace id. Defaults to the active or latest traced phone task."))
                             .put("timeline_limit", intProperty("Maximum timeline events to return, 1-300. Defaults to 80.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "server_trace",
+                        title = "Server Trace",
+                        description = "Fetch backend debug trace events for the phone trace_id so Codex can compare phone timing with server receive/queue/reply timing.",
+                        properties = JSONObject()
+                            .put("trace_id", stringProperty("Optional trace id. Defaults to the active or latest traced phone task."))
+                            .put("limit", intProperty("Maximum backend trace events to return, 1-300. Defaults to 120."))
+                            .put("server_url", stringProperty("Optional backend base URL. Defaults to http://43.139.149.158:8080.")),
                         required = JSONArray()
                     )
                 )
@@ -1243,7 +1314,10 @@ object McpDebugServer {
                             .put("timeline_limit", intProperty("Maximum latency timeline events to return, 1-300. Defaults to 80."))
                             .put("include_diagnostic_bundle", booleanProperty("Include diagnostic_bundle after waiting. Defaults to true."))
                             .put("include_logcat", booleanProperty("Include logcat in the nested diagnostic bundle. Defaults to false."))
-                            .put("include_network_check", booleanProperty("Include network_check in the nested diagnostic bundle. Defaults to true.")),
+                            .put("include_network_check", booleanProperty("Include network_check in the nested diagnostic bundle. Defaults to true."))
+                            .put("include_server_trace", booleanProperty("Include server_trace in the probe result and nested diagnostic bundle. Defaults to true."))
+                            .put("server_trace_limit", intProperty("Maximum backend trace events to return, 1-300. Defaults to 120."))
+                            .put("server_url", stringProperty("Optional backend base URL. Defaults to http://43.139.149.158:8080.")),
                         required = JSONArray().put("message")
                     )
                 )
@@ -1497,6 +1571,44 @@ object McpDebugServer {
             .put("missing_milestones", missingMilestones)
             .put("timeline", timeline)
             .put("task_status", taskStatus)
+    }
+
+    private fun serverTraceJson(args: JSONObject): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val events = DebugTraceStore.recentEvents(300)
+        val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
+            ?: pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
+            ?: latestTraceId(events)
+        val limit = args.optInt("limit", 120).coerceIn(1, 300)
+        val baseUrl = args.optString("server_url").takeIf { it.isNotBlank() }
+            ?: DEFAULT_SERVER_BASE_URL
+        if (traceId == null) {
+            return JSONObject()
+                .put("available", false)
+                .put("reason", "missing_trace_id")
+                .put("server_url", baseUrl)
+                .put("limit", limit)
+        }
+
+        val encodedTraceId = URLEncoder.encode(traceId, "UTF-8")
+        val url = "${baseUrl.trimEnd('/')}/api/debug/traces/$encodedTraceId?limit=$limit"
+        val started = SystemClock.elapsedRealtime()
+        val response = fetchJson(url)
+        val durationMs = SystemClock.elapsedRealtime() - started
+        if (response == null) {
+            return JSONObject()
+                .put("available", false)
+                .put("reason", "server_unreachable_or_non_json")
+                .put("trace_id", traceId)
+                .put("url", url)
+                .put("duration_ms", durationMs)
+                .put("limit", limit)
+        }
+        return response
+            .put("available", true)
+            .put("url", url)
+            .put("duration_ms", durationMs)
+            .put("server_url", baseUrl)
     }
 
     private fun bottleneckJson(bottleneck: Pair<String, Long>?): JSONObject {
@@ -1817,7 +1929,8 @@ object McpDebugServer {
         taskStatus: JSONObject,
         trace: JSONObject,
         logcat: Any,
-        latency: JSONObject
+        latency: JSONObject,
+        serverTrace: Any
     ): JSONObject {
         val findings = JSONArray()
         val nextActions = JSONArray()
@@ -1936,6 +2049,33 @@ object McpDebugServer {
                     "Largest latency segment is ${bottleneck.optString("name")} at ${bottleneck.optLong("duration_ms")} ms.",
                     bottleneck.optString("recommendation", "Inspect latency_report.bottleneck.")
                 )
+            }
+        }
+
+        val serverTraceJson = serverTrace as? JSONObject
+        if (serverTraceJson != null) {
+            val traceId = taskStatus.optString("trace_id").takeIf { it.isNotBlank() && it != "null" }
+            if (traceId != null && !serverTraceJson.optBoolean("available", false)) {
+                addFinding(
+                    "warning",
+                    "server_trace",
+                    "Server-side trace for the active trace_id could not be loaded.",
+                    "Call server_trace with trace_id=$traceId and compare with network_check."
+                )
+            } else if (traceId != null && serverTraceJson.optInt("matched_count", 0) == 0) {
+                val phonePayloadSent = trace.optJSONArray("events")?.let { events ->
+                    (0 until events.length()).any { index ->
+                        events.optJSONObject(index)?.optString("phase") == "task_payload_sent"
+                    }
+                } ?: false
+                if (phonePayloadSent) {
+                    addFinding(
+                        "warning",
+                        "server_trace",
+                        "Phone says the payload was sent, but the backend has no matching server trace.",
+                        "Check the backend deployment/version and whether the phone sent the expected trace_id."
+                    )
+                }
             }
         }
 
