@@ -100,6 +100,7 @@ pub async fn run_with_workspace(
     workspace: &Path,
     download_base: &str,
     user_message: &str,
+    preflight_note: Option<&str>,
     option_id: Option<&str>,
     route: intent_router::CapabilityRoute,
     require_existing_git: bool,
@@ -176,7 +177,7 @@ pub async fn run_with_workspace(
         );
     }
 
-    let prompt = build_cli_prompt(workspace, user_message, &option, route);
+    let prompt = build_cli_prompt(workspace, user_message, preflight_note, &option, route);
     let output = run_cli_command(
         &option,
         workspace,
@@ -209,7 +210,7 @@ pub async fn run_with_workspace(
         "local AI CLI request completed"
     );
 
-    let apk_url = if android_task {
+    let apk_url = if android_task && output.success {
         let _ = tx.send(
             WsMessage::Progress {
                 message: "AI 已完成处理，正在查找 APK 安装包。".into(),
@@ -390,13 +391,6 @@ async fn run_cli_command(
     let stdout = stdout_task.await.unwrap_or_default();
     let stderr = stderr_task.await.unwrap_or_default();
 
-    if !status.success() {
-        return Err(anyhow!(
-            "本地 AI CLI 执行失败: {}",
-            compact_failure(&stdout, &stderr)
-        ));
-    }
-
     Ok(CliOutput {
         success: status.success(),
         stdout,
@@ -498,6 +492,7 @@ mod tests {
         let prompt = build_cli_prompt(
             Path::new("D:/tmp/project"),
             "你好，随便聊聊",
+            None,
             &test_option(),
             intent_router::CapabilityRoute::ChatAgent,
         );
@@ -512,12 +507,28 @@ mod tests {
         let prompt = build_cli_prompt(
             Path::new("D:/tmp/project"),
             "帮我修改 APK 并发布新版",
+            None,
             &test_option(),
             intent_router::CapabilityRoute::CodeAgent,
         );
 
         assert!(prompt.contains("通用项目工作流必须始终执行"));
         assert!(prompt.contains("git pull --rebase"));
+    }
+
+    #[test]
+    fn development_prompt_includes_preflight_note() {
+        let prompt = build_cli_prompt(
+            Path::new("D:/tmp/project"),
+            "继续完成刚才的修改",
+            Some("git pull 未成功（error: cannot pull with rebase: You have unstaged changes.）"),
+            &test_option(),
+            intent_router::CapabilityRoute::CodeAgent,
+        );
+
+        assert!(prompt.contains("项目预检结果"));
+        assert!(prompt.contains("这不是最终失败"));
+        assert!(prompt.contains("不要反复盲目执行同一个失败命令"));
     }
 
     #[test]
@@ -558,6 +569,7 @@ where
 fn build_cli_prompt(
     workspace: &Path,
     user_message: &str,
+    preflight_note: Option<&str>,
     option: &AiCliOption,
     route: intent_router::CapabilityRoute,
 ) -> String {
@@ -565,7 +577,7 @@ fn build_cli_prompt(
         return build_chat_cli_prompt(workspace, user_message, option);
     }
 
-    build_development_cli_prompt(workspace, user_message, option)
+    build_development_cli_prompt(workspace, user_message, preflight_note, option)
 }
 
 fn build_chat_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
@@ -636,6 +648,7 @@ JSON 格式：
 fn build_development_cli_prompt(
     workspace: &Path,
     user_message: &str,
+    preflight_note: Option<&str>,
     option: &AiCliOption,
 ) -> String {
     let model_text = option
@@ -643,12 +656,25 @@ fn build_development_cli_prompt(
         .as_deref()
         .map(|model| format!("，当前模型：{}", model))
         .unwrap_or_default();
+    let preflight_text = preflight_note
+        .map(|note| {
+            format!(
+                r#"
+项目预检结果：
+{note}
+
+这不是最终失败。请先把它当作当前任务的一部分处理：进入工作区后查看 git status/diff，保护已有改动，不要丢弃用户或其他 AI 的工作；能安全提交、stash、创建 worktree 或 rebase 时自行处理，再继续用户原始请求。若无法判断这些未提交改动是否该保留，请用用户可见说明讲清楚并暂停等待确认。
+"#
+            )
+        })
+        .unwrap_or_default();
     format!(
         r#"你是「一龙」平台服务器上的本地 AI CLI 编程助手。
 
 当前 CLI：{provider}{model_text}
 当前工作目录是当前项目工作区：
 {workspace}
+{preflight_text}
 
 请直接处理用户请求。规则：
 - 只在当前项目工作区内读写文件，不要访问其他用户工作区。当前项目可能是模板项目、GitHub 导入项目，也可能是一龙平台自身源码；一律按普通项目处理，不要使用特殊旁路。
@@ -656,7 +682,7 @@ fn build_development_cli_prompt(
 - 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
-- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。修改后运行必要检查，git add 仅加入本次任务文件，git commit，并在配置 origin 时 git push origin main。push 被拒绝时先 rebase 再 push，不要 force push。
+- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。修改后运行必要检查，git add 仅加入本次任务文件，git commit，并在配置 origin 时 git push origin main。push 被拒绝时先 rebase 再 push，不要 force push。
 - 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit、push；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
 - 如果改动影响服务器运行，必须递增 server/Cargo.toml 的 package.version，在 commit/push 后按项目文档部署服务器，并验证健康检查和 /api/server/version。
@@ -674,6 +700,7 @@ fn build_development_cli_prompt(
         provider = option.provider,
         model_text = model_text,
         workspace = workspace.display(),
+        preflight_text = preflight_text,
         user_message = user_message
     )
 }
@@ -858,10 +885,15 @@ fn format_cli_reply(stdout: &str, stderr: &str, success: bool) -> String {
         if success {
             "本地 AI CLI 已完成处理。".into()
         } else {
-            "本地 AI CLI 执行失败，但没有返回详细错误。".into()
+            "AI 助手尝试处理这个流程，但没有返回可读的失败原因。请稍后重试；如果问题持续出现，需要人工确认当前 Git 工作区状态后再继续。".into()
         }
-    } else {
+    } else if success {
         clean
+    } else {
+        format!(
+            "{}\n\n这次 AI 助手已经尝试自行处理，但流程没有正常完成。请根据上面的原因确认下一步，或稍后重试。",
+            clean
+        )
     }
 }
 
@@ -979,16 +1011,6 @@ fn is_noisy_codex_answer_line(line: &str) -> bool {
         || lower.contains("event.timestamp=")
         || lower.contains("mcp_server=")
         || lower.contains("auth_header")
-}
-
-fn compact_failure(stdout: &str, stderr: &str) -> String {
-    let combined = if stderr.trim().is_empty() {
-        stdout
-    } else {
-        stderr
-    };
-    let clean = strip_ansi(combined);
-    truncate_chars(clean.trim(), 2000)
 }
 
 fn strip_ansi(input: &str) -> String {

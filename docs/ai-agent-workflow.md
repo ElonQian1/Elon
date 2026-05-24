@@ -11,12 +11,13 @@
 
 ## 项目进入规则（APK / Web / 服务器 Codex CLI 通用）
 
-1. 每次进入项目先观察目录结构和 `git status --short --branch`。
+1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。
 2. 如果存在 `AGENTS.md`、`CODEX.md`、`.github/copilot-instructions.md`、`.github/instructions/*.md`、`README.md` 或任务相关 `docs/`，必须先阅读，再决定修改方案。
 3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。修改前先 `git fetch origin main`；工作区干净才直接 `git pull --rebase origin main`，当前任务自己的未提交改动可 stash/rebase/pop，其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. Android APK 新功能的完成定义是“手机可安装到最新 APK”，不是 PR、分支、Debug 包或代码已提交。
+7. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
 
 ---
 
@@ -39,6 +40,7 @@
 5. Codex CLI 不能依赖跨任务记忆；未知项目必须先读 `AGENTS.md`、`CODEX.md`、`README.md`、`.github/instructions` 和相关 `docs/`。
 6. Codex CLI 完成后，后端负责验收和产品化状态：任务记录、进度展示、下载链接、版本信息、合并/发布/部署锁。
 7. 并发安全、版本顺序、APK 发布、服务器部署不能只靠提示词，必须由后端代码和发布脚本强制执行。
+8. 后端不能因为 `git pull --rebase` 的业务性失败直接终止开发任务；应把失败原因注入 CLI 任务单，让 CLI 优先自愈。只有 CLI 启动失败、超时、IO 异常这类平台问题，才由后端直接失败或切换 fallback。
 
 ---
 

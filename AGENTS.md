@@ -9,8 +9,15 @@
 
 ```powershell
 cd "d:\rust\active-projects\elon cli"
-git fetch origin main
-git status --short --branch     # 检查是否有其他 AI 未提交的改动
+powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
+```
+
+如果脚本输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 继续本次任务；不要在原主工作区改代码。
+
+Linux / macOS / 服务器 Codex CLI：
+
+```bash
+bash scripts/ai-task-preflight.sh --create-worktree
 ```
 
 同步规则：

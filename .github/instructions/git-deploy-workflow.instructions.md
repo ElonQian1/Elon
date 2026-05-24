@@ -39,12 +39,13 @@ applyTo: "**"
 
 ## ✅ 提交规则
 
-1. **任务开始前**：先执行 `git fetch origin main` 和 `git status --short --branch`，判断本地是否落后以及工作区是否有未提交改动
-2. 任务开始 **前后** 各执行一次 `git status --short`，识别主工作区是否有其他 AI 的未提交改动
-3. `git add` 只加自己任务相关的文件
-4. 发现其他代理未提交改动 → **不回退、不覆盖**，只提交自己的文件
-5. 提交前再执行 `git fetch origin main` + `git rebase origin/main`，确保本次提交基于最新远端
-6. **每次 commit 后必须立即 `git push origin main`**
+1. **任务开始前**：先运行机器预检脚本，Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`
+2. 如果预检脚本输出 `WORKTREE_CREATED=true`，必须切换到 `WORKTREE_PATH` 后再编辑文件；原工作区只保留现场，不继续叠加新改动
+3. 任务开始 **前后** 各执行一次 `git status --short`，识别当前工作区是否有其他 AI 的未提交改动
+4. `git add` 只加自己任务相关的文件
+5. 发现其他代理未提交改动 → **不回退、不覆盖**，回到预检脚本创建的 worktree 继续
+6. 提交前再执行 `git fetch origin main` + `git rebase origin/main`，确保本次提交基于最新远端
+7. **每次 commit 后必须立即 `git push origin main`**
 
 ### 本地有未提交改动时如何同步远端
 
@@ -57,9 +58,15 @@ applyTo: "**"
 独立 worktree 示例：
 
 ```powershell
-git fetch origin main
-git worktree add ..\Elon-task-$env:USERNAME -b codex/<task-name> origin/main
-Set-Location ..\Elon-task-$env:USERNAME
+powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
+# 如果输出 WORKTREE_CREATED=true：
+Set-Location "<WORKTREE_PATH>"
+```
+
+```bash
+bash scripts/ai-task-preflight.sh --create-worktree
+# 如果输出 WORKTREE_CREATED=true：
+cd "<WORKTREE_PATH>"
 ```
 
 > 未提交改动不会让本地“自动落后”；落后是因为远端后来进了新提交。未提交改动的问题是会让 `pull --rebase` 不安全，所以必须先判断归属。

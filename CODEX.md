@@ -32,7 +32,8 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 
 - Remote: `git@github.com:ElonQian1/Elon.git`
 - Main branch: `main`
-- Always check `git status --short --branch` before and after a task.
+- Always run the task preflight before editing: `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree` on Windows, or `bash scripts/ai-task-preflight.sh --create-worktree` on Linux/macOS/server CLI. If it creates a worktree, switch to `WORKTREE_PATH` for the task.
+- Still check `git status --short --branch` before and after a task.
 - Start by fetching remote state. If the workspace is clean, run `git pull --rebase origin main`. If uncommitted changes belong to the current task, stash with `git stash push -u`, rebase, then pop and resolve conflicts. If uncommitted changes are unrelated or unclear, do not stash or rebase that workspace; create a new worktree from `origin/main`.
 - Only stage files related to the current task. Never stage unrelated user or agent changes.
 - After a task commit, push with `git push origin main` unless the user explicitly says not to.
@@ -67,18 +68,15 @@ git commit
 
 ## Concurrent Work Rule
 
-If the main workspace has unrelated uncommitted changes, avoid editing code in the main workspace. Use a temporary Git worktree for isolated code changes, then integrate the finished commit back into `main` with `cherry-pick` and push.
+If the main workspace has unrelated uncommitted changes or is behind `origin/main`, avoid editing code in the main workspace. Use the preflight script to create a temporary Git worktree for isolated code changes, then push the finished commit.
 
 Typical isolation flow:
 
 ```powershell
-$id = Get-Random -Maximum 9999
-git fetch origin main
-git worktree add ..\Elon-session-$id -b codex/session-$id origin/main
-# edit and commit in the temporary worktree
-git cherry-pick <session_commit_sha>
+powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
+Set-Location "<WORKTREE_PATH>"
+# edit, verify, commit in the temporary worktree
 git push origin main
-git worktree remove ..\Elon-session-$id --force
 ```
 
 For documentation-only changes that are safely isolated by staging a single file, it is still important to avoid touching unrelated modified files.
@@ -92,6 +90,7 @@ APK-triggered project tasks use a project-scoped execution gate on the server:
 - This protects the current shared workspace from concurrent `git pull`, file edits, commits, and pushes.
 - Task worktrees are still the target model for same-project parallel coding, but merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps.
 - The built-in "一龙项目" follows this exact same rule as any other GitHub or `local_path` project.
+- Backend Git preflight failures are not final user failures. Pass them to the Codex CLI task context first; let CLI inspect `git status/diff` and try safe recovery. Only if CLI determines the flow cannot be recovered should the app show a friendly blocker.
 
 ## Backend And Codex CLI Cooperation
 

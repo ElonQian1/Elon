@@ -88,7 +88,9 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **APK 签名密钥不得泄露**，相关操作只走自动化脚本
 - **每个用户的修改是隔离的**，不能让一个用户的操作影响其他用户
 - **代码变更记录用户身份**，commit 信息中包含用户标识
+- **任务开始先跑机器预检**：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本创建 worktree 时必须切过去执行
 - **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
+- **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
 - **后端运行代码变更必须递增 `server/Cargo.toml` 版本号**，部署后校验 `/api/server/version`，APK 会动态展示后端版本
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 

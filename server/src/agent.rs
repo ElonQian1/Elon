@@ -266,6 +266,7 @@ pub async fn run_for_project(
         || is_short_build_command(user_message, &workspace)
         || is_project_delivery_request(user_message, &workspace);
     let require_git_for_this_request = require_existing_git && requires_project_workflow;
+    let mut preflight_note: Option<String> = None;
     if require_git_for_this_request
         && (!workspace.join(".git").exists() || !has_origin_remote(&workspace))
     {
@@ -284,19 +285,28 @@ pub async fn run_for_project(
         match tools::git_pull_rebase(&workspace) {
             Ok(msg) => {
                 if msg.starts_with("git pull 未成功") {
-                    let _ = tx.send(WsMessage::Error { message: msg }.to_json());
-                    return;
+                    warn!("项目同步预检未完成，交给 AI CLI 处理: {}", msg);
+                    let _ = tx.send(
+                        WsMessage::Progress {
+                            message: "同步检查遇到 Git 工作区问题，已交给 AI 助手处理。".into(),
+                        }
+                        .to_json(),
+                    );
+                    preflight_note = Some(msg);
+                } else {
+                    let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
                 }
-                let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
             }
             Err(e) => {
+                let msg = format!("git pull --rebase 执行出错: {}", e);
+                warn!("项目同步预检执行出错，交给 AI CLI 处理: {}", msg);
                 let _ = tx.send(
-                    WsMessage::Error {
-                        message: format!("git pull --rebase 失败: {}", e),
+                    WsMessage::Progress {
+                        message: "同步检查执行出错，已交给 AI 助手处理。".into(),
                     }
                     .to_json(),
                 );
-                return;
+                preflight_note = Some(msg);
             }
         }
     }
@@ -311,6 +321,7 @@ pub async fn run_for_project(
             conversation_id: conversation_id.unwrap_or("default").to_string(),
         }),
         user_message,
+        preflight_note.as_deref(),
         agent_name,
         require_git_for_this_request,
         state,
@@ -346,6 +357,7 @@ async fn run_dispatch(
         &download_base,
         None,
         user_message,
+        None,
         agent_name,
         false,
         state,
@@ -361,6 +373,7 @@ async fn run_dispatch_with_workspace(
     download_base: &str,
     native_session_scope: Option<ai_cli::NativeSessionScope>,
     user_message: &str,
+    preflight_note: Option<&str>,
     agent_name: Option<&str>,
     require_existing_git: bool,
     state: &Arc<AppState>,
@@ -459,6 +472,7 @@ async fn run_dispatch_with_workspace(
         download_base,
         native_session_scope,
         user_message,
+        preflight_note,
         backend_agent_name,
         backend_route,
         !(codex_cli_only || image_cli_only),
@@ -556,6 +570,7 @@ async fn run_backend_with_workspace(
     download_base: &str,
     native_session_scope: Option<ai_cli::NativeSessionScope>,
     user_message: &str,
+    preflight_note: Option<&str>,
     agent_name: Option<&str>,
     route: CapabilityRoute,
     allow_api_fallback: bool,
@@ -573,6 +588,7 @@ async fn run_backend_with_workspace(
                 workspace,
                 download_base,
                 user_message,
+                preflight_note,
                 cli_option_id(agent_name),
                 route,
                 require_existing_git,
@@ -601,6 +617,7 @@ async fn run_backend_with_workspace(
                         user_config_workspace,
                         download_base,
                         user_message,
+                        preflight_note,
                         api_agent_name(state, agent_name),
                         state,
                         tx,
@@ -617,6 +634,7 @@ async fn run_backend_with_workspace(
                 user_config_workspace,
                 download_base,
                 user_message,
+                preflight_note,
                 api_agent_name(state, agent_name),
                 state,
                 tx,
@@ -799,6 +817,7 @@ async fn run_api_inner_with_workspace(
     user_config_workspace: &Path,
     download_base: &str,
     user_message: &str,
+    preflight_note: Option<&str>,
     agent_name: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
@@ -867,6 +886,14 @@ async fn run_api_inner_with_workspace(
         .to_json(),
     );
 
+    let effective_user_message = match preflight_note {
+        Some(note) => format!(
+            "项目预检结果：\n{}\n\n这不是最终失败，请先把它当作当前任务的一部分处理：查看 git status/diff，保护已有改动，能安全提交、stash、worktree 或 rebase 时自行处理，再继续用户原始请求；无法判断时向用户说明并暂停。\n\n用户原始请求：\n{}",
+            note, user_message
+        ),
+        None => user_message.to_string(),
+    };
+
     // 初始化对话历史
     let mut messages = vec![
         json!({
@@ -875,7 +902,7 @@ async fn run_api_inner_with_workspace(
         }),
         json!({
             "role": "user",
-            "content": user_message
+            "content": effective_user_message
         }),
     ];
 
