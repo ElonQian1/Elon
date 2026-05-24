@@ -58,6 +58,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 在主工作区执行 `git reset --hard`、`git checkout --` | 会覆盖其他并发 AI 的未提交改动 |
 | 夹带无关文件进同一次 commit | 污染提交历史，妨碍定位问题 |
 | 编译完成后跳过"服务器是否已有更新版本"的祖先检查，强推上传 | 用旧编译覆盖别人刚发布的新版本，手机端版本倒退 |
+| 在共享脚本里写死某台机器的本机盘符（如 `E:\rust-target\...`） | 其他 PC / 远程 Codex 没有这个盘，脚本秒退；本机差异必须走 `.env.local` + `ELON_BUILD_TARGET_DIR`（详见下方 "🤝 共享脚本不绑死本机路径" 章节） |
 
 ---
 
@@ -252,7 +253,62 @@ if ($rs) { rustfmt $rs }
 
 ---
 
-## 🦀 Rust target 与构建缓存安全
+## � 共享脚本不绑死本机路径（远程协作铁律）
+
+> 多台 PC / 远程 Codex 容器共用同一个仓库，**任何共享脚本里都不能写死某台机器的本地盘符或用户名**，否则其他 PC 跑同一个脚本会因路径不存在直接失败。
+
+### 强制规则
+
+| 共享脚本默认值 | 是否允许 |
+|---|---|
+| 可移植路径（`%LOCALAPPDATA%\Elon\...`、`<repo>/.x`、`$XDG_CACHE_HOME/...`） | ✅ |
+| 从环境变量 / `.env.local` 读取的值 | ✅ |
+| 写死 `E:\`、`D:\rust\shared\...` 等具体盘符 | ❌ |
+| 写死 `C:\Users\Alice\...` 等用户名 | ❌ |
+| 相对路径（会随 cwd 漂移，回到鬼影 target 事故） | ❌ |
+
+### 本机差异的标准解决方案
+
+**1. 仓库根放未提交的 `.env.local`**（已在 `.gitignore`），里面写本机绝对路径：
+
+```bash
+# Windows
+ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+
+# Linux/macOS
+ELON_BUILD_TARGET_DIR=/var/tmp/elon-build-target
+```
+
+**2. 或临时通过进程环境变量覆盖**（CI / 一次性测试最方便）：
+
+```powershell
+$env:ELON_BUILD_TARGET_DIR = "D:\rust\shared\target"
+.\scripts\publish-server.ps1
+```
+
+**3. 仓库根提供 `.env.local.example`**（可提交，纯文档），告诉新人有哪些可配置项。
+
+### 脚本侧实现要点
+
+- 优先级：进程环境变量 > `.env.local` > 可移植默认值
+- 启动期校验：路径必须是绝对路径；Windows 上盘符必须存在；否则给出明确报错引导改 `.env.local`
+- 参考实现：`scripts/publish-server.ps1` 的 `Import-LocalEnvFile` + `Resolve-BuildTargetRoot` 函数
+
+### 适用范围
+
+不只是 Cargo target 缓存。**任何"每台机器值不同但脚本需要用"的配置**都走这套模式：
+
+- APK 签名 keystore 路径
+- 本机 IDE/编译器缓存目录
+- 本地调试用的 mock 服务器地址
+- SSH 别名 / 跳板机配置
+
+通用准则：
+> **共享脚本里只允许两种值：可移植的默认值，或从 `.env.local` / 环境变量读取的值。绝不允许某台机器的本地绝对路径作为默认值。**
+
+---
+
+## �🦀 Rust target 与构建缓存安全
 
 本机 skills 中的 `rust-shared-target-cache` 已确认一个高风险事故：相对路径的 `CARGO_TARGET_DIR` 会随 cwd 展开到不同位置，导致多个鬼影 `target/` 目录、磁盘暴涨，以及构建产物找错路径。
 
