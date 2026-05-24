@@ -512,6 +512,34 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     .modal .btn-confirm { background: var(--brand); color: #fff; }
     .modal .btn-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
     .modal .error-text { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+    .agent-list {
+      display: grid;
+      gap: 8px;
+      max-height: min(50vh, 360px);
+      overflow: auto;
+    }
+    .agent-option {
+      width: 100%;
+      min-height: 42px;
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 0 12px;
+      text-align: left;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .agent-option:hover { background: #353535; }
+    .agent-option.active {
+      border-color: var(--brand);
+      background: rgba(39, 117, 255, 0.16);
+      color: var(--ink-strong);
+    }
+    .agent-option:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+    }
 
     /* ===== 登录页 ===== */
     .login {
@@ -755,8 +783,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   <form class="modal" id="agentForm">
     <h2>AI 代理设置</h2>
     <div>
-      <label for="agentSelect">模型</label>
-      <select id="agentSelect"><option value="">默认模型</option></select>
+      <label for="agentList">模型</label>
+      <div class="agent-list" id="agentList" role="listbox" aria-label="模型"></div>
     </div>
     <div class="error-text" id="agentError"></div>
     <div class="actions">
@@ -829,7 +857,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   const cancelNewProjectBtn = $('cancelNewProjectBtn');
 
   const agentMask = $('agentMask');
-  const agentSelect = $('agentSelect');
+  const agentList = $('agentList');
+  const agentError = $('agentError');
   const cancelAgentBtn = $('cancelAgentBtn');
 
   const downloadApkBtn = $('downloadApkBtn');
@@ -848,6 +877,10 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   let socket = null;
   let busy = false;
   let selectedAgent = '';
+  let agentOptions = [];
+  let agentSelectionInitialized = false;
+  let agentLoading = false;
+  let codexCliOnly = false;
 
   // ====== 工具 ======
   function api(path, options = {}) {
@@ -1187,9 +1220,48 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     }
     renderConversationList();
   }
+  function friendlyModelName(model) {
+    const m = (model || '').trim();
+    const key = m.toLowerCase();
+    const names = {
+      'gpt-4o': 'GPT-4o',
+      'gpt-4o-mini': 'GPT-4o mini',
+      'gpt-4.1': 'GPT-4.1',
+      'gpt-4.5-preview': 'GPT-4.5 Preview',
+      'claude-3.5-sonnet': 'Claude 3.5 Sonnet',
+      'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
+      'claude-3.7-sonnet': 'Claude 3.7 Sonnet',
+      'claude-3-7-sonnet-20250219': 'Claude 3.7 Sonnet',
+      'claude-sonnet-4': 'Claude Sonnet 4',
+      'claude-sonnet-4-5': 'Claude Sonnet 4',
+      'o1-mini': 'o1 mini',
+      'o1-preview': 'o1 preview',
+      'o3-mini': 'o3 mini',
+      'gemini-2.0-flash': 'Gemini 2.0 Flash',
+      'gemini-2.0-flash-001': 'Gemini 2.0 Flash',
+      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-2.5-pro-preview': 'Gemini 2.5 Pro'
+    };
+    return names[key] || m;
+  }
+  function cleanModelLabel(label) {
+    let m = (label || '').trim().replace(/^copilot\s*\/\s*/i, '');
+    const bracket = m.match(/\[([^\]]+)\]\s*$/);
+    if (bracket && bracket[1].trim()) return friendlyModelName(bracket[1].trim());
+    if (m.includes('/')) {
+      const tail = m.split('/').pop().trim();
+      if (tail) return friendlyModelName(tail);
+    }
+    return friendlyModelName(m);
+  }
+  function modelOptionLabel(item) {
+    const model = (item.model || '').trim();
+    if (model && !/^default$/i.test(model)) return friendlyModelName(model);
+    return cleanModelLabel(item.label || item.name || 'unknown');
+  }
   function shortModelLabel(label) {
     // 与 APK MainActivity.shortModelLabel 对齐
-    const m = (label || '').replace(/^Copilot \/ /, '');
+    const m = cleanModelLabel(label);
     if (/^Codex/i.test(m)) return 'Codex';
     if (m.startsWith('服务器默认') || m === '默认模型') return '默认';
     if (m.startsWith('自定义')) return '自定';
@@ -1198,34 +1270,102 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     if (m.startsWith('o1') || m.startsWith('o3')) return m.replace(/ /g, '').slice(0, 5);
     if (m.startsWith('Claude')) return 'Cl' + (m.split(' ').pop() || '').slice(0, 3);
     if (m.startsWith('Gemini')) return 'G' + (m.split(' ').pop() || '').slice(0, 4);
-    if (m.includes('/')) return m.split('/').pop().trim().slice(0, 5);
-    if (m.includes('[')) return m.split('[')[0].trim().slice(0, 4);
     return m.slice(0, 6);
+  }
+  function selectedAgentOption() {
+    return agentOptions.find((it) => (it.name || '') === selectedAgent) || agentOptions[0] || { name: '', label: '默认模型' };
+  }
+  function updateModelButton(label) {
+    const raw = label || selectedAgentOption().label || '默认模型';
+    modelBtn.textContent = shortModelLabel(raw);
+    modelBtn.title = '选择模型：' + raw;
+  }
+  function renderAgentOptions() {
+    agentList.innerHTML = '';
+    const items = agentOptions.length ? agentOptions : [{ name: '', label: agentLoading ? '加载中...' : '默认模型', disabled: agentLoading }];
+    items.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'agent-option' + (((item.name || '') === selectedAgent) ? ' active' : '');
+      button.textContent = item.label || '默认模型';
+      button.disabled = !!item.disabled || agentLoading;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', ((item.name || '') === selectedAgent) ? 'true' : 'false');
+      button.addEventListener('click', () => selectAgentOption(item));
+      agentList.appendChild(button);
+    });
+  }
+  async function persistAgentSelection(option) {
+    const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent', {
+      method: 'PUT',
+      body: JSON.stringify({
+        use_agent: option.name || null,
+        api_base: null,
+        api_key: null,
+        model: null
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  }
+  async function selectAgentOption(option) {
+    if (!option || option.disabled || agentLoading || codexCliOnly) return;
+    const previousAgent = selectedAgent;
+    const previousLabel = selectedAgentOption().label;
+    selectedAgent = option.name || '';
+    updateModelButton(option.label);
+    renderAgentOptions();
+    agentError.textContent = '';
+    agentLoading = true;
+    renderAgentOptions();
+    try {
+      await persistAgentSelection(option);
+      agentMask.classList.remove('active');
+    } catch (err) {
+      selectedAgent = previousAgent;
+      updateModelButton(previousLabel);
+      agentError.textContent = '模型切换失败：' + ((err && err.message) ? err.message : '请稍后重试');
+    } finally {
+      agentLoading = false;
+      renderAgentOptions();
+    }
   }
   async function loadAgents() {
     if (!currentUser) return;
+    agentError.textContent = '';
+    agentLoading = true;
+    renderAgentOptions();
     try {
-      const res = await fetch('/api/user/' + encodeURIComponent(currentUser.id) + '/agent');
+      const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent');
       const data = await res.json();
-      agentSelect.innerHTML = '<option value="">默认模型</option>';
-      (data.available_agents || []).forEach((it) => {
-        const opt = document.createElement('option');
-        opt.value = it.name || '';
-        const raw = it.label || it.name || 'unknown';
-        opt.textContent = raw.replace(/^Copilot \/ /, '');
-        agentSelect.appendChild(opt);
-      });
-      agentSelect.value = selectedAgent;
-    } catch {
-      agentSelect.innerHTML = '<option value="">默认模型</option>';
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      codexCliOnly = !!data.codex_cli_only;
+      if (codexCliOnly) {
+        selectedAgent = '';
+        agentOptions = [{ name: '', label: 'Codex CLI', disabled: true }];
+        updateModelButton('Codex CLI');
+        return;
+      }
+      const options = [{ name: '', label: '默认模型' }].concat((data.available_agents || []).map((it) => ({
+        name: it.name || '',
+        label: modelOptionLabel(it)
+      })).filter((it) => it.name));
+      agentOptions = options;
+      if (!agentSelectionInitialized) {
+        const configured = data.config && data.config.use_agent;
+        selectedAgent = options.some((it) => it.name === configured) ? configured : '';
+        agentSelectionInitialized = true;
+      }
+      updateModelButton(selectedAgentOption().label);
+    } catch (err) {
+      codexCliOnly = false;
+      agentOptions = [{ name: '', label: '默认模型' }];
+      agentError.textContent = '模型列表加载失败：' + ((err && err.message) ? err.message : '请稍后重试');
+    } finally {
+      agentLoading = false;
+      renderAgentOptions();
     }
   }
-  agentSelect.addEventListener('change', () => {
-    selectedAgent = agentSelect.value;
-    const raw = selectedAgent ? (agentSelect.selectedOptions[0].textContent || '已选') : '默认';
-    modelBtn.textContent = shortModelLabel(raw);
-    modelBtn.title = '选择模型：' + raw;
-  });
   async function loadVersion() {
     try {
       const res = await fetch('/app/version.json');
@@ -1277,6 +1417,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
 
   // ====== AI 代理设置弹窗 ======
   function openAgentDialog() {
+    agentError.textContent = '';
+    renderAgentOptions();
     loadAgents();
     agentMask.classList.add('active');
   }

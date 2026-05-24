@@ -16,7 +16,7 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 
-use crate::types::{AiBackend, AppState, UserAgentConfig};
+use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
 pub async fn get_user_agent(
@@ -42,7 +42,7 @@ pub async fn get_user_agent(
             .agents
             .values()
             .map(|a| {
-                let (provider, label) = copilot_agent_meta(&a.name, &a.model);
+                let (provider, label) = agent_display_meta(&a.name, &a.model);
                 serde_json::json!({
                     "name": a.name,
                     "model": a.model,
@@ -62,7 +62,7 @@ pub async fn get_user_agent(
                 "api_base": "local",
                 "backend": "cli",
                 "provider": opt.provider,
-                "label": opt.label,
+                "label": cli_option_display_label(opt),
             })
         }));
     }
@@ -232,18 +232,54 @@ fn is_cli_alias(name: &str) -> bool {
     )
 }
 
-/// 将 Copilot 代理名 / 普通代理名 转换为 (provider, 友好 label)。
-/// - `copilot:gpt-4o`  → ("copilot", "Copilot / GPT-4o")
-/// - `openai`          → ("openai", "openai / gpt-4o")
-fn copilot_agent_meta(name: &str, model: &str) -> (String, String) {
+/// 将代理名转换为 (provider, 用户可见模型名)。
+/// - `copilot:gpt-4o`  → ("copilot", "GPT-4o")
+/// - `openai`          → ("openai", "GPT-4o")
+fn agent_display_meta(name: &str, model: &str) -> (String, String) {
     if let Some(model_id) = name.strip_prefix("copilot:") {
         (
             "copilot".to_string(),
-            format!("Copilot / {}", copilot_model_friendly_name(model_id)),
+            copilot_model_friendly_name(model_id).to_string(),
         )
     } else {
-        (name.to_string(), format!("{} / {}", name, model))
+        (name.to_string(), direct_model_label(model, name))
     }
+}
+
+fn cli_option_display_label(option: &AiCliOption) -> String {
+    option
+        .model
+        .as_deref()
+        .map(|model| direct_model_label(model, &option.label))
+        .unwrap_or_else(|| strip_provider_prefix(&option.label))
+}
+
+fn direct_model_label(model: &str, fallback: &str) -> String {
+    let model = model.trim();
+    if model.is_empty() || model.eq_ignore_ascii_case("default") {
+        strip_provider_prefix(fallback)
+    } else {
+        copilot_model_friendly_name(model).to_string()
+    }
+}
+
+fn strip_provider_prefix(label: &str) -> String {
+    let label = label.trim();
+    if let Some((_, model)) = label.rsplit_once('/') {
+        let model = model.trim();
+        if !model.is_empty() {
+            return model.to_string();
+        }
+    }
+    if let Some(start) = label.rfind('[') {
+        if label.ends_with(']') && start + 1 < label.len() - 1 {
+            let model = label[start + 1..label.len() - 1].trim();
+            if !model.is_empty() {
+                return model.to_string();
+            }
+        }
+    }
+    label.to_string()
 }
 
 /// 将 Copilot / GitHub Models 的模型 ID 映射为用户可读名称。
@@ -264,5 +300,40 @@ fn copilot_model_friendly_name(model: &str) -> &str {
         "gemini-2.0-flash" | "gemini-2.0-flash-001" => "Gemini 2.0 Flash",
         "gemini-2.5-pro" | "gemini-2.5-pro-preview" => "Gemini 2.5 Pro",
         other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::CliPromptMode;
+
+    #[test]
+    fn copilot_agent_label_shows_model_only() {
+        let (provider, label) = agent_display_meta("copilot:gpt-4o", "gpt-4o");
+        assert_eq!(provider, "copilot");
+        assert_eq!(label, "GPT-4o");
+    }
+
+    #[test]
+    fn generic_agent_label_prefers_model_over_provider() {
+        let (provider, label) = agent_display_meta("openai", "gpt-4o-mini");
+        assert_eq!(provider, "openai");
+        assert_eq!(label, "GPT-4o mini");
+    }
+
+    #[test]
+    fn cli_label_strips_legacy_provider_prefix() {
+        let option = AiCliOption {
+            id: "codex:gpt-5".into(),
+            label: "Codex CLI / gpt-5".into(),
+            provider: "codex".into(),
+            model: Some("gpt-5".into()),
+            bin: "codex".into(),
+            args: Vec::new(),
+            prompt_mode: CliPromptMode::Arg,
+            timeout_secs: 1800,
+        };
+        assert_eq!(cli_option_display_label(&option), "gpt-5");
     }
 }

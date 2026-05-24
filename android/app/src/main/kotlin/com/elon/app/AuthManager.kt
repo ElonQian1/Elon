@@ -11,7 +11,7 @@ import java.util.UUID
  *
  * 设计原则：
  * - 兼容老用户：未登录时仍走原来的随机 user_id 匿名模式。
- * - 登录后：`effectiveUserId` 返回服务器分配的 user.id；服务端所有 `/api/user/:user_id/*`
+ * - 登录后：`effectiveUserId` 返回服务器分配的 user.id；服务端所有 `/api/user/:user_id/...`
  *   路由继续工作，相当于把本机身份升级成可跨设备的账号身份。
  * - Token 通过 `Authorization: Bearer <token>` 发到需要鉴权的接口（如 `/api/me`、
  *   `/api/me/projects`、`POST /api/projects`）。老接口不需要 token。
@@ -41,7 +41,7 @@ object AuthManager {
     fun displayName(ctx: Context): String =
         nickname(ctx) ?: account(ctx) ?: "未登录"
 
-    /** 登录后用此 ID 调用服务端所有 /api/user/:user_id/* 路由；未登录时返回本机匿名 ID。 */
+    /** 登录后用此 ID 调用服务端所有 /api/user/:user_id/... 路由；未登录时返回本机匿名 ID。 */
     fun effectiveUserId(ctx: Context): String {
         userId(ctx)?.let { return it }
         return legacyAnonymousUserId(ctx)

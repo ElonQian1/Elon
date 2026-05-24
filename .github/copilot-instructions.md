@@ -129,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ---
 
-## 当前开发状态（2026-05-23 更新）
+## 当前开发状态（2026-05-24 更新）
 
 - [x] 项目整体架构设计
 - [x] Rust 服务端基础框架（axum + tokio，运行中）
@@ -138,6 +138,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - [x] 服务器 systemd 服务（自动重启，日志 `/root/elon-server.log`）
 - [x] P2P 同 WiFi APK 中继（`server/src/peer_relay.rs` + Android `PeerSeederManager.kt`）
 - [x] APK 分发机制（P2P mirrors + 直链回退）
+- [x] Web/APK 模型选择展示已简化为直接显示模型名
 - [ ] AI 对话后端集成（待实现）
 - [ ] 用户项目隔离系统（待实现）
 
