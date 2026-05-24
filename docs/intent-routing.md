@@ -32,7 +32,7 @@
 1. `agent::run_dispatch_with_workspace` 先调用 `intent_router::classify(user_message)`。
 2. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路由结果是普通聊天、模型配置、图片处理还是项目开发，最终执行后端都会被锁定为 Codex CLI。
 3. Codex CLI only 只表示“主执行者是 Codex CLI”，不表示每句话都走重型开发流程。`ChatAgent` 普通聊天继续绑定同一个 Codex CLI 原生 session，但使用轻量聊天 prompt，不做 Git 检查、不读项目文档、不修改文件、不注入发布规则。
-4. 只有 `CodeAgent`、图片转项目资产、编译、部署、发布、代码修改等开发路线，才注入通用项目工作流和强制 Git/文档/验证规则。
+4. 只有 `CodeAgent`、图片转项目资产、编译、部署、发布、代码修改等开发路线，才进入项目队列并注入通用项目工作流和强制 Git/文档/验证规则。普通聊天不能抢项目锁，也不能在进入 agent 前触发 `git pull`。
 5. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型。
 6. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
 

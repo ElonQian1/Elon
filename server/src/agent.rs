@@ -260,7 +260,14 @@ pub async fn run_for_project(
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
-    if require_existing_git && (!workspace.join(".git").exists() || !has_origin_remote(&workspace))
+    let decision = intent_router::classify(user_message);
+    let requires_project_workflow = decision.route != CapabilityRoute::ChatAgent
+        || is_short_resume_command(user_message, &workspace)
+        || is_short_build_command(user_message, &workspace)
+        || is_project_delivery_request(user_message, &workspace);
+    let require_git_for_this_request = require_existing_git && requires_project_workflow;
+    if require_git_for_this_request
+        && (!workspace.join(".git").exists() || !has_origin_remote(&workspace))
     {
         let _ = tx.send(
             WsMessage::Error {
@@ -273,7 +280,7 @@ pub async fn run_for_project(
         );
         return;
     }
-    if require_existing_git {
+    if require_git_for_this_request {
         match tools::git_pull_rebase(&workspace) {
             Ok(msg) => {
                 if msg.starts_with("git pull 未成功") {
@@ -305,7 +312,7 @@ pub async fn run_for_project(
         }),
         user_message,
         agent_name,
-        require_existing_git,
+        require_git_for_this_request,
         state,
         &tx,
     )

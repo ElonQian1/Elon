@@ -14,7 +14,7 @@ use std::{collections::HashMap, path::Path, path::PathBuf, process::Command, syn
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    agent,
+    agent, intent_router,
     store::{ProjectAccess, PublicUser},
     tools,
     types::{AppState, WsMessage},
@@ -249,6 +249,23 @@ async fn run_project_agent_with_scheduler(
     agent_name: Option<String>,
     tx: UnboundedSender<String>,
 ) {
+    let needs_project_workflow =
+        intent_router::classify(&message).route != intent_router::CapabilityRoute::ChatAgent;
+    if !needs_project_workflow {
+        agent::run_for_project(
+            &user_id,
+            &project,
+            &download_base,
+            Some(&conversation_id),
+            &message,
+            agent_name.as_deref(),
+            &state,
+            tx,
+        )
+        .await;
+        return;
+    }
+
     let _ = tx.send(
         WsMessage::Progress {
             message: "通用项目工作流已启用：先确认 Git/权限，再读取项目文档，按项目自己的规则修改；同一项目的共享工作区任务会排队，未来 task worktree 编码可并行，但合并、版本号和发布仍串行。"
