@@ -14,7 +14,9 @@ use tokio::{
 };
 
 use crate::{
-    intent_router, tools,
+    intent_router,
+    store::ConversationMessage,
+    tools,
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
 
@@ -81,7 +83,7 @@ pub async fn confirm_project_intent(
 
     let prompt = build_intent_gate_prompt(workspace, user_message, &option);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let output = run_cli_command(
+    let mut output = run_cli_command(
         &option,
         workspace,
         &prompt,
@@ -89,6 +91,22 @@ pub async fn confirm_project_intent(
         &tx,
     )
     .await?;
+    if should_retry_without_native_session(&option, native_session_id.as_deref(), &output) {
+        if let (Some(scope), Some(session_id)) =
+            (native_session_scope.as_ref(), native_session_id.as_deref())
+        {
+            let _ = state.store.deactivate_native_agent_session(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                session_id,
+            );
+        }
+        output = run_cli_command(&option, workspace, &prompt, None, &tx).await?;
+    }
 
     if let (Some(scope), Some(thread_id)) = (
         native_session_scope.as_ref(),
@@ -151,7 +169,7 @@ pub async fn prewarm_codex_session(
     let output = run_cli_command(&prewarm_option, workspace, &prompt, None, &tx).await?;
     let thread_id = extract_thread_id(&output.stdout);
     if let Some(thread_id) = thread_id.as_deref() {
-        let _ = state.store.upsert_native_agent_session(
+        let _ = state.store.upsert_native_agent_session_if_no_active(
             &native_session_scope.project_id,
             &native_session_scope.user_id,
             Some(&native_session_scope.conversation_id),
@@ -224,11 +242,11 @@ pub async fn run_with_workspace(
     }
 
     let workspace_key = workspace.display().to_string();
-    let native_session_id = if supports_codex_sessions(&option) {
+    let session_state = if supports_codex_sessions(&option) {
         native_session_scope.as_ref().and_then(|scope| {
             state
                 .store
-                .get_native_agent_session(
+                .get_native_agent_session_state(
                     &scope.project_id,
                     &scope.user_id,
                     Some(&scope.conversation_id),
@@ -242,6 +260,19 @@ pub async fn run_with_workspace(
     } else {
         None
     };
+    let mut native_session_id = session_state
+        .as_ref()
+        .map(|state| state.native_session_id.clone());
+    let mut prompt_bootstrapped = session_state
+        .as_ref()
+        .map(|state| {
+            if development_task {
+                state.dev_bootstrapped
+            } else {
+                state.chat_bootstrapped
+            }
+        })
+        .unwrap_or(false);
     if native_session_id.is_some() {
         let _ = tx.send(
             WsMessage::Progress {
@@ -251,8 +282,15 @@ pub async fn run_with_workspace(
         );
     }
 
-    let prompt = build_cli_prompt(workspace, user_message, preflight_note, &option, route);
-    let output = run_cli_command(
+    let mut prompt = build_cli_prompt(
+        workspace,
+        user_message,
+        preflight_note,
+        &option,
+        route,
+        prompt_bootstrapped,
+    );
+    let mut output = run_cli_command(
         &option,
         workspace,
         &prompt,
@@ -260,6 +298,48 @@ pub async fn run_with_workspace(
         tx,
     )
     .await?;
+    if should_retry_without_native_session(&option, native_session_id.as_deref(), &output) {
+        let stale_session_id = native_session_id.clone();
+        if let (Some(scope), Some(session_id)) =
+            (native_session_scope.as_ref(), native_session_id.as_deref())
+        {
+            let _ = state.store.deactivate_native_agent_session(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                session_id,
+            );
+        }
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "Codex CLI session expired; starting a fresh session.".into(),
+            }
+            .to_json(),
+        );
+        native_session_id = None;
+        prompt_bootstrapped = false;
+        prompt = build_cli_prompt(
+            workspace,
+            user_message,
+            preflight_note,
+            &option,
+            route,
+            prompt_bootstrapped,
+        );
+        if let Some(note) = native_session_continuity_note(
+            state,
+            native_session_scope.as_ref(),
+            stale_session_id.as_deref(),
+        ) {
+            prompt = append_native_session_continuity(prompt, &note);
+        }
+        output = run_cli_command(&option, workspace, &prompt, None, tx).await?;
+    }
+
+    let mut stored_session_id = native_session_id.clone();
     if let (Some(scope), Some(thread_id)) = (
         native_session_scope
             .as_ref()
@@ -275,6 +355,26 @@ pub async fn run_with_workspace(
             &workspace_key,
             &thread_id,
         );
+        stored_session_id = Some(thread_id);
+    }
+    if output.success {
+        if let (Some(scope), Some(session_id)) = (
+            native_session_scope
+                .as_ref()
+                .filter(|_| supports_codex_sessions(&option)),
+            stored_session_id.as_deref(),
+        ) {
+            let _ = state.store.mark_native_agent_session_bootstrapped(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                session_id,
+                development_task,
+            );
+        }
     }
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
     tracing::info!(
@@ -472,6 +572,82 @@ async fn run_cli_command(
     })
 }
 
+fn should_retry_without_native_session(
+    option: &AiCliOption,
+    native_session_id: Option<&str>,
+    output: &CliOutput,
+) -> bool {
+    if !supports_codex_sessions(option) || native_session_id.is_none() || output.success {
+        return false;
+    }
+    let combined = format!("{}\n{}", output.stdout, output.stderr).to_ascii_lowercase();
+    let mentions_session =
+        combined.contains("session") || combined.contains("thread") || combined.contains("resume");
+    let looks_stale = combined.contains("not found")
+        || combined.contains("no such")
+        || combined.contains("invalid")
+        || combined.contains("expired")
+        || combined.contains("unknown")
+        || combined.contains("could not resume")
+        || combined.contains("failed to resume");
+    mentions_session && looks_stale
+}
+
+fn native_session_continuity_note(
+    state: &Arc<AppState>,
+    scope: Option<&NativeSessionScope>,
+    stale_session_id: Option<&str>,
+) -> Option<String> {
+    let session_id = stale_session_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let scope = scope?;
+    let recent_messages = state
+        .store
+        .list_recent_conversation_messages(&scope.project_id, Some(&scope.conversation_id), 8)
+        .unwrap_or_default();
+    Some(build_native_session_continuity_note(
+        session_id,
+        &recent_messages,
+    ))
+}
+
+fn build_native_session_continuity_note(
+    stale_session_id: &str,
+    recent_messages: &[ConversationMessage],
+) -> String {
+    let thread_uri = codex_thread_uri(stale_session_id);
+    let mut note = format!(
+        "Previous Codex native thread became unavailable for direct resume.\nPrevious thread URI: {thread_uri}\nIf your environment can resolve Codex thread URIs, use that thread as continuity. If not, use the backend conversation records below as fallback context."
+    );
+    if !recent_messages.is_empty() {
+        note.push_str("\n\nRecent backend conversation records:");
+        for message in recent_messages {
+            note.push_str(&format!(
+                "\n- {}: {}",
+                message.role,
+                truncate_chars(message.content.trim(), 900)
+            ));
+        }
+    }
+    note
+}
+
+fn append_native_session_continuity(mut prompt: String, continuity_note: &str) -> String {
+    prompt.push_str("\n\nNative session continuity handoff:\n");
+    prompt.push_str(continuity_note);
+    prompt
+}
+
+fn codex_thread_uri(session_id: &str) -> String {
+    let session_id = session_id.trim();
+    if session_id.starts_with("codex://threads/") {
+        session_id.to_string()
+    } else {
+        format!("codex://threads/{session_id}")
+    }
+}
+
 async fn send_cli_heartbeat(tx: UnboundedSender<String>) {
     loop {
         tokio::time::sleep(Duration::from_secs(15)).await;
@@ -569,6 +745,7 @@ mod tests {
             None,
             &test_option(),
             intent_router::CapabilityRoute::ChatAgent,
+            false,
         );
 
         assert!(prompt.contains("轻量聊天模式"));
@@ -594,6 +771,7 @@ mod tests {
             None,
             &test_option(),
             intent_router::CapabilityRoute::CodeAgent,
+            false,
         );
 
         assert!(prompt.contains("通用项目工作流必须始终执行"));
@@ -608,11 +786,85 @@ mod tests {
             Some("git pull 未成功（error: cannot pull with rebase: You have unstaged changes.）"),
             &test_option(),
             intent_router::CapabilityRoute::CodeAgent,
+            false,
         );
 
         assert!(prompt.contains("项目预检结果"));
         assert!(prompt.contains("这不是最终失败"));
         assert!(prompt.contains("不要反复盲目执行同一个失败命令"));
+    }
+
+    #[test]
+    fn resumed_chat_prompt_is_short() {
+        let prompt = build_cli_prompt(
+            Path::new("D:/tmp/project"),
+            "继续聊这个思路",
+            None,
+            &test_option(),
+            intent_router::CapabilityRoute::ChatAgent,
+            true,
+        );
+
+        assert!(prompt.contains("Continue the existing Codex CLI native session"));
+        assert!(prompt.contains("lightweight chat"));
+        assert!(!prompt.contains("git pull --rebase"));
+    }
+
+    #[test]
+    fn resumed_development_prompt_reuses_bootstrap_rules() {
+        let prompt = build_cli_prompt(
+            Path::new("D:/tmp/project"),
+            "继续发布新版",
+            Some("git status is clean"),
+            &test_option(),
+            intent_router::CapabilityRoute::CodeAgent,
+            true,
+        );
+
+        assert!(prompt.contains("full development workflow was already injected"));
+        assert!(prompt.contains("git status is clean"));
+        assert!(!prompt.contains("开始执行前"));
+    }
+
+    #[test]
+    fn stale_codex_session_output_triggers_fresh_retry() {
+        let output = CliOutput {
+            success: false,
+            stdout: String::new(),
+            stderr: "Error: could not resume session thread-1: not found".into(),
+        };
+
+        assert!(should_retry_without_native_session(
+            &test_option(),
+            Some("thread-1"),
+            &output
+        ));
+        assert!(!should_retry_without_native_session(
+            &test_option(),
+            None,
+            &output
+        ));
+    }
+
+    #[test]
+    fn continuity_note_uses_codex_thread_uri_and_recent_messages() {
+        let note = build_native_session_continuity_note(
+            "019e55ee-81fb-7c03-98d9-957ba60739ca",
+            &[
+                ConversationMessage {
+                    role: "user".into(),
+                    content: "我们刚才在讨论普通聊天加速".into(),
+                },
+                ConversationMessage {
+                    role: "assistant".into(),
+                    content: "已经建议 session 预热和短 prompt".into(),
+                },
+            ],
+        );
+
+        assert!(note.contains("codex://threads/019e55ee-81fb-7c03-98d9-957ba60739ca"));
+        assert!(note.contains("普通聊天加速"));
+        assert!(note.contains("短 prompt"));
     }
 
     #[test]
@@ -656,11 +908,23 @@ fn build_cli_prompt(
     preflight_note: Option<&str>,
     option: &AiCliOption,
     route: intent_router::CapabilityRoute,
+    prompt_bootstrapped: bool,
 ) -> String {
     if route == intent_router::CapabilityRoute::ChatAgent {
+        if prompt_bootstrapped {
+            return build_resumed_chat_cli_prompt(workspace, user_message, option);
+        }
         return build_chat_cli_prompt(workspace, user_message, option);
     }
 
+    if prompt_bootstrapped {
+        return build_resumed_development_cli_prompt(
+            workspace,
+            user_message,
+            preflight_note,
+            option,
+        );
+    }
     build_development_cli_prompt(workspace, user_message, preflight_note, option)
 }
 
@@ -709,6 +973,38 @@ fn build_chat_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOpt
 - 回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。
 
 用户请求：
+{user_message}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        user_message = user_message
+    )
+}
+
+fn build_resumed_chat_cli_prompt(
+    workspace: &Path,
+    user_message: &str,
+    option: &AiCliOption,
+) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!(", model: {}", model))
+        .unwrap_or_default();
+    format!(
+        r#"Continue the existing Codex CLI native session for this APK project conversation.
+
+Mode: lightweight chat, not development execution.
+CLI provider: {provider}{model_text}
+Workspace: {workspace}
+
+Rules for this turn:
+- The full chat rules were already injected earlier in this session; keep that context.
+- Do not read files, inspect Git, run commands, edit code, build, deploy, or publish.
+- If the user clearly asks to change code or publish, briefly acknowledge and clarify the requested task; do not claim execution here.
+- Reply in concise natural Chinese. Do not include tool logs or the prefix "用户可见：".
+
+User message:
 {user_message}"#,
         provider = option.provider,
         model_text = model_text,
@@ -806,6 +1102,43 @@ fn build_development_cli_prompt(
 - 回复用户使用中文，内容清楚但不要过长。
 
 用户请求：
+{user_message}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        preflight_text = preflight_text,
+        user_message = user_message
+    )
+}
+
+fn build_resumed_development_cli_prompt(
+    workspace: &Path,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    option: &AiCliOption,
+) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!(", model: {}", model))
+        .unwrap_or_default();
+    let preflight_text = preflight_note
+        .map(|note| format!("\nCurrent preflight note:\n{}\n", note))
+        .unwrap_or_default();
+    format!(
+        r#"Continue the existing Codex CLI native session for this project.
+
+CLI provider: {provider}{model_text}
+Workspace: {workspace}
+{preflight_text}
+The full development workflow was already injected earlier in this session. Keep following those rules:
+- Treat every project as a normal project; do not special-case the Elon self project.
+- Read and obey project docs when code changes require it.
+- Preserve unrelated user/AI changes, verify work, commit and push when appropriate.
+- Server/APK release work must build locally and upload artifacts as documented by the project.
+- Shared actions such as merge/main pushes, version bumps, APK release, and server deploy remain serialized.
+
+User request:
 {user_message}"#,
         provider = option.provider,
         model_text = model_text,

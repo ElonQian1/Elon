@@ -13,6 +13,19 @@ pub struct Store {
     conn: Mutex<Connection>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeAgentSessionState {
+    pub native_session_id: String,
+    pub chat_bootstrapped: bool,
+    pub dev_bootstrapped: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConversationMessage {
+    pub role: String,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PublicUser {
     pub id: String,
@@ -821,6 +834,38 @@ impl Store {
         Ok(())
     }
 
+    pub fn list_recent_conversation_messages(
+        &self,
+        project_id: &str,
+        conversation_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ConversationMessage>> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let limit = limit.clamp(1, 30) as i64;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT role, content
+             FROM (
+                SELECT role, content, created_at, id
+                FROM messages
+                WHERE project_id = ?1
+                  AND conversation_id = ?2
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?3
+             )
+             ORDER BY created_at ASC, id ASC",
+        )?;
+        let messages = stmt
+            .query_map(params![project_id, conversation_id, limit], |row| {
+                Ok(ConversationMessage {
+                    role: row.get(0)?,
+                    content: row.get(1)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(messages)
+    }
+
     pub fn get_native_agent_session(
         &self,
         project_id: &str,
@@ -830,10 +875,31 @@ impl Store {
         agent_id: &str,
         workspace_path: &str,
     ) -> Result<Option<String>> {
+        Ok(self
+            .get_native_agent_session_state(
+                project_id,
+                user_id,
+                conversation_id,
+                provider,
+                agent_id,
+                workspace_path,
+            )?
+            .map(|state| state.native_session_id))
+    }
+
+    pub fn get_native_agent_session_state(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+    ) -> Result<Option<NativeAgentSessionState>> {
         let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
         self.conn()?
             .query_row(
-                "SELECT native_session_id
+                "SELECT native_session_id, chat_bootstrapped, dev_bootstrapped
                  FROM agent_native_sessions
                  WHERE project_id = ?1
                    AND user_id = ?2
@@ -852,7 +918,13 @@ impl Store {
                     agent_id,
                     workspace_path
                 ],
-                |row| row.get(0),
+                |row| {
+                    Ok(NativeAgentSessionState {
+                        native_session_id: row.get(0)?,
+                        chat_bootstrapped: row.get::<_, i64>(1)? != 0,
+                        dev_bootstrapped: row.get::<_, i64>(2)? != 0,
+                    })
+                },
             )
             .optional()
             .map_err(Into::into)
@@ -879,6 +951,16 @@ impl Store {
              ON CONFLICT(project_id, user_id, conversation_id, provider, agent_id, workspace_path)
              DO UPDATE SET
                 native_session_id = excluded.native_session_id,
+                chat_bootstrapped = CASE
+                    WHEN agent_native_sessions.native_session_id = excluded.native_session_id
+                    THEN agent_native_sessions.chat_bootstrapped
+                    ELSE 0
+                END,
+                dev_bootstrapped = CASE
+                    WHEN agent_native_sessions.native_session_id = excluded.native_session_id
+                    THEN agent_native_sessions.dev_bootstrapped
+                    ELSE 0
+                END,
                 status = 'active',
                 updated_at = excluded.updated_at",
             params![
@@ -897,6 +979,163 @@ impl Store {
     }
 
     /// 标记当前用户任务为 running（服务启动时或任务开始时调用）
+    pub fn upsert_native_agent_session_if_no_active(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+        native_session_id: &str,
+    ) -> Result<bool> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let conn = self.conn()?;
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT native_session_id
+                 FROM agent_native_sessions
+                 WHERE project_id = ?1
+                   AND user_id = ?2
+                   AND conversation_id = ?3
+                   AND provider = ?4
+                   AND agent_id = ?5
+                   AND workspace_path = ?6
+                   AND status = 'active'
+                 LIMIT 1",
+                params![
+                    project_id,
+                    user_id,
+                    conversation_id,
+                    provider,
+                    agent_id,
+                    workspace_path
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Ok(false);
+        }
+
+        let now = now();
+        conn.execute(
+            "INSERT INTO agent_native_sessions (
+                id, project_id, user_id, conversation_id, provider, agent_id,
+                workspace_path, native_session_id, status, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?9)
+             ON CONFLICT(project_id, user_id, conversation_id, provider, agent_id, workspace_path)
+             DO UPDATE SET
+                native_session_id = excluded.native_session_id,
+                chat_bootstrapped = CASE
+                    WHEN agent_native_sessions.native_session_id = excluded.native_session_id
+                    THEN agent_native_sessions.chat_bootstrapped
+                    ELSE 0
+                END,
+                dev_bootstrapped = CASE
+                    WHEN agent_native_sessions.native_session_id = excluded.native_session_id
+                    THEN agent_native_sessions.dev_bootstrapped
+                    ELSE 0
+                END,
+                status = 'active',
+                updated_at = excluded.updated_at",
+            params![
+                new_id("ans"),
+                project_id,
+                user_id,
+                conversation_id,
+                provider,
+                agent_id,
+                workspace_path,
+                native_session_id,
+                now
+            ],
+        )?;
+        Ok(true)
+    }
+
+    pub fn deactivate_native_agent_session(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+        native_session_id: &str,
+    ) -> Result<()> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        self.conn()?.execute(
+            "UPDATE agent_native_sessions
+             SET status = 'stale', updated_at = ?1
+             WHERE project_id = ?2
+               AND user_id = ?3
+               AND conversation_id = ?4
+               AND provider = ?5
+               AND agent_id = ?6
+               AND workspace_path = ?7
+               AND native_session_id = ?8
+               AND status = 'active'",
+            params![
+                now(),
+                project_id,
+                user_id,
+                conversation_id,
+                provider,
+                agent_id,
+                workspace_path,
+                native_session_id
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn mark_native_agent_session_bootstrapped(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        provider: &str,
+        agent_id: &str,
+        workspace_path: &str,
+        native_session_id: &str,
+        development: bool,
+    ) -> Result<()> {
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let column = if development {
+            "dev_bootstrapped"
+        } else {
+            "chat_bootstrapped"
+        };
+        let sql = format!(
+            "UPDATE agent_native_sessions
+             SET {column} = 1, updated_at = ?1
+             WHERE project_id = ?2
+               AND user_id = ?3
+               AND conversation_id = ?4
+               AND provider = ?5
+               AND agent_id = ?6
+               AND workspace_path = ?7
+               AND native_session_id = ?8
+               AND status = 'active'"
+        );
+        self.conn()?.execute(
+            &sql,
+            params![
+                now(),
+                project_id,
+                user_id,
+                conversation_id,
+                provider,
+                agent_id,
+                workspace_path,
+                native_session_id
+            ],
+        )?;
+        Ok(())
+    }
+
     pub fn ws_task_started(&self, workspace_user_id: &str, message: &str) -> Result<()> {
         self.conn()?.execute(
             "INSERT OR REPLACE INTO ws_task_log (workspace_user_id, message, status, started_at, finished_at)
@@ -1091,6 +1330,8 @@ fn init_schema(conn: &Connection) -> Result<()> {
           agent_id TEXT NOT NULL,
           workspace_path TEXT NOT NULL,
           native_session_id TEXT NOT NULL,
+          chat_bootstrapped INTEGER NOT NULL DEFAULT 0,
+          dev_bootstrapped INTEGER NOT NULL DEFAULT 0,
           status TEXT NOT NULL DEFAULT 'active',
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
@@ -1120,6 +1361,18 @@ fn init_schema(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "tasks", "conversation_id", "conversation_id TEXT")?;
     add_column_if_missing(conn, "tasks", "client_request_id", "client_request_id TEXT")?;
     add_column_if_missing(conn, "messages", "conversation_id", "conversation_id TEXT")?;
+    add_column_if_missing(
+        conn,
+        "agent_native_sessions",
+        "chat_bootstrapped",
+        "chat_bootstrapped INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "agent_native_sessions",
+        "dev_bootstrapped",
+        "dev_bootstrapped INTEGER NOT NULL DEFAULT 0",
+    )?;
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_client_request
          ON tasks(project_id, user_id, conversation_id, client_request_id)

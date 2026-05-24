@@ -396,8 +396,7 @@ fn copilot_api_agents() -> Vec<AgentConfig> {
 
     // 默认模型集合：与 VS Code Copilot 模型选择器一致
     let default_models = "gpt-4o,gpt-4o-mini,claude-3.5-sonnet,o1-mini";
-    let models_raw = std::env::var("COPILOT_MODELS")
-        .unwrap_or_else(|_| default_models.into());
+    let models_raw = std::env::var("COPILOT_MODELS").unwrap_or_else(|_| default_models.into());
 
     split_list(&models_raw)
         .into_iter()
@@ -528,16 +527,18 @@ pub struct ProjectTaskPermit {
 
 pub struct CodexPrewarmRegistry {
     recent: AsyncMutex<HashMap<String, Instant>>,
+    active: AsyncMutex<HashMap<String, bool>>,
 }
 
 impl CodexPrewarmRegistry {
     pub fn new() -> Self {
         Self {
             recent: AsyncMutex::new(HashMap::new()),
+            active: AsyncMutex::new(HashMap::new()),
         }
     }
 
-    pub async fn mark_if_allowed(&self, key: &str, cooldown: Duration) -> bool {
+    pub async fn start_if_allowed(&self, key: &str, cooldown: Duration) -> bool {
         let now = Instant::now();
         let mut recent = self.recent.lock().await;
         recent.retain(|_, started_at| now.duration_since(*started_at) < cooldown);
@@ -545,7 +546,29 @@ impl CodexPrewarmRegistry {
             return false;
         }
         recent.insert(key.to_string(), now);
+        drop(recent);
+
+        let mut active = self.active.lock().await;
+        if active.contains_key(key) {
+            return false;
+        }
+        active.insert(key.to_string(), false);
         true
+    }
+
+    pub async fn cancel(&self, key: &str) {
+        if let Some(cancelled) = self.active.lock().await.get_mut(key) {
+            *cancelled = true;
+        }
+    }
+
+    pub async fn finish(&self, key: &str) -> bool {
+        self.active
+            .lock()
+            .await
+            .remove(key)
+            .map(|cancelled| !cancelled)
+            .unwrap_or(true)
     }
 }
 
@@ -810,7 +833,7 @@ fn safe_workspace_part(value: &str, max_len: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_user_workspace, ProjectTaskScheduler};
+    use super::{get_user_workspace, CodexPrewarmRegistry, ProjectTaskScheduler};
     use std::{
         sync::{
             atomic::{AtomicBool, Ordering},
@@ -866,6 +889,24 @@ mod tests {
             .await;
 
         assert!(!second.was_queued());
+    }
+
+    #[tokio::test]
+    async fn codex_prewarm_registry_tracks_active_and_cancelled_runs() {
+        let registry = CodexPrewarmRegistry::new();
+        assert!(
+            registry
+                .start_if_allowed("project:user:conversation", Duration::from_secs(120))
+                .await
+        );
+        assert!(
+            !registry
+                .start_if_allowed("project:user:conversation", Duration::from_secs(120))
+                .await
+        );
+
+        registry.cancel("project:user:conversation").await;
+        assert!(!registry.finish("project:user:conversation").await);
     }
 }
 

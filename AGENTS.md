@@ -162,6 +162,8 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - When the APK opens or resumes a project conversation, it may call `/api/.../prewarm` to create or reuse the native Codex CLI session id for that project/user/conversation.
 - Prewarm is not a development task. It must not inspect files, run Git, edit code, build, deploy, publish, or inject the full project workflow.
 - The first real user message still decides the route: ordinary chat uses the lightweight Codex prompt, and development requests enter the queued project workflow.
+- The server records whether a native Codex session has already received the full chat/development bootstrap. Later turns in the same session should use the shorter resume prompt, and stale/expired native sessions should be marked stale and retried once with a fresh Codex session.
+- When retrying with a fresh native session after stale resume, include the previous `codex://threads/<thread_id>` URI plus recent backend conversation messages so the new session can bridge the old context.
 
 ## Build And Attachment Transport Rules
 

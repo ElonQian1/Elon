@@ -396,17 +396,16 @@ async fn prewarm_project_response(
         requested_agent
     };
     let workspace_key = workspace.display().to_string();
-    let throttle_key = format!(
-        "{}|{}|{}|{}|{}",
-        project.id,
-        user.id,
-        conversation_id,
-        agent.as_deref().unwrap_or("default"),
-        workspace_key
+    let throttle_key = codex_prewarm_key(
+        &project.id,
+        &user.id,
+        &conversation_id,
+        agent.as_deref(),
+        &workspace_key,
     );
     if !state
         .codex_prewarm
-        .mark_if_allowed(&throttle_key, Duration::from_secs(120))
+        .start_if_allowed(&throttle_key, Duration::from_secs(120))
         .await
     {
         return Json(serde_json::json!({
@@ -428,6 +427,7 @@ async fn prewarm_project_response(
     let agent_for_task = agent.clone();
     let project_id_for_log = project.id.clone();
     let conversation_id_for_log = conversation_id.clone();
+    let prewarm_key_for_task = throttle_key.clone();
     tokio::spawn(async move {
         match ai_cli::prewarm_codex_session(
             &workspace_for_task,
@@ -451,6 +451,17 @@ async fn prewarm_project_response(
                 error = %error,
                 "Codex CLI session prewarm failed"
             ),
+        }
+        let accepted = state_for_task
+            .codex_prewarm
+            .finish(&prewarm_key_for_task)
+            .await;
+        if !accepted {
+            tracing::info!(
+                project_id = %project_id_for_log,
+                conversation_id = %conversation_id_for_log,
+                "Codex CLI session prewarm finished after real request started"
+            );
         }
     });
 
@@ -498,6 +509,22 @@ async fn run_project_agent_with_scheduler(
             }),
         );
     }
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let workspace_key = workspace.display().to_string();
+    let prewarm_agent = if state.ai_cli.codex_cli_only {
+        None
+    } else {
+        agent_name.as_deref()
+    };
+    let prewarm_key = codex_prewarm_key(
+        &project.id,
+        &user_id,
+        &conversation_id,
+        prewarm_agent,
+        &workspace_key,
+    );
+    state.codex_prewarm.cancel(&prewarm_key).await;
     if !needs_project_workflow {
         agent::run_for_project(
             &user_id,
@@ -519,8 +546,6 @@ async fn run_project_agent_with_scheduler(
         }
         .to_json(),
     );
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let native_session_scope = ai_cli::NativeSessionScope {
         project_id: project.id.clone(),
         user_id: user_id.clone(),
@@ -1655,7 +1680,9 @@ fn record_server_message(
         .record(trace_id, "server_message_to_phone", details.clone());
     match value.get("type").and_then(|kind| kind.as_str()) {
         Some("done") => state.server_traces.record(trace_id, "server_done", details),
-        Some("error") => state.server_traces.record(trace_id, "server_error", details),
+        Some("error") => state
+            .server_traces
+            .record(trace_id, "server_error", details),
         _ => {}
     }
 }
@@ -2004,6 +2031,23 @@ fn percent_encode_path_segment(value: &str) -> String {
         }
     }
     encoded
+}
+
+fn codex_prewarm_key(
+    project_id: &str,
+    user_id: &str,
+    conversation_id: &str,
+    agent: Option<&str>,
+    workspace_key: &str,
+) -> String {
+    format!(
+        "{}|{}|{}|{}|{}",
+        project_id,
+        user_id,
+        conversation_id,
+        agent.unwrap_or("default"),
+        workspace_key
+    )
 }
 
 fn unique_project_attachment_name(dir: &Path, original: &str) -> String {
