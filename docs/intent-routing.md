@@ -36,6 +36,8 @@
 5. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型。
 6. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
 
+注意：当前的 `intent_router` 是服务端本地确定性规则，不是另一个 AI 模型。它只做安全分流，防止一句普通聊天误触发 `git pull`、构建或发布。所有真正需要模型理解、回复、澄清和代码协作的环节都必须走 Codex CLI。API fallback 默认关闭；未来恢复 API 旁路必须显式设置 `AI_ALLOW_API_FALLBACK=true`。
+
 ## 多模型旁路原则
 
 以后即使恢复或新增其他 AI 模型，Codex CLI 仍然是项目会话主线。其他模型只能承担轻量分类、摘要、图片/特殊分析、检索增强等旁路任务，不能成为长期对话 owner，也不能直接接管代码协作。

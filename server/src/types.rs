@@ -180,15 +180,13 @@ impl AiCliConfig {
             .filter(|id| options.iter().any(|opt| opt.id == *id))
             .or_else(|| options.first().map(|opt| opt.id.clone()));
 
+        let allow_api_fallback = env_bool("AI_ALLOW_API_FALLBACK", false);
+
         Self {
             enabled,
             options,
             default_option,
-            fallback_to_api: !codex_cli_only
-                && env_bool(
-                    "AI_CLI_FALLBACK_TO_API",
-                    env_bool("CODEX_CLI_FALLBACK_TO_API", true),
-                ),
+            fallback_to_api: !codex_cli_only && allow_api_fallback,
             codex_cli_only,
         }
     }
