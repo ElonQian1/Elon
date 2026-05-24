@@ -103,6 +103,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingRequestPayload: String? = null
     private var pendingReconnectForActiveWork = false
     private var reconnectAttempts = 0
+    private val runningConversationTasks = linkedMapOf<String, ConversationTaskState>()
+    private val runningTraceToConversation = linkedMapOf<String, String>()
+    private val taskResponseTokens = linkedMapOf<String, Int>()
     private var backendConnected = false
     private var taskWorkReceiverRegistered = false
     private val projects = mutableListOf<AppProject>()
@@ -196,6 +199,16 @@ class MainActivity : AppCompatActivity() {
     private data class ModelOption(
         val label: String,
         val agentName: String?
+    )
+
+    private data class ConversationTaskState(
+        val traceId: String,
+        val projectId: String,
+        val conversationId: String,
+        var payload: String,
+        var isDevelopment: Boolean,
+        var pendingReconnect: Boolean = false,
+        var startedAt: Long = System.currentTimeMillis()
     )
 
     private data class ServerVersionInfo(
@@ -325,7 +338,7 @@ class MainActivity : AppCompatActivity() {
                 startTaskWorkService(
                     if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
                 )
-            } else if (!waitingForReply) {
+            } else if (!isActiveConversationWorking()) {
                 setSendEnabled(true)
                 if (binding.chatPage.visibility == View.VISIBLE) {
                     maybePrewarmCodexSession("resume_chat")
@@ -368,6 +381,7 @@ class MainActivity : AppCompatActivity() {
         collapseAttachmentPanel()
         val text = binding.inputEdit.text.toString().trim()
         if (text.isEmpty()) return
+        if (isActiveConversationWorking()) return
         if (activeConversation().ended) {
             appendMessage(ChatMessage("error", "这个会话已结束，请新建会话继续。"))
             return
@@ -389,6 +403,11 @@ class MainActivity : AppCompatActivity() {
     ) {
         if (!restoreSendTarget(target)) {
             Toast.makeText(this, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
+            setSendEnabled(true)
+            return
+        }
+        if (runningConversationTasks.containsKey(conversationTaskKey(target.projectId, target.conversationId))) {
+            Toast.makeText(this, "这个会话正在工作中，请换一个会话并行开发。", Toast.LENGTH_LONG).show()
             setSendEnabled(true)
             return
         }
@@ -422,10 +441,10 @@ class MainActivity : AppCompatActivity() {
             )
         )
         binding.inputEdit.text.clear()
+        val requestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText)
+        rememberConversationTask(target, traceId, payload.toString(), requestIsDevelopment)
         setSendEnabled(false)
-        waitingForReply = true
-        activeRequestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText)
-        pendingRequestPayload = payload.toString()
+        activeRequestIsDevelopment = requestIsDevelopment
         pendingReconnectForActiveWork = false
         reconnectAttempts = 0
         persistActiveWork()
@@ -434,7 +453,7 @@ class MainActivity : AppCompatActivity() {
         currentEvidenceEntries.clear()
         emittedProgressSignals.clear()
         visibleAssistantUpdateCount = 0
-        if (activeRequestIsDevelopment) {
+        if (requestIsDevelopment) {
             updateProjectTitleFromRequest(visibleText)
             saveProjectTitle()
             addProjectEvent("提交需求：${summarize(visibleText, 36)}")
@@ -442,32 +461,31 @@ class MainActivity : AppCompatActivity() {
         } else {
             updateProjectViews("普通消息已发送，开发项目记录保持不变。")
         }
-        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(activeRequestIsDevelopment)))
+        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(requestIsDevelopment)))
 
         // 通过前台任务服务发送 JSON（包含 user_id，服务端据此隔离工作区）
         val responseToken = ++serverResponseToken
-        if (!startTaskWorkService(TaskWorkService.ACTION_START_WORK, payload.toString(), activeRequestIsDevelopment)) {
-            pendingReconnectForActiveWork = true
+        taskResponseTokens[traceId] = responseToken
+        if (!startTaskWorkService(TaskWorkService.ACTION_START_WORK, payload.toString(), requestIsDevelopment, traceId)) {
+            runningConversationTasks[conversationTaskKey(target.projectId, target.conversationId)]?.pendingReconnect = true
+            refreshActiveTaskState()
             persistActiveWork()
-            if (activeRequestIsDevelopment) {
+            if (requestIsDevelopment) {
                 updateStage("连接恢复", "任务请求已保留，正在重新连接服务器。")
             }
-            scheduleFirstServerResponseWatchdog(responseToken)
+            scheduleFirstServerResponseWatchdog(traceId, responseToken)
         } else {
             clearPendingAttachments()
-            scheduleFirstServerResponseWatchdog(responseToken)
+            scheduleFirstServerResponseWatchdog(traceId, responseToken)
         }
     }
 
     private fun pauseCurrentWork() {
-        if (!waitingForReply) return
-        val wasDevelopment = activeRequestIsDevelopment
-        waitingForReply = false
-        activeRequestIsDevelopment = false
-        pendingRequestPayload = null
-        pendingReconnectForActiveWork = false
+        val task = activeConversationTask() ?: return
+        val wasDevelopment = task.isDevelopment
+        removeConversationTask(task.traceId, task.projectId, task.conversationId)
         reconnectAttempts = 0
-        clearPersistedActiveWork()
+        persistActiveWork()
         stopWorkingEvidenceForActiveConversation()
         currentEvidenceEntries.clear()
         setSendEnabled(true)
@@ -478,11 +496,12 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews("当前回复已暂停，你可以继续输入新的消息。")
         }
         appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("你已暂停当前工作。", wasDevelopment)))
-        startTaskWorkService(TaskWorkService.ACTION_PAUSE)
+        startTaskWorkService(TaskWorkService.ACTION_PAUSE, traceId = task.traceId)
     }
 
-    private fun handleActiveWorkDisconnected() {
-        pendingReconnectForActiveWork = true
+    private fun handleActiveWorkDisconnected(task: ConversationTaskState) {
+        task.pendingReconnect = true
+        refreshActiveTaskState()
         persistActiveWork()
         setSendEnabled(false)
         updateFirstConversationStatus("连接恢复中 · 回来后继续")
@@ -491,16 +510,18 @@ class MainActivity : AppCompatActivity() {
             recordEvidence("connection", "连接暂时断开，正在自动恢复任务")
         }
 
-        scheduleReconnectForActiveWork()
+        scheduleReconnectForActiveWork(task.traceId)
     }
 
-    private fun scheduleReconnectForActiveWork() {
-        if (!waitingForReply || !pendingReconnectForActiveWork) return
+    private fun scheduleReconnectForActiveWork(traceId: String? = activeConversationTask()?.traceId) {
+        val task = traceId?.let { runningTraceToConversation[it] }?.let { runningConversationTasks[it] } ?: return
+        if (!task.pendingReconnect) return
         reconnectAttempts += 1
         val delay = (800L * reconnectAttempts).coerceAtMost(5_000L)
         binding.root.postDelayed({
-            if (!waitingForReply || !pendingReconnectForActiveWork || backendConnected) return@postDelayed
-            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)
+            val current = runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } ?: return@postDelayed
+            if (!current.pendingReconnect || backendConnected) return@postDelayed
+            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING, traceId = current.traceId)
         }, delay)
     }
 
@@ -530,7 +551,7 @@ class MainActivity : AppCompatActivity() {
             persistActiveWork()
             scheduleReconnectForActiveWork()
         } else {
-            scheduleFirstServerResponseWatchdog(responseToken)
+            activeConversationTask()?.let { scheduleFirstServerResponseWatchdog(it.traceId, responseToken) }
         }
     }
 
@@ -1459,7 +1480,7 @@ class MainActivity : AppCompatActivity() {
             showConversationActions(activeConversationIndex)
             true
         }
-        setSendEnabled(backendConnected && !waitingForReply)
+        setSendEnabled(backendConnected && !isActiveConversationWorking())
         maybePrewarmCodexSession("show_chat")
     }
 
@@ -2024,21 +2045,119 @@ class MainActivity : AppCompatActivity() {
             .apply()
     }
 
+    private fun conversationTaskKey(projectId: String, conversationId: String): String {
+        return "$projectId\u001F$conversationId"
+    }
+
+    private fun activeConversationTaskKey(): String {
+        return conversationTaskKey(activeProject().id, activeConversation().id)
+    }
+
+    private fun isActiveConversationWorking(): Boolean {
+        return runningConversationTasks.containsKey(activeConversationTaskKey())
+    }
+
+    private fun activeConversationTask(): ConversationTaskState? {
+        return runningConversationTasks[activeConversationTaskKey()]
+    }
+
+    private fun rememberConversationTask(
+        target: SendTarget,
+        traceId: String,
+        payload: String,
+        isDevelopment: Boolean
+    ) {
+        val key = conversationTaskKey(target.projectId, target.conversationId)
+        runningConversationTasks[key] = ConversationTaskState(
+            traceId = traceId,
+            projectId = target.projectId,
+            conversationId = target.conversationId,
+            payload = payload,
+            isDevelopment = isDevelopment
+        )
+        runningTraceToConversation[traceId] = key
+        refreshActiveTaskState()
+    }
+
+    private fun updateConversationTaskFromService(
+        traceId: String?,
+        projectId: String?,
+        conversationId: String?,
+        isDevelopment: Boolean?,
+        pendingReconnect: Boolean? = null
+    ): ConversationTaskState? {
+        val key = when {
+            !traceId.isNullOrBlank() && runningTraceToConversation.containsKey(traceId) ->
+                runningTraceToConversation[traceId]
+            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
+                conversationTaskKey(projectId, conversationId)
+            else -> null
+        } ?: return null
+        val existing = runningConversationTasks[key] ?: return null
+        if (!traceId.isNullOrBlank()) runningTraceToConversation[traceId] = key
+        isDevelopment?.let { existing.isDevelopment = it }
+        pendingReconnect?.let { existing.pendingReconnect = it }
+        refreshActiveTaskState()
+        return existing
+    }
+
+    private fun removeConversationTask(
+        traceId: String?,
+        projectId: String?,
+        conversationId: String?
+    ): ConversationTaskState? {
+        val key = when {
+            !traceId.isNullOrBlank() -> runningTraceToConversation.remove(traceId)
+            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
+                conversationTaskKey(projectId, conversationId)
+            else -> null
+        } ?: return null
+        val removed = runningConversationTasks.remove(key)
+        removed?.let {
+            runningTraceToConversation.entries.removeAll { entry -> entry.value == key }
+            taskResponseTokens.remove(it.traceId)
+        }
+        refreshActiveTaskState()
+        return removed
+    }
+
+    private fun refreshActiveTaskState() {
+        waitingForReply = runningConversationTasks.isNotEmpty()
+        val activeTask = activeConversationTask()
+        activeRequestIsDevelopment = activeTask?.isDevelopment
+            ?: runningConversationTasks.values.lastOrNull()?.isDevelopment
+            ?: false
+        pendingRequestPayload = activeTask?.payload
+        pendingReconnectForActiveWork = activeTask?.pendingReconnect ?: false
+        setSendEnabled(backendConnected && !isActiveConversationWorking())
+        renderConversationList()
+    }
+
     private fun persistActiveWork() {
-        val payload = pendingRequestPayload
-        if (!waitingForReply || payload.isNullOrBlank()) {
+        val array = JSONArray()
+        runningConversationTasks.values.forEach { task ->
+            array.put(
+                JSONObject()
+                    .put("payload", task.payload)
+                    .put("is_development", task.isDevelopment)
+                    .put("started_at", task.startedAt)
+            )
+        }
+        if (array.length() == 0) {
             clearPersistedActiveWork()
             return
         }
         prefs.edit()
-            .putString(PREF_PENDING_WORK_PAYLOAD, payload)
-            .putBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, activeRequestIsDevelopment)
-            .putLong(PREF_PENDING_WORK_TIME, System.currentTimeMillis())
+            .putString(TaskWorkService.PREF_PENDING_WORK_TASKS, array.toString())
+            .remove(PREF_PENDING_WORK_PAYLOAD)
+            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
+            .remove(PREF_PENDING_WORK_TIME)
             .apply()
     }
 
     private fun clearPersistedActiveWork() {
         prefs.edit()
+            .remove(TaskWorkService.PREF_PENDING_WORK_TASKS)
             .remove(PREF_PENDING_WORK_PAYLOAD)
             .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
             .remove(PREF_PENDING_WORK_TIME)
@@ -2046,21 +2165,61 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restorePendingActiveWork() {
-        val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
-            ?: return
-        val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
-        val tooOld = savedAt <= 0L || System.currentTimeMillis() - savedAt > PENDING_WORK_TTL_MS
-        if (tooOld) {
-            clearPersistedActiveWork()
-            return
+        val now = System.currentTimeMillis()
+        val tasksJson = prefs.getString(TaskWorkService.PREF_PENDING_WORK_TASKS, null)?.takeIf { it.isNotBlank() }
+        if (tasksJson != null) {
+            val array = runCatching { JSONArray(tasksJson) }.getOrNull()
+            if (array != null) {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val payload = item.optString("payload").takeIf { it.isNotBlank() } ?: continue
+                    val savedAt = item.optLong("started_at", now)
+                    if (savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS) continue
+                    val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: continue
+                    val traceId = parsed.optString("trace_id").takeIf { it.isNotBlank() } ?: continue
+                    val projectId = parsed.optString("project_id").takeIf { it.isNotBlank() } ?: activeProject().id
+                    val conversationId = parsed.optString("conversation_id").takeIf { it.isNotBlank() } ?: "default"
+                    val key = conversationTaskKey(projectId, conversationId)
+                    runningConversationTasks[key] = ConversationTaskState(
+                        traceId = traceId,
+                        projectId = projectId,
+                        conversationId = conversationId,
+                        payload = payload,
+                        isDevelopment = item.optBoolean("is_development", true),
+                        pendingReconnect = true,
+                        startedAt = savedAt
+                    )
+                    runningTraceToConversation[traceId] = key
+                }
+            }
+        } else {
+            val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
+                ?: return
+            val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
+            val tooOld = savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS
+            if (tooOld) {
+                clearPersistedActiveWork()
+                return
+            }
+            val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: return
+            val traceId = parsed.optString("trace_id").takeIf { it.isNotBlank() } ?: return
+            val projectId = parsed.optString("project_id").takeIf { it.isNotBlank() } ?: activeProject().id
+            val conversationId = parsed.optString("conversation_id").takeIf { it.isNotBlank() } ?: activeConversation().id
+            val key = conversationTaskKey(projectId, conversationId)
+            runningConversationTasks[key] = ConversationTaskState(
+                traceId = traceId,
+                projectId = projectId,
+                conversationId = conversationId,
+                payload = payload,
+                isDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true),
+                pendingReconnect = true,
+                startedAt = savedAt
+            )
+            runningTraceToConversation[traceId] = key
         }
 
-        waitingForReply = true
-        activeRequestIsDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true)
-        pendingRequestPayload = payload
-        pendingReconnectForActiveWork = true
+        refreshActiveTaskState()
         reconnectAttempts = 0
-        setSendEnabled(false)
         if (activeRequestIsDevelopment) {
             updateStage("后台继续", "任务仍在服务器继续处理，连接恢复后会同步最新进度。")
         } else {
@@ -2087,43 +2246,188 @@ class MainActivity : AppCompatActivity() {
         when (intent.action) {
             TaskWorkService.ACTION_EVENT -> {
                 backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
+                val traceId = intent.getStringExtra(TaskWorkService.EXTRA_TRACE_ID)?.takeIf { it.isNotBlank() }
+                val projectId = intent.getStringExtra(TaskWorkService.EXTRA_PROJECT_ID)?.takeIf { it.isNotBlank() }
+                val conversationId = intent.getStringExtra(TaskWorkService.EXTRA_CONVERSATION_ID)?.takeIf { it.isNotBlank() }
+                val isDevelopment = if (intent.hasExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT)) {
+                    intent.getBooleanExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, true)
+                } else {
+                    null
+                }
                 when (intent.getStringExtra(TaskWorkService.EXTRA_KIND)) {
                     "connected" -> {
                         reconnectAttempts = 0
                         updateFirstConversationStatus("已连接 · 点击进入开发会话")
-                        if (waitingForReply && pendingReconnectForActiveWork) {
-                            pendingReconnectForActiveWork = false
+                        val task = updateConversationTaskFromService(
+                            traceId,
+                            projectId,
+                            conversationId,
+                            isDevelopment,
+                            pendingReconnect = false
+                        )
+                        if (task != null && activeConversationTask()?.traceId == task.traceId) {
                             recordEvidence("connection", "连接已恢复，后台任务继续运行")
                         }
-                        if (!waitingForReply) setSendEnabled(true)
+                        setSendEnabled(backendConnected && !isActiveConversationWorking())
                     }
                     "disconnected" -> {
                         backendConnected = false
-                        if (waitingForReply) {
-                            if (!pendingReconnectForActiveWork) handleActiveWorkDisconnected()
+                        val task = updateConversationTaskFromService(
+                            traceId,
+                            projectId,
+                            conversationId,
+                            isDevelopment,
+                            pendingReconnect = true
+                        )
+                        if (task != null && activeConversationTask()?.traceId == task.traceId) {
+                            handleActiveWorkDisconnected(task)
                         } else {
                             updateFirstConversationStatus("未连接 · 点击重试")
-                            setSendEnabled(true)
+                            setSendEnabled(backendConnected && !isActiveConversationWorking())
                         }
                     }
                     "message" -> {
                         intent.getStringExtra(TaskWorkService.EXTRA_RAW_MESSAGE)?.let { raw ->
-                            appendMessage(raw)
+                            traceId?.let { taskResponseTokens.remove(it) }
+                            appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
                         }
                     }
                     "paused" -> {
-                        backendConnected = false
-                        setSendEnabled(true)
+                        removeConversationTask(traceId, projectId, conversationId)
+                        setSendEnabled(backendConnected && !isActiveConversationWorking())
                     }
                 }
             }
             TaskWorkService.ACTION_STATE -> {
                 backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
                 val serviceWaiting = intent.getBooleanExtra(TaskWorkService.EXTRA_WAITING, waitingForReply)
-                if (!serviceWaiting && !waitingForReply) {
-                    setSendEnabled(backendConnected)
+                syncActiveTasksFromServiceState(intent.getStringExtra(TaskWorkService.EXTRA_ACTIVE_TASKS))
+                if (!serviceWaiting) {
+                    runningConversationTasks.clear()
+                    runningTraceToConversation.clear()
+                    taskResponseTokens.clear()
+                    refreshActiveTaskState()
+                }
+                setSendEnabled(backendConnected && !isActiveConversationWorking())
+            }
+        }
+    }
+
+    private fun syncActiveTasksFromServiceState(activeTasksJson: String?) {
+        if (activeTasksJson.isNullOrBlank()) return
+        val array = runCatching { JSONArray(activeTasksJson) }.getOrNull() ?: return
+        for (index in 0 until array.length()) {
+            val item = array.optJSONObject(index) ?: continue
+            val traceId = item.optString("trace_id").takeIf { it.isNotBlank() } ?: continue
+            val projectId = item.optString("project_id").takeIf { it.isNotBlank() } ?: continue
+            val conversationId = item.optString("conversation_id").takeIf { it.isNotBlank() } ?: continue
+            val key = conversationTaskKey(projectId, conversationId)
+            val existing = runningConversationTasks[key] ?: continue
+            runningTraceToConversation[traceId] = key
+            existing.pendingReconnect = false
+            existing.isDevelopment = item.optBoolean("is_development", existing.isDevelopment)
+        }
+        refreshActiveTaskState()
+    }
+
+    private fun appendTaskMessage(
+        raw: String,
+        traceId: String?,
+        projectId: String?,
+        conversationId: String?,
+        isDevelopment: Boolean?
+    ) {
+        val parsed = runCatching { JSONObject(raw) }.getOrNull()
+        val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
+        val key = when {
+            !traceId.isNullOrBlank() && runningTraceToConversation.containsKey(traceId) ->
+                runningTraceToConversation[traceId]
+            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
+                conversationTaskKey(projectId, conversationId)
+            else -> activeConversationTaskKey()
+        }
+        val isActiveTarget = key == activeConversationTaskKey()
+        if (isActiveTarget) {
+            appendMessage(raw)
+        } else {
+            val effectiveIsDevelopment = isDevelopment
+                ?: key?.let { runningConversationTasks[it]?.isDevelopment }
+                ?: false
+            appendBackgroundTaskMessage(raw, key, effectiveIsDevelopment)
+        }
+        if (type == "done" || type == "error") {
+            removeConversationTask(traceId, projectId, conversationId)
+            persistActiveWork()
+        } else {
+            updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect = false)
+        }
+    }
+
+    private fun appendBackgroundTaskMessage(raw: String, key: String?, isDevelopment: Boolean) {
+        val location = key?.let { findConversationLocationByKey(it) } ?: return
+        val parsed = runCatching { JSONObject(raw) }.getOrNull() ?: return
+        val type = parsed.optString("type").takeIf { it.isNotBlank() } ?: return
+        if (type == "app_update_available") {
+            AppUpdateManager(this).realtimeCheck(parsed.optInt("versionCode", 0))
+            return
+        }
+        val message = when (type) {
+            "done" -> {
+                val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务已完成。"
+                val apkUrl = parsed.optString("apk_url").takeIf { it.isNotBlank() && it != "null" }
+                val imageUrl = parsed.optString("image_url").takeIf { it.isNotBlank() && it != "null" }
+                ChatMessage(
+                    "ai",
+                    finalReplyMessage(content, if (isDevelopment) apkUrl else null, imageUrl, isDevelopment)
+                )
+            }
+            "error" -> ChatMessage(
+                "error",
+                friendlyErrorMessage(parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务失败。")
+            )
+            "progress" -> {
+                val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: return
+                if (!shouldShowProgressBubble(content)) return
+                ChatMessage("ai-progress", workflowProgressMessage(content))
+            }
+            else -> return
+        }
+        appendMessageToConversation(location.first, location.second, message)
+    }
+
+    private fun findConversationLocationByKey(key: String): Pair<Int, Int>? {
+        projects.forEachIndexed { projectIndex, project ->
+            project.conversations.forEachIndexed { conversationIndex, conversation ->
+                if (conversationTaskKey(project.id, conversation.id) == key) {
+                    return projectIndex to conversationIndex
                 }
             }
+        }
+        return null
+    }
+
+    private fun appendMessageToConversation(
+        projectIndex: Int,
+        conversationIndex: Int,
+        message: ChatMessage
+    ) {
+        val project = projects.getOrNull(projectIndex) ?: return
+        val conversation = project.conversations.getOrNull(conversationIndex) ?: return
+        if (message.role in workflowTerminalRoles) {
+            closeStaleWorkflowMessages(conversation.messages)
+        }
+        conversation.messages.add(message)
+        conversation.updatedAt = System.currentTimeMillis()
+        project.updatedAt = conversation.updatedAt
+        if (!conversation.ended) {
+            conversation.subtitle = summarize(message.content, 30)
+            project.subtitle = summarize(message.content, 34)
+        }
+        saveProjects()
+        renderConversationList()
+        if (projectIndex == activeProjectIndex && conversationIndex == activeConversationIndex) {
+            chatAdapter.notifyDataSetChanged()
+            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
     }
 
@@ -2137,12 +2441,14 @@ class MainActivity : AppCompatActivity() {
     private fun startTaskWorkService(
         action: String,
         payload: String? = null,
-        isDevelopment: Boolean = activeRequestIsDevelopment
+        isDevelopment: Boolean = activeRequestIsDevelopment,
+        traceId: String? = null
     ): Boolean {
         val intent = Intent(this, TaskWorkService::class.java).apply {
             this.action = action
             payload?.let { putExtra(TaskWorkService.EXTRA_PAYLOAD, it) }
             putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
+            traceId?.let { putExtra(TaskWorkService.EXTRA_TRACE_ID, it) }
         }
         return runCatching {
             if (action == TaskWorkService.ACTION_START_WORK || action == TaskWorkService.ACTION_RESUME_PENDING) {
@@ -2166,7 +2472,21 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             val array = JSONArray(queued)
             for (index in 0 until array.length()) {
-                array.optString(index).takeIf { it.isNotBlank() }?.let { appendMessage(it) }
+                val item = array.opt(index)
+                if (item is JSONObject) {
+                    val raw = item.optString("raw").takeIf { it.isNotBlank() }
+                    if (raw != null) {
+                        appendTaskMessage(
+                            raw,
+                            item.optString("trace_id").takeIf { it.isNotBlank() },
+                            item.optString("project_id").takeIf { it.isNotBlank() },
+                            item.optString("conversation_id").takeIf { it.isNotBlank() },
+                            if (item.has("is_development")) item.optBoolean("is_development", true) else null
+                        )
+                    }
+                } else {
+                    array.optString(index).takeIf { it.isNotBlank() }?.let { appendMessage(it) }
+                }
             }
         }
     }
@@ -2718,10 +3038,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isConversationWorking(index: Int): Boolean {
-        return waitingForReply &&
-            index == activeConversationIndex &&
-            index in conversations.indices &&
-            !conversations[index].ended
+        if (index !in conversations.indices || conversations[index].ended) return false
+        return runningConversationTasks.containsKey(
+            conversationTaskKey(activeProject().id, conversations[index].id)
+        )
     }
 
     private fun createConversationDivider(): View {
@@ -3364,7 +3684,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybePrewarmCodexSession(reason: String) {
-        if (waitingForReply) return
+        if (isActiveConversationWorking()) return
         val project = activeProject()
         val conversation = activeConversation()
         if (conversation.ended) return
@@ -4456,15 +4776,17 @@ class MainActivity : AppCompatActivity() {
         messages.removeAt(messages.lastIndex)
     }
 
-    private fun scheduleFirstServerResponseWatchdog(token: Int) {
+    private fun scheduleFirstServerResponseWatchdog(traceId: String, token: Int) {
         binding.root.postDelayed({
-            if (!waitingForReply || serverResponseToken != token) return@postDelayed
-            pendingReconnectForActiveWork = true
-            if (activeRequestIsDevelopment) {
+            if (taskResponseTokens[traceId] != token) return@postDelayed
+            val task = runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } ?: return@postDelayed
+            task.pendingReconnect = true
+            refreshActiveTaskState()
+            if (task.isDevelopment && activeConversationTask()?.traceId == traceId) {
                 updateStage(currentStage, "暂时没有收到服务器进度，正在自动恢复连接。")
                 addProjectEvent("服务端暂未返回进度，自动恢复连接")
             }
-            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)
+            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING, traceId = traceId)
         }, 20_000L)
     }
 
@@ -4682,7 +5004,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStageHintShimmer() {
-        if (waitingForReply && binding.chatPage.visibility == View.VISIBLE) {
+        if (isActiveConversationWorking() && binding.chatPage.visibility == View.VISIBLE) {
             startStageHintShimmer()
         } else {
             stopStageHintShimmer()
@@ -4699,7 +5021,7 @@ class MainActivity : AppCompatActivity() {
         text.paint.shader = null
         text.alpha = 1f
         text.post {
-            if (token != stageHintShimmerToken || !waitingForReply || binding.chatPage.visibility != View.VISIBLE) {
+            if (token != stageHintShimmerToken || !isActiveConversationWorking() || binding.chatPage.visibility != View.VISIBLE) {
                 return@post
             }
             val width = text.width.coerceAtLeast(text.measuredWidth)

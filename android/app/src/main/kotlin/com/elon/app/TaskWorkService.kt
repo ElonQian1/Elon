@@ -24,24 +24,35 @@ import java.net.URLEncoder
 class TaskWorkService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
-    private var wsClient: ElonWsClient? = null
-    private var pendingPayload: String? = null
-    private var activeRequestIsDevelopment = true
-    private var waitingForReply = false
-    private var payloadSentForCurrentConnection = false
-    private var reconnectAttempts = 0
-    private var activeServerUrl: String? = null
-    private var clientGeneration = 0
-    private var activeRequestStartedAtMs = 0L
-    private var firstServerEventAtMs = 0L
-    private var firstChatReplyAtMs = 0L
-    private var activeRequestKind = "unknown"
+    private val activeTasks = linkedMapOf<String, RunningTask>()
+    private var nextClientGeneration = 0
+
+    private data class RunningTask(
+        val traceId: String,
+        val projectId: String?,
+        val conversationId: String?,
+        var payload: String,
+        var isDevelopment: Boolean,
+        var waitingForReply: Boolean = true,
+        var payloadSentForCurrentConnection: Boolean = false,
+        var reconnectAttempts: Int = 0,
+        var serverUrl: String? = null,
+        var clientGeneration: Int = 0,
+        var startedAtMs: Long = System.currentTimeMillis(),
+        var firstServerEventAtMs: Long = 0L,
+        var firstChatReplyAtMs: Long = 0L,
+        var wsClient: ElonWsClient? = null,
+        var reconnectRunnable: Runnable? = null
+    ) {
+        val requestKind: String
+            get() = if (isDevelopment) "development" else "chat"
+    }
 
     override fun onCreate() {
         super.onCreate()
         createChannels()
         restorePendingWork()
-        ensureClient()
+        if (hasActiveTasks()) connectAll()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -49,7 +60,8 @@ class TaskWorkService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         val payload = intent?.getStringExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotBlank() }
-        val traceId = extractTraceId(payload)
+        val traceId = intent?.getStringExtra(EXTRA_TRACE_ID)?.takeIf { it.isNotBlank() }
+            ?: extractTraceId(payload)
         DebugTraceStore.record(
             "task_service_command",
             mapOf(
@@ -59,8 +71,8 @@ class TaskWorkService : Service() {
                 "trace_id" to traceId,
                 "has_payload" to (payload != null),
                 "force" to (intent?.getBooleanExtra(EXTRA_FORCE_START, false) ?: false),
-                "waiting_before" to waitingForReply,
-                "pending_trace_id" to extractTraceId(pendingPayload)
+                "active_task_count" to activeTasks.size,
+                "active_trace_ids" to activeTasks.keys.joinToString(",")
             )
         )
         when (action) {
@@ -80,32 +92,38 @@ class TaskWorkService : Service() {
             }
             ACTION_RESUME_PENDING -> {
                 restorePendingWork()
-                if (waitingForReply) {
+                val task = traceId?.let { activeTasks[it] }
+                val tasksToResume = task?.let { listOf(it) } ?: activeTasks.values.toList()
+                if (tasksToResume.isNotEmpty()) {
                     DebugTraceStore.record(
                         "task_resume_pending",
                         mapOf(
-                            "trace_id" to extractTraceId(pendingPayload),
-                            "kind" to activeRequestKind,
-                            "pending_age_ms" to pendingWorkAgeMs()
+                            "trace_id" to traceId,
+                            "task_count" to tasksToResume.size,
+                            "pending_age_ms" to pendingWorkAgeMs(tasksToResume)
                         )
                     )
                     enterForeground()
-                    payloadSentForCurrentConnection = false
-                    connect()
+                    tasksToResume.forEach {
+                        it.payloadSentForCurrentConnection = false
+                        connect(it)
+                    }
+                } else {
+                    broadcastState()
                 }
             }
             ACTION_CONNECT -> {
-                if (waitingForReply) enterForeground()
-                connect()
+                if (hasActiveTasks()) enterForeground()
+                traceId?.let { activeTasks[it] }?.let { connect(it) } ?: connectAll()
             }
-            ACTION_PAUSE -> pauseWork()
+            ACTION_PAUSE -> pauseWork(traceId)
             ACTION_SYNC_STATE -> broadcastState()
             else -> {
                 restorePendingWork()
-                if (waitingForReply) {
+                if (hasActiveTasks()) {
                     enterForeground()
-                    payloadSentForCurrentConnection = false
-                    connect()
+                    activeTasks.values.forEach { it.payloadSentForCurrentConnection = false }
+                    connectAll()
                 } else {
                     broadcastState()
                 }
@@ -116,117 +134,90 @@ class TaskWorkService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        wsClient?.disconnect()
-        wsClient = null
+        activeTasks.values.forEach { it.wsClient?.disconnect() }
+        activeTasks.clear()
         super.onDestroy()
     }
 
     private fun startWork(payload: String, isDevelopment: Boolean, force: Boolean = false) {
-        if (shouldRejectBusyStart(payload, force)) {
-            rejectBusyStart(payload)
-            return
-        }
-        pendingPayload = payload
-        activeRequestIsDevelopment = isDevelopment
-        waitingForReply = true
-        reconnectAttempts = 0
-        payloadSentForCurrentConnection = false
-        activeRequestStartedAtMs = System.currentTimeMillis()
-        firstServerEventAtMs = 0L
-        firstChatReplyAtMs = 0L
-        activeRequestKind = if (isDevelopment) "development" else "chat"
-        Log.i(TAG, "request_start kind=$activeRequestKind payload_bytes=${payload.length}")
+        val traceId = extractTraceId(payload) ?: "task_${System.currentTimeMillis()}"
+        if (force) cleanupTask(traceId, disconnect = true)
+        val task = activeTasks[traceId] ?: RunningTask(
+            traceId = traceId,
+            projectId = extractPayloadString(payload, "project_id"),
+            conversationId = extractPayloadString(payload, "conversation_id"),
+            payload = payload,
+            isDevelopment = isDevelopment
+        ).also { activeTasks[traceId] = it }
+        task.payload = payload
+        task.isDevelopment = isDevelopment
+        task.waitingForReply = true
+        task.reconnectAttempts = 0
+        task.payloadSentForCurrentConnection = false
+        task.startedAtMs = System.currentTimeMillis()
+        task.firstServerEventAtMs = 0L
+        task.firstChatReplyAtMs = 0L
+        Log.i(TAG, "request_start trace=$traceId kind=${task.requestKind} payload_bytes=${payload.length}")
         DebugTraceStore.record(
             "task_start_work",
             mapOf(
-                "trace_id" to extractTraceId(payload),
-                "kind" to activeRequestKind,
+                "trace_id" to traceId,
+                "project_id" to task.projectId,
+                "conversation_id" to task.conversationId,
+                "kind" to task.requestKind,
                 "force" to force,
+                "parallel_task_count" to activeTasks.size,
                 "payload_bytes" to payload.toByteArray().size
             )
         )
         persistActiveWork()
         enterForeground()
-        connect()
+        connect(task)
     }
 
-    private fun rejectBusyStart(incomingPayload: String) {
-        val activeTraceId = extractTraceId(pendingPayload)
-        val incomingTraceId = extractTraceId(incomingPayload)
-        DebugTraceStore.record(
-            "task_start_rejected_busy",
-            mapOf(
-                "trace_id" to incomingTraceId,
-                "active_trace_id" to activeTraceId,
-                "incoming_trace_id" to incomingTraceId,
-                "kind" to activeRequestKind,
-                "elapsed_ms" to elapsedSinceRequestStart()
-            )
-        )
-        val raw = JSONObject()
-            .put("type", "error")
-            .put("busy", true)
-            .put("message", "已有任务正在处理，请稍候再发送。")
-            .put("active_trace_id", activeTraceId)
-            .put("incoming_trace_id", incomingTraceId)
-            .toString()
-        if (isAppInForeground()) {
-            broadcastMessage(raw)
-        } else {
-            queueRawEvent(raw)
-        }
-        broadcastState()
-    }
-
-    private fun shouldRejectBusyStart(incomingPayload: String, force: Boolean): Boolean {
-        if (force || !waitingForReply || pendingPayload.isNullOrBlank()) return false
-        val activeTraceId = extractTraceId(pendingPayload)
-        val incomingTraceId = extractTraceId(incomingPayload)
-        return activeTraceId.isNullOrBlank() ||
-            incomingTraceId.isNullOrBlank() ||
-            activeTraceId != incomingTraceId
-    }
-
-    private fun ensureClient(): ElonWsClient {
-        val serverUrl = buildProjectWsUrl(pendingPayload)
-        val existing = wsClient
-        if (existing != null && activeServerUrl == serverUrl) return existing
-        clientGeneration += 1
-        val generation = clientGeneration
+    private fun ensureClient(task: RunningTask): ElonWsClient {
+        val serverUrl = buildProjectWsUrl(task.payload)
+        val existing = task.wsClient
+        if (existing != null && task.serverUrl == serverUrl) return existing
+        nextClientGeneration += 1
+        val generation = nextClientGeneration
         existing?.disconnect()
-        activeServerUrl = serverUrl
+        task.serverUrl = serverUrl
+        task.clientGeneration = generation
         val created = ElonWsClient(
             serverUrl = serverUrl,
-            onMessage = { raw -> handleServerMessage(raw) },
+            onMessage = { raw -> handleServerMessage(task.traceId, raw) },
             onConnected = onConnected@{
-                if (generation != clientGeneration) {
+                val current = activeTasks[task.traceId] ?: return@onConnected
+                if (generation != current.clientGeneration) {
                     DebugTraceStore.record(
                         "task_ws_stale_connected_ignored",
-                        mapOf("trace_id" to extractTraceId(pendingPayload), "server_url" to serverUrl)
+                        mapOf("trace_id" to task.traceId, "server_url" to serverUrl)
                     )
                     return@onConnected
                 }
                 DebugTraceStore.record(
                     "task_ws_connected",
                     mapOf(
-                        "trace_id" to extractTraceId(pendingPayload),
-                        "kind" to activeRequestKind,
-                        "elapsed_ms" to elapsedSinceRequestStart(),
-                        "reconnect_attempts" to reconnectAttempts,
-                        "server_url" to activeServerUrl
+                        "trace_id" to current.traceId,
+                        "kind" to current.requestKind,
+                        "elapsed_ms" to elapsedSinceRequestStart(current),
+                        "reconnect_attempts" to current.reconnectAttempts,
+                        "server_url" to current.serverUrl
                     )
                 )
-                reconnectAttempts = 0
-                broadcastStatus("connected")
-                sendPendingPayloadIfNeeded()
+                current.reconnectAttempts = 0
+                broadcastStatus("connected", current)
+                sendPendingPayloadIfNeeded(current)
             },
             onDisconnected = onDisconnected@{
-                if (generation != clientGeneration) {
+                val current = activeTasks[task.traceId] ?: return@onDisconnected
+                if (generation != current.clientGeneration) {
                     DebugTraceStore.record(
                         "task_ws_stale_disconnect_ignored",
                         mapOf(
-                            "trace_id" to extractTraceId(pendingPayload),
-                            "kind" to activeRequestKind,
+                            "trace_id" to current.traceId,
+                            "kind" to current.requestKind,
                             "server_url" to serverUrl
                         )
                     )
@@ -235,18 +226,18 @@ class TaskWorkService : Service() {
                 DebugTraceStore.record(
                     "task_ws_disconnected",
                     mapOf(
-                        "trace_id" to extractTraceId(pendingPayload),
-                        "kind" to activeRequestKind,
-                        "elapsed_ms" to elapsedSinceRequestStart(),
-                        "reconnect_attempts" to reconnectAttempts
+                        "trace_id" to current.traceId,
+                        "kind" to current.requestKind,
+                        "elapsed_ms" to elapsedSinceRequestStart(current),
+                        "reconnect_attempts" to current.reconnectAttempts
                     )
                 )
-                payloadSentForCurrentConnection = false
-                broadcastStatus("disconnected")
-                if (waitingForReply) scheduleReconnect()
+                current.payloadSentForCurrentConnection = false
+                broadcastStatus("disconnected", current)
+                if (current.waitingForReply) scheduleReconnect(current)
             }
         )
-        wsClient = created
+        task.wsClient = created
         return created
     }
 
@@ -275,69 +266,77 @@ class TaskWorkService : Service() {
         return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
     }
 
-    private fun connect() {
-        val client = ensureClient()
+    private fun connectAll() {
+        if (activeTasks.isEmpty()) {
+            broadcastState()
+            return
+        }
+        activeTasks.values.toList().forEach { connect(it) }
+    }
+
+    private fun connect(task: RunningTask) {
+        val client = ensureClient(task)
         client.connect()
         if (client.isConnected()) {
-            sendPendingPayloadIfNeeded()
+            sendPendingPayloadIfNeeded(task)
         }
         broadcastState()
     }
 
-    private fun sendPendingPayloadIfNeeded() {
-        val payload = pendingPayload ?: return
-        if (!waitingForReply || payloadSentForCurrentConnection) return
-        val sent = ensureClient().send(payload)
-        payloadSentForCurrentConnection = sent
+    private fun sendPendingPayloadIfNeeded(task: RunningTask) {
+        val payload = task.payload
+        if (!task.waitingForReply || task.payloadSentForCurrentConnection) return
+        val sent = ensureClient(task).send(payload)
+        task.payloadSentForCurrentConnection = sent
         if (sent) {
             Log.i(
                 TAG,
-                "request_sent kind=$activeRequestKind elapsed_ms=${elapsedSinceRequestStart()}"
+                "request_sent trace=${task.traceId} kind=${task.requestKind} elapsed_ms=${elapsedSinceRequestStart(task)}"
             )
         }
         DebugTraceStore.record(
             if (sent) "task_payload_sent" else "task_payload_send_failed",
             mapOf(
-                "trace_id" to extractTraceId(payload),
-                "kind" to activeRequestKind,
-                "elapsed_ms" to elapsedSinceRequestStart(),
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(task),
                 "payload_bytes" to payload.toByteArray().size
             )
         )
-        if (!sent) scheduleReconnect()
+        if (!sent) scheduleReconnect(task)
     }
 
-    private fun scheduleReconnect() {
-        if (!waitingForReply) return
-        reconnectAttempts += 1
-        val delay = (900L * reconnectAttempts).coerceAtMost(6_000L)
+    private fun scheduleReconnect(task: RunningTask) {
+        if (!task.waitingForReply || activeTasks[task.traceId] == null) return
+        task.reconnectAttempts += 1
+        val delay = (900L * task.reconnectAttempts).coerceAtMost(6_000L)
         DebugTraceStore.record(
             "task_reconnect_scheduled",
             mapOf(
-                "trace_id" to extractTraceId(pendingPayload),
-                "kind" to activeRequestKind,
-                "elapsed_ms" to elapsedSinceRequestStart(),
-                "reconnect_attempts" to reconnectAttempts,
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(task),
+                "reconnect_attempts" to task.reconnectAttempts,
                 "delay_ms" to delay
             )
         )
-        handler.removeCallbacksAndMessages(RECONNECT_TOKEN)
-        handler.postAtTime(
-            {
-                if (!waitingForReply) return@postAtTime
-                payloadSentForCurrentConnection = false
-                ensureClient().connect()
-            },
-            RECONNECT_TOKEN,
-            android.os.SystemClock.uptimeMillis() + delay
-        )
+        task.reconnectRunnable?.let { handler.removeCallbacks(it) }
+        val runnable = Runnable {
+            val current = activeTasks[task.traceId] ?: return@Runnable
+            if (!current.waitingForReply) return@Runnable
+            current.payloadSentForCurrentConnection = false
+            ensureClient(current).connect()
+        }
+        task.reconnectRunnable = runnable
+        handler.postDelayed(runnable, delay)
     }
 
-    private fun handleServerMessage(raw: String) {
+    private fun handleServerMessage(traceId: String, raw: String) {
+        val task = activeTasks[traceId] ?: return
         if (isAppInForeground()) {
-            broadcastMessage(raw)
+            broadcastMessage(task, raw)
         } else {
-            queueRawEvent(raw)
+            queueRawEvent(task, raw)
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
@@ -346,43 +345,45 @@ class TaskWorkService : Service() {
         DebugTraceStore.record(
             "task_server_message",
             mapOf(
-                "trace_id" to extractTraceId(pendingPayload),
-                "kind" to activeRequestKind,
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "project_id" to task.projectId,
+                "conversation_id" to task.conversationId,
                 "type" to messageType,
-                "elapsed_ms" to elapsedSinceRequestStart(),
+                "elapsed_ms" to elapsedSinceRequestStart(task),
                 "bytes" to raw.toByteArray().size,
                 "message_preview" to messagePreview
             )
         )
-        if (firstServerEventAtMs == 0L && messageType != "app_update_available") {
-            firstServerEventAtMs = System.currentTimeMillis()
+        if (task.firstServerEventAtMs == 0L && messageType != "app_update_available") {
+            task.firstServerEventAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
-                "first_server_event kind=$activeRequestKind type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+                "first_server_event trace=${task.traceId} kind=${task.requestKind} type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart(task)}"
             )
             DebugTraceStore.record(
                 "task_first_server_event",
                 mapOf(
-                    "trace_id" to extractTraceId(pendingPayload),
-                    "kind" to activeRequestKind,
+                    "trace_id" to task.traceId,
+                    "kind" to task.requestKind,
                     "type" to messageType,
-                    "elapsed_ms" to elapsedSinceRequestStart()
+                    "elapsed_ms" to elapsedSinceRequestStart(task)
                 )
             )
         }
-        if (firstChatReplyAtMs == 0L && isChatReplyType(messageType)) {
-            firstChatReplyAtMs = System.currentTimeMillis()
+        if (task.firstChatReplyAtMs == 0L && isChatReplyType(messageType)) {
+            task.firstChatReplyAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
-                "first_chat_reply kind=$activeRequestKind type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+                "first_chat_reply trace=${task.traceId} kind=${task.requestKind} type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart(task)}"
             )
             DebugTraceStore.record(
                 "task_first_chat_reply",
                 mapOf(
-                    "trace_id" to extractTraceId(pendingPayload),
-                    "kind" to activeRequestKind,
+                    "trace_id" to task.traceId,
+                    "kind" to task.requestKind,
                     "type" to messageType,
-                    "elapsed_ms" to elapsedSinceRequestStart(),
+                    "elapsed_ms" to elapsedSinceRequestStart(task),
                     "message_preview" to messagePreview
                 )
             )
@@ -393,61 +394,65 @@ class TaskWorkService : Service() {
                     showAppUpdateNotification(parsed)
                 }
             }
-            "done" -> finishWork(parsed, success = true)
-            "error" -> finishWork(parsed, success = false)
+            "done" -> finishWork(task.traceId, parsed, success = true)
+            "error" -> finishWork(task.traceId, parsed, success = false)
         }
     }
 
-    private fun finishWork(json: JSONObject, success: Boolean) {
+    private fun finishWork(traceId: String, json: JSONObject, success: Boolean) {
+        val task = activeTasks[traceId] ?: return
         val apkUrl = jsonStringOrNull(json, "apk_url")
         val messagePreview = jsonStringOrNull(json, "message")?.let { preview(it) }
         Log.i(
             TAG,
-            "request_finish kind=$activeRequestKind success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart()}"
+            "request_finish trace=${task.traceId} kind=${task.requestKind} success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart(task)}"
         )
         DebugTraceStore.record(
             if (success) "task_finish_done" else "task_finish_error",
             mapOf(
-                "trace_id" to extractTraceId(pendingPayload),
-                "kind" to activeRequestKind,
-                "elapsed_ms" to elapsedSinceRequestStart(),
-                "first_chat_reply_elapsed_ms" to firstChatReplyElapsedMs(),
+                "trace_id" to task.traceId,
+                "project_id" to task.projectId,
+                "conversation_id" to task.conversationId,
+                "kind" to task.requestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(task),
+                "first_chat_reply_elapsed_ms" to firstChatReplyElapsedMs(task),
                 "has_apk_url" to !apkUrl.isNullOrBlank(),
                 "message_preview" to messagePreview
             )
         )
-        waitingForReply = false
-        pendingPayload = null
-        payloadSentForCurrentConnection = false
-        reconnectAttempts = 0
-        clearPersistedActiveWork()
-        handler.removeCallbacksAndMessages(RECONNECT_TOKEN)
+        cleanupTask(traceId, disconnect = true)
+        persistActiveWork()
         if (!isAppInForeground()) {
             notifyBackgroundTaskCompleted(
-                wasDevelopment = activeRequestIsDevelopment,
+                wasDevelopment = task.isDevelopment,
                 apkUrl = apkUrl,
                 success = success
             )
         }
-        activeRequestIsDevelopment = false
-        stopForeground(STOP_FOREGROUND_REMOVE)
         broadcastState()
-        stopSelf()
+        if (!hasActiveTasks()) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
-    private fun elapsedSinceRequestStart(): Long {
-        if (activeRequestStartedAtMs <= 0L) return 0L
-        return System.currentTimeMillis() - activeRequestStartedAtMs
+    private fun elapsedSinceRequestStart(task: RunningTask): Long {
+        if (task.startedAtMs <= 0L) return 0L
+        return System.currentTimeMillis() - task.startedAtMs
     }
 
-    private fun firstChatReplyElapsedMs(): Long? {
-        if (activeRequestStartedAtMs <= 0L || firstChatReplyAtMs <= 0L) return null
-        return firstChatReplyAtMs - activeRequestStartedAtMs
+    private fun firstChatReplyElapsedMs(task: RunningTask): Long? {
+        if (task.startedAtMs <= 0L || task.firstChatReplyAtMs <= 0L) return null
+        return task.firstChatReplyAtMs - task.startedAtMs
     }
 
     private fun extractTraceId(payload: String?): String? {
+        return extractPayloadString(payload, "trace_id")
+    }
+
+    private fun extractPayloadString(payload: String?, key: String): String? {
         return payload
-            ?.let { runCatching { JSONObject(it).optString("trace_id") }.getOrNull() }
+            ?.let { runCatching { JSONObject(it).optString(key) }.getOrNull() }
             ?.takeIf { it.isNotBlank() }
     }
 
@@ -464,19 +469,35 @@ class TaskWorkService : Service() {
         }
     }
 
-    private fun pauseWork() {
-        DebugTraceStore.record("task_pause", mapOf("trace_id" to extractTraceId(pendingPayload)))
-        waitingForReply = false
-        pendingPayload = null
-        payloadSentForCurrentConnection = false
-        reconnectAttempts = 0
-        activeRequestIsDevelopment = false
-        clearPersistedActiveWork()
-        handler.removeCallbacksAndMessages(RECONNECT_TOKEN)
-        wsClient?.disconnect()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        broadcastStatus("paused")
-        stopSelf()
+    private fun hasActiveTasks(): Boolean {
+        return activeTasks.values.any { it.waitingForReply }
+    }
+
+    private fun cleanupTask(traceId: String, disconnect: Boolean) {
+        val task = activeTasks.remove(traceId) ?: return
+        task.waitingForReply = false
+        task.reconnectRunnable?.let { handler.removeCallbacks(it) }
+        task.reconnectRunnable = null
+        if (disconnect) task.wsClient?.disconnect()
+        task.wsClient = null
+    }
+
+    private fun pauseWork(traceId: String?) {
+        val tasksToPause = traceId?.let { activeTasks[it]?.let(::listOf) } ?: activeTasks.values.toList()
+        tasksToPause.forEach { task ->
+            DebugTraceStore.record(
+                "task_pause",
+                mapOf("trace_id" to task.traceId, "conversation_id" to task.conversationId)
+            )
+            broadcastStatus("paused", task)
+            cleanupTask(task.traceId, disconnect = true)
+        }
+        persistActiveWork()
+        broadcastState()
+        if (!hasActiveTasks()) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun enterForeground() {
@@ -626,18 +647,23 @@ class TaskWorkService : Service() {
         )
     }
 
-    private fun broadcastMessage(raw: String) {
-        broadcastStatus("message") {
+    private fun broadcastMessage(task: RunningTask, raw: String) {
+        broadcastStatus("message", task) {
             putExtra(EXTRA_RAW_MESSAGE, raw)
         }
     }
 
-    private fun broadcastStatus(kind: String, extras: (Intent.() -> Unit)? = null) {
+    private fun broadcastStatus(
+        kind: String,
+        task: RunningTask? = null,
+        extras: (Intent.() -> Unit)? = null
+    ) {
         val intent = Intent(ACTION_EVENT).apply {
             setPackage(packageName)
             putExtra(EXTRA_KIND, kind)
-            putExtra(EXTRA_CONNECTED, wsClient?.isConnected() == true)
-            putExtra(EXTRA_WAITING, waitingForReply)
+            putExtra(EXTRA_CONNECTED, activeTasks.values.any { it.wsClient?.isConnected() == true })
+            putExtra(EXTRA_WAITING, hasActiveTasks())
+            task?.let { putTaskExtras(it) }
             extras?.invoke(this)
         }
         sendBroadcast(intent)
@@ -646,17 +672,47 @@ class TaskWorkService : Service() {
     private fun broadcastState() {
         val intent = Intent(ACTION_STATE).apply {
             setPackage(packageName)
-            putExtra(EXTRA_CONNECTED, wsClient?.isConnected() == true)
-            putExtra(EXTRA_WAITING, waitingForReply)
+            putExtra(EXTRA_CONNECTED, activeTasks.values.any { it.wsClient?.isConnected() == true })
+            putExtra(EXTRA_WAITING, hasActiveTasks())
+            putExtra(EXTRA_ACTIVE_TASKS, activeTasksJson().toString())
         }
         sendBroadcast(intent)
     }
 
-    private fun queueRawEvent(raw: String) {
+    private fun Intent.putTaskExtras(task: RunningTask) {
+        putExtra(EXTRA_TRACE_ID, task.traceId)
+        task.projectId?.let { putExtra(EXTRA_PROJECT_ID, it) }
+        task.conversationId?.let { putExtra(EXTRA_CONVERSATION_ID, it) }
+        putExtra(EXTRA_IS_DEVELOPMENT, task.isDevelopment)
+    }
+
+    private fun activeTasksJson(): JSONArray {
+        val array = JSONArray()
+        activeTasks.values.forEach { task ->
+            array.put(
+                JSONObject()
+                    .put("trace_id", task.traceId)
+                    .put("project_id", task.projectId)
+                    .put("conversation_id", task.conversationId)
+                    .put("is_development", task.isDevelopment)
+                    .put("started_at", task.startedAtMs)
+            )
+        }
+        return array
+    }
+
+    private fun queueRawEvent(task: RunningTask, raw: String) {
         val queue = runCatching {
             JSONArray(prefs.getString(PREF_QUEUED_TASK_EVENTS, "[]"))
         }.getOrElse { JSONArray() }
-        queue.put(raw.take(MAX_QUEUED_EVENT_LENGTH))
+        queue.put(
+            JSONObject()
+                .put("raw", raw.take(MAX_QUEUED_EVENT_LENGTH))
+                .put("trace_id", task.traceId)
+                .put("project_id", task.projectId)
+                .put("conversation_id", task.conversationId)
+                .put("is_development", task.isDevelopment)
+        )
         while (queue.length() > MAX_QUEUED_EVENTS) {
             queue.remove(0)
         }
@@ -668,20 +724,32 @@ class TaskWorkService : Service() {
     }
 
     private fun persistActiveWork() {
-        val payload = pendingPayload
-        if (!waitingForReply || payload.isNullOrBlank()) {
+        val array = JSONArray()
+        activeTasks.values
+            .filter { it.waitingForReply && it.payload.isNotBlank() }
+            .forEach { task ->
+                array.put(
+                    JSONObject()
+                        .put("payload", task.payload)
+                        .put("is_development", task.isDevelopment)
+                        .put("started_at", task.startedAtMs)
+                )
+            }
+        if (array.length() == 0) {
             clearPersistedActiveWork()
             return
         }
         prefs.edit()
-            .putString(PREF_PENDING_WORK_PAYLOAD, payload)
-            .putBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, activeRequestIsDevelopment)
-            .putLong(PREF_PENDING_WORK_TIME, System.currentTimeMillis())
+            .putString(PREF_PENDING_WORK_TASKS, array.toString())
+            .remove(PREF_PENDING_WORK_PAYLOAD)
+            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
+            .remove(PREF_PENDING_WORK_TIME)
             .apply()
     }
 
     private fun clearPersistedActiveWork() {
         prefs.edit()
+            .remove(PREF_PENDING_WORK_TASKS)
             .remove(PREF_PENDING_WORK_PAYLOAD)
             .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
             .remove(PREF_PENDING_WORK_TIME)
@@ -689,32 +757,57 @@ class TaskWorkService : Service() {
     }
 
     private fun restorePendingWork() {
-        val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
-        if (payload == null) {
-            waitingForReply = false
-            pendingPayload = null
-            activeRequestStartedAtMs = 0L
-            return
+        val restored = mutableListOf<RunningTask>()
+        val now = System.currentTimeMillis()
+        val tasksJson = prefs.getString(PREF_PENDING_WORK_TASKS, null)?.takeIf { it.isNotBlank() }
+        if (tasksJson != null) {
+            val array = runCatching { JSONArray(tasksJson) }.getOrNull()
+            if (array != null) {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val payload = item.optString("payload").takeIf { it.isNotBlank() } ?: continue
+                    val savedAt = item.optLong("started_at", now)
+                    if (savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS) continue
+                    val traceId = extractTraceId(payload) ?: continue
+                    if (activeTasks.containsKey(traceId)) continue
+                    restored += RunningTask(
+                        traceId = traceId,
+                        projectId = extractPayloadString(payload, "project_id"),
+                        conversationId = extractPayloadString(payload, "conversation_id"),
+                        payload = payload,
+                        isDevelopment = item.optBoolean("is_development", true),
+                        startedAtMs = savedAt
+                    )
+                }
+            }
         }
-        val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
-        val tooOld = savedAt <= 0L || System.currentTimeMillis() - savedAt > PENDING_WORK_TTL_MS
-        if (tooOld) {
-            clearPersistedActiveWork()
-            waitingForReply = false
-            pendingPayload = null
-            activeRequestStartedAtMs = 0L
-            return
+
+        if (tasksJson == null) {
+            val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
+            val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
+            val tooOld = savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS
+            if (payload != null && !tooOld) {
+                val traceId = extractTraceId(payload)
+                if (traceId != null && !activeTasks.containsKey(traceId)) {
+                    restored += RunningTask(
+                        traceId = traceId,
+                        projectId = extractPayloadString(payload, "project_id"),
+                        conversationId = extractPayloadString(payload, "conversation_id"),
+                        payload = payload,
+                        isDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true),
+                        startedAtMs = savedAt
+                    )
+                }
+            }
         }
-        waitingForReply = true
-        pendingPayload = payload
-        activeRequestIsDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true)
-        activeRequestKind = if (activeRequestIsDevelopment) "development" else "chat"
-        activeRequestStartedAtMs = savedAt
+
+        restored.forEach { activeTasks[it.traceId] = it }
+        persistActiveWork()
     }
 
-    private fun pendingWorkAgeMs(): Long? {
-        val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
-        return if (savedAt > 0L) System.currentTimeMillis() - savedAt else null
+    private fun pendingWorkAgeMs(tasks: List<RunningTask>): Long? {
+        val oldest = tasks.map { it.startedAtMs }.filter { it > 0L }.minOrNull() ?: return null
+        return System.currentTimeMillis() - oldest
     }
 
     private fun jsonStringOrNull(json: JSONObject, key: String): String? {
@@ -758,7 +851,12 @@ class TaskWorkService : Service() {
         const val EXTRA_RAW_MESSAGE = "raw_message"
         const val EXTRA_CONNECTED = "connected"
         const val EXTRA_WAITING = "waiting"
+        const val EXTRA_TRACE_ID = "trace_id"
+        const val EXTRA_PROJECT_ID = "project_id"
+        const val EXTRA_CONVERSATION_ID = "conversation_id"
+        const val EXTRA_ACTIVE_TASKS = "active_tasks"
 
+        const val PREF_PENDING_WORK_TASKS = "pending_work_tasks"
         const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
         const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
         const val PREF_PENDING_WORK_TIME = "pending_work_time"
@@ -778,6 +876,5 @@ class TaskWorkService : Service() {
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
         private const val MAX_QUEUED_EVENTS = 120
         private const val MAX_QUEUED_EVENT_LENGTH = 20_000
-        private val RECONNECT_TOKEN = Any()
     }
 }
