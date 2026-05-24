@@ -124,9 +124,14 @@ pub async fn confirm_project_intent(
         Ok(output) => output,
         Err(error) if is_cli_timeout_error(&error) => {
             record_intent_gate_fallback(state, trace_id, "timeout", &error.to_string());
-            return Ok(intent_gate_timeout_chat_result(user_message));
+            return Ok(intent_gate_fallback_chat_result(user_message, "timeout"));
         }
-        Err(error) => return Err(error),
+        Err(error) => {
+            // Step 6：意图门控不是阻塞条件。CLI 启动/运行任何错误都降级为 chat
+            // 路由，让用户能先拿到反馈；错误记入 trace 供运维跟踪。
+            record_intent_gate_fallback(state, trace_id, "cli_error", &error.to_string());
+            return Ok(intent_gate_fallback_chat_result(user_message, "cli_error"));
+        }
     };
     if should_retry_without_native_session(&option, native_session_id.as_deref(), &output) {
         record_cli_retry(
@@ -175,9 +180,17 @@ pub async fn confirm_project_intent(
                     "fresh_after_stale_timeout",
                     &error.to_string(),
                 );
-                return Ok(intent_gate_timeout_chat_result(user_message));
+                return Ok(intent_gate_fallback_chat_result(user_message, "timeout"));
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                record_intent_gate_fallback(
+                    state,
+                    trace_id,
+                    "fresh_after_stale_cli_error",
+                    &error.to_string(),
+                );
+                return Ok(intent_gate_fallback_chat_result(user_message, "cli_error"));
+            }
         };
     }
 
@@ -196,7 +209,12 @@ pub async fn confirm_project_intent(
         );
     }
 
-    parse_intent_gate_result(&output.stdout)
+    parse_intent_gate_result(&output.stdout).or_else(|error| {
+        // 解析失败：可能是 Codex 输出不是预期的 JSON，不要让整个请求崩。
+        // 降级为 chat 路由，同时记入 fallback 供 trace 追踪。
+        record_intent_gate_fallback(state, trace_id, "parse_error", &error.to_string());
+        Ok(intent_gate_fallback_chat_result(user_message, "parse_error"))
+    })
 }
 
 pub async fn prewarm_codex_session(
@@ -819,16 +837,22 @@ fn is_cli_timeout_error(error: &anyhow::Error) -> bool {
     text.contains("timeout") || text.contains("timed out") || text.contains("执行超时")
 }
 
+#[cfg(test)]
 fn intent_gate_timeout_chat_result(user_message: &str) -> IntentGateResult {
+    intent_gate_fallback_chat_result(user_message, "timeout")
+}
+
+/// 意图门控降级到普通聊天路由。
+fn intent_gate_fallback_chat_result(user_message: &str, cause: &str) -> IntentGateResult {
     let chat_reply = if is_tiny_chat_message(user_message) {
-        "你好，我在。刚才服务端 Codex CLI 意图确认超过轻量限时，我先按普通聊天处理，避免误进入慢速开发流程。"
+        "你好，我在。刚才服务端意图确认环节没完成，我先按普通聊天处理，避免误进入慢速开发流程。"
     } else {
         "我先按普通聊天处理，避免误进入慢速开发流程。你可以继续说；如果要我修改代码、编译或发布，请直接告诉我具体任务。"
     };
     IntentGateResult {
         route: intent_router::CapabilityRoute::ChatAgent,
         confidence: 0.5,
-        reason: "Codex CLI intent gate timed out; defaulted to chat for safety".into(),
+        reason: format!("intent_gate_fallback:{}", cause),
         chat_reply: Some(chat_reply.into()),
     }
 }
@@ -1203,8 +1227,12 @@ async fn run_cli_command(
     let now_ms = current_unix_millis();
     let last_activity_ms = Arc::new(AtomicU64::new(now_ms));
 
-    let stdout_task = tokio::spawn(read_cli_stream(stdout, Some(last_activity_ms.clone())));
-    let stderr_task = tokio::spawn(read_cli_stream(stderr, Some(last_activity_ms.clone())));
+    let stdout_task = tokio::spawn(read_cli_stream(
+        stdout,
+        Some(last_activity_ms.clone()),
+        Some(tx.clone()),
+    ));
+    let stderr_task = tokio::spawn(read_cli_stream(stderr, Some(last_activity_ms.clone()), None));
     let heartbeat_task = tokio::spawn(send_cli_heartbeat(
         tx.clone(),
         last_activity_ms.clone(),
@@ -1873,7 +1901,11 @@ mod tests {
     }
 }
 
-async fn read_cli_stream<R>(reader: R, last_activity_ms: Option<Arc<AtomicU64>>) -> String
+async fn read_cli_stream<R>(
+    reader: R,
+    last_activity_ms: Option<Arc<AtomicU64>>,
+    progress_tx: Option<UnboundedSender<String>>,
+) -> String
 where
     R: AsyncRead + Unpin,
 {
@@ -1884,11 +1916,72 @@ where
         if let Some(ts) = last_activity_ms.as_ref() {
             ts.store(current_unix_millis(), Ordering::Relaxed);
         }
+        if let Some(tx) = progress_tx.as_ref() {
+            if let Some(message) = stream_event_to_progress(&line) {
+                let _ = tx.send(WsMessage::Progress { message }.to_json());
+            }
+        }
         collected.push_str(&line);
         collected.push('\n');
     }
 
     collected
+}
+
+/// 将 codex --json 事件行翻译成给客户端的人类可读 progress 文本。
+/// 返回 None 表示该行无需 forward（噪音事件或非 JSON 行）。
+fn stream_event_to_progress(line: &str) -> Option<String> {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let value: Value = serde_json::from_str(trimmed).ok()?;
+    let event_type = value.get("type").and_then(Value::as_str)?;
+    match event_type {
+        "item.started" => {
+            let item_type = value
+                .get("item")
+                .and_then(|i| i.get("type"))
+                .and_then(Value::as_str)?;
+            match item_type {
+                "agent_reasoning" => Some("AI 正在思考……".to_string()),
+                "command_execution" => {
+                    let cmd = value
+                        .get("item")
+                        .and_then(|i| i.get("command"))
+                        .and_then(Value::as_str)
+                        .map(|c| truncate_chars(c, 80))
+                        .unwrap_or_default();
+                    if cmd.is_empty() {
+                        Some("AI 正在执行命令……".to_string())
+                    } else {
+                        Some(format!("AI 执行命令：{}", cmd))
+                    }
+                }
+                "file_change" => Some("AI 正在修改文件……".to_string()),
+                _ => None,
+            }
+        }
+        "item.completed" => {
+            let item = value.get("item")?;
+            let item_type = item.get("type").and_then(Value::as_str)?;
+            match item_type {
+                "agent_message" => {
+                    let text = item.get("text").and_then(Value::as_str)?;
+                    let snippet = truncate_chars(text.trim(), 200);
+                    if snippet.is_empty() {
+                        None
+                    } else {
+                        Some(format!("AI 回复片段：{}", snippet))
+                    }
+                }
+                "command_execution" => Some("命令执行完毕".to_string()),
+                "file_change" => Some("文件修改完毕".to_string()),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 fn build_cli_prompt(
