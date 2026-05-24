@@ -214,33 +214,34 @@ class TaskWorkService : Service() {
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
+        val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         DebugTraceStore.record(
             "task_server_message",
             mapOf(
                 "trace_id" to extractTraceId(pendingPayload),
                 "kind" to activeRequestKind,
-                "type" to parsed?.optString("type")?.takeIf { it.isNotBlank() },
+                "type" to type,
                 "elapsed_ms" to elapsedSinceRequestStart(),
                 "bytes" to raw.toByteArray().size
             )
         )
-        if (firstServerEventAtMs == 0L) {
+        if (firstServerEventAtMs == 0L && type != "app_update_available") {
             firstServerEventAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
-                "first_server_event kind=$activeRequestKind type=${parsed?.optString("type").orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+                "first_server_event kind=$activeRequestKind type=${type.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
             )
             DebugTraceStore.record(
                 "task_first_server_event",
                 mapOf(
                     "trace_id" to extractTraceId(pendingPayload),
                     "kind" to activeRequestKind,
-                    "type" to parsed?.optString("type")?.takeIf { it.isNotBlank() },
+                    "type" to type,
                     "elapsed_ms" to elapsedSinceRequestStart()
                 )
             )
         }
-        when (parsed?.optString("type")) {
+        when (type) {
             "app_update_available" -> {
                 if (!isAppInForeground()) {
                     showAppUpdateNotification(parsed)
@@ -262,7 +263,7 @@ class TaskWorkService : Service() {
                 "trace_id" to extractTraceId(pendingPayload),
                 "kind" to activeRequestKind,
                 "elapsed_ms" to elapsedSinceRequestStart(),
-                "has_apk_url" to json.optString("apk_url").isNotBlank()
+                "has_apk_url" to (jsonStringOrNull(json, "apk_url") != null)
             )
         )
         waitingForReply = false
@@ -274,7 +275,7 @@ class TaskWorkService : Service() {
         if (!isAppInForeground()) {
             notifyBackgroundTaskCompleted(
                 wasDevelopment = activeRequestIsDevelopment,
-                apkUrl = json.optString("apk_url").takeIf { it.isNotBlank() },
+                apkUrl = jsonStringOrNull(json, "apk_url"),
                 success = success
             )
         }
@@ -537,6 +538,14 @@ class TaskWorkService : Service() {
         waitingForReply = true
         pendingPayload = payload
         activeRequestIsDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true)
+        activeRequestKind = if (activeRequestIsDevelopment) "development" else "chat"
+    }
+
+    private fun jsonStringOrNull(json: JSONObject, key: String): String? {
+        if (!json.has(key) || json.isNull(key)) return null
+        return json.optString(key)
+            .trim()
+            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun updateLauncherBadgeCount(count: Int) {

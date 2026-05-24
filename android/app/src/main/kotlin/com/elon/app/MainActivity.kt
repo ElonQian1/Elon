@@ -4122,11 +4122,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appendMessage(raw: String) {
-        serverResponseToken += 1
         // 解析服务端推送的 JSON 消息
         try {
             val json = com.google.gson.JsonParser.parseString(raw).asJsonObject
             val type = jsonStringOrNull(json, "type") ?: return
+            if (type == "app_update_available") {
+                val remoteVersionCode = runCatching {
+                    json.get("versionCode")?.asInt ?: 0
+                }.getOrDefault(0)
+                AppUpdateManager(this).realtimeCheck(remoteVersionCode)
+                return
+            }
+
+            serverResponseToken += 1
             val msg = when (type) {
                 "progress"    -> {
                     val content = jsonStringOrNull(json, "message") ?: ""
@@ -4157,13 +4165,6 @@ class MainActivity : AppCompatActivity() {
                     recordEvidence(toolEvidenceKind(tool), evidence)
                     updateStage(currentStage, "${toolLabel(tool)} 已完成，正在判断下一步。")
                     addProjectEvent("工具完成：${toolLabel(tool)}")
-                    return
-                }
-                "app_update_available" -> {
-                    val remoteVersionCode = runCatching {
-                        json.get("versionCode")?.asInt ?: 0
-                    }.getOrDefault(0)
-                    AppUpdateManager(this).realtimeCheck(remoteVersionCode)
                     return
                 }
                 "done"        -> {
