@@ -100,6 +100,14 @@ class TaskWorkService : Service() {
         firstServerEventAtMs = 0L
         activeRequestKind = if (isDevelopment) "development" else "chat"
         Log.i(TAG, "request_start kind=$activeRequestKind payload_bytes=${payload.length}")
+        DebugTraceStore.record(
+            "task_start_work",
+            mapOf(
+                "trace_id" to extractTraceId(payload),
+                "kind" to activeRequestKind,
+                "payload_bytes" to payload.toByteArray().size
+            )
+        )
         persistActiveWork()
         enterForeground()
         connect()
@@ -169,6 +177,15 @@ class TaskWorkService : Service() {
                 "request_sent kind=$activeRequestKind elapsed_ms=${elapsedSinceRequestStart()}"
             )
         }
+        DebugTraceStore.record(
+            if (sent) "task_payload_sent" else "task_payload_send_failed",
+            mapOf(
+                "trace_id" to extractTraceId(payload),
+                "kind" to activeRequestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(),
+                "payload_bytes" to payload.toByteArray().size
+            )
+        )
         if (!sent) scheduleReconnect()
     }
 
@@ -196,11 +213,30 @@ class TaskWorkService : Service() {
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
+        DebugTraceStore.record(
+            "task_server_message",
+            mapOf(
+                "trace_id" to extractTraceId(pendingPayload),
+                "kind" to activeRequestKind,
+                "type" to parsed?.optString("type")?.takeIf { it.isNotBlank() },
+                "elapsed_ms" to elapsedSinceRequestStart(),
+                "bytes" to raw.toByteArray().size
+            )
+        )
         if (firstServerEventAtMs == 0L) {
             firstServerEventAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
                 "first_server_event kind=$activeRequestKind type=${parsed?.optString("type").orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+            )
+            DebugTraceStore.record(
+                "task_first_server_event",
+                mapOf(
+                    "trace_id" to extractTraceId(pendingPayload),
+                    "kind" to activeRequestKind,
+                    "type" to parsed?.optString("type")?.takeIf { it.isNotBlank() },
+                    "elapsed_ms" to elapsedSinceRequestStart()
+                )
             )
         }
         when (parsed?.optString("type")) {
@@ -213,6 +249,15 @@ class TaskWorkService : Service() {
         Log.i(
             TAG,
             "request_finish kind=$activeRequestKind success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart()}"
+        )
+        DebugTraceStore.record(
+            if (success) "task_finish_done" else "task_finish_error",
+            mapOf(
+                "trace_id" to extractTraceId(pendingPayload),
+                "kind" to activeRequestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(),
+                "has_apk_url" to json.optString("apk_url").isNotBlank()
+            )
         )
         waitingForReply = false
         pendingPayload = null
@@ -238,7 +283,14 @@ class TaskWorkService : Service() {
         return System.currentTimeMillis() - activeRequestStartedAtMs
     }
 
+    private fun extractTraceId(payload: String?): String? {
+        return payload
+            ?.let { runCatching { JSONObject(it).optString("trace_id") }.getOrNull() }
+            ?.takeIf { it.isNotBlank() }
+    }
+
     private fun pauseWork() {
+        DebugTraceStore.record("task_pause", mapOf("trace_id" to extractTraceId(pendingPayload)))
         waitingForReply = false
         pendingPayload = null
         payloadSentForCurrentConnection = false
