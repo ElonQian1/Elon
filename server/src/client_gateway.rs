@@ -9,7 +9,7 @@ use axum::{
 };
 use base64::{engine::general_purpose, Engine as _};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::Path as FsPath,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -17,8 +17,12 @@ use std::{
     },
     time::Duration,
 };
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex};
 use tracing::info;
+
+/// 连接级"已订阅的 job 锁键"集合，避免同一 WebSocket 上同一会话被多个 forwarder 重复订阅
+/// 同一份 broadcast 事件造成客户端收到重复消息。
+type ConnForwarderSet = Arc<Mutex<HashSet<String>>>;
 
 use crate::{agent, client_protocol, tools, types};
 use client_protocol::AgentRequest;
@@ -50,113 +54,121 @@ async fn handle_ws(socket: WebSocket, state: Arc<AppState>) {
 
     info!("new WebSocket connection");
 
-    while let Some(Ok(msg)) = receiver.next().await {
-        let text = match msg {
-            Message::Text(text) => text,
+    // 出站消息统一从这个 mpsc 队列经一个 sender task 写到 socket，避免多个 forwarder
+    // 同时 await sender.send() 导致顺序错乱或 borrow 冲突。
+    let (out_tx, mut out_rx) = mpsc::channel::<Message>(256);
+    let forwarders: ConnForwarderSet = Arc::new(Mutex::new(HashSet::new()));
+
+    let sender_task = tokio::spawn(async move {
+        while let Some(msg) = out_rx.recv().await {
+            if sender.send(msg).await.is_err() {
+                break;
+            }
+        }
+        let _ = sender.close().await;
+    });
+
+    while let Some(msg) = receiver.next().await {
+        let msg = match msg {
+            Ok(m) => m,
+            Err(error) => {
+                info!("WebSocket receive error: {}", error);
+                break;
+            }
+        };
+        match msg {
             Message::Ping(payload) => {
-                if sender.send(Message::Pong(payload)).await.is_err() {
+                if out_tx.send(Message::Pong(payload)).await.is_err() {
                     break;
                 }
-                continue;
             }
             Message::Pong(_) => continue,
             Message::Close(_) => break,
             Message::Binary(_) => continue,
-        };
-
-        info!("received WebSocket message: {} bytes", text.len());
-        let request = materialize_attachments(client_protocol::parse_client_message(&text), &state).await;
-        info!(
-            "dispatching request: user_id={} workspace_user_id={} agent={:?} chars={}",
-            request.user_id,
-            request.workspace_user_id,
-            request.agent,
-            request.content.chars().count()
-        );
-        if let Some(response) = quick_apk_delivery_response(&request, &state).await {
-            if sender.send(Message::Text(response)).await.is_err() {
-                break;
+            Message::Text(text) => {
+                info!("received WebSocket message: {} bytes", text.len());
+                let state_clone = state.clone();
+                let tx_clone = out_tx.clone();
+                let forwarders_clone = forwarders.clone();
+                // 关键改动：每条 Text 消息立即返回，开协程处理；reader loop 不阻塞，
+                // 后续消息可以马上进入处理流程，不会被前一条 job 卡住。
+                tokio::spawn(async move {
+                    process_incoming_text(text, state_clone, tx_clone, forwarders_clone).await;
+                });
             }
-            continue;
-        }
-        let job = get_or_start_legacy_job(request, state.clone()).await;
-        let mut job_rx = job.broadcaster.subscribe();
-        let backlog = job.backlog.lock().await.clone();
-        let mut replayed_terminal = false;
-        let mut replay_failed = false;
-        for progress in backlog {
-            if sender.send(Message::Text(progress.clone())).await.is_err() {
-                replay_failed = true;
-                break;
-            }
-            if is_terminal_ws_message(&progress) {
-                replayed_terminal = true;
-                break;
-            }
-        }
-        if replay_failed {
-            break;
-        }
-        if replayed_terminal {
-            continue;
-        }
-
-        let mut client_disconnected = false;
-        loop {
-            tokio::select! {
-                progress = job_rx.recv() => {
-                    match progress {
-                        Ok(progress) => {
-                            if sender.send(Message::Text(progress)).await.is_err() {
-                                client_disconnected = true;
-                                break;
-                            }
-                            if job.finished.load(Ordering::SeqCst) {
-                                break;
-                            }
-                        }
-                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                        Err(broadcast::error::RecvError::Closed) => break,
-                    }
-                }
-                incoming = receiver.next() => {
-                    match incoming {
-                        Some(Ok(Message::Ping(payload))) => {
-                            if sender.send(Message::Pong(payload)).await.is_err() {
-                                client_disconnected = true;
-                                break;
-                            }
-                        }
-                        Some(Ok(Message::Pong(_))) => {}
-                        Some(Ok(Message::Close(_))) | None => {
-                            client_disconnected = true;
-                            break;
-                        }
-                        Some(Ok(Message::Text(text))) => {
-                            info!(
-                                "received WebSocket message while request was running; ignoring: {} bytes",
-                                text.len()
-                            );
-                        }
-                        Some(Ok(Message::Binary(_))) => {}
-                        Some(Err(error)) => {
-                            info!("WebSocket receive error while request was running: {}", error);
-                            client_disconnected = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if client_disconnected {
-            info!(
-                "client disconnected while request was running; keeping background job alive"
-            );
-            break;
         }
     }
 
+    drop(out_tx);
+    let _ = sender_task.await;
     info!("WebSocket connection closed");
+}
+
+async fn process_incoming_text(
+    text: String,
+    state: Arc<AppState>,
+    out_tx: mpsc::Sender<Message>,
+    forwarders: ConnForwarderSet,
+) {
+    let request =
+        materialize_attachments(client_protocol::parse_client_message(&text), &state).await;
+    info!(
+        "dispatching request: user_id={} workspace_user_id={} conversation_id={} agent={:?} chars={}",
+        request.user_id,
+        request.workspace_user_id,
+        request.conversation_id,
+        request.agent,
+        request.content.chars().count()
+    );
+    if let Some(response) = quick_apk_delivery_response(&request, &state).await {
+        let _ = out_tx.send(Message::Text(response)).await;
+        return;
+    }
+    let job = get_or_start_legacy_job(request, state.clone()).await;
+    let key = job.key.clone();
+
+    // 连接维度去重：同一会话已经有 forwarder 在订阅 broadcast，则新消息只需触发 job 内的
+    // "已加入队列"提示（get_or_start_legacy_job 已发出），无需再次订阅，避免重复推送。
+    {
+        let mut set = forwarders.lock().await;
+        if !set.insert(key.clone()) {
+            return;
+        }
+    }
+
+    let mut job_rx = job.broadcaster.subscribe();
+    let backlog = job.backlog.lock().await.clone();
+    let mut replayed_terminal = false;
+    for progress in backlog {
+        if out_tx.send(Message::Text(progress.clone())).await.is_err() {
+            forwarders.lock().await.remove(&key);
+            return;
+        }
+        if is_terminal_ws_message(&progress) {
+            replayed_terminal = true;
+            break;
+        }
+    }
+    if replayed_terminal {
+        forwarders.lock().await.remove(&key);
+        return;
+    }
+
+    loop {
+        match job_rx.recv().await {
+            Ok(progress) => {
+                if out_tx.send(Message::Text(progress)).await.is_err() {
+                    break;
+                }
+                if job.finished.load(Ordering::SeqCst) {
+                    break;
+                }
+            }
+            Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            Err(broadcast::error::RecvError::Closed) => break,
+        }
+    }
+    forwarders.lock().await.remove(&key);
 }
 
 async fn materialize_attachments(mut request: AgentRequest, state: &AppState) -> AgentRequest {
