@@ -166,6 +166,7 @@ object McpDebugServer {
             "start" -> {
                 appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
                     .edit()
+                    .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, false)
                     .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, true)
                     .putLong(McpDebugKeepAliveService.PREF_STARTED_AT, System.currentTimeMillis())
                     .apply()
@@ -178,6 +179,7 @@ object McpDebugServer {
             "stop" -> {
                 appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
                     .edit()
+                    .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, true)
                     .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, false)
                     .remove(McpDebugKeepAliveService.PREF_STARTED_AT)
                     .apply()

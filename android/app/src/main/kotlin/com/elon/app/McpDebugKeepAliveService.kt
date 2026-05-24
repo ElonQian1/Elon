@@ -23,11 +23,17 @@ class McpDebugKeepAliveService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            prefs.edit()
+                .putBoolean(PREF_MANUAL_STOPPED, true)
+                .putBoolean(PREF_ACTIVE, false)
+                .remove(PREF_STARTED_AT)
+                .apply()
             stopSelf()
             return START_NOT_STICKY
         }
 
         prefs.edit()
+            .putBoolean(PREF_MANUAL_STOPPED, false)
             .putBoolean(PREF_ACTIVE, true)
             .putLong(PREF_STARTED_AT, System.currentTimeMillis())
             .apply()
@@ -94,12 +100,19 @@ class McpDebugKeepAliveService : Service() {
         const val NOTIFICATION_ID = 2500
         const val PREF_ACTIVE = "mcp_keepalive_active"
         const val PREF_STARTED_AT = "mcp_keepalive_started_at"
+        const val PREF_MANUAL_STOPPED = "mcp_keepalive_manual_stopped"
+
+        fun shouldAutoStart(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+            return !prefs.getBoolean(PREF_MANUAL_STOPPED, false)
+        }
 
         fun statusJson(context: Context): JSONObject {
             val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
             val startedAt = prefs.getLong(PREF_STARTED_AT, 0L)
             return JSONObject()
                 .put("active", prefs.getBoolean(PREF_ACTIVE, false))
+                .put("auto_start_enabled", shouldAutoStart(context))
                 .put("started_at_ms", if (startedAt > 0L) startedAt else JSONObject.NULL)
                 .put(
                     "age_ms",
