@@ -57,6 +57,48 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 只 commit 不 push | 本地磁盘故障 = 工作成果全部丢失 |
 | 在主工作区执行 `git reset --hard`、`git checkout --` | 会覆盖其他并发 AI 的未提交改动 |
 | 夹带无关文件进同一次 commit | 污染提交历史，妨碍定位问题 |
+| 编译完成后跳过"服务器是否已有更新版本"的祖先检查，强推上传 | 用旧编译覆盖别人刚发布的新版本，手机端版本倒退 |
+
+---
+
+## 🔁 编译/上传/部署的并发模型（核心理解）
+
+> 多台 PC、多个 AI 同时改这个仓库时，最大风险**不是 git 冲突**（push 拒绝可以 rebase 修），而是**编译耗时窗口内，别人已经发布了更新版本，本机的慢编译再上传会让线上倒退**。
+
+### 我们采用的模型：先 git 同步 → 编译 → 上传前再次祖先检查 → 中止或继续
+
+```
+T0  git pull --rebase origin main        ← 起点同步，基于最新 main 编译
+T1  本地编译（耗时几分钟到几十分钟）       ← 窗口期，别人可能抢先发布
+T2  ── 上传前祖先检查 ──
+       读取服务器当前 SHA（后端）或 versionCode（APK）
+       ├─ 服务器是本次的祖先 / 服务器版本号 < 本次 → ✅ 继续上传
+       └─ 服务器更新 / 服务器版本号 ≥ 本次       → ⏹  中止上传（exit 0）
+T3  flock 锁内 CAS 再次校验               ← 最后一道防线（仅后端）
+T4  替换产物 + 重启 / 写 version.json
+T5  HTTP 健康检查
+```
+
+**中止时本机的正确处理**：
+
+1. 已经 `git push` 的版本号 commit / 后端版本号 commit **保留**，不回退（远端历史无损失）。
+2. 本次编译的产物（APK / binary）**作废**，不要上传。
+3. 直接信任服务器上的新版本：
+   - 后端：`curl --noproxy '*' http://43.139.149.158:8080/api/server/version` 查看
+   - APK：`curl --noproxy '*' http://43.139.149.158:8080/app/version.json` 或直接下载 `ElonSpeed-latest.apk`
+4. 如果**确认**必须用本机版本覆盖（极少数情况，如对方推了错误版本）：重跑脚本加 `-Force`。
+
+### 各脚本当前实现
+
+| 阶段 | 后端 `publish-server.ps1` | APK `publish-apk.ps1` |
+|---|---|---|
+| 起点同步 | ✅ `git pull --rebase` | ✅ `git pull --rebase` |
+| 上传前祖先检查 | ✅ `git merge-base --is-ancestor $serverSha $localSha` | ✅ 读 `/app/version.json`，比较 `versionCode` |
+| 锁内 CAS 二次校验 | ✅ `flock + .deployed-sha` | ⚠️ 暂无（依赖前面的祖先检查 + 顺序上传） |
+| 强制覆盖参数 | `-Force` | `-Force` |
+| 中止时的退出码 | `0`（友好退出，不视为失败） | `0`（友好退出，不视为失败） |
+
+> 看到脚本输出 `部署已中止：服务器版本更新` 或 `APK 发布已中止：服务器已有更新版本` 是**正常的并发保护**，不是失败。下一步应该直接验证线上版本，而不是用 `-Force` 覆盖。
 
 ---
 

@@ -19,7 +19,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Changelog,
 
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+
+    # 跳过上传前的“服务器已发布更新 versionCode”检查，强制覆盖
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -497,6 +500,35 @@ $tmpJson = Join-Path $env:TEMP "elon-version.json"
 $versionJson | Set-Content $tmpJson -Encoding UTF8
 Write-Host "📋 version.json 已生成" -ForegroundColor Green
 
+# ── Step 5.5: 上传前再次检查服务器是否已发布更新版本 ─────────────────────
+# 场景：本机编译耗时较长，期间另一台 PC 可能已经发布了更高 versionCode 的 APK。
+# 本机上传会覆盖服务器上更新的 version.json 与 APK，导致手机端看到版本倍退。
+# 与 publish-server.ps1 里的祖先检查策略类似：服务器已有更新版本 → 中止上传。
+if (-not $Force) {
+    try {
+        $serverNow = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
+        $serverNowCode = [int]$serverNow.versionCode
+        if ($serverNowCode -ge $newCode) {
+            Write-Host ""
+            Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Host "   ⚠️  APK 发布已中止：服务器已有更新版本" -ForegroundColor Yellow
+            Write-Host "   服务器当前：build $serverNowCode (v$($serverNow.versionName))" -ForegroundColor Yellow
+            Write-Host "   本次编译：  build $newCode (v$versionName)" -ForegroundColor Yellow
+            Write-Host "   原因：另一台 PC 在本机编译期间已经发布了同等或更新的 APK。" -ForegroundColor Yellow
+            Write-Host "   处理：" -ForegroundColor Yellow
+            Write-Host "     1) 本次 build.gradle 版本号 commit 已推送，不需回退，git 历史无损失。" -ForegroundColor Yellow
+            Write-Host "     2) 本次本地编译的 APK 作废，不上传。" -ForegroundColor Yellow
+            Write-Host "     3) 如需本机中验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
+            Write-Host "     4) 如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
+            Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
+            Write-Host ""
+            exit 0
+        }
+        Write-Host "   ✅ 服务器版本检查通过（服务器 $serverNowCode < 本次 $newCode）" -ForegroundColor Green
+    } catch {
+        Write-Warning "   ⚠️  上传前无法读取服务器 version.json，跳过祖先检查：$_"
+    }
+}
 # ── Step 6: SCP 上传到服务器 ──────────────────────────────────────────────────
 
 Write-Host "🚀 上传到服务器..." -ForegroundColor Cyan
