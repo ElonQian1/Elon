@@ -163,6 +163,12 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - Prewarm is not a development task. It must not inspect files, run Git, edit code, build, deploy, publish, or inject the full project workflow.
 - The first real user message still decides the route: ordinary chat uses the lightweight Codex prompt, and development requests enter the queued project workflow.
 
+## Build And Attachment Transport Rules
+
+- Desktop Codex work must build locally: `scripts/publish-server.ps1` cross-compiles the Rust server locally and uploads the binary; `scripts/publish-apk.ps1` builds/signs the Android APK locally and uploads the APK plus `version.json`.
+- The production server is low-spec. Do not use it as the normal Rust release build machine or Android build machine.
+- APK project messages with photos/files should upload attachments first through HTTP, then send only server-side attachment references in the chat payload. Avoid putting large base64 blobs into the project WebSocket message.
+
 ## VS Code 快捷入口
 
 - 常规代码任务：运行 `/elon-dev-task`。

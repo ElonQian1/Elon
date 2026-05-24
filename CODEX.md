@@ -151,12 +151,14 @@ Server:
 - Health check: `curl http://43.139.149.158:8080/health`
 - Deploy script (Windows):     `cd scripts && .\publish-server.ps1`
 - Deploy script (Linux/macOS): `bash scripts/publish-server.sh`
+- Server deploys must compile locally on the developer machine. The production server is low-spec and should only receive the already-built binary plus a restart/health check; do not run release compilation on the server for normal desktop Codex work.
 - Both scripts are functionally identical: git pull → worktree → cross-compile with git SHA → SHA check → upload → restart → verify `/health` and `/api/server/version`
 
 APK:
 
 - Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
 - Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
+- APK release builds must run locally and upload `ElonSpeed-latest.apk` plus `version.json`; the production server should not be used as the Android build machine.
 - Release signing keystore is local-only at `D:\一龙\elon-release(1).jks`; do not commit it.
 - Keystore type: `PKCS12`; key alias: `elon`.
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.

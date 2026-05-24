@@ -60,6 +60,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_api::prewarm_user_project),
         )
         .route(
+            "/api/user/:user_id/projects/:project_id/attachments",
+            post(project_api::upload_user_project_attachment),
+        )
+        .route(
             "/api/user/:user_id/projects/:project_id/git/deploy-key",
             post(project_api::user_project_deploy_key),
         )

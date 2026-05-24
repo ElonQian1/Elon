@@ -34,7 +34,6 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextUtils
 import android.text.TextWatcher
-import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.Menu
@@ -70,8 +69,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
@@ -225,6 +226,13 @@ class MainActivity : AppCompatActivity() {
         val file: File
     )
 
+    private data class SendTarget(
+        val projectId: String,
+        val projectTitle: String,
+        val conversationId: String,
+        val conversationTitle: String
+    )
+
     private data class EvidenceEntry(
         val kind: String,
         val text: String
@@ -364,28 +372,52 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val outgoingText = expandShortDevelopmentCommand(text)
-        val attachmentPayload = attachmentPayloadJsonOrNull() ?: return
+        val target = currentSendTarget()
+        if (pendingAttachments.isNotEmpty()) {
+            uploadAttachmentsThenSend(text, outgoingText, target)
+            return
+        }
+        startPreparedMessage(text, outgoingText, com.google.gson.JsonArray(), target)
+    }
+
+    private fun startPreparedMessage(
+        visibleText: String,
+        outgoingText: String,
+        attachmentRefs: com.google.gson.JsonArray,
+        target: SendTarget
+    ) {
+        if (!restoreSendTarget(target)) {
+            Toast.makeText(this, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
+            setSendEnabled(true)
+            return
+        }
         val traceId = "ui_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
 
         val payload = com.google.gson.JsonObject().apply {
             addProperty("trace_id", traceId)
             addProperty("user_id", userId)
-            addProperty("project_id", activeProject().id)
-            addProperty("project_title", activeProject().title)
-            addProperty("conversation_id", activeConversation().id)
-            addProperty("conversation_title", activeConversation().title)
+            addProperty("project_id", target.projectId)
+            addProperty("project_title", target.projectTitle)
+            addProperty("conversation_id", target.conversationId)
+            addProperty("conversation_title", target.conversationTitle)
             addProperty("message", outgoingText)
             if (!codexCliOnly) {
                 selectedAgentName?.let { addProperty("agent", it) }
             }
-            if (attachmentPayload.size() > 0) add("attachments", attachmentPayload)
+            if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
         }
 
         // 显示用户消息
-        appendMessage(ChatMessage(role = "user", content = text))
+        appendMessage(ChatMessage(role = "user", content = visibleText))
         DebugTraceStore.record(
             "ui_chat_send",
-            mapOf("trace_id" to traceId, "project_id" to activeProject().id, "chars" to outgoingText.length)
+            mapOf(
+                "trace_id" to traceId,
+                "project_id" to target.projectId,
+                "conversation_id" to target.conversationId,
+                "chars" to outgoingText.length,
+                "attachment_refs" to attachmentRefs.size()
+            )
         )
         binding.inputEdit.text.clear()
         setSendEnabled(false)
@@ -401,9 +433,9 @@ class MainActivity : AppCompatActivity() {
         emittedProgressSignals.clear()
         visibleAssistantUpdateCount = 0
         if (activeRequestIsDevelopment) {
-            updateProjectTitleFromRequest(text)
+            updateProjectTitleFromRequest(visibleText)
             saveProjectTitle()
-            addProjectEvent("提交需求：${summarize(text, 36)}")
+            addProjectEvent("提交需求：${summarize(visibleText, 36)}")
             updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
         } else {
             updateProjectViews("普通消息已发送，开发项目记录保持不变。")
@@ -952,24 +984,141 @@ class MainActivity : AppCompatActivity() {
         updateSendButtonVisual()
     }
 
-    private fun attachmentPayloadJsonOrNull(): com.google.gson.JsonArray? {
+    private fun currentSendTarget(): SendTarget {
+        val project = activeProject()
+        val conversation = activeConversation()
+        return SendTarget(
+            projectId = project.id,
+            projectTitle = project.title,
+            conversationId = conversation.id,
+            conversationTitle = conversation.title
+        )
+    }
+
+    private fun restoreSendTarget(target: SendTarget): Boolean {
+        val projectIndex = projects.indexOfFirst { it.id == target.projectId }
+        if (projectIndex < 0) return false
+        val project = projects[projectIndex]
+        val conversationIndex = project.conversations.indexOfFirst { it.id == target.conversationId }
+        if (conversationIndex < 0) return false
+        activeProjectIndex = projectIndex
+        project.activeConversationIndex = conversationIndex
+        chatAdapter = ChatAdapter(project.conversations[conversationIndex].messages, ::pauseCurrentWork, ::showMessageActions)
+        binding.chatList.adapter = chatAdapter
+        showChat()
+        if (chatAdapter.itemCount > 0) {
+            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
+        }
+        return true
+    }
+
+    private fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
+        val attachments = pendingAttachments.toList()
+        setSendEnabled(false)
+        DebugTraceStore.record(
+            "ui_attachment_upload_start",
+            mapOf("project_id" to target.projectId, "conversation_id" to target.conversationId, "count" to attachments.size)
+        )
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            val refs = uploadAttachmentRefsOrNull(
+                attachments = attachments,
+                target = target
+            )
+            runOnUiThread {
+                if (refs == null) {
+                    setSendEnabled(true)
+                    return@runOnUiThread
+                }
+                DebugTraceStore.record(
+                    "ui_attachment_upload_done",
+                    mapOf(
+                        "project_id" to target.projectId,
+                        "conversation_id" to target.conversationId,
+                        "count" to refs.size(),
+                        "elapsed_ms" to (System.currentTimeMillis() - startedAt)
+                    )
+                )
+                startPreparedMessage(visibleText, outgoingText, refs, target)
+            }
+        }.start()
+    }
+
+    private fun uploadAttachmentRefsOrNull(
+        attachments: List<PendingAttachment>,
+        target: SendTarget
+    ): com.google.gson.JsonArray? {
         val array = com.google.gson.JsonArray()
-        for (attachment in pendingAttachments) {
-            val bytes = runCatching { attachment.file.readBytes() }.getOrElse {
-                Toast.makeText(this, "附件已失效，请重新选择：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+        for (attachment in attachments) {
+            if (!attachment.file.exists()) {
+                runOnUiThread {
+                    Toast.makeText(this, "附件已失效，请重新选择：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+                }
                 return null
             }
-            if (bytes.size > MAX_ATTACHMENT_BYTES) {
-                Toast.makeText(this, "附件过大，请重新选择较小文件：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+            if (attachment.file.length() > MAX_ATTACHMENT_BYTES) {
+                runOnUiThread {
+                    Toast.makeText(this, "附件过大，请重新选择较小文件：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+                }
                 return null
             }
-            array.add(com.google.gson.JsonObject().apply {
-                addProperty("kind", attachment.kind)
-                addProperty("display_name", attachment.displayName)
-                addProperty("file_name", attachment.fileName)
-                addProperty("mime_type", attachment.mimeType)
-                addProperty("data_base64", Base64.encodeToString(bytes, Base64.NO_WRAP))
-            })
+            val url = buildString {
+                append("$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(target.projectId)}/attachments")
+                append("?title=${urlPart(target.projectTitle)}")
+                append("&conversation_id=${urlPart(target.conversationId)}")
+                append("&conversation_title=${urlPart(target.conversationTitle)}")
+                append("&kind=${urlPart(attachment.kind)}")
+                append("&display_name=${urlPart(attachment.displayName)}")
+                append("&file_name=${urlPart(attachment.fileName)}")
+                append("&mime_type=${urlPart(attachment.mimeType)}")
+            }
+            val mediaType = attachment.mimeType.toMediaTypeOrNull()
+                ?: "application/octet-stream".toMediaType()
+            val response = try {
+                http.newCall(
+                    Request.Builder()
+                        .url(url)
+                        .post(attachment.file.asRequestBody(mediaType))
+                        .build()
+                ).execute()
+            } catch (e: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this, "附件上传失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+                DebugTraceStore.record(
+                    "ui_attachment_upload_failed",
+                    mapOf("project_id" to target.projectId, "file" to attachment.displayName, "error" to e.message)
+                )
+                return null
+            }
+            response.use {
+                val body = it.body?.string().orEmpty()
+                if (!it.isSuccessful) {
+                    runOnUiThread {
+                        Toast.makeText(this, "附件上传失败：HTTP ${it.code}", Toast.LENGTH_LONG).show()
+                    }
+                    DebugTraceStore.record(
+                        "ui_attachment_upload_failed",
+                        mapOf("project_id" to target.projectId, "file" to attachment.displayName, "http_code" to it.code)
+                    )
+                    return null
+                }
+                val uploaded = runCatching { JSONObject(body).optJSONObject("attachment") }.getOrNull()
+                if (uploaded == null) {
+                    runOnUiThread {
+                        Toast.makeText(this, "附件上传响应异常：${attachment.displayName}", Toast.LENGTH_LONG).show()
+                    }
+                    return null
+                }
+                array.add(com.google.gson.JsonObject().apply {
+                    addProperty("kind", uploaded.optString("kind", attachment.kind))
+                    addProperty("display_name", uploaded.optString("display_name", attachment.displayName))
+                    addProperty("file_name", uploaded.optString("file_name", attachment.fileName))
+                    addProperty("mime_type", uploaded.optString("mime_type", attachment.mimeType))
+                    addProperty("path", uploaded.optString("path", ""))
+                    addProperty("size_bytes", uploaded.optLong("size_bytes", attachment.file.length()))
+                })
+            }
         }
         return array
     }

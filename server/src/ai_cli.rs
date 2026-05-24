@@ -792,8 +792,8 @@ fn build_development_cli_prompt(
 - 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。修改后运行必要检查，git add 仅加入本次任务文件，git commit，并在配置 origin 时 git push origin main。push 被拒绝时先 rebase 再 push，不要 force push。
 - 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit、push；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
-- 如果改动影响服务器运行，必须递增 server/Cargo.toml 的 package.version，在 commit/push 后按项目文档部署服务器，并验证健康检查和 /api/server/version。
-- 如果改动影响 Android APK 发布给用户，必须递增 android/app/build.gradle 里的 versionCode 和 versionName，构建签名 release APK，上传最新 APK 和 version.json，再验证下载地址。签名文件应来自项目本机配置（例如 android/app/elon-release.jks 或环境变量），不得提交密钥。
+- 如果改动影响服务器运行，必须递增 server/Cargo.toml 的 package.version，在 commit/push 后用本地开发机运行 scripts/publish-server.ps1 或 scripts/publish-server.sh 交叉编译并上传 binary；生产服务器性能较弱，只负责接收 binary、重启和健康检查，不要把它当常规编译机。部署后验证 /health 和 /api/server/version。
+- 如果改动影响 Android APK 发布给用户，必须递增 android/app/build.gradle 里的 versionCode 和 versionName，在本地开发机构建签名 release APK，上传最新 APK 和 version.json，再验证下载地址。签名文件应来自项目本机配置（例如 android/app/elon-release.jks 或环境变量），不得提交密钥。
 - 对普通用户项目，遵循该项目自己的 README/AGENTS/CODEX/文档；不要把一龙自项目的服务器发布规则套到无关项目，除非该项目文档要求。
 - 开始执行前，先用 1-2 句自然中文回应用户：说清楚你理解到的具体需求，以及接下来会先检查或修改哪里。为了让客户端识别，这一行必须以「用户可见：」开头。不要使用固定模板，不要提“CLI/后台/工作区”，不要承诺还没有完成的结果。
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。

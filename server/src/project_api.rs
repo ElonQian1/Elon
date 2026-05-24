@@ -1,5 +1,5 @@
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path as AxumPath, Query, State,
@@ -21,6 +21,9 @@ use crate::{
     tools,
     types::{AppState, WsMessage},
 };
+
+const MAX_PROJECT_ATTACHMENTS_PER_MESSAGE: usize = 6;
+const MAX_PROJECT_ATTACHMENT_BYTES: usize = 12 * 1024 * 1024;
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -50,6 +53,7 @@ pub struct ProjectChatRequest {
     pub agent: Option<String>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
+    pub attachments: Option<Vec<ProjectAttachmentRef>>,
 }
 
 #[derive(Deserialize)]
@@ -57,6 +61,16 @@ pub struct ProjectPrewarmRequest {
     pub agent: Option<String>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ProjectAttachmentRef {
+    pub kind: Option<String>,
+    pub display_name: Option<String>,
+    pub file_name: Option<String>,
+    pub mime_type: Option<String>,
+    pub path: Option<String>,
+    pub size_bytes: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -183,6 +197,13 @@ pub async fn chat_project(
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+    let message = append_project_attachment_notes(
+        &state,
+        &project,
+        &conversation_id,
+        message,
+        req.attachments.as_deref(),
+    );
 
     let task_id =
         match state
@@ -648,6 +669,80 @@ pub async fn user_project_git_status(
     Json(project_git_status_json(&state, &project)).into_response()
 }
 
+pub async fn upload_user_project_attachment(
+    State(state): State<Arc<AppState>>,
+    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> Response {
+    if body.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "attachment body is empty");
+    }
+    if body.len() > MAX_PROJECT_ATTACHMENT_BYTES {
+        return json_error(StatusCode::PAYLOAD_TOO_LARGE, "attachment is too large");
+    }
+
+    let (user, project) = match ensure_mobile_project(
+        &state,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+
+    let conversation_id = match state.store.ensure_conversation(
+        &project.id,
+        &user.id,
+        query.get("conversation_id").map(String::as_str),
+        query.get("conversation_title").map(String::as_str),
+    ) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let attachments_dir = workspace
+        .join("attachments")
+        .join(safe_project_path_part(&conversation_id, 80));
+    if let Err(error) = tokio::fs::create_dir_all(&attachments_dir).await {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+    }
+
+    let display_name = query
+        .get("display_name")
+        .or_else(|| query.get("file_name"))
+        .map(String::as_str)
+        .unwrap_or("attachment.bin");
+    let original_name = query
+        .get("file_name")
+        .map(String::as_str)
+        .unwrap_or(display_name);
+    let file_name = unique_project_attachment_name(&attachments_dir, original_name);
+    let path = attachments_dir.join(&file_name);
+    if let Err(error) = tokio::fs::write(&path, body.as_ref()).await {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+    }
+
+    let attachment = serde_json::json!({
+        "kind": query.get("kind").map(String::as_str).unwrap_or("attachment"),
+        "display_name": display_name,
+        "file_name": file_name,
+        "mime_type": query.get("mime_type").map(String::as_str).unwrap_or("application/octet-stream"),
+        "path": path.to_string_lossy(),
+        "size_bytes": body.len(),
+    });
+    Json(serde_json::json!({
+        "status": "uploaded",
+        "project_id": project.id,
+        "conversation_id": conversation_id,
+        "attachment": attachment,
+    }))
+    .into_response()
+}
+
 pub async fn user_project_deploy_key(
     State(state): State<Arc<AppState>>,
     AxumPath((user_id, project_id)): AxumPath<(String, String)>,
@@ -818,6 +913,13 @@ async fn handle_project_ws(
                 request.conversation_title.as_deref(),
             )
             .unwrap_or_else(|_| "default".into());
+        let message = append_project_attachment_notes(
+            &state,
+            &project,
+            &conversation_id,
+            message,
+            request.attachments.as_deref(),
+        );
 
         let task_id = state
             .store
@@ -935,6 +1037,7 @@ fn parse_project_message(raw: &str) -> ProjectChatRequest {
         agent: None,
         conversation_id: None,
         conversation_title: None,
+        attachments: None,
     })
 }
 
@@ -1025,6 +1128,121 @@ async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: 
         )
         .body(Body::from(data))
         .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+fn append_project_attachment_notes(
+    state: &AppState,
+    project: &ProjectAccess,
+    conversation_id: &str,
+    message: String,
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> String {
+    let Some(attachments) = attachments.filter(|items| !items.is_empty()) else {
+        return message;
+    };
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let attachments_root = workspace.join("attachments");
+    let canonical_root = std::fs::canonicalize(&attachments_root).ok();
+    let mut notes = Vec::new();
+    for attachment in attachments.iter().take(MAX_PROJECT_ATTACHMENTS_PER_MESSAGE) {
+        let Some(path_text) = attachment
+            .path
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        else {
+            continue;
+        };
+        let path = PathBuf::from(path_text);
+        let valid_path = canonical_root.as_ref().is_some_and(|root| {
+            std::fs::canonicalize(&path)
+                .map(|canonical| canonical.starts_with(root))
+                .unwrap_or(false)
+        });
+        if !valid_path {
+            notes.push(format!(
+                "- {}: attachment path was rejected",
+                attachment.display_name.as_deref().unwrap_or("attachment")
+            ));
+            continue;
+        }
+        notes.push(format!(
+            "- {} [{}; {}; {} bytes] -> {}",
+            attachment
+                .display_name
+                .as_deref()
+                .or(attachment.file_name.as_deref())
+                .unwrap_or("attachment"),
+            attachment.kind.as_deref().unwrap_or("attachment"),
+            attachment
+                .mime_type
+                .as_deref()
+                .unwrap_or("application/octet-stream"),
+            attachment.size_bytes.unwrap_or(0),
+            path.display()
+        ));
+    }
+    if attachments.len() > MAX_PROJECT_ATTACHMENTS_PER_MESSAGE {
+        notes.push(format!(
+            "- {} extra attachments were ignored by the message limit.",
+            attachments.len() - MAX_PROJECT_ATTACHMENTS_PER_MESSAGE
+        ));
+    }
+    if notes.is_empty() {
+        return message;
+    }
+    format!(
+        "{}\n\nUser uploaded attachment references for this project conversation (conversation_id={}):\n{}\nRead these exact server-side paths if the task needs the files.",
+        message,
+        conversation_id,
+        notes.join("\n")
+    )
+}
+
+fn unique_project_attachment_name(dir: &Path, original: &str) -> String {
+    let safe = safe_project_file_name(original);
+    let stamp = chrono::Utc::now().timestamp_millis();
+    let mut candidate = format!("{}_{}", stamp, safe);
+    let mut suffix = 1;
+    while dir.join(&candidate).exists() {
+        candidate = format!("{}_{}_{}", stamp, suffix, safe);
+        suffix += 1;
+    }
+    candidate
+}
+
+fn safe_project_path_part(value: &str, max_len: usize) -> String {
+    let safe = value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+        .take(max_len)
+        .collect::<String>();
+    if safe.is_empty() {
+        "default".into()
+    } else {
+        safe
+    }
+}
+
+fn safe_project_file_name(original: &str) -> String {
+    let mut safe = original
+        .chars()
+        .filter_map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                Some(ch)
+            } else if ch.is_whitespace() {
+                Some('_')
+            } else {
+                None
+            }
+        })
+        .take(120)
+        .collect::<String>();
+    if safe.is_empty() || safe.trim_matches('.').is_empty() {
+        safe = "attachment.bin".into();
+    }
+    safe
 }
 
 fn ensure_mobile_project(
@@ -1444,6 +1662,50 @@ fn json_error(status: StatusCode, message: impl ToString) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_project_attachment_refs() {
+        let request = parse_project_message(
+            r#"{
+                "message":"please inspect this file",
+                "attachments":[
+                    {
+                        "kind":"image",
+                        "display_name":"screenshot.png",
+                        "file_name":"screenshot.png",
+                        "mime_type":"image/png",
+                        "path":"D:/workspace/attachments/c1/screenshot.png",
+                        "size_bytes":128
+                    }
+                ]
+            }"#,
+        );
+
+        let attachment = request
+            .attachments
+            .as_ref()
+            .and_then(|items| items.first())
+            .expect("attachment ref should be parsed");
+        assert_eq!(request.message, "please inspect this file");
+        assert_eq!(attachment.kind.as_deref(), Some("image"));
+        assert_eq!(attachment.display_name.as_deref(), Some("screenshot.png"));
+        assert_eq!(
+            attachment.path.as_deref(),
+            Some("D:/workspace/attachments/c1/screenshot.png")
+        );
+        assert_eq!(attachment.size_bytes, Some(128));
+    }
+
+    #[test]
+    fn sanitizes_project_attachment_file_names() {
+        assert_eq!(safe_project_file_name("../my file.png"), "..my_file.png");
+        assert_eq!(safe_project_file_name("../../"), "attachment.bin");
+        assert_eq!(safe_project_file_name(""), "attachment.bin");
+        assert_eq!(
+            safe_project_path_part("../conversation id!", 80),
+            "conversationid"
+        );
+    }
 
     #[test]
     fn keeps_useful_codex_gate_reply() {
