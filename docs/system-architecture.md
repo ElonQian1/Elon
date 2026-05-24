@@ -43,8 +43,8 @@
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │                 自动化流水线                          │   │
 │  │                                                     │   │
-│  │  git commit → Rust编译 → Android打包 → 前端构建      │   │
-│  │       → 签名APK → 上传CDN → 生成下载链接             │   │
+│  │  git commit → 本地开发机编译 → 上传产物到服务器     │   │
+│  │       → 重启后端 / 分发APK → 生成下载链接            │   │
 │  └─────────────────────────┬───────────────────────────┘   │
 │                            │                               │
 └────────────────────────────┼───────────────────────────────┘
@@ -91,9 +91,9 @@ AI 分析结果:
 ```
 Step 1: 修改 Android 布局文件
 Step 2: git add . && git commit -m "feat: 用户xxx请求 - 首页添加红色按钮"
-Step 3: 触发 Android 编译 (./gradlew assembleRelease)
-Step 4: APK 签名 (apksigner)
-Step 5: 上传 APK 到分发服务器
+Step 3: 在本地开发机触发 Android 编译 (./gradlew assembleRelease)
+Step 4: 本地签名 APK (apksigner / Gradle signingConfig)
+Step 5: 上传 APK 产物到分发服务器
 Step 6: 生成唯一下载链接
 Step 7: 通过 WebSocket 推送给用户
 ```
@@ -127,9 +127,9 @@ d:\一龙\
 │   ├── src\
 │   └── package.json
 └── scripts\                       ← 自动化脚本
-    ├── build-android.sh
-    ├── build-rust.sh
-    └── deploy.sh
+    ├── publish-server.ps1         ← Windows 本地交叉编译后端并上传 binary
+    ├── publish-server.sh          ← Linux/macOS 本地交叉编译后端并上传 binary
+    └── publish-apk.ps1            ← 本地构建、签名并上传 APK
 ```
 
 ---

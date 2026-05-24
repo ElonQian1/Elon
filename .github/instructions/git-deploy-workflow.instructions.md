@@ -172,7 +172,7 @@ git worktree remove ..\Elon-session-$id --force
 
 **服务器信息**：`root@43.139.149.158`，项目路径 `/root/Elon`
 
-### 完整流程
+### 标准流程：本地交叉编译，只上传 binary
 
 ```powershell
 # 1. 提交
@@ -181,50 +181,39 @@ git add server/src/<file>.rs          # 只加自己改的文件
 git commit -m "fix(server): 描述"
 git push origin main
 
-# 2. 创建临时工作树（保证基于干净 commit 构建，不含其他 AI 未提交改动）
-$sha = git rev-parse --short HEAD
-$tmp = "..\Elon-deploy-temp-$sha"
-git worktree add --detach $tmp HEAD
+# 2. 在当前执行机本地交叉编译并上传产物
+cd scripts
+.\publish-server.ps1
 
-# 3. 从临时工作树 rsync 到服务器（排除 target/ 和 .env）
-rsync -avz --exclude='target/' --exclude='.env' `
-  "$tmp/" `
-  "root@43.139.149.158:/root/Elon/"
-
-# 4. 在服务器上编译并重启
-ssh root@43.139.149.158 @"
-  source ~/.cargo/env
-  cd /root/Elon/server
-  cargo build --release 2>&1 | tail -5
-  pkill -f elon-server 2>/dev/null || true
-  sleep 1
-  nohup ./target/release/elon-server > /root/elon-server.log 2>&1 &
-  echo "已启动 PID: $!"
-"@
-
-# 5. 验证
-ssh root@43.139.149.158 'curl -s http://localhost:8080/health'
-ssh root@43.139.149.158 'curl -s http://localhost:8080/api/server/version'
-
-# 6. 清理临时工作树（必须！）
-git worktree remove $tmp --force
+# 3. 验证
+curl --noproxy '*' http://43.139.149.158:8080/health
+curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
 
-### 快速部署（仅修改服务端单个文件时）
+Linux/macOS 开发机使用等价入口：
+
+```bash
+bash scripts/publish-server.sh
+curl --noproxy '*' http://43.139.149.158:8080/health
+curl --noproxy '*' http://43.139.149.158:8080/api/server/version
+```
+
+`publish-server.ps1` / `publish-server.sh` 会自动完成：`git pull --rebase origin main`、基于干净 `HEAD` 创建临时 worktree、在本地开发机用 `cargo zigbuild --target x86_64-unknown-linux-musl` 交叉编译、把编译好的 `elon-server` binary 上传到服务器 staging 路径、通过服务器 `flock` + CAS 替换 binary、重启服务并验证。
+
+> 生产服务器只负责接收 binary、替换、重启和健康检查，不承担编译。**不要**恢复“rsync 源码到服务器后 `cargo build --release`”的旧流程；服务器性能弱，远端编译慢且容易和并发部署互相覆盖。
+
+### 仅本地验证 binary（不部署）
 
 ```powershell
-# 提交
-git add server/Cargo.toml
-git add server/src/<file>.rs
-git commit -m "fix(server): 描述"
-git push origin main
-
-# 用现有 deploy.sh（等价于上方完整流程，但不使用工作树隔离）
-# ⚠️ 仅在确认主工作区无其他 AI 未提交改动时才可用此快捷方式
-bash scripts/deploy.sh
+cd scripts
+.\publish-server.ps1 -SkipUpload
 ```
 
-> 如果主工作区有其他 AI 的未提交改动，**必须**用上方临时工作树流程。
+```bash
+bash scripts/publish-server.sh --skip-upload
+```
+
+旧入口 `scripts/deploy.sh` 只保留为兼容包装器，内部会转到 `scripts/publish-server.sh`，不得再实现远端编译。
 
 ### 后端版本号规则
 

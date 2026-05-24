@@ -209,11 +209,18 @@ git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
 
 ## Step 7：触发编译流水线
 
-### 7.1 Rust 服务端编译
+### 7.1 Rust 服务端本地交叉编译
+
+服务端发布必须使用仓库脚本在本地开发机交叉编译 Linux binary，再上传到服务器。桌面版 Codex 就是在本机编译；生产服务器只负责接收 binary、替换、重启和健康检查，不承担编译。
+
 ```powershell
-cd server
-cargo build --release
-# 编译产物: server/target/release/elon-server （Linux 服务器上运行）
+cd scripts
+.\publish-server.ps1 -SkipUpload
+# 本地交叉编译产物: server/target/x86_64-unknown-linux-musl/release/elon-server
+```
+
+```bash
+bash scripts/publish-server.sh --skip-upload
 ```
 
 后端运行代码变更必须先递增 `server/Cargo.toml` 的 `package.version`。PATCH 用于修复，MINOR 用于向后兼容的新功能，MAJOR 用于不兼容 API / 协议变更。部署脚本会把 git SHA 注入二进制，服务端通过 `/api/server/version` 暴露 `versionName` 和 `gitSha`，APK 个人页会动态显示该后端版本。
@@ -246,18 +253,13 @@ npm run build
 
 ### 8.1 部署服务端
 ```powershell
-# 重启 Rust 服务（具体命令根据服务器配置确定）
-scripts/deploy.sh server
-```
-
-当前仓库标准入口是：
-
-```powershell
 cd scripts
 .\publish-server.ps1
 curl --noproxy '*' http://43.139.149.158:8080/health
 curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
+
+Linux/macOS 开发机使用 `bash scripts/publish-server.sh`。不得使用旧式“同步源码到服务器后远端 `cargo build --release`”流程。
 
 ### 8.2 分发 APK
 
@@ -269,14 +271,6 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 ```
 
 发布脚本会完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 APK 和 `version.json`、验证服务器版本。
-
-旧式手工流程只作为脚本维护参考，不作为 AI 代理日常发布入口：
-
-```powershell
-# 上传 APK 并获取下载链接
-scripts/deploy.sh apk
-# 脚本返回: https://download.example.com/apk/v{version}/app.apk
-```
 
 ### 8.3 推送结果给用户
 
