@@ -10,6 +10,9 @@ android/local.properties
 android/*.apk
 android/app/*.jks
 android/app/*.keystore
+# Signing keys anywhere in the repo root
+/*.jks
+/*.keystore
 
 # Environment secrets
 .env.local

@@ -37,6 +37,84 @@ description: >
 - APK 签名密钥只能来自 `ELON_RELEASE_*` 环境变量或用户级 Gradle 配置，不能硬编码或提交到仓库
 - 每次任务必须有 git commit 记录
 - APK 更新/P2P 分发以公网 `/app/version.json` 为事实来源；保留 `downloadUrl` 直链兜底，修改 mirrors/peer relay 后必须发布 APK 并校验线上版本
+- 新机器首次 Android 编译前必须先测速再配置 Gradle 镜像，否则构建会因下载卡死
+
+## 🌐 Android 编译环境首次配置（每台新机器必做）
+
+每台远程开发机网络环境不同，**必须先测速再决定下载方式**，否则 Gradle 构建会因下载卡死。
+
+### 第一步：测速
+
+```powershell
+$cases = @(
+  @{Name='official-noproxy';   Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$true},
+  @{Name='tencent-mirror';     Url='https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip';  NoProxy=$true},
+  @{Name='official-with-proxy';Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$false}
+)
+foreach ($c in $cases) {
+  Write-Host "=== $($c.Name) ==="
+  $a = @('-L','-r','0-10485759','-o','NUL','-s','-w','speed=%{speed_download}B/s total=%{time_total}s code=%{http_code}\n')
+  if ($c.NoProxy) { $a += @('--noproxy','*') }
+  $a += $c.Url
+  & curl.exe @a
+}
+```
+
+判断：`code=206` 且 speed 最大 → 使用该路径；官方源 `code=307 speed=0` → 跳到 GitHub，国内不可用，必须用镜像。
+
+### 第二步：修复 Wrapper 缓存（如卡下载）
+
+```powershell
+$d = "$HOME\.gradle\wrapper\dists\gradle-8.6-bin\afr5mpiioh2wthjmwnkmdsd5w"
+if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }
+Remove-Item "$d\*.part","$d\*.lck" -ErrorAction SilentlyContinue
+curl.exe -L --noproxy '*' -o "$d\gradle-8.6-bin.zip" "https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip"
+```
+
+### 第三步：全局 Gradle 镜像（永久生效）
+
+```powershell
+# init.gradle — 注意：AGP 7+ 用 FAIL_ON_PROJECT_REPOS，必须用 settingsEvaluated，不能用 allprojects { repositories {} }
+$initFile = "$HOME\.gradle\init.gradle"
+Set-Content $initFile -Encoding UTF8 @'
+allprojects {
+    buildscript {
+        repositories {
+            maven { url "https://maven.aliyun.com/repository/google" }
+            maven { url "https://maven.aliyun.com/repository/central" }
+            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+            maven { url "https://maven.aliyun.com/repository/public" }
+        }
+    }
+}
+settingsEvaluated { settings ->
+    settings.dependencyResolutionManagement {
+        repositories {
+            maven { url "https://maven.aliyun.com/repository/google" }
+            maven { url "https://maven.aliyun.com/repository/central" }
+            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+            maven { url "https://maven.aliyun.com/repository/public" }
+        }
+    }
+}
+'@
+# gradle.properties — 禁用 JVM SOCKS 代理（否则 Maven 下载超时）
+$props = "$HOME\.gradle\gradle.properties"
+if (!(Test-Path $props)) { New-Item -ItemType File -Path $props | Out-Null }
+$content = Get-Content $props | Where-Object { $_ -notmatch '^systemProp\.' }
+$content += "systemProp.java.net.useSystemProxies=false"
+Set-Content $props $content -Encoding UTF8
+```
+
+### 验证
+
+```powershell
+cd e:\lodex\Elon\android
+.\gradlew.bat --version --no-daemon
+.\gradlew.bat :app:assembleRelease --no-daemon   # 首次通过阿里云镜像约 2-5 分钟
+```
+
+> `init.gradle` 写在 `~/.gradle/`（用户级），不进入 git，不影响 CI 和其他成员。
 
 ## 详细流程
 

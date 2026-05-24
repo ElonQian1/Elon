@@ -176,6 +176,97 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - Shared scripts must not hardcode one PC's drive letter. Machine-specific build paths belong in local environment variables or untracked `.env.local`; for server builds use `ELON_BUILD_TARGET_DIR` when a PC needs a custom Cargo target cache.
 - APK project messages with photos/files should upload attachments first through HTTP, then send only server-side attachment references in the chat payload. Avoid putting large base64 blobs into the project WebSocket message.
 
+## 🌐 Android 编译环境首次配置（每台新机器必做）
+
+每台远程开发机网络环境不同，**必须先测速再决定下载方式**，否则 Gradle 构建会因下载卡死。
+
+### 第一步：测速（选择最快的下载路径）
+
+```powershell
+# 分别测试官方直连、官方不走代理、腾讯镜像，取 speed 最大的
+$cases = @(
+  @{Name='official-noproxy';   Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$true},
+  @{Name='tencent-mirror';     Url='https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip';  NoProxy=$true},
+  @{Name='official-with-proxy';Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$false}
+)
+foreach ($c in $cases) {
+  Write-Host "=== $($c.Name) ==="
+  $a = @('-L','-r','0-10485759','-o','NUL','-s','-w','speed=%{speed_download}B/s total=%{time_total}s code=%{http_code}\n')
+  if ($c.NoProxy) { $a += @('--noproxy','*') }
+  $a += $c.Url
+  & curl.exe @a
+}
+```
+
+判断标准：
+- `speed` 最大（> 3MB/s）且 `code=206` → 使用那条路径
+- 官方源 `code=307` 且 speed=0 → 说明最终跳转到 GitHub，国内基本不可用，必须用镜像
+- `code=000` → 路由不通
+
+### 第二步：修复 Gradle Wrapper 缓存（如果卡下载）
+
+如果 `~/.gradle/wrapper/dists/gradle-8.6-bin/` 下只有 `.part/.lck` 文件（无完整 zip），说明历史下载中断，必须手动用镜像重新灌入：
+
+```powershell
+$d = "$HOME\.gradle\wrapper\dists\gradle-8.6-bin\afr5mpiioh2wthjmwnkmdsd5w"
+if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }
+Remove-Item "$d\*.part","$d\*.lck" -ErrorAction SilentlyContinue
+# 按测速结果选择最快的 URL（中国大陆一般是腾讯镜像）
+curl.exe -L --noproxy '*' -o "$d\gradle-8.6-bin.zip" "https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip"
+```
+
+### 第三步：配置全局 Gradle 镜像（一次性，永久生效）
+
+```powershell
+# 1. 创建 ~/.gradle/init.gradle — 重定向所有 Maven 仓库到阿里云
+# 注意：现代 AGP 用 FAIL_ON_PROJECT_REPOS，需用 settingsEvaluated 注入依赖仓库
+$initFile = "$HOME\.gradle\init.gradle"
+Set-Content $initFile -Encoding UTF8 @'
+// buildscript classpath（插件解析）走 allprojects.buildscript
+allprojects {
+    buildscript {
+        repositories {
+            maven { url "https://maven.aliyun.com/repository/google" }
+            maven { url "https://maven.aliyun.com/repository/central" }
+            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+            maven { url "https://maven.aliyun.com/repository/public" }
+        }
+    }
+}
+// 依赖仓库通过 settingsEvaluated 注入，避免与 FAIL_ON_PROJECT_REPOS 冲突
+settingsEvaluated { settings ->
+    settings.dependencyResolutionManagement {
+        repositories {
+            maven { url "https://maven.aliyun.com/repository/google" }
+            maven { url "https://maven.aliyun.com/repository/central" }
+            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+            maven { url "https://maven.aliyun.com/repository/public" }
+        }
+    }
+}
+'@
+
+# 2. 向 ~/.gradle/gradle.properties 添加禁用 JVM 系统代理
+# （JVM 会读取系统 SOCKS 代理导致访问超时，必须关闭）
+$props = "$HOME\.gradle\gradle.properties"
+if (!(Test-Path $props)) { New-Item -ItemType File -Path $props | Out-Null }
+$content = Get-Content $props | Where-Object { $_ -notmatch '^systemProp\.' }
+$content += "systemProp.java.net.useSystemProxies=false"
+Set-Content $props $content -Encoding UTF8
+```
+
+### 验证
+
+```powershell
+cd e:\lodex\Elon\android
+.\gradlew.bat --version --no-daemon   # 应在几秒内输出 Gradle 版本，无下载提示
+.\gradlew.bat :app:assembleRelease --no-daemon   # 首次编译会下载插件/依赖，通过阿里云镜像约 2-5 分钟
+```
+
+> **为什么不把镜像配置提交到仓库？**
+> `init.gradle` 写入用户级 `~/.gradle/`，不进入 git，不影响其他团队成员或 CI 环境。
+> 每台机器自行按网络测速决定镜像策略，符合"本地环境自治"原则。
+
 ## 本机 Skills 已沉淀规则
 
 - `\\127.0.0.1\skills\ai-git-deploy-workflow` 的核心规则已固化到本文件和 `.github/instructions/git-deploy-workflow.instructions.md`：preflight、worktree 隔离、只 stage 本任务文件、commit/push 后再 deploy、部署后 live 验证。
