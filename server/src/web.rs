@@ -6,7 +6,11 @@
 
 use std::sync::{Arc, OnceLock};
 
-use axum::{extract::State, response::Html};
+use axum::{
+    extract::State,
+    http::{header, HeaderMap, HeaderValue},
+    response::{Html, IntoResponse},
+};
 
 use crate::types::AppState;
 
@@ -14,9 +18,17 @@ const BRAND_PNG_B64: &str = include_str!("assets/ic_app_brand.b64");
 const TAB_CHAT_PNG_B64: &str = include_str!("assets/ic_tab_chat_edit.b64");
 const TAB_PROJECT_PNG_B64: &str = include_str!("assets/ic_tab_project_stack.b64");
 
-pub async fn web_page() -> Html<&'static str> {
+pub async fn web_page() -> impl IntoResponse {
     static HTML: OnceLock<String> = OnceLock::new();
-    Html(HTML.get_or_init(build_html).as_str())
+    let body = HTML.get_or_init(build_html).as_str();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
+    );
+    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
+    (headers, Html(body))
 }
 
 pub async fn download_page(State(state): State<Arc<AppState>>) -> Html<String> {
@@ -924,6 +936,12 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     loginError.textContent = msg || '';
     loginError.classList.toggle('show', !!msg);
   }
+  function fetchWithTimeout(url, options, ms) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, Object.assign({}, options, { signal: ctrl.signal }))
+      .finally(() => clearTimeout(t));
+  }
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginBtn.disabled = true;
@@ -937,11 +955,11 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
         device_name: 'web'
       };
       if (authMode === 'register') payload.nickname = nicknameInput.value.trim();
-      const res = await fetch(authMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
+      const res = await fetchWithTimeout(authMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      });
+      }, 15000);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || (authMode === 'register' ? '注册失败' : '登录失败'));
       token = data.token;
@@ -950,7 +968,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       currentUser = data.user;
       await boot();
     } catch (err) {
-      setLoginError(err.message);
+      const msg = err && err.name === 'AbortError' ? '请求超时，请检查网络后重试' : (err && err.message) || '网络错误';
+      setLoginError(msg);
     } finally {
       loginBtn.disabled = false;
       loginBtn.textContent = origBtnText;
