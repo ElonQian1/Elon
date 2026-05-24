@@ -1723,7 +1723,7 @@ class MainActivity : AppCompatActivity() {
                     val name = item.optString("name", "")
                     val model = item.optString("model", "")
                     val provider = item.optString("provider", name)
-                    val label = item.optString("label", modelLabel(provider, model))
+                    val label = item.optString("label", modelLabel(provider, model)).removePrefix("Copilot / ")
                     if (name.isNotBlank()) {
                         options.add(ModelOption(label, name))
                     }
@@ -1847,13 +1847,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shortModelLabel(label: String): String {
+        // 兼容旧缓存中仍含 "Copilot / " 前缀的 label
+        val m = label.removePrefix("Copilot / ")
         return when {
-            label.startsWith("Codex", ignoreCase = true) -> "Codex"
-            label.startsWith("服务器默认") -> "默认"
-            label.startsWith("自定义") -> "自定"
-            label.contains("/") -> label.substringBefore("/").trim().take(4)
-            label.contains("[") -> label.substringBefore("[").trim().take(4)
-            else -> label.take(4)
+            m.startsWith("Codex", ignoreCase = true) -> "Codex"
+            m.startsWith("服务器默认") -> "默认"
+            m.startsWith("自定义") -> "自定"
+            m.startsWith("GPT") -> m.replace(" ", "").take(6)           // "GPT-4o"、"GPT-4omini"→"GPT-4o"
+            m.startsWith("gpt-") -> m.take(6)                            // "gpt-4o"、"gpt-4o"
+            m.startsWith("o1") || m.startsWith("o3") -> m.replace(" ", "").take(5)
+            m.startsWith("Claude") -> "Cl" + m.substringAfterLast(" ").take(3)  // "ClSon"
+            m.startsWith("Gemini") -> "G" + m.substringAfterLast(" ").take(4)
+            // "provider / model" 格式，显示 "/" 后面的模型名前几位
+            m.contains("/") -> m.substringAfter("/").trim().take(5)
+            m.contains("[") -> m.substringBefore("[").trim().take(4)
+            else -> m.take(6)
         }
     }
 
