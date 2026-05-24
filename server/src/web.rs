@@ -1050,7 +1050,12 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   // ====== 加载用户/项目 ======
   async function loadMe() {
     const res = await api('/api/me');
-    if (!res.ok) throw new Error('登录已过期');
+    if (res.status === 401 || res.status === 403) {
+      const err = new Error('登录已过期');
+      err.authFailed = true;
+      throw err;
+    }
+    if (!res.ok) throw new Error('加载用户信息失败：HTTP ' + res.status);
     const data = await res.json();
     currentUser = data.user;
     const lines = [
@@ -1209,16 +1214,23 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     if (!token) { showLogin(); return; }
     try {
       await loadMe();
-      showApp();
-      await Promise.all([loadProjects(), loadVersion()]);
-      loadAgents();
-      switchTab('chatPage');
-    } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem('elon_token');
-      token = '';
+    } catch (err) {
+      if (err && err.authFailed) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('elon_token');
+        token = '';
+      }
+      loginError.textContent = (err && err.message) ? err.message : '加载失败，请重试';
       showLogin();
+      return;
     }
+    showApp();
+    switchTab('chatPage');
+    // 后续数据加载失败不踢回登录页，仅在控制台告警
+    Promise.all([
+      loadProjects().catch((e) => console.warn('loadProjects failed:', e)),
+      loadVersion().catch((e) => console.warn('loadVersion failed:', e)),
+    ]).then(() => loadAgents()).catch((e) => console.warn('loadAgents failed:', e));
   }
   setAuthMode('login');
   boot();
