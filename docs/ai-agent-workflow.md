@@ -213,10 +213,17 @@ git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
 
 服务端发布必须使用仓库脚本在本地开发机交叉编译 Linux binary，再上传到服务器。桌面版 Codex 就是在本机编译；生产服务器只负责接收 binary、替换、重启和健康检查，不承担编译。
 
+多台 PC 的本地盘符不同，不能把某台机器的构建目录写死在共享脚本里。需要固定本机构建缓存时，在仓库根创建未提交的 `.env.local`，设置 `ELON_BUILD_TARGET_DIR`：
+
+```powershell
+ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+```
+
+Windows / Linux / macOS 发布脚本都会读取这个变量。未配置时 Windows 发布脚本会使用当前用户的本地缓存目录，Linux/macOS 发布脚本会使用临时构建 worktree 下的 `target`；CI 或服务器 Codex 也可以直接通过进程环境变量传入 `ELON_BUILD_TARGET_DIR`。
+
 ```powershell
 cd scripts
 .\publish-server.ps1 -SkipUpload
-# 本地交叉编译产物: server/target/x86_64-unknown-linux-musl/release/elon-server
 ```
 
 ```bash

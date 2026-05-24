@@ -12,6 +12,8 @@ android/app/*.jks
 android/app/*.keystore
 
 # Environment secrets
+.env.local
+.env.*.local
 server/.env
 !server/.env.example
 

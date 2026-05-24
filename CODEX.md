@@ -33,7 +33,7 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 The local share `\\127.0.0.1\skills` has been reviewed for this repository. Keep these distilled lessons in project workflow memory:
 
 - `ai-git-deploy-workflow`: this repo already implements the core rule through preflight, worktree isolation, explicit staging, commit, push, script deploy, and live verification. Do not reintroduce direct dirty-workspace deployment or unpushed deploys.
-- `rust-shared-target-cache`: never use a relative `CARGO_TARGET_DIR`. Prefer repository scripts for Rust builds; on new machines or suspicious builds, check user/machine `CARGO_TARGET_DIR` and use an absolute Cargo `target-dir`.
+- `rust-shared-target-cache`: never use a relative `CARGO_TARGET_DIR`. Prefer repository scripts for Rust builds; on new machines or suspicious builds, check user/machine `CARGO_TARGET_DIR` and use an absolute Cargo `target-dir`. Do not hardcode one PC's drive letter in shared scripts; use `ELON_BUILD_TARGET_DIR` in the process environment or untracked `.env.local` for machine-specific build caches.
 - `p2p-app-distribution`: this repo has APK update broadcast plus same-WiFi peer relay. Preserve `version.json` as the public source of truth, keep direct download fallback, and treat WebSocket Ping/Pong, sender backpressure, and mirror priority semantics as compatibility-sensitive.
 
 ## Repository And Git
@@ -163,6 +163,7 @@ Server:
 - Deploy script (Windows):     `cd scripts && .\publish-server.ps1`
 - Deploy script (Linux/macOS): `bash scripts/publish-server.sh`
 - Server deploys must compile locally on the developer machine. The production server is low-spec and should only receive the already-built binary plus a restart/health check; do not run release compilation on the server for normal desktop Codex work.
+- Per-machine build cache paths must be local configuration, not committed script defaults. `scripts/publish-server.ps1` and `scripts/publish-server.sh` read `ELON_BUILD_TARGET_DIR` from the process environment or root `.env.local`; if unset, the Windows script uses a portable user-local cache directory and the Linux/macOS script keeps the cache under its temporary build worktree.
 - Both scripts are functionally identical: git pull → worktree → cross-compile with git SHA → SHA check → upload → restart → verify `/health` and `/api/server/version`
 
 APK:

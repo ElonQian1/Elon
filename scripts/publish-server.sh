@@ -14,6 +14,9 @@
 #    ./scripts/publish-server.sh --skip-build    # 跳过编译，用上次产物重新部署
 #    ./scripts/publish-server.sh --skip-upload   # 只本地编译，不部署
 #    ./scripts/publish-server.sh --force         # 强制部署，即使服务器已有更新版本
+#
+#  本机专用构建缓存目录可在仓库根 .env.local 中设置：
+#    ELON_BUILD_TARGET_DIR=/var/tmp/elon-build-target
 # ================================================================
 set -euo pipefail
 
@@ -49,6 +52,34 @@ SERVER_DIR="$REPO_ROOT/server"
 if [ ! -f "$SERVER_DIR/Cargo.toml" ]; then
   echo -e "${RED}❌ 找不到 $SERVER_DIR/Cargo.toml${NC}" >&2; exit 1
 fi
+
+load_local_env_file() {
+  local env_file="$1"
+  [ -f "$env_file" ] || return 0
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    [[ "$line" =~ ^[[:space:]]*$ ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+
+    if [[ "$line" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+      name="${BASH_REMATCH[1]}"
+      value="${BASH_REMATCH[2]}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+      if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+      if [ -z "${!name+x}" ]; then
+        export "$name=$value"
+      fi
+    fi
+  done < "$env_file"
+}
+
+load_local_env_file "$REPO_ROOT/.env.local"
 
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
@@ -102,8 +133,19 @@ fi
 
 # ── 3. 编译（临时工作树）─────────────────────────────────────
 TMP_WORKTREE="$(dirname "$REPO_ROOT")/elon-build-$SHA"
-BUILD_BIN="$TMP_WORKTREE/server/target/$TARGET/release/elon-server"
+if [ -n "${ELON_BUILD_TARGET_DIR:-}" ]; then
+  case "$ELON_BUILD_TARGET_DIR" in
+    /*) ;;
+    *) echo -e "${RED}❌ ELON_BUILD_TARGET_DIR 必须是绝对路径，当前值: $ELON_BUILD_TARGET_DIR${NC}" >&2; exit 1 ;;
+  esac
+  mkdir -p "$ELON_BUILD_TARGET_DIR"
+  BUILD_TARGET_DIR="$ELON_BUILD_TARGET_DIR/elon-build-$SHA"
+else
+  BUILD_TARGET_DIR="$TMP_WORKTREE/server/target"
+fi
+BUILD_BIN="$BUILD_TARGET_DIR/$TARGET/release/elon-server"
 BINARY="$BUILD_BIN"
+echo -e "${GRAY}  构建缓存: ${ELON_BUILD_TARGET_DIR:-$TMP_WORKTREE/server/target}${NC}"
 
 if [ "$SKIP_BUILD" -eq 0 ]; then
   # 清理残留工作树
@@ -116,7 +158,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
 
   echo -e "${YELLOW}3⃣  交叉编译 → $TARGET...${NC}"
   TMP_SERVER_DIR="$TMP_WORKTREE/server"
-  export CARGO_TARGET_DIR="$TMP_SERVER_DIR/target"
+  export CARGO_TARGET_DIR="$BUILD_TARGET_DIR"
   (
     cd "$TMP_SERVER_DIR"
     ELON_SERVER_GIT_SHA="$SHA_BIG" cargo zigbuild --release --target "$TARGET"

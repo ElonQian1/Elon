@@ -259,6 +259,14 @@ if ($rs) { rustfmt $rs }
 执行本项目 Rust 构建时遵守：
 
 - 优先使用仓库脚本：`scripts\publish-server.ps1` / `scripts\publish-server.sh`。脚本会设置明确的构建输出目录，不依赖用户级相对路径。
+- 多台 PC 的盘符、缓存盘、权限策略不同，不能把某台机器的绝对路径写进共享脚本。需要本机固定构建缓存时，在仓库根创建未提交的 `.env.local` 或设置进程环境变量：
+
+```powershell
+ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+```
+
+`scripts\publish-server.ps1` / `scripts\publish-server.sh` 会读取 `ELON_BUILD_TARGET_DIR` 并在其下创建 `elon-build-<sha>`；未设置时 Windows 使用当前用户的本地缓存目录，Linux/macOS 使用临时构建 worktree 下的 `target`。
+
 - 裸跑 `cargo check`、`cargo build`、`cargo zigbuild` 前，如果构建行为异常或机器是新环境，先检查 `CARGO_TARGET_DIR`：
 
 ```powershell
@@ -270,7 +278,7 @@ if ($rs) { rustfmt $rs }
 
 ```powershell
 Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
-$env:CARGO_TARGET_DIR = "E:\rust-target\elon-local"
+$env:CARGO_TARGET_DIR = "D:\rust\shared\target\manual-check"
 ```
 
 - 新 PC 的长期配置应写到 `%USERPROFILE%\.cargo\config.toml`，并使用绝对路径：

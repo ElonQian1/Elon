@@ -21,6 +21,10 @@
 .PARAMETER SkipVersionBump
     跳过自动版本递增（手动已修改 MINOR/MAJOR 版本号时使用）。
 
+.NOTES
+    本机专用构建缓存目录可在仓库根 .env.local 中设置：
+      ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+
 .EXAMPLE
     .\scripts\publish-server.ps1                          # 正常流程（自动递增 PATCH）
     .\scripts\publish-server.ps1 -SkipVersionBump         # 跳过版本递增（手动控制版本号时）
@@ -62,6 +66,63 @@ $ServerDir = Join-Path $RepoRoot "server"
 if (-not (Test-Path (Join-Path $ServerDir "Cargo.toml"))) {
     Write-Error "❌ 找不到 $ServerDir/Cargo.toml，请确认仓库结构。"
 }
+
+function Import-LocalEnvFile {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) { return }
+
+    foreach ($line in Get-Content $Path -Encoding UTF8) {
+        $trimmed = $line.Trim()
+        if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith("#")) {
+            continue
+        }
+        if ($trimmed -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
+            continue
+        }
+
+        $name = $Matches[1]
+        $value = $Matches[2].Trim()
+        if ($value.Length -ge 2) {
+            $first = $value.Substring(0, 1)
+            $last = $value.Substring($value.Length - 1, 1)
+            if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+        }
+
+        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name, "Process"))) {
+            [Environment]::SetEnvironmentVariable($name, $value, "Process")
+        }
+    }
+}
+
+function Resolve-BuildTargetRoot {
+    param([string]$RepoRoot)
+
+    if (-not [string]::IsNullOrWhiteSpace($env:ELON_BUILD_TARGET_DIR)) {
+        $root = $env:ELON_BUILD_TARGET_DIR.Trim()
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $root = Join-Path $env:LOCALAPPDATA "Elon\build-target"
+    } else {
+        $root = Join-Path (Split-Path $RepoRoot -Parent) ".elon-build-target"
+    }
+
+    if (-not [System.IO.Path]::IsPathRooted($root)) {
+        Write-Error "❌ ELON_BUILD_TARGET_DIR 必须是绝对路径，当前值: $root"
+    }
+
+    $fullPath = [System.IO.Path]::GetFullPath($root)
+    $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
+    if ($pathRoot -and -not (Test-Path $pathRoot)) {
+        Write-Error "❌ 构建缓存目录所在盘符不存在: $fullPath。请在 .env.local 或环境变量中设置 ELON_BUILD_TARGET_DIR。"
+    }
+
+    New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+    return $fullPath
+}
+
+Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
@@ -161,16 +222,12 @@ if (-not $SkipBuild) {
 # ─────────────────────────────────────────────────────────────
 # 3. 编译（临时工作树 — 确保从干净 commit 构建）
 # ─────────────────────────────────────────────────────────────
-# 把编译产物放在 E:\rust-target\elon-build-$Sha，避开 Windows 应用控制策略
-# 对 E:\lodex 路径下 build-script-build.exe 的拦截（os error 4551）
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
-$BuildTargetDir = if ($env:ELON_BUILD_TARGET_DIR) {
-    Join-Path $env:ELON_BUILD_TARGET_DIR "elon-build-$Sha"
-} else {
-    "E:\rust-target\elon-build-$Sha"
-}
+$BuildTargetRoot = Resolve-BuildTargetRoot -RepoRoot $RepoRoot
+$BuildTargetDir = Join-Path $BuildTargetRoot "elon-build-$Sha"
 $BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
+Write-Host "  构建缓存: $BuildTargetRoot" -ForegroundColor Gray
 
 function Remove-Worktree {
     if (Test-Path $TmpWorktree) {
@@ -192,8 +249,7 @@ if (-not $SkipBuild) {
     Write-Host "3⃣  交叉编译 → $Target..." -ForegroundColor Yellow
     Push-Location $TmpServerDir
     try {
-        # 把产物输出到 E:\rust-target 下，避开 Windows 应用控制策略对
-        # E:\lodex 路径的执行拦截（之前会导致 build-script-build.exe 报 os error 4551）
+        # Build outside the temporary worktree when a machine-specific cache is configured.
         $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
         cargo zigbuild --release --target $Target
