@@ -406,13 +406,9 @@ fn looks_like_clarification_only(reply: &str) -> bool {
 
 fn looks_like_multi_device_project_question(message: &str) -> bool {
     let lower = message.to_lowercase();
-    let mentions_multi_device = ["多手机", "多个手机", "多端", "同时登录", "并行", "冲突"]
+    ["多手机", "多个手机", "多端", "同时登录", "并行", "冲突"]
         .iter()
-        .any(|word| lower.contains(word));
-    let mentions_project_or_apk = ["apk", "项目", "服务器", "git", "仓库"]
-        .iter()
-        .any(|word| lower.contains(word));
-    mentions_multi_device && mentions_project_or_apk
+        .any(|word| lower.contains(word))
 }
 
 pub async fn ws_project_handler(
