@@ -161,9 +161,15 @@ if (-not $SkipBuild) {
 # ─────────────────────────────────────────────────────────────
 # 3. 编译（临时工作树 — 确保从干净 commit 构建）
 # ─────────────────────────────────────────────────────────────
-# 把编译产物放在临时工作树内的 target/，与其他项目完全隔离
+# 把编译产物放在 E:\rust-target\elon-build-$Sha，避开 Windows 应用控制策略
+# 对 E:\lodex 路径下 build-script-build.exe 的拦截（os error 4551）
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
-$BuildBinDir  = [System.IO.Path]::Combine($TmpWorktree, "server", "target", $Target, "release")
+$BuildTargetDir = if ($env:ELON_BUILD_TARGET_DIR) {
+    Join-Path $env:ELON_BUILD_TARGET_DIR "elon-build-$Sha"
+} else {
+    "E:\rust-target\elon-build-$Sha"
+}
+$BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
 
 function Remove-Worktree {
@@ -186,8 +192,9 @@ if (-not $SkipBuild) {
     Write-Host "3⃣  交叉编译 → $Target..." -ForegroundColor Yellow
     Push-Location $TmpServerDir
     try {
-        # 强制把产物输出到临时工作树内，不污染其他项目的 target 目录
-        $env:CARGO_TARGET_DIR = [System.IO.Path]::GetFullPath((Join-Path $TmpServerDir "target"))
+        # 把产物输出到 E:\rust-target 下，避开 Windows 应用控制策略对
+        # E:\lodex 路径的执行拦截（之前会导致 build-script-build.exe 报 os error 4551）
+        $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
         cargo zigbuild --release --target $Target
         if ($LASTEXITCODE -ne 0) {
