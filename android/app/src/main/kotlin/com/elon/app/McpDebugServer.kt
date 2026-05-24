@@ -745,6 +745,7 @@ object McpDebugServer {
         val conversationId = args.optString("conversation_id").takeIf { it.isNotBlank() }
         val conversationTitle = args.optString("conversation_title").takeIf { it.isNotBlank() }
         val isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true
+        val startAckTimeoutMs = args.optInt("start_ack_timeout_ms", 1_800).coerceIn(0, 10_000)
 
         val payload = JSONObject()
             .put("trace_id", traceId)
@@ -798,6 +799,37 @@ object McpDebugServer {
             "mcp_chat_queued",
             mapOf("trace_id" to traceId, "project_id" to projectId, "force" to force)
         )
+        var serviceStart = waitForTaskStartSignal(traceId, startAckTimeoutMs)
+        if (!serviceStart.optBoolean("confirmed", false) && startAckTimeoutMs > 0) {
+            DebugTraceStore.record(
+                "mcp_chat_start_unconfirmed",
+                mapOf(
+                    "trace_id" to traceId,
+                    "timeout_ms" to startAckTimeoutMs,
+                    "last_phase" to serviceStart.optString("last_phase").takeIf { it.isNotBlank() }
+                )
+            )
+            val resumeIntent = Intent(appContext, TaskWorkService::class.java).apply {
+                action = TaskWorkService.ACTION_RESUME_PENDING
+            }
+            val fallbackError = runCatching {
+                ContextCompat.startForegroundService(appContext, resumeIntent)
+            }.exceptionOrNull()
+            if (fallbackError != null) {
+                DebugTraceStore.record(
+                    "mcp_chat_start_fallback_failed",
+                    mapOf("trace_id" to traceId, "error" to fallbackError.message)
+                )
+                serviceStart = serviceStart
+                    .put("fallback_attempted", true)
+                    .put("fallback_error", fallbackError.message ?: fallbackError.javaClass.simpleName)
+            } else {
+                DebugTraceStore.record("mcp_chat_start_fallback_resume", mapOf("trace_id" to traceId))
+                val fallback = waitForTaskStartSignal(traceId, startAckTimeoutMs)
+                    .put("fallback_attempted", true)
+                serviceStart = fallback.put("initial", serviceStart)
+            }
+        }
 
         val structured = JSONObject()
             .put("trace_id", traceId)
@@ -807,7 +839,67 @@ object McpDebugServer {
             .put("is_development", isDevelopment)
             .put("force", force)
             .put("message_chars", message.length)
+            .put("service_start", serviceStart)
         return toolResult("Chat request queued on phone.", structured)
+    }
+
+    private fun waitForTaskStartSignal(traceId: String, timeoutMs: Int): JSONObject {
+        val started = SystemClock.elapsedRealtime()
+        val deadline = started + timeoutMs
+        var events = emptyList<DebugTraceStore.TraceEvent>()
+        while (true) {
+            events = DebugTraceStore.recentEvents(300)
+                .filter { it.details["trace_id"] == traceId }
+            val signal = taskStartSignalJson(
+                traceId = traceId,
+                events = events,
+                elapsedWaitMs = SystemClock.elapsedRealtime() - started,
+                timedOut = false
+            )
+            if (signal.optBoolean("confirmed", false) || timeoutMs <= 0) return signal
+            if (SystemClock.elapsedRealtime() >= deadline) break
+            Thread.sleep(minOf(100L, (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L)))
+        }
+        return taskStartSignalJson(
+            traceId = traceId,
+            events = events,
+            elapsedWaitMs = SystemClock.elapsedRealtime() - started,
+            timedOut = timeoutMs > 0
+        )
+    }
+
+    private fun taskStartSignalJson(
+        traceId: String,
+        events: List<DebugTraceStore.TraceEvent>,
+        elapsedWaitMs: Long,
+        timedOut: Boolean
+    ): JSONObject {
+        fun latest(vararg phases: String) = events.lastOrNull { it.phase in phases }
+        val started = latest("task_start_work")
+        val resumed = latest("task_resume_pending")
+        val rejected = latest("task_start_rejected_busy")
+        val missingPayload = latest("task_start_missing_payload")
+        val command = latest("task_service_command")
+        val matched = started ?: resumed ?: rejected ?: missingPayload ?: command
+        val status = when {
+            started != null -> "started"
+            resumed != null -> "resumed"
+            rejected != null -> "rejected_busy"
+            missingPayload != null -> "missing_payload"
+            command != null -> "service_command_received"
+            else -> "unconfirmed"
+        }
+        val confirmed = status != "unconfirmed" && status != "service_command_received"
+        return JSONObject()
+            .put("trace_id", traceId)
+            .put("status", status)
+            .put("confirmed", confirmed)
+            .put("timed_out", timedOut && !confirmed)
+            .put("elapsed_wait_ms", elapsedWaitMs)
+            .put("event_count", events.size)
+            .put("matched_phase", matched?.phase ?: JSONObject.NULL)
+            .put("matched_wall_time_ms", matched?.wallTimeMs ?: JSONObject.NULL)
+            .put("last_phase", events.lastOrNull()?.phase ?: JSONObject.NULL)
     }
 
     private fun chatProbe(args: JSONObject): JSONObject {
@@ -1013,7 +1105,7 @@ object McpDebugServer {
     private fun waitTargetPhases(waitFor: String): Set<String>? {
         return when (waitFor) {
             "queued" -> setOf("mcp_chat_queued")
-            "task_start" -> setOf("task_start_work")
+            "task_start" -> setOf("task_start_work", "task_resume_pending")
             "payload_sent" -> setOf("task_payload_sent")
             "first_server_event" -> setOf("task_first_server_event")
             "first_reply" -> setOf("task_first_chat_reply")
@@ -1047,6 +1139,54 @@ object McpDebugServer {
             .put("elapsed_wait_ms", System.currentTimeMillis() - startedAtWallMs)
             .put("timeout_ms", timeoutMs)
             .put("poll_interval_ms", pollIntervalMs)
+            .put("diagnosis", waitFailureDiagnosis(waitFor, reached, terminalBeforeTarget, events))
+    }
+
+    private fun waitFailureDiagnosis(
+        waitFor: String,
+        reached: Boolean,
+        terminalBeforeTarget: Boolean,
+        events: List<DebugTraceStore.TraceEvent>
+    ): JSONObject {
+        if (reached) {
+            return JSONObject()
+                .put("available", false)
+                .put("reason", "target_reached")
+        }
+        val phases = events.map { it.phase }.toSet()
+        val code = when {
+            terminalBeforeTarget -> "terminal_before_target"
+            "task_payload_send_failed" in phases -> "payload_send_failed"
+            "task_payload_sent" in phases && "task_first_server_event" !in phases -> "waiting_for_backend_first_event"
+            ("task_start_work" in phases || "task_resume_pending" in phases) && "task_payload_sent" !in phases -> "task_started_without_payload_sent"
+            "mcp_chat_start_unconfirmed" in phases -> "service_start_unconfirmed"
+            "mcp_chat_queued" in phases && "task_start_work" !in phases && "task_resume_pending" !in phases -> "queued_without_task_start"
+            "task_service_command" in phases && "task_start_work" !in phases && "task_resume_pending" !in phases -> "service_command_without_task_start"
+            else -> "insufficient_trace"
+        }
+        val area = when (code) {
+            "service_start_unconfirmed",
+            "queued_without_task_start",
+            "service_command_without_task_start" -> "phone_task_start"
+            "task_started_without_payload_sent",
+            "payload_send_failed" -> "phone_payload_send"
+            "waiting_for_backend_first_event" -> "backend_or_network_first_byte"
+            "terminal_before_target" -> "task_terminal"
+            else -> "unknown"
+        }
+        val action = when (area) {
+            "phone_task_start" -> "Inspect task_service_command, task_start_work, and mcp_chat_start_unconfirmed events; the MCP request may not be reaching TaskWorkService reliably."
+            "phone_payload_send" -> "Inspect WebSocket connection state and payload size; a connected client must still call sendPendingPayloadIfNeeded for each new task."
+            "backend_or_network_first_byte" -> "Compare phone latency_report with backend server_trace for the same trace_id."
+            "task_terminal" -> "Read task_status and task_server_message for the terminal error before the requested milestone."
+            else -> "Collect diagnostic_bundle with include_logcat=true for the same trace_id."
+        }
+        return JSONObject()
+            .put("available", true)
+            .put("wait_for", waitFor)
+            .put("code", code)
+            .put("likely_area", area)
+            .put("action", action)
     }
 
     private fun initializeResult(): JSONObject {
@@ -1289,7 +1429,8 @@ object McpDebugServer {
                             .put("agent", stringProperty("Optional backend agent id, such as codex_cli."))
                             .put("trace_id", stringProperty("Optional caller-provided trace id."))
                             .put("is_development", booleanProperty("Whether this should be treated as a development task."))
-                            .put("force", booleanProperty("Override an active phone task. Defaults to false.")),
+                            .put("force", booleanProperty("Override an active phone task. Defaults to false."))
+                            .put("start_ack_timeout_ms", intProperty("How long MCP waits for TaskWorkService to acknowledge startup, 0-10000. Defaults to 1800.")),
                         required = JSONArray().put("message")
                     )
                 )
@@ -1308,6 +1449,7 @@ object McpDebugServer {
                             .put("trace_id", stringProperty("Optional caller-provided trace id."))
                             .put("is_development", booleanProperty("Whether this probe should run as a development task. Defaults to false."))
                             .put("force", booleanProperty("Override an active phone task. Defaults to false."))
+                            .put("start_ack_timeout_ms", intProperty("How long MCP waits for TaskWorkService to acknowledge startup, 0-10000. Defaults to 1800."))
                             .put("wait_for", stringProperty("One of queued, task_start, payload_sent, first_server_event, first_reply, finish. Defaults to first_reply."))
                             .put("wait_timeout_ms", intProperty("How long to wait for the milestone, 0-120000. Defaults to 25000."))
                             .put("poll_interval_ms", intProperty("Trace polling interval, 100-2000. Defaults to 350."))
@@ -1421,13 +1563,18 @@ object McpDebugServer {
         val rejected = traceEvents.lastOrNull {
             it.phase == "task_start_rejected_busy" || it.phase == "mcp_chat_rejected_busy"
         }
+        val serviceCommand = traceEvents.lastOrNull { it.phase == "task_service_command" }
+        val startUnconfirmed = traceEvents.lastOrNull { it.phase == "mcp_chat_start_unconfirmed" }
+        val hasTaskStart = traceEvents.any { it.phase == "task_start_work" || it.phase == "task_resume_pending" }
         val status = when {
             finish?.phase == "task_finish_done" -> "done"
             finish?.phase == "task_finish_error" -> "error"
-            rejected != null && traceEvents.none { it.phase == "task_start_work" } -> "rejected_busy"
+            rejected != null && !hasTaskStart -> "rejected_busy"
             isTaskBusy(prefs) && traceId != null && pendingTask?.optString("trace_id") == traceId -> "running"
             traceEvents.any { it.phase == "task_payload_sent" } -> "sent"
-            traceEvents.any { it.phase == "task_start_work" } -> "started"
+            hasTaskStart -> "started"
+            startUnconfirmed != null -> "start_unconfirmed"
+            serviceCommand != null -> "service_received"
             traceEvents.isNotEmpty() -> "observed"
             else -> "idle"
         }
@@ -1471,7 +1618,9 @@ object McpDebugServer {
 
         val mcpSend = first("mcp_chat_send")
         val mcpQueued = first("mcp_chat_queued")
-        val taskStart = first("task_start_work")
+        val serviceCommand = first("task_service_command")
+        val startUnconfirmed = last("mcp_chat_start_unconfirmed")
+        val taskStart = first("task_start_work") ?: first("task_resume_pending")
         val wsConnected = first("task_ws_connected")
         val payloadSent = first("task_payload_sent")
         val firstServer = first("task_first_server_event")
@@ -1505,6 +1654,8 @@ object McpDebugServer {
 
         putMilestone("mcp_send", mcpSend)
         putMilestone("mcp_queued", mcpQueued)
+        putMilestone("service_command", serviceCommand)
+        putMilestone("mcp_start_unconfirmed", startUnconfirmed)
         putMilestone("task_start", taskStart)
         putMilestone("ws_connected", wsConnected)
         putMilestone("payload_sent", payloadSent)
@@ -1528,7 +1679,18 @@ object McpDebugServer {
         }
 
         addSegment("mcp_send_to_queue", mcpSend, mcpQueued)
+        addSegment("mcp_queue_to_service_command", mcpQueued, serviceCommand)
+        addSegment("service_command_to_task_start", serviceCommand, taskStart)
         addSegment("mcp_queue_to_task_start", mcpQueued, taskStart)
+        if (mcpQueued != null && taskStart == null && finish == null) {
+            val now = DebugTraceStore.TraceEvent(
+                wallTimeMs = System.currentTimeMillis(),
+                elapsedMs = SystemClock.elapsedRealtime(),
+                phase = "now",
+                details = mapOf("trace_id" to traceId.orEmpty())
+            )
+            addSegment("mcp_queue_to_now", mcpQueued, now)
+        }
         addSegment("task_start_to_ws_connected", taskStart, wsConnected)
         addSegment("ws_connected_to_payload_sent", wsConnected, payloadSent)
         addSegment("task_start_to_payload_sent", taskStart, payloadSent)
@@ -1629,7 +1791,11 @@ object McpDebugServer {
             else -> "normal"
         }
         val likelyArea = when (name) {
-            "mcp_send_to_queue", "mcp_queue_to_task_start" -> "phone_task_start"
+            "mcp_send_to_queue",
+            "mcp_queue_to_service_command",
+            "service_command_to_task_start",
+            "mcp_queue_to_task_start",
+            "mcp_queue_to_now" -> "phone_task_start"
             "task_start_to_ws_connected" -> "phone_websocket_connect"
             "ws_connected_to_payload_sent", "task_start_to_payload_sent" -> "phone_payload_send"
             "payload_sent_to_first_server_event" -> "backend_or_network_first_byte"
@@ -2022,6 +2188,18 @@ object McpDebugServer {
                 "task",
                 "The latest traced phone task finished with an error.",
                 "Open task_status.last_message_preview and trace_recent events for the active trace_id."
+            )
+            "start_unconfirmed" -> addFinding(
+                "warning",
+                "task",
+                "MCP queued the task but did not confirm TaskWorkService startup in time.",
+                "Inspect trace_recent for mcp_chat_start_unconfirmed and task_service_command; retry with chat_probe wait_for=task_start."
+            )
+            "service_received" -> addFinding(
+                "warning",
+                "task",
+                "TaskWorkService received the command but did not emit task_start_work.",
+                "Inspect task_service_command, task_start_missing_payload, and the pending task payload."
             )
             "rejected_busy" -> addFinding(
                 "warning",

@@ -46,20 +46,48 @@ class TaskWorkService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
+        val action = intent?.action
+        val payload = intent?.getStringExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotBlank() }
+        val traceId = extractTraceId(payload)
+        DebugTraceStore.record(
+            "task_service_command",
+            mapOf(
+                "action" to action,
+                "start_id" to startId,
+                "flags" to flags,
+                "trace_id" to traceId,
+                "has_payload" to (payload != null),
+                "force" to (intent?.getBooleanExtra(EXTRA_FORCE_START, false) ?: false),
+                "waiting_before" to waitingForReply,
+                "pending_trace_id" to extractTraceId(pendingPayload)
+            )
+        )
+        when (action) {
             ACTION_START_WORK -> {
-                val payload = intent.getStringExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotBlank() }
                 if (payload != null) {
                     startWork(
                         payload = payload,
-                        isDevelopment = intent.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true),
-                        force = intent.getBooleanExtra(EXTRA_FORCE_START, false)
+                        isDevelopment = intent?.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true) ?: true,
+                        force = intent?.getBooleanExtra(EXTRA_FORCE_START, false) ?: false
+                    )
+                } else {
+                    DebugTraceStore.record(
+                        "task_start_missing_payload",
+                        mapOf("action" to action, "start_id" to startId)
                     )
                 }
             }
             ACTION_RESUME_PENDING -> {
                 restorePendingWork()
                 if (waitingForReply) {
+                    DebugTraceStore.record(
+                        "task_resume_pending",
+                        mapOf(
+                            "trace_id" to extractTraceId(pendingPayload),
+                            "kind" to activeRequestKind,
+                            "pending_age_ms" to pendingWorkAgeMs()
+                        )
+                    )
                     enterForeground()
                     payloadSentForCurrentConnection = false
                     connect()
@@ -112,6 +140,7 @@ class TaskWorkService : Service() {
             mapOf(
                 "trace_id" to extractTraceId(payload),
                 "kind" to activeRequestKind,
+                "force" to force,
                 "payload_bytes" to payload.toByteArray().size
             )
         )
@@ -126,6 +155,7 @@ class TaskWorkService : Service() {
         DebugTraceStore.record(
             "task_start_rejected_busy",
             mapOf(
+                "trace_id" to incomingTraceId,
                 "active_trace_id" to activeTraceId,
                 "incoming_trace_id" to incomingTraceId,
                 "kind" to activeRequestKind,
@@ -225,7 +255,11 @@ class TaskWorkService : Service() {
     }
 
     private fun connect() {
-        ensureClient().connect()
+        val client = ensureClient()
+        client.connect()
+        if (client.isConnected()) {
+            sendPendingPayloadIfNeeded()
+        }
         broadcastState()
     }
 
@@ -638,6 +672,7 @@ class TaskWorkService : Service() {
         if (payload == null) {
             waitingForReply = false
             pendingPayload = null
+            activeRequestStartedAtMs = 0L
             return
         }
         val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
@@ -646,12 +681,19 @@ class TaskWorkService : Service() {
             clearPersistedActiveWork()
             waitingForReply = false
             pendingPayload = null
+            activeRequestStartedAtMs = 0L
             return
         }
         waitingForReply = true
         pendingPayload = payload
         activeRequestIsDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true)
         activeRequestKind = if (activeRequestIsDevelopment) "development" else "chat"
+        activeRequestStartedAtMs = savedAt
+    }
+
+    private fun pendingWorkAgeMs(): Long? {
+        val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
+        return if (savedAt > 0L) System.currentTimeMillis() - savedAt else null
     }
 
     private fun jsonStringOrNull(json: JSONObject, key: String): String? {
