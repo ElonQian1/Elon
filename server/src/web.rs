@@ -1160,9 +1160,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     const data = await res.json();
     currentUser = data.user;
     const lines = [
-      '用户：' + (currentUser.nickname || currentUser.id),
-      '账号：' + (currentUser.account || currentUser.id),
-      '用户 ID：' + currentUser.id
+      '用户：' + (currentUser.nickname || currentUser.account || ''),
+      '账号：' + (currentUser.account || '')
     ];
     userInfoText.textContent = lines.join('\n');
   }
