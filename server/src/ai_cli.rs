@@ -107,61 +107,6 @@ pub async fn run_with_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    run_with_workspace_inner(
-        user_id,
-        workspace,
-        download_base,
-        user_message,
-        option_id,
-        route,
-        require_existing_git,
-        native_session_scope,
-        state,
-        tx,
-        false,
-    )
-    .await
-}
-
-pub async fn run_lightweight_chat_with_workspace(
-    user_id: &str,
-    workspace: &Path,
-    download_base: &str,
-    user_message: &str,
-    option_id: Option<&str>,
-    native_session_scope: Option<NativeSessionScope>,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-) -> Result<()> {
-    run_with_workspace_inner(
-        user_id,
-        workspace,
-        download_base,
-        user_message,
-        option_id,
-        intent_router::CapabilityRoute::ChatAgent,
-        false,
-        native_session_scope,
-        state,
-        tx,
-        true,
-    )
-    .await
-}
-
-async fn run_with_workspace_inner(
-    user_id: &str,
-    workspace: &Path,
-    download_base: &str,
-    user_message: &str,
-    option_id: Option<&str>,
-    route: intent_router::CapabilityRoute,
-    require_existing_git: bool,
-    native_session_scope: Option<NativeSessionScope>,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-    force_lightweight_chat: bool,
-) -> Result<()> {
     let started = std::time::Instant::now();
     let option = state
         .ai_cli
@@ -171,12 +116,8 @@ async fn run_with_workspace_inner(
 
     std::fs::create_dir_all(workspace)?;
 
-    let development_task = if force_lightweight_chat {
-        false
-    } else {
-        route != intent_router::CapabilityRoute::ChatAgent
-            || intent_router::looks_like_development_request(user_message)
-    };
+    let development_task = route != intent_router::CapabilityRoute::ChatAgent
+        || intent_router::looks_like_development_request(user_message);
     if development_task {
         ensure_git(workspace, user_id, require_existing_git)?;
     }
@@ -674,6 +615,8 @@ fn build_intent_gate_prompt(workspace: &Path, user_message: &str, option: &AiCli
 - 模糊时必须判定为 chat，避免普通聊天误触发重型开发流程。
 - 如果 route 是 chat，请用 chat_reply 直接正常回复用户；项目相关普通提问也要尽量基于当前对话和通用经验回答，不要因为提到 APK、项目、服务器或 Git 就要求用户重说。
 - 例子：用户问“我们的 APK 是否支持多个手机同时登录/并行修改/会不会冲突？”这属于能力和流程讨论，route 必须是 chat，chat_reply 应该直接解释原则、风险和建议。
+- 对“是否支持/会不会/是不是/为什么/怎么做最好”这类问题，chat_reply 不要以“我没看懂/我没看清/你是想问”开头；先给原则性回答，再说明如果要精确核验代码可以进入开发流程。
+- 参考回答方向：多手机登录或多端聊天可以并行；同一项目的代码修改需要任务会话、worktree/分支、队列或合并保护，否则会有冲突风险。
 - 只有确实无法理解用户在问什么时，chat_reply 才问一个简短澄清问题。
 - 如果 route 是 development，chat_reply 置为空字符串。
 - 只输出一行 JSON，不要 Markdown，不要代码块，不要额外解释。
