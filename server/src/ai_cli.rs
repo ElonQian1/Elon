@@ -614,6 +614,7 @@ fn build_intent_gate_prompt(workspace: &Path, user_message: &str, option: &AiCli
 - 如果用户是在闲聊、提问、解释概念、讨论流程、问“会不会/是不是/为什么/怎么做最好”、表达想法但没有明确要求立刻执行，判定为 chat。
 - 模糊时必须判定为 chat，避免普通聊天误触发重型开发流程。
 - 如果 route 是 chat，请用 chat_reply 直接正常回复用户；项目相关普通提问也要尽量基于当前对话和通用经验回答，不要因为提到 APK、项目、服务器或 Git 就要求用户重说。
+- 例子：用户问“我们的 APK 是否支持多个手机同时登录/并行修改/会不会冲突？”这属于能力和流程讨论，route 必须是 chat，chat_reply 应该直接解释原则、风险和建议。
 - 只有确实无法理解用户在问什么时，chat_reply 才问一个简短澄清问题。
 - 如果 route 是 development，chat_reply 置为空字符串。
 - 只输出一行 JSON，不要 Markdown，不要代码块，不要额外解释。
