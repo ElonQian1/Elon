@@ -1361,11 +1361,7 @@ async fn get_or_start_project_ws_job(
             .store
             .list_task_events(&task.id, PROJECT_WS_BACKLOG_LIMIT)
             .unwrap_or_default();
-        let backlog = if events.is_empty() {
-            vec![terminal_event_from_task(task)]
-        } else {
-            events
-        };
+        let backlog = terminal_backlog_from_task(task, events);
         let (broadcast_tx, _) = broadcast::channel::<String>(256);
         let job = Arc::new(ProjectWsJob {
             key: key.clone(),
@@ -1796,6 +1792,25 @@ fn terminal_event_from_task(task: &TaskSnapshot) -> String {
         }
         .to_json()
     }
+}
+
+fn terminal_backlog_from_task(task: &TaskSnapshot, mut events: Vec<String>) -> Vec<String> {
+    if events.is_empty() {
+        return vec![terminal_event_from_task(task)];
+    }
+
+    if !events
+        .iter()
+        .any(|event| is_terminal_project_ws_message(event))
+    {
+        events.push(terminal_event_from_task(task));
+        if events.len() > PROJECT_WS_BACKLOG_LIMIT {
+            let overflow = events.len() - PROJECT_WS_BACKLOG_LIMIT;
+            events.drain(0..overflow);
+        }
+    }
+
+    events
 }
 
 fn is_terminal_task_status(status: &str) -> bool {
@@ -2595,6 +2610,58 @@ mod tests {
 
         assert!(first.starts_with("auto_"));
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn terminal_backlog_appends_done_when_replay_window_lacks_terminal() {
+        let task = TaskSnapshot {
+            id: "tsk_1".into(),
+            project_id: "project".into(),
+            user_id: "user".into(),
+            conversation_id: Some("conversation".into()),
+            message: "build apk".into(),
+            status: "done".into(),
+            apk_url: Some("http://example.test/app.apk".into()),
+            error: None,
+        };
+        let events = (0..PROJECT_WS_BACKLOG_LIMIT)
+            .map(|step| {
+                WsMessage::Progress {
+                    message: format!("step {step}"),
+                }
+                .to_json()
+            })
+            .collect::<Vec<_>>();
+
+        let backlog = terminal_backlog_from_task(&task, events);
+
+        assert_eq!(backlog.len(), PROJECT_WS_BACKLOG_LIMIT);
+        assert!(is_terminal_project_ws_message(backlog.last().unwrap()));
+        assert!(!backlog.iter().any(|raw| raw.contains("step 0")));
+    }
+
+    #[test]
+    fn terminal_backlog_keeps_existing_terminal_event() {
+        let task = TaskSnapshot {
+            id: "tsk_1".into(),
+            project_id: "project".into(),
+            user_id: "user".into(),
+            conversation_id: Some("conversation".into()),
+            message: "build apk".into(),
+            status: "done".into(),
+            apk_url: Some("http://example.test/app.apk".into()),
+            error: None,
+        };
+        let done = WsMessage::Done {
+            message: "finished".into(),
+            apk_url: task.apk_url.clone(),
+            image_url: None,
+        }
+        .to_json();
+
+        let backlog = terminal_backlog_from_task(&task, vec![done.clone()]);
+
+        assert_eq!(backlog, vec![done]);
     }
 
     #[test]

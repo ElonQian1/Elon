@@ -13,6 +13,8 @@ pub struct Store {
     conn: Mutex<Connection>,
 }
 
+const MAX_TASK_EVENTS_PER_TASK: i64 = 1000;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeAgentSessionState {
     pub native_session_id: String,
@@ -781,23 +783,42 @@ impl Store {
     }
 
     pub fn record_task_event(&self, task_id: &str, event_json: &str) -> Result<()> {
-        self.conn()?.execute(
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
             "INSERT INTO task_events (id, task_id, event_json, created_at)
              VALUES (?1, ?2, ?3, ?4)",
             params![new_id("tev"), task_id, event_json, now()],
         )?;
+        tx.execute(
+            "DELETE FROM task_events
+             WHERE task_id = ?1
+               AND rowid NOT IN (
+                 SELECT rowid
+                 FROM task_events
+                 WHERE task_id = ?1
+                 ORDER BY created_at DESC, rowid DESC
+                 LIMIT ?2
+               )",
+            params![task_id, MAX_TASK_EVENTS_PER_TASK],
+        )?;
+        tx.commit()?;
         Ok(())
     }
 
     pub fn list_task_events(&self, task_id: &str, limit: usize) -> Result<Vec<String>> {
-        let limit = limit.clamp(1, 1000) as i64;
+        let limit = limit.clamp(1, MAX_TASK_EVENTS_PER_TASK as usize) as i64;
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT event_json
-             FROM task_events
-             WHERE task_id = ?1
-             ORDER BY created_at ASC, id ASC
-             LIMIT ?2",
+             FROM (
+               SELECT rowid, created_at, event_json
+               FROM task_events
+               WHERE task_id = ?1
+               ORDER BY created_at DESC, rowid DESC
+               LIMIT ?2
+             )
+             ORDER BY created_at ASC, rowid ASC",
         )?;
         let events = stmt
             .query_map(params![task_id, limit], |row| row.get(0))?
@@ -1482,4 +1503,83 @@ fn password_digest(salt: &str, password: &str) -> String {
     hasher.update(b":");
     hasher.update(password.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_store() -> Store {
+        let path =
+            std::env::temp_dir().join(format!("elon_store_test_{}.db", Uuid::new_v4().simple()));
+        Store::open(&path).expect("store should open")
+    }
+
+    fn temp_task(store: &Store) -> String {
+        let user = store
+            .create_user("events@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Task Events", None, None)
+            .expect("project should be created");
+        store
+            .create_task(&project.id, &user.id, Some("conv"), "run task")
+            .expect("task should be created")
+    }
+
+    fn event_message(raw: &str) -> String {
+        serde_json::from_str::<serde_json::Value>(raw)
+            .expect("event should be json")
+            .get("message")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default()
+            .to_string()
+    }
+
+    #[test]
+    fn lists_latest_task_events_in_chronological_order() {
+        let store = temp_store();
+        let task_id = temp_task(&store);
+
+        for step in 0..5 {
+            store
+                .record_task_event(
+                    &task_id,
+                    &format!(r#"{{"type":"progress","message":"step {step}"}}"#),
+                )
+                .expect("event should be recorded");
+        }
+
+        let messages = store
+            .list_task_events(&task_id, 3)
+            .expect("events should list")
+            .into_iter()
+            .map(|raw| event_message(&raw))
+            .collect::<Vec<_>>();
+
+        assert_eq!(messages, vec!["step 2", "step 3", "step 4"]);
+    }
+
+    #[test]
+    fn prunes_old_task_events_per_task() {
+        let store = temp_store();
+        let task_id = temp_task(&store);
+
+        for step in 0..(MAX_TASK_EVENTS_PER_TASK + 5) {
+            store
+                .record_task_event(
+                    &task_id,
+                    &format!(r#"{{"type":"progress","message":"step {step}"}}"#),
+                )
+                .expect("event should be recorded");
+        }
+
+        let events = store
+            .list_task_events(&task_id, MAX_TASK_EVENTS_PER_TASK as usize + 100)
+            .expect("events should list");
+
+        assert_eq!(events.len(), MAX_TASK_EVENTS_PER_TASK as usize);
+        assert_eq!(event_message(events.first().unwrap()), "step 5");
+        assert_eq!(event_message(events.last().unwrap()), "step 1004");
+    }
 }
