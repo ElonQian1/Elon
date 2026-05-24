@@ -244,12 +244,13 @@ class MainActivity : AppCompatActivity() {
         val action: () -> Unit
     )
 
-    /** 每次安装 APP 生成的唯一用户 ID，存入 SharedPreferences 持久化 */
-    private val userId: String by lazy {
-        prefs.getString("user_id", null) ?: UUID.randomUUID().toString().replace("-", "").also {
-            prefs.edit().putString("user_id", it).apply()
-        }
-    }
+    /**
+     * 当前会话使用的 user_id。
+     * - 已登录：使用服务端返回的 user.id（跨设备稳定）。
+     * - 未登录（游客）：使用本机随机 UUID（与老版本兼容）。
+     * by lazy 在 Activity 实例生命周期内固定；登录/登出后会清掉栈重建 MainActivity。
+     */
+    private val userId: String by lazy { AuthManager.effectiveUserId(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -2780,9 +2781,59 @@ class MainActivity : AppCompatActivity() {
             AppUpdateManager(this).manualCheck()
         }
         binding.profileShareButton.setOnClickListener { showPromotionDialog() }
+        binding.profileLoginButton.setOnClickListener {
+            startActivity(Intent(this, LoginActivity::class.java))
+        }
+        binding.profileLogoutButton.setOnClickListener { confirmLogout() }
+        refreshAccountUi()
         binding.profileVersionText.text =
             "${localAppVersionLine()}\n服务器版本读取中..."
         refreshServerVersion()
+    }
+
+    private fun refreshAccountUi() {
+        if (!::binding.isInitialized) return
+        val loggedIn = AuthManager.isLoggedIn(this)
+        binding.profileLoginButton.visibility = if (loggedIn) View.GONE else View.VISIBLE
+        binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
+        binding.userInfoText.text = buildAccountInfoText()
+    }
+
+    private fun buildAccountInfoText(): String {
+        return if (AuthManager.isLoggedIn(this)) {
+            val name = AuthManager.displayName(this)
+            val account = AuthManager.account(this)
+            val tail = if (account != null && account != name) " · $account" else ""
+            "我的开发工作台\n登录账号：$name$tail\n云端工作区已就绪，可在网页版和其它手机间同步。"
+        } else {
+            "我的开发工作台\n游客模式 · 项目仅保存在本机\n登录后可在网页版和其它手机间继续同一个项目。"
+        }
+    }
+
+    private fun confirmLogout() {
+        AlertDialog.Builder(this)
+            .setTitle("退出登录")
+            .setMessage("退出后将切换为游客模式。已经登录的项目数据仍保留在云端，可重新登录恢复。")
+            .setPositiveButton("继续退出") { _, _ -> confirmLogoutStep2() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun confirmLogoutStep2() {
+        AlertDialog.Builder(this)
+            .setTitle("再次确认")
+            .setMessage("确认退出当前账号？")
+            .setPositiveButton("确认退出") { _, _ -> performLogout() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun performLogout() {
+        AuthManager.clear(this)
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 
     private fun localAppVersionLine(): String =
@@ -4680,7 +4731,7 @@ class MainActivity : AppCompatActivity() {
         binding.stageHintText.text = hint
         binding.progressTitleText.text = "开发进度：$currentStage"
         binding.conversationTimeText.text = timeFormatter.format(Date())
-        binding.userInfoText.text = "我的开发工作台\n用户 ID：${summarize(userId, 18)}\n服务端模型由管理员统一配置，当前项目记录保存在本机。"
+        binding.userInfoText.text = buildAccountInfoText()
 
         val recent = projectEvents.take(5).joinToString("\n")
         binding.projectOverviewText.text = buildString {

@@ -403,6 +403,20 @@
                     android:textSize="15sp" />
 
                 <TextView
+                    android:id="@+id/profileLoginButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="10dp"
+                    android:background="#1E1E1E"
+                    android:gravity="center_vertical"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
+                    android:text="登录账号 · 多设备同步"
+                    android:textColor="#D0D0D0"
+                    android:textSize="16sp"
+                    android:visibility="gone" />
+
+                <TextView
                     android:id="@+id/profileSettingsButton"
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
@@ -440,6 +454,20 @@
                     android:text="分享推广"
                     android:textColor="#D0D0D0"
                     android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/profileLogoutButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="10dp"
+                    android:background="#1E1E1E"
+                    android:gravity="center_vertical"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
+                    android:text="退出登录"
+                    android:textColor="#FF7A7A"
+                    android:textSize="16sp"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/profileVersionText"
