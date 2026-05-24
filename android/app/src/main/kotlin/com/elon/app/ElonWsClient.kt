@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.util.Log
 import okhttp3.*
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,16 +24,25 @@ class ElonWsClient(
         if (connected.get()) return
         ws?.cancel()
 
+        DebugTraceStore.record("ws_connect_start", mapOf("url" to serverUrl))
         val request = Request.Builder().url(serverUrl).build()
         ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 connected.set(true)
                 Log.i(TAG, "WebSocket 已连接")
+                DebugTraceStore.record(
+                    "ws_connected",
+                    mapOf("url" to serverUrl, "http_code" to response.code)
+                )
                 onConnected()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 Log.d(TAG, "收到消息: $text")
+                DebugTraceStore.record(
+                    "ws_message",
+                    mapOf("type" to messageType(text), "bytes" to text.toByteArray().size)
+                )
                 onMessage(text)
             }
 
@@ -40,6 +50,10 @@ class ElonWsClient(
                 connected.set(false)
                 if (ws == webSocket) ws = null
                 Log.e(TAG, "连接失败: ${t.message}")
+                DebugTraceStore.record(
+                    "ws_failure",
+                    mapOf("error" to t.message, "http_code" to response?.code)
+                )
                 onDisconnected()
             }
 
@@ -47,6 +61,7 @@ class ElonWsClient(
                 connected.set(false)
                 if (ws == webSocket) ws = null
                 Log.i(TAG, "连接关闭: $reason")
+                DebugTraceStore.record("ws_closed", mapOf("code" to code, "reason" to reason))
                 onDisconnected()
             }
         })
@@ -62,6 +77,10 @@ class ElonWsClient(
         }
 
         val sent = socket.send(message)
+        DebugTraceStore.record(
+            if (sent) "ws_send" else "ws_send_failed",
+            mapOf("trace_id" to traceIdFromPayload(message), "bytes" to message.toByteArray().size)
+        )
         if (!sent) {
             connected.set(false)
         }
@@ -72,5 +91,17 @@ class ElonWsClient(
         connected.set(false)
         ws?.close(1000, "用户关闭")
         ws = null
+    }
+
+    private fun traceIdFromPayload(message: String): String? {
+        return runCatching { JSONObject(message).optString("trace_id") }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun messageType(message: String): String? {
+        return runCatching { JSONObject(message).optString("type") }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
     }
 }

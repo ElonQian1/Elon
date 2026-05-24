@@ -327,8 +327,10 @@ class MainActivity : AppCompatActivity() {
         }
         val outgoingText = expandShortDevelopmentCommand(text)
         val attachmentPayload = attachmentPayloadJsonOrNull() ?: return
+        val traceId = "ui_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
 
         val payload = com.google.gson.JsonObject().apply {
+            addProperty("trace_id", traceId)
             addProperty("user_id", userId)
             addProperty("project_id", activeProject().id)
             addProperty("project_title", activeProject().title)
@@ -343,6 +345,10 @@ class MainActivity : AppCompatActivity() {
 
         // 显示用户消息
         appendMessage(ChatMessage(role = "user", content = text))
+        DebugTraceStore.record(
+            "ui_chat_send",
+            mapOf("trace_id" to traceId, "project_id" to activeProject().id, "chars" to outgoingText.length)
+        )
         binding.inputEdit.text.clear()
         setSendEnabled(false)
         waitingForReply = true
