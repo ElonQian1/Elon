@@ -1,6 +1,7 @@
 # Rust
 server/target/
 server/cargo-config.toml
+server/Cargo.lock
 
 # Android build outputs & local config
 android/.gradle/
