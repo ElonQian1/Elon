@@ -33,6 +33,7 @@ class TaskWorkService : Service() {
     private var activeServerUrl: String? = null
     private var activeRequestStartedAtMs = 0L
     private var firstServerEventAtMs = 0L
+    private var firstChatReplyAtMs = 0L
     private var activeRequestKind = "unknown"
 
     override fun onCreate() {
@@ -98,6 +99,7 @@ class TaskWorkService : Service() {
         payloadSentForCurrentConnection = false
         activeRequestStartedAtMs = System.currentTimeMillis()
         firstServerEventAtMs = 0L
+        firstChatReplyAtMs = 0L
         activeRequestKind = if (isDevelopment) "development" else "chat"
         Log.i(TAG, "request_start kind=$activeRequestKind payload_bytes=${payload.length}")
         DebugTraceStore.record(
@@ -214,34 +216,53 @@ class TaskWorkService : Service() {
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
-        val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
+        val messageType = parsed?.optString("type")?.takeIf { it.isNotBlank() }
+        val messagePreview = parsed?.let { jsonStringOrNull(it, "message") }?.let { preview(it) }
         DebugTraceStore.record(
             "task_server_message",
             mapOf(
                 "trace_id" to extractTraceId(pendingPayload),
                 "kind" to activeRequestKind,
-                "type" to type,
+                "type" to messageType,
                 "elapsed_ms" to elapsedSinceRequestStart(),
-                "bytes" to raw.toByteArray().size
+                "bytes" to raw.toByteArray().size,
+                "message_preview" to messagePreview
             )
         )
-        if (firstServerEventAtMs == 0L && type != "app_update_available") {
+        if (firstServerEventAtMs == 0L && messageType != "app_update_available") {
             firstServerEventAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
-                "first_server_event kind=$activeRequestKind type=${type.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+                "first_server_event kind=$activeRequestKind type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
             )
             DebugTraceStore.record(
                 "task_first_server_event",
                 mapOf(
                     "trace_id" to extractTraceId(pendingPayload),
                     "kind" to activeRequestKind,
-                    "type" to type,
+                    "type" to messageType,
                     "elapsed_ms" to elapsedSinceRequestStart()
                 )
             )
         }
-        when (type) {
+        if (firstChatReplyAtMs == 0L && isChatReplyType(messageType)) {
+            firstChatReplyAtMs = System.currentTimeMillis()
+            Log.i(
+                TAG,
+                "first_chat_reply kind=$activeRequestKind type=${messageType.orEmpty()} elapsed_ms=${elapsedSinceRequestStart()}"
+            )
+            DebugTraceStore.record(
+                "task_first_chat_reply",
+                mapOf(
+                    "trace_id" to extractTraceId(pendingPayload),
+                    "kind" to activeRequestKind,
+                    "type" to messageType,
+                    "elapsed_ms" to elapsedSinceRequestStart(),
+                    "message_preview" to messagePreview
+                )
+            )
+        }
+        when (messageType) {
             "app_update_available" -> {
                 if (!isAppInForeground()) {
                     showAppUpdateNotification(parsed)
@@ -253,6 +274,8 @@ class TaskWorkService : Service() {
     }
 
     private fun finishWork(json: JSONObject, success: Boolean) {
+        val apkUrl = jsonStringOrNull(json, "apk_url")
+        val messagePreview = jsonStringOrNull(json, "message")?.let { preview(it) }
         Log.i(
             TAG,
             "request_finish kind=$activeRequestKind success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart()}"
@@ -263,7 +286,9 @@ class TaskWorkService : Service() {
                 "trace_id" to extractTraceId(pendingPayload),
                 "kind" to activeRequestKind,
                 "elapsed_ms" to elapsedSinceRequestStart(),
-                "has_apk_url" to (jsonStringOrNull(json, "apk_url") != null)
+                "first_chat_reply_elapsed_ms" to firstChatReplyElapsedMs(),
+                "has_apk_url" to !apkUrl.isNullOrBlank(),
+                "message_preview" to messagePreview
             )
         )
         waitingForReply = false
@@ -275,7 +300,7 @@ class TaskWorkService : Service() {
         if (!isAppInForeground()) {
             notifyBackgroundTaskCompleted(
                 wasDevelopment = activeRequestIsDevelopment,
-                apkUrl = jsonStringOrNull(json, "apk_url"),
+                apkUrl = apkUrl,
                 success = success
             )
         }
@@ -290,10 +315,28 @@ class TaskWorkService : Service() {
         return System.currentTimeMillis() - activeRequestStartedAtMs
     }
 
+    private fun firstChatReplyElapsedMs(): Long? {
+        if (activeRequestStartedAtMs <= 0L || firstChatReplyAtMs <= 0L) return null
+        return firstChatReplyAtMs - activeRequestStartedAtMs
+    }
+
     private fun extractTraceId(payload: String?): String? {
         return payload
             ?.let { runCatching { JSONObject(it).optString("trace_id") }.getOrNull() }
             ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun isChatReplyType(type: String?): Boolean {
+        return type in setOf("progress", "done", "error", "message", "assistant_message")
+    }
+
+    private fun preview(value: String, maxChars: Int = 160): String {
+        val singleLine = value.replace('\n', ' ').trim()
+        return if (singleLine.length <= maxChars) {
+            singleLine
+        } else {
+            singleLine.take(maxChars) + "..."
+        }
     }
 
     private fun pauseWork() {

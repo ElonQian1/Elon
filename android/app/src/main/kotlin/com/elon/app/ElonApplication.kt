@@ -5,6 +5,7 @@ import android.app.Application
 class ElonApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        DebugTraceStore.init(this)
         DebugTraceStore.record(
             "app_start",
             mapOf(

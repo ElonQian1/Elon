@@ -2,14 +2,17 @@ package com.elon.app
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URL
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -25,12 +28,14 @@ object McpDebugServer {
     @Volatile private var running = false
     @Volatile private var serverSocket: ServerSocket? = null
     private val workers = Executors.newCachedThreadPool()
+    private val processStartedElapsedMs = SystemClock.elapsedRealtime()
     private lateinit var appContext: Context
 
     fun start(context: Context) {
         synchronized(this) {
             if (running) return
             appContext = context.applicationContext
+            DebugTraceStore.init(appContext)
             running = true
             Thread(::serveLoop, "elon-mcp-debug-server").apply {
                 isDaemon = true
@@ -134,6 +139,8 @@ object McpDebugServer {
                 DebugTraceStore.clear()
                 toolResult("Trace buffer cleared.", JSONObject().put("cleared", true))
             }
+            "debug_keepalive" -> debugKeepalive(args)
+            "update_status" -> updateStatus(args)
             "chat_send" -> chatSend(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
         }
@@ -146,6 +153,51 @@ object McpDebugServer {
             .put("events", DebugTraceStore.recent(limit))
             .put("limit", limit)
         return toolResult("Returned $limit recent trace events.", structured)
+    }
+
+    private fun debugKeepalive(args: JSONObject): JSONObject {
+        val action = args.optString("action", "status").lowercase(Locale.ROOT)
+        when (action) {
+            "start" -> {
+                val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
+                    this.action = McpDebugKeepAliveService.ACTION_START
+                }
+                ContextCompat.startForegroundService(appContext, intent)
+                DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "start"))
+            }
+            "stop" -> {
+                val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
+                    this.action = McpDebugKeepAliveService.ACTION_STOP
+                }
+                appContext.stopService(intent)
+                DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "stop"))
+            }
+            "status" -> Unit
+            else -> return toolResult(
+                "Unsupported keepalive action: $action",
+                JSONObject().put("action", action),
+                isError = true
+            )
+        }
+        return toolResult(
+            "MCP keepalive status returned.",
+            McpDebugKeepAliveService.statusJson(appContext).put("action", action)
+        )
+    }
+
+    private fun updateStatus(args: JSONObject): JSONObject {
+        val url = args.optString("server_url")
+            .takeIf { it.isNotBlank() }
+            ?: "http://43.139.149.158:8080/app/version.json"
+        val server = fetchJson(url)
+        val latestCode = server?.optInt("versionCode", 0) ?: 0
+        val structured = JSONObject()
+            .put("installed_version_name", BuildConfig.VERSION_NAME)
+            .put("installed_version_code", BuildConfig.VERSION_CODE)
+            .put("server_url", url)
+            .put("server_version", server ?: JSONObject.NULL)
+            .put("update_available", latestCode > BuildConfig.VERSION_CODE)
+        return toolResult("APK update status returned.", structured, isError = server == null)
     }
 
     private fun chatSend(args: JSONObject): JSONObject {
@@ -231,7 +283,7 @@ object McpDebugServer {
                     tool(
                         name = "trace_recent",
                         title = "Recent Trace Events",
-                        description = "Return recent in-memory phone trace events written to logcat tag ElonTrace.",
+                        description = "Return recent persisted phone trace events written to logcat tag ElonTrace.",
                         properties = JSONObject().put("limit", intProperty("Maximum events to return, 1-300.")),
                         required = JSONArray()
                     )
@@ -242,6 +294,26 @@ object McpDebugServer {
                         title = "Clear Trace Events",
                         description = "Clear the in-memory phone trace buffer.",
                         properties = JSONObject(),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "debug_keepalive",
+                        title = "Debug Keepalive",
+                        description = "Start, stop, or inspect the foreground debug keepalive service so MCP stays reachable while the user is in another app.",
+                        properties = JSONObject()
+                            .put("action", stringProperty("One of start, stop, or status. Defaults to status.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "update_status",
+                        title = "APK Update Status",
+                        description = "Compare the installed APK version with the server version.json.",
+                        properties = JSONObject()
+                            .put("server_url", stringProperty("Optional version.json URL.")),
                         required = JSONArray()
                     )
                 )
@@ -312,11 +384,16 @@ object McpDebugServer {
             .put("port", PORT)
             .put("protocol_version", PROTOCOL_VERSION)
             .put("running", running)
+            .put("process_uptime_ms", SystemClock.elapsedRealtime() - processStartedElapsedMs)
+            .put("app_foreground", prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false))
+            .put("background_debug_supported", true)
+            .put("trace_persistence", "shared_preferences")
+            .put("debug_keepalive", McpDebugKeepAliveService.statusJson(appContext))
             .put("user_id", prefs.getString(TaskWorkService.PREF_USER_ID, null))
             .put("active_project_id", prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null))
             .put("pending_work", !pendingPayload.isNullOrBlank())
             .put("pending_work_age_ms", pendingWorkAgeMs(prefs))
-            .put("trace_events", DebugTraceStore.recent(300).length())
+            .put("trace_events", DebugTraceStore.count())
             .apply {
                 if (includeToken) put("auth_token", debugToken())
             }
@@ -353,6 +430,23 @@ object McpDebugServer {
         var diff = 0
         for (index in a.indices) diff = diff or (a[index].toInt() xor b[index].toInt())
         return diff == 0
+    }
+
+    private fun fetchJson(url: String): JSONObject? {
+        return runCatching {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5_000
+                readTimeout = 5_000
+            }
+            try {
+                if (connection.responseCode !in 200..299) return@runCatching null
+                val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                JSONObject(body)
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()
     }
 
     private fun rpcResult(id: Any, result: JSONObject): JSONObject {
