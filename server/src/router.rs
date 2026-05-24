@@ -40,6 +40,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_api::chat_project),
         )
         .route(
+            "/api/projects/:project_id/prewarm",
+            post(project_api::prewarm_project),
+        )
+        .route(
             "/ws/projects/:project_id",
             get(project_api::ws_project_handler),
         )
@@ -50,6 +54,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/git/status",
             get(project_api::user_project_git_status),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/prewarm",
+            post(project_api::prewarm_user_project),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/git/deploy-key",

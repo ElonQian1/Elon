@@ -1,6 +1,12 @@
 use anyhow::{anyhow, Result};
 use serde_json::Value;
-use std::{path::Path, path::PathBuf, process::Stdio, sync::Arc, time::Duration};
+use std::{
+    path::Path,
+    path::PathBuf,
+    process::Stdio,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncWriteExt, BufReader},
     process::Command,
@@ -25,6 +31,13 @@ pub struct IntentGateResult {
     pub confidence: f64,
     pub reason: String,
     pub chat_reply: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrewarmResult {
+    pub reused: bool,
+    pub thread_id: Option<String>,
+    pub elapsed_ms: u128,
 }
 
 impl IntentGateResult {
@@ -93,6 +106,67 @@ pub async fn confirm_project_intent(
     }
 
     parse_intent_gate_result(&output.stdout)
+}
+
+pub async fn prewarm_codex_session(
+    workspace: &Path,
+    option_id: Option<&str>,
+    native_session_scope: NativeSessionScope,
+    state: &Arc<AppState>,
+) -> Result<PrewarmResult> {
+    let started = Instant::now();
+    let option = state
+        .ai_cli
+        .find_option(option_id)
+        .cloned()
+        .ok_or_else(|| anyhow!("no local AI CLI option is available"))?;
+    if !supports_codex_sessions(&option) {
+        return Err(anyhow!(
+            "Codex CLI session prewarm requires a Codex CLI option"
+        ));
+    }
+
+    std::fs::create_dir_all(workspace)?;
+    let workspace_key = workspace.display().to_string();
+    let existing_session_id = state.store.get_native_agent_session(
+        &native_session_scope.project_id,
+        &native_session_scope.user_id,
+        Some(&native_session_scope.conversation_id),
+        &option.provider,
+        &option.id,
+        &workspace_key,
+    )?;
+    if let Some(thread_id) = existing_session_id {
+        return Ok(PrewarmResult {
+            reused: true,
+            thread_id: Some(thread_id),
+            elapsed_ms: started.elapsed().as_millis(),
+        });
+    }
+
+    let mut prewarm_option = option.clone();
+    prewarm_option.timeout_secs = prewarm_option.timeout_secs.min(90);
+    let prompt = build_prewarm_cli_prompt(workspace, &prewarm_option);
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let output = run_cli_command(&prewarm_option, workspace, &prompt, None, &tx).await?;
+    let thread_id = extract_thread_id(&output.stdout);
+    if let Some(thread_id) = thread_id.as_deref() {
+        let _ = state.store.upsert_native_agent_session(
+            &native_session_scope.project_id,
+            &native_session_scope.user_id,
+            Some(&native_session_scope.conversation_id),
+            &option.provider,
+            &option.id,
+            &workspace_key,
+            thread_id,
+        );
+    }
+
+    Ok(PrewarmResult {
+        reused: false,
+        thread_id,
+        elapsed_ms: started.elapsed().as_millis(),
+    })
 }
 
 pub async fn run_with_workspace(
@@ -503,6 +577,16 @@ mod tests {
     }
 
     #[test]
+    fn prewarm_prompt_does_not_enter_project_workflow() {
+        let prompt = build_prewarm_cli_prompt(Path::new("D:/tmp/project"), &test_option());
+
+        assert!(prompt.contains("prewarming a Codex CLI native session"));
+        assert!(prompt.contains("Do not inspect files"));
+        assert!(!prompt.contains("git pull --rebase"));
+        assert!(!prompt.contains("General project workflow"));
+    }
+
+    #[test]
     fn development_prompt_keeps_project_workflow() {
         let prompt = build_cli_prompt(
             Path::new("D:/tmp/project"),
@@ -578,6 +662,29 @@ fn build_cli_prompt(
     }
 
     build_development_cli_prompt(workspace, user_message, preflight_note, option)
+}
+
+fn build_prewarm_cli_prompt(workspace: &Path, option: &AiCliOption) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!(", current model: {}", model))
+        .unwrap_or_default();
+    format!(
+        r#"You are prewarming a Codex CLI native session for one APK project conversation.
+
+Current CLI provider: {provider}{model_text}
+Current project workspace: {workspace}
+
+Rules:
+- Do not inspect files, run commands, use Git, modify code, build, deploy, publish, or enter the project development workflow.
+- Do not analyze the user's project. This call is only meant to create the native Codex CLI session id for future turns in the same conversation.
+- Keep any future project rules, memory, or workflow discovery for the first real user request.
+- Reply with exactly one line of JSON and nothing else: {{"status":"ready","mode":"prewarm"}}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display()
+    )
 }
 
 fn build_chat_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {

@@ -107,6 +107,10 @@ class MainActivity : AppCompatActivity() {
     private val projects = mutableListOf<AppProject>()
     private val gson = com.google.gson.Gson()
     private val http = OkHttpClient()
+    private val prewarmCooldownMs = 120_000L
+    private val prewarmLock = Any()
+    private val prewarmingConversationKeys = mutableSetOf<String>()
+    private val lastPrewarmAt = mutableMapOf<String, Long>()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
     private val serverUrl = "http://43.139.149.158:8080"
@@ -314,6 +318,9 @@ class MainActivity : AppCompatActivity() {
                 )
             } else if (!waitingForReply) {
                 setSendEnabled(true)
+                if (binding.chatPage.visibility == View.VISIBLE) {
+                    maybePrewarmCodexSession("resume_chat")
+                }
             }
         }
     }
@@ -1299,6 +1306,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
         setSendEnabled(backendConnected && !waitingForReply)
+        maybePrewarmCodexSession("show_chat")
     }
 
     private fun showCreateConversationDialog() {
@@ -3107,6 +3115,81 @@ class MainActivity : AppCompatActivity() {
 
     private fun projectGitUrl(action: String): String {
         return "$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(activeProject().id)}/git/$action?title=${urlPart(activeProject().title)}"
+    }
+
+    private fun maybePrewarmCodexSession(reason: String) {
+        if (waitingForReply) return
+        val project = activeProject()
+        val conversation = activeConversation()
+        if (conversation.ended) return
+
+        val key = "${project.id}:${conversation.id}"
+        val now = System.currentTimeMillis()
+        var shouldStart = false
+        synchronized(prewarmLock) {
+            val lastStartedAt = lastPrewarmAt[key] ?: 0L
+            if (!prewarmingConversationKeys.contains(key) && now - lastStartedAt >= prewarmCooldownMs) {
+                prewarmingConversationKeys.add(key)
+                lastPrewarmAt[key] = now
+                shouldStart = true
+            }
+        }
+        if (!shouldStart) return
+
+        val selectedAgent = if (codexCliOnly) null else selectedAgentName
+        val payload = JSONObject().apply {
+            put("conversation_id", conversation.id)
+            put("conversation_title", conversation.title)
+            if (!selectedAgent.isNullOrBlank()) put("agent", selectedAgent)
+        }
+        val url = "$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(project.id)}/prewarm?title=${urlPart(project.title)}"
+        DebugTraceStore.record(
+            "ui_prewarm_start",
+            mapOf("reason" to reason, "project_id" to project.id, "conversation_id" to conversation.id)
+        )
+
+        Thread {
+            val startedAt = System.currentTimeMillis()
+            try {
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+                http.newCall(
+                    Request.Builder()
+                        .url(url)
+                        .post(body)
+                        .build()
+                ).execute().use { response ->
+                    val responseBody = response.body?.string().orEmpty()
+                    val status = runCatching {
+                        JSONObject(responseBody).optString("status", "")
+                    }.getOrDefault("")
+                    DebugTraceStore.record(
+                        if (response.isSuccessful) "ui_prewarm_done" else "ui_prewarm_failed",
+                        mapOf(
+                            "reason" to reason,
+                            "project_id" to project.id,
+                            "conversation_id" to conversation.id,
+                            "http_code" to response.code,
+                            "status" to status,
+                            "elapsed_ms" to (System.currentTimeMillis() - startedAt)
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                DebugTraceStore.record(
+                    "ui_prewarm_failed",
+                    mapOf(
+                        "reason" to reason,
+                        "project_id" to project.id,
+                        "conversation_id" to conversation.id,
+                        "error" to e.message
+                    )
+                )
+            } finally {
+                synchronized(prewarmLock) {
+                    prewarmingConversationKeys.remove(key)
+                }
+            }
+        }.start()
     }
 
     private fun urlPart(value: String): String {

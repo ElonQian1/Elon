@@ -503,6 +503,8 @@ object McpDebugServer {
         val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
             ?: "mcp_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
         val agent = args.optString("agent").takeIf { it.isNotBlank() }
+        val conversationId = args.optString("conversation_id").takeIf { it.isNotBlank() }
+        val conversationTitle = args.optString("conversation_title").takeIf { it.isNotBlank() }
         val isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true
 
         val payload = JSONObject()
@@ -512,6 +514,8 @@ object McpDebugServer {
             .put("project_title", projectTitle)
             .put("message", message)
         if (agent != null) payload.put("agent", agent)
+        if (conversationId != null) payload.put("conversation_id", conversationId)
+        if (conversationTitle != null) payload.put("conversation_title", conversationTitle)
         val payloadText = payload.toString()
 
         if (!force) {
@@ -560,6 +564,7 @@ object McpDebugServer {
             .put("trace_id", traceId)
             .put("project_id", projectId)
             .put("project_title", projectTitle)
+            .put("conversation_id", conversationId ?: JSONObject.NULL)
             .put("is_development", isDevelopment)
             .put("force", force)
             .put("message_chars", message.length)
@@ -709,6 +714,8 @@ object McpDebugServer {
                             .put("message", stringProperty("Chat message to send from the phone."))
                             .put("project_id", stringProperty("Optional project id. Defaults to the active project."))
                             .put("project_title", stringProperty("Optional project title."))
+                            .put("conversation_id", stringProperty("Optional conversation id for native CLI session continuity."))
+                            .put("conversation_title", stringProperty("Optional conversation title."))
                             .put("agent", stringProperty("Optional backend agent id, such as codex_cli."))
                             .put("trace_id", stringProperty("Optional caller-provided trace id."))
                             .put("is_development", booleanProperty("Whether this should be treated as a development task."))

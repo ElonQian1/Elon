@@ -1,6 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{mpsc, oneshot, Mutex as AsyncMutex, OwnedMutexGuard, RwLock};
 
 use crate::store::Store;
@@ -506,6 +510,9 @@ pub struct AppState {
     /// project runs one workspace-mutating task at a time until per-task worktrees
     /// are introduced.
     pub project_task_scheduler: Arc<ProjectTaskScheduler>,
+    /// Best-effort Codex CLI native-session prewarm throttle, scoped by project,
+    /// user, conversation, agent, and workspace.
+    pub codex_prewarm: Arc<CodexPrewarmRegistry>,
 }
 
 pub struct ProjectTaskScheduler {
@@ -515,6 +522,29 @@ pub struct ProjectTaskScheduler {
 pub struct ProjectTaskPermit {
     was_queued: bool,
     _guard: OwnedMutexGuard<()>,
+}
+
+pub struct CodexPrewarmRegistry {
+    recent: AsyncMutex<HashMap<String, Instant>>,
+}
+
+impl CodexPrewarmRegistry {
+    pub fn new() -> Self {
+        Self {
+            recent: AsyncMutex::new(HashMap::new()),
+        }
+    }
+
+    pub async fn mark_if_allowed(&self, key: &str, cooldown: Duration) -> bool {
+        let now = Instant::now();
+        let mut recent = self.recent.lock().await;
+        recent.retain(|_, started_at| now.duration_since(*started_at) < cooldown);
+        if recent.contains_key(key) {
+            return false;
+        }
+        recent.insert(key.to_string(), now);
+        true
+    }
 }
 
 impl ProjectTaskScheduler {
@@ -726,6 +756,7 @@ impl AppState {
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
             project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
+            codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),
         })
     }
 

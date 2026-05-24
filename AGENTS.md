@@ -157,6 +157,12 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ---
 
+## APK Codex Session Prewarm
+
+- When the APK opens or resumes a project conversation, it may call `/api/.../prewarm` to create or reuse the native Codex CLI session id for that project/user/conversation.
+- Prewarm is not a development task. It must not inspect files, run Git, edit code, build, deploy, publish, or inject the full project workflow.
+- The first real user message still decides the route: ordinary chat uses the lightweight Codex prompt, and development requests enter the queued project workflow.
+
 ## VS Code 快捷入口
 
 - 常规代码任务：运行 `/elon-dev-task`。

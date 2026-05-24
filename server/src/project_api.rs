@@ -10,7 +10,9 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
-use std::{collections::HashMap, path::Path, path::PathBuf, process::Command, sync::Arc};
+use std::{
+    collections::HashMap, path::Path, path::PathBuf, process::Command, sync::Arc, time::Duration,
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -45,6 +47,13 @@ pub struct CreateProjectRequest {
 #[derive(Deserialize)]
 pub struct ProjectChatRequest {
     pub message: String,
+    pub agent: Option<String>,
+    pub conversation_id: Option<String>,
+    pub conversation_title: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ProjectPrewarmRequest {
     pub agent: Option<String>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
@@ -235,6 +244,145 @@ pub async fn chat_project(
         "reply": reply,
         "apk_url": apk_url,
         "image_url": image_url,
+    }))
+    .into_response()
+}
+
+pub async fn prewarm_project(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath(project_id): AxumPath<String>,
+    Json(req): Json<ProjectPrewarmRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    prewarm_project_response(state, user, project, req).await
+}
+
+pub async fn prewarm_user_project(
+    State(state): State<Arc<AppState>>,
+    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<ProjectPrewarmRequest>,
+) -> Response {
+    let (user, project) = match ensure_mobile_project(
+        &state,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    prewarm_project_response(state, user, project, req).await
+}
+
+async fn prewarm_project_response(
+    state: Arc<AppState>,
+    user: PublicUser,
+    project: ProjectAccess,
+    req: ProjectPrewarmRequest,
+) -> Response {
+    if !can_edit(&project.role) {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "current user cannot edit this project",
+        );
+    }
+
+    let conversation_id = match state.store.ensure_conversation(
+        &project.id,
+        &user.id,
+        req.conversation_id.as_deref(),
+        req.conversation_title.as_deref(),
+    ) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let requested_agent = req
+        .agent
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned);
+    let agent = if state.ai_cli.codex_cli_only {
+        None
+    } else {
+        requested_agent
+    };
+    let workspace_key = workspace.display().to_string();
+    let throttle_key = format!(
+        "{}|{}|{}|{}|{}",
+        project.id,
+        user.id,
+        conversation_id,
+        agent.as_deref().unwrap_or("default"),
+        workspace_key
+    );
+    if !state
+        .codex_prewarm
+        .mark_if_allowed(&throttle_key, Duration::from_secs(120))
+        .await
+    {
+        return Json(serde_json::json!({
+            "status": "skipped",
+            "reason": "cooldown",
+            "project_id": project.id,
+            "conversation_id": conversation_id,
+        }))
+        .into_response();
+    }
+
+    let scope = ai_cli::NativeSessionScope {
+        project_id: project.id.clone(),
+        user_id: user.id.clone(),
+        conversation_id: conversation_id.clone(),
+    };
+    let state_for_task = state.clone();
+    let workspace_for_task = workspace.clone();
+    let agent_for_task = agent.clone();
+    let project_id_for_log = project.id.clone();
+    let conversation_id_for_log = conversation_id.clone();
+    tokio::spawn(async move {
+        match ai_cli::prewarm_codex_session(
+            &workspace_for_task,
+            agent_for_task.as_deref(),
+            scope,
+            &state_for_task,
+        )
+        .await
+        {
+            Ok(result) => tracing::info!(
+                project_id = %project_id_for_log,
+                conversation_id = %conversation_id_for_log,
+                reused = result.reused,
+                thread_id = ?result.thread_id,
+                elapsed_ms = result.elapsed_ms,
+                "Codex CLI session prewarm completed"
+            ),
+            Err(error) => tracing::warn!(
+                project_id = %project_id_for_log,
+                conversation_id = %conversation_id_for_log,
+                error = %error,
+                "Codex CLI session prewarm failed"
+            ),
+        }
+    });
+
+    Json(serde_json::json!({
+        "status": "accepted",
+        "project_id": project.id,
+        "conversation_id": conversation_id,
+        "workspace": workspace_key,
     }))
     .into_response()
 }
