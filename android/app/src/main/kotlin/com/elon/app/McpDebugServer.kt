@@ -1025,6 +1025,8 @@ object McpDebugServer {
         val pendingPayload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
         val pendingTask = pendingTaskJson(prefs)
         val pendingBusy = isTaskBusy(prefs)
+        val processState = processStateJson()
+        val appForegroundRecorded = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
         return JSONObject()
             .put("package_name", appContext.packageName)
             .put("version_name", BuildConfig.VERSION_NAME)
@@ -1037,7 +1039,9 @@ object McpDebugServer {
             .put("protocol_version", PROTOCOL_VERSION)
             .put("running", running)
             .put("process_uptime_ms", SystemClock.elapsedRealtime() - processStartedElapsedMs)
-            .put("app_foreground", prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false))
+            .put("app_foreground", processState.optBoolean("foreground", appForegroundRecorded))
+            .put("app_foreground_recorded", appForegroundRecorded)
+            .put("process_state", processState)
             .put("background_debug_supported", true)
             .put("trace_persistence", "shared_preferences")
             .put("debug_keepalive", McpDebugKeepAliveService.statusJson(appContext))
@@ -1298,7 +1302,9 @@ object McpDebugServer {
 
     private fun backgroundDebugStatusJson(): JSONObject {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        val appForeground = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
+        val appForegroundRecorded = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
+        val processState = processStateJson()
+        val appForeground = processState.optBoolean("foreground", appForegroundRecorded)
         val keepalive = McpDebugKeepAliveService.statusJson(appContext)
         val notificationPermission = notificationPermissionJson()
         val batteryOptimization = batteryOptimizationJson()
@@ -1357,6 +1363,8 @@ object McpDebugServer {
 
         return JSONObject()
             .put("app_foreground", appForeground)
+            .put("app_foreground_recorded", appForegroundRecorded)
+            .put("process_state", processState)
             .put("background_reachable", backgroundReachable)
             .put("reachability", reachability)
             .put("keepalive", keepalive)
@@ -1534,6 +1542,31 @@ object McpDebugServer {
             .put("summary", summary)
             .put("findings", findings)
             .put("next_actions", nextActions)
+    }
+
+    private fun processStateJson(): JSONObject {
+        val info = ActivityManager.RunningAppProcessInfo()
+        runCatching { ActivityManager.getMyMemoryState(info) }
+        val foreground = info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+        val foregroundOrService = info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
+        return JSONObject()
+            .put("importance", info.importance)
+            .put("importance_name", processImportanceName(info.importance))
+            .put("foreground", foreground)
+            .put("foreground_or_service", foregroundOrService)
+            .put("last_trim_level", info.lastTrimLevel)
+    }
+
+    private fun processImportanceName(importance: Int): String {
+        return when (importance) {
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND -> "foreground"
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE -> "foreground_service"
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> "visible"
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE -> "perceptible"
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED -> "cached"
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE -> "gone"
+            else -> "unknown_$importance"
+        }
     }
 
     private fun notificationPermissionJson(): JSONObject {
