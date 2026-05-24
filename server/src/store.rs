@@ -63,6 +63,18 @@ pub struct ProjectAccess {
     pub status: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct TaskSnapshot {
+    pub id: String,
+    pub project_id: String,
+    pub user_id: String,
+    pub conversation_id: Option<String>,
+    pub message: String,
+    pub status: String,
+    pub apk_url: Option<String>,
+    pub error: Option<String>,
+}
+
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
@@ -592,9 +604,21 @@ impl Store {
         conversation_id: Option<&str>,
         message: &str,
     ) -> Result<String> {
+        self.create_task_with_client_request(project_id, user_id, conversation_id, None, message)
+    }
+
+    pub fn create_task_with_client_request(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        client_request_id: Option<&str>,
+        message: &str,
+    ) -> Result<String> {
         let id = new_id("tsk");
         let now = now();
         let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        let client_request_id = clean_optional(client_request_id);
         let conn = self.conn()?;
         let tx = conn.unchecked_transaction()?;
         tx.execute(
@@ -607,10 +631,18 @@ impl Store {
         )?;
         tx.execute(
             "INSERT INTO tasks (
-                id, project_id, user_id, conversation_id, message, status, created_at, updated_at
+                id, project_id, user_id, conversation_id, client_request_id, message, status, created_at, updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, 'running', ?6, ?6)",
-            params![id, project_id, user_id, conversation_id, message, now],
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'running', ?7, ?7)",
+            params![
+                id,
+                project_id,
+                user_id,
+                conversation_id,
+                client_request_id,
+                message,
+                now
+            ],
         )?;
         tx.execute(
             "INSERT INTO messages (
@@ -629,6 +661,55 @@ impl Store {
         )?;
         tx.commit()?;
         Ok(id)
+    }
+
+    pub fn get_task_by_client_request(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        client_request_id: &str,
+    ) -> Result<Option<TaskSnapshot>> {
+        let Some(client_request_id) = clean_optional(Some(client_request_id)) else {
+            return Ok(None);
+        };
+        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
+        self.conn()?
+            .query_row(
+                "SELECT id, project_id, user_id, conversation_id, message, status, apk_url, error
+                 FROM tasks
+                 WHERE project_id = ?1
+                   AND user_id = ?2
+                   AND conversation_id = ?3
+                   AND client_request_id = ?4
+                 ORDER BY created_at DESC
+                 LIMIT 1",
+                params![project_id, user_id, conversation_id, client_request_id],
+                |row| {
+                    Ok(TaskSnapshot {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        user_id: row.get(2)?,
+                        conversation_id: row.get(3)?,
+                        message: row.get(4)?,
+                        status: row.get(5)?,
+                        apk_url: row.get(6)?,
+                        error: row.get(7)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn set_task_running(&self, task_id: &str) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE tasks
+             SET status = 'running', error = NULL, updated_at = ?1
+             WHERE id = ?2",
+            params![now(), task_id],
+        )?;
+        Ok(())
     }
 
     pub fn finish_task(
@@ -682,6 +763,31 @@ impl Store {
         }
 
         Ok(())
+    }
+
+    pub fn record_task_event(&self, task_id: &str, event_json: &str) -> Result<()> {
+        self.conn()?.execute(
+            "INSERT INTO task_events (id, task_id, event_json, created_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![new_id("tev"), task_id, event_json, now()],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_task_events(&self, task_id: &str, limit: usize) -> Result<Vec<String>> {
+        let limit = limit.clamp(1, 1000) as i64;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT event_json
+             FROM task_events
+             WHERE task_id = ?1
+             ORDER BY created_at ASC, id ASC
+             LIMIT ?2",
+        )?;
+        let events = stmt
+            .query_map(params![task_id, limit], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(events)
     }
 
     pub fn add_message(
@@ -829,6 +935,18 @@ impl Store {
         Ok(n)
     }
 
+    pub fn mark_interrupted_running_tasks(&self) -> Result<usize> {
+        let n = self.conn()?.execute(
+            "UPDATE tasks
+             SET status = 'interrupted',
+                 error = COALESCE(error, 'server restarted before task finished'),
+                 updated_at = ?1
+             WHERE status = 'running'",
+            params![now()],
+        )?;
+        Ok(n)
+    }
+
     fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
@@ -904,6 +1022,7 @@ fn init_schema(conn: &Connection) -> Result<()> {
           project_id TEXT NOT NULL,
           user_id TEXT NOT NULL,
           conversation_id TEXT,
+          client_request_id TEXT,
           message TEXT NOT NULL,
           status TEXT NOT NULL,
           git_branch TEXT,
@@ -953,6 +1072,14 @@ fn init_schema(conn: &Connection) -> Result<()> {
           FOREIGN KEY (task_id) REFERENCES tasks(id)
         );
 
+        CREATE TABLE IF NOT EXISTS task_events (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          event_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (task_id) REFERENCES tasks(id)
+        );
+
         CREATE TABLE IF NOT EXISTS agent_native_sessions (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL,
@@ -989,7 +1116,19 @@ fn init_schema(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "projects", "branch", "branch TEXT")?;
     add_column_if_missing(conn, "projects", "workspace_path", "workspace_path TEXT")?;
     add_column_if_missing(conn, "tasks", "conversation_id", "conversation_id TEXT")?;
+    add_column_if_missing(conn, "tasks", "client_request_id", "client_request_id TEXT")?;
     add_column_if_missing(conn, "messages", "conversation_id", "conversation_id TEXT")?;
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_client_request
+         ON tasks(project_id, user_id, conversation_id, client_request_id)
+         WHERE client_request_id IS NOT NULL",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_task_events_task_id
+         ON task_events(task_id, created_at)",
+        [],
+    )?;
     Ok(())
 }
 

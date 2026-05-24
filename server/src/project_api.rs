@@ -10,20 +10,42 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap, path::Path, path::PathBuf, process::Command, sync::Arc, time::Duration,
+    collections::HashMap,
+    path::Path,
+    path::PathBuf,
+    process::Command,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock,
+    },
+    time::Duration,
 };
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{broadcast, mpsc::UnboundedSender, Mutex};
 
 use crate::{
     agent, ai_cli, intent_router,
-    store::{ProjectAccess, PublicUser},
+    store::{ProjectAccess, PublicUser, TaskSnapshot},
     tools,
     types::{AppState, WsMessage},
 };
 
 const MAX_PROJECT_ATTACHMENTS_PER_MESSAGE: usize = 6;
 const MAX_PROJECT_ATTACHMENT_BYTES: usize = 12 * 1024 * 1024;
+const PROJECT_WS_BACKLOG_LIMIT: usize = 512;
+
+static PROJECT_WS_JOBS: LazyLock<Mutex<HashMap<String, Arc<ProjectWsJob>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+struct ProjectWsJob {
+    key: String,
+    fingerprint: String,
+    task_id: String,
+    backlog: Mutex<Vec<String>>,
+    broadcaster: broadcast::Sender<String>,
+    finished: AtomicBool,
+}
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
@@ -49,6 +71,8 @@ pub struct CreateProjectRequest {
 
 #[derive(Deserialize)]
 pub struct ProjectChatRequest {
+    pub trace_id: Option<String>,
+    pub client_request_id: Option<String>,
     pub message: String,
     pub agent: Option<String>,
     pub conversation_id: Option<String>,
@@ -987,61 +1011,72 @@ async fn handle_project_ws(
             request.attachments.as_deref(),
         );
 
-        let task_id = state
-            .store
-            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
-            .unwrap_or_else(|_| "tsk_unknown".into());
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-        let state_clone = state.clone();
-        let user_id = user.id.clone();
-        let project_for_task = project.clone();
-        let download_base_for_task = download_base.clone();
-        let agent_task = tokio::spawn(async move {
-            run_project_agent_with_scheduler(
-                state_clone,
-                user_id,
-                project_for_task,
-                download_base_for_task,
-                conversation_id,
-                message,
-                request.agent,
-                tx,
-            )
-            .await;
-        });
+        let client_request_id =
+            project_client_request_id(&request, &project.id, &user.id, &conversation_id, &message);
+        let fingerprint =
+            project_ws_fingerprint(&conversation_id, request.agent.as_deref(), &message);
+        let job = get_or_start_project_ws_job(
+            state.clone(),
+            user.id.clone(),
+            project.clone(),
+            download_base.clone(),
+            conversation_id,
+            message,
+            request.agent,
+            client_request_id,
+            fingerprint,
+        )
+        .await;
 
-        let mut reply = String::new();
-        let mut apk_url = None;
-        let mut error = None;
+        let mut job_rx = job.broadcaster.subscribe();
+        let backlog = job.backlog.lock().await.clone();
+        let mut replayed_terminal = false;
+        let mut replay_failed = false;
+        for progress in backlog {
+            if sender.send(Message::Text(progress.clone())).await.is_err() {
+                replay_failed = true;
+                break;
+            }
+            if is_terminal_project_ws_message(&progress) {
+                replayed_terminal = true;
+                break;
+            }
+        }
+        if replay_failed {
+            break;
+        }
+        if replayed_terminal {
+            continue;
+        }
+
         let mut client_disconnected = false;
         loop {
             tokio::select! {
-                progress = rx.recv() => {
-                    let Some(progress) = progress else {
-                        break;
-                    };
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
-                        match value.get("type").and_then(|t| t.as_str()) {
-                            Some("done") => {
-                                reply = value["message"].as_str().unwrap_or("完成").to_string();
-                                apk_url = value["apk_url"].as_str().map(ToOwned::to_owned);
+                progress = job_rx.recv() => {
+                    match progress {
+                        Ok(progress) => {
+                            let terminal = is_terminal_project_ws_message(&progress);
+                            if sender.send(Message::Text(progress)).await.is_err() {
+                                client_disconnected = true;
+                                break;
                             }
-                            Some("error") => {
-                                let msg = value["message"].as_str().unwrap_or("发生错误").to_string();
-                                reply = msg.clone();
-                                error = Some(msg);
+                            if terminal || job.finished.load(Ordering::SeqCst) {
+                                break;
                             }
-                            _ => {}
                         }
-                    }
-                    if sender.send(Message::Text(progress)).await.is_err() {
-                        client_disconnected = true;
-                        break;
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(broadcast::error::RecvError::Closed) => break,
                     }
                 }
                 incoming = receiver.next() => {
                     match incoming {
-                        Some(Ok(Message::Text(_))) => {}
+                        Some(Ok(Message::Text(text))) => {
+                            tracing::info!(
+                                task_id = %job.task_id,
+                                "received project WebSocket message while request was running; ignoring {} bytes",
+                                text.len()
+                            );
+                        }
                         Some(Ok(Message::Ping(payload))) => {
                             if sender.send(Message::Pong(payload)).await.is_err() {
                                 client_disconnected = true;
@@ -1073,32 +1108,369 @@ async fn handle_project_ws(
             }
         }
         if client_disconnected {
-            agent_task.abort();
-            let _ = agent_task.await;
-            let _ = state.store.finish_task(
-                &task_id,
-                "failed",
-                Some("连接已断开"),
-                None,
-                Some("client disconnected"),
+            tracing::info!(
+                task_id = %job.task_id,
+                "project WebSocket disconnected while task was running; background job continues"
             );
             break;
         }
-        let _ = agent_task.await;
-
-        let status = if error.is_some() { "failed" } else { "done" };
-        let _ = state.store.finish_task(
-            &task_id,
-            status,
-            Some(&reply),
-            apk_url.as_deref(),
-            error.as_deref(),
-        );
     }
+}
+
+async fn get_or_start_project_ws_job(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    download_base: String,
+    conversation_id: String,
+    message: String,
+    agent_name: Option<String>,
+    client_request_id: String,
+    fingerprint: String,
+) -> Arc<ProjectWsJob> {
+    let key = project_ws_job_key(&project.id, &user_id, &conversation_id, &client_request_id);
+    let mut jobs = PROJECT_WS_JOBS.lock().await;
+    if let Some(existing) = jobs.get(&key) {
+        if existing.fingerprint == fingerprint {
+            return existing.clone();
+        }
+        if !existing.finished.load(Ordering::SeqCst) {
+            let notice = WsMessage::Progress {
+                message: "同一个请求仍在后台处理，正在继续同步已有任务进度。".into(),
+            }
+            .to_json();
+            let _ = existing.broadcaster.send(notice);
+            return existing.clone();
+        }
+        jobs.remove(&key);
+    }
+
+    let persisted = state
+        .store
+        .get_task_by_client_request(
+            &project.id,
+            &user_id,
+            Some(&conversation_id),
+            &client_request_id,
+        )
+        .ok()
+        .flatten();
+    if let Some(task) = persisted
+        .as_ref()
+        .filter(|task| is_terminal_task_status(&task.status))
+    {
+        let events = state
+            .store
+            .list_task_events(&task.id, PROJECT_WS_BACKLOG_LIMIT)
+            .unwrap_or_default();
+        let backlog = if events.is_empty() {
+            vec![terminal_event_from_task(task)]
+        } else {
+            events
+        };
+        let (broadcast_tx, _) = broadcast::channel::<String>(256);
+        let job = Arc::new(ProjectWsJob {
+            key: key.clone(),
+            fingerprint,
+            task_id: task.id.clone(),
+            backlog: Mutex::new(backlog),
+            broadcaster: broadcast_tx,
+            finished: AtomicBool::new(true),
+        });
+        jobs.insert(key.clone(), job.clone());
+        schedule_project_job_cleanup(key, job.clone());
+        return job;
+    }
+
+    let (task_id, restart_notice) = if let Some(task) = persisted {
+        let notice = if task.status == "interrupted" {
+            Some("上次任务被服务器重启中断，正在用同一个任务记录继续处理。".to_string())
+        } else {
+            Some("正在恢复服务器中已有的运行中任务。".to_string())
+        };
+        let _ = state.store.set_task_running(&task.id);
+        (task.id, notice)
+    } else {
+        match state.store.create_task_with_client_request(
+            &project.id,
+            &user_id,
+            Some(&conversation_id),
+            Some(&client_request_id),
+            &message,
+        ) {
+            Ok(task_id) => (task_id, None),
+            Err(error) => {
+                let raw = WsMessage::Error {
+                    message: format!("创建任务记录失败: {}", error),
+                }
+                .to_json();
+                let (broadcast_tx, _) = broadcast::channel::<String>(256);
+                let job = Arc::new(ProjectWsJob {
+                    key: key.clone(),
+                    fingerprint,
+                    task_id: "tsk_unknown".into(),
+                    backlog: Mutex::new(vec![raw]),
+                    broadcaster: broadcast_tx,
+                    finished: AtomicBool::new(true),
+                });
+                jobs.insert(key.clone(), job.clone());
+                schedule_project_job_cleanup(key, job.clone());
+                return job;
+            }
+        }
+    };
+
+    let (broadcast_tx, _) = broadcast::channel::<String>(256);
+    let job = Arc::new(ProjectWsJob {
+        key: key.clone(),
+        fingerprint,
+        task_id: task_id.clone(),
+        backlog: Mutex::new(Vec::new()),
+        broadcaster: broadcast_tx,
+        finished: AtomicBool::new(false),
+    });
+    jobs.insert(key.clone(), job.clone());
+
+    let job_for_task = job.clone();
+    tokio::spawn(async move {
+        run_project_ws_job(
+            state,
+            user_id,
+            project,
+            download_base,
+            conversation_id,
+            message,
+            agent_name,
+            task_id,
+            job_for_task,
+            restart_notice,
+        )
+        .await;
+    });
+
+    job
+}
+
+async fn run_project_ws_job(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    download_base: String,
+    conversation_id: String,
+    message: String,
+    agent_name: Option<String>,
+    task_id: String,
+    job: Arc<ProjectWsJob>,
+    restart_notice: Option<String>,
+) {
+    if let Some(message) = restart_notice {
+        emit_project_job_event(
+            &state,
+            &task_id,
+            &job,
+            WsMessage::Progress { message }.to_json(),
+        )
+        .await;
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let state_clone = state.clone();
+    let project_for_task = project.clone();
+    let task_conversation_id = conversation_id.clone();
+    let task_message = message.clone();
+    let task_agent_name = agent_name.clone();
+    let agent_task = tokio::spawn(async move {
+        run_project_agent_with_scheduler(
+            state_clone,
+            user_id,
+            project_for_task,
+            download_base,
+            task_conversation_id,
+            task_message,
+            task_agent_name,
+            tx,
+        )
+        .await;
+    });
+
+    let mut reply = String::new();
+    let mut apk_url = None;
+    let mut error = None;
+    let mut saw_terminal = false;
+    while let Some(progress) = rx.recv().await {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
+            match value.get("type").and_then(|t| t.as_str()) {
+                Some("done") => {
+                    reply = value["message"].as_str().unwrap_or("完成").to_string();
+                    apk_url = value["apk_url"].as_str().map(ToOwned::to_owned);
+                    saw_terminal = true;
+                }
+                Some("error") => {
+                    let msg = value["message"].as_str().unwrap_or("发生错误").to_string();
+                    reply = msg.clone();
+                    error = Some(msg);
+                    saw_terminal = true;
+                }
+                _ => {}
+            }
+        }
+        let terminal = is_terminal_project_ws_message(&progress);
+        emit_project_job_event(&state, &task_id, &job, progress).await;
+        if terminal {
+            break;
+        }
+    }
+    let _ = agent_task.await;
+
+    if !saw_terminal {
+        let msg = "任务没有返回最终结果，请稍后重试或查看服务端日志。".to_string();
+        let raw = WsMessage::Error {
+            message: msg.clone(),
+        }
+        .to_json();
+        emit_project_job_event(&state, &task_id, &job, raw).await;
+        reply = msg.clone();
+        error = Some(msg);
+    }
+
+    let status = if error.is_some() { "failed" } else { "done" };
+    let _ = state.store.finish_task(
+        &task_id,
+        status,
+        Some(&reply),
+        apk_url.as_deref(),
+        error.as_deref(),
+    );
+    job.finished.store(true, Ordering::SeqCst);
+    schedule_project_job_cleanup(job.key.clone(), job);
+}
+
+async fn emit_project_job_event(
+    state: &AppState,
+    task_id: &str,
+    job: &Arc<ProjectWsJob>,
+    raw: String,
+) {
+    {
+        let mut backlog = job.backlog.lock().await;
+        backlog.push(raw.clone());
+        if backlog.len() > PROJECT_WS_BACKLOG_LIMIT {
+            let overflow = backlog.len() - PROJECT_WS_BACKLOG_LIMIT;
+            backlog.drain(0..overflow);
+        }
+    }
+    let _ = state.store.record_task_event(task_id, &raw);
+    let _ = job.broadcaster.send(raw);
+}
+
+fn schedule_project_job_cleanup(key: String, job: Arc<ProjectWsJob>) {
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+        let mut jobs = PROJECT_WS_JOBS.lock().await;
+        if jobs
+            .get(&key)
+            .map(|existing| Arc::ptr_eq(existing, &job))
+            .unwrap_or(false)
+        {
+            jobs.remove(&key);
+        }
+    });
+}
+
+fn project_ws_job_key(
+    project_id: &str,
+    user_id: &str,
+    conversation_id: &str,
+    client_request_id: &str,
+) -> String {
+    format!(
+        "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+        project_id, user_id, conversation_id, client_request_id
+    )
+}
+
+fn project_ws_fingerprint(
+    conversation_id: &str,
+    agent_name: Option<&str>,
+    message: &str,
+) -> String {
+    format!(
+        "{}\u{1f}{}\u{1f}{}",
+        conversation_id,
+        agent_name.unwrap_or(""),
+        message
+    )
+}
+
+fn project_client_request_id(
+    request: &ProjectChatRequest,
+    project_id: &str,
+    user_id: &str,
+    conversation_id: &str,
+    message: &str,
+) -> String {
+    request
+        .client_request_id
+        .as_deref()
+        .or(request.trace_id.as_deref())
+        .map(|value| safe_project_path_part(value, 80))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| {
+            stable_request_id(&format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                project_id,
+                user_id,
+                conversation_id,
+                request.agent.as_deref().unwrap_or(""),
+                message
+            ))
+        })
+}
+
+fn stable_request_id(value: &str) -> String {
+    let digest = Sha256::digest(value.as_bytes());
+    format!("auto_{}", hex::encode(&digest[..12]))
+}
+
+fn terminal_event_from_task(task: &TaskSnapshot) -> String {
+    if task.status == "done" {
+        WsMessage::Done {
+            message: "任务已完成，正在恢复之前保存的结果。".into(),
+            apk_url: task.apk_url.clone(),
+            image_url: None,
+        }
+        .to_json()
+    } else {
+        WsMessage::Error {
+            message: task
+                .error
+                .clone()
+                .unwrap_or_else(|| "任务已结束，但没有保存详细错误。".into()),
+        }
+        .to_json()
+    }
+}
+
+fn is_terminal_task_status(status: &str) -> bool {
+    matches!(status, "done" | "failed" | "error")
+}
+
+fn is_terminal_project_ws_message(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("type")
+                .and_then(|message_type| message_type.as_str())
+                .map(|message_type| message_type == "done" || message_type == "error")
+        })
+        .unwrap_or(false)
 }
 
 fn parse_project_message(raw: &str) -> ProjectChatRequest {
     serde_json::from_str::<ProjectChatRequest>(raw).unwrap_or_else(|_| ProjectChatRequest {
+        trace_id: None,
+        client_request_id: None,
         message: raw.to_string(),
         agent: None,
         conversation_id: None,
@@ -1781,6 +2153,8 @@ mod tests {
     fn parses_project_attachment_refs() {
         let request = parse_project_message(
             r#"{
+                "trace_id":"ui_123",
+                "client_request_id":"req_123",
                 "message":"please inspect this file",
                 "attachments":[
                     {
@@ -1800,6 +2174,8 @@ mod tests {
             .as_ref()
             .and_then(|items| items.first())
             .expect("attachment ref should be parsed");
+        assert_eq!(request.trace_id.as_deref(), Some("ui_123"));
+        assert_eq!(request.client_request_id.as_deref(), Some("req_123"));
         assert_eq!(request.message, "please inspect this file");
         assert_eq!(attachment.kind.as_deref(), Some("image"));
         assert_eq!(attachment.display_name.as_deref(), Some("screenshot.png"));
@@ -1827,6 +2203,34 @@ mod tests {
             percent_encode_path_segment("project 1/图.png"),
             "project%201%2F%E5%9B%BE.png"
         );
+    }
+
+    #[test]
+    fn derives_stable_client_request_id_from_trace() {
+        let request = parse_project_message(
+            r#"{
+                "trace_id":"ui_123_abc",
+                "message":"build apk"
+            }"#,
+        );
+
+        let id =
+            project_client_request_id(&request, "project", "user", "conversation", "build apk");
+
+        assert_eq!(id, "ui_123_abc");
+    }
+
+    #[test]
+    fn derives_fallback_client_request_id_when_trace_missing() {
+        let request = parse_project_message(r#"{"message":"build apk"}"#);
+
+        let first =
+            project_client_request_id(&request, "project", "user", "conversation", "build apk");
+        let second =
+            project_client_request_id(&request, "project", "user", "conversation", "build apk");
+
+        assert!(first.starts_with("auto_"));
+        assert_eq!(first, second);
     }
 
     #[test]

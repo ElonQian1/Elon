@@ -395,6 +395,7 @@ class MainActivity : AppCompatActivity() {
 
         val payload = com.google.gson.JsonObject().apply {
             addProperty("trace_id", traceId)
+            addProperty("client_request_id", traceId)
             addProperty("user_id", userId)
             addProperty("project_id", target.projectId)
             addProperty("project_title", target.projectTitle)
@@ -4737,7 +4738,7 @@ class MainActivity : AppCompatActivity() {
         const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
         const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401
-        const val PENDING_WORK_TTL_MS = 6 * 60 * 60 * 1000L
+        const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
         const val MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024
         const val PHOTO_MAX_PIXELS = 4_000_000
         val PHOTO_COMPRESS_QUALITIES = intArrayOf(88, 78, 68, 58, 48, 38)

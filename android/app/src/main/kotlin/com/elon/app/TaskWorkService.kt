@@ -712,7 +712,7 @@ class TaskWorkService : Service() {
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401
         const val APP_UPDATE_NOTIFICATION_ID = 2402
         const val EXTRA_SHOW_APP_UPDATE = "show_app_update"
-        const val PENDING_WORK_TTL_MS = 6 * 60 * 60 * 1000L
+        const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
         private const val MAX_QUEUED_EVENTS = 120
         private const val MAX_QUEUED_EVENT_LENGTH = 20_000
         private val RECONNECT_TOKEN = Any()

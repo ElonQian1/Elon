@@ -41,6 +41,13 @@ async fn main() -> Result<()> {
     if interrupted > 0 {
         info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);
     }
+    let interrupted_tasks = state.store.mark_interrupted_running_tasks().unwrap_or(0);
+    if interrupted_tasks > 0 {
+        info!(
+            "{} 个数据库运行中任务因服务器重启被标记为已中断",
+            interrupted_tasks
+        );
+    }
 
     let app = router::build_app(state);
 
