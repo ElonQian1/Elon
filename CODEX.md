@@ -46,6 +46,7 @@ The local share `\\127.0.0.1\skills` has been reviewed for this repository. Keep
 - Only stage files related to the current task. Never stage unrelated user or agent changes.
 - After a task commit, push with `git push origin main` unless the user explicitly says not to.
 - Before pushing, fetch/rebase against `origin/main` again so the task commit is based on the latest remote history.
+- After pushing from an isolated task worktree, return to the original main workspace when available and run `git fetch origin` plus `git pull --ff-only origin main` so tracked files catch up to the pushed remote state. Do not stage, stash, delete, move, or otherwise touch untracked or unrelated local files in that main workspace. If an untracked file blocks the fast-forward because the remote added the same path, stop and report the path.
 - Commit messages should use conventional prefixes such as `feat`, `fix`, `style`, `refactor`, or `docs`.
 - For user-facing code tasks, prefer Chinese commit descriptions that identify the user request when possible.
 - Do not use destructive Git commands such as `git reset --hard` or `git checkout --` in the main workspace.
@@ -125,8 +126,9 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 6. Verify locally with the smallest useful command.
 7. Commit only the task files.
 8. Push to `origin/main`.
-9. If deployment is required, deploy from a clean committed state or detached temporary worktree.
-10. Report the commit SHA, push status, verification result, and deployment result.
+9. If the work was done in an isolated worktree, fast-forward the original main workspace to `origin/main` without touching untracked files.
+10. If deployment is required, deploy from a clean committed state or detached temporary worktree.
+11. Report the commit SHA, push status, main workspace sync status, verification result, and deployment result.
 
 Avoid large mixed commits. If a change touches more than about five files or spans multiple concerns, split it into smaller tasks when practical.
 

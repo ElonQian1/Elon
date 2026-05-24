@@ -16,8 +16,9 @@
 3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。修改前先 `git fetch origin main`；工作区干净才直接 `git pull --rebase origin main`，当前任务自己的未提交改动可 stash/rebase/pop，其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
-6. Android APK 新功能的完成定义是“手机可安装到最新 APK”，不是 PR、分支、Debug 包或代码已提交。
-7. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
+6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
+7. Android APK 新功能的完成定义是“手机可安装到最新 APK”，不是 PR、分支、Debug 包或代码已提交。
+8. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
 
 ---
 
@@ -204,6 +205,16 @@ git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
 - 前缀：`feat` 新功能 / `fix` 修复 / `style` 样式 / `refactor` 重构
 - 主体：中文，一句话描述用户看到的变化
 - 必须包含：用户ID、需求原文
+
+如果本次提交是在隔离 worktree 中完成并已推送到 `main`，回到原主工作区做安全同步：
+
+```powershell
+cd "<原主工作区>"
+git fetch origin
+git pull --ff-only origin main
+```
+
+这一步只让本地已跟踪文件追上远端；不得顺手 `git add`、stash、清理、删除或移动未跟踪文件。
 
 ---
 

@@ -112,6 +112,7 @@ T5  HTTP 健康检查
 5. 发现其他代理未提交改动 → **不回退、不覆盖**，回到预检脚本创建的 worktree 继续
 6. 提交前再执行 `git fetch origin main` + `git rebase origin/main`，确保本次提交基于最新远端
 7. **每次 commit 后必须立即 `git push origin main`**
+8. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
 
 ### 本地有未提交改动时如何同步远端
 
@@ -136,6 +137,20 @@ cd "<WORKTREE_PATH>"
 ```
 
 > 未提交改动不会让本地“自动落后”；落后是因为远端后来进了新提交。未提交改动的问题是会让 `pull --rebase` 不安全，所以必须先判断归属。
+
+### 隔离 worktree 推送后的原主工作区同步
+
+隔离 worktree 是为了保护原主工作区现场，不代表原主工作区应该长期落后。任务 worktree 成功 push 到 `main` 后，若能访问原主工作区，应执行：
+
+```powershell
+Set-Location "<原主工作区>"
+git fetch origin
+git pull --ff-only origin main
+git status --short --branch
+```
+
+这个同步只更新 Git 已跟踪文件到远端最新提交；不要借机 `git add`、stash、清理、删除或移动未跟踪文件。
+如果 `ff-only` 因为本地未跟踪文件会被远端同名文件覆盖而失败，说明需要人工判断该文件归属；此时停止并向用户报告冲突路径。
 
 ### ⚠️ 新建文件必须显式 `git add`（血泪教训）
 

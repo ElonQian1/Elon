@@ -26,6 +26,7 @@ bash scripts/ai-task-preflight.sh --create-worktree
 - 未提交改动属于本任务：先 `git stash push -u -m "wip-before-sync"`，再 `git pull --rebase origin main`，然后 `git stash pop` 并解决冲突。
 - 未提交改动不属于本任务或来源不明：**不要 stash / pull / pop 当前工作区**，必须从 `origin/main` 创建独立 worktree，例如 `git worktree add ..\Elon-task -b codex/task origin/main`。
 - 提交前再执行一次 `git fetch origin main` + `git rebase origin/main`，确认本次提交叠在最新远端之上。
+- 如果本次是在隔离 worktree 完成并推送到 `main`，任务收尾时应回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件同步到远端最新；不要 `git add`、不要 stash、不要删除或移动原主工作区的未跟踪文件。若未跟踪文件与远端新增路径冲突导致 fast-forward 失败，停止并报告具体路径。
 
 ### 🛡️ 新 clone 必须装一次 git hook（无论 Windows / Linux / 服务器 codex CLI）
 
@@ -295,6 +296,7 @@ cd e:\lodex\Elon\android
 ## 工作原则
 
 - 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
+- 隔离 worktree 推送成功后，尽量把原主工作区用 `git pull --ff-only origin main` 同步到最新，同时保留未跟踪/未提交现场不动。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
 - 后端运行代码变更只需直接运行 `.\scripts\publish-server.ps1`（自动递增 PATCH、commit、push、构建、部署）；MINOR/MAJOR 变更时手动改好 `server/Cargo.toml` 后加 `-SkipVersionBump`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
