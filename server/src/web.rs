@@ -515,7 +515,20 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       cursor: pointer;
     }
     .login-card .submit:disabled { opacity: 0.55; }
-    .login-card .error { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+    .login-card .error {
+      font-size: 14px;
+      color: #ff6b6b;
+      min-height: 0;
+      padding: 0;
+      background: transparent;
+      border-radius: 6px;
+      transition: padding 0.15s ease;
+    }
+    .login-card .error.show {
+      padding: 10px 12px;
+      background: rgba(255, 80, 80, 0.12);
+      border: 1px solid rgba(255, 107, 107, 0.4);
+    }
     .login-card .hint { font-size: 12px; color: var(--ink-faint); text-align: center; }
   </style>
 </head>
@@ -815,10 +828,16 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
   }
   authModeButtons.forEach((b) => b.addEventListener('click', () => setAuthMode(b.dataset.authMode)));
 
+  function setLoginError(msg) {
+    loginError.textContent = msg || '';
+    loginError.classList.toggle('show', !!msg);
+  }
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     loginBtn.disabled = true;
-    loginError.textContent = '';
+    const origBtnText = loginBtn.textContent;
+    loginBtn.textContent = authMode === 'register' ? '创建中…' : '登录中…';
+    setLoginError('');
     try {
       const payload = {
         account: accountInput.value.trim(),
@@ -839,9 +858,10 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       currentUser = data.user;
       await boot();
     } catch (err) {
-      loginError.textContent = err.message;
+      setLoginError(err.message);
     } finally {
       loginBtn.disabled = false;
+      loginBtn.textContent = origBtnText;
     }
   });
 
@@ -1220,7 +1240,7 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
         localStorage.removeItem('elon_token');
         token = '';
       }
-      loginError.textContent = (err && err.message) ? err.message : '加载失败，请重试';
+      setLoginError((err && err.message) ? err.message : '加载失败，请重试');
       showLogin();
       return;
     }
