@@ -31,6 +31,7 @@ class TaskWorkService : Service() {
     private var payloadSentForCurrentConnection = false
     private var reconnectAttempts = 0
     private var activeServerUrl: String? = null
+    private var clientGeneration = 0
     private var activeRequestStartedAtMs = 0L
     private var firstServerEventAtMs = 0L
     private var firstChatReplyAtMs = 0L
@@ -67,8 +68,8 @@ class TaskWorkService : Service() {
                 if (payload != null) {
                     startWork(
                         payload = payload,
-                        isDevelopment = intent?.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true) ?: true,
-                        force = intent?.getBooleanExtra(EXTRA_FORCE_START, false) ?: false
+                        isDevelopment = intent.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true),
+                        force = intent.getBooleanExtra(EXTRA_FORCE_START, false)
                     )
                 } else {
                     DebugTraceStore.record(
@@ -190,12 +191,21 @@ class TaskWorkService : Service() {
         val serverUrl = buildProjectWsUrl(pendingPayload)
         val existing = wsClient
         if (existing != null && activeServerUrl == serverUrl) return existing
+        clientGeneration += 1
+        val generation = clientGeneration
         existing?.disconnect()
         activeServerUrl = serverUrl
         val created = ElonWsClient(
             serverUrl = serverUrl,
             onMessage = { raw -> handleServerMessage(raw) },
-            onConnected = {
+            onConnected = onConnected@{
+                if (generation != clientGeneration) {
+                    DebugTraceStore.record(
+                        "task_ws_stale_connected_ignored",
+                        mapOf("trace_id" to extractTraceId(pendingPayload), "server_url" to serverUrl)
+                    )
+                    return@onConnected
+                }
                 DebugTraceStore.record(
                     "task_ws_connected",
                     mapOf(
@@ -210,7 +220,18 @@ class TaskWorkService : Service() {
                 broadcastStatus("connected")
                 sendPendingPayloadIfNeeded()
             },
-            onDisconnected = {
+            onDisconnected = onDisconnected@{
+                if (generation != clientGeneration) {
+                    DebugTraceStore.record(
+                        "task_ws_stale_disconnect_ignored",
+                        mapOf(
+                            "trace_id" to extractTraceId(pendingPayload),
+                            "kind" to activeRequestKind,
+                            "server_url" to serverUrl
+                        )
+                    )
+                    return@onDisconnected
+                }
                 DebugTraceStore.record(
                     "task_ws_disconnected",
                     mapOf(

@@ -234,8 +234,8 @@ function Invoke-GradleReleaseBuild {
     Write-Host "🔨 编译 Release APK..." -ForegroundColor Cyan
 
     $gradle = Join-Path $AndroidDir "gradlew.bat"
-    $process = Start-Process -FilePath $gradle `
-        -ArgumentList "assembleRelease" `
+    $process = Start-Process -FilePath "cmd.exe" `
+        -ArgumentList @("/c", "`"$gradle`"", "assembleRelease") `
         -WorkingDirectory $AndroidDir `
         -NoNewWindow `
         -PassThru
@@ -264,6 +264,7 @@ function Invoke-GradleReleaseBuild {
             Stop-StaleApkRelease -Success -Message "线上 APK 已包含本次基础提交 $((Format-ShortSha $BuildBaseSha))，请直接测试服务器最新版本。"
         }
     }
+    $process.WaitForExit()
 
     if ($process.ExitCode -ne 0) {
         Write-Error "Gradle assembleRelease 失败，退出码 $($process.ExitCode)。"
