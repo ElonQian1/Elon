@@ -166,11 +166,30 @@ class TaskWorkService : Service() {
             serverUrl = serverUrl,
             onMessage = { raw -> handleServerMessage(raw) },
             onConnected = {
+                DebugTraceStore.record(
+                    "task_ws_connected",
+                    mapOf(
+                        "trace_id" to extractTraceId(pendingPayload),
+                        "kind" to activeRequestKind,
+                        "elapsed_ms" to elapsedSinceRequestStart(),
+                        "reconnect_attempts" to reconnectAttempts,
+                        "server_url" to activeServerUrl
+                    )
+                )
                 reconnectAttempts = 0
                 broadcastStatus("connected")
                 sendPendingPayloadIfNeeded()
             },
             onDisconnected = {
+                DebugTraceStore.record(
+                    "task_ws_disconnected",
+                    mapOf(
+                        "trace_id" to extractTraceId(pendingPayload),
+                        "kind" to activeRequestKind,
+                        "elapsed_ms" to elapsedSinceRequestStart(),
+                        "reconnect_attempts" to reconnectAttempts
+                    )
+                )
                 payloadSentForCurrentConnection = false
                 broadcastStatus("disconnected")
                 if (waitingForReply) scheduleReconnect()
@@ -237,6 +256,16 @@ class TaskWorkService : Service() {
         if (!waitingForReply) return
         reconnectAttempts += 1
         val delay = (900L * reconnectAttempts).coerceAtMost(6_000L)
+        DebugTraceStore.record(
+            "task_reconnect_scheduled",
+            mapOf(
+                "trace_id" to extractTraceId(pendingPayload),
+                "kind" to activeRequestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(),
+                "reconnect_attempts" to reconnectAttempts,
+                "delay_ms" to delay
+            )
+        )
         handler.removeCallbacksAndMessages(RECONNECT_TOKEN)
         handler.postAtTime(
             {

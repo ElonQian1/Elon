@@ -204,6 +204,7 @@ object McpDebugServer {
             "device_snapshot" -> deviceSnapshot(args)
             "network_check" -> networkCheck(args)
             "background_debug_status" -> backgroundDebugStatus(args)
+            "latency_report" -> latencyReport(args)
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> debugKeepalive(args)
@@ -334,13 +335,20 @@ object McpDebugServer {
         }
         val backgroundRuntime = backgroundDebugStatusJson()
         val taskStatus = taskStatusJson(JSONObject())
+        val latencyArgs = JSONObject()
+            .put("timeline_limit", args.optInt("timeline_limit", 80).coerceIn(1, 300))
+        taskStatus.optString("trace_id").takeIf { it.isNotBlank() && it != "null" }?.let {
+            latencyArgs.put("trace_id", it)
+        }
+        val latency = latencyReportJson(latencyArgs)
         val assessment = diagnosticAssessmentJson(
             selfCheck = selfCheck,
             backgroundRuntime = backgroundRuntime,
             network = network,
             taskStatus = taskStatus,
             trace = trace,
-            logcat = logcat
+            logcat = logcat,
+            latency = latency
         )
 
         DebugTraceStore.record(
@@ -364,6 +372,7 @@ object McpDebugServer {
             .put("device_snapshot", deviceSnapshotJson())
             .put("network_check", network)
             .put("task_status", taskStatus)
+            .put("latency_report", latency)
             .put("task_events", taskEvents)
             .put("trace_recent", trace)
             .put("logcat_recent", logcat)
@@ -381,6 +390,10 @@ object McpDebugServer {
 
     private fun backgroundDebugStatus(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
         return toolResult("Background debug status returned.", backgroundDebugStatusJson())
+    }
+
+    private fun latencyReport(args: JSONObject): JSONObject {
+        return toolResult("Latency report returned.", latencyReportJson(args))
     }
 
     private fun mcpSelfCheck(args: JSONObject): JSONObject {
@@ -838,6 +851,7 @@ object McpDebugServer {
                             .put("note", stringProperty("Optional debug session note when start_session=true."))
                             .put("since_wall_time_ms", intProperty("Only include trace events after this wall time. Defaults to the active debug session start."))
                             .put("trace_limit", intProperty("Maximum trace events to return, 1-300. Defaults to 80."))
+                            .put("timeline_limit", intProperty("Maximum latency timeline events to return, 1-300. Defaults to 80."))
                             .put("trace_id", stringProperty("Optional trace id filter for trace_recent."))
                             .put("phase", stringProperty("Optional exact phase filter for trace_recent."))
                             .put("contains", stringProperty("Optional trace text filter."))
@@ -877,6 +891,17 @@ object McpDebugServer {
                         title = "Background Debug Status",
                         description = "Return whether MCP is likely to remain reachable while the user switches to WeChat or another app, including keepalive, notification permission, battery optimization, and network validation.",
                         properties = JSONObject(),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "latency_report",
+                        title = "Latency Report",
+                        description = "Build a per-trace latency timeline and bottleneck summary for phone chat/development tasks.",
+                        properties = JSONObject()
+                            .put("trace_id", stringProperty("Optional trace id. Defaults to the active or latest traced phone task."))
+                            .put("timeline_limit", intProperty("Maximum timeline events to return, 1-300. Defaults to 80.")),
                         required = JSONArray()
                     )
                 )
@@ -1106,6 +1131,173 @@ object McpDebugServer {
             .put("has_apk_url", finish?.details?.get("has_apk_url") ?: JSONObject.NULL)
             .put("last_phase", traceEvents.lastOrNull()?.phase ?: JSONObject.NULL)
             .put("last_event_wall_time_ms", traceEvents.lastOrNull()?.wallTimeMs ?: JSONObject.NULL)
+    }
+
+    private fun latencyReportJson(args: JSONObject): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val allEvents = DebugTraceStore.recentEvents(300)
+        val requestedTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
+        val pendingTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
+        val traceId = requestedTraceId ?: pendingTraceId ?: latestTraceId(allEvents)
+        val traceEvents = if (traceId == null) {
+            emptyList()
+        } else {
+            allEvents.filter { it.details["trace_id"] == traceId }
+        }
+        val timelineLimit = args.optInt("timeline_limit", 80).coerceIn(1, 300)
+        val taskStatusArgs = JSONObject()
+        traceId?.let { taskStatusArgs.put("trace_id", it) }
+        val taskStatus = taskStatusJson(taskStatusArgs)
+
+        fun first(phase: String) = traceEvents.firstOrNull { it.phase == phase }
+        fun last(phase: String) = traceEvents.lastOrNull { it.phase == phase }
+
+        val mcpSend = first("mcp_chat_send")
+        val mcpQueued = first("mcp_chat_queued")
+        val taskStart = first("task_start_work")
+        val wsConnected = first("task_ws_connected")
+        val payloadSent = first("task_payload_sent")
+        val firstServer = first("task_first_server_event")
+        val firstReply = first("task_first_chat_reply")
+        val finish = first("task_finish_done") ?: first("task_finish_error")
+        val baseline = taskStart ?: traceEvents.firstOrNull()
+        val milestones = JSONObject()
+
+        fun elapsedFromBaseline(event: DebugTraceStore.TraceEvent): Any {
+            val fromTrace = event.details["elapsed_ms"]?.toLongOrNull()
+            return when {
+                fromTrace != null -> fromTrace
+                baseline != null -> (event.wallTimeMs - baseline.wallTimeMs).coerceAtLeast(0L)
+                else -> JSONObject.NULL
+            }
+        }
+
+        fun putMilestone(name: String, event: DebugTraceStore.TraceEvent?) {
+            if (event == null) return
+            milestones.put(
+                name,
+                JSONObject()
+                    .put("phase", event.phase)
+                    .put("wall_time_ms", event.wallTimeMs)
+                    .put("elapsed_from_task_start_ms", elapsedFromBaseline(event))
+                    .put("details", JSONObject().apply {
+                        event.details.forEach { (key, value) -> put(key, value) }
+                    })
+            )
+        }
+
+        putMilestone("mcp_send", mcpSend)
+        putMilestone("mcp_queued", mcpQueued)
+        putMilestone("task_start", taskStart)
+        putMilestone("ws_connected", wsConnected)
+        putMilestone("payload_sent", payloadSent)
+        putMilestone("first_server_event", firstServer)
+        putMilestone("first_chat_reply", firstReply)
+        putMilestone("finish", finish)
+
+        val segments = JSONArray()
+        val bottleneckCandidates = mutableListOf<Pair<String, Long>>()
+        fun addSegment(name: String, from: DebugTraceStore.TraceEvent?, to: DebugTraceStore.TraceEvent?, candidate: Boolean = true) {
+            if (from == null || to == null) return
+            val duration = (to.wallTimeMs - from.wallTimeMs).coerceAtLeast(0L)
+            segments.put(
+                JSONObject()
+                    .put("name", name)
+                    .put("from_phase", from.phase)
+                    .put("to_phase", to.phase)
+                    .put("duration_ms", duration)
+            )
+            if (candidate) bottleneckCandidates += name to duration
+        }
+
+        addSegment("mcp_send_to_queue", mcpSend, mcpQueued)
+        addSegment("mcp_queue_to_task_start", mcpQueued, taskStart)
+        addSegment("task_start_to_ws_connected", taskStart, wsConnected)
+        addSegment("ws_connected_to_payload_sent", wsConnected, payloadSent)
+        addSegment("task_start_to_payload_sent", taskStart, payloadSent)
+        addSegment("payload_sent_to_first_server_event", payloadSent, firstServer)
+        addSegment("first_server_event_to_first_chat_reply", firstServer, firstReply)
+        addSegment("first_chat_reply_to_finish", firstReply, finish)
+        addSegment("task_start_to_finish", taskStart, finish, candidate = false)
+
+        val bottleneck = bottleneckCandidates.maxByOrNull { it.second }
+        val missingMilestones = JSONArray().apply {
+            if (taskStart == null) put("task_start")
+            if (payloadSent == null) put("payload_sent")
+            if (firstServer == null) put("first_server_event")
+            if (firstReply == null) put("first_chat_reply")
+            if (finish == null) put("finish")
+        }
+        val timeline = JSONArray().apply {
+            traceEvents.takeLast(timelineLimit).forEach { event ->
+                put(
+                    JSONObject()
+                        .put("phase", event.phase)
+                        .put("wall_time_ms", event.wallTimeMs)
+                        .put("elapsed_from_task_start_ms", elapsedFromBaseline(event))
+                        .put("details", JSONObject().apply {
+                            event.details.forEach { (key, value) -> put(key, value) }
+                        })
+                )
+            }
+        }
+
+        return JSONObject()
+            .put("trace_id", traceId ?: JSONObject.NULL)
+            .put("status", taskStatus.optString("status", "idle"))
+            .put("kind", taskStatus.optString("kind", "idle"))
+            .put("event_count", traceEvents.size)
+            .put("timeline_limit", timelineLimit)
+            .put("milestones", milestones)
+            .put("segments", segments)
+            .put("bottleneck", bottleneckJson(bottleneck))
+            .put("missing_milestones", missingMilestones)
+            .put("timeline", timeline)
+            .put("task_status", taskStatus)
+    }
+
+    private fun bottleneckJson(bottleneck: Pair<String, Long>?): JSONObject {
+        if (bottleneck == null) {
+            return JSONObject()
+                .put("available", false)
+                .put("severity", "insufficient_data")
+                .put("name", JSONObject.NULL)
+                .put("duration_ms", JSONObject.NULL)
+                .put("likely_area", JSONObject.NULL)
+                .put("recommendation", "Collect a fresh debug_session and call latency_report after the task reaches at least payload_sent.")
+        }
+        val name = bottleneck.first
+        val durationMs = bottleneck.second
+        val severity = when {
+            durationMs >= 30_000L -> "slow"
+            durationMs >= 10_000L -> "watch"
+            else -> "normal"
+        }
+        val likelyArea = when (name) {
+            "mcp_send_to_queue", "mcp_queue_to_task_start" -> "phone_task_start"
+            "task_start_to_ws_connected" -> "phone_websocket_connect"
+            "ws_connected_to_payload_sent", "task_start_to_payload_sent" -> "phone_payload_send"
+            "payload_sent_to_first_server_event" -> "backend_or_network_first_byte"
+            "first_server_event_to_first_chat_reply" -> "backend_model_first_reply"
+            "first_chat_reply_to_finish" -> "backend_completion_or_apk_release"
+            else -> "unknown"
+        }
+        val recommendation = when (likelyArea) {
+            "phone_task_start" -> "Inspect task queue and foreground-service startup; use background_debug_status and task_events."
+            "phone_websocket_connect" -> "Compare network_check with ws_failure/ws_connected trace events; backend port or phone network may be slow."
+            "phone_payload_send" -> "Check payload_bytes and attachment handling; large payloads can delay WebSocket send."
+            "backend_or_network_first_byte" -> "Backend accepted the phone payload slowly; compare server logs for this trace_id."
+            "backend_model_first_reply" -> "Backend/model generation is the likely first-reply bottleneck."
+            "backend_completion_or_apk_release" -> "First reply arrived; remaining time is likely long-running build/deploy/completion work."
+            else -> "Inspect trace_recent for the same trace_id."
+        }
+        return JSONObject()
+            .put("available", true)
+            .put("severity", severity)
+            .put("name", name)
+            .put("duration_ms", durationMs)
+            .put("likely_area", likelyArea)
+            .put("recommendation", recommendation)
     }
 
     private fun pendingWorkAgeMs(prefs: SharedPreferences): Long? {
@@ -1381,7 +1573,8 @@ object McpDebugServer {
         network: Any,
         taskStatus: JSONObject,
         trace: JSONObject,
-        logcat: Any
+        logcat: Any,
+        latency: JSONObject
     ): JSONObject {
         val findings = JSONArray()
         val nextActions = JSONArray()
@@ -1489,6 +1682,18 @@ object McpDebugServer {
                 "A phone task has been pending for more than 10 minutes.",
                 "Use diagnostic_bundle with trace_id=${taskStatus.optString("trace_id")} and inspect ws/task phases."
             )
+        }
+        val bottleneck = latency.optJSONObject("bottleneck")
+        if (bottleneck?.optBoolean("available", false) == true) {
+            val severity = bottleneck.optString("severity")
+            if (severity == "slow" || severity == "watch") {
+                addFinding(
+                    "warning",
+                    "latency",
+                    "Largest latency segment is ${bottleneck.optString("name")} at ${bottleneck.optLong("duration_ms")} ms.",
+                    bottleneck.optString("recommendation", "Inspect latency_report.bottleneck.")
+                )
+            }
         }
 
         val matchedTraceCount = trace.optInt("matched_count", 0)
