@@ -577,14 +577,22 @@ async fn run_project_agent_with_scheduler(
             }),
         );
     }
+    let routing_decision = intent_router::classify(&message);
     let needs_project_workflow =
-        intent_router::classify(&message).route != intent_router::CapabilityRoute::ChatAgent;
+        routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
+    // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务（app_or_web_development=84、
+    // image_asset_for_app=86、standalone_image=90），跳过 codex 二次意图门控，
+    // 节省每请求 5-15 秒的冷启动+推理时间。confidence < 84 的模糊判定仍走门控防误判。
+    let skip_intent_gate = needs_project_workflow && routing_decision.confidence >= 84;
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,
             "server_intent_classified",
             serde_json::json!({
                 "needs_project_workflow": needs_project_workflow,
+                "local_confidence": routing_decision.confidence,
+                "local_reason": routing_decision.reason,
+                "skip_intent_gate": skip_intent_gate,
             }),
         );
     }
@@ -640,88 +648,112 @@ async fn run_project_agent_with_scheduler(
         return;
     }
 
-    let _ = tx.send(
-        WsMessage::Progress {
-            message: "正在确认这是否需要进入开发流程。".into(),
-        }
-        .to_json(),
-    );
-    let native_session_scope = ai_cli::NativeSessionScope {
-        project_id: project.id.clone(),
-        user_id: user_id.clone(),
-        conversation_id: conversation_id.clone(),
-    };
-    match ai_cli::confirm_project_intent(
-        workspace,
-        &message,
-        agent_name.as_deref(),
-        Some(native_session_scope),
-        trace_id.as_deref(),
-        &state,
-    )
-    .await
-    {
-        Ok(gate) if !gate.should_enter_development() => {
-            if let Some(trace_id) = trace_id.as_deref() {
-                state.server_traces.record(
-                    trace_id,
-                    "server_intent_kept_chat",
-                    serde_json::json!({
-                        "confidence": gate.confidence,
-                        "reason": gate.reason,
-                    }),
-                );
-            }
-            tracing::info!(
-                confidence = gate.confidence,
-                reason = %gate.reason,
-                "Codex CLI kept request in lightweight chat"
+    if skip_intent_gate {
+        if let Some(trace_id) = trace_id.as_deref() {
+            state.server_traces.record(
+                trace_id,
+                "server_intent_gate_skipped",
+                serde_json::json!({
+                    "confidence": routing_decision.confidence,
+                    "reason": routing_decision.reason,
+                }),
             );
-            let reply = chat_reply_after_intent_gate(&message, gate.chat_reply);
-            let _ = tx.send(
-                WsMessage::Done {
-                    message: reply,
-                    apk_url: None,
-                    image_url: None,
+        }
+        tracing::info!(
+            confidence = routing_decision.confidence,
+            reason = routing_decision.reason,
+            "Skipped codex intent gate (high local confidence)"
+        );
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "已识别为开发任务，直接进入项目工作流。".into(),
+            }
+            .to_json(),
+        );
+    } else {
+        let _ = tx.send(
+            WsMessage::Progress {
+                message: "正在确认这是否需要进入开发流程。".into(),
+            }
+            .to_json(),
+        );
+        let native_session_scope = ai_cli::NativeSessionScope {
+            project_id: project.id.clone(),
+            user_id: user_id.clone(),
+            conversation_id: conversation_id.clone(),
+        };
+        match ai_cli::confirm_project_intent(
+            workspace,
+            &message,
+            agent_name.as_deref(),
+            Some(native_session_scope),
+            trace_id.as_deref(),
+            &state,
+        )
+        .await
+        {
+            Ok(gate) if !gate.should_enter_development() => {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_intent_kept_chat",
+                        serde_json::json!({
+                            "confidence": gate.confidence,
+                            "reason": gate.reason,
+                        }),
+                    );
                 }
-                .to_json(),
-            );
-            return;
-        }
-        Ok(gate) => {
-            if let Some(trace_id) = trace_id.as_deref() {
-                state.server_traces.record(
-                    trace_id,
-                    "server_intent_enter_development",
-                    serde_json::json!({
-                        "confidence": gate.confidence,
-                        "reason": gate.reason,
-                    }),
+                tracing::info!(
+                    confidence = gate.confidence,
+                    reason = %gate.reason,
+                    "Codex CLI kept request in lightweight chat"
                 );
-            }
-            tracing::info!(
-                confidence = gate.confidence,
-                reason = %gate.reason,
-                "Codex CLI confirmed development workflow"
-            );
-        }
-        Err(error) => {
-            if let Some(trace_id) = trace_id.as_deref() {
-                state.server_traces.record(
-                    trace_id,
-                    "server_intent_error",
-                    serde_json::json!({
-                        "error": error.to_string(),
-                    }),
+                let reply = chat_reply_after_intent_gate(&message, gate.chat_reply);
+                let _ = tx.send(
+                    WsMessage::Done {
+                        message: reply,
+                        apk_url: None,
+                        image_url: None,
+                    }
+                    .to_json(),
                 );
+                return;
             }
-            let _ = tx.send(
-                WsMessage::Error {
-                    message: format!("Codex CLI 意图确认失败: {}", error),
+            Ok(gate) => {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_intent_enter_development",
+                        serde_json::json!({
+                            "confidence": gate.confidence,
+                            "reason": gate.reason,
+                        }),
+                    );
                 }
-                .to_json(),
-            );
-            return;
+                tracing::info!(
+                    confidence = gate.confidence,
+                    reason = %gate.reason,
+                    "Codex CLI confirmed development workflow"
+                );
+            }
+            Err(error) => {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_intent_error",
+                        serde_json::json!({
+                            "error": error.to_string(),
+                        }),
+                    );
+                }
+                let _ = tx.send(
+                    WsMessage::Error {
+                        message: format!("Codex CLI 意图确认失败: {}", error),
+                    }
+                    .to_json(),
+                );
+                return;
+            }
         }
     }
 
@@ -763,9 +795,8 @@ async fn run_project_agent_with_scheduler(
         })
         .await;
 
-    let execution_workspace = prepared_execution_workspace.unwrap_or_else(|| {
-        ProjectConversationWorkspace::shared(base_workspace.clone())
-    });
+    let execution_workspace = prepared_execution_workspace
+        .unwrap_or_else(|| ProjectConversationWorkspace::shared(base_workspace.clone()));
 
     let shared_project_permit = if execution_workspace.is_isolated() {
         None
