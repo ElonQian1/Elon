@@ -14,7 +14,7 @@ use std::{collections::HashMap, path::Path, path::PathBuf, process::Command, syn
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    agent, intent_router,
+    agent, ai_cli, intent_router,
     store::{ProjectAccess, PublicUser},
     tools,
     types::{AppState, WsMessage},
@@ -264,6 +264,60 @@ async fn run_project_agent_with_scheduler(
         )
         .await;
         return;
+    }
+
+    let _ = tx.send(
+        WsMessage::Progress {
+            message: "正在确认这是否需要进入开发流程。".into(),
+        }
+        .to_json(),
+    );
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let native_session_scope = ai_cli::NativeSessionScope {
+        project_id: project.id.clone(),
+        user_id: user_id.clone(),
+        conversation_id: conversation_id.clone(),
+    };
+    match ai_cli::confirm_project_intent(
+        &workspace,
+        &message,
+        agent_name.as_deref(),
+        Some(native_session_scope),
+        &state,
+    )
+    .await
+    {
+        Ok(gate) if !gate.should_enter_development() => {
+            let reply = gate.chat_reply.unwrap_or_else(|| {
+                "我先按普通聊天处理。你如果要我开始改代码、编译或发布，可以直接说明。".into()
+            });
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply,
+                    apk_url: None,
+                    image_url: None,
+                }
+                .to_json(),
+            );
+            return;
+        }
+        Ok(gate) => {
+            tracing::info!(
+                confidence = gate.confidence,
+                reason = %gate.reason,
+                "Codex CLI confirmed development workflow"
+            );
+        }
+        Err(error) => {
+            let _ = tx.send(
+                WsMessage::Error {
+                    message: format!("Codex CLI 意图确认失败: {}", error),
+                }
+                .to_json(),
+            );
+            return;
+        }
     }
 
     let _ = tx.send(

@@ -19,6 +19,82 @@ pub struct NativeSessionScope {
     pub conversation_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct IntentGateResult {
+    pub route: intent_router::CapabilityRoute,
+    pub confidence: f64,
+    pub reason: String,
+    pub chat_reply: Option<String>,
+}
+
+impl IntentGateResult {
+    pub fn should_enter_development(&self) -> bool {
+        self.route == intent_router::CapabilityRoute::CodeAgent && self.confidence >= 0.75
+    }
+}
+
+pub async fn confirm_project_intent(
+    workspace: &Path,
+    user_message: &str,
+    option_id: Option<&str>,
+    native_session_scope: Option<NativeSessionScope>,
+    state: &Arc<AppState>,
+) -> Result<IntentGateResult> {
+    let option = state
+        .ai_cli
+        .find_option(option_id)
+        .cloned()
+        .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
+    if !supports_codex_sessions(&option) {
+        return Err(anyhow!("当前阶段意图确认必须使用 Codex CLI"));
+    }
+
+    std::fs::create_dir_all(workspace)?;
+    let workspace_key = workspace.display().to_string();
+    let native_session_id = native_session_scope.as_ref().and_then(|scope| {
+        state
+            .store
+            .get_native_agent_session(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+            )
+            .ok()
+            .flatten()
+    });
+
+    let prompt = build_intent_gate_prompt(workspace, user_message, &option);
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let output = run_cli_command(
+        &option,
+        workspace,
+        &prompt,
+        native_session_id.as_deref(),
+        &tx,
+    )
+    .await?;
+
+    if let (Some(scope), Some(thread_id)) = (
+        native_session_scope.as_ref(),
+        extract_thread_id(&output.stdout),
+    ) {
+        let _ = state.store.upsert_native_agent_session(
+            &scope.project_id,
+            &scope.user_id,
+            Some(&scope.conversation_id),
+            &option.provider,
+            &option.id,
+            &workspace_key,
+            &thread_id,
+        );
+    }
+
+    parse_intent_gate_result(&output.stdout)
+}
+
 pub async fn run_with_workspace(
     user_id: &str,
     workspace: &Path,
@@ -443,6 +519,25 @@ mod tests {
         assert!(prompt.contains("通用项目工作流必须始终执行"));
         assert!(prompt.contains("git pull --rebase"));
     }
+
+    #[test]
+    fn parses_intent_gate_chat_result() {
+        let stdout = r#"{"type":"item.completed","item":{"type":"agent_message","text":"{\"route\":\"chat\",\"confidence\":0.93,\"reason\":\"只是询问流程\",\"chat_reply\":\"先聊清楚也可以。\"}"}}"#;
+        let result = parse_intent_gate_result(stdout).unwrap();
+
+        assert_eq!(result.route, intent_router::CapabilityRoute::ChatAgent);
+        assert_eq!(result.chat_reply.as_deref(), Some("先聊清楚也可以。"));
+        assert!(!result.should_enter_development());
+    }
+
+    #[test]
+    fn parses_intent_gate_development_result() {
+        let stdout = r#"{"route":"development","confidence":0.91,"reason":"明确要求修改代码","chat_reply":""}"#;
+        let result = parse_intent_gate_result(stdout).unwrap();
+
+        assert_eq!(result.route, intent_router::CapabilityRoute::CodeAgent);
+        assert!(result.should_enter_development());
+    }
 }
 
 async fn read_cli_stream<R>(reader: R) -> String
@@ -501,6 +596,38 @@ fn build_chat_cli_prompt(workspace: &Path, user_message: &str, option: &AiCliOpt
     )
 }
 
+fn build_intent_gate_prompt(workspace: &Path, user_message: &str, option: &AiCliOption) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!("，当前模型：{}", model))
+        .unwrap_or_default();
+    format!(
+        r#"你是「一龙」平台里的 Codex CLI 轻量意图确认器。本轮只判断是否需要进入项目开发执行流程。
+
+当前 CLI：{provider}{model_text}
+当前项目目录：{workspace}
+
+严格规则：
+- 不要读取文件，不要检查 Git，不要运行命令，不要修改代码，不要打包 APK。
+- 如果用户明确要求修改/新增/修复代码、编译、打包、发布、部署、提交、推送、操作 Git、替换项目资源，才判定为 development。
+- 如果用户是在闲聊、提问、解释概念、讨论流程、问“会不会/是不是/为什么/怎么做最好”、表达想法但没有明确要求立刻执行，判定为 chat。
+- 模糊时必须判定为 chat，避免普通聊天误触发重型开发流程。
+- 如果 route 是 chat，请用 chat_reply 给用户一个简洁自然的中文回复；如果 route 是 development，chat_reply 置为空字符串。
+- 只输出一行 JSON，不要 Markdown，不要代码块，不要额外解释。
+
+JSON 格式：
+{{"route":"chat|development","confidence":0.0,"reason":"简短原因","chat_reply":"中文回复或空字符串"}}
+
+用户消息：
+{user_message}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        user_message = user_message
+    )
+}
+
 fn build_development_cli_prompt(
     workspace: &Path,
     user_message: &str,
@@ -544,6 +671,54 @@ fn build_development_cli_prompt(
         workspace = workspace.display(),
         user_message = user_message
     )
+}
+
+fn parse_intent_gate_result(stdout: &str) -> Result<IntentGateResult> {
+    let text = extract_json_agent_message(stdout).unwrap_or_else(|| stdout.trim().to_string());
+    let value = parse_json_object_from_text(&text)
+        .ok_or_else(|| anyhow!("Codex CLI 意图确认没有返回有效 JSON"))?;
+    let route_text = value
+        .get("route")
+        .and_then(Value::as_str)
+        .unwrap_or("chat")
+        .trim()
+        .to_ascii_lowercase();
+    let route = match route_text.as_str() {
+        "development" | "code" | "codeagent" | "dev" => intent_router::CapabilityRoute::CodeAgent,
+        _ => intent_router::CapabilityRoute::ChatAgent,
+    };
+    let confidence = value
+        .get("confidence")
+        .and_then(Value::as_f64)
+        .unwrap_or(0.0)
+        .clamp(0.0, 1.0);
+    let reason = value
+        .get("reason")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let chat_reply = value
+        .get("chat_reply")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|reply| !reply.is_empty())
+        .map(ToOwned::to_owned);
+
+    Ok(IntentGateResult {
+        route,
+        confidence,
+        reason,
+        chat_reply,
+    })
+}
+
+fn parse_json_object_from_text(text: &str) -> Option<Value> {
+    serde_json::from_str::<Value>(text).ok().or_else(|| {
+        let start = text.find('{')?;
+        let end = text.rfind('}')?;
+        serde_json::from_str::<Value>(&text[start..=end]).ok()
+    })
 }
 
 fn ensure_git(workspace: &Path, user_id: &str, require_existing_git: bool) -> Result<()> {
