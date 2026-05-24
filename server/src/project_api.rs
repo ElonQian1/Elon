@@ -294,12 +294,7 @@ async fn run_project_agent_with_scheduler(
                 reason = %gate.reason,
                 "Codex CLI kept request in lightweight chat"
             );
-            let reply = gate
-                .chat_reply
-                .filter(|reply| !reply.trim().is_empty())
-                .unwrap_or_else(|| {
-                    "我先按普通聊天处理。你如果要我开始改代码、编译或发布，可以直接说明。".into()
-                });
+            let reply = chat_reply_after_intent_gate(&message, gate.chat_reply);
             let _ = tx.send(
                 WsMessage::Done {
                     message: reply,
@@ -373,6 +368,46 @@ async fn run_project_agent_with_scheduler(
         tx,
     )
     .await;
+}
+
+fn chat_reply_after_intent_gate(user_message: &str, codex_reply: Option<String>) -> String {
+    if let Some(reply) = codex_reply {
+        let reply = reply.trim();
+        if !reply.is_empty() && !looks_like_clarification_only(reply) {
+            return reply.to_string();
+        }
+    }
+
+    if looks_like_multi_device_project_question(user_message) {
+        return "可以分两层理解：多手机同时登录或聊天本身可以并行；但多个手机同时让 AI 修改同一个项目，需要任务会话、worktree/分支、队列和合并保护，否则就可能出现冲突。我先按普通讨论处理，不进入改代码、打包或发布流程。"
+            .into();
+    }
+
+    "我先按普通聊天处理，不进入改代码、编译或发布流程。你可以继续问；如果要我实际检查项目或动代码，再直接说明。".into()
+}
+
+fn looks_like_clarification_only(reply: &str) -> bool {
+    [
+        "没看懂",
+        "没看清",
+        "没法确定",
+        "具体想问",
+        "你是想问",
+        "你可以直接说",
+    ]
+    .iter()
+    .any(|marker| reply.contains(marker))
+}
+
+fn looks_like_multi_device_project_question(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let mentions_multi_device = ["多手机", "多个手机", "多端", "同时登录", "并行", "冲突"]
+        .iter()
+        .any(|word| lower.contains(word));
+    let mentions_project_or_apk = ["apk", "项目", "服务器", "git", "仓库"]
+        .iter()
+        .any(|word| lower.contains(word));
+    mentions_multi_device && mentions_project_or_apk
 }
 
 pub async fn ws_project_handler(
@@ -1193,4 +1228,29 @@ fn json_error(status: StatusCode, message: impl ToString) -> Response {
         })),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keeps_useful_codex_gate_reply() {
+        let reply = chat_reply_after_intent_gate(
+            "我们的 apk 能不能多端使用？",
+            Some("可以，普通聊天可以并行。".into()),
+        );
+        assert_eq!(reply, "可以，普通聊天可以并行。");
+    }
+
+    #[test]
+    fn replaces_clarification_for_multi_device_project_question() {
+        let reply = chat_reply_after_intent_gate(
+            "我们的apk是否支持多个手机同时登录？",
+            Some("我没法确定你具体想问 APK 的哪方面。".into()),
+        );
+        assert!(reply.contains("多手机同时登录或聊天本身可以并行"));
+        assert!(reply.contains("worktree/分支"));
+        assert!(reply.contains("不进入改代码"));
+    }
 }
