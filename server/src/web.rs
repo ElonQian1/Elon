@@ -958,12 +958,21 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     currentTab = tabId;
     tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabId));
     pages.forEach((p) => p.classList.toggle('active', p.id === tabId));
-    // 顶栏标题
+    const inChat = tabId === 'chatPage' && !!currentProject;
+    // 顶栏标题：项目内保留项目名，列表态使用 tab 静态名
     const t = Array.prototype.find.call(tabs, (x) => x.dataset.tab === tabId);
-    topTitle.textContent = t ? t.dataset.title : '';
+    if (inChat) {
+      topTitle.textContent = currentProject.name || '会话';
+    } else {
+      topTitle.textContent = t ? t.dataset.title : '';
+    }
+    // 兜底：chatPage 且没有项目 → 强制回到列表态，避免出现"气泡可见但输入栏消失"的半残 UI
+    if (tabId === 'chatPage' && !currentProject) {
+      chatView.classList.add('hidden');
+      conversationList.classList.remove('hidden');
+    }
     // 输入栏：仅"会话"页且已进入项目时显示
-    const inChat = tabId === 'chatPage' && currentProject;
-    inputBar.classList.toggle('active', !!inChat);
+    inputBar.classList.toggle('active', inChat);
     // 返回按钮：仅"会话"页进入项目后显示
     backBtn.style.display = inChat ? '' : 'none';
     // 新建按钮：仅会话页显示
