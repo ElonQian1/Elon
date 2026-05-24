@@ -1,8 +1,14 @@
 package com.elon.app
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.BatteryManager
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -11,10 +17,12 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
 import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -27,6 +35,9 @@ object McpDebugServer {
     private const val PORT = 8787
     private const val PROTOCOL_VERSION = "2025-06-18"
     private const val PREF_MCP_TOKEN = "mcp_debug_token"
+    private const val PREF_DEBUG_SESSION_ID = "mcp_debug_session_id"
+    private const val PREF_DEBUG_SESSION_STARTED_AT = "mcp_debug_session_started_at"
+    private const val PREF_DEBUG_SESSION_NOTE = "mcp_debug_session_note"
     private const val MAX_BODY_BYTES = 256 * 1024
     private const val MAX_HEADER_BYTES = 16 * 1024
     private const val SOCKET_TIMEOUT_MS = 5_000
@@ -184,6 +195,10 @@ object McpDebugServer {
                 DebugTraceStore.clear()
                 toolResult("Trace buffer cleared.", JSONObject().put("cleared", true))
             }
+            "debug_session" -> debugSession(args)
+            "diagnostic_bundle" -> diagnosticBundle(args)
+            "device_snapshot" -> deviceSnapshot(args)
+            "network_check" -> networkCheck(args)
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> debugKeepalive(args)
@@ -225,6 +240,125 @@ object McpDebugServer {
                     .put("since_wall_time_ms", sinceWallTimeMs ?: JSONObject.NULL)
             )
         return toolResult("Returned ${events.size} recent trace events.", structured)
+    }
+
+    private fun debugSession(args: JSONObject): JSONObject {
+        val action = args.optString("action", "status").lowercase(Locale.ROOT)
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val structured = when (action) {
+            "start" -> startDebugSession(
+                prefs = prefs,
+                requestedSessionId = args.optString("session_id").takeIf { it.isNotBlank() },
+                note = args.optString("note").takeIf { it.isNotBlank() }
+            ).put("action", action)
+            "end" -> {
+                val current = debugSessionJson(prefs)
+                prefs.edit()
+                    .remove(PREF_DEBUG_SESSION_ID)
+                    .remove(PREF_DEBUG_SESSION_STARTED_AT)
+                    .remove(PREF_DEBUG_SESSION_NOTE)
+                    .apply()
+                DebugTraceStore.record(
+                    "mcp_debug_session_end",
+                    mapOf("debug_session_id" to current.optString("session_id").takeIf { it.isNotBlank() })
+                )
+                debugSessionJson(prefs)
+                    .put("action", action)
+                    .put("ended_session", current)
+            }
+            "status" -> debugSessionJson(prefs).put("action", action)
+            else -> return toolResult(
+                "Unsupported debug session action: $action",
+                JSONObject().put("action", action),
+                isError = true
+            )
+        }
+        return toolResult("Debug session status returned.", structured)
+    }
+
+    private fun diagnosticBundle(args: JSONObject): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val session = if (args.optBoolean("start_session", false)) {
+            startDebugSession(
+                prefs = prefs,
+                requestedSessionId = args.optString("session_id").takeIf { it.isNotBlank() },
+                note = args.optString("note").takeIf { it.isNotBlank() }
+            )
+        } else {
+            debugSessionJson(prefs)
+        }
+        val sessionStartedAt = session.optLong("started_at_ms", 0L).takeIf { it > 0L }
+        val sinceWallTimeMs = args.optLong("since_wall_time_ms", 0L)
+            .takeIf { it > 0L }
+            ?: sessionStartedAt
+        val traceArgs = JSONObject()
+            .put("limit", args.optInt("trace_limit", 80).coerceIn(1, 300))
+            .put("since_wall_time_ms", sinceWallTimeMs ?: 0L)
+        args.optString("trace_id").takeIf { it.isNotBlank() }?.let { traceArgs.put("trace_id", it) }
+        args.optString("phase").takeIf { it.isNotBlank() }?.let { traceArgs.put("phase", it) }
+        args.optString("contains").takeIf { it.isNotBlank() }?.let { traceArgs.put("contains", it) }
+
+        val includeLogcat = if (args.has("include_logcat")) args.optBoolean("include_logcat") else true
+        val includeNetworkCheck = if (args.has("include_network_check")) args.optBoolean("include_network_check") else true
+        val includeUpdateCheck = args.optBoolean("include_update_check", false)
+        val logcatArgs = JSONObject()
+            .put("line_count", args.optInt("logcat_line_count", 240).coerceIn(20, 1_000))
+            .put(
+                "pattern",
+                args.optString(
+                    "logcat_pattern",
+                    "ElonTrace|ElonTaskWork|ElonWsClient|ElonMcpServer|AndroidRuntime|FATAL EXCEPTION|ANR|ForegroundService"
+                )
+            )
+        val selfCheck = mcpSelfCheck(JSONObject().put("include_update_check", includeUpdateCheck))
+            .optJSONObject("structuredContent")
+            ?: JSONObject()
+        val trace = traceRecent(traceArgs).optJSONObject("structuredContent") ?: JSONObject()
+        val taskEvents = taskEvents(JSONObject().put("limit", args.optInt("task_event_limit", 20).coerceIn(1, 120)))
+            .optJSONObject("structuredContent")
+            ?: JSONObject()
+        val logcat = if (includeLogcat) {
+            logcatRecent(logcatArgs).optJSONObject("structuredContent") ?: JSONObject()
+        } else {
+            JSONObject.NULL
+        }
+        val network = if (includeNetworkCheck) {
+            networkCheck(JSONObject()).optJSONObject("structuredContent") ?: JSONObject()
+        } else {
+            JSONObject.NULL
+        }
+
+        DebugTraceStore.record(
+            "mcp_diagnostic_bundle",
+            mapOf(
+                "debug_session_id" to session.optString("session_id").takeIf { it.isNotBlank() },
+                "include_logcat" to includeLogcat,
+                "include_network_check" to includeNetworkCheck,
+                "since_wall_time_ms" to sinceWallTimeMs
+            )
+        )
+        val structured = JSONObject()
+            .put("generated_at_ms", System.currentTimeMillis())
+            .put("debug_session", session)
+            .put("since_wall_time_ms", sinceWallTimeMs ?: JSONObject.NULL)
+            .put("status", statusJson(includeToken = false))
+            .put("self_check", selfCheck)
+            .put("device_snapshot", deviceSnapshotJson())
+            .put("network_check", network)
+            .put("task_status", taskStatusJson(JSONObject()))
+            .put("task_events", taskEvents)
+            .put("trace_recent", trace)
+            .put("logcat_recent", logcat)
+            .put("metrics", metricsJson())
+        return toolResult("Diagnostic bundle returned.", structured, isError = selfCheck.optBoolean("ready", true).not())
+    }
+
+    private fun deviceSnapshot(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
+        return toolResult("Device snapshot returned.", deviceSnapshotJson())
+    }
+
+    private fun networkCheck(args: JSONObject): JSONObject {
+        return toolResult("Network check returned.", networkCheckJson(args))
     }
 
     private fun mcpSelfCheck(args: JSONObject): JSONObject {
@@ -626,6 +760,62 @@ object McpDebugServer {
                 )
                 .put(
                     tool(
+                        name = "debug_session",
+                        title = "Debug Session",
+                        description = "Start, end, or inspect a named MCP debug session marker so later diagnostic bundles can return only the relevant trace window.",
+                        properties = JSONObject()
+                            .put("action", stringProperty("One of start, status, or end. Defaults to status."))
+                            .put("session_id", stringProperty("Optional caller-provided session id for action=start."))
+                            .put("note", stringProperty("Optional human note stored with the session.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "diagnostic_bundle",
+                        title = "Diagnostic Bundle",
+                        description = "Return one compact APK debug bundle: status, self-check, device snapshot, network check, task status/events, filtered trace, logcat, and metrics.",
+                        properties = JSONObject()
+                            .put("start_session", booleanProperty("Start a debug session before collecting the bundle. Defaults to false."))
+                            .put("session_id", stringProperty("Optional debug session id when start_session=true."))
+                            .put("note", stringProperty("Optional debug session note when start_session=true."))
+                            .put("since_wall_time_ms", intProperty("Only include trace events after this wall time. Defaults to the active debug session start."))
+                            .put("trace_limit", intProperty("Maximum trace events to return, 1-300. Defaults to 80."))
+                            .put("trace_id", stringProperty("Optional trace id filter for trace_recent."))
+                            .put("phase", stringProperty("Optional exact phase filter for trace_recent."))
+                            .put("contains", stringProperty("Optional trace text filter."))
+                            .put("include_logcat", booleanProperty("Include filtered logcat. Defaults to true."))
+                            .put("logcat_line_count", intProperty("Raw logcat lines to scan, 20-1000. Defaults to 240."))
+                            .put("logcat_pattern", stringProperty("Regex filter for logcat. Defaults to Elon/crash/foreground-service tags."))
+                            .put("include_network_check", booleanProperty("Include backend network probes. Defaults to true."))
+                            .put("include_update_check", booleanProperty("Include server version.json in self-check. Defaults to false."))
+                            .put("task_event_limit", intProperty("Maximum queued task events to return, 1-120. Defaults to 20.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "device_snapshot",
+                        title = "Device Snapshot",
+                        description = "Return local device/app runtime facts useful for debugging: memory, battery, network capabilities, build info, and keepalive status.",
+                        properties = JSONObject(),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "network_check",
+                        title = "Network Check",
+                        description = "Probe backend HTTP endpoints and TCP reachability from inside the APK process.",
+                        properties = JSONObject()
+                            .put("urls", arrayProperty("Optional HTTP URLs to probe. Defaults to server /health and /app/version.json."))
+                            .put("tcp_host", stringProperty("Optional TCP host to probe. Defaults to 43.139.149.158."))
+                            .put("tcp_port", intProperty("Optional TCP port to probe. Defaults to 8080.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
                         name = "mcp_self_check",
                         title = "MCP Self Check",
                         description = "Run a one-shot local health check for MCP server reachability, background keepalive, trace storage, queued events, and request metrics.",
@@ -760,6 +950,9 @@ object McpDebugServer {
 
     private fun booleanProperty(description: String) =
         JSONObject().put("type", "boolean").put("description", description)
+
+    private fun arrayProperty(description: String) =
+        JSONObject().put("type", "array").put("description", description).put("items", JSONObject().put("type", "string"))
 
     private fun statusJson(includeToken: Boolean): JSONObject {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
@@ -987,6 +1180,214 @@ object McpDebugServer {
             event.details.forEach { (key, value) ->
                 append(' ').append(key).append('=').append(value)
             }
+        }
+    }
+
+    private fun startDebugSession(
+        prefs: SharedPreferences,
+        requestedSessionId: String?,
+        note: String?
+    ): JSONObject {
+        val sessionId = requestedSessionId ?: "mcp_session_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
+        val startedAt = System.currentTimeMillis()
+        prefs.edit()
+            .putString(PREF_DEBUG_SESSION_ID, sessionId)
+            .putLong(PREF_DEBUG_SESSION_STARTED_AT, startedAt)
+            .apply {
+                if (note == null) remove(PREF_DEBUG_SESSION_NOTE) else putString(PREF_DEBUG_SESSION_NOTE, note)
+            }
+            .apply()
+        DebugTraceStore.record(
+            "mcp_debug_session_start",
+            mapOf("debug_session_id" to sessionId, "note" to note)
+        )
+        return debugSessionJson(prefs)
+    }
+
+    private fun debugSessionJson(prefs: SharedPreferences): JSONObject {
+        val sessionId = prefs.getString(PREF_DEBUG_SESSION_ID, null)?.takeIf { it.isNotBlank() }
+        val startedAt = prefs.getLong(PREF_DEBUG_SESSION_STARTED_AT, 0L).takeIf { it > 0L }
+        return JSONObject()
+            .put("active", sessionId != null && startedAt != null)
+            .put("session_id", sessionId ?: JSONObject.NULL)
+            .put("started_at_ms", startedAt ?: JSONObject.NULL)
+            .put("age_ms", startedAt?.let { System.currentTimeMillis() - it } ?: JSONObject.NULL)
+            .put("note", prefs.getString(PREF_DEBUG_SESSION_NOTE, null) ?: JSONObject.NULL)
+    }
+
+    private fun deviceSnapshotJson(): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        return JSONObject()
+            .put("wall_time_ms", System.currentTimeMillis())
+            .put("elapsed_realtime_ms", SystemClock.elapsedRealtime())
+            .put("timezone", TimeZone.getDefault().id)
+            .put("app", statusJson(includeToken = false))
+            .put("debug_session", debugSessionJson(prefs))
+            .put("memory", memoryJson())
+            .put("battery", batteryJson())
+            .put("network", networkCapabilitiesJson())
+            .put("build", buildJson())
+    }
+
+    private fun memoryJson(): JSONObject {
+        val runtime = Runtime.getRuntime()
+        val activityManager = appContext.getSystemService(ActivityManager::class.java)
+        val memoryInfo = ActivityManager.MemoryInfo()
+        runCatching { activityManager.getMemoryInfo(memoryInfo) }
+        return JSONObject()
+            .put("runtime_max_bytes", runtime.maxMemory())
+            .put("runtime_total_bytes", runtime.totalMemory())
+            .put("runtime_free_bytes", runtime.freeMemory())
+            .put("runtime_used_bytes", runtime.totalMemory() - runtime.freeMemory())
+            .put("system_avail_bytes", memoryInfo.availMem)
+            .put("system_total_bytes", memoryInfo.totalMem)
+            .put("system_threshold_bytes", memoryInfo.threshold)
+            .put("system_low_memory", memoryInfo.lowMemory)
+    }
+
+    private fun batteryJson(): JSONObject {
+        val intent = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val temperatureTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+            ?: Int.MIN_VALUE
+        return JSONObject()
+            .put("level_percent", if (level >= 0 && scale > 0) (level * 100.0 / scale) else JSONObject.NULL)
+            .put("status", batteryStatusName(status))
+            .put("plugged", plugged != 0)
+            .put("plugged_kind", batteryPluggedKind(plugged))
+            .put(
+                "temperature_c",
+                if (temperatureTenths != Int.MIN_VALUE) temperatureTenths / 10.0 else JSONObject.NULL
+            )
+            .put("voltage_mv", intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)?.takeIf { it >= 0 } ?: JSONObject.NULL)
+    }
+
+    private fun batteryStatusName(status: Int): String {
+        return when (status) {
+            BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> "discharging"
+            BatteryManager.BATTERY_STATUS_FULL -> "full"
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "not_charging"
+            else -> "unknown"
+        }
+    }
+
+    private fun batteryPluggedKind(plugged: Int): String {
+        return when {
+            plugged and BatteryManager.BATTERY_PLUGGED_USB != 0 -> "usb"
+            plugged and BatteryManager.BATTERY_PLUGGED_AC != 0 -> "ac"
+            plugged and BatteryManager.BATTERY_PLUGGED_WIRELESS != 0 -> "wireless"
+            else -> "none"
+        }
+    }
+
+    private fun networkCapabilitiesJson(): JSONObject {
+        val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+        val network = connectivity.activeNetwork
+        val caps = network?.let { connectivity.getNetworkCapabilities(it) }
+        return JSONObject()
+            .put("active", network != null)
+            .put("internet", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false)
+            .put("validated", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ?: false)
+            .put("not_metered", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) ?: false)
+            .put("transports", JSONArray().apply {
+                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) put("wifi")
+                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true) put("cellular")
+                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true) put("ethernet")
+                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) put("vpn")
+            })
+    }
+
+    private fun buildJson(): JSONObject {
+        return JSONObject()
+            .put("manufacturer", Build.MANUFACTURER)
+            .put("brand", Build.BRAND)
+            .put("model", Build.MODEL)
+            .put("device", Build.DEVICE)
+            .put("sdk_int", Build.VERSION.SDK_INT)
+            .put("release", Build.VERSION.RELEASE)
+            .put("supported_abis", JSONArray().apply { Build.SUPPORTED_ABIS.forEach { put(it) } })
+    }
+
+    private fun networkCheckJson(args: JSONObject): JSONObject {
+        val urls = urlsFromArgs(args)
+        val tcpHost = args.optString("tcp_host").takeIf { it.isNotBlank() } ?: "43.139.149.158"
+        val tcpPort = args.optInt("tcp_port", 8080).takeIf { it in 1..65535 } ?: 8080
+        return JSONObject()
+            .put("network", networkCapabilitiesJson())
+            .put("tcp_probe", tcpProbe(tcpHost, tcpPort))
+            .put("http_probes", JSONArray().apply { urls.forEach { put(httpProbe(it)) } })
+    }
+
+    private fun urlsFromArgs(args: JSONObject): List<String> {
+        val array = args.optJSONArray("urls")
+        if (array != null && array.length() > 0) {
+            return buildList {
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let { add(it) }
+                }
+            }.ifEmpty { defaultProbeUrls() }
+        }
+        return defaultProbeUrls()
+    }
+
+    private fun defaultProbeUrls() = listOf(
+        "http://43.139.149.158:8080/health",
+        "http://43.139.149.158:8080/app/version.json"
+    )
+
+    private fun tcpProbe(host: String, port: Int): JSONObject {
+        val started = SystemClock.elapsedRealtime()
+        return runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), 5_000)
+            }
+            JSONObject()
+                .put("host", host)
+                .put("port", port)
+                .put("ok", true)
+                .put("duration_ms", SystemClock.elapsedRealtime() - started)
+        }.getOrElse { error ->
+            JSONObject()
+                .put("host", host)
+                .put("port", port)
+                .put("ok", false)
+                .put("duration_ms", SystemClock.elapsedRealtime() - started)
+                .put("error", error.message ?: error.javaClass.simpleName)
+        }
+    }
+
+    private fun httpProbe(url: String): JSONObject {
+        val started = SystemClock.elapsedRealtime()
+        return runCatching {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5_000
+                readTimeout = 5_000
+            }
+            try {
+                val code = connection.responseCode
+                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                val preview = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText().take(512) }
+                JSONObject()
+                    .put("url", url)
+                    .put("ok", code in 200..299)
+                    .put("status_code", code)
+                    .put("duration_ms", SystemClock.elapsedRealtime() - started)
+                    .put("content_type", connection.contentType ?: JSONObject.NULL)
+                    .put("body_preview", preview ?: JSONObject.NULL)
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrElse { error ->
+            JSONObject()
+                .put("url", url)
+                .put("ok", false)
+                .put("duration_ms", SystemClock.elapsedRealtime() - started)
+                .put("error", error.message ?: error.javaClass.simpleName)
         }
     }
 
