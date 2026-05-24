@@ -1,15 +1,19 @@
 package com.elon.app
 
+import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
@@ -199,6 +203,7 @@ object McpDebugServer {
             "diagnostic_bundle" -> diagnosticBundle(args)
             "device_snapshot" -> deviceSnapshot(args)
             "network_check" -> networkCheck(args)
+            "background_debug_status" -> backgroundDebugStatus(args)
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> debugKeepalive(args)
@@ -327,6 +332,16 @@ object McpDebugServer {
         } else {
             JSONObject.NULL
         }
+        val backgroundRuntime = backgroundDebugStatusJson()
+        val taskStatus = taskStatusJson(JSONObject())
+        val assessment = diagnosticAssessmentJson(
+            selfCheck = selfCheck,
+            backgroundRuntime = backgroundRuntime,
+            network = network,
+            taskStatus = taskStatus,
+            trace = trace,
+            logcat = logcat
+        )
 
         DebugTraceStore.record(
             "mcp_diagnostic_bundle",
@@ -334,6 +349,7 @@ object McpDebugServer {
                 "debug_session_id" to session.optString("session_id").takeIf { it.isNotBlank() },
                 "include_logcat" to includeLogcat,
                 "include_network_check" to includeNetworkCheck,
+                "assessment" to assessment.optString("severity"),
                 "since_wall_time_ms" to sinceWallTimeMs
             )
         )
@@ -341,11 +357,13 @@ object McpDebugServer {
             .put("generated_at_ms", System.currentTimeMillis())
             .put("debug_session", session)
             .put("since_wall_time_ms", sinceWallTimeMs ?: JSONObject.NULL)
+            .put("assessment", assessment)
             .put("status", statusJson(includeToken = false))
             .put("self_check", selfCheck)
+            .put("background_debug", backgroundRuntime)
             .put("device_snapshot", deviceSnapshotJson())
             .put("network_check", network)
-            .put("task_status", taskStatusJson(JSONObject()))
+            .put("task_status", taskStatus)
             .put("task_events", taskEvents)
             .put("trace_recent", trace)
             .put("logcat_recent", logcat)
@@ -361,16 +379,27 @@ object McpDebugServer {
         return toolResult("Network check returned.", networkCheckJson(args))
     }
 
+    private fun backgroundDebugStatus(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
+        return toolResult("Background debug status returned.", backgroundDebugStatusJson())
+    }
+
     private fun mcpSelfCheck(args: JSONObject): JSONObject {
         val includeUpdateCheck = args.optBoolean("include_update_check", false)
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
         val status = statusJson(includeToken = false)
         val taskStatus = taskStatusJson(JSONObject())
         val keepalive = McpDebugKeepAliveService.statusJson(appContext)
+        val backgroundRuntime = backgroundDebugStatusJson()
         val queuedEvents = queuedTaskEvents(prefs)
         val checks = JSONArray()
-        fun addCheck(name: String, ok: Boolean, detail: String) {
-            checks.put(JSONObject().put("name", name).put("ok", ok).put("detail", detail))
+        fun addCheck(name: String, ok: Boolean, detail: String, critical: Boolean = true) {
+            checks.put(
+                JSONObject()
+                    .put("name", name)
+                    .put("ok", ok)
+                    .put("critical", critical)
+                    .put("detail", detail)
+            )
         }
 
         val appForeground = status.optBoolean("app_foreground", false)
@@ -381,7 +410,7 @@ object McpDebugServer {
             appForeground || keepaliveActive,
             if (appForeground) "App is foreground; keepalive is optional." else "Foreground keepalive must be active while app is background."
         )
-        addCheck("trace_buffer", DebugTraceStore.count() > 0, "Trace buffer has ${DebugTraceStore.count()} persisted events.")
+        addCheck("trace_buffer", DebugTraceStore.count() > 0, "Trace buffer has ${DebugTraceStore.count()} persisted events.", critical = false)
         addCheck(
             "request_health",
             lastError == null,
@@ -390,7 +419,26 @@ object McpDebugServer {
         addCheck(
             "task_queue",
             queuedEvents.size <= 120,
-            "Queued background task events: ${queuedEvents.size}."
+            "Queued background task events: ${queuedEvents.size}.",
+            critical = false
+        )
+        addCheck(
+            "notification_permission",
+            backgroundRuntime.optJSONObject("notification_permission")?.optBoolean("granted", true) ?: true,
+            "Notification permission affects whether the user can see background debug/task service notifications.",
+            critical = false
+        )
+        addCheck(
+            "battery_optimization",
+            backgroundRuntime.optJSONObject("battery_optimization")?.optBoolean("ignoring", true) ?: true,
+            "Battery optimization may let the system defer background work on some Android builds.",
+            critical = false
+        )
+        addCheck(
+            "network_validated",
+            backgroundRuntime.optJSONObject("network")?.optBoolean("validated", true) ?: true,
+            "Validated network helps distinguish phone network issues from server or APK issues.",
+            critical = false
         )
 
         val recommendations = JSONArray()
@@ -406,17 +454,26 @@ object McpDebugServer {
         if (queuedEvents.isNotEmpty()) {
             recommendations.put("Call task_events to inspect messages queued while the app UI was backgrounded.")
         }
+        backgroundRuntime.optJSONArray("recommendations")?.let { runtimeRecommendations ->
+            for (index in 0 until runtimeRecommendations.length()) {
+                runtimeRecommendations.optString(index).takeIf { it.isNotBlank() }?.let { recommendations.put(it) }
+            }
+        }
 
         val updateStatus = if (includeUpdateCheck) {
             updateStatus(JSONObject()).optJSONObject("structuredContent") ?: JSONObject.NULL
         } else {
             JSONObject.NULL
         }
-        val ready = (0 until checks.length()).all { checks.optJSONObject(it)?.optBoolean("ok") == true }
+        val ready = (0 until checks.length()).all { check ->
+            val item = checks.optJSONObject(check) ?: return@all false
+            !item.optBoolean("critical", true) || item.optBoolean("ok", false)
+        }
         val structured = JSONObject()
             .put("ready", ready)
             .put("status", status)
             .put("task_status", taskStatus)
+            .put("background_debug", backgroundRuntime)
             .put("metrics", metricsJson())
             .put("queued_task_event_count", queuedEvents.size)
             .put("checks", checks)
@@ -811,6 +868,15 @@ object McpDebugServer {
                             .put("urls", arrayProperty("Optional HTTP URLs to probe. Defaults to server /health and /app/version.json."))
                             .put("tcp_host", stringProperty("Optional TCP host to probe. Defaults to 43.139.149.158."))
                             .put("tcp_port", intProperty("Optional TCP port to probe. Defaults to 8080.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "background_debug_status",
+                        title = "Background Debug Status",
+                        description = "Return whether MCP is likely to remain reachable while the user switches to WeChat or another app, including keepalive, notification permission, battery optimization, and network validation.",
+                        properties = JSONObject(),
                         required = JSONArray()
                     )
                 )
@@ -1223,10 +1289,275 @@ object McpDebugServer {
             .put("timezone", TimeZone.getDefault().id)
             .put("app", statusJson(includeToken = false))
             .put("debug_session", debugSessionJson(prefs))
+            .put("background_debug", backgroundDebugStatusJson())
             .put("memory", memoryJson())
             .put("battery", batteryJson())
             .put("network", networkCapabilitiesJson())
             .put("build", buildJson())
+    }
+
+    private fun backgroundDebugStatusJson(): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val appForeground = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
+        val keepalive = McpDebugKeepAliveService.statusJson(appContext)
+        val notificationPermission = notificationPermissionJson()
+        val batteryOptimization = batteryOptimizationJson()
+        val network = networkCapabilitiesJson()
+        val keepaliveActive = keepalive.optBoolean("active", false)
+        val caveats = JSONArray()
+        val recommendations = JSONArray()
+
+        fun warn(message: String, recommendation: String) {
+            caveats.put(message)
+            recommendations.put(recommendation)
+        }
+
+        if (!appForeground && !keepaliveActive) {
+            warn(
+                "App is backgrounded and MCP debug keepalive is not active.",
+                "Call debug_keepalive with action=start before switching to another app."
+            )
+        }
+        if (!notificationPermission.optBoolean("granted", true)) {
+            warn(
+                "Notification permission is denied, so the user may not see foreground debug/task status.",
+                "Open the APK once and allow notifications for clearer background debugging."
+            )
+        }
+        if (!batteryOptimization.optBoolean("ignoring", true)) {
+            warn(
+                "Battery optimization is still enabled for this APK.",
+                "Ask the user to allow unrestricted/background battery usage if MCP becomes unreachable after long idle or lock screen."
+            )
+        }
+        if (batteryOptimization.optBoolean("power_save_mode", false)) {
+            warn(
+                "System power save mode is active.",
+                "Disable power save mode while collecting timing traces for more stable background behavior."
+            )
+        }
+        if (!network.optBoolean("active", false) || !network.optBoolean("internet", false)) {
+            warn(
+                "No active internet-capable network is reported by Android.",
+                "Reconnect Wi-Fi/cellular before testing chat latency or backend reachability."
+            )
+        } else if (!network.optBoolean("validated", false)) {
+            warn(
+                "Android reports the active network is not validated.",
+                "Use network_check to separate captive-portal/phone-network issues from backend issues."
+            )
+        }
+
+        val backgroundReachable = appForeground || keepaliveActive
+        val reachability = when {
+            !backgroundReachable -> "foreground_only"
+            caveats.length() > 0 -> "at_risk"
+            else -> "ready"
+        }
+
+        return JSONObject()
+            .put("app_foreground", appForeground)
+            .put("background_reachable", backgroundReachable)
+            .put("reachability", reachability)
+            .put("keepalive", keepalive)
+            .put("notification_permission", notificationPermission)
+            .put("battery_optimization", batteryOptimization)
+            .put("network", network)
+            .put("caveats", caveats)
+            .put("recommendations", recommendations)
+    }
+
+    private fun diagnosticAssessmentJson(
+        selfCheck: JSONObject,
+        backgroundRuntime: JSONObject,
+        network: Any,
+        taskStatus: JSONObject,
+        trace: JSONObject,
+        logcat: Any
+    ): JSONObject {
+        val findings = JSONArray()
+        val nextActions = JSONArray()
+        var rank = 0
+
+        fun addFinding(severity: String, area: String, detail: String, action: String) {
+            val currentRank = when (severity) {
+                "error" -> 3
+                "warning" -> 2
+                "info" -> 1
+                else -> 0
+            }
+            rank = maxOf(rank, currentRank)
+            findings.put(
+                JSONObject()
+                    .put("severity", severity)
+                    .put("area", area)
+                    .put("detail", detail)
+                    .put("action", action)
+            )
+            nextActions.put(action)
+        }
+
+        if (!selfCheck.optBoolean("ready", true)) {
+            addFinding(
+                "error",
+                "mcp_self_check",
+                "A critical MCP self-check failed.",
+                "Inspect self_check.checks where critical=true and ok=false."
+            )
+        }
+
+        if (!backgroundRuntime.optBoolean("background_reachable", true)) {
+            addFinding(
+                "error",
+                "background",
+                "MCP may stop being reachable when the user leaves the APK.",
+                "Call debug_keepalive action=start, then verify background_debug_status.background_reachable=true."
+            )
+        } else if (backgroundRuntime.optString("reachability") == "at_risk") {
+            addFinding(
+                "warning",
+                "background",
+                "Background MCP is active but Android environment has risk factors.",
+                "Review background_debug.caveats before collecting long-running traces."
+            )
+        }
+
+        val networkJson = network as? JSONObject
+        if (networkJson != null) {
+            val activeNetwork = networkJson.optJSONObject("network")
+            if (activeNetwork != null && (!activeNetwork.optBoolean("active") || !activeNetwork.optBoolean("internet"))) {
+                addFinding(
+                    "error",
+                    "network",
+                    "Phone has no active internet-capable network.",
+                    "Reconnect Wi-Fi/cellular, then call network_check again."
+                )
+            }
+            val tcpOk = networkJson.optJSONObject("tcp_probe")?.optBoolean("ok", true) ?: true
+            if (!tcpOk) {
+                addFinding(
+                    "error",
+                    "network",
+                    "Phone cannot open a TCP connection to the backend.",
+                    "Check phone network, server port 8080, and carrier/Wi-Fi firewall before debugging chat latency."
+                )
+            }
+            val httpProbes = networkJson.optJSONArray("http_probes")
+            if (httpProbes != null) {
+                var failed = 0
+                for (index in 0 until httpProbes.length()) {
+                    if (httpProbes.optJSONObject(index)?.optBoolean("ok", true) == false) failed += 1
+                }
+                if (failed > 0) {
+                    addFinding(
+                        "warning",
+                        "network",
+                        "$failed backend HTTP probe(s) failed from the phone.",
+                        "Inspect network_check.http_probes for status_code/error and compare with desktop curl."
+                    )
+                }
+            }
+        }
+
+        when (taskStatus.optString("status")) {
+            "error" -> addFinding(
+                "error",
+                "task",
+                "The latest traced phone task finished with an error.",
+                "Open task_status.last_message_preview and trace_recent events for the active trace_id."
+            )
+            "rejected_busy" -> addFinding(
+                "warning",
+                "task",
+                "A new task was rejected because another phone task was active.",
+                "Wait for the active trace_id to finish or call task_control action=pause before retrying."
+            )
+        }
+        val pendingAgeMs = taskStatus.optLong("pending_work_age_ms", 0L)
+        if (taskStatus.optBoolean("busy", false) && pendingAgeMs > 10 * 60 * 1000L) {
+            addFinding(
+                "warning",
+                "task",
+                "A phone task has been pending for more than 10 minutes.",
+                "Use diagnostic_bundle with trace_id=${taskStatus.optString("trace_id")} and inspect ws/task phases."
+            )
+        }
+
+        val matchedTraceCount = trace.optInt("matched_count", 0)
+        if (matchedTraceCount == 0) {
+            addFinding(
+                "info",
+                "trace",
+                "No trace events matched the diagnostic window.",
+                "Start a debug_session before reproducing the issue, then call diagnostic_bundle again."
+            )
+        }
+
+        val logcatJson = logcat as? JSONObject
+        val logLines = logcatJson?.optJSONArray("lines")
+        if (logLines != null) {
+            var crashLines = 0
+            for (index in 0 until logLines.length()) {
+                val line = logLines.optString(index)
+                if (
+                    line.contains("FATAL EXCEPTION", ignoreCase = true) ||
+                    line.contains("AndroidRuntime", ignoreCase = true) ||
+                    line.contains("ANR", ignoreCase = true)
+                ) {
+                    crashLines += 1
+                }
+            }
+            if (crashLines > 0) {
+                addFinding(
+                    "error",
+                    "logcat",
+                    "Logcat contains $crashLines crash/ANR related line(s).",
+                    "Inspect logcat_recent.lines before retrying; crash noise may explain missing chat timing events."
+                )
+            }
+        }
+
+        val severity = when (rank) {
+            3 -> "error"
+            2 -> "warning"
+            1 -> "info"
+            else -> "ok"
+        }
+        val summary = when (severity) {
+            "error" -> "Critical issue found; fix the failing area before trusting latency results."
+            "warning" -> "MCP is usable, but the bundle found risk factors that may affect debugging."
+            "info" -> "MCP is usable; collect a fresh debug session if the trace window is empty."
+            else -> "MCP debug environment looks ready."
+        }
+        return JSONObject()
+            .put("severity", severity)
+            .put("summary", summary)
+            .put("findings", findings)
+            .put("next_actions", nextActions)
+    }
+
+    private fun notificationPermissionJson(): JSONObject {
+        val requiresRuntimePermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        val granted = !requiresRuntimePermission ||
+            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        return JSONObject()
+            .put("permission", Manifest.permission.POST_NOTIFICATIONS)
+            .put("requires_runtime_permission", requiresRuntimePermission)
+            .put("granted", granted)
+    }
+
+    private fun batteryOptimizationJson(): JSONObject {
+        val powerManager = appContext.getSystemService(PowerManager::class.java)
+        val ignoring = runCatching {
+            powerManager.isIgnoringBatteryOptimizations(appContext.packageName)
+        }.getOrDefault(true)
+        val powerSaveMode = runCatching { powerManager.isPowerSaveMode }.getOrDefault(false)
+        return JSONObject()
+            .put("ignoring", ignoring)
+            .put("power_save_mode", powerSaveMode)
+            .put("request_intent_action", Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .put("request_intent_data", "package:${appContext.packageName}")
     }
 
     private fun memoryJson(): JSONObject {
