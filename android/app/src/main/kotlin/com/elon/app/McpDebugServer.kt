@@ -16,6 +16,7 @@ import java.net.URL
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 object McpDebugServer {
     private const val TAG = "ElonMcpServer"
@@ -141,6 +142,8 @@ object McpDebugServer {
             }
             "debug_keepalive" -> debugKeepalive(args)
             "update_status" -> updateStatus(args)
+            "task_status" -> taskStatus(args)
+            "logcat_recent" -> logcatRecent(args)
             "chat_send" -> chatSend(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
         }
@@ -210,12 +213,79 @@ object McpDebugServer {
         return toolResult("APK update status returned.", structured, isError = server == null)
     }
 
+    private fun taskStatus(args: JSONObject): JSONObject {
+        return toolResult("Task status returned.", taskStatusJson(args))
+    }
+
+    private fun logcatRecent(args: JSONObject): JSONObject {
+        val lineCount = args.optInt("line_count", 300).coerceIn(20, 1_000)
+        val pattern = args.optString(
+            "pattern",
+            "ElonTrace|ElonTaskWork|ElonWsClient|ElonMcpServer|AndroidRuntime|FATAL EXCEPTION|ANR"
+        ).takeIf { it.isNotBlank() }
+            ?: "ElonTrace|ElonTaskWork|ElonWsClient|ElonMcpServer|AndroidRuntime|FATAL EXCEPTION|ANR"
+        val regex = runCatching { Regex(pattern) }.getOrElse {
+            return toolResult(
+                "Invalid logcat pattern.",
+                JSONObject().put("pattern", pattern).put("error", it.message),
+                isError = true
+            )
+        }
+        val command = listOf("logcat", "-d", "-v", "time", "-t", lineCount.toString())
+        val process = runCatching { ProcessBuilder(command).redirectErrorStream(true).start() }.getOrElse {
+            return toolResult(
+                "Could not start logcat.",
+                JSONObject().put("error", it.message),
+                isError = true
+            )
+        }
+        val finished = process.waitFor(3, TimeUnit.SECONDS)
+        if (!finished) {
+            process.destroy()
+            return toolResult(
+                "logcat timed out.",
+                JSONObject().put("timeout_ms", 3_000),
+                isError = true
+            )
+        }
+        val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val lines = output
+            .lineSequence()
+            .filter { regex.containsMatchIn(it) }
+            .toList()
+            .takeLast(300)
+        val structured = JSONObject()
+            .put("line_count", lineCount)
+            .put("pattern", pattern)
+            .put("limited_by_android_log_permissions", true)
+            .put("lines", JSONArray().apply { lines.forEach { put(it) } })
+        return toolResult("Filtered logcat returned.", structured)
+    }
+
     private fun chatSend(args: JSONObject): JSONObject {
         val message = args.optString("message").trim()
         if (message.isEmpty()) {
             return toolResult("message is required", JSONObject().put("field", "message"), isError = true)
         }
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val force = args.optBoolean("force", false)
+        if (isTaskBusy(prefs) && !force) {
+            val structured = taskStatusJson(JSONObject())
+                .put("rejected", true)
+                .put("reason", "busy")
+            DebugTraceStore.record(
+                "mcp_chat_rejected_busy",
+                mapOf(
+                    "active_trace_id" to structured.optString("trace_id").takeIf { it.isNotBlank() },
+                    "message_chars" to message.length
+                )
+            )
+            return toolResult(
+                "Phone already has an active task. Pass force=true to override, or wait for completion.",
+                structured,
+                isError = true
+            )
+        }
         val userId = prefs.getString(TaskWorkService.PREF_USER_ID, null)
             ?: UUID.randomUUID().toString().replace("-", "").also {
                 prefs.edit().putString(TaskWorkService.PREF_USER_ID, it).apply()
@@ -247,6 +317,7 @@ object McpDebugServer {
             action = TaskWorkService.ACTION_START_WORK
             putExtra(TaskWorkService.EXTRA_PAYLOAD, payload.toString())
             putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
+            putExtra(TaskWorkService.EXTRA_FORCE_START, force)
         }
         ContextCompat.startForegroundService(appContext, intent)
 
@@ -255,6 +326,7 @@ object McpDebugServer {
             .put("project_id", projectId)
             .put("project_title", projectTitle)
             .put("is_development", isDevelopment)
+            .put("force", force)
             .put("message_chars", message.length)
         return toolResult("Chat request queued on phone.", structured)
     }
@@ -329,6 +401,27 @@ object McpDebugServer {
                 )
                 .put(
                     tool(
+                        name = "task_status",
+                        title = "Task Status",
+                        description = "Return the active or most recent task status with timing milestones and last message preview.",
+                        properties = JSONObject()
+                            .put("trace_id", stringProperty("Optional trace id. Defaults to current pending task or latest traced task.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "logcat_recent",
+                        title = "Recent Logcat",
+                        description = "Return filtered recent logcat lines visible to the APK process.",
+                        properties = JSONObject()
+                            .put("line_count", intProperty("Raw logcat lines to scan, 20-1000. Defaults to 300."))
+                            .put("pattern", stringProperty("Regex filter. Defaults to Elon/AndroidRuntime crash tags.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
                         name = "chat_send",
                         title = "Send Chat",
                         description = "Queue a chat request on the phone through the same TaskWorkService path used by the UI.",
@@ -338,7 +431,8 @@ object McpDebugServer {
                             .put("project_title", stringProperty("Optional project title."))
                             .put("agent", stringProperty("Optional backend agent id, such as codex_cli."))
                             .put("trace_id", stringProperty("Optional caller-provided trace id."))
-                            .put("is_development", booleanProperty("Whether this should be treated as a development task.")),
+                            .put("is_development", booleanProperty("Whether this should be treated as a development task."))
+                            .put("force", booleanProperty("Override an active phone task. Defaults to false.")),
                         required = JSONArray().put("message")
                     )
                 )
@@ -383,6 +477,7 @@ object McpDebugServer {
     private fun statusJson(includeToken: Boolean): JSONObject {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
         val pendingPayload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
+        val pendingTask = pendingTaskJson(prefs)
         return JSONObject()
             .put("package_name", appContext.packageName)
             .put("version_name", BuildConfig.VERSION_NAME)
@@ -402,6 +497,9 @@ object McpDebugServer {
             .put("user_id", prefs.getString(TaskWorkService.PREF_USER_ID, null))
             .put("active_project_id", prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null))
             .put("pending_work", !pendingPayload.isNullOrBlank())
+            .put("busy", isTaskBusy(prefs))
+            .put("active_trace_id", pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() })
+            .put("active_task_kind", if (pendingPayload.isNullOrBlank()) null else pendingTaskKind(prefs))
             .put("pending_work_age_ms", pendingWorkAgeMs(prefs))
             .put("trace_events", DebugTraceStore.count())
             .apply {
@@ -409,9 +507,94 @@ object McpDebugServer {
             }
     }
 
+    private fun taskStatusJson(args: JSONObject): JSONObject {
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val pendingTask = pendingTaskJson(prefs)
+        val requestedTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
+        val events = DebugTraceStore.recentEvents(300)
+        val traceId = requestedTraceId
+            ?: pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() }
+            ?: latestTraceId(events)
+        val traceEvents = if (traceId == null) {
+            emptyList()
+        } else {
+            events.filter { it.details["trace_id"] == traceId }
+        }
+        val finish = traceEvents.lastOrNull {
+            it.phase == "task_finish_done" || it.phase == "task_finish_error"
+        }
+        val rejected = traceEvents.lastOrNull {
+            it.phase == "task_start_rejected_busy" || it.phase == "mcp_chat_rejected_busy"
+        }
+        val status = when {
+            finish?.phase == "task_finish_done" -> "done"
+            finish?.phase == "task_finish_error" -> "error"
+            rejected != null && traceEvents.none { it.phase == "task_start_work" } -> "rejected_busy"
+            isTaskBusy(prefs) && traceId != null && pendingTask?.optString("trace_id") == traceId -> "running"
+            traceEvents.any { it.phase == "task_payload_sent" } -> "sent"
+            traceEvents.any { it.phase == "task_start_work" } -> "started"
+            traceEvents.isNotEmpty() -> "observed"
+            else -> "idle"
+        }
+        val lastMessage = traceEvents.lastOrNull { it.phase == "task_server_message" }
+        return JSONObject()
+            .put("status", status)
+            .put("busy", isTaskBusy(prefs))
+            .put("trace_id", traceId ?: JSONObject.NULL)
+            .put("kind", pendingTaskKind(prefs))
+            .put("pending_work_age_ms", pendingWorkAgeMs(prefs) ?: JSONObject.NULL)
+            .put("event_count", traceEvents.size)
+            .put("sent_elapsed_ms", detailLong(traceEvents, "task_payload_sent", "elapsed_ms"))
+            .put("first_server_event_elapsed_ms", detailLong(traceEvents, "task_first_server_event", "elapsed_ms"))
+            .put("first_chat_reply_elapsed_ms", detailLong(traceEvents, "task_first_chat_reply", "elapsed_ms"))
+            .put("finish_elapsed_ms", finish?.details?.get("elapsed_ms")?.toLongOrNull() ?: JSONObject.NULL)
+            .put("last_message_type", lastMessage?.details?.get("type") ?: JSONObject.NULL)
+            .put("last_message_preview", lastMessage?.details?.get("message_preview") ?: JSONObject.NULL)
+            .put("has_apk_url", finish?.details?.get("has_apk_url") ?: JSONObject.NULL)
+            .put("last_phase", traceEvents.lastOrNull()?.phase ?: JSONObject.NULL)
+            .put("last_event_wall_time_ms", traceEvents.lastOrNull()?.wallTimeMs ?: JSONObject.NULL)
+    }
+
     private fun pendingWorkAgeMs(prefs: android.content.SharedPreferences): Long? {
         val savedAt = prefs.getLong(TaskWorkService.PREF_PENDING_WORK_TIME, 0L)
         return if (savedAt > 0L) System.currentTimeMillis() - savedAt else null
+    }
+
+    private fun isTaskBusy(prefs: android.content.SharedPreferences): Boolean {
+        return !prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null).isNullOrBlank()
+    }
+
+    private fun pendingTaskJson(prefs: android.content.SharedPreferences): JSONObject? {
+        val payload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        return runCatching { JSONObject(payload) }.getOrNull()
+    }
+
+    private fun pendingTaskKind(prefs: android.content.SharedPreferences): String {
+        if (!isTaskBusy(prefs)) return "idle"
+        return if (prefs.getBoolean(TaskWorkService.PREF_PENDING_WORK_IS_DEVELOPMENT, true)) {
+            "development"
+        } else {
+            "chat"
+        }
+    }
+
+    private fun latestTraceId(events: List<DebugTraceStore.TraceEvent>): String? {
+        return events.asReversed()
+            .firstNotNullOfOrNull { it.details["trace_id"]?.takeIf(String::isNotBlank) }
+    }
+
+    private fun detailLong(
+        events: List<DebugTraceStore.TraceEvent>,
+        phase: String,
+        key: String
+    ): Any {
+        return events.firstOrNull { it.phase == phase }
+            ?.details
+            ?.get(key)
+            ?.toLongOrNull()
+            ?: JSONObject.NULL
     }
 
     private fun authorized(headers: Map<String, String>, args: JSONObject): Boolean {

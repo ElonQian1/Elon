@@ -55,11 +55,15 @@ object DebugTraceStore {
 
     fun recent(limit: Int = 80): JSONArray {
         val snapshot = synchronized(lock) {
-            events.toList().takeLast(limit.coerceIn(1, MAX_EVENTS))
+            recentEventsLocked(limit)
         }
         return JSONArray().apply {
             snapshot.forEach { put(it.toJson()) }
         }
+    }
+
+    fun recentEvents(limit: Int = 80): List<TraceEvent> = synchronized(lock) {
+        recentEventsLocked(limit)
     }
 
     fun count(): Int = synchronized(lock) { events.size }
@@ -120,6 +124,10 @@ object DebugTraceStore {
             )
             while (events.size > MAX_EVENTS) events.removeFirst()
         }
+    }
+
+    private fun recentEventsLocked(limit: Int): List<TraceEvent> {
+        return events.toList().takeLast(limit.coerceIn(1, MAX_EVENTS))
     }
 
     private fun persistLocked() {

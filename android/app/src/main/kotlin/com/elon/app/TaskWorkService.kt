@@ -52,7 +52,8 @@ class TaskWorkService : Service() {
                 if (payload != null) {
                     startWork(
                         payload = payload,
-                        isDevelopment = intent.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true)
+                        isDevelopment = intent.getBooleanExtra(EXTRA_IS_DEVELOPMENT, true),
+                        force = intent.getBooleanExtra(EXTRA_FORCE_START, false)
                     )
                 }
             }
@@ -91,7 +92,11 @@ class TaskWorkService : Service() {
         super.onDestroy()
     }
 
-    private fun startWork(payload: String, isDevelopment: Boolean) {
+    private fun startWork(payload: String, isDevelopment: Boolean, force: Boolean = false) {
+        if (waitingForReply && !pendingPayload.isNullOrBlank() && !force) {
+            rejectBusyStart(payload)
+            return
+        }
         pendingPayload = payload
         activeRequestIsDevelopment = isDevelopment
         waitingForReply = true
@@ -113,6 +118,33 @@ class TaskWorkService : Service() {
         persistActiveWork()
         enterForeground()
         connect()
+    }
+
+    private fun rejectBusyStart(incomingPayload: String) {
+        val activeTraceId = extractTraceId(pendingPayload)
+        val incomingTraceId = extractTraceId(incomingPayload)
+        DebugTraceStore.record(
+            "task_start_rejected_busy",
+            mapOf(
+                "active_trace_id" to activeTraceId,
+                "incoming_trace_id" to incomingTraceId,
+                "kind" to activeRequestKind,
+                "elapsed_ms" to elapsedSinceRequestStart()
+            )
+        )
+        val raw = JSONObject()
+            .put("type", "error")
+            .put("busy", true)
+            .put("message", "已有任务正在处理，请稍候再发送。")
+            .put("active_trace_id", activeTraceId)
+            .put("incoming_trace_id", incomingTraceId)
+            .toString()
+        if (isAppInForeground()) {
+            broadcastMessage(raw)
+        } else {
+            queueRawEvent(raw)
+        }
+        broadcastState()
     }
 
     private fun ensureClient(): ElonWsClient {
@@ -620,6 +652,7 @@ class TaskWorkService : Service() {
 
         const val EXTRA_PAYLOAD = "payload"
         const val EXTRA_IS_DEVELOPMENT = "is_development"
+        const val EXTRA_FORCE_START = "force_start"
         const val EXTRA_KIND = "kind"
         const val EXTRA_RAW_MESSAGE = "raw_message"
         const val EXTRA_CONNECTED = "connected"
