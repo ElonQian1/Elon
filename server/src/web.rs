@@ -1323,6 +1323,9 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
 
   // ====== 退出登录 ======
   logoutRow.addEventListener('click', () => {
+    const name = (currentUser && (currentUser.username || currentUser.phone)) || '';
+    const msg = name ? `确定退出当前账号「${name}」吗？` : '确定退出当前账号吗？';
+    if (!window.confirm(msg)) return;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('elon_token');
     token = '';
