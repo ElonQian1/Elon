@@ -740,7 +740,6 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       <select id="templateSelect">
         <option value="android_kotlin">Android（Kotlin）</option>
         <option value="android_compose">Android（Compose）</option>
-        <option value="empty">空白项目</option>
       </select>
     </div>
     <div class="error-text" id="newProjectError"></div>

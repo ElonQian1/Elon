@@ -285,9 +285,11 @@ impl Store {
             .map(str::trim)
             .filter(|v| !v.is_empty())
             .unwrap_or("android");
-        if template != "android" {
-            return Err(anyhow!("目前只支持 android 模板"));
-        }
+        // 目前所有受支持的模板都按 Android 脚手架处理；未来扩展时再细分。
+        let template = match template {
+            "android" | "android_kotlin" | "android_compose" => "android",
+            _ => return Err(anyhow!("目前只支持 android 模板")),
+        };
 
         let now = now();
         let conn = self.conn()?;
