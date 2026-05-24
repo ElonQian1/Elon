@@ -13,7 +13,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case "${1:-server}" in
   server)
-    shift || true
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
     exec "$SCRIPT_DIR/publish-server.sh" "$@"
     ;;
   apk)
