@@ -57,7 +57,7 @@ object McpDebugServer {
                 serverSocket = server
                 DebugTraceStore.record(
                     "mcp_server_started",
-                    mapOf("host" to HOST, "port" to PORT, "token" to token)
+                    mapOf("host" to HOST, "port" to PORT, "token_ready" to true)
                 )
                 Log.i(TAG, "MCP endpoint: adb forward tcp:$PORT tcp:$PORT then http://$HOST:$PORT/mcp")
                 Log.i(TAG, "MCP debug token: $token")
@@ -159,6 +159,11 @@ object McpDebugServer {
         val action = args.optString("action", "status").lowercase(Locale.ROOT)
         when (action) {
             "start" -> {
+                appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, true)
+                    .putLong(McpDebugKeepAliveService.PREF_STARTED_AT, System.currentTimeMillis())
+                    .apply()
                 val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
                     this.action = McpDebugKeepAliveService.ACTION_START
                 }
@@ -166,6 +171,11 @@ object McpDebugServer {
                 DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "start"))
             }
             "stop" -> {
+                appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, false)
+                    .remove(McpDebugKeepAliveService.PREF_STARTED_AT)
+                    .apply()
                 val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
                     this.action = McpDebugKeepAliveService.ACTION_STOP
                 }
