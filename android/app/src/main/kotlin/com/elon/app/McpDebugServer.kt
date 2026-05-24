@@ -18,6 +18,8 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 object McpDebugServer {
     private const val TAG = "ElonMcpServer"
@@ -26,11 +28,24 @@ object McpDebugServer {
     private const val PROTOCOL_VERSION = "2025-06-18"
     private const val PREF_MCP_TOKEN = "mcp_debug_token"
     private const val MAX_BODY_BYTES = 256 * 1024
+    private const val MAX_HEADER_BYTES = 16 * 1024
+    private const val SOCKET_TIMEOUT_MS = 5_000
 
     @Volatile private var running = false
     @Volatile private var serverSocket: ServerSocket? = null
     private val workers = Executors.newCachedThreadPool()
     private val processStartedElapsedMs = SystemClock.elapsedRealtime()
+    private val activeConnections = AtomicInteger(0)
+    private val totalRequests = AtomicLong(0)
+    private val totalToolCalls = AtomicLong(0)
+    private val failedRequests = AtomicLong(0)
+    @Volatile private var lastRequestWallTimeMs = 0L
+    @Volatile private var lastRequestDurationMs = 0L
+    @Volatile private var lastHttpMethod: String? = null
+    @Volatile private var lastPath: String? = null
+    @Volatile private var lastRpcMethod: String? = null
+    @Volatile private var lastToolName: String? = null
+    @Volatile private var lastError: String? = null
     private lateinit var appContext: Context
 
     fun start(context: Context) {
@@ -70,6 +85,8 @@ object McpDebugServer {
                         if (running) Log.w(TAG, "accept failed")
                         break
                     }
+                    socket.soTimeout = SOCKET_TIMEOUT_MS
+                    socket.tcpNoDelay = true
                     workers.execute { handleSocket(socket) }
                 }
             }
@@ -83,22 +100,45 @@ object McpDebugServer {
     }
 
     private fun handleSocket(socket: Socket) {
+        val startedElapsedMs = SystemClock.elapsedRealtime()
+        activeConnections.incrementAndGet()
         socket.use {
-            val request = readRequest(it) ?: run {
-                writeResponse(it, 400, "Bad Request", jsonError("bad_request", "Invalid HTTP request"))
-                return
-            }
-            when {
-                request.method == "GET" && request.path == "/health" -> {
-                    writeResponse(it, 200, "OK", statusJson(includeToken = true).toString())
+            try {
+                val request = readRequest(it) ?: run {
+                    recordHttpRequest("INVALID", "invalid", startedElapsedMs)
+                    writeResponse(it, 400, "Bad Request", jsonError("bad_request", "Invalid HTTP request"))
+                    return
                 }
-                request.method == "GET" && request.path == "/mcp" -> {
-                    writeResponse(it, 405, "Method Not Allowed", jsonError("method_not_allowed", "SSE GET is not implemented in this APK build"))
+                when {
+                    request.method == "GET" && request.path == "/health" -> {
+                        writeResponse(it, 200, "OK", statusJson(includeToken = true).toString())
+                    }
+                    request.method == "GET" && request.path == "/mcp" -> {
+                        writeResponse(it, 405, "Method Not Allowed", jsonError("method_not_allowed", "SSE GET is not implemented in this APK build"))
+                    }
+                    request.method == "POST" && request.path == "/mcp" -> {
+                        handleMcpPost(it, request)
+                    }
+                    else -> writeResponse(it, 404, "Not Found", jsonError("not_found", "Unknown endpoint"))
                 }
-                request.method == "POST" && request.path == "/mcp" -> {
-                    handleMcpPost(it, request)
+                recordHttpRequest(request.method, request.path, startedElapsedMs)
+            } catch (error: Exception) {
+                failedRequests.incrementAndGet()
+                lastError = error.message ?: error.javaClass.simpleName
+                DebugTraceStore.record(
+                    "mcp_request_failed",
+                    mapOf("error" to lastError, "duration_ms" to (SystemClock.elapsedRealtime() - startedElapsedMs))
+                )
+                runCatching {
+                    writeResponse(
+                        it,
+                        500,
+                        "Internal Server Error",
+                        jsonError("internal_error", lastError ?: "MCP request failed")
+                    )
                 }
-                else -> writeResponse(it, 404, "Not Found", jsonError("not_found", "Unknown endpoint"))
+            } finally {
+                activeConnections.decrementAndGet()
             }
         }
     }
@@ -111,6 +151,7 @@ object McpDebugServer {
         }
 
         val method = rpc.optString("method")
+        lastRpcMethod = method
         val id = if (rpc.has("id")) rpc.opt("id") else null
         if (id == null) {
             writeResponse(socket, 202, "Accepted", "")
@@ -133,6 +174,8 @@ object McpDebugServer {
         if (!authorized(headers, args)) {
             return rpcError(id, -32001, "Unauthorized MCP debug tool call")
         }
+        totalToolCalls.incrementAndGet()
+        lastToolName = name
 
         val result = when (name) {
             "phone_status" -> toolResult("Phone MCP debug server is running.", statusJson(includeToken = false))
@@ -141,10 +184,13 @@ object McpDebugServer {
                 DebugTraceStore.clear()
                 toolResult("Trace buffer cleared.", JSONObject().put("cleared", true))
             }
+            "mcp_self_check" -> mcpSelfCheck(args)
+            "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> debugKeepalive(args)
             "update_status" -> updateStatus(args)
             "task_status" -> taskStatus(args)
             "task_control" -> taskControl(args)
+            "task_events" -> taskEvents(args)
             "logcat_recent" -> logcatRecent(args)
             "chat_send" -> chatSend(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
@@ -154,10 +200,99 @@ object McpDebugServer {
 
     private fun traceRecent(args: JSONObject): JSONObject {
         val limit = args.optInt("limit", 80).coerceIn(1, 300)
+        val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
+        val phase = args.optString("phase").takeIf { it.isNotBlank() }
+        val contains = args.optString("contains").takeIf { it.isNotBlank() }
+        val sinceWallTimeMs = args.optLong("since_wall_time_ms", 0L).takeIf { it > 0L }
+        val allEvents = DebugTraceStore.recentEvents(300)
+        val filtered = allEvents.filter { event ->
+            (traceId == null || event.details["trace_id"] == traceId) &&
+                (phase == null || event.phase == phase) &&
+                (contains == null || traceEventSearchText(event).contains(contains, ignoreCase = true)) &&
+                (sinceWallTimeMs == null || event.wallTimeMs >= sinceWallTimeMs)
+        }
+        val events = filtered.takeLast(limit)
         val structured = JSONObject()
-            .put("events", DebugTraceStore.recent(limit))
+            .put("events", traceEventsJson(events))
             .put("limit", limit)
-        return toolResult("Returned $limit recent trace events.", structured)
+            .put("matched_count", filtered.size)
+            .put(
+                "filters",
+                JSONObject()
+                    .put("trace_id", traceId ?: JSONObject.NULL)
+                    .put("phase", phase ?: JSONObject.NULL)
+                    .put("contains", contains ?: JSONObject.NULL)
+                    .put("since_wall_time_ms", sinceWallTimeMs ?: JSONObject.NULL)
+            )
+        return toolResult("Returned ${events.size} recent trace events.", structured)
+    }
+
+    private fun mcpSelfCheck(args: JSONObject): JSONObject {
+        val includeUpdateCheck = args.optBoolean("include_update_check", false)
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val status = statusJson(includeToken = false)
+        val taskStatus = taskStatusJson(JSONObject())
+        val keepalive = McpDebugKeepAliveService.statusJson(appContext)
+        val queuedEvents = queuedTaskEvents(prefs)
+        val checks = JSONArray()
+        fun addCheck(name: String, ok: Boolean, detail: String) {
+            checks.put(JSONObject().put("name", name).put("ok", ok).put("detail", detail))
+        }
+
+        val appForeground = status.optBoolean("app_foreground", false)
+        val keepaliveActive = keepalive.optBoolean("active", false)
+        addCheck("mcp_server_running", running, "MCP server thread is accepting local HTTP requests.")
+        addCheck(
+            "background_keepalive",
+            appForeground || keepaliveActive,
+            if (appForeground) "App is foreground; keepalive is optional." else "Foreground keepalive must be active while app is background."
+        )
+        addCheck("trace_buffer", DebugTraceStore.count() > 0, "Trace buffer has ${DebugTraceStore.count()} persisted events.")
+        addCheck(
+            "request_health",
+            lastError == null,
+            lastError?.let { "Last MCP request error: $it" } ?: "No MCP request error recorded in this process."
+        )
+        addCheck(
+            "task_queue",
+            queuedEvents.size <= 120,
+            "Queued background task events: ${queuedEvents.size}."
+        )
+
+        val recommendations = JSONArray()
+        if (!appForeground && !keepaliveActive) {
+            recommendations.put("Call debug_keepalive start, then keep the notification alive before switching apps.")
+        }
+        if (lastError != null) {
+            recommendations.put("Call mcp_metrics and logcat_recent with pattern ElonMcpServer|ElonTrace to inspect the last request failure.")
+        }
+        if (taskStatus.optBoolean("busy", false)) {
+            recommendations.put("Call task_status for timing, or task_control pause if the active phone task should be cancelled.")
+        }
+        if (queuedEvents.isNotEmpty()) {
+            recommendations.put("Call task_events to inspect messages queued while the app UI was backgrounded.")
+        }
+
+        val updateStatus = if (includeUpdateCheck) {
+            updateStatus(JSONObject()).optJSONObject("structuredContent") ?: JSONObject.NULL
+        } else {
+            JSONObject.NULL
+        }
+        val ready = (0 until checks.length()).all { checks.optJSONObject(it)?.optBoolean("ok") == true }
+        val structured = JSONObject()
+            .put("ready", ready)
+            .put("status", status)
+            .put("task_status", taskStatus)
+            .put("metrics", metricsJson())
+            .put("queued_task_event_count", queuedEvents.size)
+            .put("checks", checks)
+            .put("recommendations", recommendations)
+            .put("update_status", updateStatus)
+        return toolResult("MCP self-check returned.", structured, isError = !ready)
+    }
+
+    private fun mcpMetrics(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
+        return toolResult("MCP metrics returned.", metricsJson())
     }
 
     private fun debugKeepalive(args: JSONObject): JSONObject {
@@ -264,6 +399,25 @@ object McpDebugServer {
             )
         }
         return toolResult("Task status returned.", taskStatusJson(JSONObject()).put("action", action))
+    }
+
+    private fun taskEvents(args: JSONObject): JSONObject {
+        val limit = args.optInt("limit", 40).coerceIn(1, 120)
+        val clear = args.optBoolean("clear", false)
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val allEvents = queuedTaskEvents(prefs)
+        val returned = allEvents.takeLast(limit)
+        if (clear) {
+            prefs.edit().remove(TaskWorkService.PREF_QUEUED_TASK_EVENTS).apply()
+            DebugTraceStore.record("mcp_task_events_cleared", mapOf("cleared_count" to allEvents.size))
+        }
+        val structured = JSONObject()
+            .put("events", JSONArray().apply { returned.forEach { put(rawTaskEventJson(it)) } })
+            .put("returned_count", returned.size)
+            .put("queued_count", allEvents.size)
+            .put("limit", limit)
+            .put("cleared", clear)
+        return toolResult("Queued task events returned.", structured)
     }
 
     private fun logcatRecent(args: JSONObject): JSONObject {
@@ -446,8 +600,13 @@ object McpDebugServer {
                     tool(
                         name = "trace_recent",
                         title = "Recent Trace Events",
-                        description = "Return recent persisted phone trace events written to logcat tag ElonTrace.",
-                        properties = JSONObject().put("limit", intProperty("Maximum events to return, 1-300.")),
+                        description = "Return recent persisted phone trace events written to logcat tag ElonTrace, optionally filtered by trace id, phase, text, or wall time.",
+                        properties = JSONObject()
+                            .put("limit", intProperty("Maximum events to return, 1-300."))
+                            .put("trace_id", stringProperty("Optional trace id filter."))
+                            .put("phase", stringProperty("Optional exact phase filter."))
+                            .put("contains", stringProperty("Optional case-insensitive text filter across phase and details."))
+                            .put("since_wall_time_ms", intProperty("Optional lower bound for event wall_time_ms.")),
                         required = JSONArray()
                     )
                 )
@@ -456,6 +615,25 @@ object McpDebugServer {
                         name = "trace_clear",
                         title = "Clear Trace Events",
                         description = "Clear the in-memory phone trace buffer.",
+                        properties = JSONObject(),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "mcp_self_check",
+                        title = "MCP Self Check",
+                        description = "Run a one-shot local health check for MCP server reachability, background keepalive, trace storage, queued events, and request metrics.",
+                        properties = JSONObject()
+                            .put("include_update_check", booleanProperty("Also fetch server version.json. Defaults to false.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "mcp_metrics",
+                        title = "MCP Metrics",
+                        description = "Return MCP request counters, active connections, last RPC/tool names, and last request error.",
                         properties = JSONObject(),
                         required = JSONArray()
                     )
@@ -497,6 +675,17 @@ object McpDebugServer {
                         description = "Inspect or pause the active phone task from inside the APK process.",
                         properties = JSONObject()
                             .put("action", stringProperty("One of status or pause. Defaults to status.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
+                        name = "task_events",
+                        title = "Queued Task Events",
+                        description = "Return raw task events queued while the UI was in the background, with an option to clear them after reading.",
+                        properties = JSONObject()
+                            .put("limit", intProperty("Maximum queued events to return, 1-120. Defaults to 40."))
+                            .put("clear", booleanProperty("Clear queued events after reading. Defaults to false.")),
                         required = JSONArray()
                     )
                 )
@@ -593,7 +782,9 @@ object McpDebugServer {
             .put("active_trace_id", if (pendingBusy) pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() } else null)
             .put("active_task_kind", if (pendingBusy && !pendingPayload.isNullOrBlank()) pendingTaskKind(prefs) else null)
             .put("pending_work_age_ms", if (pendingBusy) pendingWorkAgeMs(prefs) else null)
+            .put("queued_task_events", queuedTaskEvents(prefs).size)
             .put("trace_events", DebugTraceStore.count())
+            .put("mcp_metrics", metricsJson())
             .apply {
                 if (includeToken) put("auth_token", debugToken())
             }
@@ -723,6 +914,75 @@ object McpDebugServer {
             ?: JSONObject.NULL
     }
 
+    private fun metricsJson(): JSONObject {
+        return JSONObject()
+            .put("active_connections", activeConnections.get())
+            .put("total_requests", totalRequests.get())
+            .put("total_tool_calls", totalToolCalls.get())
+            .put("failed_requests", failedRequests.get())
+            .put("last_request_wall_time_ms", if (lastRequestWallTimeMs > 0L) lastRequestWallTimeMs else JSONObject.NULL)
+            .put("last_request_duration_ms", lastRequestDurationMs)
+            .put("last_http_method", lastHttpMethod ?: JSONObject.NULL)
+            .put("last_path", lastPath ?: JSONObject.NULL)
+            .put("last_rpc_method", lastRpcMethod ?: JSONObject.NULL)
+            .put("last_tool_name", lastToolName ?: JSONObject.NULL)
+            .put("last_error", lastError ?: JSONObject.NULL)
+            .put("socket_timeout_ms", SOCKET_TIMEOUT_MS)
+    }
+
+    private fun recordHttpRequest(method: String, path: String, startedElapsedMs: Long) {
+        totalRequests.incrementAndGet()
+        lastRequestWallTimeMs = System.currentTimeMillis()
+        lastRequestDurationMs = SystemClock.elapsedRealtime() - startedElapsedMs
+        lastHttpMethod = method
+        lastPath = path
+        lastError = null
+    }
+
+    private fun queuedTaskEvents(prefs: SharedPreferences): List<String> {
+        val raw = prefs.getString(TaskWorkService.PREF_QUEUED_TASK_EVENTS, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: return emptyList()
+        val array = runCatching { JSONArray(raw) }.getOrElse { return emptyList() }
+        return buildList {
+            for (index in 0 until array.length()) {
+                array.optString(index).takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+        }
+    }
+
+    private fun rawTaskEventJson(raw: String): JSONObject {
+        val parsed = runCatching { JSONObject(raw) }.getOrNull()
+        return JSONObject()
+            .put("raw", raw.take(20_000))
+            .put("json", parsed ?: JSONObject.NULL)
+    }
+
+    private fun traceEventsJson(events: List<DebugTraceStore.TraceEvent>): JSONArray {
+        return JSONArray().apply {
+            events.forEach { event ->
+                put(
+                    JSONObject()
+                        .put("wall_time_ms", event.wallTimeMs)
+                        .put("elapsed_ms", event.elapsedMs)
+                        .put("phase", event.phase)
+                        .put("details", JSONObject().apply {
+                            event.details.forEach { (key, value) -> put(key, value) }
+                        })
+                )
+            }
+        }
+    }
+
+    private fun traceEventSearchText(event: DebugTraceStore.TraceEvent): String {
+        return buildString {
+            append(event.phase)
+            event.details.forEach { (key, value) ->
+                append(' ').append(key).append('=').append(value)
+            }
+        }
+    }
+
     private fun authorized(headers: Map<String, String>, args: JSONObject): Boolean {
         val expected = debugToken()
         val bearer = headers["authorization"]
@@ -808,7 +1068,7 @@ object McpDebugServer {
         val input = socket.getInputStream()
         val headerBytes = ByteArrayOutputStream()
         val window = java.util.ArrayDeque<Int>(4)
-        while (headerBytes.size() <= 16 * 1024) {
+        while (headerBytes.size() <= MAX_HEADER_BYTES) {
             val byte = input.read()
             if (byte < 0) return null
             headerBytes.write(byte)
