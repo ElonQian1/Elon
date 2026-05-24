@@ -1,14 +1,19 @@
 # 一龙项目 AI 工作入口
 
 本文件是 VS Code Copilot、Codex、Claude Code 等多 AI 工具共享的工作入口。  
-**最后更新：2026-05-24**
+**最后更新：2026-05-25**
 
 ---
 
 ## ⚡ 任务开始前必做（无论哪台 PC）
 
+共享文档里不要写某台 PC 的绝对路径。AI 如果已经在本仓库或任意子目录里启动，直接用当前 Git 仓库根目录；如果不是，先用本机环境变量 `ELON_REPO_PATH` 指向真实仓库。
+
 ```powershell
-cd "d:\rust\active-projects\elon cli"
+$repo = git rev-parse --show-toplevel 2>$null
+if (-not $repo) { $repo = $env:ELON_REPO_PATH }
+if (-not $repo) { throw "未找到一龙仓库：请在仓库目录启动，或先设置 ELON_REPO_PATH" }
+Set-Location -LiteralPath $repo
 powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
 ```
 
@@ -17,6 +22,15 @@ powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWo
 Linux / macOS / 服务器 Codex CLI：
 
 ```bash
+repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$repo" ]; then
+  repo="${ELON_REPO_PATH:-}"
+fi
+if [ -z "$repo" ]; then
+  echo "未找到一龙仓库：请在仓库目录启动，或先设置 ELON_REPO_PATH" >&2
+  exit 1
+fi
+cd "$repo"
 bash scripts/ai-task-preflight.sh --create-worktree
 ```
 
