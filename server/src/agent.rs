@@ -979,43 +979,37 @@ async fn run_api_inner_with_workspace(
                 );
 
                 // 执行工具：build_project 优先通过 PC agent（Windows 环境），无 agent 或失败时回退服务器本地构建
-                let result: anyhow::Result<String> =
-                    if tool_name == "build_project"
-                        && !state.agent_manager.list().await.is_empty()
-                    {
-                        let target = args["target"].as_str().unwrap_or("android");
-                        let changelog: String = user_message.chars().take(80).collect();
+                let result: anyhow::Result<String> = if tool_name == "build_project"
+                    && !state.agent_manager.list().await.is_empty()
+                {
+                    let target = args["target"].as_str().unwrap_or("android");
+                    let changelog: String = user_message.chars().take(80).collect();
+                    let _ = tx.send(
+                        WsMessage::Progress {
+                            message: format!(
+                                "正在通过 PC agent 构建 {}（实时输出将陆续显示）...",
+                                target
+                            ),
+                        }
+                        .to_json(),
+                    );
+                    let r =
+                        tools::build_project_via_agent(state, target, &changelog, Some(tx)).await;
+                    if let Err(ref e) = r {
+                        warn!("PC agent 构建失败，回退到服务器本地构建: {}", e);
                         let _ = tx.send(
                             WsMessage::Progress {
-                                message: format!(
-                                    "正在通过 PC agent 构建 {}（实时输出将陆续显示）...",
-                                    target
-                                ),
+                                message: format!("PC agent 不可用（{}），尝试服务器本地构建...", e),
                             }
                             .to_json(),
                         );
-                        let r = tools::build_project_via_agent(
-                            state, target, &changelog, Some(tx),
-                        )
-                        .await;
-                        if let Err(ref e) = r {
-                            warn!("PC agent 构建失败，回退到服务器本地构建: {}", e);
-                            let _ = tx.send(
-                                WsMessage::Progress {
-                                    message: format!(
-                                        "PC agent 不可用（{}），尝试服务器本地构建...",
-                                        e
-                                    ),
-                                }
-                                .to_json(),
-                            );
-                            execute_tool(state, &workspace, &tool_name, &args)
-                        } else {
-                            r
-                        }
-                    } else {
                         execute_tool(state, &workspace, &tool_name, &args)
-                    };
+                    } else {
+                        r
+                    }
+                } else {
+                    execute_tool(state, &workspace, &tool_name, &args)
+                };
 
                 let result_str = match result {
                     Ok(r) => {
@@ -1084,8 +1078,8 @@ async fn call_llm(state: &Arc<AppState>, agent: &AgentConfig, messages: &[Value]
 
     // GitHub Copilot 直连 API 需要额外的 editor 标识 header
     let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
-    let integration_id = std::env::var("COPILOT_INTEGRATION_ID")
-        .unwrap_or_else(|_| "vscode-chat".into());
+    let integration_id =
+        std::env::var("COPILOT_INTEGRATION_ID").unwrap_or_else(|_| "vscode-chat".into());
 
     let mut req = state
         .http_client
@@ -1098,16 +1092,13 @@ async fn call_llm(state: &Arc<AppState>, agent: &AgentConfig, messages: &[Value]
             .header("editor-plugin-version", "copilot-chat/0.26.0")
             .header("Copilot-Integration-Id", integration_id);
     }
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| {
-            if e.is_timeout() {
-                anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
-            } else {
-                anyhow::anyhow!("AI 请求失败: {}", e)
-            }
-        })?;
+    let resp = req.send().await.map_err(|e| {
+        if e.is_timeout() {
+            anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
+        } else {
+            anyhow::anyhow!("AI 请求失败: {}", e)
+        }
+    })?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -1134,8 +1125,8 @@ async fn call_chat_llm(
     });
 
     let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
-    let integration_id = std::env::var("COPILOT_INTEGRATION_ID")
-        .unwrap_or_else(|_| "vscode-chat".into());
+    let integration_id =
+        std::env::var("COPILOT_INTEGRATION_ID").unwrap_or_else(|_| "vscode-chat".into());
 
     let mut req = state
         .http_client
@@ -1148,16 +1139,13 @@ async fn call_chat_llm(
             .header("editor-plugin-version", "copilot-chat/0.26.0")
             .header("Copilot-Integration-Id", integration_id);
     }
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| {
-            if e.is_timeout() {
-                anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
-            } else {
-                anyhow::anyhow!("AI 请求失败: {}", e)
-            }
-        })?;
+    let resp = req.send().await.map_err(|e| {
+        if e.is_timeout() {
+            anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
+        } else {
+            anyhow::anyhow!("AI 请求失败: {}", e)
+        }
+    })?;
 
     if !resp.status().is_success() {
         let status = resp.status();

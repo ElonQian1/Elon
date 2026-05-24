@@ -167,6 +167,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - The first real user message still decides the route: ordinary chat uses the lightweight Codex prompt, and development requests enter the queued project workflow.
 - The server records whether a native Codex session has already received the full chat/development bootstrap. Later turns in the same session should use the shorter resume prompt, and stale/expired native sessions should be marked stale and retried once with a fresh Codex session.
 - When retrying with a fresh native session after stale resume, include the previous `codex://threads/<thread_id>` URI plus recent backend conversation messages so the new session can bridge the old context.
+- Every traced APK/Web task should expose where time went. Preserve `trace_id` through backend routing into Codex CLI calls and record `codex_cli_start`, `codex_cli_done`, `codex_cli_error`, `codex_cli_retry`, and prewarm hit/skip events with prompt size, session hit/miss, operation, attempt, and elapsed time.
 
 ## Build And Attachment Transport Rules
 

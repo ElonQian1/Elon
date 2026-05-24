@@ -42,7 +42,10 @@ impl ServerTraceStore {
             elapsed_ms: self.started_at.elapsed().as_millis(),
             details,
         };
-        let mut events = self.events.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut events = self
+            .events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         events.push_back(event);
         while events.len() > MAX_SERVER_TRACE_EVENTS {
             events.pop_front();
@@ -52,7 +55,10 @@ impl ServerTraceStore {
     pub fn trace_json(&self, trace_id: &str, limit: usize) -> Value {
         let trace_id = trace_id.trim();
         let limit = limit.clamp(1, 300);
-        let events = self.events.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let events = self
+            .events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let matched: Vec<ServerTraceEvent> = events
             .iter()
             .filter(|event| event.trace_id == trace_id)
@@ -75,7 +81,18 @@ impl ServerTraceStore {
 fn summarize_trace(events: &[ServerTraceEvent]) -> Value {
     let first = events.first();
     let last = events.last();
-    let first_outgoing = events.iter().find(|event| event.phase == "server_message_to_phone");
+    let first_outgoing = events
+        .iter()
+        .find(|event| event.phase == "server_message_to_phone");
+    let first_codex_start = events.iter().find(|event| event.phase == "codex_cli_start");
+    let last_codex_terminal = events
+        .iter()
+        .rev()
+        .find(|event| event.phase == "codex_cli_done" || event.phase == "codex_cli_error");
+    let codex_attempts = events
+        .iter()
+        .filter(|event| event.phase == "codex_cli_start")
+        .count();
     let finish = events.iter().find(|event| {
         event.phase == "server_done"
             || event.phase == "server_error"
@@ -86,11 +103,16 @@ fn summarize_trace(events: &[ServerTraceEvent]) -> Value {
         "last_phase": last.map(|event| event.phase.as_str()),
         "first_outgoing_elapsed_from_receive_ms": duration_between(first, first_outgoing),
         "finish_elapsed_from_receive_ms": duration_between(first, finish),
+        "codex_cli_elapsed_ms": duration_between(first_codex_start, last_codex_terminal),
+        "codex_cli_attempts": codex_attempts,
         "terminal": finish.map(|event| event.phase.as_str()),
     })
 }
 
-fn duration_between(start: Option<&ServerTraceEvent>, end: Option<&ServerTraceEvent>) -> Option<i64> {
+fn duration_between(
+    start: Option<&ServerTraceEvent>,
+    end: Option<&ServerTraceEvent>,
+) -> Option<i64> {
     let start = start?;
     let end = end?;
     Some((end.wall_time_ms - start.wall_time_ms).max(0))
@@ -112,13 +134,41 @@ mod tests {
         let store = ServerTraceStore::new();
         store.record("trace_a", "ws_project_message_received", json!({}));
         store.record("trace_b", "ws_project_message_received", json!({}));
-        store.record("trace_a", "server_message_to_phone", json!({"type": "progress"}));
+        store.record(
+            "trace_a",
+            "server_message_to_phone",
+            json!({"type": "progress"}),
+        );
         store.record("trace_a", "server_done", json!({"type": "done"}));
 
         let trace = store.trace_json("trace_a", 10);
         assert_eq!(trace["matched_count"], 3);
         assert_eq!(trace["returned_count"], 3);
-        assert_eq!(trace["summary"]["first_phase"], "ws_project_message_received");
+        assert_eq!(
+            trace["summary"]["first_phase"],
+            "ws_project_message_received"
+        );
         assert_eq!(trace["summary"]["terminal"], "server_done");
+    }
+
+    #[test]
+    fn summarizes_codex_cli_timing() {
+        let store = ServerTraceStore::new();
+        store.record("trace_a", "ws_project_message_received", json!({}));
+        store.record(
+            "trace_a",
+            "codex_cli_start",
+            json!({"operation": "project_request"}),
+        );
+        store.record(
+            "trace_a",
+            "codex_cli_done",
+            json!({"operation": "project_request", "success": true}),
+        );
+        store.record("trace_a", "server_done", json!({"type": "done"}));
+
+        let trace = store.trace_json("trace_a", 10);
+        assert_eq!(trace["summary"]["codex_cli_attempts"], 1);
+        assert!(trace["summary"]["codex_cli_elapsed_ms"].as_i64().is_some());
     }
 }

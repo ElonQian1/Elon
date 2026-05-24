@@ -163,6 +163,7 @@ pub async fn prewarm_codex_session(
     workspace: &Path,
     option_id: Option<&str>,
     native_session_scope: NativeSessionScope,
+    trace_id: Option<&str>,
     state: &Arc<AppState>,
 ) -> Result<PrewarmResult> {
     let started = Instant::now();
@@ -188,6 +189,14 @@ pub async fn prewarm_codex_session(
         &workspace_key,
     )?;
     if let Some(thread_id) = existing_session_id {
+        record_prewarm_session_hit(
+            state,
+            trace_id,
+            &native_session_scope,
+            &workspace_key,
+            Some(&thread_id),
+            started.elapsed().as_millis(),
+        );
         return Ok(PrewarmResult {
             reused: true,
             thread_id: Some(thread_id),
@@ -199,7 +208,23 @@ pub async fn prewarm_codex_session(
     prewarm_option.timeout_secs = prewarm_option.timeout_secs.min(90);
     let prompt = build_prewarm_cli_prompt(workspace, &prewarm_option);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let output = run_cli_command(&prewarm_option, workspace, &prompt, None, &tx).await?;
+    let output = run_cli_command_traced(
+        &prewarm_option,
+        workspace,
+        &prompt,
+        None,
+        &tx,
+        Some(CliTraceContext {
+            state,
+            trace_id,
+            operation: "prewarm",
+            attempt: "initial",
+            route: None,
+            development_task: None,
+            prompt_bootstrapped: None,
+        }),
+    )
+    .await?;
     let thread_id = extract_thread_id(&output.stdout);
     if let Some(thread_id) = thread_id.as_deref() {
         let _ = state.store.upsert_native_agent_session_if_no_active(
@@ -721,6 +746,31 @@ fn record_cli_retry(
             "operation": operation,
             "reason": reason,
             "stale_thread_uri": stale_session_id.map(codex_thread_uri),
+        }),
+    );
+}
+
+fn record_prewarm_session_hit(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    scope: &NativeSessionScope,
+    workspace_key: &str,
+    native_session_id: Option<&str>,
+    elapsed_ms: u128,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
+        return;
+    };
+    state.server_traces.record(
+        trace_id,
+        "codex_prewarm_session_hit",
+        json!({
+            "project_id": &scope.project_id,
+            "user_id": &scope.user_id,
+            "conversation_id": &scope.conversation_id,
+            "workspace": workspace_key,
+            "native_thread_uri": native_session_id.map(codex_thread_uri),
+            "elapsed_ms": elapsed_ms,
         }),
     );
 }

@@ -113,6 +113,7 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 - Codex CLI must inspect the repository and read project documents instead of relying on memory. Unknown projects are handled by reading `AGENTS.md`, `CODEX.md`, `README.md`, `.github/instructions`, and relevant `docs/`; if those files do not exist, use the platform default workflow and recommend adding them.
 - After Codex CLI finishes, the backend remains responsible for observable status, task records, download links, release metadata, and any shared locking around merge/version/release/deploy.
 - Do not rely on Codex CLI alone for concurrency safety, version ordering, or release publishing. These must be enforced by backend code and scripts.
+- Latency debugging is a backend responsibility too. Keep the user/client `trace_id` attached through routing, intent confirmation, prewarm, and the final Codex CLI call. `GET /api/debug/traces/:trace_id` should show `codex_cli_start/done/error/retry` events, prompt size, session hit/miss, operation, attempt, elapsed time, and summary `codex_cli_elapsed_ms`.
 
 ## Code Change Workflow
 

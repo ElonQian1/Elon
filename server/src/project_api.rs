@@ -83,6 +83,7 @@ pub struct ProjectChatRequest {
 
 #[derive(Deserialize)]
 pub struct ProjectPrewarmRequest {
+    pub trace_id: Option<String>,
     pub agent: Option<String>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
@@ -384,6 +385,11 @@ async fn prewarm_project_response(
 
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let trace_id = req
+        .trace_id
+        .as_deref()
+        .map(|value| clean_trace_id(Some(value)))
+        .filter(|value| !value.is_empty());
     let requested_agent = req
         .agent
         .as_deref()
@@ -403,11 +409,35 @@ async fn prewarm_project_response(
         agent.as_deref(),
         &workspace_key,
     );
+    if let Some(trace_id) = trace_id.as_deref() {
+        state.server_traces.record(
+            trace_id,
+            "codex_prewarm_request",
+            serde_json::json!({
+                "project_id": &project.id,
+                "user_id": &user.id,
+                "conversation_id": &conversation_id,
+                "workspace": &workspace_key,
+                "agent": agent.as_deref(),
+            }),
+        );
+    }
     if !state
         .codex_prewarm
         .start_if_allowed(&throttle_key, Duration::from_secs(120))
         .await
     {
+        if let Some(trace_id) = trace_id.as_deref() {
+            state.server_traces.record(
+                trace_id,
+                "codex_prewarm_skipped",
+                serde_json::json!({
+                    "reason": "cooldown",
+                    "project_id": &project.id,
+                    "conversation_id": &conversation_id,
+                }),
+            );
+        }
         return Json(serde_json::json!({
             "status": "skipped",
             "reason": "cooldown",
@@ -428,11 +458,13 @@ async fn prewarm_project_response(
     let project_id_for_log = project.id.clone();
     let conversation_id_for_log = conversation_id.clone();
     let prewarm_key_for_task = throttle_key.clone();
+    let trace_id_for_task = trace_id.clone();
     tokio::spawn(async move {
         match ai_cli::prewarm_codex_session(
             &workspace_for_task,
             agent_for_task.as_deref(),
             scope,
+            trace_id_for_task.as_deref(),
             &state_for_task,
         )
         .await
