@@ -28,6 +28,14 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 - `docs/ai-agent-workflow.md`: full AI agent workflow from request analysis through code change, verification, commit, build, deploy, and feedback.
 - `docs/system-architecture.md`: architecture, data flow, module responsibilities, and security constraints.
 
+## Local Skills Absorbed
+
+The local share `\\127.0.0.1\skills` has been reviewed for this repository. Keep these distilled lessons in project workflow memory:
+
+- `ai-git-deploy-workflow`: this repo already implements the core rule through preflight, worktree isolation, explicit staging, commit, push, script deploy, and live verification. Do not reintroduce direct dirty-workspace deployment or unpushed deploys.
+- `rust-shared-target-cache`: never use a relative `CARGO_TARGET_DIR`. Prefer repository scripts for Rust builds; on new machines or suspicious builds, check user/machine `CARGO_TARGET_DIR` and use an absolute Cargo `target-dir`.
+- `p2p-app-distribution`: this repo has APK update broadcast plus same-WiFi peer relay. Preserve `version.json` as the public source of truth, keep direct download fallback, and treat WebSocket Ping/Pong, sender backpressure, and mirror priority semantics as compatibility-sensitive.
+
 ## Repository And Git
 
 - Remote: `git@github.com:ElonQian1/Elon.git`

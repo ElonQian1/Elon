@@ -171,6 +171,12 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - The production server is low-spec. Do not use it as the normal Rust release build machine or Android build machine.
 - APK project messages with photos/files should upload attachments first through HTTP, then send only server-side attachment references in the chat payload. Avoid putting large base64 blobs into the project WebSocket message.
 
+## 本机 Skills 已沉淀规则
+
+- `\\127.0.0.1\skills\ai-git-deploy-workflow` 的核心规则已固化到本文件和 `.github/instructions/git-deploy-workflow.instructions.md`：preflight、worktree 隔离、只 stage 本任务文件、commit/push 后再 deploy、部署后 live 验证。
+- `\\127.0.0.1\skills\rust-shared-target-cache` 的关键事故规则：禁止相对路径 `CARGO_TARGET_DIR`；Rust 构建优先使用本仓库脚本，裸跑 cargo 前怀疑环境异常时先检查用户/系统环境变量。
+- `\\127.0.0.1\skills\p2p-app-distribution` 的可复用规则：APK 分发以公网 `/app/version.json` 为事实来源，P2P mirrors 只能作为加速，必须保留 `downloadUrl` 服务器直链兜底；修改 mirror 优先级、PeerSeeder、relay 或更新链路后属于 Android 可安装端能力变更，必须跑 APK 发布闭环。
+
 ## VS Code 快捷入口
 
 - 常规代码任务：运行 `/elon-dev-task`。

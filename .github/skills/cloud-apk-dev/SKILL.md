@@ -46,3 +46,5 @@ Read these files before acting:
 - If uncommitted changes are unrelated or unclear, create a new worktree from `origin/main` instead of pulling in the dirty workspace.
 - For backend runtime changes, increment `server/Cargo.toml` `package.version`, deploy with `scripts/publish-server.*`, and verify `/api/server/version`.
 - For Android installable features, PR/debug build is not complete. Run `scripts\publish-apk.ps1`, then `scripts\check-task-complete.ps1 -Kind AndroidFeature`, unless the user explicitly says not to publish the APK.
+- For Rust builds, do not rely on a relative `CARGO_TARGET_DIR`; use project scripts or an absolute target directory.
+- For APK update/P2P work, keep `version.json` as the public source of truth, preserve direct `downloadUrl` fallback, and verify live `/app/version.json` after publishing.

@@ -150,6 +150,46 @@ d:\一龙\
 
 ## 5. APK 分发方案
 
+当前一龙 APK 分发不是第三方托管方案，而是固定直链 + 版本信息 + 同 WiFi P2P mirror：
+
+```
+scripts/publish-apk.ps1
+    │
+    ├── 上传 /opt/elon/data/app/ElonSpeed-latest.apk
+    ├── 上传 /opt/elon/data/app/version.json
+    ├── POST /api/app/update/broadcast 通知在线客户端
+    │
+    ▼
+服务器
+    ├── GET /app/version.json
+    │     ├── 读取磁盘 version.json
+    │     ├── 重写 downloadUrl/downloadPageUrl 为公网地址
+    │     └── 动态注入在线 seeder mirrors
+    ├── GET /app/ElonSpeed-latest.apk
+    ├── GET /app/peer/ws?version_code=N
+    └── GET /app/relay/peer/{peer_id}/apk
+```
+
+相关实现：
+
+| 模块 | 职责 |
+|---|---|
+| `server/src/app_update.rs` | 读取最新 `version.json` 并广播在线更新事件 |
+| `server/src/peer_relay.rs` | 注册同 WiFi seeder、动态注入 `mirrors`、中继 APK 下载 |
+| `android/app/src/main/kotlin/com/elon/app/update/AppUpdateManager.kt` | 拉取 `version.json`、尝试 mirrors、失败后回退服务器直链 |
+| `android/app/src/main/kotlin/com/elon/app/update/PeerSeederManager.kt` | 已安装 APK 的手机连接 WebSocket，收到 `SEND_APK` 后发送本机安装包 |
+
+P2P 分发维护规则：
+
+- `version.json` 是 APK 分发事实来源；发布后必须校验公网 `/app/version.json`，不能只看本地生成文件。
+- 当前 mirror 字段由 `server/src/peer_relay.rs` 动态注入，仅包含 `version_code >= 当前发布 versionCode` 的在线 seeder。
+- 当前 Android 端按 `priority` 降序尝试 mirror；如果后续引入 dev-mirror 并希望采用“数字越小越优先”，必须同步修改 Android 排序、服务器注入规则和文档，然后按 APK 发布闭环发布。
+- WebSocket 长连接必须使用无读超时或足够长读超时；服务器端遇到 Ping/Pong 等控制帧不能当作传输失败。
+- 大 APK 中继要关注背压和内存占用。当前服务器会收集完整 APK 后再返回 HTTP 响应；若 APK 增大或并发增加，应改为流式转发，并在 Android WebSocket 发送端按队列大小节流，避免 OkHttp 写缓冲撑满导致截断。
+- mirror 全部失败时必须保留 `downloadUrl` 直链兜底，避免 P2P 节点不在线影响普通更新。
+
+历史备选方案：
+
 ```
 编译完成的 APK
     │
