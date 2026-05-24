@@ -298,6 +298,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         appInForeground = true
         setTaskAppForeground(true)
+        startMcpDebugKeepAlive()
         drainQueuedTaskEvents()
         clearCompletedTaskBadge()
         if (::binding.isInitialized) {
@@ -314,6 +315,23 @@ class MainActivity : AppCompatActivity() {
             } else if (!waitingForReply) {
                 setSendEnabled(true)
             }
+        }
+    }
+
+    private fun startMcpDebugKeepAlive() {
+        if (!McpDebugKeepAliveService.shouldAutoStart(this)) return
+        val intent = Intent(this, McpDebugKeepAliveService::class.java).apply {
+            action = McpDebugKeepAliveService.ACTION_START
+        }
+        runCatching {
+            ContextCompat.startForegroundService(this, intent)
+        }.onSuccess {
+            DebugTraceStore.record("mcp_keepalive_auto_start_requested")
+        }.onFailure { error ->
+            DebugTraceStore.record(
+                "mcp_keepalive_auto_start_failed",
+                mapOf("error" to (error.message ?: error.javaClass.simpleName))
+            )
         }
     }
 
