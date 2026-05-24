@@ -1057,6 +1057,8 @@ mod tests {
 
         assert!(prompt.contains("通用项目工作流必须始终执行"));
         assert!(prompt.contains("git pull --rebase"));
+        assert!(prompt.contains("scripts/publish-apk.ps1"));
+        assert!(prompt.contains("不要 rebase 后继续上传旧 APK"));
     }
 
     #[test]
@@ -1373,7 +1375,7 @@ fn build_development_cli_prompt(
 - 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit、push；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
 - 如果改动影响服务器运行，必须递增 server/Cargo.toml 的 package.version，在 commit/push 后用本地开发机运行 scripts/publish-server.ps1 或 scripts/publish-server.sh 交叉编译并上传 binary；生产服务器性能较弱，只负责接收 binary、重启和健康检查，不要把它当常规编译机。部署后验证 /health 和 /api/server/version。
-- 如果改动影响 Android APK 发布给用户，必须递增 android/app/build.gradle 里的 versionCode 和 versionName，在本地开发机构建签名 release APK，上传最新 APK 和 version.json，再验证下载地址。签名文件应来自项目本机配置（例如 android/app/elon-release.jks 或环境变量），不得提交密钥。
+- 如果改动影响 Android APK 发布给用户，必须优先使用项目发布脚本（例如 scripts/publish-apk.ps1）完成同步 main、递增 versionCode/versionName、构建签名 release APK、提交/推送 release commit、上传 APK 和 version.json、校验线上 /app/version.json。APK 编译完成后如果 push 被拒或 origin/main 已前进，不要 rebase 后继续上传旧 APK；如果服务器已部署包含本次基础 SHA 的更新 APK，就停止本地旧发布并测试线上新版；否则必须基于最新 main 重新运行发布脚本。签名文件应来自项目本机配置或环境变量，不得提交密钥。
 - 对普通用户项目，遵循该项目自己的 README/AGENTS/CODEX/文档；不要把一龙自项目的服务器发布规则套到无关项目，除非该项目文档要求。
 - 开始执行前，先用 1-2 句自然中文回应用户：说清楚你理解到的具体需求，以及接下来会先检查或修改哪里。为了让客户端识别，这一行必须以「用户可见：」开头。不要使用固定模板，不要提“CLI/后台/工作区”，不要承诺还没有完成的结果。
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。

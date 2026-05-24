@@ -171,6 +171,12 @@ APK:
 - Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
 - APK release builds must run locally and upload `ElonSpeed-latest.apk` plus `version.json`; the production server should not be used as the Android build machine.
 - `scripts/publish-apk.ps1` writes APK provenance to server-side `.apk-deployed-sha` and `version.json.gitSha`. If `origin/main` advances during a slow APK build, the script must not rebase and upload the old artifact. If the server already has a deployed SHA containing this build's base commit, stop and test that newer live APK; otherwise rerun the release from latest `main`.
+- Remote Codex CLI must treat this as the default APK release decision flow:
+  1. Sync to latest `main` before building.
+  2. Build only from a known pushed SHA.
+  3. If another machine publishes a newer APK that already contains the build's base SHA, stop local release work and verify that live APK instead.
+  4. If `origin/main` advances but the live APK does not prove it contains this build's base SHA, do not upload the stale artifact; restart the release from latest `main`.
+  5. Never rebase after APK compilation and then upload the old APK; the embedded `BuildConfig.VERSION_CODE` may no longer match `version.json`.
 - Release signing keystore is local-only at `D:\一龙\elon-release(1).jks`; do not commit it.
 - Keystore type: `PKCS12`; key alias: `elon`.
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.
