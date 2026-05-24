@@ -285,6 +285,13 @@ class MainActivity : AppCompatActivity() {
         UpdateCheckWorker.schedule(this)
         // 注册本机为同WiFi APK 种子节点（已安装用户帮助其他用户加速下载）
         com.elon.app.update.PeerSeederManager.start(this)
+        handleLaunchIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleLaunchIntent(intent)
     }
 
     override fun onResume() {
@@ -1895,6 +1902,13 @@ class MainActivity : AppCompatActivity() {
                     setSendEnabled(backendConnected)
                 }
             }
+        }
+    }
+
+    private fun handleLaunchIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
+            intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
+            AppUpdateManager(this).realtimeCheck()
         }
     }
 
@@ -4145,6 +4159,13 @@ class MainActivity : AppCompatActivity() {
                     addProjectEvent("工具完成：${toolLabel(tool)}")
                     return
                 }
+                "app_update_available" -> {
+                    val remoteVersionCode = runCatching {
+                        json.get("versionCode")?.asInt ?: 0
+                    }.getOrDefault(0)
+                    AppUpdateManager(this).realtimeCheck(remoteVersionCode)
+                    return
+                }
                 "done"        -> {
                     waitingForReply = false
                     setSendEnabled(true)
@@ -4688,7 +4709,7 @@ class MainActivity : AppCompatActivity() {
         } else if (requestCode == notificationPermissionRequest) {
             val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
             if (!granted) {
-                Toast.makeText(this, "需要通知权限才能显示桌面任务角标", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "需要通知权限才能显示任务完成和应用更新提醒", Toast.LENGTH_SHORT).show()
             }
         }
     }

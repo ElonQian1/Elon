@@ -153,8 +153,9 @@ class TaskWorkService : Service() {
         val projectTitle = json
             ?.optString("project_title")
             ?.takeIf { it.isNotBlank() }
-        val titleQuery = projectTitle?.let { "?title=${pathPart(it)}" }.orEmpty()
-        return "ws://43.139.149.158:8080/ws/user/${pathPart(userId)}/projects/${pathPart(projectId)}$titleQuery"
+        val query = mutableListOf("app_version_code=${BuildConfig.VERSION_CODE}")
+        projectTitle?.let { query += "title=${pathPart(it)}" }
+        return "ws://43.139.149.158:8080/ws/user/${pathPart(userId)}/projects/${pathPart(projectId)}?${query.joinToString("&")}"
     }
 
     private fun pathPart(value: String): String {
@@ -240,6 +241,11 @@ class TaskWorkService : Service() {
             )
         }
         when (parsed?.optString("type")) {
+            "app_update_available" -> {
+                if (!isAppInForeground()) {
+                    showAppUpdateNotification(parsed)
+                }
+            }
             "done" -> finishWork(parsed, success = true)
             "error" -> finishWork(parsed, success = false)
         }
@@ -380,6 +386,42 @@ class TaskWorkService : Service() {
         )
     }
 
+    private fun showAppUpdateNotification(json: JSONObject) {
+        val versionCode = json.optInt("versionCode", 0)
+        if (versionCode <= BuildConfig.VERSION_CODE) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        val versionName = json.optString("versionName").takeIf { it.isNotBlank() } ?: "新版"
+        val changelog = json.optString("changelog").takeIf { it.isNotBlank() }
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_SHOW_APP_UPDATE, true)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            2,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, APP_UPDATE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_task_done)
+            .setContentTitle("一龙有新版本 v$versionName")
+            .setContentText(changelog ?: "点击查看并安装更新")
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        runCatching {
+            NotificationManagerCompat.from(this).notify(APP_UPDATE_NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val notificationManager = getSystemService(NotificationManager::class.java)
@@ -400,6 +442,16 @@ class TaskWorkService : Service() {
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "后台任务完成后显示桌面角标"
+                setShowBadge(true)
+            }
+        )
+        notificationManager.createNotificationChannel(
+            NotificationChannel(
+                APP_UPDATE_CHANNEL_ID,
+                "应用更新提醒",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "一龙 APP 有新版本时提醒"
                 setShowBadge(true)
             }
         )
@@ -532,8 +584,11 @@ class TaskWorkService : Service() {
 
         const val ACTIVE_WORK_CHANNEL_ID = "active_task_work"
         const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
+        const val APP_UPDATE_CHANNEL_ID = "app_update_alerts"
         const val ACTIVE_WORK_NOTIFICATION_ID = 2400
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401
+        const val APP_UPDATE_NOTIFICATION_ID = 2402
+        const val EXTRA_SHOW_APP_UPDATE = "show_app_update"
         const val PENDING_WORK_TTL_MS = 6 * 60 * 60 * 1000L
         private const val MAX_QUEUED_EVENTS = 120
         private const val MAX_QUEUED_EVENT_LENGTH = 20_000

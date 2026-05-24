@@ -42,10 +42,14 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
         private const val KEY_DISMISSED_CODE = "dismissed_code"
         private const val KEY_DISMISSED_AT = "dismissed_at"
         private const val KEY_LAST_CHECK = "last_check"
+        private const val KEY_REALTIME_PROMPT_CODE = "realtime_prompt_code"
+        private const val KEY_REALTIME_PROMPT_AT = "realtime_prompt_at"
         /** 自动检查冷却时间：12 小时 */
         private const val AUTO_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000L
         /** 用户点"稍后"后屏蔽同版本弹窗：3 天 */
         private const val DISMISS_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000L
+        /** 防止通知点击和队列恢复同时触发两个弹窗 */
+        private const val REALTIME_PROMPT_DEDUPE_MS = 30 * 1000L
     }
 
     private val prefs: SharedPreferences =
@@ -130,6 +134,26 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
                         showUpdateDialog(info)
                 }
             }
+        }.start()
+    }
+
+    /**
+     * WebSocket 收到服务端实时更新事件后调用：
+     * 事件只作为提醒信号，真正弹窗前仍重新拉取 version.json，避免使用过期数据。
+     */
+    fun realtimeCheck(remoteVersionCode: Int = 0) {
+        if (remoteVersionCode > 0 && remoteVersionCode <= BuildConfig.VERSION_CODE) return
+
+        Thread {
+            val info = fetchVersionInfo() ?: return@Thread
+            prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
+
+            if (info.versionCode <= BuildConfig.VERSION_CODE) return@Thread
+            if (!info.forceUpdate && isDismissedRecently(info.versionCode)) return@Thread
+            if (isRealtimePromptedMomentsAgo(info.versionCode)) return@Thread
+            markRealtimePrompted(info.versionCode)
+
+            activity.runOnUiThread { showUpdateDialog(info) }
         }.start()
     }
 
@@ -333,6 +357,20 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
         if (code != versionCode) return false
         val elapsed = System.currentTimeMillis() - prefs.getLong(KEY_DISMISSED_AT, 0)
         return elapsed < DISMISS_EXPIRY_MS
+    }
+
+    private fun isRealtimePromptedMomentsAgo(versionCode: Int): Boolean {
+        val code = prefs.getInt(KEY_REALTIME_PROMPT_CODE, 0)
+        if (code != versionCode) return false
+        val elapsed = System.currentTimeMillis() - prefs.getLong(KEY_REALTIME_PROMPT_AT, 0)
+        return elapsed < REALTIME_PROMPT_DEDUPE_MS
+    }
+
+    private fun markRealtimePrompted(versionCode: Int) {
+        prefs.edit()
+            .putInt(KEY_REALTIME_PROMPT_CODE, versionCode)
+            .putLong(KEY_REALTIME_PROMPT_AT, System.currentTimeMillis())
+            .apply()
     }
 
     private fun toast(msg: String) =

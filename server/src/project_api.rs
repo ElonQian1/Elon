@@ -431,8 +431,20 @@ pub async fn ws_project_handler(
     }
 
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
-    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
-        .into_response()
+    let client_version_code = query
+        .get("app_version_code")
+        .and_then(|value| value.parse::<i64>().ok());
+    ws.on_upgrade(move |socket| {
+        handle_project_ws(
+            socket,
+            state,
+            user,
+            project,
+            download_base,
+            client_version_code,
+        )
+    })
+    .into_response()
 }
 
 pub async fn ws_user_project_handler(
@@ -454,8 +466,20 @@ pub async fn ws_user_project_handler(
         "{}/api/user/{}/projects/{}/download",
         state.public_url, user.id, project.id
     );
-    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
-        .into_response()
+    let client_version_code = query
+        .get("app_version_code")
+        .and_then(|value| value.parse::<i64>().ok());
+    ws.on_upgrade(move |socket| {
+        handle_project_ws(
+            socket,
+            state,
+            user,
+            project,
+            download_base,
+            client_version_code,
+        )
+    })
+    .into_response()
 }
 
 pub async fn user_project_git_status(
@@ -589,22 +613,48 @@ async fn handle_project_ws(
     user: PublicUser,
     project: ProjectAccess,
     download_base: String,
+    client_version_code: Option<i64>,
 ) {
     let (mut sender, mut receiver) = socket.split();
+    let mut update_rx = crate::app_update::subscribe();
 
-    while let Some(Ok(msg)) = receiver.next().await {
-        let text = match msg {
-            Message::Text(text) => text,
-            Message::Ping(payload) => {
-                if sender.send(Message::Pong(payload)).await.is_err() {
-                    break;
+    if let Some(event) =
+        crate::app_update::latest_update_event_for_client(&state, client_version_code).await
+    {
+        if sender.send(Message::Text(event)).await.is_err() {
+            return;
+        }
+    }
+
+    loop {
+        let text = tokio::select! {
+            update = update_rx.recv() => {
+                if let Ok(event) = update {
+                    if crate::app_update::is_newer_for_client(&event, client_version_code)
+                        && sender.send(Message::Text(event)).await.is_err()
+                    {
+                        break;
+                    }
                 }
                 continue;
             }
-            Message::Pong(_) => continue,
-            Message::Close(_) => break,
-            Message::Binary(_) => continue,
+            incoming = receiver.next() => {
+                match incoming {
+                    Some(Ok(Message::Text(text))) => text,
+                    Some(Ok(Message::Ping(payload))) => {
+                        if sender.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                        continue;
+                    }
+                    Some(Ok(Message::Pong(_))) => continue,
+                    Some(Ok(Message::Close(_))) | None => break,
+                    Some(Ok(Message::Binary(_))) => continue,
+                    Some(Err(_)) => break,
+                }
+            }
         };
+
         let request = parse_project_message(&text);
         let message = request.message.trim().to_string();
         if message.is_empty() {
@@ -675,6 +725,7 @@ async fn handle_project_ws(
                 }
                 incoming = receiver.next() => {
                     match incoming {
+                        Some(Ok(Message::Text(_))) => {}
                         Some(Ok(Message::Ping(payload))) => {
                             if sender.send(Message::Pong(payload)).await.is_err() {
                                 client_disconnected = true;
@@ -686,9 +737,18 @@ async fn handle_project_ws(
                             client_disconnected = true;
                             break;
                         }
-                        Some(Ok(Message::Text(_))) => {}
                         Some(Ok(Message::Binary(_))) => {}
                         Some(Err(_)) => {
+                            client_disconnected = true;
+                            break;
+                        }
+                    }
+                }
+                update = update_rx.recv() => {
+                    if let Ok(event) = update {
+                        if crate::app_update::is_newer_for_client(&event, client_version_code)
+                            && sender.send(Message::Text(event)).await.is_err()
+                        {
                             client_disconnected = true;
                             break;
                         }
@@ -746,8 +806,10 @@ pub async fn ws_elon_self_handler(
         "{}/api/user/{}/projects/{}/download",
         state.public_url, user.id, project.id
     );
-    ws.on_upgrade(move |socket| handle_project_ws(socket, state, user, project, download_base))
-        .into_response()
+    ws.on_upgrade(move |socket| {
+        handle_project_ws(socket, state, user, project, download_base, None)
+    })
+    .into_response()
 }
 
 /// APK 下载：`GET /api/elon/download/:filename`

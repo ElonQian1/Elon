@@ -7,7 +7,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
-use crate::{admin, api, client_gateway, peer_relay, project_api, user_api, web};
+use crate::{admin, api, app_update, client_gateway, peer_relay, project_api, user_api, web};
 
 pub fn build_app(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
@@ -80,6 +80,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
         .route("/app/download", get(web::download_page))
         .route("/download", get(web::download_page))
+        .route(
+            "/api/app/update/broadcast",
+            post(app_update::broadcast_latest_update),
+        )
         // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
         .route("/app/version.json", get(peer_relay::version_json))
         .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))

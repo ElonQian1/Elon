@@ -147,12 +147,24 @@ Write-Host "📝 更新版本号..." -ForegroundColor Cyan
 $content = Get-Content $GradlePath -Encoding UTF8 -Raw
 
 $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
-$newCode = $oldCode + 1
+$publishedCode = 0
+$publishedName = $null
+try {
+    $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
+    $publishedCode = [int]$published.versionCode
+    $publishedName = [string]$published.versionName
+    Write-Host "   线上版本: v$publishedName (build $publishedCode)" -ForegroundColor Gray
+} catch {
+    Write-Warning "   ⚠️  无法读取线上版本，将仅基于本地 build.gradle 递增：$_"
+}
+$baseCode = [Math]::Max($oldCode, $publishedCode)
+$newCode = $baseCode + 1
 $content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
 
 # 自动递增 versionName PATCH（1.0 → 1.0.1，1.0.1 → 1.0.2，1.2 → 1.2.1）
 $oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
-$parts = $oldName.Split('.')
+$baseName = if ($publishedCode -gt $oldCode -and $publishedName -match '^\d+(\.\d+){1,2}$') { $publishedName } else { $oldName }
+$parts = $baseName.Split('.')
 if ($parts.Count -eq 2) { $parts += "0" }   # "1.0" → ["1","0","0"]
 $parts[-1] = [string]([int]$parts[-1] + 1)   # 递增 PATCH
 $newName = $parts -join '.'
@@ -260,6 +272,19 @@ try {
     }
 } catch {
     Write-Warning "   ⚠️  验证请求失败: $_（可能服务端重启中，稍后手动验证）"
+}
+
+Write-Host "📣 广播在线客户端更新提醒..." -ForegroundColor Cyan
+try {
+    $broadcastUrl = "$ServerUrl/api/app/update/broadcast"
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($env:APP_UPDATE_BROADCAST_TOKEN)) {
+        $headers["Authorization"] = "Bearer $env:APP_UPDATE_BROADCAST_TOKEN"
+    }
+    $broadcast = Invoke-RestMethod -Method Post -Uri $broadcastUrl -Headers $headers -TimeoutSec 10
+    Write-Host "   ✅ 已通知在线连接: $($broadcast.receivers)" -ForegroundColor Green
+} catch {
+    Write-Warning "   ⚠️  实时广播失败: $_（不影响 APK 发布，离线/未收到用户仍会定期检查）"
 }
 
 # ── 汇报 ──────────────────────────────────────────────────────────────────────
