@@ -10,6 +10,7 @@ copilot-cli — Copilot / GitHub Models API 命令行包装器
   GITHUB_TOKEN 或 COPILOT_GITHUB_TOKEN     — GitHub PAT（必须）
   COPILOT_API_BASE                          — API 基础地址（可选，默认 GitHub Models）
   COPILOT_SYSTEM_PROMPT                     — 系统提示词（可选）
+  COPILOT_PROXY                             — 专用代理（可选，如 socks5h://...）；不继承 ALL_PROXY
 
 服务端配置示例（.env 或 systemd service）：
   COPILOT_CLI_ENABLED=true
@@ -97,27 +98,36 @@ def main():
         }
     ).encode("utf-8")
 
-    req = urllib.request.Request(
-        f"{api_base}/chat/completions",
-        data=payload,
-        headers=headers,
-        method="POST",
-    )
+    # 代理：只读取 COPILOT_PROXY 专用变量，不继承 ALL_PROXY（服务器直连 Azure 更快）
+    copilot_proxy = os.environ.get("COPILOT_PROXY", "")
+
+    import subprocess
+    curl_cmd = ["curl", "-s", "--noproxy", "*", "--max-time", "120", "-X", "POST",
+                f"{api_base}/chat/completions"]
+    for k, v in headers.items():
+        curl_cmd += ["-H", f"{k}: {v}"]
+    curl_cmd += ["-d", payload.decode("utf-8")]
+
+    if copilot_proxy:
+        # 有专用代理时移除 --noproxy 并添加代理
+        curl_cmd.remove("--noproxy")
+        curl_cmd.remove("*")
+        curl_cmd += ["--proxy", copilot_proxy]
 
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.load(resp)
+        result = subprocess.run(curl_cmd, capture_output=True, timeout=130)
+        if result.returncode != 0:
+            print(f"网络错误: {result.stderr.decode('utf-8', errors='replace')}", file=sys.stderr)
+            sys.exit(1)
+        data = json.loads(result.stdout.decode("utf-8"))
+        if "error" in data:
+            err = data["error"]
+            print(f"API 错误: {err.get('message', err)}", file=sys.stderr)
+            sys.exit(1)
         content = data["choices"][0]["message"]["content"]
         print(content)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        print(f"API 错误 {e.code}: {body}", file=sys.stderr)
-        sys.exit(1)
-    except urllib.error.URLError as e:
-        print(f"网络错误: {e.reason}", file=sys.stderr)
-        sys.exit(1)
-    except (KeyError, IndexError, json.JSONDecodeError) as e:
-        print(f"响应解析失败: {e}", file=sys.stderr)
+    except subprocess.TimeoutExpired:
+        print("请求超时", file=sys.stderr)
         sys.exit(1)
 
 
