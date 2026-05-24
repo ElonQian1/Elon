@@ -43,3 +43,4 @@ Read these files before acting:
 - Never stage unrelated files.
 - Never commit secrets, `.env`, APK signing keys, or generated private credentials.
 - If push is rejected, fetch/rebase or merge, resolve conflicts while preserving both sides when compatible, then push again.
+- For Android installable features, PR/debug build is not complete. Run `scripts\publish-apk.ps1`, then `scripts\check-task-complete.ps1 -Kind AndroidFeature`, unless the user explicitly says not to publish the APK.

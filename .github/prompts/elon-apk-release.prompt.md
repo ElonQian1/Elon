@@ -16,9 +16,7 @@ argument-hint: "<发布原因或用户需求>"
 发布要求：
 
 1. 先确认 Git 状态，并保护所有不属于本任务的未提交改动。
-2. 发布 APK 前必须更新 `android/app/build.gradle` 中的 `versionCode` 和 `versionName`。
-3. 先提交并 push 代码，再构建 APK。
-4. 使用 `.\gradlew.bat assembleRelease` 构建。
-5. APK 签名和分发必须使用既有脚本或环境变量配置，不得硬编码密钥。
-6. 上传后验证服务器上的 APK 文件和下载地址。
-7. 结束时汇报版本号、commit SHA、push 状态、构建结果、APK 地址。
+2. 使用 `scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"`，不要手工拼接版本号、签名和上传步骤。
+3. 发布脚本必须完成 `versionCode/versionName` 递增、release APK 构建、release commit、`HEAD:main` 推送、APK/version.json 上传和服务器校验。
+4. 发布后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature`。
+5. 结束时汇报 APK 发布状态、版本号、commit SHA、push 状态、构建结果、服务器校验结果、APK 地址。

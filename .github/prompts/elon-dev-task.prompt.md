@@ -23,4 +23,5 @@ argument-hint: "<用户需求或任务描述>"
 5. 根据影响范围运行最小有效验证。
 6. 只 stage 当前任务文件并 commit。
 7. push 到 `origin/main`；如被拒绝，fetch/rebase 或 merge 后重试。
-8. 结束时汇报提交 SHA、push 状态、验证结果、部署状态。
+8. 如任务修改 APK 可安装端能力，继续运行 `scripts\publish-apk.ps1` 和 `scripts\check-task-complete.ps1 -Kind AndroidFeature`，不能只停在 PR 或 Debug 包。
+9. 结束时汇报提交 SHA、push 状态、验证结果、部署状态；Android 任务还必须汇报 APK 发布状态、版本号和下载地址。

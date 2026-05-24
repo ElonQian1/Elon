@@ -27,6 +27,8 @@ bash scripts/install-hooks.sh
 > 不依赖 AI 是否阅读文档：装好后，`git push` 会被 hook 自动拦截
 > ——cargo check 失败或有未 add 的 `.rs` 文件时**直接拒绝 push**。
 > 这是机器强制的防漏 add 守门（修复 56bad51 类事故）。
+> Android APK 主分支推送也会被 hook 检查：如果改了 APK 运行代码但没有递增
+> `android/app/build.gradle` 里的 `versionCode/versionName`，会拒绝推送到 `main`。
 > 部署侧由服务器 flock 互斥锁 + CAS（compare-and-swap）保证不会并发覆盖。
 
 ---
@@ -50,6 +52,38 @@ bash scripts/install-hooks.sh
 
 > **并发保护**：两个脚本都内置 SHA 顺序检查。如果另一台 PC 已部署更新版本，
 > 本机旧版编译完成后**会自动中止**，不会回退服务器版本。用 `-Force`/`--force` 强制覆盖。
+
+---
+
+## 📱 APK 新功能发布闭环（不能只 PR / Debug）
+
+只要任务修改了 APK 用户可安装端能力，就不能停在 PR、分支、`assembleDebug` 或“代码已提交”。
+
+适用范围包括但不限于：
+
+- `android/app/src/main/**`
+- `android/app/src/main/AndroidManifest.xml`
+- Android 聊天链路、调试能力、更新链路、权限、前台/后台服务
+- 任何用户需要在手机上安装后才能验证的新功能或修复
+
+完成定义必须是：
+
+```powershell
+scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+```
+
+发布脚本会自动完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、校验服务器版本。
+
+最终汇报必须写清楚：
+
+- APK 发布状态：已发布 / 未发布（原因）
+- APK 版本：`versionName` + `versionCode`
+- 发布 commit SHA
+- 服务器 `/app/version.json` 校验结果
+- APK 下载地址
+
+除非用户明确说“只改代码，不发布 APK”，否则 Android 新功能默认必须跑完上面的发布闭环。
 
 ---
 
@@ -128,5 +162,6 @@ bash scripts/install-hooks.sh
 - 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
+- Android 新功能必须完成 APK 发布闭环，不能只停在 PR、Debug 包或本地验证。
 - 不提交密钥、`.env`、APK 签名材料或任何敏感信息。
 - push 被拒绝（non-fast-forward）→ `git pull --rebase` 解决后再 push，禁止 `--force`。

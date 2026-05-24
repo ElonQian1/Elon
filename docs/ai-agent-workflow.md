@@ -16,6 +16,7 @@
 3. `local_path` 和 GitHub 项目按已有 Git 仓库处理，修改前同步远端，修改后验证、commit、push。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
+6. Android APK 新功能的完成定义是“手机可安装到最新 APK”，不是 PR、分支、Debug 包或代码已提交。
 
 ---
 
@@ -246,6 +247,18 @@ scripts/deploy.sh server
 ```
 
 ### 8.2 分发 APK
+
+Android 可安装端能力变更必须使用仓库发布脚本，不得手工拼接版本号、签名、上传步骤：
+
+```powershell
+scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+```
+
+发布脚本会完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 APK 和 `version.json`、验证服务器版本。
+
+旧式手工流程只作为脚本维护参考，不作为 AI 代理日常发布入口：
+
 ```powershell
 # 上传 APK 并获取下载链接
 scripts/deploy.sh apk
@@ -293,3 +306,4 @@ scripts/deploy.sh apk
 3. **必须**在每次代码修改后更新 `copilot-instructions.md` 中的"当前开发状态"
 4. **每个用户任务**必须有完整的 git 提交记录，可溯源
 5. **不允许**一次修改范围过大（超过5个文件应拆分为多次任务）
+6. **Android 新功能禁止只交 PR 或 Debug 包**；默认必须完成 APK 发布闭环并校验服务器 `version.json`

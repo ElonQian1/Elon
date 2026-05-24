@@ -200,29 +200,16 @@ bash scripts/deploy.sh
 
 ## 📱 Android APK 部署
 
-> Android 是**例外**：允许在主工作区构建（Gradle 需要提交版本号）。
+> Android 新功能不是“代码合并即完成”。只要改了 APK 可安装端能力，必须跑发布脚本并校验服务器版本。
 
 ```powershell
-# 1. 更新版本号（如需要）
-# android/app/build.gradle → versionCode + versionName
-
-# 2. 提交
-git add android/app/build.gradle android/app/src/  # 只加 android 相关文件
-git commit -m "feat(android): 描述 - vX.X.X"
-git push origin main
-
-# 3. 本地编译 APK
-$repoRoot = git rev-parse --show-toplevel
-Set-Location "$repoRoot\android"
-.\gradlew.bat assembleRelease
-
-# 4. 上传 APK 到服务器
-$apk = Get-ChildItem "app\build\outputs\apk\release\*.apk" | Select-Object -First 1
-scp $apk.FullName "root@43.139.149.158:/root/Elon/app/ElonSpeed-latest.apk"
-
-# 5. 验证
-ssh root@43.139.149.158 'ls -lh /root/Elon/app/ElonSpeed-latest.apk'
+scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
+
+`scripts\publish-apk.ps1` 会自动完成：`git pull --rebase origin main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、`git push origin HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、验证服务器版本。
+
+如果用户明确要求“只改代码，不发布 APK”，最终汇报必须写明 `APK 发布状态：未发布（用户明确要求）`。
 
 ---
 
@@ -305,6 +292,8 @@ tls/
 ✅ 基于哪个 SHA 部署：<sha>
 ✅ 临时工作树已清理：是 / 不适用
 ✅ 服务健康验证结果：<curl 输出>
+✅ APK 发布状态：已发布 / 未发布（非 Android 任务或用户明确要求）
+✅ APK 版本与下载地址：<versionName/build/downloadUrl>
 ```
 
 ---

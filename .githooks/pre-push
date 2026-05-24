@@ -5,9 +5,15 @@
 
 set -e
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
+ZERO_SHA='0000000000000000000000000000000000000000'
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
+
+PUSH_LINES=()
+while read -r local_ref local_sha remote_ref remote_sha; do
+  PUSH_LINES+=("$local_ref $local_sha $remote_ref $remote_sha")
+done
 
 # 1. 拦截未 add 的 Rust 源文件（漏 git add 是 56bad51 类事故根因）
 UNTRACKED_RS=$(git ls-files --others --exclude-standard | grep -E '\.rs$' || true)
@@ -20,7 +26,47 @@ if [ -n "$UNTRACKED_RS" ]; then
   exit 1
 fi
 
-# 2. cargo check 守门（如果存在 server/Cargo.toml）
+# 2. Android APK 发布守门：推 main 时，APK 运行代码变化必须伴随版本号递增
+for line in "${PUSH_LINES[@]}"; do
+  set -- $line
+  local_ref="$1"
+  local_sha="$2"
+  remote_ref="$3"
+  remote_sha="$4"
+
+  if [ "$remote_ref" != "refs/heads/main" ] || [ "$local_sha" = "$ZERO_SHA" ]; then
+    continue
+  fi
+
+  if [ "$remote_sha" = "$ZERO_SHA" ]; then
+    base_sha="$(git merge-base "$local_sha" origin/main 2>/dev/null || git rev-list --max-parents=0 "$local_sha" | tail -n 1)"
+  else
+    base_sha="$remote_sha"
+  fi
+
+  changed_files="$(git diff --name-only "$base_sha" "$local_sha")"
+  android_runtime_changes="$(echo "$changed_files" | grep -E '^(android/app/src/main/|android/app/proguard-rules\.pro|android/build\.gradle|android/settings\.gradle|android/gradle\.properties)' || true)"
+
+  if [ -z "$android_runtime_changes" ]; then
+    continue
+  fi
+
+  version_diff="$(git diff "$base_sha" "$local_sha" -- android/app/build.gradle || true)"
+  has_version_code="$(echo "$version_diff" | grep -E '^[+-][[:space:]]*versionCode[[:space:]]+[0-9]+' || true)"
+  has_version_name="$(echo "$version_diff" | grep -E '^[+-][[:space:]]*versionName[[:space:]]+"[0-9.]+"' || true)"
+
+  if [ -z "$has_version_code" ] || [ -z "$has_version_name" ]; then
+    echo -e "${RED}❌ pre-push 拒绝：检测到 Android APK 运行代码变更，但没有递增版本号。${NC}" >&2
+    echo -e "${YELLOW}   变更范围：${NC}" >&2
+    echo "$android_runtime_changes" | sed 's/^/   /' >&2
+    echo -e "${YELLOW}   Android 新功能不能只推代码或 Debug 包。请运行：${NC}" >&2
+    echo -e "${YELLOW}   scripts\\\\publish-apk.ps1 -Changelog \"<本次用户可见改动>\"${NC}" >&2
+    echo -e "${YELLOW}   如果用户明确要求不发布 APK，请不要直接推 main，先走代码分支/PR 并在汇报中说明。${NC}" >&2
+    exit 1
+  fi
+done
+
+# 3. cargo check 守门（如果存在 server/Cargo.toml）
 if [ -f "server/Cargo.toml" ]; then
   echo -e "${YELLOW}🔍 pre-push: cargo check --workspace（server）...${NC}"
   if ! (cd server && cargo check --workspace --quiet 2>&1); then

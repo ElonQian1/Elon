@@ -52,6 +52,17 @@
 5. **编译部署**：Rust编译、Android打包签名、前端构建，部署到服务器
 6. **反馈用户**：将新APK下载链接通过对话界面发回用户手机
 
+### Android 新功能完成定义
+
+涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算完成。只要改动触及 `android/app/src/main/**`、`AndroidManifest.xml`、聊天链路、更新链路、权限、后台服务或手机端调试能力，除非用户明确要求“只改代码不发布 APK”，否则必须运行：
+
+```powershell
+scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+```
+
+最终回复必须包含 APK 发布状态、版本号、发布 SHA、服务器 `/app/version.json` 校验结果和下载地址。
+
 > 详细流程见：`docs/ai-agent-workflow.md`
 
 ---
@@ -77,6 +88,7 @@
 - **APK 签名密钥不得泄露**，相关操作只走自动化脚本
 - **每个用户的修改是隔离的**，不能让一个用户的操作影响其他用户
 - **代码变更记录用户身份**，commit 信息中包含用户标识
+- **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 
 ---
 
