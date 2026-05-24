@@ -25,6 +25,29 @@ applyTo: "**"
 
 ---
 
+## 🌐 访问服务器必须绕过代理
+
+> **本机可能运行了 VPN/代理客户端，会导致访问服务器的 SSH/curl 超时！**  
+> 根本原因：VPN 客户端设置了系统代理，SSH/curl 连接被路由到代理后超时。  
+> 服务器内部发起的命令不受影响，只有**从本机发起的 SSH/SCP/curl 到外网 IP** 才需要绕代理。
+
+```powershell
+# ✅ SSH / SCP：加 -o ProxyCommand=none
+ssh -o ProxyCommand=none root@43.139.149.158 'command'
+scp -o ProxyCommand=none <file> root@43.139.149.158:/path/
+
+# ✅ curl.exe（PowerShell）：加 --noproxy '*'
+curl.exe --noproxy '*' -s "http://43.139.149.158:8080/health"
+
+# ✅ Invoke-RestMethod（PowerShell）：加 -NoProxy
+Invoke-RestMethod "http://43.139.149.158:8080/api/server/version" -NoProxy
+
+# ✅ 服务器内部 SSH 执行 curl：不需要特殊处理
+ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/health'
+```
+
+---
+
 ## ❌ 绝对禁止
 
 | 禁止行为 | 原因 |
@@ -168,6 +191,25 @@ git worktree remove ..\Elon-session-$id --force
 
 ---
 
+## 🦀 Rust 代码格式化规则（增量自律）
+
+> **方针**：不重构历史代码、只对新改动增量规范。改 `.rs` 文件后，**只对自己改过的文件**跑 `rustfmt`。
+
+```powershell
+# ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）
+$rs = @(git diff --name-only) + @(git ls-files --others --exclude-standard) |
+  Where-Object { $_ -match '\.rs$' }
+if ($rs) { rustfmt $rs }
+```
+
+**禁止**：
+- `cargo fmt`（无参数）：会扫描整个 crate 数百个历史文件，产生大量无关 diff，污染 PR 历史
+- 修改其他 AI 负责的 `.rs` 文件的格式
+
+> `rustfmt <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。
+
+---
+
 ## 🦀 后端部署（Rust → Linux 服务器）
 
 **服务器信息**：`root@43.139.149.158`，项目路径 `/root/Elon`
@@ -242,15 +284,63 @@ bash scripts/publish-server.sh --skip-upload
 
 > Android 新功能不是“代码合并即完成”。只要改了 APK 可安装端能力，必须跑发布脚本并校验服务器版本。
 
+### APK 发布三步式工作流（严格分离，不得合并）
+
+```
+[第1步：提交业务代码]   git add 业务文件 → commit → push
+        ↓
+[第2步：运行发布脚本]   publish-apk.ps1 -Changelog "..."
+        （脚本自动：versionCode+1 → 编译 → 上传 → 验证）
+        ↓
+[第3步：提交脚本产生的版本号变动]   git add build.gradle → commit → push
+```
+
+**第1步必须先单独提交**，不能把业务代码和版本号文件混在同一个 commit。
+
 ```powershell
+# 第1步：先提交业务代码
+git add android/app/src/main/...   # 只加业务文件，不加 build.gradle
+git commit -m "feat(android): 描述"
+git push origin main               # 脚本基于远端 HEAD，必须先 push
+
+# 第2步：运行发布脚本（自动完成版本号递增、编译、上传）
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-`scripts\publish-apk.ps1` 会自动完成：`git pull --rebase origin main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、`git push origin HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、验证服务器版本。
+### ⚠️ 并发发布冲突：push 被拒后必须重跑脚本
+
+当第2步脚本的最终 `git push` 被拒绝（non-fast-forward），**绝对不能只 rebase 再推**：
+
+```
+❌ 错误做法：
+  git pull --rebase → git push   ← 产物里嵌入的是旧 versionCode！
+  → version.json 的版本号 ≠ APK 实际内嵌版本号 → 手机死循环弹更新提示
+
+✅ 正确做法：
+  git pull --rebase origin main   # 先同步对方的版本号 commit
+  重新运行 scripts\publish-apk.ps1 -Changelog "..."   # 基于最新版本号重新编译上传
+```
+
+**原因**：APK 产物在编译时已经把旧的 `versionCode` 打包进去了，不重新编译就上传，会导致 `version.json` 中的版本号与 APK `BuildConfig.VERSION_CODE` 不一致。
 
 如果用户明确要求“只改代码，不发布 APK”，最终汇报必须写明 `APK 发布状态：未发布（用户明确要求）`。
+### ⚠️ APK 并发发布冲突：push 被拒后必须重跑脚本
 
+当 `publish-apk.ps1` 最终 `git push` 被拒绝（non-fast-forward），**绝对不能只 rebase 再推**：
+
+```
+❌ 错误做法：git pull --rebase → git push
+   → 已编译产物里嵌入的是旧 versionCode！
+   → version.json 的版本号 ≠ APK 实际内嵌版本号
+   → 手机死循环弹更新提示（BuildConfig.VERSION_CODE 永远小于服务端）
+
+✅ 正确做法：
+   git pull --rebase origin main   # 先同步对方的版本号 commit
+   重新运行 scripts\publish-apk.ps1 -Changelog "..."  # 基于最新版本号重新编译上传
+```
+
+**原因**：APK 产物在编译时已把旧的 `versionCode` 打包进去，不重新编译直接上传会导致 `version.json` 中版本号与 `BuildConfig.VERSION_CODE` 不一致。
 ---
 
 ## 🏷️ 版本号管理规则
@@ -297,6 +387,46 @@ git commit -m "release(android): vNEW_VERSION (build $newCode) - <改动描述>"
 - 发布 APK 时不更新版本号
 - `versionCode` 减小或重复（设备会拒绝安装）
 - 多人同时发布时使用相同 `versionCode`（后推送的一方 push 被拒绝后必须再次 +1 再推）
+
+---
+
+## 🦀 Rust 代码格式化规则（增量自律）
+
+> **方针**：不重构历史代码、只对新改动增量规范。改 `.rs` 文件后，**只对自己改过的文件**跑 `rustfmt`。
+
+```powershell
+# ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）
+$rs = @(git diff --name-only) + @(git ls-files --others --exclude-standard) |
+  Where-Object { $_ -match '\.rs$' }
+if ($rs) { rustfmt $rs }
+```
+
+**禁止**：
+- `cargo fmt`（无参数）：会扫描整个 crate 数百个历史文件，产生大量无关 diff，污染 PR 历史
+- 修改其他 AI 负责的 `.rs` 文件的格式
+
+> `rustfmt <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。
+
+---
+
+## 🌐 访问服务器必须绕过本机代理
+
+**本机 VPN/代理客户端会导致 SSH/curl 超时。** 所有从本机发起的服务器访问必须绕代理：
+
+```powershell
+# SSH / SCP：加 -o ProxyCommand=none
+ssh -o ProxyCommand=none root@43.139.149.158 'command'
+scp -o ProxyCommand=none <file> root@43.139.149.158:/path/
+
+# curl.exe（PowerShell）：加 --noproxy '*'
+curl.exe --noproxy '*' http://43.139.149.158:8080/health
+
+# Invoke-RestMethod（PowerShell）：加 -NoProxy
+Invoke-RestMethod "http://43.139.149.158:8080/health" -NoProxy
+
+# 服务器 SSH 内部的 curl 不需要特殊处理（不受本机代理影响）
+ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/health'
+```
 
 ---
 
