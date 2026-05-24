@@ -394,6 +394,8 @@ fn looks_like_clarification_only(reply: &str) -> bool {
         "具体想问",
         "你是想问",
         "你可以直接说",
+        "我先按普通聊天处理",
+        "不进入改代码",
     ]
     .iter()
     .any(|marker| reply.contains(marker))
@@ -1252,5 +1254,14 @@ mod tests {
         assert!(reply.contains("多手机同时登录或聊天本身可以并行"));
         assert!(reply.contains("worktree/分支"));
         assert!(reply.contains("不进入改代码"));
+    }
+
+    #[test]
+    fn replaces_generic_guard_for_multi_device_project_question() {
+        let reply = chat_reply_after_intent_gate(
+            "我们的apk是否支持多个手机同时登录？",
+            Some("我先按普通聊天处理，不进入改代码、编译或发布流程。".into()),
+        );
+        assert!(reply.contains("多手机同时登录或聊天本身可以并行"));
     }
 }
