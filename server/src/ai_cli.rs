@@ -47,6 +47,9 @@ const DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS: u64 = 30;
 const DEFAULT_CHAT_TIMEOUT_CAP_SECS: u64 = 45;
 const DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS: u64 = 8;
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
+const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
+const DEFAULT_SESSION_REPAIR_TIMEOUT_CAP_SECS: u64 = 25;
+const DEFAULT_SESSION_REPAIR_COOLDOWN_SECS: u64 = 120;
 
 impl IntentGateResult {
     pub fn should_enter_development(&self) -> bool {
@@ -383,6 +386,16 @@ pub async fn run_with_workspace(
             }
         })
         .unwrap_or(false);
+    if lightweight_chat_task && native_session_id.is_some() && !prompt_bootstrapped {
+        record_cli_session_skipped(
+            state,
+            trace_id,
+            "run_workspace",
+            "unbootstrapped_chat_session",
+        );
+        native_session_id = None;
+        prompt_bootstrapped = false;
+    }
     if native_session_id.is_some() {
         let _ = tx.send(
             WsMessage::Progress {
@@ -429,6 +442,81 @@ pub async fn run_with_workspace(
     .await
     {
         Ok(output) => output,
+        Err(error) if lightweight_chat_task && native_session_id.is_some() => {
+            let stale_session_id = native_session_id.clone();
+            record_cli_retry(
+                state,
+                trace_id,
+                "run_workspace",
+                stale_session_id.as_deref(),
+                "resume_error_frontend_fresh_session",
+            );
+            retire_native_session_and_schedule_repair(
+                state,
+                trace_id,
+                native_session_scope.as_ref(),
+                &option,
+                workspace,
+                &workspace_key,
+                stale_session_id.as_deref(),
+                "initial_cli_error",
+                &error.to_string(),
+            );
+            let _ = tx.send(
+                WsMessage::Progress {
+                    message: "旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。".into(),
+                }
+                .to_json(),
+            );
+            native_session_id = None;
+            prompt_bootstrapped = false;
+            prompt = build_cli_prompt(
+                workspace,
+                user_message,
+                preflight_note,
+                &option,
+                route,
+                prompt_bootstrapped,
+            );
+            let mut fresh_option = option.clone();
+            cap_option_timeout(
+                &mut fresh_option,
+                configured_timeout_cap(
+                    "AI_CLI_CHAT_FRESH_TIMEOUT_SECS",
+                    DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS,
+                ),
+            );
+            match run_cli_command_traced(
+                &fresh_option,
+                workspace,
+                &prompt,
+                None,
+                tx,
+                Some(CliTraceContext {
+                    state,
+                    trace_id,
+                    operation: "run_workspace",
+                    attempt: "fresh_after_resume_error",
+                    route: Some(route),
+                    development_task: Some(development_task),
+                    prompt_bootstrapped: Some(prompt_bootstrapped),
+                }),
+            )
+            .await
+            {
+                Ok(output) => output,
+                Err(fresh_error) => {
+                    return finish_lightweight_chat_fallback(
+                        state,
+                        trace_id,
+                        tx,
+                        user_message,
+                        "fresh_after_resume_error_cli_error",
+                        &fresh_error.to_string(),
+                    );
+                }
+            }
+        }
         Err(error) if lightweight_chat_task => {
             return finish_lightweight_chat_fallback(
                 state,
@@ -450,22 +538,24 @@ pub async fn run_with_workspace(
             stale_session_id.as_deref(),
             "stale_native_session",
         );
-        if let (Some(scope), Some(session_id)) =
-            (native_session_scope.as_ref(), native_session_id.as_deref())
-        {
-            let _ = state.store.deactivate_native_agent_session(
-                &scope.project_id,
-                &scope.user_id,
-                Some(&scope.conversation_id),
-                &option.provider,
-                &option.id,
-                &workspace_key,
-                session_id,
-            );
-        }
+        retire_native_session_and_schedule_repair(
+            state,
+            trace_id,
+            native_session_scope.as_ref(),
+            &option,
+            workspace,
+            &workspace_key,
+            stale_session_id.as_deref(),
+            "stale_native_session",
+            "Codex native session reported stale or unavailable",
+        );
         let _ = tx.send(
             WsMessage::Progress {
-                message: "Codex CLI session expired; starting a fresh session.".into(),
+                message: if lightweight_chat_task {
+                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。".into()
+                } else {
+                    "Codex CLI session expired; starting a fresh session.".into()
+                },
             }
             .to_json(),
         );
@@ -479,7 +569,7 @@ pub async fn run_with_workspace(
             route,
             prompt_bootstrapped,
         );
-        if !tiny_chat_task {
+        if !lightweight_chat_task && !tiny_chat_task {
             if let Some(note) = native_session_continuity_note(
                 state,
                 native_session_scope.as_ref(),
@@ -488,8 +578,18 @@ pub async fn run_with_workspace(
                 prompt = append_native_session_continuity(prompt, &note);
             }
         }
+        let mut fresh_option = option.clone();
+        if lightweight_chat_task {
+            cap_option_timeout(
+                &mut fresh_option,
+                configured_timeout_cap(
+                    "AI_CLI_CHAT_FRESH_TIMEOUT_SECS",
+                    DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS,
+                ),
+            );
+        }
         output = match run_cli_command_traced(
-            &option,
+            &fresh_option,
             workspace,
             &prompt,
             None,
@@ -684,6 +784,10 @@ fn is_tiny_chat_message(user_message: &str) -> bool {
     if compact.is_empty() {
         return false;
     }
+    let compact_chars = compact.chars().count();
+    if compact_chars <= 2 {
+        return true;
+    }
     matches!(
         compact.as_str(),
         "你好"
@@ -700,7 +804,7 @@ fn is_tiny_chat_message(user_message: &str) -> bool {
             | "hello"
             | "hey"
             | "yo"
-    ) || (compact.chars().count() <= 4
+    ) || (compact_chars <= 4
         && (compact.contains("你好")
             || compact.contains("您好")
             || compact.contains("哈喽")
@@ -1211,6 +1315,212 @@ fn append_native_session_continuity(mut prompt: String, continuity_note: &str) -
     prompt
 }
 
+fn retire_native_session_and_schedule_repair(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    scope: Option<&NativeSessionScope>,
+    option: &AiCliOption,
+    workspace: &Path,
+    workspace_key: &str,
+    stale_session_id: Option<&str>,
+    reason: &'static str,
+    error: &str,
+) {
+    let (Some(scope), Some(session_id)) = (
+        scope,
+        stale_session_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty()),
+    ) else {
+        return;
+    };
+
+    let _ = state.store.deactivate_native_agent_session(
+        &scope.project_id,
+        &scope.user_id,
+        Some(&scope.conversation_id),
+        &option.provider,
+        &option.id,
+        workspace_key,
+        session_id,
+    );
+
+    schedule_background_native_session_repair(
+        state,
+        trace_id,
+        scope.clone(),
+        option.clone(),
+        workspace.to_path_buf(),
+        workspace_key.to_string(),
+        session_id.to_string(),
+        reason,
+        error.to_string(),
+    );
+}
+
+fn schedule_background_native_session_repair(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    scope: NativeSessionScope,
+    option: AiCliOption,
+    workspace: PathBuf,
+    workspace_key: String,
+    stale_session_id: String,
+    reason: &'static str,
+    error: String,
+) {
+    if !supports_codex_sessions(&option) {
+        return;
+    }
+    let repair_key = format!(
+        "native-session-repair:{}:{}:{}:{}:{}",
+        scope.project_id, scope.user_id, scope.conversation_id, option.id, workspace_key
+    );
+    let state = state.clone();
+    let trace_id = clean_trace_id_opt(trace_id).map(str::to_string);
+
+    tokio::spawn(async move {
+        let cooldown = Duration::from_secs(configured_timeout_cap(
+            "AI_CLI_SESSION_REPAIR_COOLDOWN_SECS",
+            DEFAULT_SESSION_REPAIR_COOLDOWN_SECS,
+        ));
+        if !state
+            .codex_prewarm
+            .start_if_allowed(&repair_key, cooldown)
+            .await
+        {
+            record_native_session_repair_event(
+                &state,
+                trace_id.as_deref(),
+                "codex_native_session_repair_skipped",
+                json!({
+                    "reason": "cooldown_or_active",
+                    "stale_thread_uri": codex_thread_uri(&stale_session_id),
+                    "trigger": reason,
+                }),
+            );
+            return;
+        }
+
+        let result = async {
+            record_native_session_repair_event(
+                &state,
+                trace_id.as_deref(),
+                "codex_native_session_repair_start",
+                json!({
+                    "project_id": &scope.project_id,
+                    "user_id": &scope.user_id,
+                    "conversation_id": &scope.conversation_id,
+                    "workspace": &workspace_key,
+                    "stale_thread_uri": codex_thread_uri(&stale_session_id),
+                    "trigger": reason,
+                    "error": truncate_chars(&error, 500),
+                }),
+            );
+
+            let recent_messages = state
+                .store
+                .list_recent_conversation_messages(
+                    &scope.project_id,
+                    Some(&scope.conversation_id),
+                    10,
+                )
+                .unwrap_or_default();
+            let mut repair_option = option.clone();
+            cap_option_timeout(
+                &mut repair_option,
+                configured_timeout_cap(
+                    "AI_CLI_SESSION_REPAIR_TIMEOUT_SECS",
+                    DEFAULT_SESSION_REPAIR_TIMEOUT_CAP_SECS,
+                ),
+            );
+            let prompt = build_native_session_repair_prompt(
+                &workspace,
+                &repair_option,
+                &stale_session_id,
+                &recent_messages,
+            );
+            let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+            let output = run_cli_command_traced(
+                &repair_option,
+                &workspace,
+                &prompt,
+                None,
+                &tx,
+                Some(CliTraceContext {
+                    state: &state,
+                    trace_id: trace_id.as_deref(),
+                    operation: "native_session_repair",
+                    attempt: "background_fresh",
+                    route: Some(intent_router::CapabilityRoute::ChatAgent),
+                    development_task: Some(false),
+                    prompt_bootstrapped: Some(false),
+                }),
+            )
+            .await?;
+
+            let Some(thread_id) = extract_thread_id(&output.stdout) else {
+                return Err(anyhow!(
+                    "background repair did not return a Codex thread id"
+                ));
+            };
+            let installed = state.store.upsert_native_agent_session_if_no_active(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                &thread_id,
+            )?;
+            record_native_session_repair_event(
+                &state,
+                trace_id.as_deref(),
+                "codex_native_session_repair_done",
+                json!({
+                    "project_id": &scope.project_id,
+                    "user_id": &scope.user_id,
+                    "conversation_id": &scope.conversation_id,
+                    "workspace": &workspace_key,
+                    "stale_thread_uri": codex_thread_uri(&stale_session_id),
+                    "new_thread_uri": codex_thread_uri(&thread_id),
+                    "installed": installed,
+                    "stdout_chars": output.stdout.chars().count(),
+                    "stderr_chars": output.stderr.chars().count(),
+                }),
+            );
+            Ok::<(), anyhow::Error>(())
+        }
+        .await;
+
+        let _ = state.codex_prewarm.finish(&repair_key).await;
+        if let Err(error) = result {
+            record_native_session_repair_event(
+                &state,
+                trace_id.as_deref(),
+                "codex_native_session_repair_failed",
+                json!({
+                    "stale_thread_uri": codex_thread_uri(&stale_session_id),
+                    "trigger": reason,
+                    "error": truncate_chars(&error.to_string(), 500),
+                }),
+            );
+        }
+    });
+}
+
+fn record_native_session_repair_event(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    phase: &'static str,
+    details: Value,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
+        return;
+    };
+    state.server_traces.record(trace_id, phase, details);
+}
+
 fn codex_thread_uri(session_id: &str) -> String {
     let session_id = session_id.trim();
     if session_id.starts_with("codex://threads/") {
@@ -1480,6 +1790,27 @@ mod tests {
     }
 
     #[test]
+    fn repair_prompt_creates_background_summary_without_project_workflow() {
+        let prompt = build_native_session_repair_prompt(
+            Path::new("D:/tmp/project"),
+            &test_option(),
+            "thread-1",
+            &[ConversationMessage {
+                role: "assistant".into(),
+                content: "已经完成轻量聊天限时修复，剩余后台恢复摘要接力。".into(),
+            }],
+        );
+
+        assert!(prompt.contains("background recovery job"));
+        assert!(prompt.contains("codex://threads/thread-1"));
+        assert!(prompt.contains("compact continuity summary"));
+        assert!(prompt.contains("后台恢复摘要接力"));
+        assert!(prompt.contains("Do not inspect files"));
+        assert!(!prompt.contains("git pull --rebase"));
+        assert!(!prompt.contains("通用项目工作流必须始终执行"));
+    }
+
+    #[test]
     fn parses_intent_gate_chat_result() {
         let stdout = r#"{"type":"item.completed","item":{"type":"agent_message","text":"{\"route\":\"chat\",\"confidence\":0.93,\"reason\":\"只是询问流程\",\"chat_reply\":\"先聊清楚也可以。\"}"}}"#;
         let result = parse_intent_gate_result(stdout).unwrap();
@@ -1560,6 +1891,52 @@ Rules:
         provider = option.provider,
         model_text = model_text,
         workspace = workspace.display()
+    )
+}
+
+fn build_native_session_repair_prompt(
+    workspace: &Path,
+    option: &AiCliOption,
+    stale_session_id: &str,
+    recent_messages: &[ConversationMessage],
+) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!(", current model: {}", model))
+        .unwrap_or_default();
+    let mut records = String::new();
+    for message in recent_messages {
+        records.push_str(&format!(
+            "\n- {}: {}",
+            message.role,
+            truncate_chars(message.content.trim(), 700)
+        ));
+    }
+    if records.is_empty() {
+        records.push_str("\n- system: No recent backend conversation records were available.");
+    }
+    format!(
+        r#"You are repairing continuity for one APK project conversation by creating a fresh Codex CLI native session.
+
+Current CLI provider: {provider}{model_text}
+Current project workspace: {workspace}
+Previous native thread URI: {thread_uri}
+
+Rules:
+- This is a background recovery job, not the user's foreground reply.
+- Do not inspect files, run commands, use Git, edit code, build, deploy, publish, or enter the project development workflow.
+- Read the recent backend conversation records below and keep a compact continuity summary in this new native session for future turns.
+- Preserve only useful context: current goals, completed work, unresolved work, important trace/thread/commit/file references, and user preferences.
+- If the previous thread cannot be directly resolved, that is fine; use the backend records as the source of truth.
+- Reply with exactly one line of JSON and nothing else: {{"status":"ready","mode":"session_repair","summary":"compact Chinese continuity summary"}}
+
+Recent backend conversation records:{records}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        thread_uri = codex_thread_uri(stale_session_id),
+        records = records
     )
 }
 
