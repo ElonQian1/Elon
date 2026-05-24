@@ -870,17 +870,15 @@ class MainActivity : AppCompatActivity() {
                 break
             }
         }
-        if (selectedBytes == null) {
-            selectedBytes = bytes.toByteArray()
-        }
+        val finalBytes = selectedBytes ?: bytes.toByteArray()
         bitmap.recycle()
-        require(selectedBytes.size <= MAX_ATTACHMENT_BYTES) { "Compressed photo is still too large" }
+        require(finalBytes.size <= MAX_ATTACHMENT_BYTES) { "Compressed photo is still too large" }
 
         val safeName = displayName.substringBeforeLast('.', displayName).ifBlank { "photo" }
         val attachmentDir = File(cacheDir, "pending_attachments").apply { mkdirs() }
         val fileName = "attachment_${System.currentTimeMillis()}_${pendingAttachments.size + 1}.jpg"
         val target = File(attachmentDir, fileName)
-        target.writeBytes(selectedBytes)
+        target.writeBytes(finalBytes)
         return PendingAttachment(
             kind = kind,
             displayName = "$safeName.jpg",
