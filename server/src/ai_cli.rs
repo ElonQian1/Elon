@@ -42,6 +42,12 @@ pub struct PrewarmResult {
     pub elapsed_ms: u128,
 }
 
+const DEFAULT_PREWARM_TIMEOUT_CAP_SECS: u64 = 8;
+const DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS: u64 = 30;
+const DEFAULT_CHAT_TIMEOUT_CAP_SECS: u64 = 45;
+const DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS: u64 = 8;
+const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
+
 impl IntentGateResult {
     pub fn should_enter_development(&self) -> bool {
         self.route == intent_router::CapabilityRoute::CodeAgent && self.confidence >= 0.75
@@ -56,11 +62,18 @@ pub async fn confirm_project_intent(
     trace_id: Option<&str>,
     state: &Arc<AppState>,
 ) -> Result<IntentGateResult> {
-    let option = state
+    let mut option = state
         .ai_cli
         .find_option(option_id)
         .cloned()
         .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
+    cap_option_timeout(
+        &mut option,
+        configured_timeout_cap(
+            "AI_CLI_INTENT_GATE_TIMEOUT_SECS",
+            DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS,
+        ),
+    );
     if !supports_codex_sessions(&option) {
         return Err(anyhow!("当前阶段意图确认必须使用 Codex CLI"));
     }
@@ -84,7 +97,7 @@ pub async fn confirm_project_intent(
 
     let prompt = build_intent_gate_prompt(workspace, user_message, &option);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let mut output = run_cli_command_traced(
+    let mut output = match run_cli_command_traced(
         &option,
         workspace,
         &prompt,
@@ -100,7 +113,15 @@ pub async fn confirm_project_intent(
             prompt_bootstrapped: None,
         }),
     )
-    .await?;
+    .await
+    {
+        Ok(output) => output,
+        Err(error) if is_cli_timeout_error(&error) => {
+            record_intent_gate_fallback(state, trace_id, "timeout", &error.to_string());
+            return Ok(intent_gate_timeout_chat_result(user_message));
+        }
+        Err(error) => return Err(error),
+    };
     if should_retry_without_native_session(&option, native_session_id.as_deref(), &output) {
         record_cli_retry(
             state,
@@ -122,7 +143,7 @@ pub async fn confirm_project_intent(
                 session_id,
             );
         }
-        output = run_cli_command_traced(
+        output = match run_cli_command_traced(
             &option,
             workspace,
             &prompt,
@@ -138,7 +159,20 @@ pub async fn confirm_project_intent(
                 prompt_bootstrapped: None,
             }),
         )
-        .await?;
+        .await
+        {
+            Ok(output) => output,
+            Err(error) if is_cli_timeout_error(&error) => {
+                record_intent_gate_fallback(
+                    state,
+                    trace_id,
+                    "fresh_after_stale_timeout",
+                    &error.to_string(),
+                );
+                return Ok(intent_gate_timeout_chat_result(user_message));
+            }
+            Err(error) => return Err(error),
+        };
     }
 
     if let (Some(scope), Some(thread_id)) = (
@@ -205,7 +239,13 @@ pub async fn prewarm_codex_session(
     }
 
     let mut prewarm_option = option.clone();
-    prewarm_option.timeout_secs = prewarm_option.timeout_secs.min(90);
+    cap_option_timeout(
+        &mut prewarm_option,
+        configured_timeout_cap(
+            "AI_CLI_PREWARM_TIMEOUT_SECS",
+            DEFAULT_PREWARM_TIMEOUT_CAP_SECS,
+        ),
+    );
     let prompt = build_prewarm_cli_prompt(workspace, &prewarm_option);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let output = run_cli_command_traced(
@@ -260,7 +300,7 @@ pub async fn run_with_workspace(
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     let started = std::time::Instant::now();
-    let option = state
+    let mut option = state
         .ai_cli
         .find_option(option_id)
         .cloned()
@@ -270,6 +310,12 @@ pub async fn run_with_workspace(
 
     let development_task = route != intent_router::CapabilityRoute::ChatAgent
         || intent_router::looks_like_development_request(user_message);
+    let lightweight_chat_task =
+        route == intent_router::CapabilityRoute::ChatAgent && !development_task;
+    let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
+    if lightweight_chat_task {
+        cap_option_timeout(&mut option, chat_timeout_cap_secs(tiny_chat_task));
+    }
     if development_task {
         ensure_git(workspace, user_id, require_existing_git)?;
     }
@@ -301,7 +347,12 @@ pub async fn run_with_workspace(
     }
 
     let workspace_key = workspace.display().to_string();
-    let session_state = if supports_codex_sessions(&option) {
+    let skip_native_session = tiny_chat_task && supports_codex_sessions(&option);
+    if skip_native_session {
+        record_cli_session_skipped(state, trace_id, "run_workspace", "tiny_chat_fast_path");
+    }
+    let use_native_sessions = supports_codex_sessions(&option) && !skip_native_session;
+    let session_state = if use_native_sessions {
         native_session_scope.as_ref().and_then(|scope| {
             state
                 .store
@@ -349,8 +400,18 @@ pub async fn run_with_workspace(
         route,
         prompt_bootstrapped,
     );
-    let mut output = run_cli_command_traced(
-        &option,
+    let mut initial_option = option.clone();
+    if lightweight_chat_task && native_session_id.is_some() {
+        cap_option_timeout(
+            &mut initial_option,
+            configured_timeout_cap(
+                "AI_CLI_CHAT_RESUME_TIMEOUT_SECS",
+                DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS,
+            ),
+        );
+    }
+    let mut output = match run_cli_command_traced(
+        &initial_option,
         workspace,
         &prompt,
         native_session_id.as_deref(),
@@ -365,8 +426,22 @@ pub async fn run_with_workspace(
             prompt_bootstrapped: Some(prompt_bootstrapped),
         }),
     )
-    .await?;
-    if should_retry_without_native_session(&option, native_session_id.as_deref(), &output) {
+    .await
+    {
+        Ok(output) => output,
+        Err(error) if lightweight_chat_task => {
+            return finish_lightweight_chat_fallback(
+                state,
+                trace_id,
+                tx,
+                user_message,
+                "initial_cli_error",
+                &error.to_string(),
+            );
+        }
+        Err(error) => return Err(error),
+    };
+    if should_retry_without_native_session(&initial_option, native_session_id.as_deref(), &output) {
         let stale_session_id = native_session_id.clone();
         record_cli_retry(
             state,
@@ -404,14 +479,16 @@ pub async fn run_with_workspace(
             route,
             prompt_bootstrapped,
         );
-        if let Some(note) = native_session_continuity_note(
-            state,
-            native_session_scope.as_ref(),
-            stale_session_id.as_deref(),
-        ) {
-            prompt = append_native_session_continuity(prompt, &note);
+        if !tiny_chat_task {
+            if let Some(note) = native_session_continuity_note(
+                state,
+                native_session_scope.as_ref(),
+                stale_session_id.as_deref(),
+            ) {
+                prompt = append_native_session_continuity(prompt, &note);
+            }
         }
-        output = run_cli_command_traced(
+        output = match run_cli_command_traced(
             &option,
             workspace,
             &prompt,
@@ -427,14 +504,28 @@ pub async fn run_with_workspace(
                 prompt_bootstrapped: Some(prompt_bootstrapped),
             }),
         )
-        .await?;
+        .await
+        {
+            Ok(output) => output,
+            Err(error) if lightweight_chat_task => {
+                return finish_lightweight_chat_fallback(
+                    state,
+                    trace_id,
+                    tx,
+                    user_message,
+                    "fresh_after_stale_cli_error",
+                    &error.to_string(),
+                );
+            }
+            Err(error) => return Err(error),
+        };
     }
 
     let mut stored_session_id = native_session_id.clone();
     if let (Some(scope), Some(thread_id)) = (
         native_session_scope
             .as_ref()
-            .filter(|_| supports_codex_sessions(&option)),
+            .filter(|_| use_native_sessions),
         extract_thread_id(&output.stdout),
     ) {
         let _ = state.store.upsert_native_agent_session(
@@ -452,7 +543,7 @@ pub async fn run_with_workspace(
         if let (Some(scope), Some(session_id)) = (
             native_session_scope
                 .as_ref()
-                .filter(|_| supports_codex_sessions(&option)),
+                .filter(|_| use_native_sessions),
             stored_session_id.as_deref(),
         ) {
             let _ = state.store.mark_native_agent_session_bootstrapped(
@@ -536,6 +627,128 @@ fn supports_codex_sessions(option: &AiCliOption) -> bool {
             .next()
             .map(|bin| bin.eq_ignore_ascii_case("codex"))
             .unwrap_or(false)
+}
+
+fn configured_timeout_cap(env_name: &str, default_secs: u64) -> u64 {
+    std::env::var(env_name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|secs| (1..=3600).contains(secs))
+        .unwrap_or(default_secs)
+}
+
+fn cap_option_timeout(option: &mut AiCliOption, cap_secs: u64) {
+    let cap_secs = cap_secs.max(1);
+    if option.timeout_secs == 0 || option.timeout_secs > cap_secs {
+        option.timeout_secs = cap_secs;
+    }
+}
+
+fn chat_timeout_cap_secs(tiny_chat_task: bool) -> u64 {
+    if tiny_chat_task {
+        configured_timeout_cap(
+            "AI_CLI_TINY_CHAT_TIMEOUT_SECS",
+            DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS,
+        )
+    } else {
+        configured_timeout_cap("AI_CLI_CHAT_TIMEOUT_SECS", DEFAULT_CHAT_TIMEOUT_CAP_SECS)
+    }
+}
+
+fn is_tiny_chat_message(user_message: &str) -> bool {
+    let compact: String = user_message
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|ch| {
+            !ch.is_whitespace()
+                && !matches!(
+                    ch,
+                    '!' | '！'
+                        | '?'
+                        | '？'
+                        | '.'
+                        | '。'
+                        | ','
+                        | '，'
+                        | ';'
+                        | '；'
+                        | ':'
+                        | '：'
+                        | '~'
+                        | '～'
+                )
+        })
+        .take(32)
+        .collect();
+    if compact.is_empty() {
+        return false;
+    }
+    matches!(
+        compact.as_str(),
+        "你好"
+            | "您好"
+            | "嗨"
+            | "哈喽"
+            | "哈啰"
+            | "在吗"
+            | "在嘛"
+            | "早"
+            | "早上好"
+            | "晚上好"
+            | "hi"
+            | "hello"
+            | "hey"
+            | "yo"
+    ) || (compact.chars().count() <= 4
+        && (compact.contains("你好")
+            || compact.contains("您好")
+            || compact.contains("哈喽")
+            || compact.contains("在吗")))
+}
+
+fn is_cli_timeout_error(error: &anyhow::Error) -> bool {
+    let text = error.to_string().to_ascii_lowercase();
+    text.contains("timeout") || text.contains("timed out") || text.contains("执行超时")
+}
+
+fn intent_gate_timeout_chat_result(user_message: &str) -> IntentGateResult {
+    let chat_reply = if is_tiny_chat_message(user_message) {
+        "你好，我在。刚才服务端 Codex CLI 意图确认超过轻量限时，我先按普通聊天处理，避免误进入慢速开发流程。"
+    } else {
+        "我先按普通聊天处理，避免误进入慢速开发流程。你可以继续说；如果要我修改代码、编译或发布，请直接告诉我具体任务。"
+    };
+    IntentGateResult {
+        route: intent_router::CapabilityRoute::ChatAgent,
+        confidence: 0.5,
+        reason: "Codex CLI intent gate timed out; defaulted to chat for safety".into(),
+        chat_reply: Some(chat_reply.into()),
+    }
+}
+
+fn finish_lightweight_chat_fallback(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    tx: &UnboundedSender<String>,
+    user_message: &str,
+    reason: &'static str,
+    error: &str,
+) -> Result<()> {
+    record_lightweight_chat_fallback(state, trace_id, reason, error);
+    let message = if is_tiny_chat_message(user_message) {
+        "你好，我在。刚才服务端 Codex CLI 会话响应超过轻量聊天限时，我先结束本轮，避免手机一直卡住；你继续发消息就可以。"
+    } else {
+        "这次服务端 Codex CLI 没有在轻量聊天限时内返回结果。我已经结束本轮，避免手机一直等待；你可以继续发消息，或直接说要进入开发流程检查原因。"
+    };
+    let _ = tx.send(
+        WsMessage::Done {
+            message: message.into(),
+            apk_url: None,
+            image_url: None,
+        }
+        .to_json(),
+    );
+    Ok(())
 }
 
 fn cli_args_for_run(option: &AiCliOption, native_session_id: Option<&str>) -> Vec<String> {
@@ -750,6 +963,63 @@ fn record_cli_retry(
     );
 }
 
+fn record_cli_session_skipped(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    operation: &'static str,
+    reason: &'static str,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
+        return;
+    };
+    state.server_traces.record(
+        trace_id,
+        "codex_cli_session_skipped",
+        json!({
+            "operation": operation,
+            "reason": reason,
+        }),
+    );
+}
+
+fn record_intent_gate_fallback(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    reason: &'static str,
+    error: &str,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
+        return;
+    };
+    state.server_traces.record(
+        trace_id,
+        "codex_intent_gate_fallback",
+        json!({
+            "reason": reason,
+            "error": truncate_chars(error, 500),
+        }),
+    );
+}
+
+fn record_lightweight_chat_fallback(
+    state: &Arc<AppState>,
+    trace_id: Option<&str>,
+    reason: &'static str,
+    error: &str,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
+        return;
+    };
+    state.server_traces.record(
+        trace_id,
+        "codex_lightweight_chat_fallback",
+        json!({
+            "reason": reason,
+            "error": truncate_chars(error, 500),
+        }),
+    );
+}
+
 fn record_prewarm_session_hit(
     state: &Arc<AppState>,
     trace_id: Option<&str>,
@@ -789,6 +1059,10 @@ async fn run_cli_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
 
     match option.prompt_mode {
         CliPromptMode::Arg => {
@@ -831,7 +1105,9 @@ async fn run_cli_command(
             Ok(result) => result?,
             Err(_) => {
                 heartbeat_task.abort();
-                let _ = child.kill().await;
+                stdout_task.abort();
+                stderr_task.abort();
+                kill_timed_out_child(&mut child).await;
                 return Err(anyhow!(
                     "本地 AI CLI 执行超时，请稍后重试或调大对应 TIMEOUT_SECS"
                 ));
@@ -847,6 +1123,25 @@ async fn run_cli_command(
         stdout,
         stderr,
     })
+}
+
+async fn kill_timed_out_child(child: &mut tokio::process::Child) {
+    #[cfg(unix)]
+    {
+        if let Some(pid) = child.id() {
+            let process_group = format!("-{}", pid);
+            let _ = Command::new("kill")
+                .args(["-TERM", &process_group])
+                .status()
+                .await;
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let _ = Command::new("kill")
+                .args(["-KILL", &process_group])
+                .status()
+                .await;
+        }
+    }
+    let _ = child.kill().await;
 }
 
 fn should_retry_without_native_session(
@@ -1129,6 +1424,38 @@ mod tests {
             None,
             &output
         ));
+    }
+
+    #[test]
+    fn tiny_chat_messages_use_fast_path() {
+        assert!(is_tiny_chat_message("你好"));
+        assert!(is_tiny_chat_message("你好！"));
+        assert!(is_tiny_chat_message("hello"));
+        assert!(is_tiny_chat_message("在吗"));
+        assert!(!is_tiny_chat_message("你好，帮我发布新版 APK"));
+        assert!(!is_tiny_chat_message("继续修复刚才的构建问题"));
+    }
+
+    #[test]
+    fn timeout_caps_never_expand_cli_timeout() {
+        let mut option = test_option();
+        option.timeout_secs = 1800;
+        cap_option_timeout(&mut option, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS);
+        assert_eq!(option.timeout_secs, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS);
+
+        let mut short_option = test_option();
+        short_option.timeout_secs = 3;
+        cap_option_timeout(&mut short_option, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS);
+        assert_eq!(short_option.timeout_secs, 3);
+    }
+
+    #[test]
+    fn intent_gate_timeout_defaults_to_chat() {
+        let result = intent_gate_timeout_chat_result("你好");
+
+        assert_eq!(result.route, intent_router::CapabilityRoute::ChatAgent);
+        assert!(!result.should_enter_development());
+        assert!(result.chat_reply.unwrap().contains("普通聊天"));
     }
 
     #[test]
