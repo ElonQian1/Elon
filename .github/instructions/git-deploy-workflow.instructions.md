@@ -210,6 +210,38 @@ if ($rs) { rustfmt $rs }
 
 ---
 
+## 🦀 Rust target 与构建缓存安全
+
+本机 skills 中的 `rust-shared-target-cache` 已确认一个高风险事故：相对路径的 `CARGO_TARGET_DIR` 会随 cwd 展开到不同位置，导致多个鬼影 `target/` 目录、磁盘暴涨，以及构建产物找错路径。
+
+执行本项目 Rust 构建时遵守：
+
+- 优先使用仓库脚本：`scripts\publish-server.ps1` / `scripts\publish-server.sh`。脚本会设置明确的构建输出目录，不依赖用户级相对路径。
+- 裸跑 `cargo check`、`cargo build`、`cargo zigbuild` 前，如果构建行为异常或机器是新环境，先检查 `CARGO_TARGET_DIR`：
+
+```powershell
+[System.Environment]::GetEnvironmentVariable("CARGO_TARGET_DIR", "User")
+[System.Environment]::GetEnvironmentVariable("CARGO_TARGET_DIR", "Machine")
+```
+
+- 如果任何输出包含 `..`、`.` 开头或其他相对路径，当前任务不要继续裸跑构建；临时清掉当前进程变量并改用绝对路径，后续再修正用户级配置：
+
+```powershell
+Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+$env:CARGO_TARGET_DIR = "E:\rust-target\elon-local"
+```
+
+- 新 PC 的长期配置应写到 `%USERPROFILE%\.cargo\config.toml`，并使用绝对路径：
+
+```toml
+[build]
+target-dir = "E:/rust-target"
+```
+
+- 不要把相对路径 `CARGO_TARGET_DIR` 写入用户环境变量、系统环境变量、脚本或文档示例。
+
+---
+
 ## 🦀 后端部署（Rust → Linux 服务器）
 
 **服务器信息**：`root@43.139.149.158`，项目路径 `/root/Elon`
