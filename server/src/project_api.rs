@@ -283,23 +283,41 @@ async fn run_project_agent_with_scheduler(
         &workspace,
         &message,
         agent_name.as_deref(),
-        Some(native_session_scope),
+        Some(native_session_scope.clone()),
         &state,
     )
     .await
     {
         Ok(gate) if !gate.should_enter_development() => {
-            let reply = gate.chat_reply.unwrap_or_else(|| {
-                "我先按普通聊天处理。你如果要我开始改代码、编译或发布，可以直接说明。".into()
-            });
-            let _ = tx.send(
-                WsMessage::Done {
-                    message: reply,
-                    apk_url: None,
-                    image_url: None,
-                }
-                .to_json(),
+            tracing::info!(
+                confidence = gate.confidence,
+                reason = %gate.reason,
+                "Codex CLI kept request in lightweight chat"
             );
+            if let Err(error) = ai_cli::run_lightweight_chat_with_workspace(
+                &user_id,
+                &workspace,
+                &download_base,
+                &message,
+                agent_name.as_deref(),
+                Some(native_session_scope),
+                &state,
+                &tx,
+            )
+            .await
+            {
+                let reply = gate.chat_reply.unwrap_or_else(|| {
+                    format!("我先按普通聊天处理，但 Codex CLI 轻量回复失败: {}", error)
+                });
+                let _ = tx.send(
+                    WsMessage::Done {
+                        message: reply,
+                        apk_url: None,
+                        image_url: None,
+                    }
+                    .to_json(),
+                );
+            }
             return;
         }
         Ok(gate) => {

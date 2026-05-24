@@ -107,6 +107,61 @@ pub async fn run_with_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    run_with_workspace_inner(
+        user_id,
+        workspace,
+        download_base,
+        user_message,
+        option_id,
+        route,
+        require_existing_git,
+        native_session_scope,
+        state,
+        tx,
+        false,
+    )
+    .await
+}
+
+pub async fn run_lightweight_chat_with_workspace(
+    user_id: &str,
+    workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    option_id: Option<&str>,
+    native_session_scope: Option<NativeSessionScope>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    run_with_workspace_inner(
+        user_id,
+        workspace,
+        download_base,
+        user_message,
+        option_id,
+        intent_router::CapabilityRoute::ChatAgent,
+        false,
+        native_session_scope,
+        state,
+        tx,
+        true,
+    )
+    .await
+}
+
+async fn run_with_workspace_inner(
+    user_id: &str,
+    workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    option_id: Option<&str>,
+    route: intent_router::CapabilityRoute,
+    require_existing_git: bool,
+    native_session_scope: Option<NativeSessionScope>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+    force_lightweight_chat: bool,
+) -> Result<()> {
     let started = std::time::Instant::now();
     let option = state
         .ai_cli
@@ -116,8 +171,12 @@ pub async fn run_with_workspace(
 
     std::fs::create_dir_all(workspace)?;
 
-    let development_task = route != intent_router::CapabilityRoute::ChatAgent
-        || intent_router::looks_like_development_request(user_message);
+    let development_task = if force_lightweight_chat {
+        false
+    } else {
+        route != intent_router::CapabilityRoute::ChatAgent
+            || intent_router::looks_like_development_request(user_message)
+    };
     if development_task {
         ensure_git(workspace, user_id, require_existing_git)?;
     }
