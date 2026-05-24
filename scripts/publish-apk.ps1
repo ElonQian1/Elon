@@ -34,10 +34,13 @@ $ApkPattern = Join-Path $AndroidDir "app\build\outputs\apk\release\*.apk"
 $ServerHost = "root@43.139.149.158"
 $ServerDir  = "/opt/elon/data/app"
 $ServerUrl  = "http://43.139.149.158:8080"
+$ApkShaFile = "$ServerDir/.apk-deployed-sha"
 
 $DefaultKeystore = Join-Path $env:USERPROFILE ".elon\signing\elon-release.jks"
 $LegacyKeystore  = Join-Path $AndroidDir "app\elon-release.jks"
 $UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
+$OriginalGradleContent = $null
+$BuildBaseSha = $null
 
 function Get-UserGradleProperty {
     param([string]$Name)
@@ -119,19 +122,269 @@ function Assert-ReleaseSigningConfig {
     }
 }
 
-function Push-HeadToMain {
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
-        git -C $RepoRoot push origin HEAD:main
-        if ($LASTEXITCODE -eq 0) { return }
+function Format-ShortSha {
+    param([string]$Sha)
 
-        Write-Warning "push 被拒绝，正在 fetch + rebase 后重试（第 $attempt 次）..."
-        git -C $RepoRoot fetch origin
-        if ($LASTEXITCODE -ne 0) { Write-Error "git fetch 失败" }
-        git -C $RepoRoot rebase origin/main
-        if ($LASTEXITCODE -ne 0) { Write-Error "git rebase 失败，请解决冲突后重试发布。" }
+    if ([string]::IsNullOrWhiteSpace($Sha)) { return "" }
+    if ($Sha.Length -le 7) { return $Sha }
+    return $Sha.Substring(0, 7)
+}
+
+function Restore-GradleVersionFile {
+    if ($null -eq $script:OriginalGradleContent) { return }
+    [System.IO.File]::WriteAllText(
+        $script:GradlePath,
+        $script:OriginalGradleContent,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+}
+
+function Test-GitAncestor {
+    param(
+        [string]$Ancestor,
+        [string]$Descendant
+    )
+
+    if ($Ancestor -notmatch '^[0-9a-f]{40}$' -or $Descendant -notmatch '^[0-9a-f]{40}$') {
+        return $false
     }
 
-    Write-Error "重试 3 次后仍无法推送，已停止上传 APK。"
+    git -C $RepoRoot merge-base --is-ancestor $Ancestor $Descendant 2>$null | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Get-OriginMainSha {
+    git -C $RepoRoot fetch origin main --quiet
+    if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败，无法判断 APK 构建是否已过期。" }
+    $sha = (git -C $RepoRoot rev-parse origin/main 2>$null).Trim()
+    if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') {
+        Write-Error "无法读取 origin/main SHA。"
+    }
+    return $sha
+}
+
+function Get-DeployedApkSha {
+    try {
+        $raw = ssh -o ProxyCommand=none $ServerHost "cat $ApkShaFile 2>/dev/null || true" 2>$null
+        $sha = ($raw | Out-String).Trim()
+        if ($sha -match '^[0-9a-f]{40}$') { return $sha }
+    } catch {
+        Write-Warning "无法读取服务器 APK 部署 SHA：$_"
+    }
+    try {
+        $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
+        $sha = [string]$published.gitSha
+        if ($sha -match '^[0-9a-f]{40}$') { return $sha }
+    } catch {
+        Write-Warning "无法从 /app/version.json 读取 APK gitSha：$_"
+    }
+    return $null
+}
+
+function Get-ApkBuildFreshness {
+    param([string]$BaseSha)
+
+    $remoteHead = Get-OriginMainSha
+    $deployedSha = Get-DeployedApkSha
+
+    if ($remoteHead -eq $BaseSha) {
+        return [PSCustomObject]@{
+            Action = "Continue"
+            RemoteHead = $remoteHead
+            DeployedSha = $deployedSha
+            Reason = "origin/main 未变化"
+        }
+    }
+
+    if ($deployedSha -and (Test-GitAncestor $BaseSha $deployedSha)) {
+        return [PSCustomObject]@{
+            Action = "Skip"
+            RemoteHead = $remoteHead
+            DeployedSha = $deployedSha
+            Reason = "服务器已部署包含本次基础提交的新 APK"
+        }
+    }
+
+    return [PSCustomObject]@{
+        Action = "Stale"
+        RemoteHead = $remoteHead
+        DeployedSha = $deployedSha
+        Reason = "origin/main 在 APK 构建期间前进，但线上 APK 还未确认包含本次基础提交"
+    }
+}
+
+function Stop-StaleApkRelease {
+    param(
+        [string]$Message,
+        [switch]$Success
+    )
+
+    Restore-GradleVersionFile
+    if ($Success) {
+        Write-Host "⏭️  $Message" -ForegroundColor Cyan
+        exit 0
+    }
+    Write-Error $Message
+}
+
+function Invoke-GradleReleaseBuild {
+    Write-Host "🔨 编译 Release APK..." -ForegroundColor Cyan
+
+    $gradle = Join-Path $AndroidDir "gradlew.bat"
+    $process = Start-Process -FilePath $gradle `
+        -ArgumentList "assembleRelease" `
+        -WorkingDirectory $AndroidDir `
+        -NoNewWindow `
+        -PassThru
+
+    $lastPreemptCheck = [datetime]::MinValue
+    while (-not $process.HasExited) {
+        Start-Sleep -Seconds 10
+        $process.Refresh()
+
+        if (((Get-Date) - $lastPreemptCheck).TotalSeconds -lt 30) { continue }
+        $lastPreemptCheck = Get-Date
+
+        try {
+            $freshness = Get-ApkBuildFreshness -BaseSha $BuildBaseSha
+        } catch {
+            Write-Warning "APK 编译中途并发检查失败，继续编译并在上传前再次检查：$_"
+            continue
+        }
+        if ($freshness.Action -eq "Skip") {
+            Write-Host "⏭️  检测到线上 APK 已更新到 $((Format-ShortSha $freshness.DeployedSha))，正在中止本地旧编译..." -ForegroundColor Cyan
+            try {
+                $process.Kill($true)
+            } catch {
+                taskkill /PID $process.Id /T /F | Out-Null
+            }
+            Stop-StaleApkRelease -Success -Message "线上 APK 已包含本次基础提交 $((Format-ShortSha $BuildBaseSha))，请直接测试服务器最新版本。"
+        }
+    }
+
+    if ($process.ExitCode -ne 0) {
+        Write-Error "Gradle assembleRelease 失败，退出码 $($process.ExitCode)。"
+    }
+}
+
+function Push-HeadToMain {
+    git -C $RepoRoot push origin HEAD:main
+    if ($LASTEXITCODE -eq 0) { return }
+
+    Write-Error @"
+git push 被拒绝。APK 已经按旧 HEAD 编译，脚本不会 rebase 后继续上传旧产物。
+请同步最新 main 后重新运行：
+  git fetch origin main
+  git rebase origin/main
+  scripts\publish-apk.ps1 -Changelog "$Changelog"
+"@
+}
+
+function Assert-ApkStillCurrentBeforeCommit {
+    $freshness = Get-ApkBuildFreshness -BaseSha $BuildBaseSha
+    if ($freshness.Action -eq "Continue") { return }
+
+    if ($freshness.Action -eq "Skip") {
+        Stop-StaleApkRelease -Success -Message "服务器已部署更新 APK（$((Format-ShortSha $freshness.DeployedSha))），且包含本次基础提交 $((Format-ShortSha $BuildBaseSha))。本次旧构建不再提交、不再上传。"
+    }
+
+    Stop-StaleApkRelease -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，本次 APK 产物已过期。已还原 build.gradle，请基于最新 main 重新运行发布脚本。"
+}
+
+function Assert-ApkStillCurrentBeforeUpload {
+    param([string]$ReleaseSha)
+
+    $remoteHead = Get-OriginMainSha
+    $deployedSha = Get-DeployedApkSha
+
+    if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
+        Write-Host "⏭️  服务器已部署包含本 release commit 的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
+        exit 0
+    }
+
+    if ($remoteHead -ne $ReleaseSha) {
+        Write-Error "origin/main 已从本 release commit $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))。为避免上传旧 APK，已停止；请基于最新 main 重新运行发布脚本。"
+    }
+}
+
+function Publish-ApkStaged {
+    param(
+        [string]$ApkPath,
+        [string]$JsonPath,
+        [string]$ReleaseSha,
+        [string]$ExpectedServerSha,
+        [int]$Attempt = 1
+    )
+
+    $apkStage = "$ServerDir/ElonSpeed-latest.apk.$ReleaseSha.tmp"
+    $jsonStage = "$ServerDir/version.json.$ReleaseSha.tmp"
+
+    ssh -o ProxyCommand=none $ServerHost "mkdir -p $ServerDir"
+    if ($LASTEXITCODE -ne 0) { Write-Error "无法创建服务器 APK 目录：$ServerDir" }
+
+    scp -o ProxyCommand=none $ApkPath "${ServerHost}:${apkStage}"
+    if ($LASTEXITCODE -ne 0) { Write-Error "APK staging 上传失败" }
+    Write-Host "   ✅ APK staging 上传完成" -ForegroundColor Green
+
+    scp -o ProxyCommand=none $JsonPath "${ServerHost}:${jsonStage}"
+    if ($LASTEXITCODE -ne 0) { Write-Error "version.json staging 上传失败" }
+    Write-Host "   ✅ version.json staging 上传完成" -ForegroundColor Green
+
+    $remoteScript = @'
+set -eu
+APP_DIR='__APP_DIR__'
+EXPECTED='__EXPECTED__'
+NEW_SHA='__NEW_SHA__'
+APK_STAGE='__APK_STAGE__'
+JSON_STAGE='__JSON_STAGE__'
+LOCK_FILE="$APP_DIR/.apk-deploy.lock"
+SHA_FILE="$APP_DIR/.apk-deployed-sha"
+
+(
+  flock -x 9
+  CURRENT=""
+  if [ -f "$SHA_FILE" ]; then
+    CURRENT="$(cat "$SHA_FILE" 2>/dev/null || true)"
+  fi
+  if [ "$CURRENT" != "$EXPECTED" ]; then
+    echo "APK_DEPLOY_CAS_MISMATCH current=$CURRENT expected=$EXPECTED" >&2
+    exit 42
+  fi
+  mv "$APK_STAGE" "$APP_DIR/ElonSpeed-latest.apk"
+  mv "$JSON_STAGE" "$APP_DIR/version.json"
+  printf '%s\n' "$NEW_SHA" > "$SHA_FILE"
+) 9>"$LOCK_FILE"
+'@
+
+    $remoteScript = $remoteScript.
+        Replace('__APP_DIR__', $ServerDir).
+        Replace('__EXPECTED__', $ExpectedServerSha).
+        Replace('__NEW_SHA__', $ReleaseSha).
+        Replace('__APK_STAGE__', $apkStage).
+        Replace('__JSON_STAGE__', $jsonStage)
+
+    $remoteScript | ssh -o ProxyCommand=none $ServerHost "bash -s"
+    $deployExit = $LASTEXITCODE
+
+    if ($deployExit -eq 42) {
+        $deployedSha = Get-DeployedApkSha
+        if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
+            Write-Host "⏭️  另一台机器已部署更新 APK：$((Format-ShortSha $deployedSha))。本次 staging 不覆盖。" -ForegroundColor Cyan
+            ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
+            exit 0
+        }
+        if ($deployedSha -and (Test-GitAncestor $deployedSha $ReleaseSha) -and $Attempt -lt 3) {
+            Write-Host "   ℹ️  服务器刚部署了较旧 APK $((Format-ShortSha $deployedSha))，本 release $((Format-ShortSha $ReleaseSha)) 更新，重试原子发布..." -ForegroundColor Cyan
+            Publish-ApkStaged -ApkPath $ApkPath -JsonPath $JsonPath -ReleaseSha $ReleaseSha -ExpectedServerSha $deployedSha -Attempt ($Attempt + 1)
+            return
+        }
+        ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
+        Write-Error "APK 上传 CAS 失败：服务器部署状态已变化，但未确认包含本 release commit。请基于最新 main 重新发布。"
+    }
+
+    if ($deployExit -ne 0) {
+        Write-Error "服务器 APK 原子发布失败，退出码 $deployExit"
+    }
 }
 
 # ── Step 0: Git pull（防止 push 冲突） ────────────────────────────────────────
@@ -139,12 +392,14 @@ function Push-HeadToMain {
 Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
 git -C $RepoRoot pull --rebase origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
+$BuildBaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 
 # ── Step 1: 递增 versionCode，确认 versionName ────────────────────────────────
 
 Write-Host "📝 更新版本号..." -ForegroundColor Cyan
 
 $content = Get-Content $GradlePath -Encoding UTF8 -Raw
+$OriginalGradleContent = $content
 
 $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
 $publishedCode = 0
@@ -184,16 +439,12 @@ Write-Host "   versionName: $oldName → $newName" -ForegroundColor Green
 
 if (-not $SkipBuild) {
     Assert-ReleaseSigningConfig
-    Write-Host "🔨 编译 Release APK..." -ForegroundColor Cyan
-    Push-Location $AndroidDir
-    try {
-        .\gradlew.bat assembleRelease
-    } finally {
-        Pop-Location
-    }
+    Invoke-GradleReleaseBuild
 } else {
     Write-Host "⏭️  跳过编译（-SkipBuild）" -ForegroundColor Yellow
 }
+
+Assert-ApkStillCurrentBeforeCommit
 
 # ── Step 3: 找到 APK 文件 ─────────────────────────────────────────────────────
 
@@ -221,7 +472,12 @@ if ($LASTEXITCODE -ne 0) { Write-Error "git commit 失败" }
 Push-HeadToMain
 
 $sha = git -C $RepoRoot rev-parse --short HEAD
+$shaFull = (git -C $RepoRoot rev-parse HEAD).Trim()
 Write-Host "   Commit SHA: $sha" -ForegroundColor Green
+
+Assert-ApkStillCurrentBeforeUpload -ReleaseSha $shaFull
+$serverShaBeforeUpload = Get-DeployedApkSha
+if ($null -eq $serverShaBeforeUpload) { $serverShaBeforeUpload = "" }
 
 # ── Step 5: 生成 version.json ─────────────────────────────────────────────────
 
@@ -233,6 +489,8 @@ $versionJson = @{
     changelog   = $Changelog
     forceUpdate = $false
     fileSize    = $fileSize
+    gitSha      = $shaFull
+    sourceSha   = $BuildBaseSha
 } | ConvertTo-Json -Depth 2
 
 $tmpJson = Join-Path $env:TEMP "elon-version.json"
@@ -243,16 +501,8 @@ Write-Host "📋 version.json 已生成" -ForegroundColor Green
 
 Write-Host "🚀 上传到服务器..." -ForegroundColor Cyan
 
-# 确保目标目录存在
-ssh -o ProxyCommand=none $ServerHost "mkdir -p $ServerDir"
-
-# 上传 APK
-scp -o ProxyCommand=none $apk.FullName "${ServerHost}:${ServerDir}/ElonSpeed-latest.apk"
-Write-Host "   ✅ APK 上传完成" -ForegroundColor Green
-
-# 上传 version.json
-scp -o ProxyCommand=none $tmpJson "${ServerHost}:${ServerDir}/version.json"
-Write-Host "   ✅ version.json 上传完成" -ForegroundColor Green
+Publish-ApkStaged -ApkPath $apk.FullName -JsonPath $tmpJson -ReleaseSha $shaFull -ExpectedServerSha $serverShaBeforeUpload
+Write-Host "   ✅ APK 原子发布完成，.apk-deployed-sha = $sha" -ForegroundColor Green
 
 # 清理临时文件
 Remove-Item $tmpJson -Force

@@ -270,7 +270,9 @@ scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-发布脚本会完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 APK 和 `version.json`、验证服务器版本。
+发布脚本会完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。
+
+APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进但线上未确认包含本次基础提交，就停止上传并从最新 `main` 重新发布。脚本不得在 APK 编译完成后自动 rebase 再上传旧产物。
 
 ### 8.3 推送结果给用户
 

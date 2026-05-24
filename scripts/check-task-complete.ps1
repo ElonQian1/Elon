@@ -80,6 +80,15 @@ if ($Kind -eq "AndroidFeature") {
         Stop-Check "Server APK version mismatch: local v$localName build $localCode, server v$($remoteVersion.versionName) build $($remoteVersion.versionCode)."
     }
 
+    $remoteGitSha = [string]$remoteVersion.gitSha
+    if ([string]::IsNullOrWhiteSpace($remoteGitSha)) {
+        Stop-Check "Server /app/version.json does not include gitSha; APK deploy provenance is unknown."
+    }
+
+    if (-not ($head.StartsWith($remoteGitSha) -or $remoteGitSha.StartsWith($head))) {
+        Stop-Check "Server APK gitSha mismatch: local HEAD=$($head.Substring(0, 7)), server gitSha=$remoteGitSha."
+    }
+
     try {
         $apkHead = Invoke-WebRequest -Uri "$ServerUrl/app/ElonSpeed-latest.apk" -Method Head -TimeoutSec 10 -UseBasicParsing
     } catch {
@@ -98,6 +107,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  version:     v$localName (build $localCode)"
+    Write-Host "  APK gitSha:  $remoteGitSha"
     Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
     exit 0
 }

@@ -356,6 +356,17 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 **原因**：APK 产物在编译时已经把旧的 `versionCode` 打包进去了，不重新编译就上传，会导致 `version.json` 中的版本号与 APK `BuildConfig.VERSION_CODE` 不一致。
 
+### ⚠️ APK 慢构建防覆盖规则
+
+`scripts\publish-apk.ps1` 必须把 APK 发布视为基于明确 git SHA 的原子动作：
+
+- 构建开始前记录基础 SHA。
+- 构建期间定期检查 `origin/main` 和服务器 `.apk-deployed-sha`；如果线上 APK 已部署了包含基础 SHA 的更新提交，立即中止本地旧编译，改为测试线上新版。
+- 构建完成后、提交 release commit 前再次检查 `origin/main`；如果远端已前进但线上还未确认包含基础 SHA，停止发布并要求基于最新 `main` 重跑。
+- `git push HEAD:main` 被拒绝时，脚本不得自动 rebase 后继续上传旧 APK；必须停止并要求重新运行发布脚本。
+- 上传 APK 和 `version.json` 必须先传 staging 文件，再由服务器 `flock` + `.apk-deployed-sha` CAS 原子替换；慢构建不得覆盖已经上线的后代 SHA。
+- `version.json` 必须包含发布 commit 的 `gitSha`，`check-task-complete.ps1 -Kind AndroidFeature` 必须校验线上 `gitSha` 等于当前 HEAD。
+
 如果用户明确要求“只改代码，不发布 APK”，最终汇报必须写明 `APK 发布状态：未发布（用户明确要求）`。
 
 ---

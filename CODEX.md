@@ -169,6 +169,7 @@ APK:
 - Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
 - Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
 - APK release builds must run locally and upload `ElonSpeed-latest.apk` plus `version.json`; the production server should not be used as the Android build machine.
+- `scripts/publish-apk.ps1` writes APK provenance to server-side `.apk-deployed-sha` and `version.json.gitSha`. If `origin/main` advances during a slow APK build, the script must not rebase and upload the old artifact. If the server already has a deployed SHA containing this build's base commit, stop and test that newer live APK; otherwise rerun the release from latest `main`.
 - Release signing keystore is local-only at `D:\一龙\elon-release(1).jks`; do not commit it.
 - Keystore type: `PKCS12`; key alias: `elon`.
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.

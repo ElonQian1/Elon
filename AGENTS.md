@@ -91,7 +91,9 @@ scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-发布脚本会自动完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、校验服务器版本。
+发布脚本会自动完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、写入 `.apk-deployed-sha`、校验服务器版本。
+
+发布脚本必须防止慢构建覆盖新版本：如果构建期间 `origin/main` 已前进，且服务器 `.apk-deployed-sha` 已包含本次基础提交，脚本应中止本地编译/发布并直接让 AI 测试线上新版；如果 `origin/main` 已前进但线上 APK 未确认包含本次基础提交，脚本必须停止上传，要求基于最新 `main` 重新发布。
 
 最终汇报必须写清楚：
 
@@ -99,6 +101,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - APK 版本：`versionName` + `versionCode`
 - 发布 commit SHA
 - 服务器 `/app/version.json` 校验结果
+- 服务器 `/app/version.json` 中的 `gitSha` 是否等于发布 commit
 - APK 下载地址
 
 除非用户明确说“只改代码，不发布 APK”，否则 Android 新功能默认必须跑完上面的发布闭环。
