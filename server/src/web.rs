@@ -364,57 +364,40 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
       padding: 20px 0 32px;
     }
 
-    /* ===== 推广下载页 ===== */
-    .download-page { padding: 0; align-items: stretch; }
-    .download-hero {
+    /* ===== 我的页 APK 推广块 ===== */
+    .apk-promo {
       background: var(--panel-2);
-      padding: 32px 22px 24px;
-      display: flex; flex-direction: column;
-      align-items: center; gap: 12px;
-      text-align: center;
+      padding: 16px 22px 14px;
+      margin-top: 10px;
     }
-    .download-hero .app-icon {
-      width: 76px; height: 76px;
-      border-radius: 16px; overflow: hidden;
-    }
-    .download-hero .app-icon img { width: 100%; height: 100%; object-fit: cover; }
-    .download-hero .app-name { font-size: 22px; color: var(--ink-strong); font-weight: 500; }
-    .download-hero .app-tagline { font-size: 14px; color: var(--ink-muted); }
-    .download-hero .app-version { font-size: 13px; color: var(--ink-dim); }
-    .download-actions {
-      padding: 20px 16px 10px;
-      display: flex; flex-direction: column; gap: 10px;
-    }
+    .apk-promo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .apk-promo-icon { width: 44px; height: 44px; border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+    .apk-promo-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .apk-promo-meta { display: flex; flex-direction: column; gap: 3px; }
+    .apk-promo-name { font-size: 15px; color: var(--ink); }
+    .apk-promo-ver { font-size: 12px; color: var(--ink-dim); }
+    .apk-promo-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+    .apk-promo-actions .download-btn { flex: 1; height: 42px; font-size: 14px; border-radius: 7px; }
+    .apk-promo-actions .copy-btn { flex: 1; height: 42px; font-size: 13px; border-radius: 7px; gap: 6px; }
     .download-btn {
-      height: 52px;
       background: var(--brand); color: #fff;
-      border: 0; border-radius: 8px;
-      font-size: 17px; cursor: pointer; width: 100%;
+      border: 0; cursor: pointer; width: 100%;
     }
     .download-btn:hover { background: var(--brand-hover); }
     .copy-btn {
-      height: 52px;
       background: var(--panel-3); color: var(--ink);
       border: 1px solid var(--line);
-      border-radius: 8px; font-size: 15px;
       cursor: pointer; width: 100%;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      display: flex; align-items: center; justify-content: center;
     }
     .copy-btn:hover { background: #353535; }
     .copy-btn.copied { color: var(--brand); border-color: var(--brand); }
     .download-link-box {
       background: var(--panel); border: 1px solid var(--line);
-      border-radius: 8px; padding: 12px 14px;
-      font-size: 13px; color: var(--ink-soft);
+      border-radius: 7px; padding: 10px 12px;
+      font-size: 12px; color: var(--ink-soft);
       word-break: break-all; line-height: 1.5;
-      margin: 4px 16px 0;
     }
-    .download-tips {
-      padding: 18px 22px 32px;
-      font-size: 13px; color: var(--ink-muted); line-height: 1.8;
-    }
-    .download-tips h4 { margin: 0 0 8px; font-size: 14px; color: var(--ink-soft); font-weight: normal; }
-    .download-tips ol { margin: 0; padding-left: 20px; }
 
     /* ===== 输入栏 ===== */
     .input-bar {
@@ -679,6 +662,26 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     <!-- 我的页 -->
     <div id="profilePage" class="page">
       <div class="profile-header" id="userInfoText">我的开发工作台</div>
+
+      <!-- APK 推广下载块 -->
+      <div class="apk-promo">
+        <div class="apk-promo-row">
+          <div class="apk-promo-icon"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" /></div>
+          <div class="apk-promo-meta">
+            <span class="apk-promo-name">一龙 APK</span>
+            <span class="apk-promo-ver" id="downloadVersionText">加载中…</span>
+          </div>
+        </div>
+        <div class="apk-promo-actions">
+          <button class="download-btn" id="downloadApkBtn">📥 下载 APK</button>
+          <button class="copy-btn" id="copyLinkBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制下载链接
+          </button>
+        </div>
+        <div class="download-link-box" id="downloadLinkBox">生成中…</div>
+      </div>
+
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
@@ -689,32 +692,6 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
         <span>退出登录</span><span class="arrow">›</span>
       </button>
       <div class="profile-version" id="versionText">一龙网页版</div>
-    </div>
-
-    <!-- 推广下载页 -->
-    <div id="downloadPage" class="page download-page">
-      <div class="download-hero">
-        <div class="app-icon"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" /></div>
-        <div class="app-name">一龙</div>
-        <div class="app-tagline">云端 APK 开发平台</div>
-        <div class="app-version" id="downloadVersionText">加载中…</div>
-      </div>
-      <div class="download-actions">
-        <button class="download-btn" id="downloadApkBtn">📥 下载 APK</button>
-        <button class="copy-btn" id="copyLinkBtn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          复制下载链接
-        </button>
-      </div>
-      <div class="download-link-box" id="downloadLinkBox">生成中…</div>
-      <div class="download-tips">
-        <h4>安装说明</h4>
-        <ol>
-          <li>点击"下载 APK"或复制链接后在手机浏览器打开</li>
-          <li>下载完成后，允许"安装未知来源应用"</li>
-          <li>安装完成后登录账号即可使用</li>
-        </ol>
-      </div>
     </div>
 
   </section>
@@ -742,15 +719,6 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
         </svg>
       </span>
       <span>我的</span>
-    </button>
-    <button class="tab" data-tab="downloadPage" data-title="下载 APK">
-      <span class="ic">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v13M7 11l5 5 5-5"/>
-          <path d="M5 21h14"/>
-        </svg>
-      </span>
-      <span>下载</span>
     </button>
   </nav>
 </main>
@@ -1002,8 +970,8 @@ const WEB_HTML_TEMPLATE: &str = r###"<!doctype html>
     // 新建按钮：仅会话页显示
     addBtn.style.display = tabId === 'chatPage' ? '' : 'none';
     searchBtn.style.display = tabId === 'chatPage' ? '' : 'none';
-    // 下载页：切入时刷新版本信息
-    if (tabId === 'downloadPage') refreshDownloadPage();
+    // 下载页：切入"我的"时刷新版本信息
+    if (tabId === 'profilePage') refreshDownloadPage();
   }
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
