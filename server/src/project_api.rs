@@ -70,6 +70,7 @@ pub struct ProjectAttachmentRef {
     pub file_name: Option<String>,
     pub mime_type: Option<String>,
     pub path: Option<String>,
+    pub url: Option<String>,
     pub size_bytes: Option<u64>,
 }
 
@@ -732,6 +733,14 @@ pub async fn upload_user_project_attachment(
         "file_name": file_name,
         "mime_type": query.get("mime_type").map(String::as_str).unwrap_or("application/octet-stream"),
         "path": path.to_string_lossy(),
+        "url": format!(
+            "{}/api/user/{}/projects/{}/attachments/{}/{}",
+            state.public_url.trim_end_matches('/'),
+            percent_encode_path_segment(&user.id),
+            percent_encode_path_segment(&project.id),
+            percent_encode_path_segment(&conversation_id),
+            percent_encode_path_segment(&file_name)
+        ),
         "size_bytes": body.len(),
     });
     Json(serde_json::json!({
@@ -741,6 +750,63 @@ pub async fn upload_user_project_attachment(
         "attachment": attachment,
     }))
     .into_response()
+}
+
+pub async fn download_user_project_attachment(
+    State(state): State<Arc<AppState>>,
+    AxumPath((user_id, project_id, conversation_id, filename)): AxumPath<(
+        String,
+        String,
+        String,
+        String,
+    )>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
+    }
+
+    let (_user, project) = match ensure_mobile_project(
+        &state,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    let attachments_dir = workspace
+        .join("attachments")
+        .join(safe_project_path_part(&conversation_id, 80));
+    let path = attachments_dir.join(&filename);
+    let valid_path = std::fs::canonicalize(&attachments_dir)
+        .ok()
+        .and_then(|root| {
+            std::fs::canonicalize(&path)
+                .ok()
+                .filter(|canonical| canonical.starts_with(root))
+        })
+        .is_some();
+    if !valid_path {
+        return json_error(StatusCode::NOT_FOUND, "attachment not found");
+    }
+
+    let data = match tokio::fs::read(&path).await {
+        Ok(data) => data,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let content_type = content_type_for_file(&filename);
+    axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("inline; filename=\"{}\"", filename),
+        )
+        .body(Body::from(data))
+        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 pub async fn user_project_deploy_key(
@@ -1167,21 +1233,37 @@ fn append_project_attachment_notes(
             ));
             continue;
         }
-        notes.push(format!(
+        let display_name = attachment
+            .display_name
+            .as_deref()
+            .or(attachment.file_name.as_deref())
+            .unwrap_or("attachment");
+        let mime_type = attachment
+            .mime_type
+            .as_deref()
+            .unwrap_or("application/octet-stream");
+        let mut note = format!(
             "- {} [{}; {}; {} bytes] -> {}",
-            attachment
-                .display_name
-                .as_deref()
-                .or(attachment.file_name.as_deref())
-                .unwrap_or("attachment"),
+            display_name,
             attachment.kind.as_deref().unwrap_or("attachment"),
-            attachment
-                .mime_type
-                .as_deref()
-                .unwrap_or("application/octet-stream"),
+            mime_type,
             attachment.size_bytes.unwrap_or(0),
             path.display()
-        ));
+        );
+        if let Some(url) = attachment
+            .url
+            .as_deref()
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            note.push_str(&format!(" (url: {})", url));
+        }
+        if mime_type.starts_with("image/") {
+            note.push_str(
+                "\n  Image context: this is an actual uploaded chat image. Open/view the local file path above when answering image questions; do not answer from the file name alone.",
+            );
+        }
+        notes.push(note);
     }
     if attachments.len() > MAX_PROJECT_ATTACHMENTS_PER_MESSAGE {
         notes.push(format!(
@@ -1193,11 +1275,43 @@ fn append_project_attachment_notes(
         return message;
     }
     format!(
-        "{}\n\nUser uploaded attachment references for this project conversation (conversation_id={}):\n{}\nRead these exact server-side paths if the task needs the files.",
+        "{}\n\nUser uploaded real chat attachments for this project conversation (conversation_id={}):\n{}\nThese attachments are part of the current message context, like images/files in a normal chat app. If the user asks about an uploaded image, inspect the exact local path listed above before answering.",
         message,
         conversation_id,
         notes.join("\n")
     )
+}
+
+fn content_type_for_file(filename: &str) -> &'static str {
+    match filename
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "txt" | "md" | "log" => "text/plain; charset=utf-8",
+        "json" => "application/json",
+        "pdf" => "application/pdf",
+        _ => "application/octet-stream",
+    }
+}
+
+fn percent_encode_path_segment(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.as_bytes() {
+        match *byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(*byte as char)
+            }
+            other => encoded.push_str(&format!("%{:02X}", other)),
+        }
+    }
+    encoded
 }
 
 fn unique_project_attachment_name(dir: &Path, original: &str) -> String {
@@ -1704,6 +1818,14 @@ mod tests {
         assert_eq!(
             safe_project_path_part("../conversation id!", 80),
             "conversationid"
+        );
+    }
+
+    #[test]
+    fn encodes_attachment_url_path_segments() {
+        assert_eq!(
+            percent_encode_path_segment("project 1/图.png"),
+            "project%201%2F%E5%9B%BE.png"
         );
     }
 

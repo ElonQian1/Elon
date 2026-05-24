@@ -1116,6 +1116,9 @@ class MainActivity : AppCompatActivity() {
                     addProperty("file_name", uploaded.optString("file_name", attachment.fileName))
                     addProperty("mime_type", uploaded.optString("mime_type", attachment.mimeType))
                     addProperty("path", uploaded.optString("path", ""))
+                    uploaded.optString("url", "").takeIf { it.isNotBlank() }?.let {
+                        addProperty("url", it)
+                    }
                     addProperty("size_bytes", uploaded.optLong("size_bytes", attachment.file.length()))
                 })
             }
