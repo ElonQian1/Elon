@@ -214,6 +214,7 @@ object McpDebugServer {
             "task_events" -> taskEvents(args)
             "logcat_recent" -> logcatRecent(args)
             "chat_send" -> chatSend(args)
+            "chat_probe" -> chatProbe(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
         }
         return rpcResult(id, result)
@@ -775,6 +776,223 @@ object McpDebugServer {
         return toolResult("Chat request queued on phone.", structured)
     }
 
+    private fun chatProbe(args: JSONObject): JSONObject {
+        val message = args.optString("message").trim()
+        if (message.isEmpty()) {
+            return toolResult("message is required", JSONObject().put("field", "message"), isError = true)
+        }
+        val waitFor = args.optString("wait_for", "first_reply").lowercase(Locale.ROOT)
+        val timeoutMs = args.optInt("wait_timeout_ms", 25_000).coerceIn(0, 120_000)
+        val pollIntervalMs = args.optInt("poll_interval_ms", 350).coerceIn(100, 2_000)
+        val timelineLimit = args.optInt("timeline_limit", 80).coerceIn(1, 300)
+        val includeDiagnosticBundle = if (args.has("include_diagnostic_bundle")) {
+            args.optBoolean("include_diagnostic_bundle")
+        } else {
+            true
+        }
+        val includeLogcat = args.optBoolean("include_logcat", false)
+        val includeNetworkCheck = if (args.has("include_network_check")) {
+            args.optBoolean("include_network_check")
+        } else {
+            true
+        }
+
+        if (waitTargetPhases(waitFor) == null) {
+            return toolResult(
+                "Unsupported wait_for value: $waitFor",
+                JSONObject()
+                    .put("wait_for", waitFor)
+                    .put("supported", JSONArray().apply {
+                        listOf("queued", "task_start", "payload_sent", "first_server_event", "first_reply", "finish")
+                            .forEach { put(it) }
+                    }),
+                isError = true
+            )
+        }
+
+        val probeStartedAt = System.currentTimeMillis()
+        val chatArgs = JSONObject(args.toString())
+        if (!chatArgs.has("is_development")) chatArgs.put("is_development", false)
+        if (!chatArgs.has("trace_id")) {
+            chatArgs.put("trace_id", "mcp_probe_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}")
+        }
+        DebugTraceStore.record(
+            "mcp_chat_probe_start",
+            mapOf(
+                "trace_id" to chatArgs.optString("trace_id"),
+                "wait_for" to waitFor,
+                "timeout_ms" to timeoutMs,
+                "is_development" to chatArgs.optBoolean("is_development")
+            )
+        )
+
+        val sendResult = chatSend(chatArgs)
+        val sendStructured = sendResult.optJSONObject("structuredContent") ?: JSONObject()
+        val traceId = sendStructured.optString("trace_id").takeIf { it.isNotBlank() }
+            ?: chatArgs.optString("trace_id").takeIf { it.isNotBlank() }
+        if (sendResult.optBoolean("isError", false) || traceId == null) {
+            return toolResult(
+                "Chat probe could not queue a phone chat request.",
+                JSONObject()
+                    .put("send_result", sendStructured)
+                    .put("wait_for", waitFor)
+                    .put("queued", false),
+                isError = true
+            )
+        }
+
+        val waitResult = waitForTraceTarget(
+            traceId = traceId,
+            waitFor = waitFor,
+            timeoutMs = timeoutMs,
+            pollIntervalMs = pollIntervalMs,
+            startedAtWallMs = probeStartedAt
+        )
+        val latency = latencyReportJson(JSONObject().put("trace_id", traceId).put("timeline_limit", timelineLimit))
+        val taskStatus = taskStatusJson(JSONObject().put("trace_id", traceId))
+        val diagnostic = if (includeDiagnosticBundle) {
+            diagnosticBundle(
+                JSONObject()
+                    .put("trace_id", traceId)
+                    .put("include_logcat", includeLogcat)
+                    .put("include_network_check", includeNetworkCheck)
+                    .put("trace_limit", timelineLimit)
+                    .put("timeline_limit", timelineLimit)
+                    .put("since_wall_time_ms", probeStartedAt)
+            ).optJSONObject("structuredContent") ?: JSONObject()
+        } else {
+            JSONObject.NULL
+        }
+
+        DebugTraceStore.record(
+            "mcp_chat_probe_finish",
+            mapOf(
+                "trace_id" to traceId,
+                "wait_for" to waitFor,
+                "reached" to waitResult.optBoolean("reached"),
+                "matched_phase" to waitResult.optString("matched_phase").takeIf { it.isNotBlank() },
+                "elapsed_wait_ms" to waitResult.optLong("elapsed_wait_ms")
+            )
+        )
+        val structured = JSONObject()
+            .put("trace_id", traceId)
+            .put("wait_for", waitFor)
+            .put("timeout_ms", timeoutMs)
+            .put("queued", true)
+            .put("send_result", sendStructured)
+            .put("wait_result", waitResult)
+            .put("task_status", taskStatus)
+            .put("latency_report", latency)
+            .put("diagnostic_bundle", diagnostic)
+        return toolResult(
+            if (waitResult.optBoolean("reached", false)) {
+                "Chat probe reached $waitFor."
+            } else {
+                "Chat probe timed out before $waitFor."
+            },
+            structured,
+            isError = waitResult.optBoolean("timed_out", false)
+        )
+    }
+
+    private fun waitForTraceTarget(
+        traceId: String,
+        waitFor: String,
+        timeoutMs: Int,
+        pollIntervalMs: Int,
+        startedAtWallMs: Long
+    ): JSONObject {
+        val targetPhases = waitTargetPhases(waitFor) ?: emptySet()
+        val terminalPhases = setOf("task_finish_done", "task_finish_error")
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        var lastEvents = emptyList<DebugTraceStore.TraceEvent>()
+        while (true) {
+            lastEvents = DebugTraceStore.recentEvents(300)
+                .filter { it.details["trace_id"] == traceId || it.phase == "mcp_chat_send" && it.details["trace_id"] == traceId }
+            val matched = lastEvents.firstOrNull { it.phase in targetPhases }
+            if (matched != null) {
+                return waitResultJson(
+                    traceId = traceId,
+                    waitFor = waitFor,
+                    reached = true,
+                    timedOut = false,
+                    matched = matched,
+                    events = lastEvents,
+                    startedAtWallMs = startedAtWallMs,
+                    timeoutMs = timeoutMs,
+                    pollIntervalMs = pollIntervalMs
+                )
+            }
+            val terminal = lastEvents.firstOrNull { it.phase in terminalPhases }
+            if (terminal != null && waitFor != "finish") {
+                return waitResultJson(
+                    traceId = traceId,
+                    waitFor = waitFor,
+                    reached = false,
+                    timedOut = false,
+                    matched = terminal,
+                    events = lastEvents,
+                    startedAtWallMs = startedAtWallMs,
+                    timeoutMs = timeoutMs,
+                    pollIntervalMs = pollIntervalMs,
+                    terminalBeforeTarget = true
+                )
+            }
+            if (timeoutMs <= 0 || SystemClock.elapsedRealtime() >= deadline) break
+            Thread.sleep(minOf(pollIntervalMs.toLong(), (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L)))
+        }
+        return waitResultJson(
+            traceId = traceId,
+            waitFor = waitFor,
+            reached = false,
+            timedOut = true,
+            matched = lastEvents.lastOrNull(),
+            events = lastEvents,
+            startedAtWallMs = startedAtWallMs,
+            timeoutMs = timeoutMs,
+            pollIntervalMs = pollIntervalMs
+        )
+    }
+
+    private fun waitTargetPhases(waitFor: String): Set<String>? {
+        return when (waitFor) {
+            "queued" -> setOf("mcp_chat_queued")
+            "task_start" -> setOf("task_start_work")
+            "payload_sent" -> setOf("task_payload_sent")
+            "first_server_event" -> setOf("task_first_server_event")
+            "first_reply" -> setOf("task_first_chat_reply")
+            "finish" -> setOf("task_finish_done", "task_finish_error")
+            else -> null
+        }
+    }
+
+    private fun waitResultJson(
+        traceId: String,
+        waitFor: String,
+        reached: Boolean,
+        timedOut: Boolean,
+        matched: DebugTraceStore.TraceEvent?,
+        events: List<DebugTraceStore.TraceEvent>,
+        startedAtWallMs: Long,
+        timeoutMs: Int,
+        pollIntervalMs: Int,
+        terminalBeforeTarget: Boolean = false
+    ): JSONObject {
+        return JSONObject()
+            .put("trace_id", traceId)
+            .put("wait_for", waitFor)
+            .put("reached", reached)
+            .put("timed_out", timedOut)
+            .put("terminal_before_target", terminalBeforeTarget)
+            .put("matched_phase", matched?.phase ?: JSONObject.NULL)
+            .put("matched_wall_time_ms", matched?.wallTimeMs ?: JSONObject.NULL)
+            .put("last_phase", events.lastOrNull()?.phase ?: JSONObject.NULL)
+            .put("event_count", events.size)
+            .put("elapsed_wait_ms", System.currentTimeMillis() - startedAtWallMs)
+            .put("timeout_ms", timeoutMs)
+            .put("poll_interval_ms", pollIntervalMs)
+    }
+
     private fun initializeResult(): JSONObject {
         return JSONObject()
             .put("protocolVersion", PROTOCOL_VERSION)
@@ -1001,6 +1219,31 @@ object McpDebugServer {
                             .put("trace_id", stringProperty("Optional caller-provided trace id."))
                             .put("is_development", booleanProperty("Whether this should be treated as a development task."))
                             .put("force", booleanProperty("Override an active phone task. Defaults to false.")),
+                        required = JSONArray().put("message")
+                    )
+                )
+                .put(
+                    tool(
+                        name = "chat_probe",
+                        title = "Chat Probe",
+                        description = "Send a probe chat through the phone, wait for a milestone, then return task status, latency report, and optional diagnostic bundle in one call.",
+                        properties = JSONObject()
+                            .put("message", stringProperty("Probe chat message to send from the phone. Defaults to an ordinary chat unless is_development=true."))
+                            .put("project_id", stringProperty("Optional project id. Defaults to the active project."))
+                            .put("project_title", stringProperty("Optional project title."))
+                            .put("conversation_id", stringProperty("Optional conversation id for native CLI session continuity."))
+                            .put("conversation_title", stringProperty("Optional conversation title."))
+                            .put("agent", stringProperty("Optional backend agent id, such as codex_cli."))
+                            .put("trace_id", stringProperty("Optional caller-provided trace id."))
+                            .put("is_development", booleanProperty("Whether this probe should run as a development task. Defaults to false."))
+                            .put("force", booleanProperty("Override an active phone task. Defaults to false."))
+                            .put("wait_for", stringProperty("One of queued, task_start, payload_sent, first_server_event, first_reply, finish. Defaults to first_reply."))
+                            .put("wait_timeout_ms", intProperty("How long to wait for the milestone, 0-120000. Defaults to 25000."))
+                            .put("poll_interval_ms", intProperty("Trace polling interval, 100-2000. Defaults to 350."))
+                            .put("timeline_limit", intProperty("Maximum latency timeline events to return, 1-300. Defaults to 80."))
+                            .put("include_diagnostic_bundle", booleanProperty("Include diagnostic_bundle after waiting. Defaults to true."))
+                            .put("include_logcat", booleanProperty("Include logcat in the nested diagnostic bundle. Defaults to false."))
+                            .put("include_network_check", booleanProperty("Include network_check in the nested diagnostic bundle. Defaults to true.")),
                         required = JSONArray().put("message")
                     )
                 )
