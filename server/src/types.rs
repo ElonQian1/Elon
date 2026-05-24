@@ -371,6 +371,41 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+/// 从 COPILOT_GITHUB_TOKEN（或 GITHUB_TOKEN）+ COPILOT_MODELS 自动生成
+/// GitHub Copilot / GitHub Models 多模型 API 代理配置。
+///
+/// 默认 API 地址：https://models.inference.ai.azure.com（OpenAI 兼容，无需特殊 header）
+/// 若要用 GitHub Copilot 直连 API，设置 COPILOT_API_BASE=https://api.githubcopilot.com
+/// 并配合 COPILOT_INTEGRATION_ID=vscode-chat（由 agent.rs 中的 call_llm 自动识别并添加 header）
+fn copilot_api_agents() -> Vec<AgentConfig> {
+    let token = std::env::var("COPILOT_GITHUB_TOKEN")
+        .or_else(|_| std::env::var("GITHUB_TOKEN"))
+        .ok()
+        .filter(|t| !t.trim().is_empty());
+    let token = match token {
+        Some(t) => t,
+        None => return Vec::new(),
+    };
+
+    let api_base = std::env::var("COPILOT_API_BASE")
+        .unwrap_or_else(|_| "https://models.inference.ai.azure.com".into());
+
+    // 默认模型集合：与 VS Code Copilot 模型选择器一致
+    let default_models = "gpt-4o,gpt-4o-mini,claude-3.5-sonnet,o1-mini";
+    let models_raw = std::env::var("COPILOT_MODELS")
+        .unwrap_or_else(|_| default_models.into());
+
+    split_list(&models_raw)
+        .into_iter()
+        .map(|model| AgentConfig {
+            name: format!("copilot:{}", model),
+            api_base: api_base.clone(),
+            api_key: token.clone(),
+            model,
+        })
+        .collect()
+}
+
 fn split_cli_args(raw: &str) -> Vec<String> {
     let mut args = Vec::new();
     let mut current = String::new();
@@ -564,6 +599,17 @@ impl AppState {
                 tracing::info!("已加载 AI 代理: {} -> {}", cfg.name, cfg.api_base);
                 agents.insert(cfg.name.clone(), cfg);
             }
+        }
+
+        // 从 COPILOT_GITHUB_TOKEN / GITHUB_TOKEN 自动加载 Copilot 多模型代理
+        for cfg in copilot_api_agents() {
+            tracing::info!(
+                "已加载 Copilot 代理: {} -> {} (model: {})",
+                cfg.name,
+                cfg.api_base,
+                cfg.model
+            );
+            agents.entry(cfg.name.clone()).or_insert(cfg);
         }
 
         let config_path = std::path::PathBuf::from(

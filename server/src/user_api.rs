@@ -42,13 +42,14 @@ pub async fn get_user_agent(
             .agents
             .values()
             .map(|a| {
+                let (provider, label) = copilot_agent_meta(&a.name, &a.model);
                 serde_json::json!({
                     "name": a.name,
                     "model": a.model,
                     "api_base": a.api_base,
                     "backend": "api",
-                    "provider": a.name,
-                    "label": format!("{} / {}", a.name, a.model),
+                    "provider": provider,
+                    "label": label,
                 })
             })
             .collect()
@@ -229,4 +230,39 @@ fn is_cli_alias(name: &str) -> bool {
         name.trim().to_ascii_lowercase().as_str(),
         "codex" | "codex_cli" | "cli" | "local" | "local_cli"
     )
+}
+
+/// 将 Copilot 代理名 / 普通代理名 转换为 (provider, 友好 label)。
+/// - `copilot:gpt-4o`  → ("copilot", "Copilot / GPT-4o")
+/// - `openai`          → ("openai", "openai / gpt-4o")
+fn copilot_agent_meta(name: &str, model: &str) -> (String, String) {
+    if let Some(model_id) = name.strip_prefix("copilot:") {
+        (
+            "copilot".to_string(),
+            format!("Copilot / {}", copilot_model_friendly_name(model_id)),
+        )
+    } else {
+        (name.to_string(), format!("{} / {}", name, model))
+    }
+}
+
+/// 将 Copilot / GitHub Models 的模型 ID 映射为用户可读名称。
+fn copilot_model_friendly_name(model: &str) -> &str {
+    match model {
+        "gpt-4o" => "GPT-4o",
+        "gpt-4o-mini" => "GPT-4o mini",
+        "gpt-4.1" => "GPT-4.1",
+        "gpt-4.5-preview" => "GPT-4.5 Preview",
+        "claude-3.5-sonnet" | "claude-3-5-sonnet-20241022" => "Claude 3.5 Sonnet",
+        "claude-3.7-sonnet" | "claude-3-7-sonnet-20250219" => "Claude 3.7 Sonnet",
+        "claude-sonnet-4" | "claude-sonnet-4-5" => "Claude Sonnet 4",
+        "o1" => "o1",
+        "o1-mini" => "o1 mini",
+        "o1-preview" => "o1 preview",
+        "o3" => "o3",
+        "o3-mini" => "o3 mini",
+        "gemini-2.0-flash" | "gemini-2.0-flash-001" => "Gemini 2.0 Flash",
+        "gemini-2.5-pro" | "gemini-2.5-pro-preview" => "Gemini 2.5 Pro",
+        other => other,
+    }
 }

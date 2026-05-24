@@ -1039,11 +1039,23 @@ async fn call_llm(state: &Arc<AppState>, agent: &AgentConfig, messages: &[Value]
         "tool_choice": "auto",
     });
 
-    let resp = state
+    // GitHub Copilot 直连 API 需要额外的 editor 标识 header
+    let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
+    let integration_id = std::env::var("COPILOT_INTEGRATION_ID")
+        .unwrap_or_else(|_| "vscode-chat".into());
+
+    let mut req = state
         .http_client
         .post(&url)
         .bearer_auth(&agent.api_key)
-        .json(&body)
+        .json(&body);
+    if is_copilot_direct {
+        req = req
+            .header("editor-version", "vscode/1.99.0")
+            .header("editor-plugin-version", "copilot-chat/0.26.0")
+            .header("Copilot-Integration-Id", integration_id);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| {
@@ -1078,11 +1090,22 @@ async fn call_chat_llm(
         "max_tokens": 700,
     });
 
-    let resp = state
+    let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
+    let integration_id = std::env::var("COPILOT_INTEGRATION_ID")
+        .unwrap_or_else(|_| "vscode-chat".into());
+
+    let mut req = state
         .http_client
         .post(&url)
         .bearer_auth(&agent.api_key)
-        .json(&body)
+        .json(&body);
+    if is_copilot_direct {
+        req = req
+            .header("editor-version", "vscode/1.99.0")
+            .header("editor-plugin-version", "copilot-chat/0.26.0")
+            .header("Copilot-Integration-Id", integration_id);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| {
