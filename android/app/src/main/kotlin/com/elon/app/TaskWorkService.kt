@@ -93,7 +93,7 @@ class TaskWorkService : Service() {
     }
 
     private fun startWork(payload: String, isDevelopment: Boolean, force: Boolean = false) {
-        if (waitingForReply && !pendingPayload.isNullOrBlank() && !force) {
+        if (shouldRejectBusyStart(payload, force)) {
             rejectBusyStart(payload)
             return
         }
@@ -145,6 +145,15 @@ class TaskWorkService : Service() {
             queueRawEvent(raw)
         }
         broadcastState()
+    }
+
+    private fun shouldRejectBusyStart(incomingPayload: String, force: Boolean): Boolean {
+        if (force || !waitingForReply || pendingPayload.isNullOrBlank()) return false
+        val activeTraceId = extractTraceId(pendingPayload)
+        val incomingTraceId = extractTraceId(incomingPayload)
+        return activeTraceId.isNullOrBlank() ||
+            incomingTraceId.isNullOrBlank() ||
+            activeTraceId != incomingTraceId
     }
 
     private fun ensureClient(): ElonWsClient {

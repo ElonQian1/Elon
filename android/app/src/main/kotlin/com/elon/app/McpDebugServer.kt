@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -143,6 +144,7 @@ object McpDebugServer {
             "debug_keepalive" -> debugKeepalive(args)
             "update_status" -> updateStatus(args)
             "task_status" -> taskStatus(args)
+            "task_control" -> taskControl(args)
             "logcat_recent" -> logcatRecent(args)
             "chat_send" -> chatSend(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
@@ -215,6 +217,51 @@ object McpDebugServer {
 
     private fun taskStatus(args: JSONObject): JSONObject {
         return toolResult("Task status returned.", taskStatusJson(args))
+    }
+
+    private fun taskControl(args: JSONObject): JSONObject {
+        val action = args.optString("action", "status").lowercase(Locale.ROOT)
+        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        when (action) {
+            "pause" -> {
+                val activeTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
+                clearPersistedTask(prefs)
+                val serviceIntent = Intent(appContext, TaskWorkService::class.java).apply {
+                    this.action = TaskWorkService.ACTION_PAUSE
+                }
+                val serviceSignal = runCatching { appContext.startService(serviceIntent) }
+                    .fold(onSuccess = { "pause_sent" }, onFailure = { "pause_start_failed:${it.javaClass.simpleName}" })
+                val stopped = if (serviceSignal.startsWith("pause_start_failed")) {
+                    runCatching { appContext.stopService(Intent(appContext, TaskWorkService::class.java)) }
+                        .getOrDefault(false)
+                } else {
+                    false
+                }
+                DebugTraceStore.record(
+                    "mcp_task_control",
+                    mapOf(
+                        "action" to action,
+                        "active_trace_id" to activeTraceId,
+                        "service_signal" to serviceSignal,
+                        "stop_service" to stopped
+                    )
+                )
+                return toolResult(
+                    "Task pause requested.",
+                    taskStatusJson(JSONObject())
+                        .put("action", action)
+                        .put("service_signal", serviceSignal)
+                        .put("stop_service", stopped)
+                )
+            }
+            "status" -> Unit
+            else -> return toolResult(
+                "Unsupported task control action: $action",
+                JSONObject().put("action", action),
+                isError = true
+            )
+        }
+        return toolResult("Task status returned.", taskStatusJson(JSONObject()).put("action", action))
     }
 
     private fun logcatRecent(args: JSONObject): JSONObject {
@@ -309,18 +356,49 @@ object McpDebugServer {
             .put("project_title", projectTitle)
             .put("message", message)
         if (agent != null) payload.put("agent", agent)
+        val payloadText = payload.toString()
+
+        if (!force) {
+            reservePendingTask(prefs, payloadText, isDevelopment)
+        }
 
         DebugTraceStore.record(
             "mcp_chat_send",
-            mapOf("trace_id" to traceId, "project_id" to projectId, "chars" to message.length)
+            mapOf(
+                "trace_id" to traceId,
+                "project_id" to projectId,
+                "chars" to message.length,
+                "reserved_pending" to !force
+            )
         )
         val intent = Intent(appContext, TaskWorkService::class.java).apply {
             action = TaskWorkService.ACTION_START_WORK
-            putExtra(TaskWorkService.EXTRA_PAYLOAD, payload.toString())
+            putExtra(TaskWorkService.EXTRA_PAYLOAD, payloadText)
             putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
             putExtra(TaskWorkService.EXTRA_FORCE_START, force)
         }
-        ContextCompat.startForegroundService(appContext, intent)
+        val startResult = runCatching {
+            ContextCompat.startForegroundService(appContext, intent)
+        }.exceptionOrNull()
+        if (startResult != null) {
+            if (!force) clearReservedPendingTask(prefs, traceId)
+            DebugTraceStore.record(
+                "mcp_chat_start_failed",
+                mapOf("trace_id" to traceId, "error" to startResult.message)
+            )
+            return toolResult(
+                "Could not start phone task service.",
+                JSONObject()
+                    .put("trace_id", traceId)
+                    .put("project_id", projectId)
+                    .put("error", startResult.message ?: startResult.javaClass.simpleName),
+                isError = true
+            )
+        }
+        DebugTraceStore.record(
+            "mcp_chat_queued",
+            mapOf("trace_id" to traceId, "project_id" to projectId, "force" to force)
+        )
 
         val structured = JSONObject()
             .put("trace_id", traceId)
@@ -412,6 +490,16 @@ object McpDebugServer {
                 )
                 .put(
                     tool(
+                        name = "task_control",
+                        title = "Task Control",
+                        description = "Inspect or pause the active phone task from inside the APK process.",
+                        properties = JSONObject()
+                            .put("action", stringProperty("One of status or pause. Defaults to status.")),
+                        required = JSONArray()
+                    )
+                )
+                .put(
+                    tool(
                         name = "logcat_recent",
                         title = "Recent Logcat",
                         description = "Return filtered recent logcat lines visible to the APK process.",
@@ -479,6 +567,7 @@ object McpDebugServer {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
         val pendingPayload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
         val pendingTask = pendingTaskJson(prefs)
+        val pendingBusy = isTaskBusy(prefs)
         return JSONObject()
             .put("package_name", appContext.packageName)
             .put("version_name", BuildConfig.VERSION_NAME)
@@ -497,11 +586,11 @@ object McpDebugServer {
             .put("debug_keepalive", McpDebugKeepAliveService.statusJson(appContext))
             .put("user_id", prefs.getString(TaskWorkService.PREF_USER_ID, null))
             .put("active_project_id", prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null))
-            .put("pending_work", !pendingPayload.isNullOrBlank())
-            .put("busy", isTaskBusy(prefs))
-            .put("active_trace_id", pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() })
-            .put("active_task_kind", if (pendingPayload.isNullOrBlank()) null else pendingTaskKind(prefs))
-            .put("pending_work_age_ms", pendingWorkAgeMs(prefs))
+            .put("pending_work", pendingBusy)
+            .put("busy", pendingBusy)
+            .put("active_trace_id", if (pendingBusy) pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() } else null)
+            .put("active_task_kind", if (pendingBusy && !pendingPayload.isNullOrBlank()) pendingTaskKind(prefs) else null)
+            .put("pending_work_age_ms", if (pendingBusy) pendingWorkAgeMs(prefs) else null)
             .put("trace_events", DebugTraceStore.count())
             .apply {
                 if (includeToken) put("auth_token", debugToken())
@@ -556,29 +645,63 @@ object McpDebugServer {
             .put("last_event_wall_time_ms", traceEvents.lastOrNull()?.wallTimeMs ?: JSONObject.NULL)
     }
 
-    private fun pendingWorkAgeMs(prefs: android.content.SharedPreferences): Long? {
+    private fun pendingWorkAgeMs(prefs: SharedPreferences): Long? {
         val savedAt = prefs.getLong(TaskWorkService.PREF_PENDING_WORK_TIME, 0L)
         return if (savedAt > 0L) System.currentTimeMillis() - savedAt else null
     }
 
-    private fun isTaskBusy(prefs: android.content.SharedPreferences): Boolean {
-        return !prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null).isNullOrBlank()
+    private fun isTaskBusy(prefs: SharedPreferences): Boolean {
+        val payload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
+            ?.takeIf { it.isNotBlank() }
+            ?: return false
+        val savedAt = prefs.getLong(TaskWorkService.PREF_PENDING_WORK_TIME, 0L)
+        val expired = savedAt > 0L && System.currentTimeMillis() - savedAt > TaskWorkService.PENDING_WORK_TTL_MS
+        return !expired && payload.isNotBlank()
     }
 
-    private fun pendingTaskJson(prefs: android.content.SharedPreferences): JSONObject? {
+    private fun pendingTaskJson(prefs: SharedPreferences): JSONObject? {
         val payload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
             ?.takeIf { it.isNotBlank() }
             ?: return null
         return runCatching { JSONObject(payload) }.getOrNull()
     }
 
-    private fun pendingTaskKind(prefs: android.content.SharedPreferences): String {
+    private fun pendingTaskKind(prefs: SharedPreferences): String {
         if (!isTaskBusy(prefs)) return "idle"
         return if (prefs.getBoolean(TaskWorkService.PREF_PENDING_WORK_IS_DEVELOPMENT, true)) {
             "development"
         } else {
             "chat"
         }
+    }
+
+    private fun reservePendingTask(prefs: SharedPreferences, payload: String, isDevelopment: Boolean) {
+        prefs.edit()
+            .putString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, payload)
+            .putBoolean(TaskWorkService.PREF_PENDING_WORK_IS_DEVELOPMENT, isDevelopment)
+            .putLong(TaskWorkService.PREF_PENDING_WORK_TIME, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun clearPersistedTask(prefs: SharedPreferences) {
+        prefs.edit()
+            .remove(TaskWorkService.PREF_PENDING_WORK_PAYLOAD)
+            .remove(TaskWorkService.PREF_PENDING_WORK_IS_DEVELOPMENT)
+            .remove(TaskWorkService.PREF_PENDING_WORK_TIME)
+            .apply()
+    }
+
+    private fun clearReservedPendingTask(prefs: SharedPreferences, traceId: String) {
+        val currentTraceId = traceIdFromPayload(
+            prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
+        )
+        if (currentTraceId == traceId) clearPersistedTask(prefs)
+    }
+
+    private fun traceIdFromPayload(payload: String?): String? {
+        return payload
+            ?.let { runCatching { JSONObject(it).optString("trace_id") }.getOrNull() }
+            ?.takeIf { it.isNotBlank() }
     }
 
     private fun latestTraceId(events: List<DebugTraceStore.TraceEvent>): String? {
