@@ -978,8 +978,44 @@ async fn run_api_inner_with_workspace(
                     .to_json(),
                 );
 
-                // 执行工具
-                let result = execute_tool(state, &workspace, &tool_name, &args);
+                // 执行工具：build_project 优先通过 PC agent（Windows 环境），无 agent 或失败时回退服务器本地构建
+                let result: anyhow::Result<String> =
+                    if tool_name == "build_project"
+                        && !state.agent_manager.list().await.is_empty()
+                    {
+                        let target = args["target"].as_str().unwrap_or("android");
+                        let changelog: String = user_message.chars().take(80).collect();
+                        let _ = tx.send(
+                            WsMessage::Progress {
+                                message: format!(
+                                    "正在通过 PC agent 构建 {}（实时输出将陆续显示）...",
+                                    target
+                                ),
+                            }
+                            .to_json(),
+                        );
+                        let r = tools::build_project_via_agent(
+                            state, target, &changelog, Some(tx),
+                        )
+                        .await;
+                        if let Err(ref e) = r {
+                            warn!("PC agent 构建失败，回退到服务器本地构建: {}", e);
+                            let _ = tx.send(
+                                WsMessage::Progress {
+                                    message: format!(
+                                        "PC agent 不可用（{}），尝试服务器本地构建...",
+                                        e
+                                    ),
+                                }
+                                .to_json(),
+                            );
+                            execute_tool(state, &workspace, &tool_name, &args)
+                        } else {
+                            r
+                        }
+                    } else {
+                        execute_tool(state, &workspace, &tool_name, &args)
+                    };
 
                 let result_str = match result {
                     Ok(r) => {
