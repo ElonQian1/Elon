@@ -42,7 +42,6 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 
 class MainActivity : AppCompatActivity() {
 
@@ -110,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
+    private var preparedMessageActions: MainPreparedMessageActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -295,96 +295,62 @@ class MainActivity : AppCompatActivity() {
         target: SendTarget,
         chatAttachments: List<ChatAttachment>
     ) {
-        if (!restoreSendTarget(target)) {
-            Toast.makeText(this, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
-            setSendEnabled(true)
-            return
-        }
-        if (runningConversationTasks.containsKey(conversationTaskKey(target.projectId, target.conversationId))) {
-            Toast.makeText(this, "这个会话正在工作中，请换一个会话并行开发。", Toast.LENGTH_LONG).show()
-            setSendEnabled(true)
-            return
-        }
-        val traceId = "ui_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
-
-        val payload = com.google.gson.JsonObject().apply {
-            addProperty("trace_id", traceId)
-            addProperty("client_request_id", traceId)
-            addProperty("user_id", userId)
-            addProperty("project_id", target.projectId)
-            addProperty("project_title", target.projectTitle)
-            addProperty("conversation_id", target.conversationId)
-            addProperty("conversation_title", target.conversationTitle)
-            addProperty("message", outgoingText)
-            modelActions().selectedAgentForRequest()?.let { addProperty("agent", it) }
-            if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
-        }
-
-        // 显示用户消息
-        appendMessage(
-            ChatMessage(
-                role = "user",
-                content = visibleText,
-                attachments = chatAttachments.takeIf { it.isNotEmpty() }
-            )
+        preparedMessageActions().startPreparedMessage(
+            visibleText = visibleText,
+            outgoingText = outgoingText,
+            attachmentRefs = attachmentRefs,
+            target = target,
+            chatAttachments = chatAttachments
         )
-        DebugTraceStore.record(
-            "ui_chat_send",
-            mapOf(
-                "trace_id" to traceId,
-                "project_id" to target.projectId,
-                "conversation_id" to target.conversationId,
-                "chars" to outgoingText.length,
-                "attachment_refs" to attachmentRefs.size()
-            )
-        )
-        binding.inputEdit.text.clear()
-        collapseInputComposer()
-        val requestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText)
-        rememberConversationTask(target, traceId, payload.toString(), requestIsDevelopment)
-        setSendEnabled(false)
-        activeRequestIsDevelopment = requestIsDevelopment
-        pendingReconnectForActiveWork = false
-        reconnectAttempts = 0
-        persistActiveWork()
-        workflowStepIndex = 0
-        resetFoldedCliLog()
-        clearCurrentEvidence()
-        toolActionBubbles().clear()
-        progressNarrativeActions().clear()
-        if (requestIsDevelopment) {
-            updateProjectTitleFromRequest(visibleText)
-            saveProjectTitle()
-            addProjectEvent("提交需求：${summarize(visibleText, 36)}")
-            updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
-        } else {
-            updateProjectViews("普通消息已发送，开发项目记录保持不变。")
-        }
-        appendMessage(
-            CodexInteractionPresentation.intentMessage(
-                visibleText = visibleText,
-                outgoingText = outgoingText,
-                isDevelopment = requestIsDevelopment,
-                hasAttachments = attachmentRefs.size() > 0
-            )
-        )
-        appendMessage(ChatMessage("ai-working", initialWorkflowMessage(requestIsDevelopment)))
+    }
 
-        // 通过前台任务服务发送 JSON（包含 user_id，服务端据此隔离工作区）
-        val responseToken = ++serverResponseToken
-        taskResponseTokens[traceId] = responseToken
-        if (!startTaskWorkService(TaskWorkService.ACTION_START_WORK, payload.toString(), requestIsDevelopment, traceId)) {
-            runningConversationTasks[conversationTaskKey(target.projectId, target.conversationId)]?.pendingReconnect = true
-            refreshActiveTaskState()
-            persistActiveWork()
-            if (requestIsDevelopment) {
-                updateStage("连接恢复", "任务请求已保留，正在重新连接服务器。")
-            }
-            scheduleFirstServerResponseWatchdog(traceId, responseToken)
-        } else {
-            clearPendingAttachments()
-            scheduleFirstServerResponseWatchdog(traceId, responseToken)
-        }
+    private fun preparedMessageActions(): MainPreparedMessageActions {
+        preparedMessageActions?.let { return it }
+        return MainPreparedMessageActions(
+            activity = this,
+            binding = binding,
+            restoreSendTarget = ::restoreSendTarget,
+            isConversationTaskRunning = { target ->
+                runningConversationTasks.containsKey(conversationTaskKey(target.projectId, target.conversationId))
+            },
+            setSendEnabled = ::setSendEnabled,
+            userId = { userId },
+            selectedAgentForRequest = { modelActions().selectedAgentForRequest() },
+            appendMessage = ::appendMessage,
+            collapseInputComposer = { collapseInputComposer() },
+            looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
+            looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
+            rememberConversationTask = ::rememberConversationTask,
+            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            resetRequestState = {
+                pendingReconnectForActiveWork = false
+                reconnectAttempts = 0
+                persistActiveWork()
+                workflowStepIndex = 0
+                resetFoldedCliLog()
+                clearCurrentEvidence()
+                toolActionBubbles().clear()
+                progressNarrativeActions().clear()
+            },
+            acceptDevelopmentRequest = { text ->
+                updateProjectTitleFromRequest(text)
+                saveProjectTitle()
+                addProjectEvent("提交需求：${summarize(text, 36)}")
+                updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
+            },
+            updateProjectViews = ::updateProjectViews,
+            nextServerResponseToken = { ++serverResponseToken },
+            putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
+            startTaskWorkService = ::startTaskWorkService,
+            markTaskPendingReconnect = { target ->
+                runningConversationTasks[conversationTaskKey(target.projectId, target.conversationId)]?.pendingReconnect = true
+            },
+            refreshActiveTaskState = ::refreshActiveTaskState,
+            persistActiveWork = ::persistActiveWork,
+            updateStage = ::updateStage,
+            scheduleFirstServerResponseWatchdog = ::scheduleFirstServerResponseWatchdog,
+            clearPendingAttachments = ::clearPendingAttachments
+        ).also { preparedMessageActions = it }
     }
 
     private fun pauseCurrentWork() {
