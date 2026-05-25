@@ -4,6 +4,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
 
 mod admin;
+mod admin_html;
 mod agent;
 mod agent_prompts;
 mod ai_cli;
