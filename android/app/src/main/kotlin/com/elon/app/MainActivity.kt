@@ -59,6 +59,32 @@ class MainActivity : AppCompatActivity() {
      */
     private val userId: String by lazy { AuthManager.effectiveUserId(this) }
 
+    private val workflowActions: MainWorkflowActions by lazy {
+        MainWorkflowActions(
+            activity = this,
+            binding = binding,
+            chatAdapter = { chatAdapter },
+            activeRequestIsDevelopment = { activeRequestIsDevelopment },
+            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            setWaitingForReply = { waitingForReply = it },
+            clearPendingRequestPayload = { pendingRequestPayload = null },
+            clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            incrementServerResponseToken = { serverResponseToken += 1 },
+            currentTimeText = { timeFormatter.format(Date()) },
+            taskResponseTokens = taskResponseTokens,
+            runningTraceToConversation = runningTraceToConversation,
+            runningConversationTasks = runningConversationTasks,
+            projectStateActions = { projectStateActions },
+            projectViewActions = { projectViewActions },
+            projectRecordActions = { projectRecordActions },
+            conversationPreviewActions = { conversationPreviewActions },
+            conversationTaskRegistryActions = { conversationTaskRegistryActions },
+            taskWorkServiceActions = { taskWorkServiceActions },
+            sendEnabledActions = { sendEnabledActions }
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -128,7 +154,7 @@ class MainActivity : AppCompatActivity() {
             currentStage = { projectStateActions.currentStage },
             updateStage = projectViewActions::updateStage,
             recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
+                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
             startTaskWorkService = { action ->
                 taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
@@ -164,7 +190,7 @@ class MainActivity : AppCompatActivity() {
             setSendEnabled = sendEnabledActions::setSendEnabled,
             userId = { userId },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
-            appendMessage = messageAppendActions::appendMessage,
+            appendMessage = workflowActions.messageAppendActions::appendMessage,
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
@@ -174,10 +200,10 @@ class MainActivity : AppCompatActivity() {
                 pendingReconnectForActiveWork = false
                 reconnectAttempts = 0
                 conversationTaskRegistryActions.persistActiveWork()
-                foldedCliLogActions.reset()
-                evidenceActions.clearCurrentEvidence()
-                toolActionBubbles.clear()
-                progressNarrativeActions.clear()
+                workflowActions.foldedCliLogActions.reset()
+                workflowActions.evidenceActions.clearCurrentEvidence()
+                workflowActions.toolActionBubbles.clear()
+                workflowActions.progressNarrativeActions.clear()
             },
             acceptDevelopmentRequest = { text ->
                 projectRecordActions.updateProjectTitleFromRequest(text)
@@ -197,7 +223,7 @@ class MainActivity : AppCompatActivity() {
             persistActiveWork = conversationTaskRegistryActions::persistActiveWork,
             updateStage = projectViewActions::updateStage,
             scheduleFirstServerResponseWatchdog = { traceId, token ->
-                serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
+                workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             },
             clearPendingAttachments = {
                 pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
@@ -229,10 +255,10 @@ class MainActivity : AppCompatActivity() {
             clearPersistedActiveWork = conversationTaskRegistryActions::clearPersistedActiveWork,
             refreshActiveTaskState = conversationTaskRegistryActions::refreshActiveTaskState,
             stopWorkingEvidenceForActiveConversation = {
-                evidenceActions.stopWorkingEvidenceForActiveConversation()
+                workflowActions.evidenceActions.stopWorkingEvidenceForActiveConversation()
             },
-            clearCurrentEvidence = { evidenceActions.clearCurrentEvidence() },
-            clearToolActionBubbles = { toolActionBubbles.clear() },
+            clearCurrentEvidence = { workflowActions.evidenceActions.clearCurrentEvidence() },
+            clearToolActionBubbles = { workflowActions.toolActionBubbles.clear() },
             setSendEnabled = sendEnabledActions::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
@@ -241,14 +267,14 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews = projectViewActions::updateProjectViews,
             addProjectEvent = projectRecordActions::addProjectEvent,
             recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
+                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
-            appendMessage = messageAppendActions::appendMessage,
+            appendMessage = workflowActions.messageAppendActions::appendMessage,
             workflowStoppedMessage = ::mainWorkflowStoppedMessage,
             startTaskWorkService = taskWorkServiceActions::startTaskWorkService,
             nextServerResponseToken = { ++serverResponseToken },
             scheduleFirstServerResponseWatchdog = { traceId, token ->
-                serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
+                workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             }
         )
     }
@@ -352,7 +378,7 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             activeProject = projectStateActions::activeProject,
             activeConversation = projectStateActions::activeConversation,
-            appendMessage = messageAppendActions::appendMessage,
+            appendMessage = workflowActions.messageAppendActions::appendMessage,
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
                 attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
@@ -546,7 +572,7 @@ class MainActivity : AppCompatActivity() {
             projects = projects,
             activeProjectIndex = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
-            normalizeProject = { project -> projectHygieneActions.normalizeProject(project) }
+            normalizeProject = { project -> workflowActions.projectHygieneActions.normalizeProject(project) }
         )
     }
 
@@ -584,7 +610,7 @@ class MainActivity : AppCompatActivity() {
                 conversationTaskRegistryActions::updateConversationTaskFromService,
             activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
             recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
+                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
             setSendEnabled = sendEnabledActions::setSendEnabled,
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
@@ -620,7 +646,7 @@ class MainActivity : AppCompatActivity() {
             conversationTaskKey = conversationTaskRegistryActions::conversationTaskKey,
             activeConversationTaskKey = conversationTaskRegistryActions::activeConversationTaskKey,
             taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
-            appendActiveMessage = { raw -> assistantRawMessageActions.appendMessage(raw) },
+            appendActiveMessage = { raw -> workflowActions.assistantRawMessageActions.appendMessage(raw) },
             appendBackgroundTaskMessage = { raw, key, isDevelopment ->
                 backgroundTaskMessageActions.appendBackgroundTaskMessage(raw, key, isDevelopment)
             },
@@ -646,7 +672,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             prefs = prefs,
             appendTaskMessage = taskMessageRouterActions::appendTaskMessage,
-            appendRawMessage = { raw -> assistantRawMessageActions.appendMessage(raw) }
+            appendRawMessage = { raw -> workflowActions.assistantRawMessageActions.appendMessage(raw) }
         )
     }
 
@@ -663,7 +689,7 @@ class MainActivity : AppCompatActivity() {
             conversationTaskKey = conversationTaskRegistryActions::conversationTaskKey,
             workflowTerminalRoles = MainWorkflowRoles.terminal,
             closeStaleWorkflowMessages = { messages ->
-                workflowMessageCompactor.closeStaleWorkflowMessages(messages)
+                workflowActions.workflowMessageCompactor.closeStaleWorkflowMessages(messages)
             },
             hasRunningTasks = { runningConversationTasks.isNotEmpty() },
             saveConversations = projectStateActions::saveConversations,
@@ -834,176 +860,6 @@ class MainActivity : AppCompatActivity() {
             shareActions = uiTools::shareActions,
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
-        )
-    }
-
-    private val evidenceActions: MainEvidenceActions by lazy {
-        MainEvidenceActions(
-            activeConversation = projectStateActions::activeConversation,
-            chatAdapter = { chatAdapter },
-            saveConversations = projectStateActions::saveConversations,
-            assistantEvidenceRoles = MainWorkflowRoles.assistantEvidence
-        )
-    }
-
-    private val foldedCliLogActions: MainFoldedCliLogActions by lazy {
-        MainFoldedCliLogActions(
-            currentStage = { projectStateActions.currentStage },
-            updateStage = projectViewActions::updateStage,
-            maybeAppendVisibleCliSignal = { category, line ->
-                progressNarrativeActions.maybeAppendVisibleCliSignal(category, line)
-            },
-            recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
-            }
-        )
-    }
-
-    private val progressNarrativeActions: MainProgressNarrativeActions by lazy {
-        MainProgressNarrativeActions(
-            isDevelopmentRequest = { activeRequestIsDevelopment },
-            finalizeEvidenceForLatestAssistant = { evidenceActions.finalizeEvidenceForLatestAssistant() },
-            appendMessage = messageAppendActions::appendMessage,
-            attachEvidenceToLatestAi = { evidenceActions.attachEvidenceToLatestAi() }
-        )
-    }
-
-    private val toolActionBubbles: MainToolActionBubbles by lazy {
-        MainToolActionBubbles(
-            activeConversation = projectStateActions::activeConversation,
-            chatAdapter = { chatAdapter },
-            saveConversations = projectStateActions::saveConversations,
-            appendMessage = messageAppendActions::appendMessage
-        )
-    }
-
-    private val projectHygieneActions: MainProjectHygieneActions by lazy {
-        MainProjectHygieneActions(
-            timeText = { timeFormatter.format(Date()) },
-            removeLeakedAndRoutineWorkflowMessages = { messages ->
-                workflowMessageCompactor.removeLeakedAndRoutineWorkflowMessages(messages)
-            },
-            compactWorkflowStatusMessages = { messages ->
-                workflowMessageCompactor.compactWorkflowStatusMessages(messages)
-            },
-            closeStaleWorkflowMessages = { messages ->
-                workflowMessageCompactor.closeStaleWorkflowMessages(messages)
-            }
-        )
-    }
-
-    private val workflowMessageCompactor: MainWorkflowMessageCompactor by lazy {
-        MainWorkflowMessageCompactor(
-            staleWorkflowRoles = MainWorkflowRoles.staleWorkflow,
-            workflowHistoryStatusRoles = MainWorkflowRoles.historyStatus,
-            workflowTerminalRoles = MainWorkflowRoles.terminal
-        )
-    }
-
-    private val serverResponseWatchdogActions: MainServerResponseWatchdogActions by lazy {
-        MainServerResponseWatchdogActions(
-            binding = binding,
-            taskResponseTokens = taskResponseTokens,
-            taskForTrace = { traceId -> runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } },
-            activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
-            getCurrentStage = { projectStateActions.currentStage },
-            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            refreshActiveTaskState = conversationTaskRegistryActions::refreshActiveTaskState,
-            updateStage = projectViewActions::updateStage,
-            addProjectEvent = projectRecordActions::addProjectEvent,
-            startTaskWorkService = taskWorkServiceActions::startTaskWorkService
-        )
-    }
-
-    private val assistantRawMessageActions: MainAssistantRawMessageActions by lazy {
-        MainAssistantRawMessageActions(
-            activity = this,
-            assistantStreamEvents = { assistantStreamEvents },
-            assistantTerminalActions = { assistantTerminalActions },
-            incrementServerResponseToken = { serverResponseToken += 1 },
-            appendMessage = messageAppendActions::appendMessage
-        )
-    }
-
-    private val messageAppendActions: MainMessageAppendActions by lazy {
-        MainMessageAppendActions(
-            binding = binding,
-            chatAdapter = { chatAdapter },
-            activeConversation = projectStateActions::activeConversation,
-            workflowMessageCompactor = { workflowMessageCompactor },
-            updateActiveConversationPreview = { message ->
-                conversationPreviewActions.updateActiveConversationPreview(message)
-            },
-            saveConversations = projectStateActions::saveConversations,
-            workflowTerminalRoles = MainWorkflowRoles.terminal
-        )
-    }
-
-    private val assistantStreamEvents: MainAssistantStreamEvents by lazy {
-        MainAssistantStreamEvents(
-            handleTaskEvent = { event, taskId, content ->
-                workflowStageActions.handleTaskEvent(event, taskId, content)
-            },
-            maybeAppendTaskEventNarrative = { event, content ->
-                progressNarrativeActions.maybeAppendTaskEventNarrative(event, content)
-            },
-            maybeAppendWorkflowProgressNarrative = { content ->
-                progressNarrativeActions.maybeAppendWorkflowProgressNarrative(content)
-            },
-            maybeAppendToolCallNarrative = { tool ->
-                progressNarrativeActions.maybeAppendToolCallNarrative(tool)
-            },
-            handleProgress = { content, recordProgressEvidence ->
-                workflowStageActions.handleProgress(content, recordProgressEvidence)
-            },
-            handleFoldedCliOutput = { content -> foldedCliLogActions.handleFoldedCliOutput(content) },
-            markToolCallStarted = { tool -> workflowStageActions.handleToolCall(tool) },
-            appendToolCallBubble = { tool, args -> toolActionBubbles.appendToolCallBubble(tool, args) },
-            markToolResultDone = { toolActionBubbles.markToolResultDone(it) },
-            markToolResult = { workflowStageActions.markToolResult(it) },
-            recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
-            },
-            isDevelopmentRequest = { activeRequestIsDevelopment },
-            addProjectEvent = projectRecordActions::addProjectEvent
-        )
-    }
-
-    private val assistantTerminalActions: MainAssistantTerminalActions by lazy {
-        MainAssistantTerminalActions(
-            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
-            setWaitingForReply = { waitingForReply = it },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
-            clearPendingRequestPayload = { pendingRequestPayload = null },
-            clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
-            resetReconnectAttempts = { reconnectAttempts = 0 },
-            clearPersistedActiveWork = conversationTaskRegistryActions::clearPersistedActiveWork,
-            updateStage = projectViewActions::updateStage,
-            updateProjectViews = projectViewActions::updateProjectViews,
-            addProjectEvent = projectRecordActions::addProjectEvent,
-            recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
-            },
-            stopWorkingEvidenceForActiveConversation = {
-                evidenceActions.stopWorkingEvidenceForActiveConversation()
-            },
-            clearCurrentEvidence = { evidenceActions.clearCurrentEvidence() },
-            resetFoldedCliLog = { foldedCliLogActions.reset() },
-            aiMessageWithCurrentEvidence = evidenceActions::aiMessageWithCurrentEvidence,
-            appendMessage = messageAppendActions::appendMessage,
-            workflowStoppedMessage = { reason -> mainWorkflowStoppedMessage(reason, activeRequestIsDevelopment) }
-        )
-    }
-
-    private val workflowStageActions: MainWorkflowStageActions by lazy {
-        MainWorkflowStageActions(
-            currentStage = { projectStateActions.currentStage },
-            updateStage = projectViewActions::updateStage,
-            addProjectEvent = projectRecordActions::addProjectEvent,
-            recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
-            }
         )
     }
 
