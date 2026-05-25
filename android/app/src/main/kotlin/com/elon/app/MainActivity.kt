@@ -43,7 +43,6 @@ import com.elon.app.BuildConfig
 import com.elon.app.update.AppUpdateManager
 import com.elon.app.update.UpdateCheckWorker
 import android.widget.FrameLayout
-import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -3165,98 +3164,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showTopActionPopup(anchor: View, actions: List<TopAction>) {
-        actionPopup?.dismiss()
-
-        val popupWidth = dp(168)
-        val arrowHeight = dp(8)
-        val root = FrameLayout(this).apply {
-            layoutParams = ViewGroup.LayoutParams(popupWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
-            alpha = 0f
-            scaleX = 0.98f
-            scaleY = 0.98f
-        }
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
-                setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
-            }
-        }
-        root.addView(panel, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            topMargin = arrowHeight
-        })
-
-        root.addView(createPopupArrowView(), FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
-            gravity = Gravity.TOP or Gravity.END
-            rightMargin = dp(20)
-        })
-
-        actions.forEachIndexed { index, action ->
-            panel.addView(createTopActionRow(action))
-            if (index < actions.lastIndex) {
-                panel.addView(createPopupDivider(marginStart = dp(52)))
-            }
-        }
-
-        actionPopup = PopupWindow(
-            root,
-            popupWidth,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            true
-        ).apply {
-            isOutsideTouchable = true
-            elevation = dp(8).toFloat()
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            showAsDropDown(anchor, anchor.width - popupWidth + dp(2), -dp(2))
-        }
-        root.pivotX = (popupWidth - dp(28)).toFloat()
-        root.pivotY = 0f
-        root.animate()
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(120L)
-            .start()
-    }
-
-    private fun createTopActionRow(action: TopAction): View {
-        return LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(46)
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(12), 0)
-            isClickable = true
-            foreground = selectableForeground()
-
-            addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
-                setImageResource(action.iconRes)
-                setColorFilter(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-            })
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    marginStart = dp(13)
-                }
-                includeFontPadding = false
-                text = action.title
-                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-                textSize = 15.5f
-            })
-            setOnClickListener {
-                actionPopup?.dismiss()
-                action.action()
-            }
-        }
+        actionPopup = popupRenderer().showTopActionPopup(anchor, actionPopup, actions)
     }
 
     private fun createPopupDivider(marginStart: Int = 0): View {
@@ -3298,6 +3206,16 @@ class MainActivity : AppCompatActivity() {
                 canvas.drawPath(path, paint)
             }
         }
+    }
+
+    private fun popupRenderer(): MainActionPopupRenderer {
+        return MainActionPopupRenderer(
+            activity = this,
+            dp = ::dp,
+            selectableForeground = ::selectableForeground,
+            createDivider = ::createPopupDivider,
+            createArrow = ::createPopupArrowView
+        )
     }
 
     private fun showProjectRecordDialog() {
@@ -3443,8 +3361,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
-        actionPopup?.dismiss()
-
         val actions = listOf(
             TopAction("复制", R.drawable.ic_msg_copy) { copyMessageText(text) },
             TopAction("转发", R.drawable.ic_msg_forward) { forwardMessageText(text) },
@@ -3456,107 +3372,7 @@ class MainActivity : AppCompatActivity() {
             TopAction("搜一搜", R.drawable.ic_msg_search) { searchMessageText(text) },
             TopAction("从当前听", R.drawable.ic_msg_listen) { toastMessageAction("从当前听准备中") }
         )
-
-        val popupWidth = minOf(resources.displayMetrics.widthPixels - dp(24), dp(282))
-        val arrowHeight = dp(8)
-        val panelHeight = dp(132)
-        val totalHeight = panelHeight + arrowHeight
-        val root = FrameLayout(this).apply {
-            layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
-            alpha = 0f
-            scaleX = 0.96f
-            scaleY = 0.96f
-        }
-
-        val panel = GridLayout(this).apply {
-            columnCount = 5
-            rowCount = 2
-            background = GradientDrawable().apply {
-                cornerRadius = dp(4).toFloat()
-                setColor(Color.parseColor("#3D3D3D"))
-            }
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-        }
-        root.addView(panel, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            panelHeight
-        ))
-
-        actions.forEach { action ->
-            panel.addView(createMessageActionCell(action), GridLayout.LayoutParams().apply {
-                width = (popupWidth - dp(20)) / 5
-                height = dp(58)
-            })
-        }
-
-        val anchorLocation = IntArray(2)
-        anchor.getLocationOnScreen(anchorLocation)
-        val anchorCenterX = anchorLocation[0] + anchor.width / 2
-        val aboveY = anchorLocation[1] - totalHeight - dp(8)
-        val showAbove = aboveY > dp(76)
-        val popupX = (anchorCenterX - popupWidth / 2)
-            .coerceIn(dp(12), resources.displayMetrics.widthPixels - popupWidth - dp(12))
-        val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
-        val arrowX = (anchorCenterX - popupX - dp(9)).coerceIn(dp(18), popupWidth - dp(36))
-
-        root.addView(
-            createPopupArrowView(pointsUp = !showAbove, color = Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR)),
-            FrameLayout.LayoutParams(dp(18), arrowHeight).apply {
-                gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
-                leftMargin = arrowX
-            }
-        )
-        if (!showAbove) {
-            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
-        }
-
-        actionPopup = PopupWindow(
-            root,
-            popupWidth,
-            totalHeight,
-            true
-        ).apply {
-            isOutsideTouchable = true
-            elevation = dp(8).toFloat()
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
-        }
-        root.animate()
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(120L)
-            .start()
-    }
-
-    private fun createMessageActionCell(action: TopAction): View {
-        return LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.VERTICAL
-            isClickable = true
-            foreground = selectableForeground()
-
-            addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
-                setImageResource(action.iconRes)
-            })
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(4)
-                }
-                includeFontPadding = false
-                text = action.title
-                setTextColor(Color.parseColor("#EAEAEA"))
-                textSize = 13f
-            })
-            setOnClickListener {
-                actionPopup?.dismiss()
-                action.action()
-            }
-        }
+        actionPopup = popupRenderer().showMessageActionPopup(anchor, actionPopup, actions)
     }
 
     private fun deleteMessage(message: ChatMessage) {
@@ -4266,10 +4082,6 @@ class MainActivity : AppCompatActivity() {
         const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
         const val PREF_PENDING_WORK_TIME = "pending_work_time"
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
-        const val WECHAT_POPUP_PANEL_COLOR = "#BDBDBD"
-        const val WECHAT_POPUP_TEXT_COLOR = "#242424"
-        const val WECHAT_POPUP_DIVIDER_COLOR = "#A8A8A8"
-        const val LEGACY_MESSAGE_POPUP_COLOR = "#3D3D3D"
         val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
