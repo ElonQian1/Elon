@@ -5,7 +5,7 @@ use std::time::Duration;
 #[cfg(unix)]
 use tokio::process::Command;
 
-use crate::ai_cli::supports_codex_sessions;
+use crate::ai_cli_process::supports_codex_sessions;
 use crate::types::AiCliOption;
 
 pub(crate) fn cli_args_for_run(

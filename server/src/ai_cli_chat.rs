@@ -3,7 +3,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    ai_cli::{configured_timeout_cap, IntentGateResult},
+    ai_cli::IntentGateResult,
+    ai_cli_process::{configured_timeout_cap, is_cli_timeout_error},
     ai_cli_trace::record_lightweight_chat_fallback,
     intent_router,
     types::{AppState, WsMessage},
@@ -77,11 +78,6 @@ pub(crate) fn is_tiny_chat_message(user_message: &str) -> bool {
             || compact.contains("您好")
             || compact.contains("哈喽")
             || compact.contains("在吗")))
-}
-
-pub(crate) fn is_cli_timeout_error(error: &anyhow::Error) -> bool {
-    let text = error.to_string().to_ascii_lowercase();
-    text.contains("timeout") || text.contains("timed out") || text.contains("执行超时")
 }
 
 pub(crate) fn codex_network_or_timeout_error(error: &anyhow::Error) -> bool {

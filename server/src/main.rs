@@ -16,6 +16,7 @@ mod ai_cli_chat;
 mod ai_cli_environment;
 mod ai_cli_native_session;
 mod ai_cli_output;
+mod ai_cli_process;
 mod ai_cli_prompts;
 mod ai_cli_runner;
 mod ai_cli_streaming;
