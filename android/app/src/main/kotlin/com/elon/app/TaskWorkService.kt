@@ -19,7 +19,7 @@ class TaskWorkService : Service() {
     override fun onCreate() {
         super.onCreate()
         createTaskWorkNotificationChannels(this)
-        restorePendingWork()
+        restorePersistedTaskWork(prefs, activeTasks)
         if (hasActiveTasks()) connectAll()
     }
 
@@ -59,7 +59,7 @@ class TaskWorkService : Service() {
                 }
             }
             ACTION_RESUME_PENDING -> {
-                restorePendingWork()
+                restorePersistedTaskWork(prefs, activeTasks)
                 val task = traceId?.let { activeTasks[it] }
                 val tasksToResume = task?.let { listOf(it) } ?: activeTasks.values.toList()
                 if (tasksToResume.isNotEmpty()) {
@@ -68,7 +68,7 @@ class TaskWorkService : Service() {
                         mapOf(
                             "trace_id" to traceId,
                             "task_count" to tasksToResume.size,
-                            "pending_age_ms" to pendingWorkAgeMs(tasksToResume)
+                            "pending_age_ms" to taskPendingWorkAgeMs(tasksToResume)
                         )
                     )
                     enterForeground()
@@ -87,7 +87,7 @@ class TaskWorkService : Service() {
             ACTION_PAUSE -> pauseWork(traceId)
             ACTION_SYNC_STATE -> broadcastState()
             else -> {
-                restorePendingWork()
+                restorePersistedTaskWork(prefs, activeTasks)
                 if (hasActiveTasks()) {
                     enterForeground()
                     activeTasks.values.forEach { it.payloadSentForCurrentConnection = false }
@@ -138,7 +138,7 @@ class TaskWorkService : Service() {
                 "payload_bytes" to payload.toByteArray().size
             )
         )
-        persistActiveWork()
+        persistTaskWork(prefs, activeTasks.values)
         enterForeground()
         connect(task)
     }
@@ -378,7 +378,7 @@ class TaskWorkService : Service() {
             )
         )
         cleanupTask(traceId, disconnect = true)
-        persistActiveWork()
+        persistTaskWork(prefs, activeTasks.values)
         if (!isAppInForeground()) {
             notifyBackgroundTaskCompleted(
                 context = this,
@@ -443,7 +443,7 @@ class TaskWorkService : Service() {
             broadcastStatus("paused", task)
             cleanupTask(task.traceId, disconnect = true)
         }
-        persistActiveWork()
+        persistTaskWork(prefs, activeTasks.values)
         broadcastState()
         if (!hasActiveTasks()) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -482,7 +482,7 @@ class TaskWorkService : Service() {
             setPackage(packageName)
             putExtra(EXTRA_CONNECTED, activeTasks.values.any { it.wsClient?.isConnected() == true })
             putExtra(EXTRA_WAITING, hasActiveTasks())
-            putExtra(EXTRA_ACTIVE_TASKS, activeTasksJson().toString())
+            putExtra(EXTRA_ACTIVE_TASKS, taskActiveTasksJson(activeTasks.values).toString())
         }
         sendBroadcast(intent)
     }
@@ -492,21 +492,6 @@ class TaskWorkService : Service() {
         task.projectId?.let { putExtra(EXTRA_PROJECT_ID, it) }
         task.conversationId?.let { putExtra(EXTRA_CONVERSATION_ID, it) }
         putExtra(EXTRA_IS_DEVELOPMENT, task.isDevelopment)
-    }
-
-    private fun activeTasksJson(): JSONArray {
-        val array = JSONArray()
-        activeTasks.values.forEach { task ->
-            array.put(
-                JSONObject()
-                    .put("trace_id", task.traceId)
-                    .put("project_id", task.projectId)
-                    .put("conversation_id", task.conversationId)
-                    .put("is_development", task.isDevelopment)
-                    .put("started_at", task.startedAtMs)
-            )
-        }
-        return array
     }
 
     private fun queueRawEvent(task: RunningTask, raw: String) {
@@ -529,93 +514,6 @@ class TaskWorkService : Service() {
 
     private fun isAppInForeground(): Boolean {
         return prefs.getBoolean(PREF_APP_IN_FOREGROUND, false)
-    }
-
-    private fun persistActiveWork() {
-        val array = JSONArray()
-        activeTasks.values
-            .filter { it.waitingForReply && it.payload.isNotBlank() }
-            .forEach { task ->
-                array.put(
-                    JSONObject()
-                        .put("payload", task.payload)
-                        .put("is_development", task.isDevelopment)
-                        .put("started_at", task.startedAtMs)
-                )
-            }
-        if (array.length() == 0) {
-            clearPersistedActiveWork()
-            return
-        }
-        prefs.edit()
-            .putString(PREF_PENDING_WORK_TASKS, array.toString())
-            .remove(PREF_PENDING_WORK_PAYLOAD)
-            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
-            .remove(PREF_PENDING_WORK_TIME)
-            .apply()
-    }
-
-    private fun clearPersistedActiveWork() {
-        prefs.edit()
-            .remove(PREF_PENDING_WORK_TASKS)
-            .remove(PREF_PENDING_WORK_PAYLOAD)
-            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
-            .remove(PREF_PENDING_WORK_TIME)
-            .apply()
-    }
-
-    private fun restorePendingWork() {
-        val restored = mutableListOf<RunningTask>()
-        val now = System.currentTimeMillis()
-        val tasksJson = prefs.getString(PREF_PENDING_WORK_TASKS, null)?.takeIf { it.isNotBlank() }
-        if (tasksJson != null) {
-            val array = runCatching { JSONArray(tasksJson) }.getOrNull()
-            if (array != null) {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val payload = item.optString("payload").takeIf { it.isNotBlank() } ?: continue
-                    val savedAt = item.optLong("started_at", now)
-                    if (savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS) continue
-                    val traceId = taskPayloadTraceId(payload) ?: continue
-                    if (activeTasks.containsKey(traceId)) continue
-                    restored += RunningTask(
-                        traceId = traceId,
-                        projectId = taskPayloadString(payload, "project_id"),
-                        conversationId = taskPayloadString(payload, "conversation_id"),
-                        payload = payload,
-                        isDevelopment = item.optBoolean("is_development", true),
-                        startedAtMs = savedAt
-                    )
-                }
-            }
-        }
-
-        if (tasksJson == null) {
-            val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
-            val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
-            val tooOld = savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS
-            if (payload != null && !tooOld) {
-                val traceId = taskPayloadTraceId(payload)
-                if (traceId != null && !activeTasks.containsKey(traceId)) {
-                    restored += RunningTask(
-                        traceId = traceId,
-                        projectId = taskPayloadString(payload, "project_id"),
-                        conversationId = taskPayloadString(payload, "conversation_id"),
-                        payload = payload,
-                        isDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true),
-                        startedAtMs = savedAt
-                    )
-                }
-            }
-        }
-
-        restored.forEach { activeTasks[it.traceId] = it }
-        persistActiveWork()
-    }
-
-    private fun pendingWorkAgeMs(tasks: List<RunningTask>): Long? {
-        val oldest = tasks.map { it.startedAtMs }.filter { it > 0L }.minOrNull() ?: return null
-        return System.currentTimeMillis() - oldest
     }
 
     companion object {
