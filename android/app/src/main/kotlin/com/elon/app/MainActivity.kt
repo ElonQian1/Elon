@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
     private var voiceModeActions: MainVoiceModeActions? = null
     private var inputFocusActions: MainInputFocusActions? = null
+    private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1844,46 +1845,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appendMessage(raw: String) {
-        // 解析服务端推送的 JSON 消息
-        try {
-            val json = com.google.gson.JsonParser.parseString(raw).asJsonObject
-            val type = jsonStringOrNull(json, "type") ?: return
-            if (type == "app_update_available") {
-                val remoteVersionCode = runCatching {
-                    json.get("versionCode")?.asInt ?: 0
-                }.getOrDefault(0)
-                AppUpdateManager(this).realtimeCheck(remoteVersionCode)
-                return
-            }
+        assistantRawMessageActions().appendMessage(raw)
+    }
 
-            serverResponseToken += 1
-            val msg = when (type) {
-                "task_event" -> assistantStreamEvents().taskEventMessage(json) ?: return
-                "progress" -> assistantStreamEvents().progressMessage(json) ?: return
-                "tool_call"   -> {
-                    assistantStreamEvents().handleToolCall(json)
-                    return
-                }
-                "tool_result" -> {
-                    assistantStreamEvents().handleToolResult(json)
-                    return
-                }
-                "assistant_message" -> assistantStreamEvents().assistantMessage(json) ?: return
-                "done"        -> {
-                    val content = jsonStringOrNull(json, "message") ?: ""
-                    val apkUrl  = jsonStringOrNull(json, "apk_url")
-                    val imageUrl = jsonStringOrNull(json, "image_url")
-                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl)
-                }
-                "error" -> {
-                    assistantTerminalActions().handleError(jsonStringOrNull(json, "message") ?: "未知错误")
-                }
-                else -> return
-            }
-            appendMessage(msg)
-        } catch (_: Exception) {
-            assistantTerminalActions().handleMalformedResponse()
-        }
+    private fun assistantRawMessageActions(): MainAssistantRawMessageActions {
+        assistantRawMessageActions?.let { return it }
+        return MainAssistantRawMessageActions(
+            activity = this,
+            assistantStreamEvents = { assistantStreamEvents() },
+            assistantTerminalActions = { assistantTerminalActions() },
+            incrementServerResponseToken = { serverResponseToken += 1 },
+            appendMessage = { msg -> appendMessage(msg) }
+        ).also { assistantRawMessageActions = it }
     }
 
     private fun appendMessage(msg: ChatMessage) {
