@@ -80,7 +80,27 @@ class MainActivity : AppCompatActivity() {
             projectRecordActions = { projectRecordActions },
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
-            taskWorkServiceActions = { taskWorkServiceActions },
+            taskWorkServiceActions = { taskActions.taskWorkServiceActions },
+            sendEnabledActions = { sendEnabledActions }
+        )
+    }
+
+    private val taskActions: MainTaskActions by lazy {
+        MainTaskActions(
+            activity = this,
+            prefs = prefs,
+            backendConnected = { backendConnected },
+            setBackendConnected = { backendConnected = it },
+            waitingForReply = { waitingForReply },
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            taskResponseTokens = taskResponseTokens,
+            runningTraceToConversation = runningTraceToConversation,
+            runningConversationTasks = runningConversationTasks,
+            activeRequestIsDevelopment = { activeRequestIsDevelopment },
+            workflowActions = { workflowActions },
+            conversationPreviewActions = { conversationPreviewActions },
+            conversationTaskRegistryActions = { conversationTaskRegistryActions },
+            activeWorkControlActions = { activeWorkControlActions },
             sendEnabledActions = { sendEnabledActions }
         )
     }
@@ -110,15 +130,15 @@ class MainActivity : AppCompatActivity() {
             setupInputComposer = ::setupInputComposer,
             restoreCachedModelSelection = { modelActions.restoreCachedModelSelection() },
             updateProjectViews = projectViewActions::updateProjectViews,
-            setTaskAppForeground = { foreground -> taskWorkServiceActions.setTaskAppForeground(foreground) },
-            registerTaskWorkReceiver = { taskWorkReceiverActions.registerTaskWorkReceiver() },
+            setTaskAppForeground = { foreground -> taskActions.taskWorkServiceActions.setTaskAppForeground(foreground) },
+            registerTaskWorkReceiver = { taskActions.taskWorkReceiverActions.registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             getWaitingForReply = { waitingForReply },
             getBackendConnected = { backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             startTaskWorkService = { action ->
-                taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
             },
             openConversation = conversationOpenActions::openConversation,
             loadModelOptions = { modelActions.loadModelOptions() },
@@ -144,8 +164,8 @@ class MainActivity : AppCompatActivity() {
             prefs = prefs,
             isBindingInitialized = { ::binding.isInitialized },
             setAppInForeground = { appInForeground = it },
-            setTaskAppForeground = { foreground -> taskWorkServiceActions.setTaskAppForeground(foreground) },
-            drainQueuedTaskEvents = { taskWorkServiceActions.drainQueuedTaskEvents() },
+            setTaskAppForeground = { foreground -> taskActions.taskWorkServiceActions.setTaskAppForeground(foreground) },
+            drainQueuedTaskEvents = { taskActions.taskWorkServiceActions.drainQueuedTaskEvents() },
             loadModelOptions = { modelActions.loadModelOptions() },
             getBackendConnected = { backendConnected },
             getWaitingForReply = { waitingForReply },
@@ -157,7 +177,7 @@ class MainActivity : AppCompatActivity() {
                 if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
             startTaskWorkService = { action ->
-                taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = sendEnabledActions::setSendEnabled,
@@ -167,13 +187,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         appInForeground = false
-        taskWorkServiceActions.setTaskAppForeground(false)
+        taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
 
     override fun onStop() {
         appInForeground = false
-        taskWorkServiceActions.setTaskAppForeground(false)
+        taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
         super.onStop()
     }
@@ -214,7 +234,7 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews = projectViewActions::updateProjectViews,
             nextServerResponseToken = { ++serverResponseToken },
             putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
-            startTaskWorkService = taskWorkServiceActions::startTaskWorkService,
+            startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
             markTaskPendingReconnect = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks[key]?.pendingReconnect = true
@@ -271,7 +291,7 @@ class MainActivity : AppCompatActivity() {
             },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
             workflowStoppedMessage = ::mainWorkflowStoppedMessage,
-            startTaskWorkService = taskWorkServiceActions::startTaskWorkService,
+            startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
             nextServerResponseToken = { ++serverResponseToken },
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
@@ -597,85 +617,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private val taskWorkEventActions: MainTaskWorkEventActions by lazy {
-        MainTaskWorkEventActions(
-            getBackendConnected = { backendConnected },
-            setBackendConnected = { backendConnected = it },
-            getWaitingForReply = { waitingForReply },
-            resetReconnectAttempts = { reconnectAttempts = 0 },
-            updateFirstConversationStatus = { text ->
-                conversationPreviewActions.updateFirstConversationStatus(text)
-            },
-            updateConversationTaskFromService =
-                conversationTaskRegistryActions::updateConversationTaskFromService,
-            activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
-            recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
-            },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
-            isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            handleActiveWorkDisconnected = { task -> activeWorkControlActions.handleActiveWorkDisconnected(task) },
-            updateIdleReadyStatus = { conversationPreviewActions.updateIdleReadyStatus() },
-            appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
-                traceId?.let { taskResponseTokens.remove(it) }
-                taskMessageRouterActions.appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
-            },
-            removeConversationTask = conversationTaskRegistryActions::removeConversationTask,
-            syncActiveTasksFromServiceState = { activeTasksJson ->
-                conversationTaskRegistryActions.syncActiveTasksFromServiceState(activeTasksJson)
-            },
-            clearTaskMaps = {
-                runningConversationTasks.clear()
-                runningTraceToConversation.clear()
-                taskResponseTokens.clear()
-            },
-            refreshActiveTaskState = { conversationTaskRegistryActions.refreshActiveTaskState() }
-        )
-    }
-
-    private val taskWorkReceiverActions: MainTaskWorkReceiverActions by lazy {
-        MainTaskWorkReceiverActions(
-            activity = this,
-            handleTaskWorkEvent = { intent -> taskWorkEventActions.handleTaskWorkEvent(intent) }
-        )
-    }
-
-    private val taskMessageRouterActions: MainTaskMessageRouterActions by lazy {
-        MainTaskMessageRouterActions(
-            keyForTrace = { traceId -> runningTraceToConversation[traceId] },
-            conversationTaskKey = conversationTaskRegistryActions::conversationTaskKey,
-            activeConversationTaskKey = conversationTaskRegistryActions::activeConversationTaskKey,
-            taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
-            appendActiveMessage = { raw -> workflowActions.assistantRawMessageActions.appendMessage(raw) },
-            appendBackgroundTaskMessage = { raw, key, isDevelopment ->
-                backgroundTaskMessageActions.appendBackgroundTaskMessage(raw, key, isDevelopment)
-            },
-            removeConversationTask = conversationTaskRegistryActions::removeConversationTask,
-            persistActiveWork = conversationTaskRegistryActions::persistActiveWork,
-            updateConversationTaskFromService =
-                conversationTaskRegistryActions::updateConversationTaskFromService
-        )
-    }
-
-    private val backgroundTaskMessageActions: MainBackgroundTaskMessageActions by lazy {
-        MainBackgroundTaskMessageActions(
-            activity = this,
-            findConversationLocationByKey = { key -> conversationPreviewActions.findConversationLocationByKey(key) },
-            appendMessageToConversation = { projectIndex, conversationIndex, message ->
-                conversationPreviewActions.appendMessageToConversation(projectIndex, conversationIndex, message)
-            }
-        )
-    }
-
-    private val taskWorkServiceActions: MainTaskWorkServiceActions by lazy {
-        MainTaskWorkServiceActions(
-            activity = this,
-            prefs = prefs,
-            appendTaskMessage = taskMessageRouterActions::appendTaskMessage,
-            appendRawMessage = { raw -> workflowActions.assistantRawMessageActions.appendMessage(raw) }
-        )
-    }
-
     private val conversationPreviewActions: MainConversationPreviewActions by lazy {
         MainConversationPreviewActions(
             binding = binding,
@@ -959,8 +900,8 @@ class MainActivity : AppCompatActivity() {
                 speechInputActions?.destroy()
                 speechInputActions = null
             },
-            isTaskWorkReceiverRegistered = { taskWorkReceiverActions.isRegistered },
-            unregisterTaskWorkReceiver = { taskWorkReceiverActions.unregisterTaskWorkReceiver() }
+            isTaskWorkReceiverRegistered = { taskActions.taskWorkReceiverActions.isRegistered },
+            unregisterTaskWorkReceiver = { taskActions.taskWorkReceiverActions.unregisterTaskWorkReceiver() }
         )
     }
 }
