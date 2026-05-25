@@ -112,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
     private var profileQuickActions: MainProfileQuickActions? = null
+    private var quickCommandActions: MainQuickCommandActions? = null
     private var createActions: MainCreateActions? = null
     private var resumeActions: MainResumeActions? = null
     private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
@@ -806,7 +807,7 @@ class MainActivity : AppCompatActivity() {
             inputBarContainerProvider = ::inputBarContainerOrNull,
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
-            openSettings = ::openSettings,
+            openSettings = { quickCommandActions().openSettings() },
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { modelActions = it }
@@ -1267,11 +1268,11 @@ class MainActivity : AppCompatActivity() {
             serverVersionUrl = serverVersionUrl,
             isBindingInitialized = { ::binding.isInitialized },
             refreshAccountUi = ::refreshAccountUi,
-            fillPlanPrompt = ::fillPlanPrompt,
-            sendQuickCommand = ::sendQuickCommand,
+            fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
+            sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = ::showProjectRecordDialog,
             showGitProjectDialog = ::showGitProjectDialog,
-            openSettings = ::openSettings,
+            openSettings = { quickCommandActions().openSettings() },
             showPromotionDialog = ::showPromotionDialog,
             showGuestImportDialog = ::showGuestImportDialog,
             confirmLogout = ::confirmLogout
@@ -1294,13 +1295,13 @@ class MainActivity : AppCompatActivity() {
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             shareActions = ::shareActions,
-            fillPlanPrompt = ::fillPlanPrompt,
-            sendQuickCommand = ::sendQuickCommand,
+            fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
+            sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = ::showProjectRecordDialog,
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = ::showCreateProjectDialog,
             showCreateConversationDialog = ::showCreateConversationDialog,
-            openSettings = ::openSettings,
+            openSettings = { quickCommandActions().openSettings() },
             deleteMessage = ::deleteMessage,
             quoteMessage = ::quoteMessage,
             dp = ::dp,
@@ -1356,24 +1357,16 @@ class MainActivity : AppCompatActivity() {
         return MainExternalActions(this).also { externalActions = it }
     }
 
-    private fun fillPlanPrompt() {
-        binding.inputEdit.setText("我想开发一个 App，请先帮我拆解功能、页面和开发计划：")
-        binding.inputEdit.setSelection(binding.inputEdit.text.length)
-    }
-
-    private fun sendQuickCommand(text: String) {
-        if (activeConversation().ended) {
-            showCreateConversationDialog()
-            return
-        }
-        showChat()
-        binding.inputEdit.setText(text)
-        binding.inputEdit.setSelection(binding.inputEdit.text.length)
-        sendMessage()
-    }
-
-    private fun openSettings() {
-        startActivity(Intent(this, SettingsActivity::class.java))
+    private fun quickCommandActions(): MainQuickCommandActions {
+        quickCommandActions?.let { return it }
+        return MainQuickCommandActions(
+            activity = this,
+            binding = binding,
+            activeConversation = ::activeConversation,
+            showCreateConversationDialog = ::showCreateConversationDialog,
+            showChat = { showChat() },
+            sendMessage = ::sendMessage
+        ).also { quickCommandActions = it }
     }
 
     private fun showMessageActions(anchor: View, message: ChatMessage) {
@@ -1772,7 +1765,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == R.id.action_settings) {
-            openSettings()
+            quickCommandActions().openSettings()
             return true
         }
         return super.onOptionsItemSelected(item)
