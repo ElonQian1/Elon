@@ -292,9 +292,9 @@ class MainActivity : AppCompatActivity() {
                 progressNarrativeActions().clear()
             },
             acceptDevelopmentRequest = { text ->
-                updateProjectTitleFromRequest(text)
-                saveProjectTitle()
-                addProjectEvent("提交需求：${summarize(text, 36)}")
+                projectRecordActions().updateProjectTitleFromRequest(text)
+                projectRecordActions().saveProjectTitle()
+                projectRecordActions().addProjectEvent("提交需求：${summarize(text, 36)}")
                 updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
             },
             updateProjectViews = ::updateProjectViews,
@@ -668,7 +668,7 @@ class MainActivity : AppCompatActivity() {
             actionPopupProvider = { actionPopup },
             activeConversationProvider = ::activeConversation,
             activeConversationIndexProvider = { activeConversationIndex },
-            compactProjectTitle = ::compactProjectTitle,
+            compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList,
             refreshServerVersion = { profileQuickActions().refreshServerVersion() },
@@ -1074,7 +1074,7 @@ class MainActivity : AppCompatActivity() {
             projects = { projects },
             conversations = { conversations },
             activeProject = ::activeProject,
-            compactProjectTitle = ::compactProjectTitle,
+            compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             formatTime = { timeFormatter.format(Date(it)) },
             isTaskRunning = { projectId, conversationId ->
                 runningConversationTasks.containsKey(conversationTaskKey(projectId, conversationId))
@@ -1153,7 +1153,7 @@ class MainActivity : AppCompatActivity() {
             },
             fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
-            showProjectRecordDialog = ::showProjectRecordDialog,
+            showProjectRecordDialog = { projectRecordActions().showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             openSettings = { quickCommandActions().openSettings() },
             showPromotionDialog = { messageActions().showPromotionDialog() },
@@ -1172,7 +1172,7 @@ class MainActivity : AppCompatActivity() {
             shareActions = ::shareActions,
             fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
-            showProjectRecordDialog = ::showProjectRecordDialog,
+            showProjectRecordDialog = { projectRecordActions().showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions().showCreateProjectDialog() },
             showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
@@ -1182,10 +1182,6 @@ class MainActivity : AppCompatActivity() {
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { actionPopups = it }
-    }
-
-    private fun showProjectRecordDialog() {
-        projectRecordActions().showProjectRecordDialog()
     }
 
     private fun showGitProjectDialog() {
@@ -1505,10 +1501,6 @@ class MainActivity : AppCompatActivity() {
         ).also { projectViewActions = it }
     }
 
-    private fun compactProjectTitle(): String {
-        return projectRecordActions().compactProjectTitle()
-    }
-
     private companion object {
         val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
@@ -1518,14 +1510,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun addProjectEvent(text: String) {
         projectRecordActions().addProjectEvent(text)
-    }
-
-    private fun saveProjectTitle() {
-        projectRecordActions().saveProjectTitle()
-    }
-
-    private fun updateProjectTitleFromRequest(text: String) {
-        projectRecordActions().updateProjectTitleFromRequest(text)
     }
 
     private fun projectRecordActions(): MainProjectRecordActions {
