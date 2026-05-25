@@ -46,28 +46,31 @@ class MainActivity : AppCompatActivity() {
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
     private var activeProjectIndex = 0
-    private val conversations: MutableList<AppConversation> get() = activeProject().conversations
-    private val projectEvents: MutableList<String> get() = activeProject().events
+    private val conversations: MutableList<AppConversation> get() = projectStateActions().activeProject().conversations
+    private val projectEvents: MutableList<String> get() = projectStateActions().activeProject().events
     private var currentProjectTitle: String
-        get() = activeProject().title
+        get() = projectStateActions().activeProject().title
         set(value) {
-            activeProject().title = value
-            activeProject().updatedAt = System.currentTimeMillis()
+            val project = projectStateActions().activeProject()
+            project.title = value
+            project.updatedAt = System.currentTimeMillis()
         }
     private var currentStage: String
-        get() = activeProject().stage
+        get() = projectStateActions().activeProject().stage
         set(value) {
-            activeProject().stage = value
-            activeProject().updatedAt = System.currentTimeMillis()
+            val project = projectStateActions().activeProject()
+            project.stage = value
+            project.updatedAt = System.currentTimeMillis()
         }
     private var activeConversationIndex: Int
-        get() = activeProject().activeConversationIndex
+        get() = projectStateActions().activeProject().activeConversationIndex
         set(value) {
-            activeProject().activeConversationIndex = value
+            projectStateActions().activeProject().activeConversationIndex = value
         }
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
     private var modelActions: MainModelActions? = null
+    private var projectStateActions: MainProjectStateActions? = null
     private var conversationOpenActions: MainConversationOpenActions? = null
     private var projectActions: MainProjectActions? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
@@ -158,9 +161,9 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             prefs = prefs,
             notificationPermissionRequest = notificationPermissionRequest,
-            loadProjects = ::loadProjects,
+            loadProjects = projectStateActions()::loadProjects,
             setupAttachmentLaunchers = { attachmentPickerActions().setupAttachmentLaunchers() },
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
@@ -231,7 +234,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         appInForeground = false
         taskWorkServiceActions().setTaskAppForeground(false)
-        saveProjects()
+        projectStateActions().saveProjects()
         super.onStop()
     }
 
@@ -401,7 +404,7 @@ class MainActivity : AppCompatActivity() {
         return MainInputFocusActions(
             activity = this,
             binding = binding,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() },
@@ -432,7 +435,7 @@ class MainActivity : AppCompatActivity() {
         attachmentPickerActions?.let { return it }
         return MainAttachmentPickerActions(
             activity = this,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             attachPickedFile = { kind, uri, fallbackName ->
                 pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
             }
@@ -446,8 +449,8 @@ class MainActivity : AppCompatActivity() {
             pendingAttachments = pendingAttachments,
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
-            activeProject = ::activeProject,
-            activeConversation = ::activeConversation,
+            activeProject = projectStateActions()::activeProject,
+            activeConversation = projectStateActions()::activeConversation,
             appendMessage = ::appendMessage,
             collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
@@ -502,7 +505,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             dp = ::dp,
             selectableForeground = ::selectableForeground,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             attachmentPanel = { if (::attachmentPanel.isInitialized) attachmentPanel else null },
             attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
             collapseInputComposer = { inputFocusActions().collapseInputComposer() },
@@ -548,7 +551,7 @@ class MainActivity : AppCompatActivity() {
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
-            activeConversation = ::activeConversation
+            activeConversation = projectStateActions()::activeConversation
         ).also { sendButtonVisualActions = it }
     }
 
@@ -558,7 +561,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             speechPermissionRequest = speechPermissionRequest,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             voiceHoldButton = { voiceHoldButton },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() }
@@ -571,7 +574,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             actionPopupProvider = { actionPopup },
-            activeConversationProvider = ::activeConversation,
+            activeConversationProvider = projectStateActions()::activeConversation,
             activeConversationIndexProvider = { activeConversationIndex },
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             renderConversationList = ::renderConversationList,
@@ -608,12 +611,12 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             conversationsProvider = { conversations },
-            activeProjectProvider = ::activeProject,
+            activeProjectProvider = projectStateActions()::activeProject,
             activeConversationIndexProvider = { activeConversationIndex },
             setActiveConversationIndex = { activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
             titleEditText = ::titleEditText,
-            saveConversations = ::saveConversations,
+            saveConversations = projectStateActions()::saveConversations,
             renderConversationList = ::renderConversationList,
             setSendEnabled = ::setSendEnabled
         ).also { conversationActions = it }
@@ -644,7 +647,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             projects = { projects },
             conversations = { conversations },
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             activeConversationIndex = { activeConversationIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { activeConversationIndex = it },
@@ -652,48 +655,20 @@ class MainActivity : AppCompatActivity() {
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             showChat = { animate -> navigationController().showChat(animate = animate) },
-            saveProjects = ::saveProjects
+            saveProjects = projectStateActions()::saveProjects
         ).also { conversationOpenActions = it }
     }
 
-    private fun activeProject(): AppProject {
-        if (projects.isEmpty()) {
-            projects.add(newAppProject("一龙开发助手", "默认项目 · 点击进入会话"))
-        }
-        activeProjectIndex = activeProjectIndex.coerceIn(0, projects.lastIndex)
-        val project = projects[activeProjectIndex]
-        if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
-        project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
-        return project
-    }
-
-    private fun activeConversation(): AppConversation {
-        if (conversations.isEmpty()) {
-            conversations.add(defaultAppConversation())
-        }
-        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
-        return conversations[activeConversationIndex]
-    }
-
-    private fun loadProjects() {
-        val loaded = loadStoredProjects(
-            prefs,
-            gson,
-            { project -> projectHygieneActions().normalizeProject(project) }
-        )
-        projects.clear()
-        projects.addAll(loaded.projects)
-        activeProjectIndex = loaded.activeProjectIndex
-        activeProject()
-        saveProjects()
-    }
-
-    private fun saveConversations() {
-        saveProjects()
-    }
-
-    private fun saveProjects() {
-        saveStoredProjects(prefs, gson, projects, activeProjectIndex, activeProject().id)
+    private fun projectStateActions(): MainProjectStateActions {
+        projectStateActions?.let { return it }
+        return MainProjectStateActions(
+            prefs = prefs,
+            gson = gson,
+            projects = projects,
+            activeProjectIndex = { activeProjectIndex },
+            setActiveProjectIndex = { activeProjectIndex = it },
+            normalizeProject = { project -> projectHygieneActions().normalizeProject(project) }
+        ).also { projectStateActions = it }
     }
 
     private fun conversationTaskRegistryActions(): MainConversationTaskRegistryActions {
@@ -703,8 +678,8 @@ class MainActivity : AppCompatActivity() {
             runningConversationTasks = runningConversationTasks,
             runningTraceToConversation = runningTraceToConversation,
             taskResponseTokens = taskResponseTokens,
-            activeProject = ::activeProject,
-            activeConversation = ::activeConversation,
+            activeProject = projectStateActions()::activeProject,
+            activeConversation = projectStateActions()::activeConversation,
             setWaitingForReply = { waitingForReply = it },
             setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
             setPendingRequestPayload = { pendingRequestPayload = it },
@@ -817,8 +792,8 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             projects = { projects },
             conversations = { conversations },
-            activeProject = ::activeProject,
-            activeConversation = ::activeConversation,
+            activeProject = projectStateActions()::activeProject,
+            activeConversation = projectStateActions()::activeConversation,
             activeProjectIndex = { activeProjectIndex },
             activeConversationIndex = { activeConversationIndex },
             chatAdapter = { chatAdapter },
@@ -828,8 +803,8 @@ class MainActivity : AppCompatActivity() {
                 workflowMessageCompactor().closeStaleWorkflowMessages(messages)
             },
             hasRunningTasks = { runningConversationTasks.isNotEmpty() },
-            saveConversations = ::saveConversations,
-            saveProjects = ::saveProjects,
+            saveConversations = projectStateActions()::saveConversations,
+            saveProjects = projectStateActions()::saveProjects,
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList
         ).also { conversationPreviewActions = it }
@@ -850,7 +825,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             projects = { projects },
             conversations = { conversations },
-            activeProject = ::activeProject,
+            activeProject = projectStateActions()::activeProject,
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             formatTime = { timeFormatter.format(Date(it)) },
             isTaskRunning = { projectId, conversationId ->
@@ -889,7 +864,7 @@ class MainActivity : AppCompatActivity() {
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { activeConversationIndex = it },
             titleEditText = ::titleEditText,
-            saveProjects = ::saveProjects,
+            saveProjects = projectStateActions()::saveProjects,
             renderProjectList = ::renderProjectList,
             openProject = conversationOpenActions()::openProject,
             showGitProjectDialog = ::showGitProjectDialog
@@ -913,7 +888,7 @@ class MainActivity : AppCompatActivity() {
             projects = projects,
             gson = gson,
             prefs = prefs,
-            saveProjects = ::saveProjects,
+            saveProjects = projectStateActions()::saveProjects,
             renderProjectList = ::renderProjectList
         )
     }
@@ -968,7 +943,7 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverUrl = serverUrl,
             userId = userId,
-            projectProvider = ::activeProject,
+            projectProvider = projectStateActions()::activeProject,
             projectTitleProvider = { currentProjectTitle },
             addProjectEvent = ::addProjectEvent,
             openUrl = { url -> externalActions().openUrl(url) },
@@ -982,8 +957,8 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverUrl = serverUrl,
             userId = userId,
-            activeProject = ::activeProject,
-            activeConversation = ::activeConversation,
+            activeProject = projectStateActions()::activeProject,
+            activeConversation = projectStateActions()::activeConversation,
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             selectedAgentForRequest = { modelActions().selectedAgentForRequest() }
         ).also { codexPrewarm = it }
@@ -999,7 +974,7 @@ class MainActivity : AppCompatActivity() {
         return MainQuickCommandActions(
             activity = this,
             binding = binding,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
             showChat = { navigationController().showChat() },
             sendMessage = { sendMessageActions().sendMessage() }
@@ -1015,9 +990,9 @@ class MainActivity : AppCompatActivity() {
         return MainMessageActions(
             activity = this,
             binding = binding,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             chatAdapter = { chatAdapter },
-            saveConversations = ::saveConversations,
+            saveConversations = projectStateActions()::saveConversations,
             renderConversationList = ::renderConversationList,
             showChat = { navigationController().showChat() },
             showMessageActionPopup = { anchor, message, text ->
@@ -1044,9 +1019,9 @@ class MainActivity : AppCompatActivity() {
     private fun evidenceActions(): MainEvidenceActions {
         evidenceActions?.let { return it }
         return MainEvidenceActions(
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             chatAdapter = { chatAdapter },
-            saveConversations = ::saveConversations,
+            saveConversations = projectStateActions()::saveConversations,
             assistantEvidenceRoles = assistantEvidenceRoles
         ).also { evidenceActions = it }
     }
@@ -1078,9 +1053,9 @@ class MainActivity : AppCompatActivity() {
     private fun toolActionBubbles(): MainToolActionBubbles {
         toolActionBubbles?.let { return it }
         return MainToolActionBubbles(
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             chatAdapter = { chatAdapter },
-            saveConversations = ::saveConversations,
+            saveConversations = projectStateActions()::saveConversations,
             appendMessage = ::appendMessage
         ).also { toolActionBubbles = it }
     }
@@ -1151,9 +1126,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun removeTransientWorkflowMessagesAfterLatestUser() {
-        if (workflowMessageCompactor().removeTransientWorkflowMessagesAfterLatestUser(activeConversation().messages)) {
+        if (workflowMessageCompactor().removeTransientWorkflowMessagesAfterLatestUser(projectStateActions().activeConversation().messages)) {
             chatAdapter.notifyDataSetChanged()
-            saveConversations()
+            projectStateActions().saveConversations()
         }
     }
 
@@ -1238,8 +1213,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStage(stage: String, hint: String) {
         currentStage = stage
-        activeProject().subtitle = hint
-        saveProjects()
+        projectStateActions().activeProject().subtitle = hint
+        projectStateActions().saveProjects()
         updateProjectViews(hint)
     }
 
@@ -1280,13 +1255,13 @@ class MainActivity : AppCompatActivity() {
             appName = { getString(R.string.app_name) },
             currentProjectTitle = { currentProjectTitle },
             setCurrentProjectTitle = { currentProjectTitle = it },
-            activeProject = ::activeProject,
+            activeProject = projectStateActions()::activeProject,
             projectEvents = { projectEvents },
             currentStage = { currentStage },
             conversationCount = { conversations.size },
             currentTimeText = { timeFormatter.format(Date()) },
             currentStageHint = { binding.stageHintText.text.toString() },
-            saveProjects = ::saveProjects,
+            saveProjects = projectStateActions()::saveProjects,
             updateProjectViews = ::updateProjectViews
         ).also { projectRecordActions = it }
     }
@@ -1299,7 +1274,7 @@ class MainActivity : AppCompatActivity() {
         sendEnabledActions?.let { return it }
         return MainSendEnabledActions(
             binding = binding,
-            activeConversation = ::activeConversation,
+            activeConversation = projectStateActions()::activeConversation,
             setInputCanSend = { inputCanSend = it },
             inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
             voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
