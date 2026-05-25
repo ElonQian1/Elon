@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import org.json.JSONArray
 import org.json.JSONObject
 
 class TaskWorkService : Service() {
@@ -276,10 +275,10 @@ class TaskWorkService : Service() {
 
     private fun handleServerMessage(traceId: String, raw: String) {
         val task = activeTasks[traceId] ?: return
-        if (isAppInForeground()) {
+        if (isTaskAppInForeground(prefs)) {
             broadcastMessage(task, raw)
         } else {
-            queueRawEvent(task, raw)
+            queueTaskRawEvent(prefs, task, raw)
         }
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
@@ -333,7 +332,7 @@ class TaskWorkService : Service() {
         }
         when (messageType) {
             "app_update_available" -> {
-                if (!isAppInForeground()) {
+                if (!isTaskAppInForeground(prefs)) {
                     showAppUpdateNotification(this, parsed)
                 }
             }
@@ -341,7 +340,7 @@ class TaskWorkService : Service() {
                 val step = parsed?.optInt("step_current", 0) ?: 0
                 val total = parsed?.optInt("step_total", 0) ?: 0
                 val phase = parsed?.optString("phase")?.takeIf { it.isNotBlank() }
-                if (step > 0 && total > 0 && phase != null && !isAppInForeground()) {
+                if (step > 0 && total > 0 && phase != null && !isTaskAppInForeground(prefs)) {
                     task.lastStep = step
                     task.lastStepTotal = total
                     if (task.lastPhaseStartMs == 0L) task.lastPhaseStartMs = System.currentTimeMillis()
@@ -379,7 +378,7 @@ class TaskWorkService : Service() {
         )
         cleanupTask(traceId, disconnect = true)
         persistTaskWork(prefs, activeTasks.values)
-        if (!isAppInForeground()) {
+        if (!isTaskAppInForeground(prefs)) {
             notifyBackgroundTaskCompleted(
                 context = this,
                 prefs = prefs,
@@ -494,28 +493,6 @@ class TaskWorkService : Service() {
         putExtra(EXTRA_IS_DEVELOPMENT, task.isDevelopment)
     }
 
-    private fun queueRawEvent(task: RunningTask, raw: String) {
-        val queue = runCatching {
-            JSONArray(prefs.getString(PREF_QUEUED_TASK_EVENTS, "[]"))
-        }.getOrElse { JSONArray() }
-        queue.put(
-            JSONObject()
-                .put("raw", raw.take(MAX_QUEUED_EVENT_LENGTH))
-                .put("trace_id", task.traceId)
-                .put("project_id", task.projectId)
-                .put("conversation_id", task.conversationId)
-                .put("is_development", task.isDevelopment)
-        )
-        while (queue.length() > MAX_QUEUED_EVENTS) {
-            queue.remove(0)
-        }
-        prefs.edit().putString(PREF_QUEUED_TASK_EVENTS, queue.toString()).apply()
-    }
-
-    private fun isAppInForeground(): Boolean {
-        return prefs.getBoolean(PREF_APP_IN_FOREGROUND, false)
-    }
-
     companion object {
         private const val TAG = "ElonTaskWork"
         const val ACTION_START_WORK = "com.elon.app.task.START_WORK"
@@ -556,7 +533,5 @@ class TaskWorkService : Service() {
         const val APP_UPDATE_NOTIFICATION_ID = 2402
         const val EXTRA_SHOW_APP_UPDATE = "show_app_update"
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
-        private const val MAX_QUEUED_EVENTS = 120
-        private const val MAX_QUEUED_EVENT_LENGTH = 20_000
     }
 }
