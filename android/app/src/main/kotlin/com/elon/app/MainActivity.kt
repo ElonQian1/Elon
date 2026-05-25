@@ -344,7 +344,9 @@ class MainActivity : AppCompatActivity() {
             clearCurrentEvidence = { evidenceActions().clearCurrentEvidence() },
             clearToolActionBubbles = { toolActionBubbles().clear() },
             setSendEnabled = ::setSendEnabled,
-            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            updateFirstConversationStatus = { text ->
+                conversationPreviewActions().updateFirstConversationStatus(text)
+            },
             updateStage = ::updateStage,
             updateProjectViews = ::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
@@ -676,7 +678,9 @@ class MainActivity : AppCompatActivity() {
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups().showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups().showChatActionPopup(anchor) },
-            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            updateFirstConversationStatus = { text ->
+                conversationPreviewActions().updateFirstConversationStatus(text)
+            },
             collapseInputComposer = ::collapseInputComposer,
             isActiveConversationWorking = ::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
@@ -783,7 +787,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadProjects() {
-        val loaded = loadStoredProjects(prefs, gson, ::normalizeProject)
+        val loaded = loadStoredProjects(
+            prefs,
+            gson,
+            { project -> projectHygieneActions().normalizeProject(project) }
+        )
         projects.clear()
         projects.addAll(loaded.projects)
         activeProjectIndex = loaded.activeProjectIndex
@@ -904,7 +912,9 @@ class MainActivity : AppCompatActivity() {
             setBackendConnected = { backendConnected = it },
             getWaitingForReply = { waitingForReply },
             resetReconnectAttempts = { reconnectAttempts = 0 },
-            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            updateFirstConversationStatus = { text ->
+                conversationPreviewActions().updateFirstConversationStatus(text)
+            },
             updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
                 updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
             },
@@ -915,7 +925,7 @@ class MainActivity : AppCompatActivity() {
             setSendEnabled = ::setSendEnabled,
             isActiveConversationWorking = ::isActiveConversationWorking,
             handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
-            updateIdleReadyStatus = ::updateIdleReadyStatus,
+            updateIdleReadyStatus = { conversationPreviewActions().updateIdleReadyStatus() },
             appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
                 traceId?.let { taskResponseTokens.remove(it) }
                 appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
@@ -966,21 +976,11 @@ class MainActivity : AppCompatActivity() {
         backgroundTaskMessageActions?.let { return it }
         return MainBackgroundTaskMessageActions(
             activity = this,
-            findConversationLocationByKey = ::findConversationLocationByKey,
-            appendMessageToConversation = ::appendMessageToConversation
+            findConversationLocationByKey = { key -> conversationPreviewActions().findConversationLocationByKey(key) },
+            appendMessageToConversation = { projectIndex, conversationIndex, message ->
+                conversationPreviewActions().appendMessageToConversation(projectIndex, conversationIndex, message)
+            }
         ).also { backgroundTaskMessageActions = it }
-    }
-
-    private fun findConversationLocationByKey(key: String): Pair<Int, Int>? {
-        return conversationPreviewActions().findConversationLocationByKey(key)
-    }
-
-    private fun appendMessageToConversation(
-        projectIndex: Int,
-        conversationIndex: Int,
-        message: ChatMessage
-    ) {
-        conversationPreviewActions().appendMessageToConversation(projectIndex, conversationIndex, message)
     }
 
     private fun handleLaunchIntent(intent: Intent?) {
@@ -1007,22 +1007,6 @@ class MainActivity : AppCompatActivity() {
             appendTaskMessage = ::appendTaskMessage,
             appendRawMessage = { raw -> appendMessage(raw) }
         ).also { taskWorkServiceActions = it }
-    }
-
-    private fun normalizeProject(project: AppProject) {
-        projectHygieneActions().normalizeProject(project)
-    }
-
-    private fun updateFirstConversationStatus(text: String) {
-        conversationPreviewActions().updateFirstConversationStatus(text)
-    }
-
-    private fun updateIdleReadyStatus() {
-        conversationPreviewActions().updateIdleReadyStatus()
-    }
-
-    private fun updateActiveConversationPreview(message: ChatMessage) {
-        conversationPreviewActions().updateActiveConversationPreview(message)
     }
 
     private fun conversationPreviewActions(): MainConversationPreviewActions {
@@ -1377,7 +1361,7 @@ class MainActivity : AppCompatActivity() {
             removeTransientWorkflowMessagesAfterLatestUser()
         }
         chatAdapter.addMessage(msg)
-        updateActiveConversationPreview(msg)
+        conversationPreviewActions().updateActiveConversationPreview(msg)
         binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
     }
 
