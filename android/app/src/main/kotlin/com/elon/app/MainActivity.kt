@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
+    private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -2023,64 +2024,17 @@ class MainActivity : AppCompatActivity() {
 
             serverResponseToken += 1
             val msg = when (type) {
-                "task_event" -> {
-                    val event = jsonStringOrNull(json, "event").orEmpty()
-                    val taskId = jsonStringOrNull(json, "task_id")
-                    val content = jsonStringOrNull(json, "message").orEmpty()
-                    handleTaskEvent(event, taskId, content)
-                    if (maybeAppendTaskEventNarrative(event, content)) return
-                    if (event == "accepted" && shouldShowProgressBubble(content)) {
-                        ChatMessage("ai-progress", workflowProgressMessage(content))
-                    } else {
-                        return
-                    }
-                }
-                "progress"    -> {
-                    val content = jsonStringOrNull(json, "message") ?: ""
-                    if (isCliOutputProgress(content)) {
-                        handleFoldedCliOutput(content)
-                        return
-                    }
-                    val surfaced = maybeAppendWorkflowProgressNarrative(content)
-                    handleProgress(content, recordProgressEvidence = !surfaced)
-                    if (surfaced) return
-                    if (shouldShowProgressBubble(content)) {
-                        ChatMessage("ai-progress", workflowProgressMessage(content))
-                    } else {
-                        return
-                    }
-                }
+                "task_event" -> assistantStreamEvents().taskEventMessage(json) ?: return
+                "progress" -> assistantStreamEvents().progressMessage(json) ?: return
                 "tool_call"   -> {
-                    val tool = jsonStringOrNull(json, "tool") ?: "工具"
-                    val args = json.get("args")?.takeIf { it.isJsonObject }?.asJsonObject
-                    maybeAppendToolCallNarrative(tool)
-                    handleToolCall(tool)
-                    toolActionBubbles().appendToolCallBubble(tool, args)
+                    assistantStreamEvents().handleToolCall(json)
                     return
                 }
                 "tool_result" -> {
-                    val tool = jsonStringOrNull(json, "tool") ?: "工具"
-                    val result = jsonStringOrNull(json, "result").orEmpty()
-                    val evidence = if (result.isBlank()) {
-                        "完成：${toolLabel(tool)}"
-                    } else {
-                        "完成：${toolLabel(tool)}，${summarize(result, 80)}"
-                    }
-                    recordEvidence(toolEvidenceKind(tool), evidence)
-                    toolActionBubbles().markToolResultDone(tool)
-                    workflowStageActions().markToolResult(tool)
+                    assistantStreamEvents().handleToolResult(json)
                     return
                 }
-                "assistant_message" -> {
-                    val text = jsonStringOrNull(json, "text").orEmpty().trim()
-                    if (text.isBlank()) return
-                    if (activeRequestIsDevelopment) {
-                        addProjectEvent("AI 说明：${summarize(text, 36)}")
-                    }
-                    // AI 的中间发言：直接以 ai-intent 主白底气泡呈现，
-                    // 不再被压缩成 200 字进度文案，给用户真正的"对话感"。
-                    ChatMessage("ai-intent", text)
-                }
+                "assistant_message" -> assistantStreamEvents().assistantMessage(json) ?: return
                 "done"        -> {
                     val content = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl  = jsonStringOrNull(json, "apk_url")
@@ -2124,6 +2078,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleToolCall(tool: String) {
         workflowStageActions().handleToolCall(tool)
+    }
+
+    private fun assistantStreamEvents(): MainAssistantStreamEvents {
+        assistantStreamEvents?.let { return it }
+        return MainAssistantStreamEvents(
+            handleTaskEvent = ::handleTaskEvent,
+            maybeAppendTaskEventNarrative = ::maybeAppendTaskEventNarrative,
+            maybeAppendWorkflowProgressNarrative = ::maybeAppendWorkflowProgressNarrative,
+            maybeAppendToolCallNarrative = ::maybeAppendToolCallNarrative,
+            handleProgress = ::handleProgress,
+            handleFoldedCliOutput = ::handleFoldedCliOutput,
+            markToolCallStarted = ::handleToolCall,
+            appendToolCallBubble = { tool, args -> toolActionBubbles().appendToolCallBubble(tool, args) },
+            markToolResultDone = { toolActionBubbles().markToolResultDone(it) },
+            markToolResult = { workflowStageActions().markToolResult(it) },
+            recordEvidence = ::recordEvidence,
+            isDevelopmentRequest = { activeRequestIsDevelopment },
+            addProjectEvent = ::addProjectEvent
+        ).also { assistantStreamEvents = it }
     }
 
     private fun assistantTerminalActions(): MainAssistantTerminalActions {
