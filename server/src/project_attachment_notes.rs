@@ -68,6 +68,9 @@ pub(crate) fn append_project_attachment_notes(
             note.push_str(&format!(" (url: {})", url));
         }
         if mime_type.starts_with("image/") {
+            if let Some(dimensions) = attachment_image_dimensions(attachment) {
+                note.push_str(&format!("\n  image_dimensions: {}", dimensions));
+            }
             note.push_str(
                 "\n  Image context: this is an actual uploaded chat image. Open/view the local file path above when answering image questions; do not answer from the file name alone.",
             );
@@ -89,4 +92,12 @@ pub(crate) fn append_project_attachment_notes(
         conversation_id,
         notes.join("\n")
     )
+}
+
+fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<String> {
+    Some(format!(
+        "{}x{}",
+        attachment.image_width?,
+        attachment.image_height?
+    ))
 }

@@ -43,13 +43,13 @@ internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List
 
 private fun createImageAttachmentView(context: Context, attachment: ChatAttachment): View {
     val image = ImageView(context).apply {
-        layoutParams = LinearLayout.LayoutParams(context.dp(196), context.dp(148))
+        layoutParams = imageAttachmentLayoutParams(context, attachment)
         background = GradientDrawable().apply {
             cornerRadius = context.dp(7).toFloat()
             setColor(Color.parseColor("#1F1F1F"))
         }
         contentDescription = attachment.displayName ?: "图片"
-        scaleType = ImageView.ScaleType.CENTER_CROP
+        scaleType = ImageView.ScaleType.FIT_CENTER
         setPadding(0, 0, 0, 0)
     }
 
@@ -72,6 +72,28 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
         }
     }
     return image
+}
+
+private fun imageAttachmentLayoutParams(
+    context: Context,
+    attachment: ChatAttachment
+): LinearLayout.LayoutParams {
+    val maxWidth = context.dp(220)
+    val maxHeight = context.dp(260)
+    val minSide = context.dp(112)
+    val sourceWidth = attachment.imageWidth?.takeIf { it > 0 } ?: 4
+    val sourceHeight = attachment.imageHeight?.takeIf { it > 0 } ?: 3
+    val ratio = sourceWidth.toFloat() / sourceHeight.toFloat()
+    var targetWidth = maxWidth
+    var targetHeight = (targetWidth / ratio).toInt().coerceAtLeast(minSide)
+    if (targetHeight > maxHeight) {
+        targetHeight = maxHeight
+        targetWidth = (targetHeight * ratio).toInt().coerceAtLeast(minSide)
+    }
+    return LinearLayout.LayoutParams(
+        targetWidth.coerceIn(minSide, maxWidth),
+        targetHeight.coerceIn(minSide, maxHeight)
+    )
 }
 
 private fun createFileAttachmentView(context: Context, attachment: ChatAttachment): View {

@@ -54,6 +54,12 @@ pub async fn upload_project_attachment(
         query.get("display_name").map(String::as_str),
         query.get("file_name").map(String::as_str),
         query.get("mime_type").map(String::as_str),
+        query
+            .get("image_width")
+            .and_then(|value| parse_positive_u32(value)),
+        query
+            .get("image_height")
+            .and_then(|value| parse_positive_u32(value)),
         body,
         true,
     )
@@ -86,6 +92,12 @@ pub async fn upload_user_project_attachment(
         query.get("display_name").map(String::as_str),
         query.get("file_name").map(String::as_str),
         query.get("mime_type").map(String::as_str),
+        query
+            .get("image_width")
+            .and_then(|value| parse_positive_u32(value)),
+        query
+            .get("image_height")
+            .and_then(|value| parse_positive_u32(value)),
         body,
         false,
     )
@@ -102,6 +114,8 @@ async fn upload_project_attachment_impl(
     display_name_hint: Option<&str>,
     file_name_hint: Option<&str>,
     mime_type_hint: Option<&str>,
+    image_width_hint: Option<u32>,
+    image_height_hint: Option<u32>,
     body: Bytes,
     include_project_api_url: bool,
 ) -> Response {
@@ -161,7 +175,7 @@ async fn upload_project_attachment_impl(
         ));
     }
 
-    let attachment = serde_json::json!({
+    let mut attachment = serde_json::json!({
         "attachment_id": attachment_id,
         "kind": kind_hint.unwrap_or("attachment"),
         "display_name": display_name,
@@ -173,6 +187,12 @@ async fn upload_project_attachment_impl(
         "sha256": sha256,
         "size_bytes": body.len(),
     });
+    if let Some(width) = image_width_hint {
+        attachment["image_width"] = serde_json::json!(width);
+    }
+    if let Some(height) = image_height_hint {
+        attachment["image_height"] = serde_json::json!(height);
+    }
     Json(serde_json::json!({
         "status": "uploaded",
         "project_id": project.id,
@@ -303,6 +323,7 @@ pub async fn append_project_cli_attachment_artifacts(
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty());
+        let dimensions = attachment_image_dimensions(attachment);
 
         let mut note = format!(
             "- {} [{}; {}; {} bytes]\n  artifact_id: {}\n  cli_workspace_path: {}\n  source_server_path: {}",
@@ -321,6 +342,9 @@ pub async fn append_project_cli_attachment_artifacts(
             note.push_str(&format!("\n  url: {}", url));
         }
         if mime_type.starts_with("image/") {
+            if let Some(dimensions) = dimensions.as_deref() {
+                note.push_str(&format!("\n  image_dimensions: {}", dimensions));
+            }
             note.push_str("\n  Image context: inspect cli_workspace_path directly when this message asks about the image.");
         }
         notes.push(note);
@@ -332,6 +356,8 @@ pub async fn append_project_cli_attachment_artifacts(
             "kind": kind,
             "mime_type": mime_type,
             "size_bytes": size_bytes,
+            "image_width": attachment.image_width,
+            "image_height": attachment.image_height,
             "sha256": sha256,
             "cli_workspace_path": artifact_path.to_string_lossy(),
             "source_server_path": canonical_source.to_string_lossy(),
@@ -372,6 +398,18 @@ pub async fn append_project_cli_attachment_artifacts(
         conversation_id,
         notes.join("\n")
     )
+}
+
+fn parse_positive_u32(value: &str) -> Option<u32> {
+    value.trim().parse::<u32>().ok().filter(|value| *value > 0)
+}
+
+fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<String> {
+    Some(format!(
+        "{}x{}",
+        attachment.image_width?,
+        attachment.image_height?
+    ))
 }
 
 pub async fn download_user_project_attachment(

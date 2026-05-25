@@ -38,6 +38,8 @@ pub struct ProjectAttachmentRef {
     pub url: Option<String>,
     pub sha256: Option<String>,
     pub size_bytes: Option<u64>,
+    pub image_width: Option<u32>,
+    pub image_height: Option<u32>,
 }
 
 pub fn enrich_project_ws_event(raw: String, task_id: &str) -> String {
@@ -264,7 +266,9 @@ mod tests {
                         "mime_type":"image/png",
                         "path":"D:/workspace/attachments/c1/screenshot.png",
                         "sha256":"abc123",
-                        "size_bytes":128
+                        "size_bytes":128,
+                        "image_width":640,
+                        "image_height":480
                     }
                 ]
             }"#,
@@ -289,6 +293,8 @@ mod tests {
         );
         assert_eq!(attachment.sha256.as_deref(), Some("abc123"));
         assert_eq!(attachment.size_bytes, Some(128));
+        assert_eq!(attachment.image_width, Some(640));
+        assert_eq!(attachment.image_height, Some(480));
     }
 
     #[test]

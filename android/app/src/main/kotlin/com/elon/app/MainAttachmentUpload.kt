@@ -38,6 +38,8 @@ internal fun uploadAttachmentRefsOrNull(
             append("&display_name=${urlPart(attachment.displayName)}")
             append("&file_name=${urlPart(attachment.fileName)}")
             append("&mime_type=${urlPart(attachment.mimeType)}")
+            attachment.imageWidth?.let { append("&image_width=$it") }
+            attachment.imageHeight?.let { append("&image_height=$it") }
         }
         val mediaType = attachment.mimeType.toMediaTypeOrNull()
             ?: "application/octet-stream".toMediaType()
@@ -88,8 +90,19 @@ internal fun uploadAttachmentRefsOrNull(
                     addProperty("sha256", it)
                 }
                 addProperty("size_bytes", uploaded.optLong("size_bytes", attachment.file.length()))
+                uploaded.optIntOrNull("image_width", attachment.imageWidth)?.let {
+                    addProperty("image_width", it)
+                }
+                uploaded.optIntOrNull("image_height", attachment.imageHeight)?.let {
+                    addProperty("image_height", it)
+                }
             })
         }
     }
     return array
+}
+
+private fun JSONObject.optIntOrNull(name: String, fallback: Int?): Int? {
+    if (!has(name) || isNull(name)) return fallback
+    return optInt(name).takeIf { it > 0 } ?: fallback
 }

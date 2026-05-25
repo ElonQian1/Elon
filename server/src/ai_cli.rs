@@ -36,7 +36,7 @@ use crate::ai_cli_native_session::build_native_session_continuity_note;
 #[cfg(test)]
 use crate::ai_cli_output::extract_json_agent_message;
 #[cfg(test)]
-use crate::ai_cli_prompts::build_native_session_repair_prompt;
+use crate::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
 #[cfg(test)]
 use crate::store::ConversationMessage;
 #[cfg(test)]

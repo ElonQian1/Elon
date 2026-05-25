@@ -139,7 +139,9 @@ internal class PendingAttachmentPreviewStrip(
             fileName = fileName,
             mimeType = mimeType,
             localPath = file.absolutePath,
-            sizeBytes = file.length()
+            sizeBytes = file.length(),
+            imageWidth = imageWidth,
+            imageHeight = imageHeight
         )
     }
 

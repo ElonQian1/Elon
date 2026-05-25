@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -28,7 +29,19 @@ internal fun copyAttachmentToCache(
     displayName: String,
     attachmentIndex: Int
 ): PendingAttachment {
-    val mimeType = context.contentResolver.getType(uri) ?: guessMimeType(displayName)
+    val mimeType = (context.contentResolver.getType(uri) ?: guessMimeType(displayName))
+        .lowercase(Locale.CHINA)
+    if (isStaticPhotoAttachment(mimeType)) {
+        return normalizePhotoAttachmentToCache(
+            context,
+            displayLabel,
+            uri,
+            displayName,
+            attachmentIndex,
+            mimeType
+        )
+    }
+
     val extension = extensionForAttachment(displayName, mimeType)
     val fileName = "attachment_${System.currentTimeMillis()}_$attachmentIndex.$extension"
     val attachmentDir = File(context.cacheDir, "pending_attachments").apply { mkdirs() }
@@ -44,15 +57,6 @@ internal fun copyAttachmentToCache(
                 total += read
                 if (total > MAX_ATTACHMENT_BYTES) {
                     target.delete()
-                    if (isPhotoAttachment(mimeType)) {
-                        return compressPhotoAttachmentToCache(
-                            context,
-                            displayLabel,
-                            uri,
-                            displayName,
-                            attachmentIndex
-                        )
-                    }
                     throw IllegalArgumentException("Attachment too large")
                 }
                 output.write(buffer, 0, read)
@@ -69,16 +73,17 @@ internal fun copyAttachmentToCache(
     )
 }
 
-private fun isPhotoAttachment(mimeType: String): Boolean {
-    return mimeType.startsWith("image/")
+private fun isStaticPhotoAttachment(mimeType: String): Boolean {
+    return mimeType in setOf("image/jpeg", "image/png", "image/webp")
 }
 
-private fun compressPhotoAttachmentToCache(
+private fun normalizePhotoAttachmentToCache(
     context: Context,
     displayLabel: String,
     uri: Uri,
     displayName: String,
-    attachmentIndex: Int
+    attachmentIndex: Int,
+    sourceMimeType: String
 ): PendingAttachment {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri).use { input ->
@@ -95,33 +100,58 @@ private fun compressPhotoAttachmentToCache(
         BitmapFactory.decodeStream(input, null, decodeOptions)
     } ?: throw IllegalArgumentException("Cannot decode selected photo")
 
-    val bytes = ByteArrayOutputStream()
-    var selectedBytes: ByteArray? = null
-    for (quality in PHOTO_COMPRESS_QUALITIES) {
-        bytes.reset()
-        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, bytes)
-        if (bytes.size() <= MAX_ATTACHMENT_BYTES) {
-            selectedBytes = bytes.toByteArray()
-            break
-        }
-    }
-    val finalBytes = selectedBytes ?: bytes.toByteArray()
+    val normalized = normalizedPhotoBytes(bitmap, sourceMimeType)
+    val finalBytes = normalized.bytes
+    val width = bitmap.width
+    val height = bitmap.height
     bitmap.recycle()
     require(finalBytes.size <= MAX_ATTACHMENT_BYTES) { "Compressed photo is still too large" }
 
     val safeName = displayName.substringBeforeLast('.', displayName).ifBlank { "photo" }
     val attachmentDir = File(context.cacheDir, "pending_attachments").apply { mkdirs() }
-    val fileName = "attachment_${System.currentTimeMillis()}_$attachmentIndex.jpg"
+    val fileName = "attachment_${System.currentTimeMillis()}_$attachmentIndex.${normalized.extension}"
     val target = File(attachmentDir, fileName)
     target.writeBytes(finalBytes)
     return PendingAttachment(
         kind = "image",
         displayLabel = displayLabel,
-        displayName = "$safeName.jpg",
+        displayName = "$safeName.${normalized.extension}",
         fileName = fileName,
-        mimeType = "image/jpeg",
-        file = target
+        mimeType = normalized.mimeType,
+        file = target,
+        imageWidth = width,
+        imageHeight = height
     )
+}
+
+private data class NormalizedPhotoBytes(
+    val bytes: ByteArray,
+    val mimeType: String,
+    val extension: String
+)
+
+private fun normalizedPhotoBytes(bitmap: Bitmap, sourceMimeType: String): NormalizedPhotoBytes {
+    val pngBytes = if (sourceMimeType == "image/png") {
+        ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+            output.toByteArray().takeIf { it.size <= MAX_ATTACHMENT_BYTES }
+        }
+    } else {
+        null
+    }
+    if (pngBytes != null) {
+        return NormalizedPhotoBytes(pngBytes, "image/png", "png")
+    }
+
+    val bytes = ByteArrayOutputStream()
+    for (quality in PHOTO_COMPRESS_QUALITIES) {
+        bytes.reset()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes)
+        if (bytes.size() <= MAX_ATTACHMENT_BYTES) {
+            return NormalizedPhotoBytes(bytes.toByteArray(), "image/jpeg", "jpg")
+        }
+    }
+    return NormalizedPhotoBytes(bytes.toByteArray(), "image/jpeg", "jpg")
 }
 
 private fun normalizedAttachmentKind(mimeType: String): String {
@@ -130,7 +160,7 @@ private fun normalizedAttachmentKind(mimeType: String): String {
 
 private fun photoSampleSize(width: Int, height: Int): Int {
     var sample = 1
-    while ((width / sample) * (height / sample) > PHOTO_MAX_PIXELS) {
+    while ((width / sample).toLong() * (height / sample).toLong() > PHOTO_MAX_PIXELS) {
         sample *= 2
     }
     return sample

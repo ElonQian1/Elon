@@ -10,7 +10,9 @@ data class ChatAttachment(
     val mimeType: String? = null,
     val url: String? = null,
     val localPath: String? = null,
-    val sizeBytes: Long? = null
+    val sizeBytes: Long? = null,
+    val imageWidth: Int? = null,
+    val imageHeight: Int? = null
 ) {
     fun isImage(): Boolean {
         return kind == "image" || mimeType.orEmpty().startsWith("image/")
@@ -30,7 +32,9 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
             localPath = item.stringOrNull("local_path"),
             sizeBytes = runCatching {
                 item.get("size_bytes")?.takeIf { it.isJsonPrimitive }?.asLong
-            }.getOrNull()
+            }.getOrNull(),
+            imageWidth = item.positiveIntOrNull("image_width"),
+            imageHeight = item.positiveIntOrNull("image_height")
         )
     }
 }
@@ -53,6 +57,12 @@ internal fun chatAttachmentFromImageUrl(url: String?): List<ChatAttachment> {
             url = imageUrl
         )
     )
+}
+
+private fun JsonObject.positiveIntOrNull(name: String): Int? {
+    return runCatching {
+        get(name)?.takeIf { it.isJsonPrimitive }?.asInt?.takeIf { value -> value > 0 }
+    }.getOrNull()
 }
 
 internal fun visibleTextForPendingAttachments(rawText: String, attachments: List<PendingAttachment>): String {
