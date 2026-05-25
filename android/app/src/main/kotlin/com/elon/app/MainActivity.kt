@@ -302,12 +302,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendMessage() {
         collapseAttachmentPanel()
-        val text = binding.inputEdit.text.toString().trim()
-        if (text.isEmpty()) return
+        val rawText = binding.inputEdit.text.toString().trim()
+        if (rawText.isEmpty() && pendingAttachments.isEmpty()) return
         if (isActiveConversationWorking()) return
         if (activeConversation().ended) {
             appendMessage(ChatMessage("error", "这个会话已结束，请新建会话继续。"))
             return
+        }
+        val text = if (pendingAttachments.isNotEmpty()) {
+            visibleTextForPendingAttachments(rawText, pendingAttachments)
+        } else {
+            rawText
         }
         val outgoingText = expandShortDevelopmentCommand(text, activeConversation().messages)
         val target = currentSendTarget()
@@ -316,14 +321,15 @@ class MainActivity : AppCompatActivity() {
             uploadAttachmentsThenSend(text, outgoingText, target)
             return
         }
-        startPreparedMessage(text, outgoingText, com.google.gson.JsonArray(), target)
+        startPreparedMessage(text, outgoingText, com.google.gson.JsonArray(), target, emptyList())
     }
 
     private fun startPreparedMessage(
         visibleText: String,
         outgoingText: String,
         attachmentRefs: com.google.gson.JsonArray,
-        target: SendTarget
+        target: SendTarget,
+        chatAttachments: List<ChatAttachment>
     ) {
         if (!restoreSendTarget(target)) {
             Toast.makeText(this, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
@@ -353,7 +359,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 显示用户消息
-        appendMessage(ChatMessage(role = "user", content = visibleText))
+        appendMessage(
+            ChatMessage(
+                role = "user",
+                content = visibleText,
+                attachments = chatAttachments.takeIf { it.isNotEmpty() }
+            )
+        )
         DebugTraceStore.record(
             "ui_chat_send",
             mapOf(
@@ -968,8 +980,8 @@ class MainActivity : AppCompatActivity() {
         }.getOrNull() ?: return
 
         pendingAttachments.add(attachment)
-        appendAttachmentLabel(kind, attachment.displayName)
-        Toast.makeText(this, "已添加${kind}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+        appendAttachmentLabel(attachment.displayLabel, attachment.displayName)
+        Toast.makeText(this, "已添加${attachment.displayLabel}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
     }
 
     private fun appendAttachmentLabel(kind: String, name: String) {
@@ -1049,7 +1061,7 @@ class MainActivity : AppCompatActivity() {
                         "elapsed_ms" to (System.currentTimeMillis() - startedAt)
                     )
                 )
-                startPreparedMessage(visibleText, outgoingText, refs, target)
+                startPreparedMessage(visibleText, outgoingText, refs, target, chatAttachmentsFromRefs(refs))
             }
         }.start()
     }
@@ -3721,8 +3733,11 @@ class MainActivity : AppCompatActivity() {
         saveConversations()
     }
 
-    private fun aiMessageWithCurrentEvidence(content: String): ChatMessage {
-        val message = ChatMessage("ai", content)
+    private fun aiMessageWithCurrentEvidence(
+        content: String,
+        attachments: List<ChatAttachment> = emptyList()
+    ): ChatMessage {
+        val message = ChatMessage("ai", content, attachments.takeIf { it.isNotEmpty() })
         if (currentEvidenceEntries.isNotEmpty()) {
             stopWorkingEvidenceForActiveConversation()
             applyEvidenceToMessage(message, currentEvidenceEntries, working = false)
@@ -4008,7 +4023,10 @@ class MainActivity : AppCompatActivity() {
                     stopWorkingEvidenceForActiveConversation()
                     resetFoldedCliLog()
                     val visibleApkUrl = if (wasDevelopment) apkUrl else null
-                    val finalMessage = aiMessageWithCurrentEvidence(finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment))
+                    val finalMessage = aiMessageWithCurrentEvidence(
+                        finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment),
+                        chatAttachmentFromImageUrl(imageUrl)
+                    )
                     finalMessage
                 }
                 "error" -> {

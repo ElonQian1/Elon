@@ -59,6 +59,7 @@ data class GitProjectStatus(
 
 data class PendingAttachment(
     val kind: String,
+    val displayLabel: String = kind,
     val displayName: String,
     val fileName: String,
     val mimeType: String,

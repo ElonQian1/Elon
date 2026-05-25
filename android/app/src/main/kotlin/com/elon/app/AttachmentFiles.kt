@@ -23,7 +23,7 @@ internal fun displayNameForUri(context: Context, uri: Uri): String? {
 
 internal fun copyAttachmentToCache(
     context: Context,
-    kind: String,
+    displayLabel: String,
     uri: Uri,
     displayName: String,
     attachmentIndex: Int
@@ -44,8 +44,14 @@ internal fun copyAttachmentToCache(
                 total += read
                 if (total > MAX_ATTACHMENT_BYTES) {
                     target.delete()
-                    if (isPhotoAttachment(kind, mimeType)) {
-                        return compressPhotoAttachmentToCache(context, kind, uri, displayName, attachmentIndex)
+                    if (isPhotoAttachment(mimeType)) {
+                        return compressPhotoAttachmentToCache(
+                            context,
+                            displayLabel,
+                            uri,
+                            displayName,
+                            attachmentIndex
+                        )
                     }
                     throw IllegalArgumentException("Attachment too large")
                 }
@@ -54,7 +60,8 @@ internal fun copyAttachmentToCache(
         }
     }
     return PendingAttachment(
-        kind = kind,
+        kind = normalizedAttachmentKind(mimeType),
+        displayLabel = displayLabel,
         displayName = displayName,
         fileName = fileName,
         mimeType = mimeType,
@@ -62,13 +69,13 @@ internal fun copyAttachmentToCache(
     )
 }
 
-private fun isPhotoAttachment(kind: String, mimeType: String): Boolean {
-    return kind.contains("相册") && mimeType.startsWith("image/")
+private fun isPhotoAttachment(mimeType: String): Boolean {
+    return mimeType.startsWith("image/")
 }
 
 private fun compressPhotoAttachmentToCache(
     context: Context,
-    kind: String,
+    displayLabel: String,
     uri: Uri,
     displayName: String,
     attachmentIndex: Int
@@ -108,12 +115,17 @@ private fun compressPhotoAttachmentToCache(
     val target = File(attachmentDir, fileName)
     target.writeBytes(finalBytes)
     return PendingAttachment(
-        kind = kind,
+        kind = "image",
+        displayLabel = displayLabel,
         displayName = "$safeName.jpg",
         fileName = fileName,
         mimeType = "image/jpeg",
         file = target
     )
+}
+
+private fun normalizedAttachmentKind(mimeType: String): String {
+    return if (mimeType.startsWith("image/")) "image" else "file"
 }
 
 private fun photoSampleSize(width: Int, height: Int): Int {

@@ -1,0 +1,199 @@
+package com.elon.app
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.util.LruCache
+import android.view.Gravity
+import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import kotlin.math.max
+
+internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List<ChatAttachment>?) {
+    if (container == null) return
+    val items = attachments.orEmpty()
+    container.removeAllViews()
+    if (items.isEmpty()) {
+        container.visibility = View.GONE
+        return
+    }
+    container.visibility = View.VISIBLE
+    items.take(MAX_CHAT_ATTACHMENTS).forEach { attachment ->
+        val view = if (attachment.isImage()) {
+            createImageAttachmentView(container.context, attachment)
+        } else {
+            createFileAttachmentView(container.context, attachment)
+        }
+        view.layoutParams = (view.layoutParams as LinearLayout.LayoutParams).apply {
+            bottomMargin = container.context.dp(6)
+        }
+        container.addView(view)
+    }
+}
+
+private fun createImageAttachmentView(context: Context, attachment: ChatAttachment): View {
+    val image = ImageView(context).apply {
+        layoutParams = LinearLayout.LayoutParams(context.dp(196), context.dp(148))
+        background = GradientDrawable().apply {
+            cornerRadius = context.dp(7).toFloat()
+            setColor(Color.parseColor("#1F1F1F"))
+        }
+        contentDescription = attachment.displayName ?: "图片"
+        scaleType = ImageView.ScaleType.CENTER_CROP
+        setPadding(0, 0, 0, 0)
+    }
+
+    val source = imageSource(attachment)
+    if (source == null) {
+        image.setImageResource(android.R.drawable.ic_menu_report_image)
+        return image
+    }
+
+    image.tag = source
+    image.setImageResource(android.R.drawable.ic_menu_gallery)
+    image.setOnClickListener {
+        attachment.url?.let { url ->
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        }
+    }
+    ChatImagePreviewLoader.load(source) { bitmap ->
+        image.post {
+            if (image.tag == source) {
+                image.setImageBitmap(bitmap)
+            }
+        }
+    }
+    return image
+}
+
+private fun createFileAttachmentView(context: Context, attachment: ChatAttachment): View {
+    return TextView(context).apply {
+        layoutParams = LinearLayout.LayoutParams(context.dp(196), LinearLayout.LayoutParams.WRAP_CONTENT)
+        background = GradientDrawable().apply {
+            cornerRadius = context.dp(7).toFloat()
+            setColor(Color.parseColor("#22FFFFFF"))
+            setStroke(context.dp(1), Color.parseColor("#33000000"))
+        }
+        gravity = Gravity.CENTER_VERTICAL
+        includeFontPadding = false
+        maxLines = 2
+        setPadding(context.dp(10), context.dp(9), context.dp(10), context.dp(9))
+        setTextColor(Color.parseColor("#202020"))
+        textSize = 13f
+        text = buildString {
+            append(attachment.displayName ?: attachment.fileName ?: "附件")
+            attachment.sizeBytes?.takeIf { it > 0 }?.let {
+                append("\n")
+                append(formatAttachmentSize(it))
+            }
+        }
+        attachment.url?.let { url ->
+            setOnClickListener {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                }
+            }
+        }
+    }
+}
+
+private fun imageSource(attachment: ChatAttachment): String? {
+    val local = attachment.localPath
+        ?.takeIf { it.isNotBlank() }
+        ?.takeIf { File(it).exists() }
+    return local ?: attachment.url?.takeIf { it.isNotBlank() }
+}
+
+private fun formatAttachmentSize(bytes: Long): String {
+    return if (bytes >= 1_048_576) {
+        "%.1f MB".format(bytes / 1_048_576.0)
+    } else {
+        "${max(1, bytes / 1024)} KB"
+    }
+}
+
+private fun Context.dp(value: Int): Int {
+    return (value * resources.displayMetrics.density).toInt()
+}
+
+private object ChatImagePreviewLoader {
+    private const val MAX_IMAGE_BYTES = 12 * 1024 * 1024
+    private const val MAX_THUMBNAIL_PIXELS = 1_200_000
+    private val cache = object : LruCache<String, Bitmap>(16 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
+
+    fun load(source: String, onReady: (Bitmap) -> Unit) {
+        cache.get(source)?.let {
+            onReady(it)
+            return
+        }
+        Thread {
+            val bitmap = runCatching { loadBitmap(source) }.getOrNull() ?: return@Thread
+            cache.put(source, bitmap)
+            onReady(bitmap)
+        }.start()
+    }
+
+    private fun loadBitmap(source: String): Bitmap {
+        val bytes = if (source.startsWith("http://") || source.startsWith("https://")) {
+            readUrlBytes(source)
+        } else {
+            File(source).readBytes()
+        }
+        return decodeSampledBitmap(bytes)
+    }
+
+    private fun readUrlBytes(source: String): ByteArray {
+        val connection = (URL(source).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 8_000
+            readTimeout = 12_000
+        }
+        return connection.inputStream.use { input ->
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                total += read
+                if (total > MAX_IMAGE_BYTES) error("image preview is too large")
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray()
+        }
+    }
+
+    private fun decodeSampledBitmap(bytes: ByteArray): Bitmap {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = thumbnailSampleSize(bounds.outWidth, bounds.outHeight)
+        }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            ?: error("cannot decode image preview")
+    }
+
+    private fun thumbnailSampleSize(width: Int, height: Int): Int {
+        if (width <= 0 || height <= 0) return 1
+        var sample = 1
+        while ((width / sample) * (height / sample) > MAX_THUMBNAIL_PIXELS) {
+            sample *= 2
+        }
+        return sample
+    }
+}
+
+private const val MAX_CHAT_ATTACHMENTS = 6

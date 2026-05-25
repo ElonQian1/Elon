@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.sin
@@ -19,6 +20,7 @@ import kotlin.math.sin
 data class ChatMessage(
     val role: String,
     val content: String,
+    val attachments: List<ChatAttachment>? = null,
     var evidenceTitle: String? = null,
     var evidenceDetails: String? = null,
     var evidenceExpanded: Boolean = false,
@@ -34,6 +36,7 @@ class ChatAdapter(
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val text: TextView = view.findViewById(R.id.messageText)
+        val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
@@ -88,9 +91,15 @@ class ChatAdapter(
         val message = messages[position]
         holder.stopShimmer()
         holder.text.text = message.content
+        holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
+            View.GONE
+        } else {
+            View.VISIBLE
+        }
         holder.text.setTextColor(messageTextColor(message.role))
         Linkify.addLinks(holder.text, Linkify.WEB_URLS)
         holder.text.movementMethod = LinkMovementMethod.getInstance()
+        bindChatAttachmentViews(holder.attachmentList, message.attachments)
         bindMessageActions(holder, message)
         bindEvidence(holder, message, position)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)

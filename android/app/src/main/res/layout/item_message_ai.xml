@@ -23,18 +23,33 @@
         android:layout_marginStart="8dp"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/messageText"
+        <LinearLayout
+            android:id="@+id/messageBubble"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_bubble_ai"
-            android:lineSpacingExtra="2dp"
+            android:orientation="vertical"
             android:paddingStart="12dp"
             android:paddingTop="9dp"
             android:paddingEnd="12dp"
-            android:paddingBottom="9dp"
-            android:textColor="#F4F4F4"
-            android:textSize="15sp" />
+            android:paddingBottom="9dp">
+
+            <LinearLayout
+                android:id="@+id/messageAttachmentList"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/messageText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="2dp"
+                android:textColor="#F4F4F4"
+                android:textSize="15sp" />
+
+        </LinearLayout>
 
         <TextView
             android:id="@+id/evidenceSummary"

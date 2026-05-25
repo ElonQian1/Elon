@@ -1,6 +1,7 @@
 use axum::{
-    Router,
+    extract::DefaultBodyLimit,
     routing::{delete, get, post},
+    Router,
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -48,7 +49,9 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/projects/:project_id/attachments",
-            post(project_attachments::upload_project_attachment),
+            post(project_attachments::upload_project_attachment).layer(DefaultBodyLimit::max(
+                project_attachments::MAX_PROJECT_ATTACHMENT_BYTES,
+            )),
         )
         .route(
             "/api/projects/:project_id/attachments/:conversation_id/:filename",
@@ -72,7 +75,9 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments",
-            post(project_attachments::upload_user_project_attachment),
+            post(project_attachments::upload_user_project_attachment).layer(DefaultBodyLimit::max(
+                project_attachments::MAX_PROJECT_ATTACHMENT_BYTES,
+            )),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments/:conversation_id/:filename",
