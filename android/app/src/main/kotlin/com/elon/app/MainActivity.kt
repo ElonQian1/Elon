@@ -1295,10 +1295,6 @@ class MainActivity : AppCompatActivity() {
         navigationController().setupBackHandling()
     }
 
-    private fun navigateBackOneLevel() {
-        navigationController().navigateBackOneLevel()
-    }
-
     private fun showConversationHome(animate: Boolean = false) {
         navigationController().showConversationHome(animate)
     }
@@ -2188,10 +2184,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    private fun showMoreActions() {
-        actionPopups().showMoreActions()
     }
 
     private fun showHomeActionPopup(anchor: View, tab: TextView) {

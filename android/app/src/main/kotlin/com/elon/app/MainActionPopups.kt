@@ -25,10 +25,6 @@ internal class MainActionPopups(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
-    fun showMoreActions() {
-        showChatActionPopup(binding.moreButton)
-    }
-
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
             listOf(
