@@ -1379,7 +1379,7 @@ class MainActivity : AppCompatActivity() {
             pageTransitionRunning = true
             WechatPageTransition.exitToRight(
                 container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage),
+                outgoing = listOf(binding.chatPage, binding.inputLayout),
                 incoming = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
@@ -1415,11 +1415,10 @@ class MainActivity : AppCompatActivity() {
         applyChatChrome()
         if (shouldAnimate) {
             collapseInputComposer(animate = false)
-            binding.inputLayout.visibility = View.GONE
             pageTransitionRunning = true
             WechatPageTransition.enterFromRight(
                 container = binding.contentContainer,
-                incoming = listOf(binding.chatPage),
+                incoming = listOf(binding.chatPage, binding.inputLayout),
                 outgoing = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
