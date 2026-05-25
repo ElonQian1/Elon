@@ -147,3 +147,78 @@ internal fun buildJson(): JSONObject {
         .put("release", Build.VERSION.RELEASE)
         .put("supported_abis", JSONArray().apply { Build.SUPPORTED_ABIS.forEach { put(it) } })
 }
+
+internal fun backgroundDebugStatusJson(context: Context): JSONObject {
+    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val appForegroundRecorded = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
+    val processState = processStateJson()
+    val appForeground = processState.optBoolean("foreground", appForegroundRecorded)
+    val keepalive = McpDebugKeepAliveService.statusJson(context)
+    val notificationPermission = notificationPermissionJson(context)
+    val batteryOptimization = batteryOptimizationJson(context)
+    val network = networkCapabilitiesJson(context)
+    val keepaliveActive = keepalive.optBoolean("active", false)
+    val caveats = JSONArray()
+    val recommendations = JSONArray()
+
+    fun warn(message: String, recommendation: String) {
+        caveats.put(message)
+        recommendations.put(recommendation)
+    }
+
+    if (!appForeground && !keepaliveActive) {
+        warn(
+            "App is backgrounded and MCP debug keepalive is not active.",
+            "Call debug_keepalive with action=start before switching to another app."
+        )
+    }
+    if (!notificationPermission.optBoolean("granted", true)) {
+        warn(
+            "Notification permission is denied, so the user may not see foreground debug/task status.",
+            "Open the APK once and allow notifications for clearer background debugging."
+        )
+    }
+    if (!batteryOptimization.optBoolean("ignoring", true)) {
+        warn(
+            "Battery optimization is still enabled for this APK.",
+            "Ask the user to allow unrestricted/background battery usage if MCP becomes unreachable after long idle or lock screen."
+        )
+    }
+    if (batteryOptimization.optBoolean("power_save_mode", false)) {
+        warn(
+            "System power save mode is active.",
+            "Disable power save mode while collecting timing traces for more stable background behavior."
+        )
+    }
+    if (!network.optBoolean("active", false) || !network.optBoolean("internet", false)) {
+        warn(
+            "No active internet-capable network is reported by Android.",
+            "Reconnect Wi-Fi/cellular before testing chat latency or backend reachability."
+        )
+    } else if (!network.optBoolean("validated", false)) {
+        warn(
+            "Android reports the active network is not validated.",
+            "Use network_check to separate captive-portal/phone-network issues from backend issues."
+        )
+    }
+
+    val backgroundReachable = appForeground || keepaliveActive
+    val reachability = when {
+        !backgroundReachable -> "foreground_only"
+        caveats.length() > 0 -> "at_risk"
+        else -> "ready"
+    }
+
+    return JSONObject()
+        .put("app_foreground", appForeground)
+        .put("app_foreground_recorded", appForegroundRecorded)
+        .put("process_state", processState)
+        .put("background_reachable", backgroundReachable)
+        .put("reachability", reachability)
+        .put("keepalive", keepalive)
+        .put("notification_permission", notificationPermission)
+        .put("battery_optimization", batteryOptimization)
+        .put("network", network)
+        .put("caveats", caveats)
+        .put("recommendations", recommendations)
+}
