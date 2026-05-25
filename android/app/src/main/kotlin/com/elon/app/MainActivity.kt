@@ -304,12 +304,12 @@ class MainActivity : AppCompatActivity() {
             },
             updateStage = projectViewActions()::updateStage,
             updateProjectViews = projectViewActions()::updateProjectViews,
-            addProjectEvent = ::addProjectEvent,
+            addProjectEvent = projectRecordActions()::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
             appendMessage = ::appendMessage,
-            workflowStoppedMessage = { reason, wasDevelopment -> workflowStoppedMessage(reason, wasDevelopment) },
+            workflowStoppedMessage = ::mainWorkflowStoppedMessage,
             startTaskWorkService = ::startTaskWorkService,
             nextServerResponseToken = { ++serverResponseToken },
             scheduleFirstServerResponseWatchdog = { traceId, token ->
@@ -903,7 +903,7 @@ class MainActivity : AppCompatActivity() {
             userId = userId,
             projectProvider = projectStateActions()::activeProject,
             projectTitleProvider = { projectStateActions().currentProjectTitle },
-            addProjectEvent = ::addProjectEvent,
+            addProjectEvent = projectRecordActions()::addProjectEvent,
             openUrl = { url -> externalActions().openUrl(url) },
             copyText = { label, text -> externalActions().copyText(label, text) }
         ).showGitProjectDialog()
@@ -960,18 +960,6 @@ class MainActivity : AppCompatActivity() {
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         ).also { messageActions = it }
-    }
-
-    private fun workflowStoppedMessage(reason: String, wasDevelopment: Boolean = activeRequestIsDevelopment): String {
-        val stage = if (wasDevelopment) "需要处理" else "回复中断"
-        return "工作停止：$stage。原因：$reason"
-    }
-
-    private fun aiMessageWithCurrentEvidence(
-        content: String,
-        attachments: List<ChatAttachment> = emptyList()
-    ): ChatMessage {
-        return evidenceActions().aiMessageWithCurrentEvidence(content, attachments)
     }
 
     private fun evidenceActions(): MainEvidenceActions {
@@ -1058,7 +1046,7 @@ class MainActivity : AppCompatActivity() {
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             updateStage = projectViewActions()::updateStage,
-            addProjectEvent = ::addProjectEvent,
+            addProjectEvent = projectRecordActions()::addProjectEvent,
             startTaskWorkService = ::startTaskWorkService
         ).also { serverResponseWatchdogActions = it }
     }
@@ -1117,7 +1105,7 @@ class MainActivity : AppCompatActivity() {
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
             isDevelopmentRequest = { activeRequestIsDevelopment },
-            addProjectEvent = ::addProjectEvent
+            addProjectEvent = projectRecordActions()::addProjectEvent
         ).also { assistantStreamEvents = it }
     }
 
@@ -1134,7 +1122,7 @@ class MainActivity : AppCompatActivity() {
             clearPersistedActiveWork = conversationTaskRegistryActions()::clearPersistedActiveWork,
             updateStage = projectViewActions()::updateStage,
             updateProjectViews = projectViewActions()::updateProjectViews,
-            addProjectEvent = ::addProjectEvent,
+            addProjectEvent = projectRecordActions()::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
@@ -1143,9 +1131,9 @@ class MainActivity : AppCompatActivity() {
             },
             clearCurrentEvidence = { evidenceActions().clearCurrentEvidence() },
             resetFoldedCliLog = { foldedCliLogActions().reset() },
-            aiMessageWithCurrentEvidence = ::aiMessageWithCurrentEvidence,
+            aiMessageWithCurrentEvidence = evidenceActions()::aiMessageWithCurrentEvidence,
             appendMessage = ::appendMessage,
-            workflowStoppedMessage = { workflowStoppedMessage(it) }
+            workflowStoppedMessage = { reason -> mainWorkflowStoppedMessage(reason, activeRequestIsDevelopment) }
         ).also { assistantTerminalActions = it }
     }
 
@@ -1154,7 +1142,7 @@ class MainActivity : AppCompatActivity() {
         return MainWorkflowStageActions(
             currentStage = { projectStateActions().currentStage },
             updateStage = projectViewActions()::updateStage,
-            addProjectEvent = ::addProjectEvent,
+            addProjectEvent = projectRecordActions()::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             }
@@ -1192,10 +1180,6 @@ class MainActivity : AppCompatActivity() {
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
         val workflowTerminalRoles = setOf("ai", "ai-intent", "error", "ai-stopped")
-    }
-
-    private fun addProjectEvent(text: String) {
-        projectRecordActions().addProjectEvent(text)
     }
 
     private fun projectRecordActions(): MainProjectRecordActions {

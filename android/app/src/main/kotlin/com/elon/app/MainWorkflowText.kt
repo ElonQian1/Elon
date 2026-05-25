@@ -106,6 +106,11 @@ internal fun finalReplyMessage(content: String, apkUrl: String?, imageUrl: Strin
     }
 }
 
+internal fun mainWorkflowStoppedMessage(reason: String, wasDevelopment: Boolean): String {
+    val stage = if (wasDevelopment) "需要处理" else "回复中断"
+    return "工作停止：$stage。原因：$reason"
+}
+
 internal fun nextWorkflowHint(stage: String): String {
     return when (stage) {
         "需求分析" -> "定位相关文件。"
