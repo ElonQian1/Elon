@@ -220,7 +220,7 @@ class MainActivity : AppCompatActivity() {
             },
             startTaskWorkService = { action -> startTaskWorkService(action) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
         ).also { resumeActions = it }
     }
@@ -248,7 +248,7 @@ class MainActivity : AppCompatActivity() {
                 val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks.containsKey(key)
             },
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             userId = { userId },
             selectedAgentForRequest = { modelActions().selectedAgentForRequest() },
             appendMessage = ::appendMessage,
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
             },
             clearCurrentEvidence = { evidenceActions().clearCurrentEvidence() },
             clearToolActionBubbles = { toolActionBubbles().clear() },
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
@@ -481,7 +481,7 @@ class MainActivity : AppCompatActivity() {
             serverUrl = serverUrl,
             userId = { userId },
             pendingAttachments = { pendingAttachments.toList() },
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             startPreparedMessage = preparedMessageActions()::startPreparedMessage
         ).also { attachmentSendActions = it }
     }
@@ -577,8 +577,8 @@ class MainActivity : AppCompatActivity() {
             activeConversationProvider = projectStateActions()::activeConversation,
             activeConversationIndexProvider = { activeConversationIndex },
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
-            renderConversationList = ::renderConversationList,
-            renderProjectList = ::renderProjectList,
+            renderConversationList = homeListActions()::renderConversationList,
+            renderProjectList = homeListActions()::renderProjectList,
             refreshServerVersion = { profileQuickActions().refreshServerVersion() },
             openConversation = conversationOpenActions()::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
@@ -589,7 +589,7 @@ class MainActivity : AppCompatActivity() {
             },
             collapseInputComposer = { animate -> inputFocusActions().collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
         ).also { navigationController = it }
     }
@@ -617,8 +617,8 @@ class MainActivity : AppCompatActivity() {
             chatAdapterProvider = { chatAdapter },
             titleEditText = ::titleEditText,
             saveConversations = projectStateActions()::saveConversations,
-            renderConversationList = ::renderConversationList,
-            setSendEnabled = ::setSendEnabled
+            renderConversationList = homeListActions()::renderConversationList,
+            setSendEnabled = sendEnabledActions()::setSendEnabled
         ).also { conversationActions = it }
     }
 
@@ -686,8 +686,8 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             resetReconnectAttempts = { reconnectAttempts = 0 },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            setSendEnabled = ::setSendEnabled,
-            renderConversationList = ::renderConversationList,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            renderConversationList = homeListActions()::renderConversationList,
             updateStage = ::updateStage,
             updateProjectViews = ::updateProjectViews
         ).also { conversationTaskRegistryActions = it }
@@ -709,7 +709,7 @@ class MainActivity : AppCompatActivity() {
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
             updateIdleReadyStatus = { conversationPreviewActions().updateIdleReadyStatus() },
@@ -805,17 +805,9 @@ class MainActivity : AppCompatActivity() {
             hasRunningTasks = { runningConversationTasks.isNotEmpty() },
             saveConversations = projectStateActions()::saveConversations,
             saveProjects = projectStateActions()::saveProjects,
-            renderConversationList = ::renderConversationList,
-            renderProjectList = ::renderProjectList
+            renderConversationList = homeListActions()::renderConversationList,
+            renderProjectList = homeListActions()::renderProjectList
         ).also { conversationPreviewActions = it }
-    }
-
-    private fun renderConversationList() {
-        homeListActions().renderConversationList()
-    }
-
-    private fun renderProjectList() {
-        homeListActions().renderProjectList()
     }
 
     private fun homeListActions(): MainHomeListActions {
@@ -865,7 +857,7 @@ class MainActivity : AppCompatActivity() {
             setActiveConversationIndex = { activeConversationIndex = it },
             titleEditText = ::titleEditText,
             saveProjects = projectStateActions()::saveProjects,
-            renderProjectList = ::renderProjectList,
+            renderProjectList = homeListActions()::renderProjectList,
             openProject = conversationOpenActions()::openProject,
             showGitProjectDialog = ::showGitProjectDialog
         ).also { projectActions = it }
@@ -889,7 +881,7 @@ class MainActivity : AppCompatActivity() {
             gson = gson,
             prefs = prefs,
             saveProjects = projectStateActions()::saveProjects,
-            renderProjectList = ::renderProjectList
+            renderProjectList = homeListActions()::renderProjectList
         )
     }
 
@@ -993,7 +985,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions()::activeConversation,
             chatAdapter = { chatAdapter },
             saveConversations = projectStateActions()::saveConversations,
-            renderConversationList = ::renderConversationList,
+            renderConversationList = homeListActions()::renderConversationList,
             showChat = { navigationController().showChat() },
             showMessageActionPopup = { anchor, message, text ->
                 actionPopups().showMessageActionPopup(anchor, message, text)
@@ -1169,7 +1161,7 @@ class MainActivity : AppCompatActivity() {
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
             setWaitingForReply = { waitingForReply = it },
-            setSendEnabled = ::setSendEnabled,
+            setSendEnabled = sendEnabledActions()::setSendEnabled,
             clearPendingRequestPayload = { pendingRequestPayload = null },
             clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { reconnectAttempts = 0 },
@@ -1231,8 +1223,8 @@ class MainActivity : AppCompatActivity() {
             currentProjectTitle = { currentProjectTitle },
             projectEvents = { projectEvents },
             currentTimeText = { timeFormatter.format(Date()) },
-            renderConversationList = ::renderConversationList,
-            renderProjectList = ::renderProjectList,
+            renderConversationList = homeListActions()::renderConversationList,
+            renderProjectList = homeListActions()::renderProjectList,
             updateStageHintShimmer = { stageHintShimmer().update() }
         ).also { projectViewActions = it }
     }
@@ -1264,10 +1256,6 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions()::saveProjects,
             updateProjectViews = ::updateProjectViews
         ).also { projectRecordActions = it }
-    }
-
-    private fun setSendEnabled(enabled: Boolean) {
-        sendEnabledActions().setSendEnabled(enabled)
     }
 
     private fun sendEnabledActions(): MainSendEnabledActions {
