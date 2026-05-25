@@ -1,0 +1,52 @@
+package com.elon.app
+
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.databinding.ActivityMainBinding
+
+internal class MainProjectViewActions(
+    private val activity: AppCompatActivity,
+    private val binding: ActivityMainBinding,
+    private val currentStage: () -> String,
+    private val currentProjectTitle: () -> String,
+    private val projectEvents: () -> List<String>,
+    private val currentTimeText: () -> String,
+    private val updateStageLines: () -> Unit,
+    private val renderConversationList: () -> Unit,
+    private val renderProjectList: () -> Unit,
+    private val updateStageHintShimmer: () -> Unit
+) {
+    fun updateProjectViews(hint: String) {
+        val stage = currentStage()
+        val events = projectEvents()
+        binding.currentStageText.text = stage
+        binding.projectStatusText.text = "一龙开发助手"
+        binding.stageHintText.text = hint
+        binding.progressTitleText.text = "开发进度：$stage"
+        binding.conversationTimeText.text = currentTimeText()
+        binding.userInfoText.text = accountInfoText(activity)
+
+        val recent = events.take(5).joinToString("\n")
+        binding.projectOverviewText.text = buildString {
+            append("项目管理\n")
+            append("项目：${currentProjectTitle()}\n")
+            append("阶段：$stage")
+            if (recent.isNotBlank()) {
+                append("\n\n最近记录\n")
+                append(recent)
+            }
+        }
+        binding.projectHistoryText.text = if (events.isEmpty()) {
+            "暂无进度记录"
+        } else {
+            events.joinToString("\n")
+        }
+        binding.projectWorkflowText.text = projectWorkflowCardText(stage)
+        updateStageLines()
+        renderConversationList()
+        if (binding.projectPage.visibility == View.VISIBLE) {
+            renderProjectList()
+        }
+        updateStageHintShimmer()
+    }
+}

@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity() {
     private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
+    private var projectViewActions: MainProjectViewActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1939,35 +1940,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateProjectViews(hint: String) {
-        binding.currentStageText.text = currentStage
-        binding.projectStatusText.text = "一龙开发助手"
-        binding.stageHintText.text = hint
-        binding.progressTitleText.text = "开发进度：$currentStage"
-        binding.conversationTimeText.text = timeFormatter.format(Date())
-        binding.userInfoText.text = accountInfoText(this)
+        projectViewActions().updateProjectViews(hint)
+    }
 
-        val recent = projectEvents.take(5).joinToString("\n")
-        binding.projectOverviewText.text = buildString {
-            append("项目管理\n")
-            append("项目：$currentProjectTitle\n")
-            append("阶段：$currentStage")
-            if (recent.isNotBlank()) {
-                append("\n\n最近记录\n")
-                append(recent)
-            }
-        }
-        binding.projectHistoryText.text = if (projectEvents.isEmpty()) {
-            "暂无进度记录"
-        } else {
-            projectEvents.joinToString("\n")
-        }
-        binding.projectWorkflowText.text = projectWorkflowCardText(currentStage)
-        updateStageLines()
-        renderConversationList()
-        if (binding.projectPage.visibility == View.VISIBLE) {
-            renderProjectList()
-        }
-        updateStageHintShimmer()
+    private fun projectViewActions(): MainProjectViewActions {
+        projectViewActions?.let { return it }
+        return MainProjectViewActions(
+            activity = this,
+            binding = binding,
+            currentStage = { currentStage },
+            currentProjectTitle = { currentProjectTitle },
+            projectEvents = { projectEvents },
+            currentTimeText = { timeFormatter.format(Date()) },
+            updateStageLines = ::updateStageLines,
+            renderConversationList = ::renderConversationList,
+            renderProjectList = ::renderProjectList,
+            updateStageHintShimmer = ::updateStageHintShimmer
+        ).also { projectViewActions = it }
     }
 
     private fun updateStageLines() {
