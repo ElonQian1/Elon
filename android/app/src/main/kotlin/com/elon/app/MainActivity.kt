@@ -3028,101 +3028,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshAccountUi() {
         if (!::binding.isInitialized) return
-        val loggedIn = AuthManager.isLoggedIn(this)
-        binding.profileLoginButton.visibility = if (loggedIn) View.GONE else View.VISIBLE
-        binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
-        binding.profileImportGuestButton.visibility =
-            if (loggedIn && importableGuestProjects().isNotEmpty()) View.VISIBLE else View.GONE
-        binding.userInfoText.text = accountInfoText(this)
+        accountActions().refreshAccountUi()
     }
 
-    /** 返回游客 prefs 中"值得导入"的项目列表（已登录、且当前账号中不存在）。 */
-    private fun importableGuestProjects(): List<AppProject> {
-        if (!AuthManager.isLoggedIn(this)) return emptyList()
-        val json = AuthManager.guestDataPrefs(this).getString("projects_json", null) ?: return emptyList()
-        val all = runCatching {
-            gson.fromJson(json, Array<AppProject>::class.java)?.toList()
-        }.getOrNull() ?: return emptyList()
-        val existingIds = projects.map { it.id }.toSet()
-        return all.filter { p ->
-            p.id != "elon-self" &&
-            p.id !in existingIds &&
-            p.conversations.any { c -> c.messages.any { m -> m.role == "user" } }
-        }
-    }
-
-    /** 首次登录后自动弹窗询问是否导入游客记录（每个游客 ID 只弹一次）。 */
     private fun checkAndOfferGuestImport() {
-        if (!AuthManager.isLoggedIn(this)) return
-        val guestId = AuthManager.legacyAnonymousUserId(this)
-        val offerKey = "guest_import_offered_$guestId"
-        if (prefs.getBoolean(offerKey, false)) return
-        val importable = importableGuestProjects()
-        if (importable.isEmpty()) return
-        prefs.edit().putBoolean(offerKey, true).apply()
-        AlertDialog.Builder(this)
-            .setTitle("发现游客记录")
-            .setMessage("检测到本机游客状态下有 ${importable.size} 个项目，是否导入到当前账号？")
-            .setPositiveButton("导入") { _, _ -> performGuestImport(importable) }
-            .setNegativeButton("暂不导入", null)
-            .show()
+        accountActions().checkAndOfferGuestImport()
     }
 
-    /** 手动从个人页触发的导入入口。 */
     private fun showGuestImportDialog() {
-        val importable = importableGuestProjects()
-        if (importable.isEmpty()) {
-            android.widget.Toast.makeText(this, "没有可导入的游客记录", android.widget.Toast.LENGTH_SHORT).show()
-            return
-        }
-        AlertDialog.Builder(this)
-            .setTitle("导入游客记录")
-            .setMessage("将导入 ${importable.size} 个游客项目到当前账号，是否继续？")
-            .setPositiveButton("导入") { _, _ -> performGuestImport(importable) }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun performGuestImport(importable: List<AppProject>) {
-        var count = 0
-        for (p in importable) {
-            if (projects.none { it.id == p.id }) {
-                projects.add(p)
-                count++
-            }
-        }
-        if (count > 0) {
-            saveProjects()
-            renderProjectList()
-            refreshAccountUi()
-            android.widget.Toast.makeText(this, "已导入 $count 个游客项目", android.widget.Toast.LENGTH_SHORT).show()
-        }
+        accountActions().showGuestImportDialog()
     }
 
     private fun confirmLogout() {
-        AlertDialog.Builder(this)
-            .setTitle("退出登录")
-            .setMessage("退出后将切换为游客模式。已经登录的项目数据仍保留在云端，可重新登录恢复。")
-            .setPositiveButton("继续退出") { _, _ -> confirmLogoutStep2() }
-            .setNegativeButton("取消", null)
-            .show()
+        accountActions().confirmLogout()
     }
 
-    private fun confirmLogoutStep2() {
-        AlertDialog.Builder(this)
-            .setTitle("再次确认")
-            .setMessage("确认退出当前账号？")
-            .setPositiveButton("确认退出") { _, _ -> performLogout() }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-    private fun performLogout() {
-        AuthManager.clear(this)
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
+    private fun accountActions(): MainAccountActions {
+        return MainAccountActions(
+            activity = this,
+            binding = binding,
+            projects = projects,
+            gson = gson,
+            prefs = prefs,
+            saveProjects = ::saveProjects,
+            renderProjectList = ::renderProjectList
+        )
     }
 
     private fun refreshServerVersion() {
