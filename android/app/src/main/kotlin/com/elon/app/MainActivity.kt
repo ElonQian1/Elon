@@ -75,7 +75,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -3199,15 +3198,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadGitProjectStatus(onLoaded: (GitProjectStatus) -> Unit) {
         Thread {
             try {
-                val response = http.newCall(
-                    Request.Builder()
-                        .url(projectGitUrl("status"))
-                        .get()
-                        .build()
-                ).execute()
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
-                val status = parseGitProjectStatus(JSONObject(body))
+                val status = fetchProjectGitStatus(http, serverUrl, userId, activeProject())
                 runOnUiThread { onLoaded(status) }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -3220,18 +3211,7 @@ class MainActivity : AppCompatActivity() {
     private fun generateDeployKey() {
         Thread {
             try {
-                val emptyBody = "{}".toRequestBody("application/json".toMediaType())
-                val response = http.newCall(
-                    Request.Builder()
-                        .url(projectGitUrl("deploy-key"))
-                        .post(emptyBody)
-                        .build()
-                ).execute()
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
-                val json = JSONObject(body)
-                val publicKey = json.optString("public_key", "")
-                val status = parseGitProjectStatus(json.optJSONObject("status") ?: JSONObject())
+                val (publicKey, status) = generateProjectDeployKey(http, serverUrl, userId, activeProject())
                 runOnUiThread {
                     copyText("GitHub Deploy Key", publicKey)
                     AlertDialog.Builder(this)
@@ -3254,21 +3234,7 @@ class MainActivity : AppCompatActivity() {
     private fun saveGitConfig(repoUrl: String, branch: String) {
         Thread {
             try {
-                val payload = JSONObject().apply {
-                    put("repo_url", repoUrl)
-                    put("branch", branch)
-                    put("auth_type", "deploy_key")
-                }
-                val body = payload.toString().toRequestBody("application/json".toMediaType())
-                val response = http.newCall(
-                    Request.Builder()
-                        .url(projectGitUrl("config"))
-                        .post(body)
-                        .build()
-                ).execute()
-                val responseBody = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(responseBody.ifBlank { "HTTP ${response.code}" })
-                val status = parseGitProjectStatus(JSONObject(responseBody))
+                val status = saveProjectGitConfig(http, serverUrl, userId, activeProject(), repoUrl, branch)
                 runOnUiThread {
                     activeProject().subtitle = if (status.remoteOk == true) {
                         "GitHub 仓库已连接"
@@ -3284,10 +3250,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    private fun projectGitUrl(action: String): String {
-        return "$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(activeProject().id)}/git/$action?title=${urlPart(activeProject().title)}"
     }
 
     private fun maybePrewarmCodexSession(reason: String) {
@@ -3363,10 +3325,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    private fun urlPart(value: String): String {
-        return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
     }
 
     private fun copyText(label: String, text: String) {
