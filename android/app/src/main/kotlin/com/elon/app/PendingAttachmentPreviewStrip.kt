@@ -72,6 +72,7 @@ internal class PendingAttachmentPreviewStrip(
             background = roundedBackground("#2A2A2A")
             contentDescription = attachment.displayName
             scaleType = ImageView.ScaleType.CENTER_CROP
+            setOnClickListener { ChatImageViewer.show(context, attachment.toChatAttachment()) }
             loadPendingAttachmentThumbnail(attachment.file)?.let {
                 setImageBitmap(it)
             } ?: setImageResource(android.R.drawable.ic_menu_gallery)
@@ -129,6 +130,17 @@ internal class PendingAttachmentPreviewStrip(
 
     private fun PendingAttachment.isImage(): Boolean {
         return kind == "image" || mimeType.startsWith("image/")
+    }
+
+    private fun PendingAttachment.toChatAttachment(): ChatAttachment {
+        return ChatAttachment(
+            kind = kind,
+            displayName = displayName,
+            fileName = fileName,
+            mimeType = mimeType,
+            localPath = file.absolutePath,
+            sizeBytes = file.length()
+        )
     }
 
     private fun loadPendingAttachmentThumbnail(file: File) = runCatching {

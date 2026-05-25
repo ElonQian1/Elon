@@ -53,7 +53,7 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
         setPadding(0, 0, 0, 0)
     }
 
-    val source = imageSource(attachment)
+    val source = chatAttachmentImageSource(attachment)
     if (source == null) {
         image.setImageResource(android.R.drawable.ic_menu_report_image)
         return image
@@ -62,11 +62,7 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
     image.tag = source
     image.setImageResource(android.R.drawable.ic_menu_gallery)
     image.setOnClickListener {
-        attachment.url?.let { url ->
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            }
-        }
+        ChatImageViewer.show(context, attachment)
     }
     ChatImagePreviewLoader.load(source) { bitmap ->
         image.post {
@@ -109,7 +105,7 @@ private fun createFileAttachmentView(context: Context, attachment: ChatAttachmen
     }
 }
 
-private fun imageSource(attachment: ChatAttachment): String? {
+internal fun chatAttachmentImageSource(attachment: ChatAttachment): String? {
     val local = attachment.localPath
         ?.takeIf { it.isNotBlank() }
         ?.takeIf { File(it).exists() }
@@ -128,7 +124,7 @@ private fun Context.dp(value: Int): Int {
     return (value * resources.displayMetrics.density).toInt()
 }
 
-private object ChatImagePreviewLoader {
+internal object ChatImagePreviewLoader {
     private const val MAX_IMAGE_BYTES = 12 * 1024 * 1024
     private const val MAX_THUMBNAIL_PIXELS = 1_200_000
     private val cache = object : LruCache<String, Bitmap>(16 * 1024 * 1024) {

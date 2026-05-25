@@ -14,6 +14,10 @@ internal class MainPendingAttachmentActions(
     private val refreshPendingAttachmentPreview: () -> Unit
 ) {
     fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
+        if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
+            Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
+            return
+        }
         val name = fallbackName ?: displayNameForUri(activity, uri) ?: uri.lastPathSegment ?: kind
         val attachment = runCatching {
             copyAttachmentToCache(activity, kind, uri, name, pendingAttachments.size + 1)
@@ -45,3 +49,5 @@ internal class MainPendingAttachmentActions(
         refreshPendingAttachmentPreview()
     }
 }
+
+internal const val MAX_PENDING_ATTACHMENTS = 9

@@ -33,9 +33,13 @@ internal class MainAttachmentPickerActions(
                 Toast.makeText(activity, "已取消拍摄", Toast.LENGTH_SHORT).show()
             }
         }
-        photoAttachmentLauncher = activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                attachPickedFile("相册图片", uri, null)
+        photoAttachmentLauncher = activity.registerForActivityResult(
+            ActivityResultContracts.PickMultipleVisualMedia(MAX_PENDING_ATTACHMENTS)
+        ) { uris ->
+            if (uris.isNotEmpty()) {
+                uris.forEach { uri ->
+                    attachPickedFile("相册图片", uri, null)
+                }
             } else {
                 Toast.makeText(activity, "已取消选择相册", Toast.LENGTH_SHORT).show()
             }
