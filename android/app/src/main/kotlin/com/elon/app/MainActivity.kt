@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             setupBackHandling = { navigationController().setupBackHandling() },
             setupInputComposer = ::setupInputComposer,
             restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
-            updateProjectViews = ::updateProjectViews,
+            updateProjectViews = projectViewActions()::updateProjectViews,
             setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
             registerTaskWorkReceiver = { taskWorkReceiverActions().registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions().restorePendingActiveWork() },
@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
             getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             currentStage = { projectStateActions().currentStage },
-            updateStage = ::updateStage,
+            updateStage = projectViewActions()::updateStage,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
@@ -247,9 +247,9 @@ class MainActivity : AppCompatActivity() {
                 projectRecordActions().updateProjectTitleFromRequest(text)
                 projectRecordActions().saveProjectTitle()
                 projectRecordActions().addProjectEvent("提交需求：${summarize(text, 36)}")
-                updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
+                projectViewActions().updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
             },
-            updateProjectViews = ::updateProjectViews,
+            updateProjectViews = projectViewActions()::updateProjectViews,
             nextServerResponseToken = { ++serverResponseToken },
             putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
             startTaskWorkService = ::startTaskWorkService,
@@ -259,7 +259,7 @@ class MainActivity : AppCompatActivity() {
             },
             refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
-            updateStage = ::updateStage,
+            updateStage = projectViewActions()::updateStage,
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
             },
@@ -302,8 +302,8 @@ class MainActivity : AppCompatActivity() {
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
-            updateStage = ::updateStage,
-            updateProjectViews = ::updateProjectViews,
+            updateStage = projectViewActions()::updateStage,
+            updateProjectViews = projectViewActions()::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
@@ -654,8 +654,8 @@ class MainActivity : AppCompatActivity() {
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             setSendEnabled = sendEnabledActions()::setSendEnabled,
             renderConversationList = homeListActions()::renderConversationList,
-            updateStage = ::updateStage,
-            updateProjectViews = ::updateProjectViews
+            updateStage = projectViewActions()::updateStage,
+            updateProjectViews = projectViewActions()::updateProjectViews
         ).also { conversationTaskRegistryActions = it }
     }
 
@@ -988,7 +988,7 @@ class MainActivity : AppCompatActivity() {
         foldedCliLogActions?.let { return it }
         return MainFoldedCliLogActions(
             currentStage = { projectStateActions().currentStage },
-            updateStage = ::updateStage,
+            updateStage = projectViewActions()::updateStage,
             maybeAppendVisibleCliSignal = { category, line ->
                 progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
             },
@@ -1057,7 +1057,7 @@ class MainActivity : AppCompatActivity() {
             getCurrentStage = { projectStateActions().currentStage },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
-            updateStage = ::updateStage,
+            updateStage = projectViewActions()::updateStage,
             addProjectEvent = ::addProjectEvent,
             startTaskWorkService = ::startTaskWorkService
         ).also { serverResponseWatchdogActions = it }
@@ -1132,8 +1132,8 @@ class MainActivity : AppCompatActivity() {
             clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { reconnectAttempts = 0 },
             clearPersistedActiveWork = conversationTaskRegistryActions()::clearPersistedActiveWork,
-            updateStage = ::updateStage,
-            updateProjectViews = ::updateProjectViews,
+            updateStage = projectViewActions()::updateStage,
+            updateProjectViews = projectViewActions()::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
@@ -1153,7 +1153,7 @@ class MainActivity : AppCompatActivity() {
         workflowStageActions?.let { return it }
         return MainWorkflowStageActions(
             currentStage = { projectStateActions().currentStage },
-            updateStage = ::updateStage,
+            updateStage = projectViewActions()::updateStage,
             addProjectEvent = ::addProjectEvent,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
@@ -1169,26 +1169,18 @@ class MainActivity : AppCompatActivity() {
         ).also { stageHintShimmer = it }
     }
 
-    private fun updateStage(stage: String, hint: String) {
-        projectStateActions().currentStage = stage
-        projectStateActions().activeProject().subtitle = hint
-        projectStateActions().saveProjects()
-        updateProjectViews(hint)
-    }
-
-    private fun updateProjectViews(hint: String) {
-        projectViewActions().updateProjectViews(hint)
-    }
-
     private fun projectViewActions(): MainProjectViewActions {
         projectViewActions?.let { return it }
         return MainProjectViewActions(
             activity = this,
             binding = binding,
             currentStage = { projectStateActions().currentStage },
+            setCurrentStage = { projectStateActions().currentStage = it },
+            setActiveProjectSubtitle = { projectStateActions().activeProject().subtitle = it },
             currentProjectTitle = { projectStateActions().currentProjectTitle },
             projectEvents = { projectStateActions().projectEvents },
             currentTimeText = { timeFormatter.format(Date()) },
+            saveProjects = projectStateActions()::saveProjects,
             renderConversationList = homeListActions()::renderConversationList,
             renderProjectList = homeListActions()::renderProjectList,
             updateStageHintShimmer = { stageHintShimmer().update() }
@@ -1220,7 +1212,7 @@ class MainActivity : AppCompatActivity() {
             currentTimeText = { timeFormatter.format(Date()) },
             currentStageHint = { binding.stageHintText.text.toString() },
             saveProjects = projectStateActions()::saveProjects,
-            updateProjectViews = ::updateProjectViews
+            updateProjectViews = projectViewActions()::updateProjectViews
         ).also { projectRecordActions = it }
     }
 

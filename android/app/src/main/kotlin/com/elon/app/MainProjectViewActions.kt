@@ -8,13 +8,23 @@ internal class MainProjectViewActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val currentStage: () -> String,
+    private val setCurrentStage: (String) -> Unit,
+    private val setActiveProjectSubtitle: (String) -> Unit,
     private val currentProjectTitle: () -> String,
     private val projectEvents: () -> List<String>,
     private val currentTimeText: () -> String,
+    private val saveProjects: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val updateStageHintShimmer: () -> Unit
 ) {
+    fun updateStage(stage: String, hint: String) {
+        setCurrentStage(stage)
+        setActiveProjectSubtitle(hint)
+        saveProjects()
+        updateProjectViews(hint)
+    }
+
     fun updateProjectViews(hint: String) {
         val stage = currentStage()
         val events = projectEvents()
