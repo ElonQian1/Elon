@@ -19,6 +19,7 @@ handoffs:
 - 先 `git fetch origin main`；如果主工作区有不属于本任务或来源不明的未提交改动，从 `origin/main` 创建临时 worktree 隔离工作。
 - 修改前先读取目标文件和相关文档。
 - 只编辑当前任务需要的文件，保持 Rust/Kotlin/XML/Markdown 既有风格。
+- 不继续制造巨型文件；触碰 1500 行以上文件时，除小修外优先把本次职责抽到独立模块，并保持提交聚焦。
 - 根据风险运行最小有效验证：Rust 用 `cargo check`，Android 用 Gradle lint/assemble，文档用 `git diff --check`。
 - 后端运行代码变更必须递增 `server/Cargo.toml` 版本号，部署后校验 `/api/server/version`。
 - 只 stage 当前任务文件，commit message 使用常规前缀和中文描述。

@@ -14,7 +14,8 @@ disable-model-invocation: false
 2. Git 工作流违规：夹带无关文件、未保护并发改动、未 push、部署基于脏状态。
 3. 版本发布问题：后端运行代码未递增 `server/Cargo.toml` 版本号、APK 发布未更新版本号、签名/分发路径错误。
 4. 缺失验证：未运行与改动风险匹配的检查。
-5. 文档或指令与 VS Code Copilot customization 约定不一致。
+5. 模块化违规：继续向巨型文件追加大段逻辑、职责边界混杂、拆分提交夹带新功能。
+6. 文档或指令与 VS Code Copilot customization 约定不一致。
 
 输出格式：
 

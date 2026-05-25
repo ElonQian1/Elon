@@ -19,18 +19,20 @@ description: >
 
 1. **分析需求** → 判断涉及哪些模块（Android / Rust / 前端）
 2. **读取目标文件** → 理解现有代码结构
-3. **生成修改方案** → 精确定位要改的内容
-4. **执行修改** → 使用精确替换，保持代码风格
-5. **语法检查** → `cargo check` / `./gradlew lint` / `npm run lint`
-6. **git commit + push** → 只提交本任务文件，推送到 `origin/main`
-7. **触发编译/发布** → 后端用 `scripts/publish-server.ps1|sh`，APK 用 `scripts/publish-apk.ps1`
-8. **签名APK** → 使用环境变量或用户 Gradle 配置中的密钥，不硬编码
-9. **部署上线** → 必须基于已提交、已推送的 SHA
-10. **推送结果** → 汇报 SHA、验证结果、APK 版本和下载链接
+3. **规划模块边界** → 避免继续向巨型文件堆逻辑，必要时先抽职责模块
+4. **生成修改方案** → 精确定位要改的内容
+5. **执行修改** → 使用精确替换，保持代码风格
+6. **语法检查** → `cargo check` / `./gradlew lint` / `npm run lint`
+7. **git commit + push** → 只提交本任务文件，推送到 `origin/main`
+8. **触发编译/发布** → 后端用 `scripts/publish-server.ps1|sh`，APK 用 `scripts/publish-apk.ps1`
+9. **签名APK** → 使用环境变量或用户 Gradle 配置中的密钥，不硬编码
+10. **部署上线** → 必须基于已提交、已推送的 SHA
+11. **推送结果** → 汇报 SHA、验证结果、APK 版本和下载链接
 
 ## 关键规则
 
 - 修改前必须先读文件，不允许盲改
+- 不继续制造巨型文件；触碰 1500 行以上文件时，除小修外优先抽出本次职责模块
 - 有其他任务或来源不明的未提交改动时，必须从 `origin/main` 新建 worktree，不在脏工作区硬拉远端
 - 服务端运行代码变更必须递增 `server/Cargo.toml` 的 `version`，部署后校验 `/api/server/version`
 - Rust 构建不得依赖相对路径 `CARGO_TARGET_DIR`；优先使用项目脚本或绝对 target 目录

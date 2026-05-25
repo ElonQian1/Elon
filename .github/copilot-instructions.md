@@ -92,6 +92,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
+- **长期主义模块化**：不要继续制造巨型文件；新增功能按职责拆到模块里，入口文件只做组装和路由。修改 `MainActivity.kt`、`McpDebugServer.kt`、`project_api.rs`、`ai_cli.rs` 等巨型文件时，除小修外优先顺手抽出本次触碰到的职责边界
 - **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本自动递增 PATCH 版本号、commit、push、构建、部署；部署后校验 `/api/server/version`，APK 会动态展示后端版本；MINOR/MAJOR 变更时手动改好 `server/Cargo.toml` 后加 `-SkipVersionBump` 参数
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 
@@ -122,6 +123,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 | 文档 | 内容 |
 |---|---|
+| `.github/instructions/modular-architecture.instructions.md` | 模块化、巨型文件治理、多 AI 并行拆分边界 |
 | `docs/system-architecture.md` | 系统架构详细设计、组件交互、数据流 |
 | `docs/ai-agent-workflow.md` | AI代理如何执行代码修改→编译→部署的完整流程 |
 | `docs/vscode-copilot-working-model.md` | VS Code Copilot 最新 agent / instructions / prompt files / custom agents 工作方式速记 |

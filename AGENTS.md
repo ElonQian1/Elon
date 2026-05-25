@@ -143,8 +143,9 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 1. `.github/copilot-instructions.md`：项目定位、当前状态、部署速查、全局 AI 原则。
 2. `.github/instructions/git-deploy-workflow.instructions.md`：多 AI 并发、worktree 隔离、push 冲突处理。
-3. `docs/ai-agent-workflow.md`：需求分析→代码修改→编译→部署完整流程。
-4. `docs/system-architecture.md`：架构、模块边界、数据流。
+3. `.github/instructions/modular-architecture.instructions.md`：模块化、巨型文件治理、长期维护边界。
+4. `docs/ai-agent-workflow.md`：需求分析→代码修改→编译→部署完整流程。
+5. `docs/system-architecture.md`：架构、模块边界、数据流。
 
 ---
 
@@ -311,6 +312,7 @@ cd e:\lodex\Elon\android
 
 - 有未提交并发改动时，用临时 worktree 隔离（见 git-deploy-workflow）。
 - 隔离 worktree 推送成功后，尽量把原主工作区用 `git pull --ff-only origin main` 同步到最新，同时保留未跟踪/未提交现场不动。
+- 避免继续制造巨型文件；新增功能按职责拆模块，入口文件只做组装和路由。修改 1500 行以上文件时，除小修外优先把本次触碰到的职责抽到独立模块。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
 - 后端运行代码变更只需直接运行 `.\scripts\publish-server.ps1`（自动递增 PATCH、commit、push、构建、部署）；MINOR/MAJOR 变更时手动改好 `server/Cargo.toml` 后加 `-SkipVersionBump`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。

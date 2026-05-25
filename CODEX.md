@@ -21,6 +21,7 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 - `AGENTS.md`: shared entry point for VS Code Copilot, Codex, Claude Code, and other AI agents.
 - `.github/copilot-instructions.md`: global project positioning and agent principles.
 - `.github/instructions/git-deploy-workflow.instructions.md`: mandatory Git, push, worktree, deploy, and report workflow.
+- `.github/instructions/modular-architecture.instructions.md`: mandatory modularity, giant-file prevention, and long-term maintainability rules.
 - `.github/prompts/*.prompt.md`: VS Code slash-command prompts for recurring project workflows.
 - `.github/agents/*.agent.md`: VS Code custom agents for planning, implementation, and review roles.
 - `.github/skills/cloud-apk-dev/SKILL.md`: VS Code official Agent Skills entry for cloud APK development and deployment.
@@ -124,14 +125,22 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 3. Read the existing files and surrounding context first.
 4. Plan narrowly scoped changes.
 5. Edit only the needed files and preserve existing style.
-6. Verify locally with the smallest useful command.
-7. Commit only the task files.
-8. Push to `origin/main`.
-9. If the work was done in an isolated worktree, fast-forward the original main workspace to `origin/main` without touching untracked files.
-10. If deployment is required, deploy from a clean committed state or detached temporary worktree.
-11. Report the commit SHA, push status, main workspace sync status, verification result, and deployment result.
+6. Avoid adding substantial logic to giant files. If a touched file is already over 1500 lines, prefer extracting the touched responsibility into a focused module before adding new behavior.
+7. Verify locally with the smallest useful command.
+8. Commit only the task files.
+9. Push to `origin/main`.
+10. If the work was done in an isolated worktree, fast-forward the original main workspace to `origin/main` without touching untracked files.
+11. If deployment is required, deploy from a clean committed state or detached temporary worktree.
+12. Report the commit SHA, push status, main workspace sync status, verification result, and deployment result.
 
 Avoid large mixed commits. If a change touches more than about five files or spans multiple concerns, split it into smaller tasks when practical.
+
+## Modular Development Rule
+
+- Do not create new giant files. New features should be placed behind clear module boundaries.
+- Entry files should assemble and route; feature logic, persistence, protocol parsing, prompt building, diagnostics, UI construction, and command execution should live in focused modules.
+- For the current repo, keep shrinking `MainActivity.kt`, `McpDebugServer.kt`, `project_api.rs`, and `ai_cli.rs` as nearby work touches their responsibilities.
+- When multiple AI agents work in parallel, divide work by module ownership and sync with `origin/main` before editing or committing.
 
 ## Verification Commands
 

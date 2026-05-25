@@ -7,6 +7,10 @@
 > [.github/instructions/git-deploy-workflow.instructions.md](../.github/instructions/git-deploy-workflow.instructions.md)
 > 该文件通过 `applyTo: "**"` 自动注入，AI 代理编辑任何文件时均自动生效。
 
+> **模块化与长期维护规则**（避免巨型文件、按职责拆模块、多 AI 并行边界）见：
+> [.github/instructions/modular-architecture.instructions.md](../.github/instructions/modular-architecture.instructions.md)
+> 该文件同样通过 `applyTo: "**"` 自动注入。
+
 ---
 
 ## 项目进入规则（APK / Web / 服务器 Codex CLI 通用）
@@ -162,6 +166,7 @@ AI 代理接收用户消息后，必须先判断需求类型：
 - 使用 `replace_string_in_file` 或 `multi_replace_string_in_file` 精确修改
 - **不允许**整个文件重写，除非是新建文件
 - **不允许**删除用户未明确要求删除的功能
+- **不允许**继续向巨型文件堆叠大段新逻辑；触碰 1500 行以上文件时，除小修外优先抽出本次职责模块
 - 保持代码缩进、风格与原文件一致
 
 ---
@@ -335,3 +340,4 @@ APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现�
 5. **不允许**一次修改范围过大（超过5个文件应拆分为多次任务）
 6. **Android 新功能禁止只交 PR 或 Debug 包**；默认必须完成 APK 发布闭环并校验服务器 `version.json`
 7. **后端运行代码变更必须递增服务端版本号**；默认必须部署后校验服务器 `/api/server/version`
+8. **不允许继续制造巨型文件**；新功能默认按职责模块化，入口文件只做组装和路由

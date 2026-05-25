@@ -24,8 +24,9 @@ Read these files before acting:
 1. `AGENTS.md`
 2. `.github/copilot-instructions.md`
 3. `.github/instructions/git-deploy-workflow.instructions.md`
-4. `docs/ai-agent-workflow.md`
-5. `docs/system-architecture.md`
+4. `.github/instructions/modular-architecture.instructions.md`
+5. `docs/ai-agent-workflow.md`
+6. `docs/system-architecture.md`
 
 ## Commands And Entry Points
 
@@ -39,6 +40,7 @@ Read these files before acting:
 
 - Start and end with `git status --short --branch`.
 - If the main workspace has unrelated uncommitted changes, use a temporary worktree.
+- Do not keep adding logic to giant files. For files over 1500 lines, extract the touched responsibility into a focused module unless the change is a tiny fix.
 - Never deploy uncommitted code.
 - Never stage unrelated files.
 - Never commit secrets, `.env`, APK signing keys, or generated private credentials.
