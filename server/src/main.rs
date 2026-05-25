@@ -32,6 +32,8 @@ mod image_generation;
 mod intent_router;
 mod peer_relay;
 mod project_api;
+mod project_attachment_notes;
+mod project_attachment_paths;
 mod project_attachments;
 mod project_auth;
 mod project_chat;

@@ -1,25 +1,25 @@
 use axum::{
+    Json,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Path as AxumPath, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
 };
 use tokio::sync::broadcast;
 
 use crate::{
-    project_attachments::append_project_attachment_notes,
+    project_attachment_notes::append_project_attachment_notes,
     project_auth::{
-        auth_from_headers, can_edit, json_error, login_inner, project_access, register_inner,
-        LoginRequest, RegisterRequest,
+        LoginRequest, RegisterRequest, auth_from_headers, can_edit, json_error, login_inner,
+        project_access, register_inner,
     },
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_mobile::ensure_mobile_project,

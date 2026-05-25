@@ -4,11 +4,8 @@ use std::{
 };
 
 use crate::{
-    project_attachments::safe_project_path_part,
-    project_git::git_output,
-    store::ProjectAccess,
-    tools,
-    types::AppState,
+    project_attachment_paths::safe_project_path_part, project_git::git_output,
+    store::ProjectAccess, tools, types::AppState,
 };
 
 #[derive(Debug, Clone)]
