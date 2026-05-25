@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
     private var sendMessageActions: MainSendMessageActions? = null
+    private var serverResponseWatchdogActions: MainServerResponseWatchdogActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -309,7 +310,9 @@ class MainActivity : AppCompatActivity() {
             refreshActiveTaskState = ::refreshActiveTaskState,
             persistActiveWork = ::persistActiveWork,
             updateStage = ::updateStage,
-            scheduleFirstServerResponseWatchdog = ::scheduleFirstServerResponseWatchdog,
+            scheduleFirstServerResponseWatchdog = { traceId, token ->
+                serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
+            },
             clearPendingAttachments = { clearPendingAttachments(deleteFiles = false) }
         ).also { preparedMessageActions = it }
     }
@@ -367,7 +370,9 @@ class MainActivity : AppCompatActivity() {
             workflowStoppedMessage = { reason, wasDevelopment -> workflowStoppedMessage(reason, wasDevelopment) },
             startTaskWorkService = ::startTaskWorkService,
             nextServerResponseToken = { ++serverResponseToken },
-            scheduleFirstServerResponseWatchdog = ::scheduleFirstServerResponseWatchdog
+            scheduleFirstServerResponseWatchdog = { traceId, token ->
+                serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
+            }
         ).also { activeWorkControlActions = it }
     }
 
@@ -1503,22 +1508,24 @@ class MainActivity : AppCompatActivity() {
         ).also { workflowMessageCompactor = it }
     }
 
-    private fun scheduleFirstServerResponseWatchdog(traceId: String, token: Int) {
-        binding.root.postDelayed({
-            if (taskResponseTokens[traceId] != token) return@postDelayed
-            val task = runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } ?: return@postDelayed
-            task.pendingReconnect = true
-            refreshActiveTaskState()
-            if (task.isDevelopment && activeConversationTask()?.traceId == traceId) {
-                updateStage(currentStage, "暂时没有收到服务器进度，正在自动恢复连接。")
-                addProjectEvent("服务端暂未返回进度，自动恢复连接")
-            }
-            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING, traceId = traceId)
-        }, 20_000L)
-    }
-
     private fun appendMessage(raw: String) {
         assistantRawMessageActions().appendMessage(raw)
+    }
+
+    private fun serverResponseWatchdogActions(): MainServerResponseWatchdogActions {
+        serverResponseWatchdogActions?.let { return it }
+        return MainServerResponseWatchdogActions(
+            binding = binding,
+            taskResponseTokens = taskResponseTokens,
+            taskForTrace = { traceId -> runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } },
+            activeConversationTask = ::activeConversationTask,
+            getCurrentStage = { currentStage },
+            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
+            refreshActiveTaskState = ::refreshActiveTaskState,
+            updateStage = ::updateStage,
+            addProjectEvent = ::addProjectEvent,
+            startTaskWorkService = ::startTaskWorkService
+        ).also { serverResponseWatchdogActions = it }
     }
 
     private fun assistantRawMessageActions(): MainAssistantRawMessageActions {
