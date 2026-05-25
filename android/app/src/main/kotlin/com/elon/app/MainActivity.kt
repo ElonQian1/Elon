@@ -173,7 +173,7 @@ class MainActivity : AppCompatActivity() {
             setupAttachmentLaunchers = ::setupAttachmentLaunchers,
             activeConversation = ::activeConversation,
             pauseCurrentWork = ::pauseCurrentWork,
-            showMessageActions = ::showMessageActions,
+            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
             setupNavigation = ::setupNavigation,
             setupQuickActions = ::setupQuickActions,
@@ -536,7 +536,11 @@ class MainActivity : AppCompatActivity() {
         if (conversationIndex < 0) return false
         activeProjectIndex = projectIndex
         project.activeConversationIndex = conversationIndex
-        chatAdapter = ChatAdapter(project.conversations[conversationIndex].messages, ::pauseCurrentWork, ::showMessageActions)
+        chatAdapter = ChatAdapter(
+            project.conversations[conversationIndex].messages,
+            ::pauseCurrentWork,
+            { anchor, message -> messageActions().showMessageActions(anchor, message) }
+        )
         binding.chatList.adapter = chatAdapter
         showChat()
         if (chatAdapter.itemCount > 0) {
@@ -824,7 +828,11 @@ class MainActivity : AppCompatActivity() {
     private fun openConversation(index: Int) {
         if (conversations.isEmpty()) conversations.add(defaultAppConversation())
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
-        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
+        chatAdapter = ChatAdapter(
+            activeConversation().messages,
+            ::pauseCurrentWork,
+            { anchor, message -> messageActions().showMessageActions(anchor, message) }
+        )
         binding.chatList.adapter = chatAdapter
         showChat(animate = true)
         if (chatAdapter.itemCount > 0) {
@@ -1273,7 +1281,7 @@ class MainActivity : AppCompatActivity() {
             showProjectRecordDialog = ::showProjectRecordDialog,
             showGitProjectDialog = ::showGitProjectDialog,
             openSettings = { quickCommandActions().openSettings() },
-            showPromotionDialog = ::showPromotionDialog,
+            showPromotionDialog = { messageActions().showPromotionDialog() },
             showGuestImportDialog = ::showGuestImportDialog,
             confirmLogout = ::confirmLogout
         ).also { profileQuickActions = it }
@@ -1302,8 +1310,8 @@ class MainActivity : AppCompatActivity() {
             showCreateProjectDialog = ::showCreateProjectDialog,
             showCreateConversationDialog = ::showCreateConversationDialog,
             openSettings = { quickCommandActions().openSettings() },
-            deleteMessage = ::deleteMessage,
-            quoteMessage = ::quoteMessage,
+            deleteMessage = { message -> messageActions().deleteMessage(message) },
+            quoteMessage = { text -> messageActions().quoteMessage(text) },
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { actionPopups = it }
@@ -1322,8 +1330,8 @@ class MainActivity : AppCompatActivity() {
             projectProvider = ::activeProject,
             projectTitleProvider = { currentProjectTitle },
             addProjectEvent = ::addProjectEvent,
-            openUrl = ::openUrl,
-            copyText = ::copyText
+            openUrl = { url -> externalActions().openUrl(url) },
+            copyText = { label, text -> externalActions().copyText(label, text) }
         ).showGitProjectDialog()
     }
 
@@ -1344,14 +1352,6 @@ class MainActivity : AppCompatActivity() {
         ).also { codexPrewarm = it }
     }
 
-    private fun copyText(label: String, text: String) {
-        externalActions().copyText(label, text)
-    }
-
-    private fun openUrl(url: String) {
-        externalActions().openUrl(url)
-    }
-
     private fun externalActions(): MainExternalActions {
         externalActions?.let { return it }
         return MainExternalActions(this).also { externalActions = it }
@@ -1369,26 +1369,6 @@ class MainActivity : AppCompatActivity() {
         ).also { quickCommandActions = it }
     }
 
-    private fun showMessageActions(anchor: View, message: ChatMessage) {
-        messageActions().showMessageActions(anchor, message)
-    }
-
-    private fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
-        actionPopups().showMessageActionPopup(anchor, message, text)
-    }
-
-    private fun deleteMessage(message: ChatMessage) {
-        messageActions().deleteMessage(message)
-    }
-
-    private fun quoteMessage(text: String) {
-        messageActions().quoteMessage(text)
-    }
-
-    private fun showPromotionDialog() {
-        messageActions().showPromotionDialog()
-    }
-
     private fun shareActions(): MainShareActions {
         return MainShareActions(this, ::dp)
     }
@@ -1403,7 +1383,9 @@ class MainActivity : AppCompatActivity() {
             saveConversations = ::saveConversations,
             renderConversationList = ::renderConversationList,
             showChat = { showChat() },
-            showMessageActionPopup = ::showMessageActionPopup,
+            showMessageActionPopup = { anchor, message, text ->
+                actionPopups().showMessageActionPopup(anchor, message, text)
+            },
             shareActions = ::shareActions,
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
