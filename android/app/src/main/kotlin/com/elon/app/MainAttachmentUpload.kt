@@ -6,7 +6,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import org.json.JSONObject
 
 internal fun uploadAttachmentRefsOrNull(
@@ -17,10 +16,11 @@ internal fun uploadAttachmentRefsOrNull(
     target: SendTarget,
     maxAttachmentBytes: Int,
     showShortToast: (String) -> Unit,
-    showLongToast: (String) -> Unit
+    showLongToast: (String) -> Unit,
+    onProgress: (AttachmentUploadProgress) -> Unit = {}
 ): JsonArray? {
     val array = JsonArray()
-    for (attachment in attachments) {
+    for ((index, attachment) in attachments.withIndex()) {
         if (!attachment.file.exists()) {
             showShortToast("附件已失效，请重新选择：${attachment.displayName}")
             return null
@@ -44,10 +44,17 @@ internal fun uploadAttachmentRefsOrNull(
         val mediaType = attachment.mimeType.toMediaTypeOrNull()
             ?: "application/octet-stream".toMediaType()
         val response = try {
+            val body = AttachmentUploadProgressBody(
+                file = attachment.file,
+                mediaType = mediaType,
+                attachmentIndex = index + 1,
+                attachmentCount = attachments.size,
+                onProgress = onProgress
+            )
             http.newCall(
                 Request.Builder()
                     .url(url)
-                    .post(attachment.file.asRequestBody(mediaType))
+                    .post(body)
                     .build()
             ).execute()
         } catch (e: Exception) {
