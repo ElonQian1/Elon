@@ -126,10 +126,10 @@ class MainActivity : AppCompatActivity() {
         set(value) {
             activeProject().activeConversationIndex = value
         }
+    private var homeRows: MainHomeRows? = null
     private var modelActions: MainModelActions? = null
     private var stageHintAnimator: ValueAnimator? = null
     private var stageHintShimmerToken = 0
-    private var conversationHomeRowAnimator: ValueAnimator? = null
     private var exitConfirmDialog: AlertDialog? = null
     private var actionPopup: PopupWindow? = null
     private var pageTransitionRunning = false
@@ -2331,14 +2331,16 @@ class MainActivity : AppCompatActivity() {
         binding.statusText.text = first.subtitle
         binding.statusText.setTextColor(conversationSubtitleColor(first.subtitle))
         binding.conversationTimeText.text = timeFormatter.format(Date(first.updatedAt))
-        updateConversationRowShimmer(binding.conversationItem, listVisible && isConversationWorking(0), true)
+        homeRows().updateConversationRowShimmer(binding.conversationItem, listVisible && isConversationWorking(0), true)
 
         while (binding.conversationPage.childCount > 1) {
             binding.conversationPage.removeViewAt(1)
         }
         for (index in 1 until conversations.size) {
-            binding.conversationPage.addView(createConversationDivider())
-            binding.conversationPage.addView(createConversationRow(index, conversations[index], listVisible))
+            binding.conversationPage.addView(homeRows().createConversationDivider())
+            binding.conversationPage.addView(
+                homeRows().createConversationRow(index, conversations[index], listVisible && isConversationWorking(index))
+            )
         }
     }
 
@@ -2365,105 +2367,8 @@ class MainActivity : AppCompatActivity() {
         })
 
         projects.forEachIndexed { index, project ->
-            container.addView(createProjectRow(index, project))
+            container.addView(homeRows().createProjectRow(index, project))
         }
-    }
-
-    private fun createProjectRow(index: Int, project: AppProject): View {
-        val wrapper = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(76)
-            ).apply {
-                topMargin = if (index == 0) 0 else 1
-            }
-        }
-
-        val row = LinearLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Color.parseColor(if (index == activeProjectIndex) "#292929" else "#202020"))
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(16), 0, dp(14), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { openProject(index) }
-            setOnLongClickListener {
-                showProjectActions(index)
-                true
-            }
-        }
-
-        row.addView(createAvatarView(project.title, 44, 18f))
-
-        val middle = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(12)
-            }
-            orientation = LinearLayout.VERTICAL
-        }
-        middle.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = project.title
-            setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 16f
-        })
-        middle.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(5)
-            }
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = "${project.conversations.size} 个会话 · ${project.stage}"
-            setTextColor(Color.parseColor("#A9A9A9"))
-            textSize = 13f
-        })
-        row.addView(middle)
-
-        row.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.TOP
-                marginStart = dp(8)
-                topMargin = dp(17)
-            }
-            includeFontPadding = false
-            text = timeFormatter.format(Date(project.updatedAt))
-            setTextColor(Color.parseColor("#C4C4C4"))
-            textSize = 13f
-        })
-        wrapper.addView(row)
-
-        if (index == activeProjectIndex) {
-            wrapper.addView(View(this).apply {
-                layoutParams = FrameLayout.LayoutParams(dp(8), dp(8)).apply {
-                    gravity = Gravity.START or Gravity.TOP
-                    leftMargin = dp(10)
-                    topMargin = dp(10)
-                }
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#FF4D4F"))
-                }
-            })
-        }
-
-        return wrapper
     }
 
     private fun showProjectActions(index: Int) {
@@ -2538,132 +2443,6 @@ class MainActivity : AppCompatActivity() {
         renderProjectList()
     }
 
-    private fun createConversationRow(index: Int, conversation: AppConversation, listVisible: Boolean): View {
-        val row = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(66)
-            )
-            setBackgroundColor(Color.parseColor("#242424"))
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), 0, dp(14), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { openConversation(index) }
-            setOnLongClickListener {
-                showConversationActions(index)
-                true
-            }
-        }
-
-        row.addView(createAvatarView(conversation.title, 44, 17f))
-
-        val middle = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(10)
-            }
-            orientation = LinearLayout.VERTICAL
-        }
-        middle.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = conversation.title
-            setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 16f
-        })
-        middle.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(4)
-            }
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = conversation.subtitle
-            setTextColor(conversationSubtitleColor(conversation.subtitle))
-            textSize = 13f
-        })
-        row.addView(middle)
-
-        row.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.TOP
-                marginStart = dp(7)
-                topMargin = dp(16)
-            }
-            includeFontPadding = false
-            text = timeFormatter.format(Date(conversation.updatedAt))
-            setTextColor(Color.parseColor("#C4C4C4"))
-            textSize = 12f
-        })
-        updateConversationRowShimmer(row, listVisible && isConversationWorking(index), false)
-        return row
-    }
-
-    private fun updateConversationRowShimmer(row: View, active: Boolean, homeRow: Boolean) {
-        if (active) {
-            startConversationRowShimmer(row, homeRow)
-        } else {
-            stopConversationRowShimmer(row, homeRow)
-        }
-    }
-
-    private fun startConversationRowShimmer(row: View, homeRow: Boolean) {
-        if (homeRow && conversationHomeRowAnimator?.isRunning == true) {
-            return
-        }
-        if (homeRow) {
-            conversationHomeRowAnimator?.cancel()
-        }
-
-        val baseColor = Color.parseColor("#242424")
-        val highlightColor = Color.parseColor("#303030")
-        row.setBackgroundColor(baseColor)
-
-        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1350L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            interpolator = LinearInterpolator()
-            addUpdateListener { valueAnimator ->
-                val fraction = valueAnimator.animatedFraction
-                val pulse = sin(Math.PI * fraction).toFloat()
-                row.setBackgroundColor(blendColor(baseColor, highlightColor, pulse))
-            }
-        }
-
-        if (homeRow) {
-            conversationHomeRowAnimator = animator
-        } else {
-            row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) = Unit
-                override fun onViewDetachedFromWindow(v: View) {
-                    animator.cancel()
-                }
-            })
-        }
-        animator.start()
-    }
-
-    private fun stopConversationRowShimmer(row: View, homeRow: Boolean) {
-        if (homeRow) {
-            conversationHomeRowAnimator?.cancel()
-            conversationHomeRowAnimator = null
-        }
-        row.setBackgroundColor(Color.parseColor("#242424"))
-    }
-
     private fun isConversationWorking(index: Int): Boolean {
         if (index !in conversations.indices || conversations[index].ended) return false
         return runningConversationTasks.containsKey(
@@ -2671,39 +2450,19 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun createConversationDivider(): View {
-        return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                1
-            ).apply {
-                marginStart = dp(68)
-            }
-            setBackgroundColor(Color.parseColor("#343434"))
-        }
-    }
-
-    private fun createAvatarView(title: String, sizeDp: Int, textSizeSp: Float): View {
-        val size = dp(sizeDp)
-        if (title.startsWith(getString(R.string.app_name))) {
-            return ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(size, size)
-                contentDescription = getString(R.string.app_name)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setImageResource(R.drawable.ic_app_brand)
-            }
-        }
-
-        return TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(size, size)
-            setBackgroundResource(R.drawable.bg_mock_avatar)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = avatarText(title)
-            setTextColor(Color.parseColor("#333333"))
-            textSize = textSizeSp
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
+    private fun homeRows(): MainHomeRows {
+        homeRows?.let { return it }
+        return MainHomeRows(
+            activity = this,
+            timeFormatter = timeFormatter,
+            activeProjectIndexProvider = { activeProjectIndex },
+            openProject = ::openProject,
+            showProjectActions = ::showProjectActions,
+            openConversation = ::openConversation,
+            showConversationActions = ::showConversationActions,
+            dp = ::dp,
+            selectableForeground = ::selectableForeground
+        ).also { homeRows = it }
     }
 
     private fun selectableForeground() = runCatching {
@@ -3750,8 +3509,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopStageHintShimmer()
-        conversationHomeRowAnimator?.cancel()
-        conversationHomeRowAnimator = null
+        homeRows?.cancelHomeRowShimmer()
+        homeRows = null
         speechRecognizer?.destroy()
         speechRecognizer = null
         if (taskWorkReceiverRegistered) {
