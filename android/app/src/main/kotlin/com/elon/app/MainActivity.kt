@@ -4805,6 +4805,17 @@ class MainActivity : AppCompatActivity() {
 
             serverResponseToken += 1
             val msg = when (type) {
+                "task_event" -> {
+                    val event = jsonStringOrNull(json, "event").orEmpty()
+                    val taskId = jsonStringOrNull(json, "task_id")
+                    val content = jsonStringOrNull(json, "message").orEmpty()
+                    handleTaskEvent(event, taskId, content)
+                    if (event == "accepted" && shouldShowProgressBubble(content)) {
+                        ChatMessage("ai-progress", workflowProgressMessage(content))
+                    } else {
+                        return
+                    }
+                }
                 "progress"    -> {
                     val content = jsonStringOrNull(json, "message") ?: ""
                     if (isCliOutputProgress(content)) {
@@ -4967,6 +4978,33 @@ class MainActivity : AppCompatActivity() {
             recordEvidence("progress", userFacingProgress(content))
         }
         addProjectEvent("进度更新：${summarize(content, 30)}")
+    }
+
+    private fun handleTaskEvent(event: String, taskId: String?, content: String) {
+        val suffix = taskId?.takeIf { it.isNotBlank() }?.let { "（任务 $it）" }.orEmpty()
+        when (event) {
+            "accepted" -> {
+                updateStage("任务排队", if (content.isBlank()) "请求已进入任务队列。" else content)
+                addProjectEvent("任务已受理$suffix")
+            }
+            "started" -> {
+                updateStage("开发实现", if (content.isBlank()) "任务开始执行。" else content)
+                addProjectEvent("任务开始执行$suffix")
+            }
+            "cancel_requested" -> {
+                updateStage("需要处理", if (content.isBlank()) "已请求取消任务。" else content)
+                addProjectEvent("任务取消请求已发送$suffix")
+            }
+            "canceled" -> {
+                updateStage("需要处理", if (content.isBlank()) "任务已取消。" else content)
+                addProjectEvent("任务已取消$suffix")
+            }
+            else -> {
+                if (content.isNotBlank()) {
+                    addProjectEvent("任务事件：${summarize(content, 30)}")
+                }
+            }
+        }
     }
 
     private fun shouldShowProgressBubble(content: String): Boolean {

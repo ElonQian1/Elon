@@ -457,7 +457,7 @@ class TaskWorkService : Service() {
     }
 
     private fun isChatReplyType(type: String?): Boolean {
-        return type in setOf("progress", "done", "error", "message", "assistant_message")
+        return type in setOf("progress", "done", "error", "task_event", "message", "assistant_message")
     }
 
     private fun preview(value: String, maxChars: Int = 160): String {
