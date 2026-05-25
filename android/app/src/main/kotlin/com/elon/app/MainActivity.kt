@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity() {
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
+    private var sendMessageActions: MainSendMessageActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -255,27 +256,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendMessage() {
-        collapseAttachmentPanel()
-        val rawText = binding.inputEdit.text.toString().trim()
-        if (rawText.isEmpty() && pendingAttachments.isEmpty()) return
-        if (isActiveConversationWorking()) return
-        if (activeConversation().ended) {
-            appendMessage(ChatMessage("error", "这个会话已结束，请新建会话继续。"))
-            return
-        }
-        val text = if (pendingAttachments.isNotEmpty()) {
-            visibleTextForPendingAttachments(rawText, pendingAttachments)
-        } else {
-            rawText
-        }
-        val outgoingText = expandShortDevelopmentCommand(text, activeConversation().messages)
-        val target = currentSendTarget()
-        collapseInputComposer()
-        if (pendingAttachments.isNotEmpty()) {
-            uploadAttachmentsThenSend(text, outgoingText, target)
-            return
-        }
-        startPreparedMessage(text, outgoingText, com.google.gson.JsonArray(), target, emptyList())
+        sendMessageActions().sendMessage()
     }
 
     private fun startPreparedMessage(
@@ -541,15 +522,20 @@ class MainActivity : AppCompatActivity() {
         pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
     }
 
-    private fun currentSendTarget(): SendTarget {
-        val project = activeProject()
-        val conversation = activeConversation()
-        return SendTarget(
-            projectId = project.id,
-            projectTitle = project.title,
-            conversationId = conversation.id,
-            conversationTitle = conversation.title
-        )
+    private fun sendMessageActions(): MainSendMessageActions {
+        sendMessageActions?.let { return it }
+        return MainSendMessageActions(
+            binding = binding,
+            pendingAttachments = pendingAttachments,
+            collapseAttachmentPanel = ::collapseAttachmentPanel,
+            isActiveConversationWorking = ::isActiveConversationWorking,
+            activeProject = ::activeProject,
+            activeConversation = ::activeConversation,
+            appendMessage = ::appendMessage,
+            collapseInputComposer = { collapseInputComposer() },
+            uploadAttachmentsThenSend = ::uploadAttachmentsThenSend,
+            startPreparedMessage = ::startPreparedMessage
+        ).also { sendMessageActions = it }
     }
 
     private fun restoreSendTarget(target: SendTarget): Boolean {
