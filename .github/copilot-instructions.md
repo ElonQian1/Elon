@@ -93,7 +93,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
-- **长期主义模块化**：不要继续制造巨型文件；新增功能按职责拆到模块里，入口文件只做组装和路由。修改 `MainActivity.kt`、`McpDebugServer.kt`、`project_api.rs`、`ai_cli.rs` 等巨型文件时，除小修外优先顺手抽出本次触碰到的职责边界
+- **长期主义模块化**：不要继续制造巨型文件；写代码前先做短文件计划。新建源文件默认目标 ≤500 行，501-800 行可容忍但必须单一职责，超过 800 行必须拆分；入口文件只做组装和路由。修改 `MainActivity.kt`、`McpDebugServer.kt`、`project_api.rs`、`ai_cli.rs` 等巨型文件时，除小修外优先顺手抽出本次触碰到的职责边界
 - **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 

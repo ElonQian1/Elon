@@ -51,6 +51,7 @@ mod project_ws_protocol;
 mod release_claim;
 mod router;
 mod server_trace;
+mod source_hygiene;
 mod store;
 mod store_schema;
 mod tools;

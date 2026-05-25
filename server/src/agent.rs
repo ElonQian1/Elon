@@ -15,6 +15,7 @@ use crate::{
     },
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
+    source_hygiene,
     store::ProjectAccess,
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
@@ -97,7 +98,7 @@ pub async fn run_for_project_in_workspace(
                     warn!("项目同步预检未完成，交给 AI CLI 处理: {}", msg);
                     let _ = tx.send(
                         WsMessage::progress("同步检查遇到 Git 工作区问题，已交给 AI 助手处理。")
-                        .to_json(),
+                            .to_json(),
                     );
                     preflight_note = Some(msg);
                 } else {
@@ -107,10 +108,8 @@ pub async fn run_for_project_in_workspace(
             Err(e) => {
                 let msg = format!("git pull --rebase 执行出错: {}", e);
                 warn!("项目同步预检执行出错，交给 AI CLI 处理: {}", msg);
-                let _ = tx.send(
-                    WsMessage::progress("同步检查执行出错，已交给 AI 助手处理。")
-                    .to_json(),
-                );
+                let _ = tx
+                    .send(WsMessage::progress("同步检查执行出错，已交给 AI 助手处理。").to_json());
                 preflight_note = Some(msg);
             }
         }
@@ -209,8 +208,7 @@ async fn run_dispatch_with_workspace(
             .unwrap_or(false)
         {
             let _ = tx.send(
-                WsMessage::progress("当前已锁定使用 Codex CLI，不切换到其他 AI 代理。")
-                .to_json(),
+                WsMessage::progress("当前已锁定使用 Codex CLI，不切换到其他 AI 代理。").to_json(),
             );
         }
         decision.route
@@ -221,8 +219,7 @@ async fn run_dispatch_with_workspace(
             ));
         }
         let _ = tx.send(
-            WsMessage::progress("图片处理已切换为 Codex CLI，不调用独立图片模型。")
-            .to_json(),
+            WsMessage::progress("图片处理已切换为 Codex CLI，不调用独立图片模型。").to_json(),
         );
         CapabilityRoute::CodeAgent
     } else {
@@ -278,6 +275,13 @@ async fn run_backend_with_workspace(
 ) -> Result<()> {
     let user_config = UserAgentConfig::load(&user_config_workspace);
     let backend = choose_backend(state, user_config.as_ref(), agent_name, route);
+    let source_hygiene_note = if route == CapabilityRoute::ChatAgent {
+        None
+    } else {
+        source_hygiene::source_size_preflight_note(workspace)
+    };
+    let combined_preflight_note =
+        combine_preflight_notes(preflight_note, source_hygiene_note.as_deref());
 
     match backend {
         AiBackend::LocalCli => {
@@ -286,7 +290,7 @@ async fn run_backend_with_workspace(
                 workspace,
                 download_base,
                 user_message,
-                preflight_note,
+                combined_preflight_note.as_deref(),
                 cli_option_id(agent_name),
                 route,
                 require_existing_git,
@@ -305,7 +309,10 @@ async fn run_backend_with_workspace(
                 {
                     warn!("本地 AI CLI 执行失败，回退到 API 代理: {}", e);
                     let _ = tx.send(
-                        WsMessage::progress(format!("本地 AI CLI 暂不可用，正在切换原 API 代理: {}", e))
+                        WsMessage::progress(format!(
+                            "本地 AI CLI 暂不可用，正在切换原 API 代理: {}",
+                            e
+                        ))
                         .to_json(),
                     );
                     run_api_inner_with_workspace(
@@ -314,7 +321,7 @@ async fn run_backend_with_workspace(
                         user_config_workspace,
                         download_base,
                         user_message,
-                        preflight_note,
+                        combined_preflight_note.as_deref(),
                         api_agent_name(state, agent_name),
                         state,
                         tx,
@@ -331,12 +338,21 @@ async fn run_backend_with_workspace(
                 user_config_workspace,
                 download_base,
                 user_message,
-                preflight_note,
+                combined_preflight_note.as_deref(),
                 api_agent_name(state, agent_name),
                 state,
                 tx,
             )
             .await
         }
+    }
+}
+
+fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) -> Option<String> {
+    match (git_note, source_note) {
+        (Some(git), Some(source)) => Some(format!("{git}\n\n{source}")),
+        (Some(git), None) => Some(git.to_string()),
+        (None, Some(source)) => Some(source.to_string()),
+        (None, None) => None,
     }
 }

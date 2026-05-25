@@ -110,6 +110,7 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 
 - Before calling Codex CLI, the backend performs hard checks: project identity, workspace path, Git/origin readiness, permissions, queue/lock state, and user-selected model.
 - The backend sends Codex CLI a structured task brief every time. The brief must include the user's request, project path, mandatory document-read order, Git rules, validation expectations, and the rule that shared release/deploy steps are serialized.
+- Before development prompts, the backend performs a cheap source-size scan and injects only a compact summary of files over 500 lines. Codex must use that summary for a short file plan, target <=500 lines for new source files, tolerate 501-800 only for one responsibility, and split anything over 800 lines.
 - APK clients may call `/api/.../prewarm` when a user opens or resumes a project conversation. This is only a best-effort native Codex CLI session warmup: it may create or reuse the session id, but it must not inspect files, run Git, edit code, build, deploy, publish, or inject the full project workflow.
 - The backend tracks native Codex session bootstrap state. The first real chat/development turn injects the full rules; later turns in the same native session use a shorter resume prompt. If `codex resume` reports a stale/expired session, mark that native session stale and retry once with a fresh session.
 - Fresh-session retry must include a continuity handoff: the old `codex://threads/<thread_id>` URI and recent backend conversation messages, so the new Codex session can reconnect to the prior context instead of starting cold.
@@ -126,7 +127,7 @@ The backend is the workflow orchestrator; Codex CLI is the code executor.
 3. Read the existing files and surrounding context first.
 4. Plan narrowly scoped changes.
 5. Edit only the needed files and preserve existing style.
-6. Avoid adding substantial logic to giant files. If a touched file is already over 1500 lines, prefer extracting the touched responsibility into a focused module before adding new behavior.
+6. Keep source files small by default: new source files target <=500 lines; 501-800 lines are tolerated only for one focused responsibility; new files over 800 lines must be split. If a touched file is already over 1500 lines, prefer extracting the touched responsibility into a focused module before adding new behavior.
 7. Verify locally with the smallest useful command.
 8. Commit only the task files.
 9. Push to `origin/main`.
@@ -139,6 +140,7 @@ Avoid large mixed commits. If a change touches more than about five files or spa
 ## Modular Development Rule
 
 - Do not create new giant files. New features should be placed behind clear module boundaries.
+- For APK-triggered and local Codex/Codex CLI work, use the same low-token source-size flow: make a short file plan before coding, keep new source files <=500 lines when practical, allow 501-800 only for one responsibility, and split anything over 800 lines before delivery.
 - Entry files should assemble and route; feature logic, persistence, protocol parsing, prompt building, diagnostics, UI construction, and command execution should live in focused modules.
 - For the current repo, keep shrinking `MainActivity.kt`, `McpDebugServer.kt`, `project_api.rs`, and `ai_cli.rs` as nearby work touches their responsibilities.
 - When multiple AI agents work in parallel, divide work by module ownership and sync with `origin/main` before editing or committing.

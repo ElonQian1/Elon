@@ -114,10 +114,33 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("ELON_BUILD_VERSION"));
     assert!(prompt.contains("临时写入 build.gradle"));
     assert!(prompt.contains("禁止为了发布手动递增并提交"));
+    assert!(prompt.contains("新建源文件默认目标 <=500 行"));
+    assert!(prompt.contains("501-800 行可容忍"));
+    assert!(prompt.contains(">800 行必须拆分"));
+    assert!(prompt.contains("已有 >1500 行文件"));
+    assert!(prompt.contains("5-15 行文件计划"));
     assert!(!prompt.contains("必须递增 server/Cargo.toml 的 package.version"));
     assert!(!prompt.contains("递增 versionCode/versionName"));
     assert!(prompt.contains("服务器为本 APK 会话创建的 worktree/分支"));
     assert!(prompt.contains("服务器会在任务完成后串行合并回项目主分支"));
+}
+
+#[test]
+fn resumed_development_prompt_keeps_source_size_guardrail() {
+    let prompt = build_cli_prompt(
+        Path::new("D:/tmp/project"),
+        "继续刚才的代码修改",
+        None,
+        &test_option(),
+        intent_router::CapabilityRoute::CodeAgent,
+        true,
+    );
+
+    assert!(prompt.contains("source-size guardrail"));
+    assert!(prompt.contains("new source files target <=500 lines"));
+    assert!(prompt.contains("501-800 lines are tolerated"));
+    assert!(prompt.contains(">800 lines must be split"));
+    assert!(prompt.contains("existing >1500-line files"));
 }
 
 #[test]

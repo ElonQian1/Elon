@@ -224,10 +224,10 @@ pub(crate) fn build_development_cli_prompt(
         .map(|note| {
             format!(
                 r#"
-项目预检结果：
+项目预检与约束摘要：
 {note}
 
-这不是最终失败。请先把它当作当前任务的一部分处理：进入工作区后查看 git status/diff，保护已有改动，不要丢弃用户或其他 AI 的工作；能安全提交、stash、创建 worktree 或 rebase 时自行处理，再继续用户原始请求。若无法判断这些未提交改动是否该保留，请用用户可见说明讲清楚并暂停等待确认。
+这不是最终失败。请先把它当作当前任务的一部分处理：如果包含 Git 同步问题，进入工作区后查看 git status/diff，保护已有改动，不要丢弃用户或其他 AI 的工作；能安全提交、stash、创建 worktree 或 rebase 时自行处理，再继续用户原始请求。若包含源文件体量预检，请据此先做文件计划，避免向红区文件继续堆逻辑。若无法判断未提交改动是否该保留，请用用户可见说明讲清楚并暂停等待确认。
 "#
             )
         })
@@ -245,6 +245,7 @@ pub(crate) fn build_development_cli_prompt(
 - 如果只是普通问答或咨询，不需要改文件，请直接用简洁中文回复。
 - 如果用户消息里包含“User uploaded real chat attachments”或附件路径，这些附件属于本轮聊天上下文；涉及图片/文件内容的问题应先查看列出的真实附件路径，再继续回答或开发。
 - 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
+- 低算力模块化流程必须执行：写代码前先做 5-15 行文件计划，优先说明要新建/修改哪些 focused modules；新建源文件默认目标 <=500 行，501-800 行可容忍但必须单一职责，>800 行必须拆分；已有 >1500 行文件除小修外不得追加新功能，先把本次职责抽到独立模块；提交前用便宜行数检查复核本轮变更文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
 - 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。当前目录可能已经是服务器为本 APK 会话创建的 worktree/分支；这种情况下不要切回项目主工作区，也不要手动推 main，只需在当前分支完成修改、验证、git add/commit；如果当前仓库配置了 origin，再 push 当前分支。没有 origin/远端的本地模板项目只需本地 commit，服务器会在任务完成后串行合并回项目主分支并生成下载链接；不要把“没有远端/无法 push”写成用户可见失败。push 被拒绝时先 rebase 再 push，不要 force push。
@@ -293,6 +294,7 @@ Workspace: {workspace}
 The full development workflow was already injected earlier in this session. Keep following those rules:
 - Treat every project as a normal project; do not special-case the Elon self project.
 - Read and obey project docs when code changes require it.
+- Keep the source-size guardrail active even on resumed turns: new source files target <=500 lines, 501-800 lines are tolerated only for one focused responsibility, >800 lines must be split, and existing >1500-line files must not receive new feature logic except tiny fixes.
 - Preserve unrelated user/AI changes, verify work, commit and push when appropriate.
 - Server/APK release work must build locally and upload artifacts as documented by the project.
 - For the Elon project v0.3.69+ flow, release versions are server-allocated through /api/release/claim and completed through /api/release/finish; do not manually bump or commit server/Cargo.toml or build.gradle version fields for release purposes.
