@@ -68,10 +68,8 @@ bash scripts/install-hooks.sh
 > 不依赖 AI 是否阅读文档：装好后，`git push` 会被 hook 自动拦截
 > ——cargo check 失败或有未 add 的 `.rs` 文件时**直接拒绝 push**。
 > 这是机器强制的防漏 add 守门（修复 56bad51 类事故）。
-> Android APK 主分支推送也会被 hook 检查：如果改了 APK 运行代码但没有递增
-> `android/app/build.gradle` 里的 `versionCode/versionName`，会拒绝推送到 `main`。
-> 后端运行代码主分支推送也会被 hook 检查：如果改了 `server/src/**`
-> 但没有递增 `server/Cargo.toml` 的 `version`，会拒绝推送。
+> v0.3.69+ 起，版本号由服务器 `/api/release/claim` 原子分配，不再写入 git，
+> 因此 hook 不再检查 `build.gradle` 和 `server/Cargo.toml` 的 version 字段。
 > 部署侧由服务器 flock 互斥锁 + CAS（compare-and-swap）保证不会并发覆盖。
 
 ---
@@ -80,12 +78,11 @@ bash scripts/install-hooks.sh
 
 ```
 改代码
-  → 如涉及 server/src/** 后端运行代码：递增 server/Cargo.toml 的 version
   → git status --short | Select-String "^\?\?"  ← ⚠️ 检查是否有新建文件未 add
   → git add <只加自己改的文件，含新建 .rs 文件>
   → git commit -m "type(scope): 描述"
   → git push origin main
-  → 根据系统选择部署脚本：
+  → 根据系统选择部署脚本（脚本会自动从服务器 claim 版本号，编译期注入，不写入 git）：
        Windows:       cd scripts; .\publish-server.ps1
        Linux/macOS:   bash scripts/publish-server.sh
   → 验证健康: curl --noproxy '*' http://43.139.149.158:8080/health
@@ -118,7 +115,7 @@ scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-发布脚本会自动完成：同步 `main`、递增 `versionCode/versionName`、构建 release APK、提交 release commit、推送 `HEAD:main`、上传 `ElonSpeed-latest.apk` 和 `version.json`、写入 `.apk-deployed-sha`、校验服务器版本。
+发布脚本会自动完成：同步 `main`、POST `/api/release/claim` 拿版本号、临时写入 `build.gradle`、构建 release APK、上传 `ElonSpeed-latest.apk` 和 `version.json`、写入 `.apk-deployed-sha`、POST `/api/release/finish` 释放槽位、还原 `build.gradle` 到 git 兜底值。版本号**不写入 git**。
 
 发布脚本必须防止慢构建覆盖新版本：如果构建期间 `origin/main` 已前进，且服务器 `.apk-deployed-sha` 已包含本次基础提交，脚本应中止本地编译/发布并直接让 AI 测试线上新版；如果 `origin/main` 已前进但线上 APK 未确认包含本次基础提交，脚本必须停止上传，要求基于最新 `main` 重新发布。
 
@@ -328,7 +325,7 @@ cd e:\lodex\Elon\android
 - 避免继续制造巨型文件；新增功能按职责拆模块，入口文件只做组装和路由。修改 1500 行以上文件时，除小修外优先把本次触碰到的职责抽到独立模块。
 - 只 stage 当前任务文件，不夹带其他 AI 的改动。
 - 每次任务必须 commit + push，部署必须基于已推送的 SHA。
-- 后端运行代码变更只需直接运行 `.\scripts\publish-server.ps1`（自动递增 PATCH、commit、push、构建、部署）；MINOR/MAJOR 变更时手动改好 `server/Cargo.toml` 后加 `-SkipVersionBump`；部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
+- 后端运行代码变更只需直接运行 `.\scripts\publish-server.ps1`：脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，通过 `ELON_BUILD_VERSION` 环境变量编译期注入 binary，部署成功后 POST `/api/release/finish`。版本号**不写入 git**，`server/Cargo.toml` 的 version 是冷启动兜底，禁止手动递增并提交。部署脚本会把 git SHA 注入 `/api/server/version`，APK 会动态展示该后端版本。
 - Android 新功能必须完成 APK 发布闭环，不能只停在 PR、Debug 包或本地验证。
 - 不提交密钥、`.env`、APK 签名材料或任何敏感信息。
 - push 被拒绝（non-fast-forward）→ `git pull --rebase` 解决后再 push，禁止 `--force`。

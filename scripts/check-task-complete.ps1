@@ -4,8 +4,9 @@
 
 .DESCRIPTION
     Use this before the final AI report. AndroidFeature verifies that local
-    HEAD equals origin/main and that server /app/version.json matches the
-    local Android version. Server verifies /health and /api/server/version.
+    HEAD equals origin/main and that server /app/version.json points at the
+    pushed source commit. APK version numbers are assigned by the server.
+    Server verifies /health and /api/server/version.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
@@ -20,7 +21,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
-$GradlePath = Join-Path $RepoRoot "android\app\build.gradle"
 $ServerCargoPath = Join-Path $RepoRoot "server\Cargo.toml"
 $ServerUrl = "http://43.139.149.158:8080"
 
@@ -54,30 +54,10 @@ if ($Kind -eq "AndroidFeature") {
         Stop-Check "Android task is not complete: HEAD is not pushed to origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
     }
 
-    if (-not (Test-Path $GradlePath)) {
-        Stop-Check "Android build.gradle was not found: $GradlePath"
-    }
-
-    $content = Get-Content $GradlePath -Encoding UTF8
-    $versionCodeLine = $content | Where-Object { $_ -match 'versionCode' } | Select-Object -First 1
-    $versionNameLine = $content | Where-Object { $_ -match 'versionName' } | Select-Object -First 1
-    if (-not $versionCodeLine -or -not $versionNameLine) {
-        Stop-Check "Could not read versionCode/versionName from android/app/build.gradle."
-    }
-
-    $localCodeText = ($versionCodeLine -replace '.*versionCode\s+', '').Trim()
-    $localNameText = ($versionNameLine -replace '.*versionName\s+', '').Trim()
-    $localCode = [int]$localCodeText
-    $localName = $localNameText.Trim([char]34)
-
     try {
         $remoteVersion = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
     } catch {
         Stop-Check "Could not read server /app/version.json: $_"
-    }
-
-    if ([int]$remoteVersion.versionCode -ne $localCode -or [string]$remoteVersion.versionName -ne $localName) {
-        Stop-Check "Server APK version mismatch: local v$localName build $localCode, server v$($remoteVersion.versionName) build $($remoteVersion.versionCode)."
     }
 
     $remoteGitSha = [string]$remoteVersion.gitSha
@@ -106,7 +86,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "Android APK completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
-    Write-Host "  version:     v$localName (build $localCode)"
+    Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
     Write-Host "  APK gitSha:  $remoteGitSha"
     Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
     exit 0

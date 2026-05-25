@@ -1,15 +1,26 @@
 ﻿<#
 .SYNOPSIS
-    一龙 Android APK 发布脚本
+    一龙 Android APK 发布脚本（版本号由服务器分配，build.gradle 不再进 git）
 
 .DESCRIPTION
-    自动完成：versionCode +1 → 编译 APK → 生成 version.json → SCP 上传服务器 → 验证
+    新版业务流程（version-from-server）：
+      1. git pull --rebase origin main      (业务 commit 必须先由 AI 自己 push)
+      2. POST /api/release/claim            (服务器原子分配 assignedVersionName + assignedVersionCode)
+      3. 临时改写 build.gradle 注入版本号 → ./gradlew assembleRelease
+      4. 上传 APK + version.json (CAS by .apk-deployed-sha)
+      5. POST /api/release/finish           (释放 in-flight 槽位)
+      6. **不 commit build.gradle** —— 还原文件，git 里 build.gradle 版本号永远是冷启动兜底。
+
+    版本号不再进入 git 历史；多 AI / 多 PC 不会因为撞版本号死循环 rebase。
 
 .PARAMETER Changelog
-    本次版本更新说明（必填）
+    本次版本更新说明（必填，写进 version.json 给手机端用户看）
 
 .PARAMETER SkipBuild
     跳过 Gradle 编译，直接用已有的 APK 重新上传（用于调试脚本）
+
+.PARAMETER Force
+    跳过上传前的"服务器已有更新 versionCode"检查，强制覆盖。
 
 .EXAMPLE
     .\publish-apk.ps1 -Changelog "修复启动闪退"
@@ -21,11 +32,92 @@ param(
 
     [switch]$SkipBuild,
 
-    # 跳过上传前的“服务器已发布更新 versionCode”检查，强制覆盖
+    # 跳过上传前的"服务器已发布更新 versionCode"检查，强制覆盖
     [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
+
+# ── Release API helper（同 publish-server.ps1） ─────────────────────────────
+$ReleaseApiBase = "$($null)"
+$ReleaseApiBase = "http://43.139.149.158:8080/api/release"
+
+function Invoke-ReleaseApi {
+    param(
+        [Parameter(Mandatory)] [string]$Endpoint,
+        [object]$Body = $null,
+        [int]$TimeoutSec = 20
+    )
+    $url = "$ReleaseApiBase/$Endpoint"
+    $tmp = $null
+    try {
+        $curlArgs = @('--noproxy','*','-s','--max-time',$TimeoutSec,'-w','\n__HTTP_STATUS__:%{http_code}','-X','POST',$url)
+        if ($Body) {
+            $json = ($Body | ConvertTo-Json -Depth 6 -Compress)
+            $tmp = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmp, $json, [System.Text.UTF8Encoding]::new($false))
+            $curlArgs += @('-H','Content-Type: application/json; charset=utf-8','--data-binary',"@$tmp")
+        }
+        $raw = & curl.exe @curlArgs 2>&1
+        $rawText = ($raw -join "`n")
+        if ($LASTEXITCODE -ne 0) {
+            throw "curl 调用失败 ($Endpoint, exit=$LASTEXITCODE): $rawText"
+        }
+        $statusLine = ($rawText -split "`n") | Where-Object { $_ -match '^__HTTP_STATUS__:' } | Select-Object -Last 1
+        $bodyText = ($rawText -replace "(?s)\n?__HTTP_STATUS__:\d+\s*$","")
+        $status = if ($statusLine) { [int]($statusLine -replace '^__HTTP_STATUS__:','') } else { 0 }
+        if ($status -lt 200 -or $status -ge 300) {
+            throw "release/$Endpoint HTTP ${status}: $bodyText"
+        }
+        if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
+        return ($bodyText | ConvertFrom-Json)
+    } finally {
+        if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+$script:ReleaseToken = $null
+$script:ReleaseFinished = $false
+
+function Complete-Release {
+    param(
+        [Parameter(Mandatory)] [bool]$Success,
+        [string]$VersionName = '',
+        [int]$VersionCode = 0,
+        [string]$Sha = '',
+        [string]$ErrorMessage = ''
+    )
+    if (-not $script:ReleaseToken -or $script:ReleaseFinished) { return }
+    try {
+        $payload = @{
+            kind  = 'apk'
+            token = $script:ReleaseToken
+            success = $Success
+        }
+        if ($Success) {
+            if ($VersionName) { $payload.versionName = $VersionName }
+            if ($VersionCode -gt 0) { $payload.versionCode = $VersionCode }
+            if ($Sha)         { $payload.sha = $Sha }
+        } else {
+            if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
+        }
+        Invoke-ReleaseApi -Endpoint 'finish' -Body $payload | Out-Null
+        $script:ReleaseFinished = $true
+    } catch {
+        Write-Host "   ⚠️  release/finish 调用失败（不影响主流程）: $_" -ForegroundColor Yellow
+    }
+}
+
+# 全局错误兜底：任何未捕获的 terminating error 也释放槽位
+trap {
+    try {
+        if ($script:ReleaseToken -and -not $script:ReleaseFinished) {
+            Complete-Release -Success:$false -ErrorMessage ("uncaught error: " + ($_ | Out-String))
+        }
+    } catch {}
+    # 让原始错误继续抛出（脚本仍按 $ErrorActionPreference=Stop 终止）
+    continue
+}
 
 # ── 路径配置 ──────────────────────────────────────────────────────────────────
 
@@ -228,6 +320,8 @@ function Stop-StaleApkRelease {
     )
 
     Restore-GradleVersionFile
+    # 通知服务器释放本次预占的版本号槽位
+    Complete-Release -Success:$false -ErrorMessage $Message
     if ($Success) {
         Write-Host "⏭️  $Message" -ForegroundColor Cyan
         exit 0
@@ -348,11 +442,18 @@ function Assert-ApkStillCurrentBeforeUpload {
 
     if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
         Write-Host "⏭️  服务器已部署包含本 release commit 的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
+        Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
         exit 0
     }
 
     if ($remoteHead -ne $ReleaseSha) {
-        Write-Error "origin/main 已从本 release commit $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))。为避免上传旧 APK，已停止；请基于最新 main 重新运行发布脚本。"
+        # 远端在编译期间前进；如果新增提交都不影响 Android，仍可安全发布
+        if (Test-RemoteAdvanceSafeForApk -BaseSha $ReleaseSha) {
+            Write-Host "   ℹ️  origin/main 已前进到 $((Format-ShortSha $remoteHead))，但新提交不影响 Android，继续发布。" -ForegroundColor Cyan
+            return
+        }
+        Complete-Release -Success:$false -ErrorMessage "origin/main moved to $remoteHead and changed android files"
+        Write-Error "origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；请重新运行发布脚本。"
     }
 }
 
@@ -424,6 +525,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
         if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
             Write-Host "⏭️  另一台机器已部署更新 APK：$((Format-ShortSha $deployedSha))。本次 staging 不覆盖。" -ForegroundColor Cyan
             ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
+            Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
             exit 0
         }
         if ($deployedSha -and (Test-GitAncestor $deployedSha $ReleaseSha) -and $Attempt -lt 3) {
@@ -432,10 +534,12 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
             return
         }
         ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
+        Complete-Release -Success:$false -ErrorMessage "cas mismatch in apk deploy"
         Write-Error "APK 上传 CAS 失败：服务器部署状态已变化，但未确认包含本 release commit。请基于最新 main 重新发布。"
     }
 
     if ($deployExit -ne 0) {
+        Complete-Release -Success:$false -ErrorMessage "apk atomic deploy failed: exit=$deployExit"
         Write-Error "服务器 APK 原子发布失败，退出码 $deployExit"
     }
 }
@@ -456,36 +560,54 @@ if ($BuildBaseSha -ne $originMainSha) {
     }
 }
 
-# ── Step 1: 递增 versionCode，确认 versionName ────────────────────────────────
+# ── Step 1: 向服务器申请新的 versionName + versionCode（claim） ───────────
 
-Write-Host "📝 更新版本号..." -ForegroundColor Cyan
+Write-Host "📝 向服务器申请新版本号..." -ForegroundColor Cyan
 
 $content = Get-Content $GradlePath -Encoding UTF8 -Raw
 $OriginalGradleContent = $content
 
 $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
-$publishedCode = 0
-$publishedName = $null
-try {
-    $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
-    $publishedCode = [int]$published.versionCode
-    $publishedName = [string]$published.versionName
-    Write-Host "   线上版本: v$publishedName (build $publishedCode)" -ForegroundColor Gray
-} catch {
-    Write-Warning "   ⚠️  无法读取线上版本，将仅基于本地 build.gradle 递增：$_"
-}
-$baseCode = [Math]::Max($oldCode, $publishedCode)
-$newCode = $baseCode + 1
-$content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
-
-# 自动递增 versionName PATCH（1.0 → 1.0.1，1.0.1 → 1.0.2，1.2 → 1.2.1）
 $oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
-$baseName = if ($publishedCode -gt $oldCode -and $publishedName -match '^\d+(\.\d+){1,2}$') { $publishedName } else { $oldName }
-$parts = $baseName.Split('.')
-if ($parts.Count -eq 2) { $parts += "0" }   # "1.0" → ["1","0","0"]
-$parts[-1] = [string]([int]$parts[-1] + 1)   # 递增 PATCH
-$newName = $parts -join '.'
-$content = $content -replace "versionName\s+`"$([regex]::Escape($oldName))`"", "versionName `"$newName`""
+Write-Host "   build.gradle 兜底: v$oldName (build $oldCode) — 不会被本次脚本提交" -ForegroundColor DarkGray
+
+$builderId = "$env:COMPUTERNAME-$env:USERNAME"
+if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq "-") {
+    $builderId = "unknown-builder-" + ([Guid]::NewGuid().ToString().Substring(0,8))
+}
+$builderLabel = "publish-apk.ps1 @ $builderId"
+
+try {
+    $claim = Invoke-ReleaseApi -Endpoint 'claim' -Body (@{
+        kind               = 'apk'
+        sha                = $BuildBaseSha
+        builderId          = $builderId
+        builderLabel       = $builderLabel
+        bump               = 'patch'
+        currentVersionName = $oldName
+        currentVersionCode = $oldCode
+    })
+} catch {
+    Write-Error "❌ /api/release/claim 失败：$_"
+}
+
+if (-not $claim -or $claim.action -ne 'build') {
+    Write-Error "❌ release/claim 返回非预期响应：$($claim | ConvertTo-Json -Compress)"
+}
+
+$script:ReleaseToken = [string]$claim.token
+$newName = [string]$claim.assignedVersionName
+$newCode = [int]$claim.assignedVersionCode
+if ([string]::IsNullOrWhiteSpace($newName) -or $newCode -le 0) {
+    Write-Error "❌ release/claim 未返回有效的 assignedVersionName/Code: $($claim | ConvertTo-Json -Compress)"
+}
+$InFlightCount = if ($claim.PSObject.Properties.Match('inFlightCount').Count) { [int]$claim.inFlightCount } else { 1 }
+Write-Host "   ✅ 已分配版本号: v$newName (build $newCode) [token=$($script:ReleaseToken.Substring(0,8))..., in-flight=$InFlightCount]" -ForegroundColor Green
+
+# 把分配到的版本号临时写入 build.gradle（编译时 AGP 必须能读到），编译完成后通过 Restore-GradleVersionFile 还原。
+$content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
+$escapedOldName = [regex]::Escape($oldName)
+$content = $content -replace "versionName\s+`"$escapedOldName`"", "versionName `"$newName`""
 [System.IO.File]::WriteAllText(
     $GradlePath,
     $content,
@@ -494,8 +616,8 @@ $content = $content -replace "versionName\s+`"$([regex]::Escape($oldName))`"", "
 
 $versionName = $newName
 
-Write-Host "   versionCode: $oldCode → $newCode" -ForegroundColor Green
-Write-Host "   versionName: $oldName → $newName" -ForegroundColor Green
+Write-Host "   versionCode: $oldCode → $newCode (临时写入 build.gradle，编译后自动还原)" -ForegroundColor Green
+Write-Host "   versionName: $oldName → $newName (临时写入 build.gradle，编译后自动还原)" -ForegroundColor Green
 
 # ── Step 2: 编译 APK ─────────────────────────────────────────────────────────
 
@@ -519,23 +641,16 @@ if (-not $apk) {
 $fileSize = $apk.Length
 Write-Host "📦 APK: $($apk.Name) ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
 
-# ── Step 4: Git commit + push ─────────────────────────────────────────────────
+# ── Step 4: 还原 build.gradle（版本号不进 git） ──────────────────────────────
 
-Write-Host "📤 提交版本号变动..." -ForegroundColor Cyan
+Write-Host "🧹 还原 build.gradle 到 git 兜底版本（v$oldName / build $oldCode）..." -ForegroundColor Cyan
+Restore-GradleVersionFile
 
-# rustfmt（如有 .rs 改动）
-$rs = @(git -C $RepoRoot diff --name-only) + @(git -C $RepoRoot ls-files --others --exclude-standard) |
-    Where-Object { $_ -match '\.rs$' }
-if ($rs) { rustfmt $rs }
-
-git -C $RepoRoot add android/app/build.gradle
-git -C $RepoRoot commit -m "release(android): v$versionName (build $newCode) - $Changelog"
-if ($LASTEXITCODE -ne 0) { Write-Error "git commit 失败" }
-Push-HeadToMain
-
-$sha = git -C $RepoRoot rev-parse --short HEAD
-$shaFull = (git -C $RepoRoot rev-parse HEAD).Trim()
-Write-Host "   Commit SHA: $sha" -ForegroundColor Green
+# 本次发布的 git SHA 直接采用基础 commit（没有新的 release commit）。
+# version.json 的 gitSha = 本次实际编译用的源代码 SHA。
+$shaFull = $BuildBaseSha
+$sha = $shaFull.Substring(0,7)
+Write-Host "   本次发布对应源 SHA: $sha (无新增 release commit)" -ForegroundColor Green
 
 Assert-ApkStillCurrentBeforeUpload -ReleaseSha $shaFull
 $serverShaBeforeUpload = Get-DeployedApkSha
@@ -574,13 +689,12 @@ if (-not $Force) {
             Write-Host "   服务器当前：build $serverNowCode (v$($serverNow.versionName))" -ForegroundColor Yellow
             Write-Host "   本次编译：  build $newCode (v$versionName)" -ForegroundColor Yellow
             Write-Host "   原因：另一台 PC 在本机编译期间已经发布了同等或更新的 APK。" -ForegroundColor Yellow
-            Write-Host "   处理：" -ForegroundColor Yellow
-            Write-Host "     1) 本次 build.gradle 版本号 commit 已推送，不需回退，git 历史无损失。" -ForegroundColor Yellow
-            Write-Host "     2) 本次本地编译的 APK 作废，不上传。" -ForegroundColor Yellow
-            Write-Host "     3) 如需本机中验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
-            Write-Host "     4) 如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
+            Write-Host "   处理：本次本机编译的 APK 作废；服务器分配的 build $newCode 槽位将释放回 in-flight 列表。" -ForegroundColor Yellow
+            Write-Host "   如需本机验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
+            Write-Host "   如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host ""
+            Complete-Release -Success:$false -ErrorMessage "server already has newer apk: build $serverNowCode"
             exit 0
         }
         Write-Host "   ✅ 服务器版本检查通过（服务器 $serverNowCode < 本次 $newCode）" -ForegroundColor Green
@@ -630,10 +744,12 @@ try {
 
 # ── 汇报 ──────────────────────────────────────────────────────────────────────
 
+Complete-Release -Success:$true -VersionName $versionName -VersionCode $newCode -Sha $shaFull
+
 Write-Host ""
 Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host "✅ 发布完成！" -ForegroundColor Green
-Write-Host "   版本: v$versionName (build $newCode)" -ForegroundColor White
-Write-Host "   SHA:  $sha" -ForegroundColor White
+Write-Host "   版本: v$versionName (build $newCode) — 服务器分配，未写入 git" -ForegroundColor White
+Write-Host "   SHA:  $sha (源代码 commit，无新增 release commit)" -ForegroundColor White
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
 Write-Host ("=" * 60) -ForegroundColor Cyan

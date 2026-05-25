@@ -167,7 +167,7 @@ git status --short | Select-String "^\?\?"
 ```powershell
 git add server/src/<new-file>.rs   # 新文件必须显式添加
 git add server/src/main.rs         # 以及引用它的文件
-git add server/Cargo.toml          # 以及 Cargo.toml（如有新依赖）
+git add server/Cargo.toml          # 仅当有新增依赖时；禁止用于递增 version 字段
 ```
 
 **反例（导致构建断裂）**：
@@ -370,8 +370,7 @@ target-dir = "E:/rust-target"
 ### 标准流程：本地交叉编译，只上传 binary
 
 ```powershell
-# 1. 提交
-git add server/Cargo.toml          # 后端运行代码变化必须递增 package.version
+# 1. 提交业务代码（不再需要手动改 server/Cargo.toml 的 version）
 git add server/src/<file>.rs          # 只加自己改的文件
 git commit -m "fix(server): 描述"
 git push origin main
@@ -410,26 +409,32 @@ bash scripts/publish-server.sh --skip-upload
 
 旧入口 `scripts/deploy.sh` 只保留为兼容包装器，内部会转到 `scripts/publish-server.sh`，不得再实现远端编译。
 
-### 后端版本号规则
+### 后端版本号规则（v0.3.69+ 新流程：服务器分配，不再进 git）
 
-**`scripts/publish-server.ps1` 会自动完成 PATCH 递增 → commit → push → 构建 → 部署 → 验证。**  
-通常直接运行脚本即可，无需手动修改版本号。
+**版本号由服务器在 `/api/release/claim` 原子分配，`server/Cargo.toml` 里的 `version` 字段只是冷启动兜底，不再被任何脚本或 git 提交修改。**
 
-| 情况 | 递增位 | 做法 |
-|---|---|---|
-| 修复 Bug，无新接口能力 | PATCH（自动） | 直接运行 `.\scripts\publish-server.ps1` |
-| 新增后端功能，向后兼容 | MINOR，PATCH 归零 | 手动改 `server/Cargo.toml` 版本后加 `-SkipVersionBump` |
-| 不兼容 API / 协议变更 | MAJOR，其余归零 | 手动改 `server/Cargo.toml` 版本后加 `-SkipVersionBump` |
+`scripts/publish-server.ps1` / `publish-server.sh` 自动执行：
+
+1. `git pull --rebase origin main`
+2. POST `/api/release/claim` → 服务器返回 `assignedVersionName` 和 `token`
+3. 设置环境变量 `ELON_BUILD_VERSION=<assignedVersionName>`，`cargo zigbuild` 通过 `option_env!("ELON_BUILD_VERSION")` 把版本号编进 binary
+4. 上传 binary → flock + CAS 替换 → 重启
+5. POST `/api/release/finish`（success=true/false）释放或确认 in-flight 槽位
+
+并发多 builder 时，服务器维护 in-flight 列表，每个 builder 拿到不同 patch，互不冲突。
+
+| 情况 | 做法 |
+|---|---|
+| 修复 Bug / 新增后端功能 | 直接运行 `.\scripts\publish-server.ps1`（默认 bump=patch） |
+| MINOR / MAJOR 版本切换 | 由人工修改服务器侧 `LaneState.last_published_version_name`（运维操作） |
+| 旧参数 `-SkipVersionBump` | 已废弃，留作向后兼容；新流程下没有 git 版本号变动，本参数无效果 |
 
 ```powershell
-# 普通部署（自动递增 PATCH）
+# 一条命令完成：claim → 编译 → 部署 → finish
 .\scripts\publish-server.ps1
-
-# 手动控制 MINOR/MAJOR 时（已在 Cargo.toml 手动改好版本号）
-.\scripts\publish-server.ps1 -SkipVersionBump
 ```
 
-脚本会在构建时注入 git SHA，服务端通过 `/api/server/version` 返回 `versionName` 和 `gitSha`，APK 个人页动态读取该接口展示后端版本。
+脚本会在构建时注入 git SHA + 服务器分配的版本号，`/api/server/version` 返回 `versionName` 和 `gitSha`。`server/Cargo.toml` 的 version 字段被 `option_env!` 覆盖，permanent 不变。
 
 ---
 
@@ -437,18 +442,19 @@ bash scripts/publish-server.sh --skip-upload
 
 > Android 新功能不是“代码合并即完成”。只要改了 APK 可安装端能力，必须跑发布脚本并校验服务器版本。
 
-### APK 发布三步式工作流（严格分离，不得合并）
+### APK 发布两步式工作流（v0.3.69+ 新流程：版本号不进 git）
 
 ```
-[第1步：提交业务代码]   git add 业务文件 → commit → push
+[第1步：提交业务代码]   git add 业务文件 → commit → push origin main
         ↓
 [第2步：运行发布脚本]   publish-apk.ps1 -Changelog "..."
-        （脚本自动：versionCode+1 → 编译 → 上传 → 验证）
-        ↓
-[第3步：提交脚本产生的版本号变动]   git add build.gradle → commit → push
+        （脚本自动：claim 拿版本号 → 临时注入 build.gradle → 编译 → 上传
+         → finish 释放槽位 → 还原 build.gradle 到 git 兜底版本）
 ```
 
-**第1步必须先单独提交**，不能把业务代码和版本号文件混在同一个 commit。
+**与旧流程的核心区别**：
+- 不再有"第3步：提交版本号变动"。`android/app/build.gradle` 里的 `versionCode/versionName` 永远是冷启动兜底，不会被脚本提交。
+- 多 PC 并发发布时不会撞 versionCode：服务器 `/api/release/claim` 原子分配不同的 patch 号给不同 builder。
 
 ```powershell
 # 第1步：先提交业务代码
@@ -456,86 +462,68 @@ git add android/app/src/main/...   # 只加业务文件，不加 build.gradle
 git commit -m "feat(android): 描述"
 git push origin main               # 脚本基于远端 HEAD，必须先 push
 
-# 第2步：运行发布脚本（自动完成版本号递增、编译、上传）
+# 第2步：运行发布脚本（脚本会自动 claim 版本号、编译、上传、finish）
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-### ⚠️ 并发发布冲突：push 被拒后必须重跑脚本
+### ⚠️ 并发发布冲突：服务器 claim 已天然防撞，无需手动 rebase
 
-当第2步脚本的最终 `git push` 被拒绝（non-fast-forward），**绝对不能只 rebase 再推**：
-
-```
-❌ 错误做法：
-  git pull --rebase → git push   ← 产物里嵌入的是旧 versionCode！
-  → version.json 的版本号 ≠ APK 实际内嵌版本号 → 手机死循环弹更新提示
-
-✅ 正确做法：
-  git pull --rebase origin main   # 先同步对方的版本号 commit
-  重新运行 scripts\publish-apk.ps1 -Changelog "..."   # 基于最新版本号重新编译上传
-```
-
-**原因**：APK 产物在编译时已经把旧的 `versionCode` 打包进去了，不重新编译就上传，会导致 `version.json` 中的版本号与 APK `BuildConfig.VERSION_CODE` 不一致。
+旧版死循环（"build.gradle commit push 被拒 → pull rebase 丢弃版本号 commit → 再次撞号"）已不存在。
+新版多 PC / 多 AI 同时跑 `publish-apk.ps1`：
+- A 先 claim 拿到 `build 70`；B 同时 claim 自动拿到 `build 71`。
+- A 上传成功 → finish 写 `last_published_version_code=70`；B 上传成功 → finish 写 `last_published_version_code=71`。
+- 如果 B 慢于 A 上传，且服务器 `version.json` 已经是 `build 70`，B 上传时会看到 `serverNowCode=70 < 71`，正常覆盖发布 71。
+- 如果 B 编译时间过长，A 已发布 build 71 之后又有人发布 build 72，B 拿到的 build 71 < server 72，脚本会自动中止并 `finish(success=false)`，释放占用，不污染 git。
 
 ### ⚠️ APK 慢构建防覆盖规则
 
-`scripts\publish-apk.ps1` 必须把 APK 发布视为基于明确 git SHA 的原子动作：
+`scripts\publish-apk.ps1` 必须把 APK 发布视为基于明确 git SHA + 服务器 token 的原子动作：
 
-- 构建开始前记录基础 SHA。
-- 构建期间定期检查 `origin/main` 和服务器 `.apk-deployed-sha`；如果线上 APK 已部署了包含基础 SHA 的更新提交，立即中止本地旧编译，改为测试线上新版。
-- 构建完成后、提交 release commit 前再次检查 `origin/main`；如果远端已前进但线上还未确认包含基础 SHA，停止发布并要求基于最新 `main` 重跑。
-- `git push HEAD:main` 被拒绝时，脚本不得自动 rebase 后继续上传旧 APK；必须停止并要求重新运行发布脚本。
+- 构建开始前 claim 拿到 token + version。
+- 构建期间定期检查 `origin/main` 和服务器 `.apk-deployed-sha`；如果线上 APK 已部署了包含基础 SHA 的更新提交，立即中止本地旧编译并 finish(success=false)，改为测试线上新版。
+- 构建完成后再次检查 `origin/main` 与 `version.json`；服务器已有同等或更高 versionCode 时，停止上传并 finish(success=false)。
 - 上传 APK 和 `version.json` 必须先传 staging 文件，再由服务器 `flock` + `.apk-deployed-sha` CAS 原子替换；慢构建不得覆盖已经上线的后代 SHA。
-- `version.json` 必须包含发布 commit 的 `gitSha`，`check-task-complete.ps1 -Kind AndroidFeature` 必须校验线上 `gitSha` 等于当前 HEAD。
+- `version.json` 必须包含本次源码 commit 的 `gitSha`（即 `BuildBaseSha`，没有新增 release commit），`check-task-complete.ps1 -Kind AndroidFeature` 校验线上 `gitSha` 等于当前 main HEAD。
+- 任何失败路径（claim 后 abort、编译失败、CAS 冲突、scp 失败）必须调 `/api/release/finish` 的 success=false 以释放 in-flight 槽位。
 
-如果用户明确要求“只改代码，不发布 APK”，最终汇报必须写明 `APK 发布状态：未发布（用户明确要求）`。
+如果用户明确要求"只改代码，不发布 APK"，最终汇报必须写明 `APK 发布状态：未发布（用户明确要求）`。
 
 ---
 
-## 🏷️ 版本号管理规则
+## 🏷️ 版本号管理规则（v0.3.69+ 服务器分配）
 
-> 版本号由两个字段组成，均在 `android/app/build.gradle` 维护。
+> **版本号不再由 git 管理**。`android/app/build.gradle` 和 `server/Cargo.toml` 里的版本号是冷启动兜底值，所有 AI 代理都**不得手动递增并提交**这些字段。
 
-| 字段 | 格式 | 规则 |
-|------|------|------|
-| `versionCode` | 整数，只增不减 | **每次发布 APK 必须 +1** |
-| `versionName` | `MAJOR.MINOR.PATCH` | 按语义版本递增 |
+| 项目 | 字段位置 | 实际来源 |
+|------|---------|---------|
+| 后端 `versionName` | `server/Cargo.toml` (兜底) | `option_env!("ELON_BUILD_VERSION")` ← `/api/release/claim` |
+| 后端 `gitSha` | 编译时注入 | 本机 `git rev-parse HEAD` |
+| APK `versionCode` | `build.gradle` (兜底) | publish-apk.ps1 临时写入 ← `/api/release/claim` |
+| APK `versionName` | `build.gradle` (兜底) | publish-apk.ps1 临时写入 ← `/api/release/claim` |
+| APK `gitSha` (version.json) | 上传 json | 本机 `BuildBaseSha` |
 
-**语义版本递增规则**：
-
-| 情况 | 递增位 | 示例 |
-|------|--------|------|
-| 修复 Bug，无新功能 | PATCH | `1.2.3` → `1.2.4` |
-| 新增功能，向后兼容 | MINOR，PATCH 归零 | `1.2.3` → `1.3.0` |
-| 破坏性变更（API 不兼容） | MAJOR，其余归零 | `1.2.3` → `2.0.0` |
-
-**AI 代理执行 APK 发布时必须**：
+**AI 代理执行规则**：
 
 ```powershell
-# 1. 自动读取并递增 versionCode（脚本化，不依赖 AI 手动计算）
-$repoRoot = git rev-parse --show-toplevel
-$gradlePath = "$repoRoot\android\app\build.gradle"
-$content = Get-Content $gradlePath -Raw
+# ✅ 正确：直接运行发布脚本，版本号由服务器分配
+.\scripts\publish-apk.ps1 -Changelog "<改动描述>"
+.\scripts\publish-server.ps1
 
-$oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value)
-$newCode = $oldCode + 1
-$content = $content -replace "versionCode\s+$oldCode", "versionCode $newCode"
-Set-Content $gradlePath $content -NoNewline
-Write-Host "versionCode: $oldCode → $newCode"
-
-# 2. 根据本次改动类型手动决定 versionName 递增哪位（见上方规则表）
-#    bug fix → PATCH；新功能 → MINOR；破坏性变更 → MAJOR
-$oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
-# 手动替换 $content 里的 versionName 为新版本号，再次 Set-Content
-
-# 3. 将版本号写入 commit message（格式固定）
-git commit -m "release(android): vNEW_VERSION (build $newCode) - <改动描述>"
+# ❌ 禁止：手动递增 build.gradle 的 versionCode 并 commit
+# ❌ 禁止：手动递增 server/Cargo.toml 的 version 并 commit
 ```
 
+**服务器 `/api/release/claim` 协议要点**：
+- 请求体：`{ kind, sha, builderId, builderLabel, bump, currentVersionName, currentVersionCode? }`
+- 响应：`{ action: "build", token, assignedVersionName, assignedVersionCode?, inFlightCount }`
+- 状态持久化在 `<data_dir>/release-state.json`（每 lane 独立 LaneState）
+- finish 必须带 token + success；success=true 时单调更新 `lastPublishedVersionName/Code`
+
 **禁止**：
-- 发布 APK 时不更新版本号
-- `versionCode` 减小或重复（设备会拒绝安装）
-- 多人同时发布时使用相同 `versionCode`（后推送的一方 push 被拒绝后必须再次 +1 再推）
+- 手动递增 `versionCode` / `versionName` / `Cargo.toml` 的 version 并 commit
+- `versionCode` 减小或重复（设备会拒绝安装；服务器 claim 已天然单调递增防重复）
+- 跳过 `/api/release/finish` 调用（会让 in-flight 槽位永久残留，需运维清理 `release-state.json`）
 
 ---
 

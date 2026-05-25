@@ -1,10 +1,17 @@
 ﻿<#
 .SYNOPSIS
-    elon cli 服务端 — 本地交叉编译 → 部署
+    elon cli 服务端 — 本地交叉编译 → 部署（版本号由服务器分配）
 .DESCRIPTION
-    本地用 cargo zigbuild 交叉编译到 x86_64-unknown-linux-musl，
-    通过 git worktree 临时隔离（不把未提交改动带到服务器），
-    scp 上传到服务器后重启并验证。
+    新版业务流程（version-from-server，不再把版本号写进 git）：
+
+      1. git pull --rebase origin main    (业务代码 commit 必须先由 AI 自己 push)
+      2. POST /api/release/claim          (服务器原子分配一个新的 versionName 给本机)
+      3. cargo zigbuild --target musl     (设 ELON_BUILD_VERSION=<assignedVersionName> 注入产物)
+      4. SHA 顺序检查 + flock CAS         (服务器若已有更新版本则作废本机产物)
+      5. POST /api/release/finish         (汇报成功/失败，释放 in-flight 槽位)
+
+    版本号永远不进 Cargo.toml / git。多 AI 并发不再因为"同时 bump 同一版本号"
+    撞 rebase 死循环；脚本不再自动 commit/push 版本号。
 
     依赖（首次运行前手动安装一次即可）：
       1. zig 工具链：https://ziglang.org/download/  → 解压后加入 PATH
@@ -13,23 +20,24 @@
       4. OpenSSH 客户端（Windows 11 内置）
 
 .PARAMETER SkipBuild
-    跳过编译，用上次已有的产物直接重新部署（仅上传 + 重启）。
+    跳过编译，用上次已有的产物直接重新部署（仅上传 + 重启）。注意：仍会调用 claim 拿新版本号，
+    但 binary 是旧的，binary 内嵌的版本可能与本次 assignedVersionName 不符。
 .PARAMETER SkipUpload
-    只做本地编译，不上传不重启（用于本地验证 binary）。
+    只做本地编译，不上传不重启（用于本地验证 binary）。会调用 finish(success=false) 释放槽位。
 .PARAMETER Force
-    强制重新部署，即使检测到服务器上已是相同 SHA。
+    强制重新部署，跳过 SHA 顺序检查 + CAS（仅在确认要覆盖线上更新版本时使用）。
 .PARAMETER SkipVersionBump
-    跳过自动版本递增（手动已修改 MINOR/MAJOR 版本号时使用）。
+    [DEPRECATED] 旧流程参数，已无意义（版本号由服务器分配）。保留只为兼容，会打印一条提示。
 
 .NOTES
     本机专用构建缓存目录可在仓库根 .env.local 中设置：
       ELON_BUILD_TARGET_DIR=D:\rust\shared\target
 
 .EXAMPLE
-    .\scripts\publish-server.ps1                          # 正常流程（自动递增 PATCH）
-    .\scripts\publish-server.ps1 -SkipVersionBump         # 跳过版本递增（手动控制版本号时）
+    .\scripts\publish-server.ps1                          # 正常流程（claim → 编译 → 部署 → finish）
     .\scripts\publish-server.ps1 -SkipBuild               # 只用上次产物重新部署
     .\scripts\publish-server.ps1 -SkipUpload              # 只本地编译，不部署
+    .\scripts\publish-server.ps1 -Force                   # 强制覆盖线上版本（绕过祖先检查 + CAS）
 #>
 param(
     [switch]$SkipBuild,
@@ -124,6 +132,80 @@ function Resolve-BuildTargetRoot {
 
 Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
 
+# ─────────────────────────────────────────────────────────────
+# Release API helper（与服务器 /api/release/{claim,heartbeat,finish} 通讯）
+# ─────────────────────────────────────────────────────────────
+$ReleaseApiBase = "http://43.139.149.158:8080/api/release"
+
+function Invoke-ReleaseApi {
+    param(
+        [Parameter(Mandatory)] [string]$Endpoint,
+        [object]$Body = $null,
+        [int]$TimeoutSec = 20
+    )
+    $url = "$ReleaseApiBase/$Endpoint"
+    $tmp = $null
+    try {
+        $curlArgs = @('--noproxy','*','-s','--max-time',$TimeoutSec,'-w','\n__HTTP_STATUS__:%{http_code}','-X','POST',$url)
+        if ($Body) {
+            $json = ($Body | ConvertTo-Json -Depth 6 -Compress)
+            $tmp = [System.IO.Path]::GetTempFileName()
+            [System.IO.File]::WriteAllText($tmp, $json, [System.Text.UTF8Encoding]::new($false))
+            $curlArgs += @('-H','Content-Type: application/json; charset=utf-8','--data-binary',"@$tmp")
+        }
+        $raw = & curl.exe @curlArgs 2>&1
+        $rawText = ($raw -join "`n")
+        if ($LASTEXITCODE -ne 0) {
+            throw "curl 调用失败 ($Endpoint, exit=$LASTEXITCODE): $rawText"
+        }
+        $statusLine = ($rawText -split "`n") | Where-Object { $_ -match '^__HTTP_STATUS__:' } | Select-Object -Last 1
+        $bodyText = ($rawText -replace "(?s)\n?__HTTP_STATUS__:\d+\s*$","")
+        $status = if ($statusLine) { [int]($statusLine -replace '^__HTTP_STATUS__:','') } else { 0 }
+        if ($status -lt 200 -or $status -ge 300) {
+            throw "release/$Endpoint HTTP ${status}: $bodyText"
+        }
+        if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
+        return ($bodyText | ConvertFrom-Json)
+    } finally {
+        if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+# 全局状态：claim token，脚本失败/中止时用来调 finish 释放槽位
+$script:ReleaseToken = $null
+$script:ReleaseFinished = $false
+
+function Complete-Release {
+    param(
+        [Parameter(Mandatory)] [bool]$Success,
+        [string]$VersionName = '',
+        [string]$Sha = '',
+        [string]$ErrorMessage = ''
+    )
+    if (-not $script:ReleaseToken -or $script:ReleaseFinished) { return }
+    try {
+        $payload = @{
+            kind  = 'server'
+            token = $script:ReleaseToken
+            success = $Success
+        }
+        if ($Success) {
+            if ($VersionName) { $payload.versionName = $VersionName }
+            if ($Sha)         { $payload.sha = $Sha }
+        } else {
+            if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
+        }
+        Invoke-ReleaseApi -Endpoint 'finish' -Body $payload | Out-Null
+        $script:ReleaseFinished = $true
+    } catch {
+        Write-Host "   ⚠️  release/finish 调用失败（不影响主流程）: $_" -ForegroundColor Yellow
+    }
+}
+
+if ($SkipVersionBump) {
+    Write-Host "ℹ️  -SkipVersionBump 已废弃（版本号现由服务器分配，不再写 Cargo.toml）。" -ForegroundColor DarkGray
+}
+
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "   elon cli 服务端  交叉编译 + 部署" -ForegroundColor Cyan
@@ -134,54 +216,68 @@ Write-Host "  服务器: $Server" -ForegroundColor Gray
 Write-Host ""
 
 # ─────────────────────────────────────────────────────────────
-# 1. git pull --rebase（避免 push 时冲突）
+# 1. git pull --rebase（同步业务代码；版本号不再由本机改动）
 # ─────────────────────────────────────────────────────────────
 Write-Host "1⃣  同步最新代码..." -ForegroundColor Yellow
 git -C $RepoRoot pull --rebase origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 
+# 提前阻断：业务代码必须已 commit + push，否则脚本不应当继续（claim 会基于线上 main 的最新版本号）
+$dirty = (git -C $RepoRoot status --porcelain 2>$null) | Out-String
+$dirty = $dirty.Trim()
+if ($dirty) {
+    Write-Host ""
+    Write-Host "❌ 工作区不干净，请先 commit + push 业务改动再运行部署脚本：" -ForegroundColor Red
+    Write-Host $dirty -ForegroundColor Yellow
+    Write-Host ""
+    Write-Error "工作区有未提交改动"
+}
+
 $Sha      = (git -C $RepoRoot rev-parse --short HEAD).Trim()
 $ShaBig   = (git -C $RepoRoot rev-parse HEAD).Trim()
 $CargoTomlPath = Join-Path $ServerDir "Cargo.toml"
-$ServerVersion = [regex]::Match(
+$FallbackVersion = [regex]::Match(
     (Get-Content $CargoTomlPath -Encoding UTF8 -Raw),
     '(?m)^version\s*=\s*"([^"]+)"'
 ).Groups[1].Value
 Write-Host "   ✅ 最新 SHA: $Sha" -ForegroundColor Green
-Write-Host "   ✅ 后端版本: v$ServerVersion" -ForegroundColor Green
+Write-Host "   ℹ️  Cargo.toml 兜底版本: v$FallbackVersion（不会被本次脚本修改）" -ForegroundColor DarkGray
 
 # ─────────────────────────────────────────────────────────────
-# 1.5  自动递增 PATCH 版本号（仅 Build 且未指定 -SkipVersionBump 时）
+# 1.5  从服务器原子分配新版本号（claim）
 # ─────────────────────────────────────────────────────────────
-if (-not $SkipBuild -and -not $SkipVersionBump) {
-    Write-Host ""
-    Write-Host "1.5⃣  自动递增 PATCH 版本号..." -ForegroundColor Yellow
-    $cargoContent = Get-Content $CargoTomlPath -Raw -Encoding UTF8
-    $oldVersion   = [regex]::Match($cargoContent, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
-    $parts        = $oldVersion.Split('.')
-    $parts[2]     = [string]([int]$parts[2] + 1)
-    $newVersion   = $parts -join '.'
-    # 只替换第一个 version = "..." 行（[package] 段，不误改依赖版本）
-    $cargoContent = [regex]::Replace($cargoContent, '(?m)^(version\s*=\s*)"[^"]+"', "`${1}`"$newVersion`"", 1)
-    Set-Content $CargoTomlPath $cargoContent -NoNewline -Encoding UTF8
-
-    Write-Host "   📦 版本号递增: v$oldVersion → v$newVersion" -ForegroundColor Cyan
-
-    git -C $RepoRoot add "server/Cargo.toml"
-    git -C $RepoRoot commit -m "chore(server): bump version to $newVersion"
-    if ($LASTEXITCODE -ne 0) { Write-Error "❌ git commit 版本号失败" }
-
-    git -C $RepoRoot push origin main
-    if ($LASTEXITCODE -ne 0) { Write-Error "❌ git push 版本号失败（存在冲突时请先 git pull --rebase 后重试）" }
-
-    # 版本 commit 后 SHA 变了，重新获取
-    $Sha           = (git -C $RepoRoot rev-parse --short HEAD).Trim()
-    $ShaBig        = (git -C $RepoRoot rev-parse HEAD).Trim()
-    $ServerVersion = $newVersion
-    Write-Host "   ✅ 版本已提交推送 SHA: $Sha  v$ServerVersion" -ForegroundColor Green
-} elseif ($SkipVersionBump) {
-    Write-Host "1.5⃣  ⏩ 跳过版本递增（-SkipVersionBump）" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "1.5⃣  向服务器申请新版本号..." -ForegroundColor Yellow
+$builderId = "$env:COMPUTERNAME-$env:USERNAME"
+if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq "-") {
+    $builderId = "unknown-builder-" + ([Guid]::NewGuid().ToString().Substring(0,8))
 }
+$builderLabel = "publish-server.ps1 @ $builderId"
+
+try {
+    $claim = Invoke-ReleaseApi -Endpoint 'claim' -Body (@{
+        kind              = 'server'
+        sha               = $ShaBig
+        builderId         = $builderId
+        builderLabel      = $builderLabel
+        bump              = 'patch'
+        currentVersionName = $FallbackVersion
+    })
+} catch {
+    Write-Error "❌ /api/release/claim 失败：$_"
+}
+
+if (-not $claim -or $claim.action -ne 'build') {
+    Write-Error "❌ release/claim 返回非预期响应：$($claim | ConvertTo-Json -Compress)"
+}
+
+$script:ReleaseToken = [string]$claim.token
+$AssignedVersion     = [string]$claim.assignedVersionName
+if ([string]::IsNullOrWhiteSpace($AssignedVersion)) {
+    Write-Error "❌ release/claim 未返回 assignedVersionName"
+}
+$InFlightCount = if ($claim.PSObject.Properties.Match('inFlightCount').Count) { [int]$claim.inFlightCount } else { 1 }
+Write-Host "   ✅ 已分配版本号: v$AssignedVersion (token=$($script:ReleaseToken.Substring(0,8))..., in-flight=$InFlightCount)" -ForegroundColor Green
 
 # ─────────────────────────────────────────────────────────────
 # 2. 环境检查（仅 Build 时做）
@@ -252,27 +348,34 @@ if (-not $SkipBuild) {
         # Build outside the temporary worktree when a machine-specific cache is configured.
         $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
+        $env:ELON_BUILD_VERSION  = $AssignedVersion
         cargo zigbuild --release --target $Target
         if ($LASTEXITCODE -ne 0) {
             Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
+            Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
             Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
             Pop-Location
             Remove-Worktree
+            Complete-Release -Success $false -ErrorMessage "cargo zigbuild failed"
             Write-Error "❌ 编译失败"
         }
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
+        Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     } catch {
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
+        Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
         Pop-Location -ErrorAction SilentlyContinue
         Remove-Worktree
+        Complete-Release -Success $false -ErrorMessage "cargo zigbuild exception: $_"
         throw
     }
     Pop-Location
 
     if (-not (Test-Path $Binary)) {
         Remove-Worktree
+        Complete-Release -Success $false -ErrorMessage "binary missing after build"
         Write-Error "❌ 编译产物不存在: $Binary"
     }
 
@@ -295,7 +398,9 @@ if ($SkipUpload) {
     Write-Host ""
     Write-Host "✅ 本地编译完成（-SkipUpload，未部署）" -ForegroundColor Green
     Write-Host "   产物: $Binary" -ForegroundColor Gray
+    Write-Host "   注入版本: v$AssignedVersion" -ForegroundColor Gray
     Remove-Worktree
+    Complete-Release -Success $false -ErrorMessage "skip upload (local build only)"
     exit 0
 }
 
@@ -308,6 +413,7 @@ $stagingPath = "/tmp/elon-server-$Sha"
 scp @SshOpts $Binary "${Server}:${stagingPath}"
 if ($LASTEXITCODE -ne 0) {
     Remove-Worktree
+    Complete-Release -Success $false -ErrorMessage "scp upload failed"
     Write-Error "❌ SCP 上传失败"
 }
 Write-Host "   ✅ 上传完成" -ForegroundColor Green
@@ -325,6 +431,7 @@ if (-not $Force) {
             # 服务器 SHA 不是我们的祖先 → 服务器已有更新版本，拒绝回退
             ssh @SshOpts $Server "rm -f $stagingPath" 2>$null
             Remove-Worktree
+            Complete-Release -Success $false -ErrorMessage "superseded by server sha $serverSha"
             $shortServer = $serverSha.Substring(0, [Math]::Min(8, $serverSha.Length))
             Write-Host ""
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
@@ -332,6 +439,7 @@ if (-not $Force) {
             Write-Host "   服务器当前: $shortServer（比本次 $Sha 更新）" -ForegroundColor Yellow
             Write-Host "   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。" -ForegroundColor Yellow
             Write-Host "   解决：git pull --rebase 后重新编译部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+            Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host ""
             exit 0
@@ -398,15 +506,18 @@ $lockResult = ssh @SshOpts $Server "flock -x -w 120 /tmp/elon-deploy.lock bash -
 $lockExit = $LASTEXITCODE
 if ($lockExit -eq 42) {
     Remove-Worktree
+    Complete-Release -Success $false -ErrorMessage "cas conflict inside flock: $lockResult"
     Write-Host ""
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     Write-Host "   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）" -ForegroundColor Yellow
     Write-Host "   $lockResult" -ForegroundColor Yellow
     Write-Host "   解决：git pull --rebase 后重新部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+    Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     exit 0
 } elseif ($lockExit -ne 0) {
     Remove-Worktree
+    Complete-Release -Success $false -ErrorMessage "deploy script failed: exit=$lockExit"
     Write-Error "❌ 锁内部署失败（exit=$lockExit）: $lockResult"
 }
 Write-Host "   ✅ 服务重启指令已发送（锁内完成 mv + restart + 写 SHA）" -ForegroundColor Green
@@ -433,14 +544,15 @@ if ($serverVersionResp -and $serverVersionResp.ToString().Trim() -ne "") {
 }
 
 # ─────────────────────────────────────────────────────────────
-# 7. 清理工作树
+# 7. 清理工作树 + finish(success=true)
 # ─────────────────────────────────────────────────────────────
 Remove-Worktree
+Complete-Release -Success $true -VersionName $AssignedVersion -Sha $ShaBig
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "   ✅ 部署完成！" -ForegroundColor Green
-Write-Host "   版本:   v$ServerVersion" -ForegroundColor Gray
+Write-Host "   版本:   v$AssignedVersion  (服务器分配，未写入 git)" -ForegroundColor Gray
 Write-Host "   SHA:    $Sha" -ForegroundColor Gray
 Write-Host "   服务:   http://43.139.149.158:8080/health" -ForegroundColor Gray
 Write-Host "   版本接口: http://43.139.149.158:8080/api/server/version" -ForegroundColor Gray

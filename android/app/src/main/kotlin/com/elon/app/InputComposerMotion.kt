@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 internal class InputComposerMotion(
     private val expandedInputContainer: FrameLayout,
     private val collapsedInputContainer: FrameLayout,
+    private val collapsedText: View,
     private val modelButton: View,
     private val rightControls: FrameLayout
 ) {
@@ -36,6 +37,9 @@ internal class InputComposerMotion(
         val endHeight = targetExpandedHeight(expanded)
         val startPillAlpha = collapsedInputContainer.alpha
         val endPillAlpha = if (expanded) 0f else 1f
+        val textTravel = collapsedInputContainer.resources.displayMetrics.density * 8f
+        val startTextTranslationY = collapsedText.translationY
+        val endTextTranslationY = if (expanded) -textTravel else 0f
         val startModelAlpha = modelButton.alpha
         val endModelAlpha = if (expanded) 1f else 0f
         val startRightWidth = rightControls.width.takeIf { it > 0 } ?: rightControls.layoutParams.width
@@ -47,6 +51,7 @@ internal class InputComposerMotion(
         if (!animate) {
             setExpandedHeight(endHeight)
             collapsedInputContainer.alpha = endPillAlpha
+            collapsedText.translationY = endTextTranslationY
             modelButton.alpha = endModelAlpha
             setRightControlsWidth(endRightWidth)
             collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
@@ -61,6 +66,7 @@ internal class InputComposerMotion(
                 val t = animator.animatedValue as Float
                 setExpandedHeight(lerp(startHeight, endHeight, t))
                 collapsedInputContainer.alpha = lerp(startPillAlpha, endPillAlpha, t)
+                collapsedText.translationY = lerp(startTextTranslationY, endTextTranslationY, t)
                 modelButton.alpha = lerp(startModelAlpha, endModelAlpha, t)
                 setRightControlsWidth(lerp(startRightWidth, endRightWidth, t))
             }

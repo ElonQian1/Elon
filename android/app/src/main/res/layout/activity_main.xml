@@ -564,7 +564,7 @@
         <LinearLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="60dp"
             android:layout_gravity="bottom"
             android:background="#1E1E1E"
             android:orientation="horizontal">
