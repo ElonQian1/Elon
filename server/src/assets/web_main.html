@@ -1148,9 +1148,13 @@
     if (!res.ok) throw new Error('加载用户信息失败：HTTP ' + res.status);
     const data = await res.json();
     currentUser = data.user;
+    const name = currentUser.nickname || currentUser.account || '';
+    const account = currentUser.account || '';
+    const tail = (account && account !== name) ? ' · ' + account : '';
     const lines = [
-      '用户：' + (currentUser.nickname || currentUser.account || ''),
-      '账号：' + (currentUser.account || '')
+      '我的开发工作台',
+      '登录账号：' + name + tail,
+      '云端工作区已就绪，可在网页版和其它手机间同步。'
     ];
     userInfoText.textContent = lines.join('\n');
   }
@@ -1431,8 +1435,8 @@
 
   // ====== 退出登录 ======
   logoutRow.addEventListener('click', () => {
-    const name = (currentUser && (currentUser.username || currentUser.phone)) || '';
-    const msg = name ? `确定退出当前账号「${name}」吗？` : '确定退出当前账号吗？';
+    const name = (currentUser && (currentUser.nickname || currentUser.account)) || '';
+    const msg = name ? `确定退出账号「${name}」？退出后仍可重新登录恢复项目。` : '确定退出当前账号吗？';
     if (!window.confirm(msg)) return;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('elon_token');
