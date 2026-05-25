@@ -1142,7 +1142,9 @@ class MainActivity : AppCompatActivity() {
             chatAdapter = { chatAdapter },
             conversationTaskKey = ::conversationTaskKey,
             workflowTerminalRoles = workflowTerminalRoles,
-            closeStaleWorkflowMessages = ::closeStaleWorkflowMessages,
+            closeStaleWorkflowMessages = { messages ->
+                workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+            },
             hasRunningTasks = { runningConversationTasks.isNotEmpty() },
             saveConversations = ::saveConversations,
             saveProjects = ::saveProjects,
@@ -1444,46 +1446,16 @@ class MainActivity : AppCompatActivity() {
         ).also { evidenceActions = it }
     }
 
-    private fun handleFoldedCliOutput(content: String) {
-        foldedCliLogActions().handleFoldedCliOutput(content)
-    }
-
-    private fun foldedCliLogSummary(): String {
-        return foldedCliLogActions().summary()
-    }
-
     private fun foldedCliLogActions(): MainFoldedCliLogActions {
         foldedCliLogActions?.let { return it }
         return MainFoldedCliLogActions(
             currentStage = { currentStage },
             updateStage = ::updateStage,
-            maybeAppendVisibleCliSignal = ::maybeAppendVisibleCliSignal,
+            maybeAppendVisibleCliSignal = { category, line ->
+                progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
+            },
             recordEvidence = ::recordEvidence
         ).also { foldedCliLogActions = it }
-    }
-
-    private fun removeLeakedAndRoutineWorkflowMessages(messages: MutableList<ChatMessage>) {
-        workflowMessageCompactor().removeLeakedAndRoutineWorkflowMessages(messages)
-    }
-
-    private fun compactWorkflowStatusMessages(messages: MutableList<ChatMessage>) {
-        workflowMessageCompactor().compactWorkflowStatusMessages(messages)
-    }
-
-    private fun maybeAppendVisibleCliSignal(category: String, line: String): Boolean {
-        return progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
-    }
-
-    private fun maybeAppendWorkflowProgressNarrative(content: String): Boolean {
-        return progressNarrativeActions().maybeAppendWorkflowProgressNarrative(content)
-    }
-
-    private fun maybeAppendTaskEventNarrative(event: String, content: String): Boolean {
-        return progressNarrativeActions().maybeAppendTaskEventNarrative(event, content)
-    }
-
-    private fun maybeAppendToolCallNarrative(tool: String): Boolean {
-        return progressNarrativeActions().maybeAppendToolCallNarrative(tool)
     }
 
     private fun progressNarrativeActions(): MainProgressNarrativeActions {
@@ -1506,17 +1478,19 @@ class MainActivity : AppCompatActivity() {
         ).also { toolActionBubbles = it }
     }
 
-    private fun closeStaleWorkflowMessages(messages: MutableList<ChatMessage>) {
-        workflowMessageCompactor().closeStaleWorkflowMessages(messages)
-    }
-
     private fun projectHygieneActions(): MainProjectHygieneActions {
         projectHygieneActions?.let { return it }
         return MainProjectHygieneActions(
             timeText = { timeFormatter.format(Date()) },
-            removeLeakedAndRoutineWorkflowMessages = ::removeLeakedAndRoutineWorkflowMessages,
-            compactWorkflowStatusMessages = ::compactWorkflowStatusMessages,
-            closeStaleWorkflowMessages = ::closeStaleWorkflowMessages
+            removeLeakedAndRoutineWorkflowMessages = { messages ->
+                workflowMessageCompactor().removeLeakedAndRoutineWorkflowMessages(messages)
+            },
+            compactWorkflowStatusMessages = { messages ->
+                workflowMessageCompactor().compactWorkflowStatusMessages(messages)
+            },
+            closeStaleWorkflowMessages = { messages ->
+                workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+            }
         ).also { projectHygieneActions = it }
     }
 
@@ -1590,11 +1564,17 @@ class MainActivity : AppCompatActivity() {
         assistantStreamEvents?.let { return it }
         return MainAssistantStreamEvents(
             handleTaskEvent = ::handleTaskEvent,
-            maybeAppendTaskEventNarrative = ::maybeAppendTaskEventNarrative,
-            maybeAppendWorkflowProgressNarrative = ::maybeAppendWorkflowProgressNarrative,
-            maybeAppendToolCallNarrative = ::maybeAppendToolCallNarrative,
+            maybeAppendTaskEventNarrative = { event, content ->
+                progressNarrativeActions().maybeAppendTaskEventNarrative(event, content)
+            },
+            maybeAppendWorkflowProgressNarrative = { content ->
+                progressNarrativeActions().maybeAppendWorkflowProgressNarrative(content)
+            },
+            maybeAppendToolCallNarrative = { tool ->
+                progressNarrativeActions().maybeAppendToolCallNarrative(tool)
+            },
             handleProgress = ::handleProgress,
-            handleFoldedCliOutput = ::handleFoldedCliOutput,
+            handleFoldedCliOutput = { content -> foldedCliLogActions().handleFoldedCliOutput(content) },
             markToolCallStarted = ::handleToolCall,
             appendToolCallBubble = { tool, args -> toolActionBubbles().appendToolCallBubble(tool, args) },
             markToolResultDone = { toolActionBubbles().markToolResultDone(it) },
