@@ -10,7 +10,7 @@ pub(crate) use crate::ai_cli_process::{
 #[cfg(test)]
 pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
 pub(crate) use crate::ai_cli_runner::codex_thread_uri;
-pub use crate::ai_cli_prewarm::{prewarm_codex_session, PrewarmResult};
+pub use crate::ai_cli_prewarm::prewarm_codex_session;
 
 use crate::{
     ai_cli_chat::{
