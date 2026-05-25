@@ -1182,88 +1182,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun persistActiveWork() {
-        val array = JSONArray()
-        runningConversationTasks.values.forEach { task ->
-            array.put(
-                JSONObject()
-                    .put("payload", task.payload)
-                    .put("is_development", task.isDevelopment)
-                    .put("started_at", task.startedAt)
-            )
-        }
-        if (array.length() == 0) {
-            clearPersistedActiveWork()
-            return
-        }
-        prefs.edit()
-            .putString(TaskWorkService.PREF_PENDING_WORK_TASKS, array.toString())
-            .remove(PREF_PENDING_WORK_PAYLOAD)
-            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
-            .remove(PREF_PENDING_WORK_TIME)
-            .apply()
+        persistActiveWorkTasks(prefs, runningConversationTasks.values)
     }
 
     private fun clearPersistedActiveWork() {
-        prefs.edit()
-            .remove(TaskWorkService.PREF_PENDING_WORK_TASKS)
-            .remove(PREF_PENDING_WORK_PAYLOAD)
-            .remove(PREF_PENDING_WORK_IS_DEVELOPMENT)
-            .remove(PREF_PENDING_WORK_TIME)
-            .apply()
+        clearPersistedActiveWorkTasks(prefs)
     }
 
     private fun restorePendingActiveWork() {
-        val now = System.currentTimeMillis()
-        val tasksJson = prefs.getString(TaskWorkService.PREF_PENDING_WORK_TASKS, null)?.takeIf { it.isNotBlank() }
-        if (tasksJson != null) {
-            val array = runCatching { JSONArray(tasksJson) }.getOrNull()
-            if (array != null) {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val payload = item.optString("payload").takeIf { it.isNotBlank() } ?: continue
-                    val savedAt = item.optLong("started_at", now)
-                    if (savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS) continue
-                    val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: continue
-                    val traceId = parsed.optString("trace_id").takeIf { it.isNotBlank() } ?: continue
-                    val projectId = parsed.optString("project_id").takeIf { it.isNotBlank() } ?: activeProject().id
-                    val conversationId = parsed.optString("conversation_id").takeIf { it.isNotBlank() } ?: "default"
-                    val key = conversationTaskKey(projectId, conversationId)
-                    runningConversationTasks[key] = ConversationTaskState(
-                        traceId = traceId,
-                        projectId = projectId,
-                        conversationId = conversationId,
-                        payload = payload,
-                        isDevelopment = item.optBoolean("is_development", true),
-                        pendingReconnect = true,
-                        startedAt = savedAt
-                    )
-                    runningTraceToConversation[traceId] = key
-                }
-            }
-        } else {
-            val payload = prefs.getString(PREF_PENDING_WORK_PAYLOAD, null)?.takeIf { it.isNotBlank() }
-                ?: return
-            val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
-            val tooOld = savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS
-            if (tooOld) {
-                clearPersistedActiveWork()
-                return
-            }
-            val parsed = runCatching { JSONObject(payload) }.getOrNull() ?: return
-            val traceId = parsed.optString("trace_id").takeIf { it.isNotBlank() } ?: return
-            val projectId = parsed.optString("project_id").takeIf { it.isNotBlank() } ?: activeProject().id
-            val conversationId = parsed.optString("conversation_id").takeIf { it.isNotBlank() } ?: activeConversation().id
-            val key = conversationTaskKey(projectId, conversationId)
-            runningConversationTasks[key] = ConversationTaskState(
-                traceId = traceId,
-                projectId = projectId,
-                conversationId = conversationId,
-                payload = payload,
-                isDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true),
-                pendingReconnect = true,
-                startedAt = savedAt
-            )
-            runningTraceToConversation[traceId] = key
+        val restored = restorePersistedActiveWorkTasks(
+            prefs = prefs,
+            now = System.currentTimeMillis(),
+            fallbackProjectId = activeProject().id,
+            fallbackConversationId = activeConversation().id
+        )
+        if (!restored.shouldRefreshUi) return
+
+        restored.tasks.forEach { task ->
+            val key = conversationTaskKey(task.projectId, task.conversationId)
+            runningConversationTasks[key] = task
+            runningTraceToConversation[task.traceId] = key
         }
 
         refreshActiveTaskState()
@@ -2433,10 +2371,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
-        const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
-        const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
-        const val PREF_PENDING_WORK_TIME = "pending_work_time"
-        const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
         val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
