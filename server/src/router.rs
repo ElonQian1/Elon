@@ -8,8 +8,8 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, api, app_update, peer_relay, project_api, project_attachments, project_downloads,
-    project_git, user_api, web,
+    admin, api, app_update, peer_relay, project_api, project_attachments, project_chat,
+    project_downloads, project_git, user_api, web,
 };
 
 pub fn build_app(state: Arc<AppState>) -> Router {
@@ -40,11 +40,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/projects", post(project_api::create_project))
         .route(
             "/api/projects/:project_id/chat",
-            post(project_api::chat_project),
+            post(project_chat::chat_project),
         )
         .route(
             "/api/projects/:project_id/prewarm",
-            post(project_api::prewarm_project),
+            post(project_chat::prewarm_project),
         )
         .route(
             "/api/projects/:project_id/attachments",
@@ -68,7 +68,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/prewarm",
-            post(project_api::prewarm_user_project),
+            post(project_chat::prewarm_user_project),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments",
