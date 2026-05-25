@@ -344,7 +344,7 @@ class TaskWorkService : Service() {
                     task.lastStep = step
                     task.lastStepTotal = total
                     if (task.lastPhaseStartMs == 0L) task.lastPhaseStartMs = System.currentTimeMillis()
-                    val etaText = estimateEta(task)
+                    val etaText = estimateTaskEta(task)
                     val notif = updateProgressNotification(this, step, total, phase, etaText)
                     getSystemService(NotificationManager::class.java)
                         .notify(ACTIVE_WORK_NOTIFICATION_ID, notif)
@@ -392,31 +392,6 @@ class TaskWorkService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
-    }
-
-    private fun estimateEta(task: RunningTask): String? {
-        val step = task.lastStep
-        val total = task.lastStepTotal
-        if (step <= 0 || step >= total) return null
-        val elapsed = System.currentTimeMillis() - task.startedAtMs
-        if (elapsed < 5_000L) return null
-        val remaining = ((elapsed.toDouble() / step) * (total - step)).toLong()
-        return when {
-            remaining < 60_000L -> "不到 1 分钟"
-            remaining < 120_000L -> "约 1 分钟"
-            remaining < 300_000L -> "约 ${remaining / 60_000} 分钟"
-            else -> null
-        }
-    }
-
-    private fun elapsedSinceRequestStart(task: RunningTask): Long {
-        if (task.startedAtMs <= 0L) return 0L
-        return System.currentTimeMillis() - task.startedAtMs
-    }
-
-    private fun firstChatReplyElapsedMs(task: RunningTask): Long? {
-        if (task.startedAtMs <= 0L || task.firstChatReplyAtMs <= 0L) return null
-        return task.firstChatReplyAtMs - task.startedAtMs
     }
 
     private fun hasActiveTasks(): Boolean {
