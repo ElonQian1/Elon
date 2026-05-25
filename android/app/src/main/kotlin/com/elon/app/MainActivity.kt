@@ -6,11 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import com.elon.app.BuildConfig
-import android.widget.FrameLayout
-import android.widget.ImageButton
-import android.widget.LinearLayout
 import android.widget.PopupWindow
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
@@ -98,18 +94,8 @@ class MainActivity : AppCompatActivity() {
     private var sendMessageActions: MainSendMessageActions? = null
     private var serverResponseWatchdogActions: MainServerResponseWatchdogActions? = null
     private var navigationController: MainNavigationController? = null
-    private lateinit var inputModeButton: ImageButton
-    private lateinit var attachmentButton: ImageButton
-    private lateinit var voiceHoldButton: TextView
-    private lateinit var inputBarContainer: LinearLayout
-    private lateinit var inputCenterContainer: FrameLayout
-    private lateinit var expandedInputContainer: FrameLayout
-    private lateinit var collapsedInputPreview: TextView
+    private lateinit var inputComposerViews: MainInputComposerViews
     private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
-    private lateinit var modelButtonShell: FrameLayout
-    private lateinit var inputRightControls: FrameLayout
-    private lateinit var inputComposerMotion: InputComposerMotion
-    private lateinit var attachmentPanel: LinearLayout
     private var voiceMode = false
     private var inputCanSend = true
     private var suppressInputFocusAnimation = false
@@ -347,17 +333,7 @@ class MainActivity : AppCompatActivity() {
             updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
         ).setup()
 
-        inputModeButton = views.inputModeButton
-        attachmentButton = views.attachmentButton
-        voiceHoldButton = views.voiceHoldButton
-        inputBarContainer = views.inputBarContainer
-        inputCenterContainer = views.inputCenterContainer
-        expandedInputContainer = views.expandedInputContainer
-        collapsedInputPreview = views.collapsedInputPreview
-        modelButtonShell = views.modelButtonShell
-        inputRightControls = views.inputRightControls
-        inputComposerMotion = views.inputComposerMotion
-        attachmentPanel = views.attachmentPanel
+        inputComposerViews = views
         pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(this, pendingAttachments) {
             collapsedInputPreviewActions().updateCollapsedInputPreview()
             updateSendButtonVisual()
@@ -369,14 +345,18 @@ class MainActivity : AppCompatActivity() {
         adaptiveInputHeightActions().updateAdaptiveInputHeight()
     }
 
+    private fun inputComposerViewsOrNull(): MainInputComposerViews? {
+        return if (::inputComposerViews.isInitialized) inputComposerViews else null
+    }
+
     private fun adaptiveInputHeightActions(): MainAdaptiveInputHeightActions {
         adaptiveInputHeightActions?.let { return it }
         return MainAdaptiveInputHeightActions(
             binding = binding,
             dp = uiTools()::dp,
-            inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
-            inputBarContainer = { if (::inputBarContainer.isInitialized) inputBarContainer else null },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
+            inputBarContainer = { inputComposerViewsOrNull()?.inputBarContainer },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode }
         ).also { adaptiveInputHeightActions = it }
     }
@@ -390,7 +370,7 @@ class MainActivity : AppCompatActivity() {
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
@@ -402,7 +382,7 @@ class MainActivity : AppCompatActivity() {
         return MainCollapsedInputPreviewActions(
             binding = binding,
             pendingAttachments = { pendingAttachments },
-            collapsedInputPreview = { if (::collapsedInputPreview.isInitialized) collapsedInputPreview else null }
+            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview }
         ).also { collapsedInputPreviewActions = it }
     }
 
@@ -476,7 +456,7 @@ class MainActivity : AppCompatActivity() {
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
         ).also { pendingAttachmentActions = it }
     }
@@ -488,8 +468,8 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools()::dp,
             selectableForeground = uiTools()::selectableForeground,
             activeConversation = projectStateActions()::activeConversation,
-            attachmentPanel = { if (::attachmentPanel.isInitialized) attachmentPanel else null },
-            attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
+            attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
+            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
             collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             openCameraAttachment = { attachmentPickerActions().openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions().openPhotoAttachment() },
@@ -502,13 +482,13 @@ class MainActivity : AppCompatActivity() {
         return MainVoiceModeActions(
             activity = this,
             binding = binding,
-            inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
-            voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
-            inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
-            expandedInputContainer = { if (::expandedInputContainer.isInitialized) expandedInputContainer else null },
-            collapsedInputPreview = { if (::collapsedInputPreview.isInitialized) collapsedInputPreview else null },
-            modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
+            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
+            expandedInputContainer = { inputComposerViewsOrNull()?.expandedInputContainer },
+            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview },
+            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
@@ -528,8 +508,8 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             dp = uiTools()::dp,
-            attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
@@ -544,7 +524,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             speechPermissionRequest = speechPermissionRequest,
             activeConversation = projectStateActions()::activeConversation,
-            voiceHoldButton = { voiceHoldButton },
+            voiceHoldButton = { inputComposerViews.voiceHoldButton },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() }
         ).also { speechInputActions = it }
@@ -602,8 +582,8 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverUrl = serverUrl,
             userIdProvider = { userId },
-            modelButtonShellProvider = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
-            inputBarContainerProvider = { if (::inputBarContainer.isInitialized) inputBarContainer else null },
+            modelButtonShellProvider = { inputComposerViewsOrNull()?.modelButtonShell },
+            inputBarContainerProvider = { inputComposerViewsOrNull()?.inputBarContainer },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions().openSettings() },
@@ -1181,10 +1161,10 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             activeConversation = projectStateActions()::activeConversation,
             setInputCanSend = { inputCanSend = it },
-            inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
-            voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
-            modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
-            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
+            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateStageHintShimmer = { stageHintShimmer().update() }
         ).also { sendEnabledActions = it }
