@@ -7,6 +7,7 @@ mod admin;
 mod agent;
 mod ai_cli;
 mod ai_cli_environment;
+mod ai_cli_native_session;
 mod ai_cli_output;
 mod ai_cli_prompts;
 mod ai_cli_streaming;
