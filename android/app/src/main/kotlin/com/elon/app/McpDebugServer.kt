@@ -14,7 +14,6 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
-import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -23,7 +22,6 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.URLEncoder
 import java.net.URL
 import java.util.Locale
 import java.util.TimeZone
@@ -209,7 +207,7 @@ object McpDebugServer {
             "task_control" -> taskControl(args)
             "task_events" -> taskEvents(args)
             "logcat_recent" -> mcpLogcatRecent(args)
-            "chat_send" -> chatSend(args)
+            "chat_send" -> chatSend(appContext, args)
             "chat_probe" -> chatProbe(args)
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
         }
@@ -289,7 +287,7 @@ object McpDebugServer {
                 .apply {
                     args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
                 }
-                .let { serverTraceJson(it) }
+                .let { serverTraceJson(appContext, it, DEFAULT_SERVER_BASE_URL) }
         } else {
             JSONObject.NULL
         }
@@ -352,7 +350,7 @@ object McpDebugServer {
     }
 
     private fun serverTrace(args: JSONObject): JSONObject {
-        val structured = serverTraceJson(args)
+        val structured = serverTraceJson(appContext, args, DEFAULT_SERVER_BASE_URL)
         val available = structured.optBoolean("available", false)
         return toolResult(
             if (available) "Server trace returned." else "Server trace is not available.",
@@ -532,127 +530,6 @@ object McpDebugServer {
         return toolResult("Queued task events returned.", structured)
     }
 
-    private fun chatSend(args: JSONObject): JSONObject {
-        val message = args.optString("message").trim()
-        if (message.isEmpty()) {
-            return toolResult("message is required", JSONObject().put("field", "message"), isError = true)
-        }
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        val force = args.optBoolean("force", false)
-        val userId = prefs.getString(TaskWorkService.PREF_USER_ID, null)
-            ?: UUID.randomUUID().toString().replace("-", "").also {
-                prefs.edit().putString(TaskWorkService.PREF_USER_ID, it).apply()
-            }
-        val projectId = args.optString("project_id").takeIf { it.isNotBlank() }
-            ?: prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null)
-            ?: "elon-self"
-        val projectTitle = args.optString("project_title").takeIf { it.isNotBlank() }
-            ?: prefs.getString("project_title", null)
-            ?: "Elon debug project"
-        val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
-            ?: "mcp_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
-        val agent = args.optString("agent").takeIf { it.isNotBlank() }
-        val conversationId = args.optString("conversation_id").takeIf { it.isNotBlank() }
-        val conversationTitle = args.optString("conversation_title").takeIf { it.isNotBlank() }
-        val isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true
-        val startAckTimeoutMs = args.optInt("start_ack_timeout_ms", 1_800).coerceIn(0, 10_000)
-
-        val payload = JSONObject()
-            .put("trace_id", traceId)
-            .put("user_id", userId)
-            .put("project_id", projectId)
-            .put("project_title", projectTitle)
-            .put("message", message)
-        if (agent != null) payload.put("agent", agent)
-        if (conversationId != null) payload.put("conversation_id", conversationId)
-        if (conversationTitle != null) payload.put("conversation_title", conversationTitle)
-        val payloadText = payload.toString()
-
-        if (!force) {
-            reservePendingTask(prefs, payloadText, isDevelopment)
-        }
-
-        DebugTraceStore.record(
-            "mcp_chat_send",
-            mapOf(
-                "trace_id" to traceId,
-                "project_id" to projectId,
-                "chars" to message.length,
-                "reserved_pending" to !force
-            )
-        )
-        val intent = Intent(appContext, TaskWorkService::class.java).apply {
-            action = TaskWorkService.ACTION_START_WORK
-            putExtra(TaskWorkService.EXTRA_PAYLOAD, payloadText)
-            putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
-            putExtra(TaskWorkService.EXTRA_FORCE_START, force)
-        }
-        val startResult = runCatching {
-            ContextCompat.startForegroundService(appContext, intent)
-        }.exceptionOrNull()
-        if (startResult != null) {
-            if (!force) clearReservedPendingTask(prefs, traceId)
-            DebugTraceStore.record(
-                "mcp_chat_start_failed",
-                mapOf("trace_id" to traceId, "error" to startResult.message)
-            )
-            return toolResult(
-                "Could not start phone task service.",
-                JSONObject()
-                    .put("trace_id", traceId)
-                    .put("project_id", projectId)
-                    .put("error", startResult.message ?: startResult.javaClass.simpleName),
-                isError = true
-            )
-        }
-        DebugTraceStore.record(
-            "mcp_chat_queued",
-            mapOf("trace_id" to traceId, "project_id" to projectId, "force" to force)
-        )
-        var serviceStart = waitForTaskStartSignal(traceId, startAckTimeoutMs)
-        if (!serviceStart.optBoolean("confirmed", false) && startAckTimeoutMs > 0) {
-            DebugTraceStore.record(
-                "mcp_chat_start_unconfirmed",
-                mapOf(
-                    "trace_id" to traceId,
-                    "timeout_ms" to startAckTimeoutMs,
-                    "last_phase" to serviceStart.optString("last_phase").takeIf { it.isNotBlank() }
-                )
-            )
-            val resumeIntent = Intent(appContext, TaskWorkService::class.java).apply {
-                action = TaskWorkService.ACTION_RESUME_PENDING
-            }
-            val fallbackError = runCatching {
-                ContextCompat.startForegroundService(appContext, resumeIntent)
-            }.exceptionOrNull()
-            if (fallbackError != null) {
-                DebugTraceStore.record(
-                    "mcp_chat_start_fallback_failed",
-                    mapOf("trace_id" to traceId, "error" to fallbackError.message)
-                )
-                serviceStart = serviceStart
-                    .put("fallback_attempted", true)
-                    .put("fallback_error", fallbackError.message ?: fallbackError.javaClass.simpleName)
-            } else {
-                DebugTraceStore.record("mcp_chat_start_fallback_resume", mapOf("trace_id" to traceId))
-                val fallback = waitForTaskStartSignal(traceId, startAckTimeoutMs)
-                    .put("fallback_attempted", true)
-                serviceStart = fallback.put("initial", serviceStart)
-            }
-        }
-
-        val structured = JSONObject()
-            .put("trace_id", traceId)
-            .put("project_id", projectId)
-            .put("project_title", projectTitle)
-            .put("conversation_id", conversationId ?: JSONObject.NULL)
-            .put("is_development", isDevelopment)
-            .put("force", force)
-            .put("message_chars", message.length)
-            .put("service_start", serviceStart)
-        return toolResult("Chat request queued on phone.", structured)
-    }
-
 
     private fun chatProbe(args: JSONObject): JSONObject {
         val message = args.optString("message").trim()
@@ -709,7 +586,7 @@ object McpDebugServer {
             )
         )
 
-        val sendResult = chatSend(chatArgs)
+        val sendResult = chatSend(appContext, chatArgs)
         val sendStructured = sendResult.optJSONObject("structuredContent") ?: JSONObject()
         val traceId = sendStructured.optString("trace_id").takeIf { it.isNotBlank() }
             ?: chatArgs.optString("trace_id").takeIf { it.isNotBlank() }
@@ -740,7 +617,7 @@ object McpDebugServer {
                 .apply {
                     args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
                 }
-                .let { serverTraceJson(it) }
+                .let { serverTraceJson(appContext, it, DEFAULT_SERVER_BASE_URL) }
         } else {
             JSONObject.NULL
         }
@@ -835,44 +712,6 @@ object McpDebugServer {
             .apply {
                 if (includeToken) put("auth_token", debugToken())
             }
-    }
-
-    private fun serverTraceJson(args: JSONObject): JSONObject {
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        val events = DebugTraceStore.recentEvents(300)
-        val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
-            ?: pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
-            ?: mcpLatestTraceId(events)
-        val limit = args.optInt("limit", 120).coerceIn(1, 300)
-        val baseUrl = args.optString("server_url").takeIf { it.isNotBlank() }
-            ?: DEFAULT_SERVER_BASE_URL
-        if (traceId == null) {
-            return JSONObject()
-                .put("available", false)
-                .put("reason", "missing_trace_id")
-                .put("server_url", baseUrl)
-                .put("limit", limit)
-        }
-
-        val encodedTraceId = URLEncoder.encode(traceId, "UTF-8")
-        val url = "${baseUrl.trimEnd('/')}/api/debug/traces/$encodedTraceId?limit=$limit"
-        val started = SystemClock.elapsedRealtime()
-        val response = fetchJson(url)
-        val durationMs = SystemClock.elapsedRealtime() - started
-        if (response == null) {
-            return JSONObject()
-                .put("available", false)
-                .put("reason", "server_unreachable_or_non_json")
-                .put("trace_id", traceId)
-                .put("url", url)
-                .put("duration_ms", durationMs)
-                .put("limit", limit)
-        }
-        return response
-            .put("available", true)
-            .put("url", url)
-            .put("duration_ms", durationMs)
-            .put("server_url", baseUrl)
     }
 
     private fun metricsJson(): JSONObject {
