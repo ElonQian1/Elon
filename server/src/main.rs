@@ -20,6 +20,7 @@ mod project_attachments;
 mod project_auth;
 mod project_conversation_workspace;
 mod project_git;
+mod project_mobile;
 mod project_ws_protocol;
 mod router;
 mod server_trace;
