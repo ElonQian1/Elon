@@ -157,7 +157,9 @@ class MainActivity : AppCompatActivity() {
             getWaitingForReply = { waitingForReply },
             getBackendConnected = { backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
-            startTaskWorkService = { action -> startTaskWorkService(action) },
+            startTaskWorkService = { action ->
+                taskWorkServiceActions().startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+            },
             openConversation = conversationOpenActions()::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
             sendMessage = { sendMessageActions().sendMessage() }
@@ -195,7 +197,9 @@ class MainActivity : AppCompatActivity() {
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
-            startTaskWorkService = { action -> startTaskWorkService(action) },
+            startTaskWorkService = { action ->
+                taskWorkServiceActions().startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+            },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = sendEnabledActions()::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
@@ -252,7 +256,7 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews = projectViewActions()::updateProjectViews,
             nextServerResponseToken = { ++serverResponseToken },
             putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
-            startTaskWorkService = ::startTaskWorkService,
+            startTaskWorkService = taskWorkServiceActions()::startTaskWorkService,
             markTaskPendingReconnect = { target ->
                 val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks[key]?.pendingReconnect = true
@@ -310,7 +314,7 @@ class MainActivity : AppCompatActivity() {
             },
             appendMessage = ::appendMessage,
             workflowStoppedMessage = ::mainWorkflowStoppedMessage,
-            startTaskWorkService = ::startTaskWorkService,
+            startTaskWorkService = taskWorkServiceActions()::startTaskWorkService,
             nextServerResponseToken = { ++serverResponseToken },
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
@@ -733,15 +737,6 @@ class MainActivity : AppCompatActivity() {
         ).also { backgroundTaskMessageActions = it }
     }
 
-    private fun startTaskWorkService(
-        action: String,
-        payload: String? = null,
-        isDevelopment: Boolean = activeRequestIsDevelopment,
-        traceId: String? = null
-    ): Boolean {
-        return taskWorkServiceActions().startTaskWorkService(action, payload, isDevelopment, traceId)
-    }
-
     private fun taskWorkServiceActions(): MainTaskWorkServiceActions {
         taskWorkServiceActions?.let { return it }
         return MainTaskWorkServiceActions(
@@ -1047,7 +1042,7 @@ class MainActivity : AppCompatActivity() {
             refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             updateStage = projectViewActions()::updateStage,
             addProjectEvent = projectRecordActions()::addProjectEvent,
-            startTaskWorkService = ::startTaskWorkService
+            startTaskWorkService = taskWorkServiceActions()::startTaskWorkService
         ).also { serverResponseWatchdogActions = it }
     }
 
