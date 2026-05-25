@@ -7,7 +7,10 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
-use crate::{admin, api, app_update, peer_relay, project_api, project_attachments, user_api, web};
+use crate::{
+    admin, api, app_update, peer_relay, project_api, project_attachments, project_downloads,
+    user_api, web,
+};
 
 pub fn build_app(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
@@ -85,11 +88,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/download/:filename",
-            get(project_api::download_user_project_apk),
+            get(project_downloads::download_user_project_apk),
         )
         .route(
             "/api/projects/:project_id/download/:filename",
-            get(project_api::download_project_apk),
+            get(project_downloads::download_project_apk),
         )
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
         .route("/app/download", get(web::download_page))
