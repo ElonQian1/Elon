@@ -14,6 +14,7 @@ mod agent_routing;
 mod ai_cli;
 mod ai_cli_chat;
 mod ai_cli_environment;
+mod ai_cli_intent_gate;
 mod ai_cli_native_session;
 mod ai_cli_output;
 mod ai_cli_process;
