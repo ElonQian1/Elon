@@ -411,6 +411,14 @@ Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
 git -C $RepoRoot pull --rebase origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 $BuildBaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+$originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()
+if ($BuildBaseSha -ne $originMainSha) {
+    git -C $RepoRoot merge-base --is-ancestor $originMainSha $BuildBaseSha | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ℹ️  检测到本地存在待发布业务提交，APK freshness 基线改为 origin/main：$((Format-ShortSha $originMainSha))" -ForegroundColor Yellow
+        $BuildBaseSha = $originMainSha
+    }
+}
 
 # ── Step 1: 递增 versionCode，确认 versionName ────────────────────────────────
 
