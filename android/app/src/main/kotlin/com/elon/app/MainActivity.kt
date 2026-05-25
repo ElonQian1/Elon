@@ -42,11 +42,6 @@ class MainActivity : AppCompatActivity() {
     private var homeRows: MainHomeRows? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
-    private var activeWorkControlActions: MainActiveWorkControlActions? = null
-    private var createActions: MainCreateActions? = null
-    private var resumeActions: MainResumeActions? = null
-    private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
-    private var preparedMessageActions: MainPreparedMessageActions? = null
     private lateinit var inputComposerViews: MainInputComposerViews
     private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
     private var voiceMode = false
@@ -68,12 +63,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        createActions().onCreate(intent)
+        createActions.onCreate(intent)
     }
 
-    private fun createActions(): MainCreateActions {
-        createActions?.let { return it }
-        return MainCreateActions(
+    private val createActions: MainCreateActions by lazy {
+        MainCreateActions(
             activity = this,
             binding = binding,
             prefs = prefs,
@@ -81,7 +75,7 @@ class MainActivity : AppCompatActivity() {
             loadProjects = projectStateActions::loadProjects,
             setupAttachmentLaunchers = { attachmentPickerActions.setupAttachmentLaunchers() },
             activeConversation = projectStateActions::activeConversation,
-            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
             setupNavigation = { navigationController.setupNavigation() },
@@ -103,23 +97,22 @@ class MainActivity : AppCompatActivity() {
             openConversation = conversationOpenActions::openConversation,
             loadModelOptions = { modelActions.loadModelOptions() },
             sendMessage = { sendMessageActions.sendMessage() }
-        ).also { createActions = it }
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        createActions().handleLaunchIntent(intent)
+        createActions.handleLaunchIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        resumeActions().onResume()
+        resumeActions.onResume()
     }
 
-    private fun resumeActions(): MainResumeActions {
-        resumeActions?.let { return it }
-        return MainResumeActions(
+    private val resumeActions: MainResumeActions by lazy {
+        MainResumeActions(
             activity = this,
             binding = binding,
             prefs = prefs,
@@ -143,7 +136,7 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
-        ).also { resumeActions = it }
+        )
     }
 
     override fun onPause() {
@@ -159,9 +152,8 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
-    private fun preparedMessageActions(): MainPreparedMessageActions {
-        preparedMessageActions?.let { return it }
-        return MainPreparedMessageActions(
+    private val preparedMessageActions: MainPreparedMessageActions by lazy {
+        MainPreparedMessageActions(
             activity = this,
             binding = binding,
             restoreSendTarget = { target -> sendTargetRestoreActions.restoreSendTarget(target) },
@@ -210,12 +202,11 @@ class MainActivity : AppCompatActivity() {
             clearPendingAttachments = {
                 pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
             }
-        ).also { preparedMessageActions = it }
+        )
     }
 
-    private fun activeWorkControlActions(): MainActiveWorkControlActions {
-        activeWorkControlActions?.let { return it }
-        return MainActiveWorkControlActions(
+    private val activeWorkControlActions: MainActiveWorkControlActions by lazy {
+        MainActiveWorkControlActions(
             binding = binding,
             activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
             removeConversationTask = conversationTaskRegistryActions::removeConversationTask,
@@ -259,7 +250,7 @@ class MainActivity : AppCompatActivity() {
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             }
-        ).also { activeWorkControlActions = it }
+        )
     }
 
     private fun setupInputComposer() {
@@ -366,7 +357,7 @@ class MainActivity : AppCompatActivity() {
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
                 attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
-            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+            startPreparedMessage = preparedMessageActions::startPreparedMessage
         )
     }
 
@@ -376,7 +367,7 @@ class MainActivity : AppCompatActivity() {
             projects = projects,
             setActiveProjectIndex = { activeProjectIndex = it },
             setChatAdapter = { chatAdapter = it },
-            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             showChat = { navigationController.showChat() }
         )
@@ -390,7 +381,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             pendingAttachments = { pendingAttachments.toList() },
             setSendEnabled = sendEnabledActions::setSendEnabled,
-            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+            startPreparedMessage = preparedMessageActions::startPreparedMessage
         )
     }
 
@@ -541,7 +532,7 @@ class MainActivity : AppCompatActivity() {
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             setChatAdapter = { chatAdapter = it },
-            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
             saveProjects = projectStateActions::saveProjects
@@ -597,7 +588,7 @@ class MainActivity : AppCompatActivity() {
             },
             setSendEnabled = sendEnabledActions::setSendEnabled,
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
+            handleActiveWorkDisconnected = { task -> activeWorkControlActions.handleActiveWorkDisconnected(task) },
             updateIdleReadyStatus = { conversationPreviewActions.updateIdleReadyStatus() },
             appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
                 traceId?.let { taskResponseTokens.remove(it) }
@@ -1090,17 +1081,16 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        lifecycleEdgeActions().onRequestPermissionsResult(requestCode, grantResults)
+        lifecycleEdgeActions.onRequestPermissionsResult(requestCode, grantResults)
     }
 
     override fun onDestroy() {
-        lifecycleEdgeActions().onDestroy()
+        lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }
 
-    private fun lifecycleEdgeActions(): MainLifecycleEdgeActions {
-        lifecycleEdgeActions?.let { return it }
-        return MainLifecycleEdgeActions(
+    private val lifecycleEdgeActions: MainLifecycleEdgeActions by lazy {
+        MainLifecycleEdgeActions(
             activity = this,
             speechPermissionRequest = speechPermissionRequest,
             notificationPermissionRequest = notificationPermissionRequest,
@@ -1115,6 +1105,6 @@ class MainActivity : AppCompatActivity() {
             },
             isTaskWorkReceiverRegistered = { taskWorkReceiverActions.isRegistered },
             unregisterTaskWorkReceiver = { taskWorkReceiverActions.unregisterTaskWorkReceiver() }
-        ).also { lifecycleEdgeActions = it }
+        )
     }
 }
