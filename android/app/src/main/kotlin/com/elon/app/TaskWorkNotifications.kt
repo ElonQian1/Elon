@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.Manifest
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,10 +13,24 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
+
+private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+
+internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
+    createTaskWorkNotificationChannels(activity)
+    requestTaskNotificationPermissionIfNeeded(activity, prefs, requestCode)
+}
+
+internal fun clearCompletedTaskBadge(context: Context, prefs: SharedPreferences) {
+    prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).apply()
+    NotificationManagerCompat.from(context).cancel(TaskWorkService.TASK_COMPLETE_NOTIFICATION_ID)
+    updateLauncherBadgeCount(context, 0)
+}
 
 internal fun createTaskWorkNotificationChannels(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -49,6 +64,22 @@ internal fun createTaskWorkNotificationChannels(context: Context) {
             description = "一龙 APP 有新版本时提醒"
             setShowBadge(true)
         }
+    )
+}
+
+private fun requestTaskNotificationPermissionIfNeeded(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
+    ) {
+        return
+    }
+    if (prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, false)) return
+    prefs.edit().putBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, true).apply()
+    ActivityCompat.requestPermissions(
+        activity,
+        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+        requestCode
     )
 }
 

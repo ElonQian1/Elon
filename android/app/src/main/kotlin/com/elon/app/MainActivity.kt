@@ -3,9 +3,6 @@ package com.elon.app
 import android.Manifest
 import android.annotation.SuppressLint
 import android.animation.ValueAnimator
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -23,7 +20,6 @@ import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -61,8 +57,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
@@ -190,7 +184,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setupTaskCompletionAlerts()
+        setupTaskCompletionAlerts(this, prefs, notificationPermissionRequest)
 
         loadProjects()
 
@@ -251,7 +245,7 @@ class MainActivity : AppCompatActivity() {
         setTaskAppForeground(true)
         startMcpDebugKeepAlive()
         drainQueuedTaskEvents()
-        clearCompletedTaskBadge()
+        clearCompletedTaskBadge(this, prefs)
         if (::binding.isInitialized) {
             loadModelOptions()
             if (!backendConnected) {
@@ -2524,122 +2518,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupTaskCompletionAlerts() {
-        createTaskCompletionChannel()
-        requestTaskNotificationPermissionIfNeeded()
-    }
-
-    private fun createTaskCompletionChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(
-            TASK_COMPLETE_CHANNEL_ID,
-            "任务完成提醒",
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = "后台任务完成后显示桌面角标"
-            setShowBadge(true)
-        }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-    }
-
-    private fun requestTaskNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        if (prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, false)) return
-        prefs.edit().putBoolean(PREF_NOTIFICATION_PERMISSION_ASKED, true).apply()
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-            notificationPermissionRequest
-        )
-    }
-
-    private fun notifyBackgroundTaskCompleted(wasDevelopment: Boolean, apkUrl: String?) {
-        val count = completedTaskBadgeCount() + 1
-        prefs.edit().putInt(PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
-        updateLauncherBadgeCount(count)
-        showTaskCompletedNotification(count, wasDevelopment, apkUrl)
-    }
-
-    private fun completedTaskBadgeCount(): Int {
-        return prefs.getInt(PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0)
-    }
-
-    private fun clearCompletedTaskBadge() {
-        prefs.edit().putInt(PREF_COMPLETED_TASK_BADGE_COUNT, 0).apply()
-        NotificationManagerCompat.from(this).cancel(TASK_COMPLETE_NOTIFICATION_ID)
-        updateLauncherBadgeCount(0)
-    }
-
-    private fun updateLauncherBadgeCount(count: Int) {
-        updateHuaweiLauncherBadgeCount(count)
-    }
-
-    private fun shouldNotifyTaskCompletion(): Boolean {
-        return !appInForeground || !hasWindowFocus()
-    }
-
-    private fun updateHuaweiLauncherBadgeCount(count: Int) {
-        val badge = count.coerceAtLeast(0)
-        val payload = Bundle().apply {
-            putString("package", packageName)
-            putString("class", MainActivity::class.java.name)
-            putInt("badgenumber", badge)
-        }
-        listOf(
-            "content://com.huawei.android.launcher.settings/badge/",
-            "content://com.hihonor.android.launcher.settings/badge/"
-        ).forEach { badgeUri ->
-            runCatching {
-                contentResolver.call(Uri.parse(badgeUri), "change_badge", null, payload)
-            }
-        }
-    }
-
-    private fun showTaskCompletedNotification(count: Int, wasDevelopment: Boolean, apkUrl: String?) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val title = if (wasDevelopment) "开发任务已完成" else "任务已完成"
-        val text = if (apkUrl != null) {
-            "已有 $count 个任务完成，APK 可以下载测试。"
-        } else {
-            "已有 $count 个任务完成，点击查看结果。"
-        }
-        val notification = NotificationCompat.Builder(this, TASK_COMPLETE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_task_done)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setNumber(count)
-            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        runCatching {
-            NotificationManagerCompat.from(this).notify(TASK_COMPLETE_NOTIFICATION_ID, notification)
-        }
-    }
-
     private fun normalizeProject(project: AppProject) {
         if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
         project.conversations.forEach {
@@ -4538,10 +4416,6 @@ class MainActivity : AppCompatActivity() {
         const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
         const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
         const val PREF_PENDING_WORK_TIME = "pending_work_time"
-        const val PREF_COMPLETED_TASK_BADGE_COUNT = "completed_task_badge_count"
-        const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
-        const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
-        const val TASK_COMPLETE_NOTIFICATION_ID = 2401
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
         const val WECHAT_POPUP_PANEL_COLOR = "#BDBDBD"
         const val WECHAT_POPUP_TEXT_COLOR = "#242424"
