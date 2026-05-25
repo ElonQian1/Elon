@@ -1,24 +1,19 @@
-//! 发布抢占锁（self-claim release lock）
+//! 多 builder 并发发布协调器（不阻塞编译，只分配版本号）
 //!
-//! 解决多台开发机 / 多个 AI 并发发版时的竞态死循环：
-//!   - 推码者一旦推到 main，先向服务器 POST /api/release/claim 抢占发版权
-//!   - 若没人在编译，服务器原子返回 `build` 指令 + 服务器生成的下一版本号 + 租约 token
-//!   - 若有人在编译，服务器返回 `queue` 指令，告知当前 builder、已用时间、预计剩余
-//!   - builder 每 5 分钟用 token 心跳一次刷新租约（默认 30 分钟 TTL）
-//!   - builder 完成（成功/失败）后 POST /api/release/finish 释放锁并写入新版本号
-//!   - 租约过期自动视为 idle，下一个 claim 直接接管
+//! 与最初 v0.3.65 的「互斥锁」语义不同，这里采用「版本号分配器」语义：
 //!
-//! 状态持久化到 `{data_dir}/release-state.json`，进程内用 tokio Mutex 串行化访问。
-//! Server 通道（kind="server"）与 APK 通道（kind="apk"）互不阻塞，可并行发版。
-//!
-//! 版本号策略（v1）：
-//!   - 服务器持久化最近一次发版的 versionName / versionCode
-//!   - 启动时若状态文件不存在，从环境（自身 CARGO_PKG_VERSION + data_dir/app/version.json）冷启动
-//!   - claim 默认自动 PATCH +1，可通过 `bump` 参数选择 minor / major / none
-//!   - APK 通道每次 versionCode +1，versionName 按 bump 策略
+//! - 任何 builder 都可以随时编译（不互斥），多人同时干活也 OK。
+//! - 服务器保证每个 `claim` 拿到**唯一递增**的 `version_name` / `version_code`，
+//!   两人同时 claim 不会拿到相同号码（in_flight 中的号码也算进 max）。
+//! - 上传产物的并发安全由现有 `flock + .deployed-sha` CAS 处理；
+//!   编完发现服务器已是更新 SHA 的后代，builder 自行放弃产物（让贤）。
+//! - 版本号**完全脱离 git**：不再写回 `Cargo.toml` / `build.gradle`，
+//!   编译时通过环境变量 `ELON_BUILD_VERSION(_NAME|_CODE)` 注入产物，
+//!   release-state.json 是版本号的事实来源。
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::{
     extract::{Query, State},
@@ -26,85 +21,81 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::types::AppState;
 
-const STATE_FILE: &str = "release-state.json";
-const DEFAULT_LEASE_SECS: i64 = 30 * 60;
-const MAX_LEASE_SECS: i64 = 60 * 60;
-const ESTIMATED_BUILD_SECS_SERVER: i64 = 5 * 60;
-const ESTIMATED_BUILD_SECS_APK: i64 = 6 * 60;
+// ===== 调参常量 =====
 
-// ───────────────────────────── 状态结构 ─────────────────────────────
+/// 默认 lease 时长（秒）。心跳一次刷新到这么长。
+const DEFAULT_LEASE_SECS: i64 = 1800; // 30 min
+/// 最长 lease 时长（秒）。客户端要求再长也截到这里。
+const MAX_LEASE_SECS: i64 = 3600; // 1 h
+/// `claim` 时如未给 `lease_secs`，按构建预估给的最低基线
+const ESTIMATED_BUILD_SECS_SERVER: i64 = 300;
+const ESTIMATED_BUILD_SECS_APK: i64 = 360;
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-struct LaneState {
-    /// 当前活动 token；None 表示通道空闲
-    active_token: Option<String>,
-    /// 当前 builder 机器标识（uuid / mac / 主机名，用于程序对比）
-    builder_id: Option<String>,
-    /// 当前 builder 人类可读名（用于排队提示）
-    builder_label: Option<String>,
-    /// 正在 build 的提交 SHA
-    sha: Option<String>,
-    /// 服务器分配给当前 builder 的目标版本号（如 0.3.63）
-    next_version_name: Option<String>,
-    /// 服务器分配给当前 builder 的 versionCode（仅 APK）
-    next_version_code: Option<i64>,
-    /// 抢锁时间（unix 秒）
-    claimed_at: Option<i64>,
-    /// 上次心跳时间
-    last_heartbeat: Option<i64>,
-    /// 租约到期时间
-    lease_expires_at: Option<i64>,
-    /// 上一次完成的发版记录
-    last_release: Option<LastRelease>,
-    /// 已确认发版的最高 versionName（用于下次自动递增）
-    last_published_version_name: Option<String>,
-    /// 已确认发版的最高 versionCode（仅 APK）
-    last_published_version_code: Option<i64>,
+// ===== 持久化结构 =====
+
+/// 正在进行的一次构建（in_flight）。
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InFlightBuilder {
+    pub token: String,
+    pub builder_id: String,
+    pub builder_label: String,
+    pub sha: String,
+    /// 服务器分配给这次构建的版本号
+    pub assigned_version_name: String,
+    /// APK 通道使用；server 通道为 None
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assigned_version_code: Option<i64>,
+    pub claimed_at: i64,
+    pub last_heartbeat: i64,
+    pub lease_expires_at: i64,
 }
 
+/// 一次已完成发布的快照。
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LastRelease {
-    success: bool,
-    sha: String,
-    version_name: Option<String>,
-    version_code: Option<i64>,
-    finished_at: i64,
-    builder_label: Option<String>,
-    error_message: Option<String>,
+    pub success: bool,
+    pub sha: String,
+    pub version_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_code: Option<i64>,
+    pub finished_at: i64,
+    pub builder_label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+/// 一个通道（server / apk）的状态。
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaneState {
+    #[serde(default)]
+    pub in_flight: Vec<InFlightBuilder>,
+    #[serde(default)]
+    pub last_release: Option<LastRelease>,
+    /// 截至目前 finish(success=true) 中观察到的最大版本号。
+    #[serde(default)]
+    pub last_published_version_name: Option<String>,
+    #[serde(default)]
+    pub last_published_version_code: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct ReleaseStateFile {
+    #[serde(default)]
     server: LaneState,
+    #[serde(default)]
     apk: LaneState,
 }
 
-impl LaneState {
-    fn is_busy(&self, now: i64) -> bool {
-        match (self.active_token.as_ref(), self.lease_expires_at) {
-            (Some(_), Some(expires)) => expires > now,
-            _ => false,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.active_token = None;
-        self.builder_id = None;
-        self.builder_label = None;
-        self.sha = None;
-        self.next_version_name = None;
-        self.next_version_code = None;
-        self.claimed_at = None;
-        self.last_heartbeat = None;
-        self.lease_expires_at = None;
-    }
-}
-
-// ───────────────────────────── Manager ─────────────────────────────
+// ===== 全局 Manager =====
 
 pub struct ReleaseManager {
     inner: Mutex<ReleaseStateFile>,
@@ -112,30 +103,27 @@ pub struct ReleaseManager {
 }
 
 impl ReleaseManager {
-    fn load_or_init(data_dir: &Path) -> Self {
-        let path = data_dir.join(STATE_FILE);
+    fn load_or_init(data_dir: &Path) -> Arc<Self> {
+        let path = data_dir.join("release-state.json");
         let state = std::fs::read_to_string(&path)
             .ok()
             .and_then(|s| serde_json::from_str::<ReleaseStateFile>(&s).ok())
             .unwrap_or_default();
-        Self {
+        Arc::new(Self {
             inner: Mutex::new(state),
             path,
-        }
+        })
     }
 
-    fn persist(&self, state: &ReleaseStateFile) {
-        let _ = (|| -> std::io::Result<()> {
-            if let Some(parent) = self.path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            let content = serde_json::to_string_pretty(state)?;
-            let tmp = self.path.with_extension("json.tmp");
-            std::fs::write(&tmp, content)?;
-            std::fs::rename(&tmp, &self.path)?;
-            Ok(())
-        })()
-        .inspect_err(|e| tracing::warn!("release state persist failed: {}", e));
+    async fn persist(&self, state: &ReleaseStateFile) {
+        let json = match serde_json::to_string_pretty(state) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let tmp = self.path.with_extension("json.tmp");
+        if std::fs::write(&tmp, json).is_ok() {
+            let _ = std::fs::rename(&tmp, &self.path);
+        }
     }
 }
 
@@ -143,432 +131,403 @@ static MANAGER: OnceLock<Arc<ReleaseManager>> = OnceLock::new();
 
 fn manager(state: &AppState) -> Arc<ReleaseManager> {
     MANAGER
-        .get_or_init(|| Arc::new(ReleaseManager::load_or_init(&state.data_dir)))
+        .get_or_init(|| ReleaseManager::load_or_init(&state.data_dir))
         .clone()
 }
 
-// ───────────────────────────── 请求/响应 ─────────────────────────────
+// ===== 请求 / 响应 =====
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct ClaimRequest {
-    /// "server" | "apk"
-    pub kind: String,
+    pub kind: String, // "server" | "apk"
     pub sha: String,
     pub builder_id: String,
-    #[serde(default)]
     pub builder_label: Option<String>,
-    /// "patch" | "minor" | "major" | "none"，默认 patch
-    #[serde(default)]
+    /// 期望递增位：major / minor / patch（仅 server 通道用）。默认 patch。
     pub bump: Option<String>,
-    /// 客户端期望的租约秒数（最大 MAX_LEASE_SECS）
-    #[serde(default)]
-    pub lease_secs: Option<i64>,
-    /// 客户端报告的当前 main 上版本号（用于 fall-back 计算 next_version）
-    #[serde(default)]
+    /// 客户端可选地告诉服务器自己看到的当前已发布版本号，
+    /// 用于 release-state.json 空文件冷启动时的兜底。
     pub current_version_name: Option<String>,
-    /// 同上，APK versionCode
-    #[serde(default)]
     pub current_version_code: Option<i64>,
+    pub lease_secs: Option<i64>,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(tag = "action", rename_all = "lowercase")]
-pub enum ClaimResponse {
-    Build {
-        token: String,
-        kind: String,
-        sha: String,
-        next_version_name: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        next_version_code: Option<i64>,
-        lease_expires_at: i64,
-        claimed_at: i64,
-    },
-    Queue {
-        kind: String,
-        current_builder_label: Option<String>,
-        current_sha: Option<String>,
-        claimed_at: Option<i64>,
-        lease_expires_at: Option<i64>,
-        elapsed_secs: i64,
-        estimated_remaining_secs: i64,
-        last_heartbeat_age_secs: Option<i64>,
-    },
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaimResponse {
+    pub action: &'static str, // 永远是 "build"
+    pub kind: String,
+    pub token: String,
+    pub sha: String,
+    pub assigned_version_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assigned_version_code: Option<i64>,
+    pub claimed_at: i64,
+    pub lease_expires_at: i64,
+    pub in_flight_count: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct HeartbeatRequest {
     pub kind: String,
     pub token: String,
-    #[serde(default)]
     pub lease_secs: Option<i64>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct HeartbeatResponse {
     pub ok: bool,
     pub lease_expires_at: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct FinishRequest {
     pub kind: String,
     pub token: String,
     pub success: bool,
-    pub sha: String,
-    #[serde(default)]
+    pub sha: Option<String>,
     pub version_name: Option<String>,
-    #[serde(default)]
     pub version_code: Option<i64>,
-    #[serde(default)]
     pub error_message: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct FinishResponse {
     pub ok: bool,
+    pub recorded: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct StatusQuery {
-    #[serde(default)]
     pub kind: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub struct LaneStatus {
-    pub kind: String,
-    pub busy: bool,
-    pub current_builder_label: Option<String>,
-    pub current_sha: Option<String>,
-    pub claimed_at: Option<i64>,
-    pub lease_expires_at: Option<i64>,
-    pub last_heartbeat: Option<i64>,
-    pub last_release: Option<LastRelease>,
-    pub last_published_version_name: Option<String>,
-    pub last_published_version_code: Option<i64>,
+// ===== Handlers =====
+
+pub async fn claim_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ClaimRequest>,
+) -> Result<Json<ClaimResponse>, (StatusCode, Json<Value>)> {
+    let kind = parse_kind(&req.kind)?;
+    let mgr = manager(&state);
+    let mut guard = mgr.inner.lock().await;
+    let now = now_secs();
+
+    sweep_expired(lane_mut(&mut guard, kind), now);
+
+    let lease = clamp_lease(req.lease_secs.unwrap_or(match kind {
+        Lane::Server => ESTIMATED_BUILD_SECS_SERVER,
+        Lane::Apk => ESTIMATED_BUILD_SECS_APK,
+    }));
+
+    let bump_kind = req.bump.as_deref().unwrap_or("patch");
+
+    // 计算下一个版本号：取 max(last_published, current_reported, in_flight 中最大) 然后 bump。
+    let lane_ref = lane(&guard, kind);
+    let mut candidates_name: Vec<String> = Vec::new();
+    if let Some(v) = lane_ref.last_published_version_name.clone() {
+        candidates_name.push(v);
+    }
+    if let Some(v) = req.current_version_name.clone() {
+        candidates_name.push(v);
+    }
+    for b in &lane_ref.in_flight {
+        candidates_name.push(b.assigned_version_name.clone());
+    }
+    let base_name = max_semver(&candidates_name).unwrap_or_else(|| "0.0.0".to_string());
+    let assigned_version_name = bump_semver(&base_name, bump_kind);
+
+    // APK 通道：versionCode 单调递增整数
+    let assigned_version_code = if matches!(kind, Lane::Apk) {
+        let mut candidates_code: Vec<i64> = Vec::new();
+        if let Some(c) = lane_ref.last_published_version_code {
+            candidates_code.push(c);
+        }
+        if let Some(c) = req.current_version_code {
+            candidates_code.push(c);
+        }
+        for b in &lane_ref.in_flight {
+            if let Some(c) = b.assigned_version_code {
+                candidates_code.push(c);
+            }
+        }
+        let base = candidates_code.into_iter().max().unwrap_or(0);
+        Some(base + 1)
+    } else {
+        None
+    };
+
+    let token = Uuid::new_v4().to_string();
+    let lease_expires_at = now + lease;
+    let builder_label = req.builder_label.unwrap_or_else(|| req.builder_id.clone());
+
+    let entry = InFlightBuilder {
+        token: token.clone(),
+        builder_id: req.builder_id.clone(),
+        builder_label: builder_label.clone(),
+        sha: req.sha.clone(),
+        assigned_version_name: assigned_version_name.clone(),
+        assigned_version_code,
+        claimed_at: now,
+        last_heartbeat: now,
+        lease_expires_at,
+    };
+
+    let lane_mut_ref = lane_mut(&mut guard, kind);
+    lane_mut_ref.in_flight.push(entry);
+    let in_flight_count = lane_mut_ref.in_flight.len();
+
+    let resp = ClaimResponse {
+        action: "build",
+        kind: req.kind,
+        token,
+        sha: req.sha,
+        assigned_version_name,
+        assigned_version_code,
+        claimed_at: now,
+        lease_expires_at,
+        in_flight_count,
+    };
+
+    mgr.persist(&guard).await;
+    drop(guard);
+    Ok(Json(resp))
 }
 
-// ───────────────────────────── handlers ─────────────────────────────
+pub async fn heartbeat_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<HeartbeatRequest>,
+) -> Result<Json<HeartbeatResponse>, (StatusCode, Json<Value>)> {
+    let kind = parse_kind(&req.kind)?;
+    let mgr = manager(&state);
+    let mut guard = mgr.inner.lock().await;
+    let now = now_secs();
+
+    sweep_expired(lane_mut(&mut guard, kind), now);
+
+    let lease = clamp_lease(req.lease_secs.unwrap_or(DEFAULT_LEASE_SECS));
+    let lane_mut_ref = lane_mut(&mut guard, kind);
+    let item = lane_mut_ref
+        .in_flight
+        .iter_mut()
+        .find(|b| b.token == req.token);
+    let Some(b) = item else {
+        return Err(err(
+            StatusCode::GONE,
+            "token-not-active",
+            "lease expired or unknown token",
+        ));
+    };
+    b.last_heartbeat = now;
+    b.lease_expires_at = now + lease;
+    let lease_expires_at = b.lease_expires_at;
+
+    let resp = HeartbeatResponse {
+        ok: true,
+        lease_expires_at,
+    };
+    mgr.persist(&guard).await;
+    drop(guard);
+    Ok(Json(resp))
+}
+
+pub async fn finish_handler(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<FinishRequest>,
+) -> Result<Json<FinishResponse>, (StatusCode, Json<Value>)> {
+    let kind = parse_kind(&req.kind)?;
+    let mgr = manager(&state);
+    let mut guard = mgr.inner.lock().await;
+    let now = now_secs();
+
+    let lane_mut_ref = lane_mut(&mut guard, kind);
+    let pos = lane_mut_ref
+        .in_flight
+        .iter()
+        .position(|b| b.token == req.token);
+    let removed = pos.map(|i| lane_mut_ref.in_flight.remove(i));
+
+    let recorded = if let Some(b) = removed {
+        let final_vn = req.version_name.clone().unwrap_or(b.assigned_version_name);
+        let final_vc = req.version_code.or(b.assigned_version_code);
+        let final_sha = req.sha.clone().unwrap_or(b.sha);
+        let last = LastRelease {
+            success: req.success,
+            sha: final_sha,
+            version_name: final_vn.clone(),
+            version_code: final_vc,
+            finished_at: now,
+            builder_label: b.builder_label,
+            error_message: req.error_message.clone(),
+        };
+        lane_mut_ref.last_release = Some(last);
+
+        if req.success {
+            // 单调推进 last_published_*
+            let prev_vn = lane_mut_ref.last_published_version_name.clone();
+            let new_vn = match prev_vn {
+                Some(p) => {
+                    if semver_ge(&final_vn, &p) {
+                        final_vn
+                    } else {
+                        p
+                    }
+                }
+                None => final_vn,
+            };
+            lane_mut_ref.last_published_version_name = Some(new_vn);
+            if let Some(c) = final_vc {
+                let new_c = lane_mut_ref
+                    .last_published_version_code
+                    .map(|prev| prev.max(c))
+                    .unwrap_or(c);
+                lane_mut_ref.last_published_version_code = Some(new_c);
+            }
+        }
+        true
+    } else {
+        false
+    };
+
+    let resp = FinishResponse { ok: true, recorded };
+    mgr.persist(&guard).await;
+    drop(guard);
+    Ok(Json(resp))
+}
+
+pub async fn status_handler(
+    State(state): State<Arc<AppState>>,
+    Query(q): Query<StatusQuery>,
+) -> Json<Value> {
+    let mgr = manager(&state);
+    let mut guard = mgr.inner.lock().await;
+    let now = now_secs();
+    sweep_expired(&mut guard.server, now);
+    sweep_expired(&mut guard.apk, now);
+    // 不需要 persist：sweep 只是清掉过期 in_flight，下一次 claim 会持久化
+
+    let render = |lane: &LaneState, name: &str| -> Value {
+        json!({
+            "kind": name,
+            "inFlight": lane.in_flight,
+            "lastRelease": lane.last_release,
+            "lastPublishedVersionName": lane.last_published_version_name,
+            "lastPublishedVersionCode": lane.last_published_version_code,
+        })
+    };
+
+    let body = match q.kind.as_deref() {
+        Some("server") => render(&guard.server, "server"),
+        Some("apk") => render(&guard.apk, "apk"),
+        _ => json!({
+            "server": render(&guard.server, "server"),
+            "apk": render(&guard.apk, "apk"),
+            "now": now,
+        }),
+    };
+    drop(guard);
+    Json(body)
+}
+
+// ===== 内部辅助 =====
+
+#[derive(Copy, Clone, Debug)]
+enum Lane {
+    Server,
+    Apk,
+}
+
+fn parse_kind(s: &str) -> Result<Lane, (StatusCode, Json<Value>)> {
+    match s {
+        "server" => Ok(Lane::Server),
+        "apk" => Ok(Lane::Apk),
+        other => Err(err(
+            StatusCode::BAD_REQUEST,
+            "bad-kind",
+            &format!("unknown kind: {other}"),
+        )),
+    }
+}
+
+fn lane(state: &ReleaseStateFile, k: Lane) -> &LaneState {
+    match k {
+        Lane::Server => &state.server,
+        Lane::Apk => &state.apk,
+    }
+}
+
+fn lane_mut(state: &mut ReleaseStateFile, k: Lane) -> &mut LaneState {
+    match k {
+        Lane::Server => &mut state.server,
+        Lane::Apk => &mut state.apk,
+    }
+}
+
+fn sweep_expired(lane: &mut LaneState, now: i64) {
+    lane.in_flight.retain(|b| b.lease_expires_at > now);
+}
+
+fn clamp_lease(secs: i64) -> i64 {
+    secs.max(60).min(MAX_LEASE_SECS)
+}
 
 fn now_secs() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
 
-fn err(status: StatusCode, msg: &str) -> (StatusCode, Json<serde_json::Value>) {
-    (status, Json(serde_json::json!({ "error": msg })))
+fn err(code: StatusCode, kind: &str, msg: &str) -> (StatusCode, Json<Value>) {
+    (
+        code,
+        Json(json!({
+            "error": kind,
+            "message": msg,
+        })),
+    )
 }
 
-fn parse_kind(raw: &str) -> Result<&'static str, (StatusCode, Json<serde_json::Value>)> {
-    match raw {
-        "server" => Ok("server"),
-        "apk" => Ok("apk"),
-        _ => Err(err(StatusCode::BAD_REQUEST, "kind must be 'server' or 'apk'")),
-    }
+fn parse_semver(s: &str) -> Option<(u32, u32, u32)> {
+    let mut parts = s.split('.');
+    let a = parts.next()?.parse().ok()?;
+    let b = parts.next()?.parse().ok()?;
+    let c = parts.next()?.parse().ok()?;
+    Some((a, b, c))
 }
 
-fn lane_mut<'a>(state: &'a mut ReleaseStateFile, kind: &str) -> &'a mut LaneState {
-    match kind {
-        "server" => &mut state.server,
-        _ => &mut state.apk,
-    }
-}
-
-fn lane<'a>(state: &'a ReleaseStateFile, kind: &str) -> &'a LaneState {
-    match kind {
-        "server" => &state.server,
-        _ => &state.apk,
-    }
-}
-
-/// 解析 semver-ish 字符串 (X.Y.Z) → (X, Y, Z)。失败返回 None。
-fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
-    let mut parts = s.trim().split('.');
-    let x: u64 = parts.next()?.parse().ok()?;
-    let y: u64 = parts.next()?.parse().ok()?;
-    let z: u64 = parts.next()?.parse().ok()?;
-    Some((x, y, z))
-}
-
-fn bump_semver(s: &str, mode: &str) -> String {
-    let (x, y, z) = parse_semver(s).unwrap_or((0, 0, 0));
-    let (nx, ny, nz) = match mode {
-        "major" => (x + 1, 0, 0),
-        "minor" => (x, y + 1, 0),
-        "none" => (x, y, z),
-        _ => (x, y, z + 1), // patch (默认)
-    };
-    format!("{}.{}.{}", nx, ny, nz)
-}
-
-/// 比较 semver，返回较大值
-fn max_semver<'a>(a: &'a str, b: &'a str) -> &'a str {
+fn semver_ge(a: &str, b: &str) -> bool {
     match (parse_semver(a), parse_semver(b)) {
-        (Some(va), Some(vb)) => {
-            if va >= vb {
-                a
-            } else {
-                b
-            }
-        }
-        (Some(_), None) => a,
-        (None, Some(_)) => b,
-        (None, None) => a,
+        (Some(x), Some(y)) => x >= y,
+        _ => a >= b,
     }
 }
 
-pub async fn claim_handler(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<ClaimRequest>,
-) -> Result<Json<ClaimResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let kind = parse_kind(&req.kind)?;
-    let bump = req.bump.as_deref().unwrap_or("patch").to_string();
-    let lease_secs = req
-        .lease_secs
-        .unwrap_or(DEFAULT_LEASE_SECS)
-        .clamp(60, MAX_LEASE_SECS);
-
-    let mgr = manager(&state);
-    let mut guard = mgr.inner.lock().await;
-    let now = now_secs();
-
-    // TTL 检查：如果租约已过期，自动释放
-    {
-        let l = lane_mut(&mut guard, kind);
-        if let (Some(_), Some(exp)) = (l.active_token.as_ref(), l.lease_expires_at) {
-            if exp <= now {
-                tracing::info!(
-                    "release lane '{}' lease expired (builder={:?} sha={:?}), auto-releasing",
-                    kind,
-                    l.builder_label,
-                    l.sha
-                );
-                l.clear();
+fn max_semver(list: &[String]) -> Option<String> {
+    let mut best: Option<(u32, u32, u32)> = None;
+    let mut best_str: Option<String> = None;
+    for s in list {
+        if let Some(p) = parse_semver(s) {
+            if best.map(|b| p > b).unwrap_or(true) {
+                best = Some(p);
+                best_str = Some(s.clone());
             }
         }
     }
-
-    let lane_ref = lane(&guard, kind);
-    if lane_ref.is_busy(now) {
-        let claimed_at = lane_ref.claimed_at;
-        let elapsed = claimed_at.map(|c| (now - c).max(0)).unwrap_or(0);
-        let est = match kind {
-            "server" => ESTIMATED_BUILD_SECS_SERVER,
-            _ => ESTIMATED_BUILD_SECS_APK,
-        };
-        let remaining = (est - elapsed).max(0);
-        let hb_age = lane_ref.last_heartbeat.map(|h| (now - h).max(0));
-        return Ok(Json(ClaimResponse::Queue {
-            kind: kind.to_string(),
-            current_builder_label: lane_ref.builder_label.clone(),
-            current_sha: lane_ref.sha.clone(),
-            claimed_at,
-            lease_expires_at: lane_ref.lease_expires_at,
-            elapsed_secs: elapsed,
-            estimated_remaining_secs: remaining,
-            last_heartbeat_age_secs: hb_age,
-        }));
-    }
-
-    // 通道空闲 → 分配版本号 + 写入 lock
-    let token = uuid::Uuid::new_v4().to_string();
-    let expires = now + lease_secs;
-
-    let next_version_name: String;
-    let next_version_code: Option<i64>;
-    {
-        let l = lane_mut(&mut guard, kind);
-
-        // 基准 versionName：max(last_published, current_reported)
-        let base_name = match (
-            l.last_published_version_name.as_deref(),
-            req.current_version_name.as_deref(),
-        ) {
-            (Some(a), Some(b)) => max_semver(a, b).to_string(),
-            (Some(a), None) => a.to_string(),
-            (None, Some(b)) => b.to_string(),
-            (None, None) => "0.0.0".to_string(),
-        };
-        next_version_name = bump_semver(&base_name, &bump);
-
-        // versionCode 仅 APK
-        next_version_code = if kind == "apk" {
-            let base_code = std::cmp::max(
-                l.last_published_version_code.unwrap_or(0),
-                req.current_version_code.unwrap_or(0),
-            );
-            Some(base_code + 1)
-        } else {
-            None
-        };
-
-        l.active_token = Some(token.clone());
-        l.builder_id = Some(req.builder_id.clone());
-        l.builder_label = req.builder_label.clone();
-        l.sha = Some(req.sha.clone());
-        l.next_version_name = Some(next_version_name.clone());
-        l.next_version_code = next_version_code;
-        l.claimed_at = Some(now);
-        l.last_heartbeat = Some(now);
-        l.lease_expires_at = Some(expires);
-    }
-
-    mgr.persist(&guard);
-
-    tracing::info!(
-        "release lane '{}' CLAIMED by {} (sha={}, next={}, code={:?}, token={})",
-        kind,
-        req.builder_label.as_deref().unwrap_or(&req.builder_id),
-        &req.sha,
-        &next_version_name,
-        next_version_code,
-        &token,
-    );
-
-    Ok(Json(ClaimResponse::Build {
-        token,
-        kind: kind.to_string(),
-        sha: req.sha,
-        next_version_name,
-        next_version_code,
-        lease_expires_at: expires,
-        claimed_at: now,
-    }))
+    best_str
 }
 
-pub async fn heartbeat_handler(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<HeartbeatRequest>,
-) -> Result<Json<HeartbeatResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let kind = parse_kind(&req.kind)?;
-    let lease_secs = req
-        .lease_secs
-        .unwrap_or(DEFAULT_LEASE_SECS)
-        .clamp(60, MAX_LEASE_SECS);
-
-    let mgr = manager(&state);
-    let mut guard = mgr.inner.lock().await;
-    let now = now_secs();
-    let expires;
-    {
-        let l = lane_mut(&mut guard, kind);
-        match l.active_token.as_deref() {
-            Some(tok) if tok == req.token => {
-                expires = now + lease_secs;
-                l.last_heartbeat = Some(now);
-                l.lease_expires_at = Some(expires);
-            }
-            _ => {
-                return Err(err(
-                    StatusCode::GONE,
-                    "claim token invalid or lease released",
-                ));
-            }
-        }
+fn bump_semver(base: &str, kind: &str) -> String {
+    let (a, b, c) = parse_semver(base).unwrap_or((0, 0, 0));
+    match kind {
+        "major" => format!("{}.0.0", a + 1),
+        "minor" => format!("{}.{}.0", a, b + 1),
+        _ => format!("{}.{}.{}", a, b, c + 1),
     }
-    mgr.persist(&guard);
-    Ok(Json(HeartbeatResponse {
-        ok: true,
-        lease_expires_at: expires,
-    }))
-}
-
-pub async fn finish_handler(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<FinishRequest>,
-) -> Result<Json<FinishResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let kind = parse_kind(&req.kind)?;
-    let mgr = manager(&state);
-    let mut guard = mgr.inner.lock().await;
-    let now = now_secs();
-    {
-        let l = lane_mut(&mut guard, kind);
-        match l.active_token.as_deref() {
-            Some(tok) if tok == req.token => {
-                let release = LastRelease {
-                    success: req.success,
-                    sha: req.sha.clone(),
-                    version_name: req.version_name.clone(),
-                    version_code: req.version_code,
-                    finished_at: now,
-                    builder_label: l.builder_label.clone(),
-                    error_message: req.error_message.clone(),
-                };
-                // 成功时记入最高已发版版本
-                if req.success {
-                    if let Some(vn) = req.version_name.as_deref() {
-                        let new_max = match l.last_published_version_name.as_deref() {
-                            Some(prev) => max_semver(prev, vn).to_string(),
-                            None => vn.to_string(),
-                        };
-                        l.last_published_version_name = Some(new_max);
-                    }
-                    if kind == "apk" {
-                        if let Some(vc) = req.version_code {
-                            let prev = l.last_published_version_code.unwrap_or(0);
-                            l.last_published_version_code = Some(std::cmp::max(prev, vc));
-                        }
-                    }
-                }
-                l.clear();
-                l.last_release = Some(release);
-            }
-            _ => {
-                return Err(err(
-                    StatusCode::GONE,
-                    "claim token invalid or already released",
-                ));
-            }
-        }
-    }
-    mgr.persist(&guard);
-    tracing::info!(
-        "release lane '{}' FINISHED (success={}, sha={}, version={:?}, code={:?})",
-        kind,
-        req.success,
-        req.sha,
-        req.version_name,
-        req.version_code,
-    );
-    Ok(Json(FinishResponse { ok: true }))
-}
-
-pub async fn status_handler(
-    State(state): State<Arc<AppState>>,
-    Query(q): Query<StatusQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let mgr = manager(&state);
-    let guard = mgr.inner.lock().await;
-    let now = now_secs();
-
-    fn snapshot(kind: &str, l: &LaneState, now: i64) -> LaneStatus {
-        LaneStatus {
-            kind: kind.to_string(),
-            busy: l.is_busy(now),
-            current_builder_label: l.builder_label.clone(),
-            current_sha: l.sha.clone(),
-            claimed_at: l.claimed_at,
-            lease_expires_at: l.lease_expires_at,
-            last_heartbeat: l.last_heartbeat,
-            last_release: l.last_release.clone(),
-            last_published_version_name: l.last_published_version_name.clone(),
-            last_published_version_code: l.last_published_version_code,
-        }
-    }
-
-    if let Some(k) = q.kind.as_deref() {
-        let kind = parse_kind(k)?;
-        let snap = snapshot(kind, lane(&guard, kind), now);
-        return Ok(Json(serde_json::to_value(snap).unwrap_or_default()));
-    }
-    let snap = serde_json::json!({
-        "server": snapshot("server", &guard.server, now),
-        "apk": snapshot("apk", &guard.apk, now),
-        "now": now,
-    });
-    Ok(Json(snap))
 }

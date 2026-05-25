@@ -54,10 +54,12 @@ pub struct ServerVersionResponse {
 }
 
 pub async fn server_version() -> Json<ServerVersionResponse> {
+    // 版本号优先取构建脚本注入的 ELON_BUILD_VERSION（来自 release_claim 服务器分配），
+    // 否则回落到 CARGO_PKG_VERSION（本地 cargo run 时 Cargo.toml 的占位值）。
     Json(ServerVersionResponse {
         service: "elon-server",
         status: "ok",
-        version_name: env!("CARGO_PKG_VERSION"),
+        version_name: option_env!("ELON_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
         git_sha: option_env!("ELON_SERVER_GIT_SHA").unwrap_or("dev"),
     })
 }
