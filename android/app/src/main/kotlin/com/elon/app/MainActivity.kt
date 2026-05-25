@@ -23,7 +23,6 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -92,6 +91,7 @@ class MainActivity : AppCompatActivity() {
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
     private var attachmentPickerActions: MainAttachmentPickerActions? = null
     private var attachmentSendActions: MainAttachmentSendActions? = null
+    private var pendingAttachmentActions: MainPendingAttachmentActions? = null
     private var workflowStageActions: MainWorkflowStageActions? = null
     private var evidenceActions: MainEvidenceActions? = null
     private var progressNarrativeActions: MainProgressNarrativeActions? = null
@@ -538,23 +538,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
-        val name = fallbackName ?: displayNameForUri(this, uri) ?: uri.lastPathSegment ?: kind
-        val attachment = runCatching {
-            copyAttachmentToCache(this, kind, uri, name, pendingAttachments.size + 1)
-        }.onFailure {
-            Toast.makeText(this, "附件读取失败，请重新选择", Toast.LENGTH_SHORT).show()
-        }.getOrNull() ?: return
-
-        pendingAttachments.add(attachment)
-        if (voiceMode) {
-            voiceMode = false
-            applyVoiceMode()
-        }
-        if (::inputComposerMotion.isInitialized && !inputComposerMotion.isExpanded) {
-            inputComposerMotion.setExpanded(true, animate = true)
-        }
-        refreshPendingAttachmentPreview()
-        Toast.makeText(this, "已添加${attachment.displayLabel}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
+        pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
     }
 
     private fun currentSendTarget(): SendTarget {
@@ -603,13 +587,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun clearPendingAttachments(deleteFiles: Boolean = true) {
-        if (deleteFiles) {
-            pendingAttachments.forEach { attachment ->
-                runCatching { attachment.file.delete() }
-            }
-        }
-        pendingAttachments.clear()
-        refreshPendingAttachmentPreview()
+        pendingAttachmentActions().clearPendingAttachments(deleteFiles)
+    }
+
+    private fun pendingAttachmentActions(): MainPendingAttachmentActions {
+        pendingAttachmentActions?.let { return it }
+        return MainPendingAttachmentActions(
+            activity = this,
+            pendingAttachments = pendingAttachments,
+            isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = ::applyVoiceMode,
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
+        ).also { pendingAttachmentActions = it }
     }
 
     private fun handleSendOrAttachment() {
