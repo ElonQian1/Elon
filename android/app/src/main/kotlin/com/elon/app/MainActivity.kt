@@ -1332,13 +1332,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun createConversation(title: String) {
         conversations.add(
-            AppConversation(
-                id = UUID.randomUUID().toString(),
-                title = summarize(title, 24),
-                subtitle = "点击进入开发会话",
-                updatedAt = System.currentTimeMillis(),
-                messages = mutableListOf(welcomeMessage())
-            )
+            newAppConversation(title, "点击进入开发会话")
         )
         activeProject().updatedAt = System.currentTimeMillis()
         activeProject().subtitle = "${conversations.size} 个会话"
@@ -1347,7 +1341,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createProject(title: String) {
-        projects.add(createProject(title, "新项目 · 点击进入会话"))
+        projects.add(newAppProject(title, "新项目 · 点击进入会话"))
         activeProjectIndex = projects.lastIndex
         activeConversationIndex = 0
         saveProjects()
@@ -1450,7 +1444,7 @@ class MainActivity : AppCompatActivity() {
         if (index !in conversations.indices) return
         conversations.removeAt(index)
         if (conversations.isEmpty()) {
-            conversations.add(createDefaultConversation())
+            conversations.add(defaultAppConversation())
         }
         activeProject().subtitle = "${conversations.size} 个会话"
         activeProject().updatedAt = System.currentTimeMillis()
@@ -1656,7 +1650,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openConversation(index: Int) {
-        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
+        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
         chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
         binding.chatList.adapter = chatAdapter
@@ -1669,7 +1663,7 @@ class MainActivity : AppCompatActivity() {
     private fun openProject(index: Int) {
         if (index !in projects.indices) return
         activeProjectIndex = index
-        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
+        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
         activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
         saveProjects()
         binding.tabChat.performClick()
@@ -1677,48 +1671,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun activeProject(): AppProject {
         if (projects.isEmpty()) {
-            projects.add(createProject("一龙开发助手", "默认项目 · 点击进入会话"))
+            projects.add(newAppProject("一龙开发助手", "默认项目 · 点击进入会话"))
         }
         activeProjectIndex = activeProjectIndex.coerceIn(0, projects.lastIndex)
         val project = projects[activeProjectIndex]
-        if (project.conversations.isEmpty()) project.conversations.add(createDefaultConversation())
+        if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
         project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
         return project
     }
 
     private fun activeConversation(): AppConversation {
         if (conversations.isEmpty()) {
-            conversations.add(createDefaultConversation())
+            conversations.add(defaultAppConversation())
         }
         activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
         return conversations[activeConversationIndex]
-    }
-
-    private fun createDefaultConversation(): AppConversation {
-        return AppConversation(
-            id = "default",
-            title = "一龙开发助手",
-            subtitle = "连接中...",
-            updatedAt = System.currentTimeMillis(),
-            messages = mutableListOf(welcomeMessage())
-        )
-    }
-
-    private fun createProject(title: String, subtitle: String): AppProject {
-        return AppProject(
-            id = UUID.randomUUID().toString(),
-            title = summarize(title, 24),
-            subtitle = subtitle,
-            updatedAt = System.currentTimeMillis(),
-            conversations = mutableListOf(createDefaultConversation())
-        )
-    }
-
-    private fun welcomeMessage(): ChatMessage {
-        return ChatMessage(
-            "ai",
-            "你可以直接描述想开发的 App 功能；我会先说明我理解到的意图，再把需求分析、开发实现、编译打包和交付证据折叠同步给你。"
-        )
     }
 
     private fun loadProjects() {
@@ -1737,7 +1704,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         if (projects.isEmpty()) {
-            projects.add(loadLegacyProject())
+            projects.add(legacyAppProject(prefs, gson))
         }
 
         // 确保「一龙项目」（平台自身源码）始终作为第一个项目存在
@@ -2346,9 +2313,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun normalizeProject(project: AppProject) {
-        if (project.conversations.isEmpty()) project.conversations.add(createDefaultConversation())
+        if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
         project.conversations.forEach {
-            if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
+            if (it.messages.isEmpty()) it.messages.add(welcomeChatMessage())
             it.messages.forEach { message -> message.evidenceWorking = false }
             compactCliTranscriptMessages(it.messages)
             sanitizeExistingCliLogMessages(it.messages)
@@ -2363,31 +2330,8 @@ class MainActivity : AppCompatActivity() {
         project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
     }
 
-    private fun loadLegacyProject(): AppProject {
-        val saved = prefs.getString("conversations_json", null)
-        val legacyConversations = runCatching {
-            if (saved.isNullOrBlank()) null
-            else gson.fromJson(saved, Array<AppConversation>::class.java)?.toMutableList()
-        }.getOrNull().orEmpty().filter { it.title.isNotBlank() }.toMutableList()
-        legacyConversations.forEach {
-            if (it.messages.isEmpty()) it.messages.add(welcomeMessage())
-        }
-        if (legacyConversations.isEmpty()) legacyConversations.add(createDefaultConversation())
-
-        val savedEvents = prefs.getString("project_events", "").orEmpty()
-        val title = prefs.getString("project_title", null)?.takeIf { it.isNotBlank() } ?: "一龙开发助手"
-        return AppProject(
-            id = UUID.randomUUID().toString(),
-            title = summarize(title, 24),
-            subtitle = "默认项目 · ${legacyConversations.size} 个会话",
-            updatedAt = legacyConversations.maxOfOrNull { it.updatedAt } ?: System.currentTimeMillis(),
-            conversations = legacyConversations,
-            events = savedEvents.lines().filter { it.isNotBlank() }.toMutableList()
-        )
-    }
-
     private fun updateFirstConversationStatus(text: String) {
-        if (conversations.isEmpty()) conversations.add(createDefaultConversation())
+        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
         if (conversations[0].ended) return
         conversations[0].subtitle = text
         conversations[0].updatedAt = System.currentTimeMillis()
