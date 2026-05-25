@@ -10,12 +10,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.Shader
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -2841,47 +2838,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun showTopActionPopup(anchor: View, actions: List<TopAction>) {
         actionPopup = popupRenderer().showTopActionPopup(anchor, actionPopup, actions)
-    }
-
-    private fun createPopupDivider(marginStart: Int = 0): View {
-        return View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                1
-            ).apply {
-                this.marginStart = marginStart
-            }
-            alpha = 0.55f
-            setBackgroundColor(Color.parseColor(WECHAT_POPUP_DIVIDER_COLOR))
-        }
-    }
-
-    private fun createPopupArrowView(
-        pointsUp: Boolean = true,
-        color: Int = Color.parseColor(WECHAT_POPUP_PANEL_COLOR)
-    ): View {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.FILL
-        }
-        return object : View(this) {
-            override fun onDraw(canvas: Canvas) {
-                super.onDraw(canvas)
-                val path = Path().apply {
-                    if (pointsUp) {
-                        moveTo(width / 2f, 0f)
-                        lineTo(width.toFloat(), height.toFloat())
-                        lineTo(0f, height.toFloat())
-                    } else {
-                        moveTo(0f, 0f)
-                        lineTo(width.toFloat(), 0f)
-                        lineTo(width / 2f, height.toFloat())
-                    }
-                    close()
-                }
-                canvas.drawPath(path, paint)
-            }
-        }
     }
 
     private fun popupRenderer(): MainActionPopupRenderer {
