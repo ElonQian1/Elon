@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
+    private var conversationTaskRegistryActions: MainConversationTaskRegistryActions? = null
     private var projectViewActions: MainProjectViewActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
@@ -941,19 +942,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun conversationTaskKey(projectId: String, conversationId: String): String {
-        return "$projectId\u001F$conversationId"
+        return conversationTaskRegistryActions().conversationTaskKey(projectId, conversationId)
     }
 
     private fun activeConversationTaskKey(): String {
-        return conversationTaskKey(activeProject().id, activeConversation().id)
+        return conversationTaskRegistryActions().activeConversationTaskKey()
     }
 
     private fun isActiveConversationWorking(): Boolean {
-        return runningConversationTasks.containsKey(activeConversationTaskKey())
+        return conversationTaskRegistryActions().isActiveConversationWorking()
     }
 
     private fun activeConversationTask(): ConversationTaskState? {
-        return runningConversationTasks[activeConversationTaskKey()]
+        return conversationTaskRegistryActions().activeConversationTask()
     }
 
     private fun rememberConversationTask(
@@ -962,16 +963,7 @@ class MainActivity : AppCompatActivity() {
         payload: String,
         isDevelopment: Boolean
     ) {
-        val key = conversationTaskKey(target.projectId, target.conversationId)
-        runningConversationTasks[key] = ConversationTaskState(
-            traceId = traceId,
-            projectId = target.projectId,
-            conversationId = target.conversationId,
-            payload = payload,
-            isDevelopment = isDevelopment
-        )
-        runningTraceToConversation[traceId] = key
-        refreshActiveTaskState()
+        conversationTaskRegistryActions().rememberConversationTask(target, traceId, payload, isDevelopment)
     }
 
     private fun updateConversationTaskFromService(
@@ -981,19 +973,13 @@ class MainActivity : AppCompatActivity() {
         isDevelopment: Boolean?,
         pendingReconnect: Boolean? = null
     ): ConversationTaskState? {
-        val key = when {
-            !traceId.isNullOrBlank() && runningTraceToConversation.containsKey(traceId) ->
-                runningTraceToConversation[traceId]
-            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
-                conversationTaskKey(projectId, conversationId)
-            else -> null
-        } ?: return null
-        val existing = runningConversationTasks[key] ?: return null
-        if (!traceId.isNullOrBlank()) runningTraceToConversation[traceId] = key
-        isDevelopment?.let { existing.isDevelopment = it }
-        pendingReconnect?.let { existing.pendingReconnect = it }
-        refreshActiveTaskState()
-        return existing
+        return conversationTaskRegistryActions().updateConversationTaskFromService(
+            traceId,
+            projectId,
+            conversationId,
+            isDevelopment,
+            pendingReconnect
+        )
     }
 
     private fun removeConversationTask(
@@ -1001,63 +987,45 @@ class MainActivity : AppCompatActivity() {
         projectId: String?,
         conversationId: String?
     ): ConversationTaskState? {
-        val key = when {
-            !traceId.isNullOrBlank() -> runningTraceToConversation.remove(traceId)
-            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
-                conversationTaskKey(projectId, conversationId)
-            else -> null
-        } ?: return null
-        val removed = runningConversationTasks.remove(key)
-        removed?.let {
-            runningTraceToConversation.entries.removeAll { entry -> entry.value == key }
-            taskResponseTokens.remove(it.traceId)
-        }
-        refreshActiveTaskState()
-        return removed
+        return conversationTaskRegistryActions().removeConversationTask(traceId, projectId, conversationId)
     }
 
     private fun refreshActiveTaskState() {
-        waitingForReply = runningConversationTasks.isNotEmpty()
-        val activeTask = activeConversationTask()
-        activeRequestIsDevelopment = activeTask?.isDevelopment
-            ?: runningConversationTasks.values.lastOrNull()?.isDevelopment
-            ?: false
-        pendingRequestPayload = activeTask?.payload
-        pendingReconnectForActiveWork = activeTask?.pendingReconnect ?: false
-        setSendEnabled(!isActiveConversationWorking())
-        renderConversationList()
+        conversationTaskRegistryActions().refreshActiveTaskState()
     }
 
     private fun persistActiveWork() {
-        persistActiveWorkTasks(prefs, runningConversationTasks.values)
+        conversationTaskRegistryActions().persistActiveWork()
     }
 
     private fun clearPersistedActiveWork() {
-        clearPersistedActiveWorkTasks(prefs)
+        conversationTaskRegistryActions().clearPersistedActiveWork()
     }
 
     private fun restorePendingActiveWork() {
-        val restored = restorePersistedActiveWorkTasks(
+        conversationTaskRegistryActions().restorePendingActiveWork()
+    }
+
+    private fun conversationTaskRegistryActions(): MainConversationTaskRegistryActions {
+        conversationTaskRegistryActions?.let { return it }
+        return MainConversationTaskRegistryActions(
             prefs = prefs,
-            now = System.currentTimeMillis(),
-            fallbackProjectId = activeProject().id,
-            fallbackConversationId = activeConversation().id
-        )
-        if (!restored.shouldRefreshUi) return
-
-        restored.tasks.forEach { task ->
-            val key = conversationTaskKey(task.projectId, task.conversationId)
-            runningConversationTasks[key] = task
-            runningTraceToConversation[task.traceId] = key
-        }
-
-        refreshActiveTaskState()
-        reconnectAttempts = 0
-        if (activeRequestIsDevelopment) {
-            updateStage("后台继续", "任务仍在服务器继续处理，连接恢复后会同步最新进度。")
-        } else {
-            updateProjectViews("上一条回复仍在处理，连接恢复后会同步结果。")
-        }
+            runningConversationTasks = runningConversationTasks,
+            runningTraceToConversation = runningTraceToConversation,
+            taskResponseTokens = taskResponseTokens,
+            activeProject = ::activeProject,
+            activeConversation = ::activeConversation,
+            setWaitingForReply = { waitingForReply = it },
+            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            setPendingRequestPayload = { pendingRequestPayload = it },
+            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
+            setSendEnabled = ::setSendEnabled,
+            renderConversationList = ::renderConversationList,
+            updateStage = ::updateStage,
+            updateProjectViews = ::updateProjectViews
+        ).also { conversationTaskRegistryActions = it }
     }
 
     private fun registerTaskWorkReceiver() {
@@ -1112,20 +1080,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun syncActiveTasksFromServiceState(activeTasksJson: String?) {
-        if (activeTasksJson.isNullOrBlank()) return
-        val array = runCatching { JSONArray(activeTasksJson) }.getOrNull() ?: return
-        for (index in 0 until array.length()) {
-            val item = array.optJSONObject(index) ?: continue
-            val traceId = item.optString("trace_id").takeIf { it.isNotBlank() } ?: continue
-            val projectId = item.optString("project_id").takeIf { it.isNotBlank() } ?: continue
-            val conversationId = item.optString("conversation_id").takeIf { it.isNotBlank() } ?: continue
-            val key = conversationTaskKey(projectId, conversationId)
-            val existing = runningConversationTasks[key] ?: continue
-            runningTraceToConversation[traceId] = key
-            existing.pendingReconnect = false
-            existing.isDevelopment = item.optBoolean("is_development", existing.isDevelopment)
-        }
-        refreshActiveTaskState()
+        conversationTaskRegistryActions().syncActiveTasksFromServiceState(activeTasksJson)
     }
 
     private fun appendTaskMessage(
