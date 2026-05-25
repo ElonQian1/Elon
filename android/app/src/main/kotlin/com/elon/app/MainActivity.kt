@@ -40,26 +40,18 @@ class MainActivity : AppCompatActivity() {
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
     private var activeProjectIndex = 0
     private var homeRows: MainHomeRows? = null
-    private var modelActions: MainModelActions? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
-    private var actionPopups: MainActionPopups? = null
-    private var messageActions: MainMessageActions? = null
-    private var codexPrewarm: MainCodexPrewarm? = null
-    private var sendEnabledActions: MainSendEnabledActions? = null
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var taskWorkServiceActions: MainTaskWorkServiceActions? = null
     private var activeWorkControlActions: MainActiveWorkControlActions? = null
-    private var profileQuickActions: MainProfileQuickActions? = null
-    private var quickCommandActions: MainQuickCommandActions? = null
     private var createActions: MainCreateActions? = null
     private var resumeActions: MainResumeActions? = null
     private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var taskWorkReceiverActions: MainTaskWorkReceiverActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
-    private var navigationController: MainNavigationController? = null
     private lateinit var inputComposerViews: MainInputComposerViews
     private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
     private var voiceMode = false
@@ -95,13 +87,13 @@ class MainActivity : AppCompatActivity() {
             setupAttachmentLaunchers = { attachmentPickerActions.setupAttachmentLaunchers() },
             activeConversation = projectStateActions::activeConversation,
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
-            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
-            setupNavigation = { navigationController().setupNavigation() },
-            setupQuickActions = { profileQuickActions().setupQuickActions() },
-            setupBackHandling = { navigationController().setupBackHandling() },
+            setupNavigation = { navigationController.setupNavigation() },
+            setupQuickActions = { profileQuickActions.setupQuickActions() },
+            setupBackHandling = { navigationController.setupBackHandling() },
             setupInputComposer = ::setupInputComposer,
-            restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
+            restoreCachedModelSelection = { modelActions.restoreCachedModelSelection() },
             updateProjectViews = projectViewActions::updateProjectViews,
             setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
             registerTaskWorkReceiver = { taskWorkReceiverActions().registerTaskWorkReceiver() },
@@ -114,7 +106,7 @@ class MainActivity : AppCompatActivity() {
                 taskWorkServiceActions().startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
             },
             openConversation = conversationOpenActions::openConversation,
-            loadModelOptions = { modelActions().loadModelOptions() },
+            loadModelOptions = { modelActions.loadModelOptions() },
             sendMessage = { sendMessageActions.sendMessage() }
         ).also { createActions = it }
     }
@@ -140,7 +132,7 @@ class MainActivity : AppCompatActivity() {
             setAppInForeground = { appInForeground = it },
             setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
             drainQueuedTaskEvents = { taskWorkServiceActions().drainQueuedTaskEvents() },
-            loadModelOptions = { modelActions().loadModelOptions() },
+            loadModelOptions = { modelActions.loadModelOptions() },
             getBackendConnected = { backendConnected },
             getWaitingForReply = { waitingForReply },
             getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
@@ -154,8 +146,8 @@ class MainActivity : AppCompatActivity() {
                 taskWorkServiceActions().startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
-            maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
+            setSendEnabled = sendEnabledActions::setSendEnabled,
+            maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
         ).also { resumeActions = it }
     }
 
@@ -182,9 +174,9 @@ class MainActivity : AppCompatActivity() {
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks.containsKey(key)
             },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             userId = { userId },
-            selectedAgentForRequest = { modelActions().selectedAgentForRequest() },
+            selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             appendMessage = messageAppendActions::appendMessage,
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
@@ -255,7 +247,7 @@ class MainActivity : AppCompatActivity() {
             },
             clearCurrentEvidence = { evidenceActions.clearCurrentEvidence() },
             clearToolActionBubbles = { toolActionBubbles.clear() },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -280,7 +272,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             dp = uiTools::dp,
-            currentModelLabel = { modelActions().currentModelLabel },
+            currentModelLabel = { modelActions.currentModelLabel },
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
             isAttachmentPanelOpen = { attachmentPanelActions.isOpen },
@@ -288,7 +280,7 @@ class MainActivity : AppCompatActivity() {
             focusInputComposer = { inputFocusActions.focusInputComposer() },
             startSpeechToText = { speechInputActions().startSpeechToText() },
             stopSpeechToText = { speechInputActions().stopSpeechToText() },
-            showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
+            showModelPopupOrLoad = { modelActions.showModelPopupOrLoad() },
             sendMessage = { sendMessageActions.sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
             buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
@@ -390,8 +382,8 @@ class MainActivity : AppCompatActivity() {
             setActiveProjectIndex = { activeProjectIndex = it },
             setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
-            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
-            showChat = { navigationController().showChat() }
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            showChat = { navigationController.showChat() }
         )
     }
 
@@ -402,7 +394,7 @@ class MainActivity : AppCompatActivity() {
             serverUrl = serverUrl,
             userId = { userId },
             pendingAttachments = { pendingAttachments.toList() },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             startPreparedMessage = preparedMessageActions()::startPreparedMessage
         )
     }
@@ -485,9 +477,8 @@ class MainActivity : AppCompatActivity() {
         ).also { speechInputActions = it }
     }
 
-    private fun navigationController(): MainNavigationController {
-        navigationController?.let { return it }
-        return MainNavigationController(
+    private val navigationController: MainNavigationController by lazy {
+        MainNavigationController(
             activity = this,
             binding = binding,
             actionPopupProvider = { actionPopup },
@@ -496,19 +487,19 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList,
-            refreshServerVersion = { profileQuickActions().refreshServerVersion() },
+            refreshServerVersion = { profileQuickActions.refreshServerVersion() },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
-            showHomeActionPopup = { anchor, tab -> actionPopups().showHomeActionPopup(anchor, tab) },
-            showChatActionPopup = { anchor -> actionPopups().showChatActionPopup(anchor) },
+            showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
+            showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
             collapseInputComposer = { animate -> inputFocusActions.collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
-            maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
-        ).also { navigationController = it }
+            setSendEnabled = sendEnabledActions::setSendEnabled,
+            maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
+        )
     }
 
     private val conversationActions: MainConversationActions by lazy {
@@ -523,13 +514,12 @@ class MainActivity : AppCompatActivity() {
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            setSendEnabled = sendEnabledActions()::setSendEnabled
+            setSendEnabled = sendEnabledActions::setSendEnabled
         )
     }
 
-    private fun modelActions(): MainModelActions {
-        modelActions?.let { return it }
-        return MainModelActions(
+    private val modelActions: MainModelActions by lazy {
+        MainModelActions(
             activity = this,
             binding = binding,
             prefs = prefs,
@@ -540,10 +530,10 @@ class MainActivity : AppCompatActivity() {
             inputBarContainerProvider = { inputComposerViewsOrNull()?.inputBarContainer },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
-            openSettings = { quickCommandActions().openSettings() },
+            openSettings = { quickCommandActions.openSettings() },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
-        ).also { modelActions = it }
+        )
     }
 
     private val conversationOpenActions: MainConversationOpenActions by lazy {
@@ -557,8 +547,8 @@ class MainActivity : AppCompatActivity() {
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
-            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
-            showChat = { animate -> navigationController().showChat(animate = animate) },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            showChat = { animate -> navigationController.showChat(animate = animate) },
             saveProjects = projectStateActions::saveProjects
         )
     }
@@ -588,7 +578,7 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             resetReconnectAttempts = { reconnectAttempts = 0 },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             renderConversationList = homeListActions::renderConversationList,
             updateStage = projectViewActions::updateStage,
             updateProjectViews = projectViewActions::updateProjectViews
@@ -611,7 +601,7 @@ class MainActivity : AppCompatActivity() {
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions.recordEvidence(kind, detail)
             },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
             updateIdleReadyStatus = { conversationPreviewActions.updateIdleReadyStatus() },
@@ -767,9 +757,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun profileQuickActions(): MainProfileQuickActions {
-        profileQuickActions?.let { return it }
-        return MainProfileQuickActions(
+    private val profileQuickActions: MainProfileQuickActions by lazy {
+        MainProfileQuickActions(
             activity = this,
             binding = binding,
             http = http,
@@ -778,37 +767,36 @@ class MainActivity : AppCompatActivity() {
             refreshAccountUi = {
                 if (::binding.isInitialized) accountActions().refreshAccountUi()
             },
-            fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
-            sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
+            fillPlanPrompt = { quickCommandActions.fillPlanPrompt() },
+            sendQuickCommand = { text -> quickCommandActions.sendQuickCommand(text) },
             showProjectRecordDialog = { projectRecordActions.showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
-            openSettings = { quickCommandActions().openSettings() },
-            showPromotionDialog = { messageActions().showPromotionDialog() },
+            openSettings = { quickCommandActions.openSettings() },
+            showPromotionDialog = { messageActions.showPromotionDialog() },
             showGuestImportDialog = { accountActions().showGuestImportDialog() },
             confirmLogout = { accountActions().confirmLogout() }
-        ).also { profileQuickActions = it }
+        )
     }
 
-    private fun actionPopups(): MainActionPopups {
-        actionPopups?.let { return it }
-        return MainActionPopups(
+    private val actionPopups: MainActionPopups by lazy {
+        MainActionPopups(
             activity = this,
             binding = binding,
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             shareActions = uiTools::shareActions,
-            fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
-            sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
+            fillPlanPrompt = { quickCommandActions.fillPlanPrompt() },
+            sendQuickCommand = { text -> quickCommandActions.sendQuickCommand(text) },
             showProjectRecordDialog = { projectRecordActions.showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
-            openSettings = { quickCommandActions().openSettings() },
-            deleteMessage = { message -> messageActions().deleteMessage(message) },
-            quoteMessage = { text -> messageActions().quoteMessage(text) },
+            openSettings = { quickCommandActions.openSettings() },
+            deleteMessage = { message -> messageActions.deleteMessage(message) },
+            quoteMessage = { text -> messageActions.quoteMessage(text) },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
-        ).also { actionPopups = it }
+        )
     }
 
     private fun showGitProjectDialog() {
@@ -825,50 +813,47 @@ class MainActivity : AppCompatActivity() {
         ).showGitProjectDialog()
     }
 
-    private fun codexPrewarm(): MainCodexPrewarm {
-        codexPrewarm?.let { return it }
-        return MainCodexPrewarm(
+    private val codexPrewarm: MainCodexPrewarm by lazy {
+        MainCodexPrewarm(
             http = http,
             serverUrl = serverUrl,
             userId = userId,
             activeProject = projectStateActions::activeProject,
             activeConversation = projectStateActions::activeConversation,
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            selectedAgentForRequest = { modelActions().selectedAgentForRequest() }
-        ).also { codexPrewarm = it }
+            selectedAgentForRequest = { modelActions.selectedAgentForRequest() }
+        )
     }
 
     private val externalActions: MainExternalActions by lazy { MainExternalActions(this) }
 
-    private fun quickCommandActions(): MainQuickCommandActions {
-        quickCommandActions?.let { return it }
-        return MainQuickCommandActions(
+    private val quickCommandActions: MainQuickCommandActions by lazy {
+        MainQuickCommandActions(
             activity = this,
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
-            showChat = { navigationController().showChat() },
+            showChat = { navigationController.showChat() },
             sendMessage = { sendMessageActions.sendMessage() }
-        ).also { quickCommandActions = it }
+        )
     }
 
-    private fun messageActions(): MainMessageActions {
-        messageActions?.let { return it }
-        return MainMessageActions(
+    private val messageActions: MainMessageActions by lazy {
+        MainMessageActions(
             activity = this,
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
             chatAdapter = { chatAdapter },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            showChat = { navigationController().showChat() },
+            showChat = { navigationController.showChat() },
             showMessageActionPopup = { anchor, message, text ->
-                actionPopups().showMessageActionPopup(anchor, message, text)
+                actionPopups.showMessageActionPopup(anchor, message, text)
             },
             shareActions = uiTools::shareActions,
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
-        ).also { messageActions = it }
+        )
     }
 
     private val evidenceActions: MainEvidenceActions by lazy {
@@ -1008,7 +993,7 @@ class MainActivity : AppCompatActivity() {
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
             setWaitingForReply = { waitingForReply = it },
-            setSendEnabled = sendEnabledActions()::setSendEnabled,
+            setSendEnabled = sendEnabledActions::setSendEnabled,
             clearPendingRequestPayload = { pendingRequestPayload = null },
             clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { reconnectAttempts = 0 },
@@ -1083,9 +1068,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun sendEnabledActions(): MainSendEnabledActions {
-        sendEnabledActions?.let { return it }
-        return MainSendEnabledActions(
+    private val sendEnabledActions: MainSendEnabledActions by lazy {
+        MainSendEnabledActions(
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
             setInputCanSend = { inputCanSend = it },
@@ -1095,7 +1079,7 @@ class MainActivity : AppCompatActivity() {
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateStageHintShimmer = { stageHintShimmer().update() }
-        ).also { sendEnabledActions = it }
+        )
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -1104,7 +1088,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == R.id.action_settings) {
-            quickCommandActions().openSettings()
+            quickCommandActions.openSettings()
             return true
         }
         return super.onOptionsItemSelected(item)
