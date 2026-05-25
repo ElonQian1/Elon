@@ -123,9 +123,14 @@ where
     match item_type {
         "agent_message" => {
             if let Some(text) = item.get("text").and_then(Value::as_str) {
-                let snippet = truncate_chars(text.trim(), 200);
-                if !snippet.is_empty() {
-                    push_progress(out, format!("AI 回复片段：{}", snippet));
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    out.push(
+                        WsMessage::AssistantMessage {
+                            text: trimmed.to_string(),
+                        }
+                        .to_json(),
+                    );
                 }
             }
         }
@@ -329,5 +334,21 @@ mod tests {
         assert!(stream_event_to_ws_messages("").is_empty());
         assert!(stream_event_to_ws_messages("not json").is_empty());
         assert!(stream_event_to_ws_messages(r#"{"type":"unknown_event"}"#).is_empty());
+    }
+
+    #[test]
+    fn stream_event_emits_assistant_message_for_agent_message_completed() {
+        let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"  我已经读完了 main.rs，准备开始改造。  "}}"#;
+        let msgs = stream_event_to_ws_messages(line);
+        assert_eq!(msgs.len(), 1);
+        let value: Value = serde_json::from_str(&msgs[0]).unwrap();
+        assert_eq!(value["type"], "assistant_message");
+        assert_eq!(value["text"], "我已经读完了 main.rs，准备开始改造。");
+    }
+
+    #[test]
+    fn stream_event_skips_blank_agent_message() {
+        let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"   "}}"#;
+        assert!(stream_event_to_ws_messages(line).is_empty());
     }
 }

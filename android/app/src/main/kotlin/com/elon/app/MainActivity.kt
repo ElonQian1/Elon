@@ -90,6 +90,8 @@ class MainActivity : AppCompatActivity() {
     private val foldedCliLogSamples = ArrayDeque<String>()
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
     private val currentEvidenceEntries = mutableListOf<EvidenceEntry>()
+    // tool 名 -> 已派发但尚未 tool_result 的 ai-action 气泡在当前会话中的 index 队列
+    private val pendingToolActionBubbles = linkedMapOf<String, ArrayDeque<Int>>()
     private val emittedProgressSignals = linkedSetOf<String>()
     private var serverResponseToken = 0
     private var appInForeground = false
@@ -371,6 +373,7 @@ class MainActivity : AppCompatActivity() {
         workflowStepIndex = 0
         resetFoldedCliLog()
         currentEvidenceEntries.clear()
+        pendingToolActionBubbles.clear()
         emittedProgressSignals.clear()
         if (requestIsDevelopment) {
             updateProjectTitleFromRequest(visibleText)
@@ -415,6 +418,7 @@ class MainActivity : AppCompatActivity() {
         persistActiveWork()
         stopWorkingEvidenceForActiveConversation()
         currentEvidenceEntries.clear()
+        pendingToolActionBubbles.clear()
         setSendEnabled(true)
         if (wasDevelopment) {
             updateStage("工作暂停", "你已暂停当前任务，可以调整需求后继续发送。")
@@ -3870,8 +3874,19 @@ class MainActivity : AppCompatActivity() {
                 }
                 "tool_call"   -> {
                     val tool = jsonStringOrNull(json, "tool") ?: "工具"
+                    val args = json.get("args")?.takeIf { it.isJsonObject }?.asJsonObject
                     maybeAppendToolCallNarrative(tool)
                     handleToolCall(tool)
+                    // 真实交互感：每次 tool_call 追加一条小灰字"动作卡片"气泡，
+                    // 让用户看到 AI 正在读什么、改什么、执行什么命令。
+                    val actionText = describeToolAction(tool, args)
+                    val bubble = ChatMessage("ai-action", actionText)
+                    appendMessage(bubble)
+                    val msgs = activeConversation().messages
+                    val idx = msgs.indices.lastOrNull { msgs[it].role == "ai-action" } ?: -1
+                    if (idx >= 0) {
+                        pendingToolActionBubbles.getOrPut(tool) { ArrayDeque() }.addLast(idx)
+                    }
                     return
                 }
                 "tool_result" -> {
@@ -3883,9 +3898,35 @@ class MainActivity : AppCompatActivity() {
                         "完成：${toolLabel(tool)}，${summarize(result, 80)}"
                     }
                     recordEvidence(toolEvidenceKind(tool), evidence)
+                    // 把对应 ai-action 卡片标记为 ✓ 已完成
+                    val queue = pendingToolActionBubbles[tool]
+                    if (queue != null && queue.isNotEmpty()) {
+                        val idx = queue.removeFirst()
+                        val messages = activeConversation().messages
+                        if (idx in messages.indices && messages[idx].role == "ai-action") {
+                            val old = messages[idx]
+                            val newContent = markToolActionDone(old.content)
+                            if (newContent != old.content) {
+                                messages[idx] = old.copy(content = newContent)
+                                chatAdapter.notifyMessageUpdated(idx)
+                                saveConversations()
+                            }
+                        }
+                        if (queue.isEmpty()) pendingToolActionBubbles.remove(tool)
+                    }
                     updateStage(currentStage, "${toolLabel(tool)} 已完成，正在判断下一步。")
                     addProjectEvent("工具完成：${toolLabel(tool)}")
                     return
+                }
+                "assistant_message" -> {
+                    val text = jsonStringOrNull(json, "text").orEmpty().trim()
+                    if (text.isBlank()) return
+                    if (activeRequestIsDevelopment) {
+                        addProjectEvent("AI 说明：${summarize(text, 36)}")
+                    }
+                    // AI 的中间发言：直接以 ai-intent 主白底气泡呈现，
+                    // 不再被压缩成 200 字进度文案，给用户真正的"对话感"。
+                    ChatMessage("ai-intent", text)
                 }
                 "done"        -> {
                     waitingForReply = false
