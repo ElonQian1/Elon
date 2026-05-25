@@ -214,38 +214,6 @@ fn system_prompt(workspace: &str) -> String {
     )
 }
 
-/// 运行 AI 代理的主循环
-/// - user_id:      用户标识（决定工作区目录）
-/// - user_message: 用户发送的消息
-/// - agent_name:   可选，指定使用哪个 AI 代理
-pub async fn run(
-    user_id: &str,
-    workspace_user_id: &str,
-    user_message: &str,
-    agent_name: Option<&str>,
-    state: &Arc<AppState>,
-    tx: UnboundedSender<String>,
-) {
-    if let Err(e) = run_dispatch(
-        user_id,
-        workspace_user_id,
-        user_message,
-        agent_name,
-        state,
-        &tx,
-    )
-    .await
-    {
-        error!("AI 代理运行出错: {}", e);
-        let _ = tx.send(
-            WsMessage::Error {
-                message: e.to_string(),
-            }
-            .to_json(),
-        );
-    }
-}
-
 pub async fn run_for_project(
     user_id: &str,
     project: &ProjectAccess,
@@ -366,34 +334,6 @@ pub async fn run_for_project_in_workspace(
             .to_json(),
         );
     }
-}
-
-async fn run_dispatch(
-    user_id: &str,
-    workspace_user_id: &str,
-    user_message: &str,
-    agent_name: Option<&str>,
-    state: &Arc<AppState>,
-    tx: &UnboundedSender<String>,
-) -> Result<()> {
-    let workspace = state.get_user_workspace(workspace_user_id);
-    let user_config_workspace = state.get_user_workspace(user_id);
-    let download_base = format!("{}/download/{}", state.public_url, workspace_user_id);
-    run_dispatch_with_workspace(
-        user_id,
-        &workspace,
-        &user_config_workspace,
-        &download_base,
-        None,
-        user_message,
-        None,
-        agent_name,
-        None,
-        false,
-        state,
-        tx,
-    )
-    .await
 }
 
 async fn run_dispatch_with_workspace(

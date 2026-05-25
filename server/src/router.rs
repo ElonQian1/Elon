@@ -7,7 +7,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
-use crate::{admin, api, app_update, client_gateway, peer_relay, project_api, user_api, web};
+use crate::{admin, api, app_update, peer_relay, project_api, user_api, web};
 
 pub fn build_app(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
@@ -28,8 +28,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/runtime", get(api::readyz))
         .route("/api/server/version", get(api::server_version))
         .route("/api/debug/traces/:trace_id", get(api::server_trace))
-        .route("/ws", get(client_gateway::ws_handler))
-        .route("/api/chat", post(api::chat))
         .route("/api/image/generate", post(api::generate_image))
         .route("/api/auth/login", post(project_api::login))
         .route("/api/auth/register", post(project_api::register))
@@ -84,12 +82,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/user/:user_id/projects/:project_id/git/config",
             post(project_api::user_project_git_config),
         )
-        // ── 旧 APK 兼容入口：内部映射到普通项目 elon-self ───────────────────
-        .route("/ws/elon", get(project_api::ws_elon_self_handler))
-        .route(
-            "/api/elon/download/:filename",
-            get(project_api::download_elon_self_apk),
-        )
         .route(
             "/api/user/:user_id/projects/:project_id/download/:filename",
             get(project_api::download_user_project_apk),
@@ -97,10 +89,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/download/:filename",
             get(project_api::download_project_apk),
-        )
-        .route(
-            "/download/:user_id/:filename",
-            get(client_gateway::download_apk),
         )
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
         .route("/app/download", get(web::download_page))

@@ -8,8 +8,6 @@ mod agent;
 mod ai_cli;
 mod api;
 mod app_update;
-mod client_gateway;
-mod client_protocol;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;

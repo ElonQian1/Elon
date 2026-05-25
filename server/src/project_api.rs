@@ -2695,60 +2695,6 @@ fn parse_project_message(raw: &str) -> ProjectChatRequest {
     })
 }
 
-// ── 兼容旧 APK：旧入口会被映射到普通项目 elon-self ───────────────────────
-
-/// WebSocket 入口：`GET /ws/elon`，无需 token。新客户端应使用
-/// `/ws/user/:user_id/projects/:project_id`。
-pub async fn ws_elon_self_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> Response {
-    let (user, project) = match ensure_mobile_project(&state, "elon-system", "elon-self", None) {
-        Ok(pair) => pair,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-    };
-    let download_base = format!(
-        "{}/api/user/{}/projects/{}/download",
-        state.public_url, user.id, project.id
-    );
-    ws.on_upgrade(move |socket| {
-        handle_project_ws(socket, state, user, project, download_base, None)
-    })
-    .into_response()
-}
-
-/// APK 下载：`GET /api/elon/download/:filename`
-pub async fn download_elon_self_apk(AxumPath(filename): AxumPath<String>) -> Response {
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
-    }
-    if !filename.ends_with(".apk") {
-        return json_error(StatusCode::BAD_REQUEST, "only APK downloads are allowed");
-    }
-
-    let workspace = agent::elon_self_workspace();
-    let Some(apk_path) = tools::find_apk_by_filename(&workspace.join("android"), &filename) else {
-        return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
-    };
-    let data = match tokio::fs::read(&apk_path).await {
-        Ok(data) => data,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
-
-    axum::response::Response::builder()
-        .status(StatusCode::OK)
-        .header(
-            header::CONTENT_TYPE,
-            "application/vnd.android.package-archive",
-        )
-        .header(
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", filename),
-        )
-        .body(Body::from(data))
-        .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
 async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: &str) -> Response {
     if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
         return json_error(StatusCode::BAD_REQUEST, "invalid filename");
