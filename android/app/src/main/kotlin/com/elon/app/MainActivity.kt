@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -114,6 +113,7 @@ class MainActivity : AppCompatActivity() {
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
     private var resumeActions: MainResumeActions? = null
+    private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1855,32 +1855,35 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == speechPermissionRequest) {
-            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-            Toast.makeText(
-                this,
-                if (granted) "已开启语音权限，请按住说话" else "需要麦克风权限才能语音转文字",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else if (requestCode == notificationPermissionRequest) {
-            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                Toast.makeText(this, "需要通知权限才能显示任务完成和应用更新提醒", Toast.LENGTH_SHORT).show()
-            }
-        }
+        lifecycleEdgeActions().onRequestPermissionsResult(requestCode, grantResults)
     }
 
     override fun onDestroy() {
-        stopStageHintShimmer()
-        homeRows?.cancelHomeRowShimmer()
-        homeRows = null
-        speechInputActions?.destroy()
-        speechInputActions = null
-        if (taskWorkReceiverRegistered) {
-            unregisterReceiver(taskWorkReceiver)
-            taskWorkReceiverRegistered = false
-        }
+        lifecycleEdgeActions().onDestroy()
         super.onDestroy()
+    }
+
+    private fun lifecycleEdgeActions(): MainLifecycleEdgeActions {
+        lifecycleEdgeActions?.let { return it }
+        return MainLifecycleEdgeActions(
+            activity = this,
+            speechPermissionRequest = speechPermissionRequest,
+            notificationPermissionRequest = notificationPermissionRequest,
+            stopStageHintShimmer = ::stopStageHintShimmer,
+            cancelHomeRowShimmer = {
+                homeRows?.cancelHomeRowShimmer()
+                homeRows = null
+            },
+            destroySpeechInput = {
+                speechInputActions?.destroy()
+                speechInputActions = null
+            },
+            isTaskWorkReceiverRegistered = { taskWorkReceiverRegistered },
+            unregisterTaskWorkReceiver = {
+                unregisterReceiver(taskWorkReceiver)
+                taskWorkReceiverRegistered = false
+            }
+        ).also { lifecycleEdgeActions = it }
     }
 }
 
