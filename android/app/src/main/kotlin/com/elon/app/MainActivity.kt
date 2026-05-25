@@ -2897,18 +2897,7 @@ class MainActivity : AppCompatActivity() {
         binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
         binding.profileImportGuestButton.visibility =
             if (loggedIn && importableGuestProjects().isNotEmpty()) View.VISIBLE else View.GONE
-        binding.userInfoText.text = buildAccountInfoText()
-    }
-
-    private fun buildAccountInfoText(): String {
-        return if (AuthManager.isLoggedIn(this)) {
-            val name = AuthManager.displayName(this)
-            val account = AuthManager.account(this)
-            val tail = if (account != null && account != name) " · $account" else ""
-            "我的开发工作台\n登录账号：$name$tail\n云端工作区已就绪，可在网页版和其它手机间同步。"
-        } else {
-            "我的开发工作台\n游客模式 · 项目仅保存在本机\n登录后可在网页版和其它手机间继续同一个项目。"
-        }
+        binding.userInfoText.text = accountInfoText(this)
     }
 
     /** 返回游客 prefs 中"值得导入"的项目列表（已登录、且当前账号中不存在）。 */
@@ -3000,13 +2989,10 @@ class MainActivity : AppCompatActivity() {
         finish()
     }
 
-    private fun localAppVersionLine(): String =
-        "一龙 v${BuildConfig.VERSION_NAME}  (build ${BuildConfig.VERSION_CODE})"
-
     private fun refreshServerVersion() {
         Thread {
             val info = fetchServerVersionInfo()
-            val serverLine = info?.let { formatServerVersionLine(it) } ?: "服务器版本暂不可用"
+            val serverLine = info?.let { serverVersionLine(it) } ?: "服务器版本暂不可用"
             runOnUiThread {
                 if (::binding.isInitialized) {
                     binding.profileVersionText.text = "${localAppVersionLine()}\n$serverLine"
@@ -3031,17 +3017,6 @@ class MainActivity : AppCompatActivity() {
         }
     } catch (_: Exception) {
         null
-    }
-
-    private fun formatServerVersionLine(info: ServerVersionInfo): String {
-        val shortSha = info.gitSha
-            ?.takeIf { it != "dev" }
-            ?.take(8)
-        return if (shortSha.isNullOrBlank()) {
-            "服务器 v${info.versionName}"
-        } else {
-            "服务器 v${info.versionName} ($shortSha)"
-        }
     }
 
     private fun showMoreActions() {
@@ -4257,7 +4232,7 @@ class MainActivity : AppCompatActivity() {
         binding.stageHintText.text = hint
         binding.progressTitleText.text = "开发进度：$currentStage"
         binding.conversationTimeText.text = timeFormatter.format(Date())
-        binding.userInfoText.text = buildAccountInfoText()
+        binding.userInfoText.text = accountInfoText(this)
 
         val recent = projectEvents.take(5).joinToString("\n")
         binding.projectOverviewText.text = buildString {
