@@ -1,4 +1,5 @@
 use super::*;
+use crate::ai_cli_output::parse_intent_gate_result;
 
 #[test]
 fn codex_exec_args_enable_json_output() {
@@ -108,7 +109,13 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("通用项目工作流必须始终执行"));
     assert!(prompt.contains("git pull --rebase"));
     assert!(prompt.contains("scripts/publish-apk.ps1"));
-    assert!(prompt.contains("不要 rebase 后继续上传旧 APK"));
+    assert!(prompt.contains("/api/release/claim"));
+    assert!(prompt.contains("/api/release/finish"));
+    assert!(prompt.contains("ELON_BUILD_VERSION"));
+    assert!(prompt.contains("临时写入 build.gradle"));
+    assert!(prompt.contains("禁止为了发布手动递增并提交"));
+    assert!(!prompt.contains("必须递增 server/Cargo.toml 的 package.version"));
+    assert!(!prompt.contains("递增 versionCode/versionName"));
     assert!(prompt.contains("服务器为本 APK 会话创建的 worktree/分支"));
     assert!(prompt.contains("服务器会在任务完成后串行合并回项目主分支"));
 }
@@ -157,6 +164,9 @@ fn resumed_development_prompt_reuses_bootstrap_rules() {
     );
 
     assert!(prompt.contains("full development workflow was already injected"));
+    assert!(prompt.contains("/api/release/claim"));
+    assert!(prompt.contains("/api/release/finish"));
+    assert!(prompt.contains("do not manually bump or commit"));
     assert!(prompt.contains("git status is clean"));
     assert!(prompt.contains("用户可见："));
     assert!(prompt.contains("new judgment"));
