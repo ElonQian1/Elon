@@ -1076,47 +1076,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadProjects() {
+        val loaded = loadStoredProjects(prefs, gson, ::normalizeProject)
         projects.clear()
-        val savedProjects = prefs.getString("projects_json", null)
-        val loadedProjects = runCatching {
-            if (savedProjects.isNullOrBlank()) null
-            else gson.fromJson(savedProjects, Array<AppProject>::class.java)?.toMutableList()
-        }.getOrNull()
-
-        loadedProjects.orEmpty()
-            .filter { it.title.isNotBlank() }
-            .forEach {
-                normalizeProject(it)
-                projects.add(it)
-            }
-
-        if (projects.isEmpty()) {
-            projects.add(legacyAppProject(prefs, gson))
-        }
-
-        // 确保「一龙项目」（平台自身源码）始终作为第一个项目存在
-        val elonSelfId = "elon-self"
-        if (projects.none { it.id == elonSelfId }) {
-            val elonProject = AppProject(
-                id = elonSelfId,
-                title = "一龙项目",
-                subtitle = "修改平台自身 · AI 云端迭代",
-                updatedAt = 0L,
-                conversations = mutableListOf(AppConversation(
-                    id = "elon-self-default",
-                    title = "一龙项目",
-                    subtitle = "连接中...",
-                    updatedAt = 0L,
-                    messages = mutableListOf(ChatMessage(
-                        "ai",
-                        "你可以直接告诉我想给 APK 加什么功能，例如「加一个深色模式切换」——我会先确认理解，再修改源码、检查结果并把新 APK 发给你。"
-                    ))
-                ))
-            )
-            projects.add(0, elonProject)
-        }
-
-        activeProjectIndex = prefs.getInt("active_project_index", 0).coerceIn(0, projects.lastIndex)
+        projects.addAll(loaded.projects)
+        activeProjectIndex = loaded.activeProjectIndex
         activeProject()
         saveProjects()
     }
@@ -1126,11 +1089,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveProjects() {
-        prefs.edit()
-            .putString("projects_json", gson.toJson(projects))
-            .putInt("active_project_index", activeProjectIndex)
-            .putString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, activeProject().id)
-            .apply()
+        saveStoredProjects(prefs, gson, projects, activeProjectIndex, activeProject().id)
     }
 
     private fun conversationTaskKey(projectId: String, conversationId: String): String {

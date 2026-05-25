@@ -4,6 +4,11 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import java.util.UUID
 
+internal data class LoadedProjects(
+    val projects: MutableList<AppProject>,
+    val activeProjectIndex: Int
+)
+
 internal fun welcomeChatMessage(): ChatMessage {
     return ChatMessage(
         "ai",
@@ -63,3 +68,73 @@ internal fun legacyAppProject(prefs: SharedPreferences, gson: Gson): AppProject 
         events = savedEvents.lines().filter { it.isNotBlank() }.toMutableList()
     )
 }
+
+internal fun loadStoredProjects(
+    prefs: SharedPreferences,
+    gson: Gson,
+    normalizeProject: (AppProject) -> Unit
+): LoadedProjects {
+    val savedProjects = prefs.getString(PROJECTS_JSON_KEY, null)
+    val projects = runCatching {
+        if (savedProjects.isNullOrBlank()) null
+        else gson.fromJson(savedProjects, Array<AppProject>::class.java)?.toMutableList()
+    }.getOrNull()
+        .orEmpty()
+        .filter { it.title.isNotBlank() }
+        .onEach(normalizeProject)
+        .toMutableList()
+
+    if (projects.isEmpty()) {
+        projects.add(legacyAppProject(prefs, gson))
+    }
+
+    ensureElonSelfProject(projects)
+    val activeIndex = prefs.getInt(ACTIVE_PROJECT_INDEX_KEY, 0).coerceIn(0, projects.lastIndex)
+    return LoadedProjects(projects, activeIndex)
+}
+
+internal fun saveStoredProjects(
+    prefs: SharedPreferences,
+    gson: Gson,
+    projects: List<AppProject>,
+    activeProjectIndex: Int,
+    activeProjectId: String
+) {
+    prefs.edit()
+        .putString(PROJECTS_JSON_KEY, gson.toJson(projects))
+        .putInt(ACTIVE_PROJECT_INDEX_KEY, activeProjectIndex)
+        .putString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, activeProjectId)
+        .apply()
+}
+
+private fun ensureElonSelfProject(projects: MutableList<AppProject>) {
+    if (projects.any { it.id == ELON_SELF_PROJECT_ID }) return
+    projects.add(0, elonSelfProject())
+}
+
+private fun elonSelfProject(): AppProject {
+    return AppProject(
+        id = ELON_SELF_PROJECT_ID,
+        title = "一龙项目",
+        subtitle = "修改平台自身 · AI 云端迭代",
+        updatedAt = 0L,
+        conversations = mutableListOf(
+            AppConversation(
+                id = "elon-self-default",
+                title = "一龙项目",
+                subtitle = "连接中...",
+                updatedAt = 0L,
+                messages = mutableListOf(
+                    ChatMessage(
+                        "ai",
+                        "你可以直接告诉我想给 APK 加什么功能，例如「加一个深色模式切换」——我会先确认理解，再修改源码、检查结果并把新 APK 发给你。"
+                    )
+                )
+            )
+        )
+    )
+}
+
+private const val PROJECTS_JSON_KEY = "projects_json"
+private const val ACTIVE_PROJECT_INDEX_KEY = "active_project_index"
+private const val ELON_SELF_PROJECT_ID = "elon-self"
