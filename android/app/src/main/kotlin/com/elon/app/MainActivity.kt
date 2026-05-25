@@ -2967,7 +2967,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshServerVersion() {
         Thread {
-            val info = fetchServerVersionInfo()
+            val info = fetchServerVersionInfo(http, serverVersionUrl)
             val serverLine = info?.let { serverVersionLine(it) } ?: "服务器版本暂不可用"
             runOnUiThread {
                 if (::binding.isInitialized) {
@@ -2975,24 +2975,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    private fun fetchServerVersionInfo(): ServerVersionInfo? = try {
-        val request = Request.Builder()
-            .url(serverVersionUrl)
-            .addHeader("Cache-Control", "no-cache")
-            .build()
-        http.newCall(request).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val body = resp.body?.string() ?: return null
-            val json = JSONObject(body)
-            val versionName = json.optString("versionName", json.optString("version_name", ""))
-            val gitSha = json.optString("gitSha", json.optString("git_sha", ""))
-            if (versionName.isBlank()) return null
-            ServerVersionInfo(versionName = versionName, gitSha = gitSha.takeIf { it.isNotBlank() })
-        }
-    } catch (_: Exception) {
-        null
     }
 
     private fun showMoreActions() {
