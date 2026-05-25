@@ -292,8 +292,11 @@ class MainActivity : AppCompatActivity() {
 
         // 重连按钮
         binding.statusText.setOnClickListener {
-            if (backendConnected) openConversation(0)
-            else startTaskWorkService(TaskWorkService.ACTION_CONNECT)
+            if (backendConnected || !isActiveConversationWorking()) {
+                openConversation(0)
+            } else {
+                startTaskWorkService(TaskWorkService.ACTION_CONNECT)
+            }
         }
 
         loadModelOptions()
@@ -1481,7 +1484,7 @@ class MainActivity : AppCompatActivity() {
             showConversationActions(activeConversationIndex)
             true
         }
-        setSendEnabled(backendConnected && !isActiveConversationWorking())
+        setSendEnabled(!isActiveConversationWorking())
         maybePrewarmCodexSession("show_chat")
     }
 
@@ -2130,7 +2133,7 @@ class MainActivity : AppCompatActivity() {
             ?: false
         pendingRequestPayload = activeTask?.payload
         pendingReconnectForActiveWork = activeTask?.pendingReconnect ?: false
-        setSendEnabled(backendConnected && !isActiveConversationWorking())
+        setSendEnabled(!isActiveConversationWorking())
         renderConversationList()
     }
 
@@ -2269,7 +2272,7 @@ class MainActivity : AppCompatActivity() {
                         if (task != null && activeConversationTask()?.traceId == task.traceId) {
                             recordEvidence("connection", "连接已恢复，后台任务继续运行")
                         }
-                        setSendEnabled(backendConnected && !isActiveConversationWorking())
+                        setSendEnabled(!isActiveConversationWorking())
                     }
                     "disconnected" -> {
                         backendConnected = false
@@ -2283,8 +2286,8 @@ class MainActivity : AppCompatActivity() {
                         if (task != null && activeConversationTask()?.traceId == task.traceId) {
                             handleActiveWorkDisconnected(task)
                         } else {
-                            updateFirstConversationStatus("未连接 · 点击重试")
-                            setSendEnabled(backendConnected && !isActiveConversationWorking())
+                            updateIdleReadyStatus()
+                            setSendEnabled(!isActiveConversationWorking())
                         }
                     }
                     "message" -> {
@@ -2295,7 +2298,8 @@ class MainActivity : AppCompatActivity() {
                     }
                     "paused" -> {
                         removeConversationTask(traceId, projectId, conversationId)
-                        setSendEnabled(backendConnected && !isActiveConversationWorking())
+                        updateIdleReadyStatus()
+                        setSendEnabled(!isActiveConversationWorking())
                     }
                 }
             }
@@ -2308,8 +2312,9 @@ class MainActivity : AppCompatActivity() {
                     runningTraceToConversation.clear()
                     taskResponseTokens.clear()
                     refreshActiveTaskState()
+                    updateIdleReadyStatus()
                 }
-                setSendEnabled(backendConnected && !isActiveConversationWorking())
+                setSendEnabled(!isActiveConversationWorking())
             }
         }
     }
@@ -2656,6 +2661,12 @@ class MainActivity : AppCompatActivity() {
         conversations[0].updatedAt = System.currentTimeMillis()
         saveConversations()
         renderConversationList()
+    }
+
+    private fun updateIdleReadyStatus() {
+        if (runningConversationTasks.isEmpty()) {
+            updateFirstConversationStatus("已就绪 · 点击进入开发会话")
+        }
     }
 
     private fun updateActiveConversationPreview(message: ChatMessage) {
