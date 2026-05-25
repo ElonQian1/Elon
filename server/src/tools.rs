@@ -72,6 +72,9 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
     // 尝试推送到远程（用户隔离工作区可能无远程，失败时非致命）。
     // 会话 worktree 会运行在自己的分支上，这里必须推当前分支而不是硬编码 main。
     let branch = current_branch(project_root).unwrap_or_else(|| "main".into());
+    if !has_origin_remote(project_root) {
+        return Ok(format!("git commit 成功: {}", stdout.trim()));
+    }
     let push_output = Command::new("git")
         .args(["push", "origin", &branch])
         .current_dir(project_root)
@@ -89,6 +92,15 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         }
     };
     Ok(format!("git commit 成功: {}{}", stdout.trim(), push_note))
+}
+
+fn has_origin_remote(project_root: &Path) -> bool {
+    Command::new("git")
+        .args(["remote", "get-url", "origin"])
+        .current_dir(project_root)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 fn current_branch(project_root: &Path) -> Option<String> {

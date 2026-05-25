@@ -247,8 +247,8 @@ pub(crate) fn build_development_cli_prompt(
 - 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
-- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。当前目录可能已经是服务器为本 APK 会话创建的 worktree/分支；这种情况下不要切回项目主工作区，也不要手动推 main，只需在当前分支完成修改、验证、git add/commit，并 push 当前分支（如有远端）。服务器会在任务完成后串行合并回项目主分支。push 被拒绝时先 rebase 再 push，不要 force push。
-- 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit、push 当前分支；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
+- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。当前目录可能已经是服务器为本 APK 会话创建的 worktree/分支；这种情况下不要切回项目主工作区，也不要手动推 main，只需在当前分支完成修改、验证、git add/commit；如果当前仓库配置了 origin，再 push 当前分支。没有 origin/远端的本地模板项目只需本地 commit，服务器会在任务完成后串行合并回项目主分支并生成下载链接；不要把“没有远端/无法 push”写成用户可见失败。push 被拒绝时先 rebase 再 push，不要 force push。
+- 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit；有 origin 时 push 当前分支，无 origin 时本地提交即可；共享动作（merge/main、版本号递增、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
 - 如果改动影响服务器运行，必须递增 server/Cargo.toml 的 package.version，在 commit/push 后用本地开发机运行 scripts/publish-server.ps1 或 scripts/publish-server.sh 交叉编译并上传 binary；生产服务器性能较弱，只负责接收 binary、重启和健康检查，不要把它当常规编译机。部署后验证 /health 和 /api/server/version。
 - 如果改动影响 Android APK 发布给用户，必须优先使用项目发布脚本（例如 scripts/publish-apk.ps1）完成同步 main、递增 versionCode/versionName、构建签名 release APK、提交/推送 release commit、上传 APK 和 version.json、校验线上 /app/version.json。APK 编译完成后如果 push 被拒或 origin/main 已前进，不要 rebase 后继续上传旧 APK；如果服务器已部署包含本次基础 SHA 的更新 APK，就停止本地旧发布并测试线上新版；否则必须基于最新 main 重新运行发布脚本。签名文件应来自项目本机配置或环境变量，不得提交密钥。
@@ -257,7 +257,7 @@ pub(crate) fn build_development_cli_prompt(
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。
 - 除了真正要展示给用户的自然说明外，不要在其他位置输出「用户可见：」。
 - 如果用户要 Android APK，优先复用当前目录已有项目；空目录时可以根据需求新建项目，能构建时请运行构建并在最终回复里写出 APK 路径。
-- 修改代码后请在最终回复里说明改了什么、验证了什么；不要编造没有运行过的检查。
+- 修改代码后请在最终回复里说明改了什么、验证了什么；不要编造没有运行过的检查。APK 已生成或下载链接已返回时，不要把本地项目缺少远端当作交付失败。
 - 回复用户使用中文，内容清楚但不要过长。
 
 用户请求：

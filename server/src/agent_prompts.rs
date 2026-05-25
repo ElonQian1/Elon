@@ -191,7 +191,7 @@ pub(crate) fn system_prompt(workspace: &str) -> String {
 - 只有在确实需要读取、修改、提交或构建项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
 - 每完成一个功能点就 git_commit（中文描述）
-- git_commit 会自动提交并推送当前分支（如工作区有配置 origin）；如果当前目录是会话 worktree，不要手动推 main，服务器会在任务完成后串行合并。
+- git_commit 会自动提交，并在工作区配置 origin 时推送当前分支；未配置 origin 的本地模板项目只需本地提交，不要把它写成用户可见失败。如果当前目录是会话 worktree，不要手动推 main，服务器会在任务完成后串行合并。
 - build_project("android") 会自动递增 versionCode 和 versionName，无需手动改版本号
 - build_project 失败时分析错误，最多修复 3 次
 - 回复用户用简洁中文，告知进度
