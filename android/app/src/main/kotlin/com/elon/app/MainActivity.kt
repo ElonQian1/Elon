@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
@@ -90,6 +89,7 @@ class MainActivity : AppCompatActivity() {
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var sendEnabledActions: MainSendEnabledActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
+    private var collapsedInputPreviewActions: MainCollapsedInputPreviewActions? = null
     private var voiceModeActions: MainVoiceModeActions? = null
     private var inputFocusActions: MainInputFocusActions? = null
     private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
@@ -372,7 +372,7 @@ class MainActivity : AppCompatActivity() {
             buildAttachmentPanel = { attachmentPanelActions().buildAttachmentPanel() },
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
             collapseInputComposer = { inputFocusActions().collapseInputComposer() },
-            updateCollapsedInputPreview = ::updateCollapsedInputPreview,
+            updateCollapsedInputPreview = { collapsedInputPreviewActions().updateCollapsedInputPreview() },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
         ).setup()
@@ -389,12 +389,12 @@ class MainActivity : AppCompatActivity() {
         inputComposerMotion = views.inputComposerMotion
         attachmentPanel = views.attachmentPanel
         pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(this, pendingAttachments) {
-            updateCollapsedInputPreview()
+            collapsedInputPreviewActions().updateCollapsedInputPreview()
             updateSendButtonVisual()
         }
         binding.inputLayout.addView(pendingAttachmentPreviewStrip.view, 1)
         voiceModeActions().applyVoiceMode()
-        updateCollapsedInputPreview()
+        collapsedInputPreviewActions().updateCollapsedInputPreview()
         updateSendButtonVisual()
         adaptiveInputHeightActions().updateAdaptiveInputHeight()
     }
@@ -409,21 +409,6 @@ class MainActivity : AppCompatActivity() {
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             isVoiceMode = { voiceMode }
         ).also { adaptiveInputHeightActions = it }
-    }
-
-    private fun updateCollapsedInputPreview() {
-        if (!::collapsedInputPreview.isInitialized) return
-        val draft = binding.inputEdit.text?.toString().orEmpty()
-        val hasDraft = draft.isNotBlank()
-        val hasAttachments = pendingAttachments.isNotEmpty()
-        collapsedInputPreview.text = when {
-            hasDraft -> draft
-            hasAttachments -> pendingAttachmentSummary(pendingAttachments)
-            else -> "文本内容在此输入。"
-        }
-        collapsedInputPreview.setTextColor(
-            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#A8D0D0D0")
-        )
     }
 
     private fun inputFocusActions(): MainInputFocusActions {
@@ -442,10 +427,19 @@ class MainActivity : AppCompatActivity() {
         ).also { inputFocusActions = it }
     }
 
+    private fun collapsedInputPreviewActions(): MainCollapsedInputPreviewActions {
+        collapsedInputPreviewActions?.let { return it }
+        return MainCollapsedInputPreviewActions(
+            binding = binding,
+            pendingAttachments = { pendingAttachments },
+            collapsedInputPreview = { if (::collapsedInputPreview.isInitialized) collapsedInputPreview else null }
+        ).also { collapsedInputPreviewActions = it }
+    }
+
     private fun refreshPendingAttachmentPreview() {
         if (!::pendingAttachmentPreviewStrip.isInitialized) return
         pendingAttachmentPreviewStrip.refresh()
-        updateCollapsedInputPreview()
+        collapsedInputPreviewActions().updateCollapsedInputPreview()
         updateSendButtonVisual()
     }
 
