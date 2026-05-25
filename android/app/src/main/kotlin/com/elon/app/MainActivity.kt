@@ -112,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private var activeWorkControlActions: MainActiveWorkControlActions? = null
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
+    private var conversationPreviewActions: MainConversationPreviewActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1105,14 +1106,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun findConversationLocationByKey(key: String): Pair<Int, Int>? {
-        projects.forEachIndexed { projectIndex, project ->
-            project.conversations.forEachIndexed { conversationIndex, conversation ->
-                if (conversationTaskKey(project.id, conversation.id) == key) {
-                    return projectIndex to conversationIndex
-                }
-            }
-        }
-        return null
+        return conversationPreviewActions().findConversationLocationByKey(key)
     }
 
     private fun appendMessageToConversation(
@@ -1120,24 +1114,7 @@ class MainActivity : AppCompatActivity() {
         conversationIndex: Int,
         message: ChatMessage
     ) {
-        val project = projects.getOrNull(projectIndex) ?: return
-        val conversation = project.conversations.getOrNull(conversationIndex) ?: return
-        if (message.role in workflowTerminalRoles) {
-            closeStaleWorkflowMessages(conversation.messages)
-        }
-        conversation.messages.add(message)
-        conversation.updatedAt = System.currentTimeMillis()
-        project.updatedAt = conversation.updatedAt
-        if (!conversation.ended) {
-            conversation.subtitle = summarize(message.content, 30)
-            project.subtitle = summarize(message.content, 34)
-        }
-        saveProjects()
-        renderConversationList()
-        if (projectIndex == activeProjectIndex && conversationIndex == activeConversationIndex) {
-            chatAdapter.notifyDataSetChanged()
-            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
-        }
+        conversationPreviewActions().appendMessageToConversation(projectIndex, conversationIndex, message)
     }
 
     private fun handleLaunchIntent(intent: Intent?) {
@@ -1193,44 +1170,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateFirstConversationStatus(text: String) {
-        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
-        if (conversations[0].ended) return
-        conversations[0].subtitle = text
-        conversations[0].updatedAt = System.currentTimeMillis()
-        saveConversations()
-        renderConversationList()
+        conversationPreviewActions().updateFirstConversationStatus(text)
     }
 
     private fun updateIdleReadyStatus() {
-        if (runningConversationTasks.isEmpty()) {
-            updateFirstConversationStatus("已就绪 · 点击进入开发会话")
-        }
+        conversationPreviewActions().updateIdleReadyStatus()
     }
 
     private fun updateActiveConversationPreview(message: ChatMessage) {
-        val conversation = activeConversation()
-        val project = activeProject()
-        conversation.updatedAt = System.currentTimeMillis()
-        project.updatedAt = conversation.updatedAt
-        when (message.role) {
-            "user" -> {
-                conversation.subtitle = summarize(message.content, 30)
-                project.subtitle = summarize(message.content, 34)
-                if (conversation.title.startsWith("新会话")) {
-                    conversation.title = summarize(message.content, 12)
-                    binding.topTitleText.text = conversation.title
-                }
-            }
-            "ai", "ai-intent", "ai-working", "ai-progress", "ai-tool", "ai-complete", "ai-stopped", "error" -> {
-                if (!conversation.ended) {
-                    conversation.subtitle = summarize(message.content, 30)
-                    project.subtitle = summarize(message.content, 34)
-                }
-            }
-        }
-        saveConversations()
-        renderConversationList()
-        if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
+        conversationPreviewActions().updateActiveConversationPreview(message)
+    }
+
+    private fun conversationPreviewActions(): MainConversationPreviewActions {
+        conversationPreviewActions?.let { return it }
+        return MainConversationPreviewActions(
+            binding = binding,
+            projects = { projects },
+            conversations = { conversations },
+            activeProject = ::activeProject,
+            activeConversation = ::activeConversation,
+            activeProjectIndex = { activeProjectIndex },
+            activeConversationIndex = { activeConversationIndex },
+            chatAdapter = { chatAdapter },
+            conversationTaskKey = ::conversationTaskKey,
+            workflowTerminalRoles = workflowTerminalRoles,
+            closeStaleWorkflowMessages = ::closeStaleWorkflowMessages,
+            hasRunningTasks = { runningConversationTasks.isNotEmpty() },
+            saveConversations = ::saveConversations,
+            saveProjects = ::saveProjects,
+            renderConversationList = ::renderConversationList,
+            renderProjectList = ::renderProjectList
+        ).also { conversationPreviewActions = it }
     }
 
     private fun renderConversationList() {
