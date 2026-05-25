@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -13,6 +13,7 @@ use crate::store_schema::init_schema;
 
 mod native_sessions;
 mod tasks;
+mod users;
 
 pub struct Store {
     conn: Mutex<Connection>,
@@ -110,181 +111,6 @@ impl Store {
         Ok(Self {
             conn: Mutex::new(conn),
         })
-    }
-
-    pub fn create_user(
-        &self,
-        account: &str,
-        password: &str,
-        nickname: Option<&str>,
-        role: Option<&str>,
-    ) -> Result<PublicUser> {
-        let account = normalize_account(account)?;
-        validate_password(password)?;
-        let now = now();
-        let id = new_id("usr");
-        let password_hash = hash_password(password);
-        let role = role
-            .map(str::trim)
-            .filter(|v| !v.is_empty())
-            .unwrap_or("user");
-        if !matches!(role, "user" | "admin") {
-            return Err(anyhow!("用户角色只能是 user 或 admin"));
-        }
-
-        let (phone, email) = account_columns(&account);
-        self.conn()?.execute(
-            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'active', ?7, ?7)",
-            params![
-                id,
-                phone,
-                email,
-                password_hash,
-                clean_optional(nickname),
-                role,
-                now
-            ],
-        )?;
-
-        Ok(PublicUser {
-            id,
-            account,
-            nickname: clean_optional(nickname).map(ToOwned::to_owned),
-            role: role.to_string(),
-            status: "active".into(),
-        })
-    }
-
-    pub fn authenticate_password(&self, account: &str, password: &str) -> Result<PublicUser> {
-        let account = normalize_account(account)?;
-        let row = self
-            .conn()?
-            .query_row(
-                "SELECT id, phone, email, password_hash, nickname, role, status
-                 FROM users
-                 WHERE (phone = ?1 OR email = ?1 OR id = ?1) AND status = 'active'",
-                params![account],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, String>(3)?,
-                        row.get::<_, Option<String>>(4)?,
-                        row.get::<_, String>(5)?,
-                        row.get::<_, String>(6)?,
-                    ))
-                },
-            )
-            .optional()?
-            .ok_or_else(|| anyhow!("账号不存在或已停用"))?;
-
-        if !verify_password(password, &row.3) {
-            return Err(anyhow!("密码错误"));
-        }
-
-        Ok(PublicUser {
-            id: row.0,
-            account: row.2.or(row.1).unwrap_or(account),
-            nickname: row.4,
-            role: row.5,
-            status: row.6,
-        })
-    }
-
-    pub fn create_session(
-        &self,
-        user_id: &str,
-        device_name: Option<&str>,
-    ) -> Result<(String, String)> {
-        let token = format!("tok_{}", Uuid::new_v4().simple());
-        let token_hash = hash_token(&token);
-        let session_id = new_id("ses");
-        let created_at = now();
-        let expires_at = (Utc::now() + Duration::days(30)).to_rfc3339();
-
-        self.conn()?.execute(
-            "INSERT INTO sessions (id, user_id, token_hash, device_name, expires_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                session_id,
-                user_id,
-                token_hash,
-                clean_optional(device_name),
-                expires_at,
-                created_at
-            ],
-        )?;
-
-        Ok((token, expires_at))
-    }
-
-    pub fn authenticate_token(&self, token: &str) -> Result<PublicUser> {
-        let token = token.trim();
-        if token.is_empty() {
-            return Err(anyhow!("缺少登录 token"));
-        }
-
-        let token_hash = hash_token(token);
-        self.conn()?
-            .query_row(
-                "SELECT u.id, u.phone, u.email, u.nickname, u.role, u.status
-                 FROM sessions s
-                 JOIN users u ON u.id = s.user_id
-                 WHERE s.token_hash = ?1
-                   AND s.expires_at > ?2
-                   AND u.status = 'active'",
-                params![token_hash, now()],
-                |row| {
-                    let phone: Option<String> = row.get(1)?;
-                    let email: Option<String> = row.get(2)?;
-                    Ok(PublicUser {
-                        id: row.get(0)?,
-                        account: email
-                            .or(phone)
-                            .unwrap_or_else(|| row.get(0).unwrap_or_default()),
-                        nickname: row.get(3)?,
-                        role: row.get(4)?,
-                        status: row.get(5)?,
-                    })
-                },
-            )
-            .optional()?
-            .ok_or_else(|| anyhow!("登录已过期，请重新登录"))
-    }
-
-    pub fn list_users(&self) -> Result<Vec<AdminUserSummary>> {
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare(
-            "SELECT u.id, u.phone, u.email, u.nickname, u.role, u.status,
-                    COUNT(pm.project_id) AS project_count, u.created_at, u.updated_at
-             FROM users u
-             LEFT JOIN project_members pm ON pm.user_id = u.id
-             GROUP BY u.id
-             ORDER BY u.created_at DESC",
-        )?;
-
-        let users = stmt
-            .query_map([], |row| {
-                let phone: Option<String> = row.get(1)?;
-                let email: Option<String> = row.get(2)?;
-                Ok(AdminUserSummary {
-                    id: row.get(0)?,
-                    account: email
-                        .or(phone)
-                        .unwrap_or_else(|| row.get(0).unwrap_or_default()),
-                    nickname: row.get(3)?,
-                    role: row.get(4)?,
-                    status: row.get(5)?,
-                    project_count: row.get(6)?,
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
-                })
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-
-        Ok(users)
     }
 
     pub fn create_project(
