@@ -58,8 +58,8 @@ android {
         applicationId "com.elon.app"
         minSdk 26
         targetSdk 34
-        versionCode 62
-        versionName "1.1.54"
+        versionCode 63
+        versionName "1.1.55"
     }
 
     buildTypes {
