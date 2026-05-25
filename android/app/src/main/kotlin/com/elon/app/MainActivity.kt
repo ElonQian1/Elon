@@ -13,7 +13,6 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
 import com.elon.app.BuildConfig
-import com.elon.app.update.AppUpdateManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -190,15 +189,14 @@ class MainActivity : AppCompatActivity() {
             startTaskWorkService = { action -> startTaskWorkService(action) },
             openConversation = ::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
-            sendMessage = { sendMessageActions().sendMessage() },
-            handleLaunchIntent = ::handleLaunchIntent
+            sendMessage = { sendMessageActions().sendMessage() }
         ).also { createActions = it }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        handleLaunchIntent(intent)
+        createActions().handleLaunchIntent(intent)
     }
 
     override fun onResume() {
@@ -940,13 +938,6 @@ class MainActivity : AppCompatActivity() {
                 conversationPreviewActions().appendMessageToConversation(projectIndex, conversationIndex, message)
             }
         ).also { backgroundTaskMessageActions = it }
-    }
-
-    private fun handleLaunchIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
-            intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
-            AppUpdateManager(this).realtimeCheck()
-        }
     }
 
     private fun startTaskWorkService(

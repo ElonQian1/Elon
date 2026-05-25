@@ -37,8 +37,7 @@ internal class MainCreateActions(
     private val startTaskWorkService: (String) -> Boolean,
     private val openConversation: (Int) -> Unit,
     private val loadModelOptions: () -> Unit,
-    private val sendMessage: () -> Unit,
-    private val handleLaunchIntent: (Intent?) -> Unit
+    private val sendMessage: () -> Unit
 ) {
     fun onCreate(intent: Intent?) {
         setupTaskCompletionAlerts(activity, prefs, notificationPermissionRequest)
@@ -67,6 +66,13 @@ internal class MainCreateActions(
         UpdateCheckWorker.schedule(activity)
         PeerSeederManager.start(activity)
         handleLaunchIntent(intent)
+    }
+
+    fun handleLaunchIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
+            intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
+            AppUpdateManager(activity).realtimeCheck()
+        }
     }
 
     private fun bindStatusReconnect() {
