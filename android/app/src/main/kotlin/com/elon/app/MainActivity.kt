@@ -174,7 +174,7 @@ class MainActivity : AppCompatActivity() {
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             getWaitingForReply = { waitingForReply },
             getBackendConnected = { backendConnected },
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             startTaskWorkService = { action -> startTaskWorkService(action) },
             openConversation = ::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
             startTaskWorkService = { action -> startTaskWorkService(action) },
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
             maybePrewarmCodexSession = ::maybePrewarmCodexSession
         ).also { resumeActions = it }
@@ -256,7 +256,8 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             restoreSendTarget = ::restoreSendTarget,
             isConversationTaskRunning = { target ->
-                runningConversationTasks.containsKey(conversationTaskKey(target.projectId, target.conversationId))
+                val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
+                runningConversationTasks.containsKey(key)
             },
             setSendEnabled = ::setSendEnabled,
             userId = { userId },
@@ -265,12 +266,12 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
-            rememberConversationTask = ::rememberConversationTask,
+            rememberConversationTask = conversationTaskRegistryActions()::rememberConversationTask,
             setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
             resetRequestState = {
                 pendingReconnectForActiveWork = false
                 reconnectAttempts = 0
-                persistActiveWork()
+                conversationTaskRegistryActions().persistActiveWork()
                 foldedCliLogActions().reset()
                 evidenceActions().clearCurrentEvidence()
                 toolActionBubbles().clear()
@@ -287,10 +288,11 @@ class MainActivity : AppCompatActivity() {
             putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
             startTaskWorkService = ::startTaskWorkService,
             markTaskPendingReconnect = { target ->
-                runningConversationTasks[conversationTaskKey(target.projectId, target.conversationId)]?.pendingReconnect = true
+                val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
+                runningConversationTasks[key]?.pendingReconnect = true
             },
-            refreshActiveTaskState = ::refreshActiveTaskState,
-            persistActiveWork = ::persistActiveWork,
+            refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
+            persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
             updateStage = ::updateStage,
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
@@ -305,8 +307,8 @@ class MainActivity : AppCompatActivity() {
         activeWorkControlActions?.let { return it }
         return MainActiveWorkControlActions(
             binding = binding,
-            activeConversationTask = ::activeConversationTask,
-            removeConversationTask = ::removeConversationTask,
+            activeConversationTask = conversationTaskRegistryActions()::activeConversationTask,
+            removeConversationTask = conversationTaskRegistryActions()::removeConversationTask,
             resetReconnectAttempts = { reconnectAttempts = 0 },
             incrementReconnectAttempts = {
                 reconnectAttempts += 1
@@ -322,9 +324,9 @@ class MainActivity : AppCompatActivity() {
             getPendingRequestPayload = { pendingRequestPayload },
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             setWaitingForReply = { waitingForReply = it },
-            persistActiveWork = ::persistActiveWork,
-            clearPersistedActiveWork = ::clearPersistedActiveWork,
-            refreshActiveTaskState = ::refreshActiveTaskState,
+            persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
+            clearPersistedActiveWork = conversationTaskRegistryActions()::clearPersistedActiveWork,
+            refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             stopWorkingEvidenceForActiveConversation = {
                 evidenceActions().stopWorkingEvidenceForActiveConversation()
             },
@@ -475,7 +477,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             pendingAttachments = pendingAttachments,
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             activeProject = ::activeProject,
             activeConversation = ::activeConversation,
             appendMessage = ::appendMessage,
@@ -635,7 +637,7 @@ class MainActivity : AppCompatActivity() {
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
             collapseInputComposer = ::collapseInputComposer,
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
             maybePrewarmCodexSession = ::maybePrewarmCodexSession
         ).also { navigationController = it }
@@ -752,67 +754,6 @@ class MainActivity : AppCompatActivity() {
         saveStoredProjects(prefs, gson, projects, activeProjectIndex, activeProject().id)
     }
 
-    private fun conversationTaskKey(projectId: String, conversationId: String): String {
-        return conversationTaskRegistryActions().conversationTaskKey(projectId, conversationId)
-    }
-
-    private fun activeConversationTaskKey(): String {
-        return conversationTaskRegistryActions().activeConversationTaskKey()
-    }
-
-    private fun isActiveConversationWorking(): Boolean {
-        return conversationTaskRegistryActions().isActiveConversationWorking()
-    }
-
-    private fun activeConversationTask(): ConversationTaskState? {
-        return conversationTaskRegistryActions().activeConversationTask()
-    }
-
-    private fun rememberConversationTask(
-        target: SendTarget,
-        traceId: String,
-        payload: String,
-        isDevelopment: Boolean
-    ) {
-        conversationTaskRegistryActions().rememberConversationTask(target, traceId, payload, isDevelopment)
-    }
-
-    private fun updateConversationTaskFromService(
-        traceId: String?,
-        projectId: String?,
-        conversationId: String?,
-        isDevelopment: Boolean?,
-        pendingReconnect: Boolean? = null
-    ): ConversationTaskState? {
-        return conversationTaskRegistryActions().updateConversationTaskFromService(
-            traceId,
-            projectId,
-            conversationId,
-            isDevelopment,
-            pendingReconnect
-        )
-    }
-
-    private fun removeConversationTask(
-        traceId: String?,
-        projectId: String?,
-        conversationId: String?
-    ): ConversationTaskState? {
-        return conversationTaskRegistryActions().removeConversationTask(traceId, projectId, conversationId)
-    }
-
-    private fun refreshActiveTaskState() {
-        conversationTaskRegistryActions().refreshActiveTaskState()
-    }
-
-    private fun persistActiveWork() {
-        conversationTaskRegistryActions().persistActiveWork()
-    }
-
-    private fun clearPersistedActiveWork() {
-        conversationTaskRegistryActions().clearPersistedActiveWork()
-    }
-
     private fun conversationTaskRegistryActions(): MainConversationTaskRegistryActions {
         conversationTaskRegistryActions?.let { return it }
         return MainConversationTaskRegistryActions(
@@ -845,22 +786,21 @@ class MainActivity : AppCompatActivity() {
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
-            updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
-                updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
-            },
-            activeConversationTask = ::activeConversationTask,
+            updateConversationTaskFromService =
+                conversationTaskRegistryActions()::updateConversationTaskFromService,
+            activeConversationTask = conversationTaskRegistryActions()::activeConversationTask,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
             },
             setSendEnabled = ::setSendEnabled,
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
             updateIdleReadyStatus = { conversationPreviewActions().updateIdleReadyStatus() },
             appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
                 traceId?.let { taskResponseTokens.remove(it) }
                 appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
             },
-            removeConversationTask = ::removeConversationTask,
+            removeConversationTask = conversationTaskRegistryActions()::removeConversationTask,
             syncActiveTasksFromServiceState = { activeTasksJson ->
                 conversationTaskRegistryActions().syncActiveTasksFromServiceState(activeTasksJson)
             },
@@ -895,18 +835,17 @@ class MainActivity : AppCompatActivity() {
         taskMessageRouterActions?.let { return it }
         return MainTaskMessageRouterActions(
             keyForTrace = { traceId -> runningTraceToConversation[traceId] },
-            conversationTaskKey = ::conversationTaskKey,
-            activeConversationTaskKey = ::activeConversationTaskKey,
+            conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
+            activeConversationTaskKey = conversationTaskRegistryActions()::activeConversationTaskKey,
             taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
             appendActiveMessage = { raw -> appendMessage(raw) },
             appendBackgroundTaskMessage = { raw, key, isDevelopment ->
                 backgroundTaskMessageActions().appendBackgroundTaskMessage(raw, key, isDevelopment)
             },
-            removeConversationTask = ::removeConversationTask,
-            persistActiveWork = ::persistActiveWork,
-            updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
-                updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
-            }
+            removeConversationTask = conversationTaskRegistryActions()::removeConversationTask,
+            persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
+            updateConversationTaskFromService =
+                conversationTaskRegistryActions()::updateConversationTaskFromService
         ).also { taskMessageRouterActions = it }
     }
 
@@ -951,7 +890,7 @@ class MainActivity : AppCompatActivity() {
             activeProjectIndex = { activeProjectIndex },
             activeConversationIndex = { activeConversationIndex },
             chatAdapter = { chatAdapter },
-            conversationTaskKey = ::conversationTaskKey,
+            conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
             workflowTerminalRoles = workflowTerminalRoles,
             closeStaleWorkflowMessages = { messages ->
                 workflowMessageCompactor().closeStaleWorkflowMessages(messages)
@@ -983,7 +922,8 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             formatTime = { timeFormatter.format(Date(it)) },
             isTaskRunning = { projectId, conversationId ->
-                runningConversationTasks.containsKey(conversationTaskKey(projectId, conversationId))
+                val key = conversationTaskRegistryActions().conversationTaskKey(projectId, conversationId)
+                runningConversationTasks.containsKey(key)
             },
             homeRows = { homeRows() },
             dp = ::dp,
@@ -1116,7 +1056,7 @@ class MainActivity : AppCompatActivity() {
             userId = userId,
             activeProject = ::activeProject,
             activeConversation = ::activeConversation,
-            isActiveConversationWorking = ::isActiveConversationWorking,
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             selectedAgentForRequest = { modelActions().selectedAgentForRequest() }
         ).also { codexPrewarm = it }
     }
@@ -1252,10 +1192,10 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             taskResponseTokens = taskResponseTokens,
             taskForTrace = { traceId -> runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } },
-            activeConversationTask = ::activeConversationTask,
+            activeConversationTask = conversationTaskRegistryActions()::activeConversationTask,
             getCurrentStage = { currentStage },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            refreshActiveTaskState = ::refreshActiveTaskState,
+            refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             updateStage = ::updateStage,
             addProjectEvent = ::addProjectEvent,
             startTaskWorkService = ::startTaskWorkService
@@ -1330,7 +1270,7 @@ class MainActivity : AppCompatActivity() {
             clearPendingRequestPayload = { pendingRequestPayload = null },
             clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { reconnectAttempts = 0 },
-            clearPersistedActiveWork = ::clearPersistedActiveWork,
+            clearPersistedActiveWork = conversationTaskRegistryActions()::clearPersistedActiveWork,
             updateStage = ::updateStage,
             updateProjectViews = ::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
@@ -1364,7 +1304,7 @@ class MainActivity : AppCompatActivity() {
         stageHintShimmer?.let { return it }
         return MainStageHintShimmer(
             binding = binding,
-            isActiveConversationWorking = ::isActiveConversationWorking
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking
         ).also { stageHintShimmer = it }
     }
 
