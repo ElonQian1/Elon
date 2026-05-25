@@ -6,8 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -25,7 +23,6 @@ import com.elon.app.update.AppUpdateManager
 import com.elon.app.update.UpdateCheckWorker
 import android.widget.FrameLayout
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -110,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var messageActions: MainMessageActions? = null
     private var codexPrewarm: MainCodexPrewarm? = null
     private var externalActions: MainExternalActions? = null
+    private var attachmentPanelActions: MainAttachmentPanelActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -122,8 +120,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputRightControls: FrameLayout
     private lateinit var inputComposerMotion: InputComposerMotion
     private lateinit var attachmentPanel: LinearLayout
-    private var attachmentPanelOpen = false
-    private var attachmentIconAnimationToken = 0
     private var voiceMode = false
     private var inputCanSend = true
     private var suppressInputFocusAnimation = false
@@ -473,7 +469,7 @@ class MainActivity : AppCompatActivity() {
             currentModelLabel = { modelActions().currentModelLabel },
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
-            isAttachmentPanelOpen = { attachmentPanelOpen },
+            isAttachmentPanelOpen = { attachmentPanelActions().isOpen },
             toggleVoiceMode = ::toggleVoiceMode,
             focusInputComposer = ::focusInputComposer,
             startSpeechToText = ::startSpeechToText,
@@ -624,70 +620,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildAttachmentPanel(): LinearLayout {
-        return LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(104)
-            )
-            background = ColorDrawable(Color.TRANSPARENT)
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(18), dp(8), dp(18), dp(8))
-            visibility = View.GONE
-
-            addView(createAttachmentAction("相机", R.drawable.ic_attach_camera, addEndMargin = true) {
-                openCameraAttachment()
-            })
-            addView(createAttachmentAction("相册", R.drawable.ic_attach_photos, addEndMargin = true) {
-                openPhotoAttachment()
-            })
-            addView(createAttachmentAction("文档", R.drawable.ic_attach_files, addEndMargin = false) {
-                openDocumentAttachment()
-            })
-        }
-    }
-
-    private fun createAttachmentAction(
-        label: String,
-        iconRes: Int,
-        addEndMargin: Boolean = true,
-        action: () -> Unit
-    ): View {
-        return LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                if (addEndMargin) marginEnd = dp(8)
-            }
-            background = GradientDrawable().apply {
-                cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#242424"))
-                setStroke(dp(1), Color.parseColor("#444444"))
-            }
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.VERTICAL
-            isClickable = true
-            foreground = selectableForeground()
-
-            addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
-                setImageResource(iconRes)
-            })
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(8)
-                }
-                includeFontPadding = false
-                text = label
-                setTextColor(Color.WHITE)
-                textSize = 14f
-            })
-            setOnClickListener {
-                collapseAttachmentPanel()
-                action()
-            }
-        }
+        return attachmentPanelActions().buildAttachmentPanel()
     }
 
     private fun openCameraAttachment() {
@@ -838,58 +771,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleAttachmentPanel() {
-        if (attachmentPanelOpen) collapseAttachmentPanel() else expandAttachmentPanel()
+        attachmentPanelActions().toggleAttachmentPanel()
     }
 
     private fun expandAttachmentPanel() {
-        if (activeConversation().ended) return
-        collapseInputComposer()
-        if (attachmentPanelOpen) return
-        attachmentPanelOpen = true
-        attachmentPanel.visibility = View.VISIBLE
-        animateAttachmentButtonIcon(expanded = true)
+        attachmentPanelActions().expandAttachmentPanel()
     }
 
     private fun collapseAttachmentPanel() {
-        if (!::attachmentPanel.isInitialized) return
-        val wasOpen = attachmentPanelOpen || attachmentPanel.visibility == View.VISIBLE
-        attachmentPanelOpen = false
-        attachmentPanel.visibility = View.GONE
-        if (wasOpen) {
-            animateAttachmentButtonIcon(expanded = false)
-        } else {
-            updateAttachmentButtonIcon(expanded = false)
-        }
+        attachmentPanelActions().collapseAttachmentPanel()
     }
 
-    private fun animateAttachmentButtonIcon(expanded: Boolean) {
-        if (!::attachmentButton.isInitialized) return
-        val token = ++attachmentIconAnimationToken
-        val targetAlpha = if (activeConversation().ended) 0.55f else 1f
-        attachmentButton.animate().cancel()
-        attachmentButton.rotation = 0f
-        attachmentButton.scaleX = 1f
-        attachmentButton.scaleY = 1f
-        attachmentButton.animate()
-            .alpha(0.55f)
-            .setDuration(70L)
-            .withEndAction {
-                if (token != attachmentIconAnimationToken) return@withEndAction
-                updateAttachmentButtonIcon(expanded)
-                attachmentButton.animate()
-                    .alpha(targetAlpha)
-                    .setDuration(90L)
-                    .start()
-            }
-            .start()
+    private fun attachmentPanelActions(): MainAttachmentPanelActions {
+        attachmentPanelActions?.let { return it }
+        return MainAttachmentPanelActions(
+            activity = this,
+            dp = ::dp,
+            selectableForeground = ::selectableForeground,
+            activeConversation = ::activeConversation,
+            attachmentPanel = ::attachmentPanelOrNull,
+            attachmentButton = ::attachmentButtonOrNull,
+            collapseInputComposer = { collapseInputComposer() },
+            openCameraAttachment = ::openCameraAttachment,
+            openPhotoAttachment = ::openPhotoAttachment,
+            openDocumentAttachment = ::openDocumentAttachment
+        ).also { attachmentPanelActions = it }
     }
 
-    private fun updateAttachmentButtonIcon(expanded: Boolean) {
-        if (!::attachmentButton.isInitialized) return
-        attachmentButton.setImageResource(
-            if (expanded) R.drawable.ic_input_chevron_down_circle else R.drawable.ic_add_circle_simple
-        )
-        attachmentButton.contentDescription = if (expanded) "收起更多输入功能" else "展开更多输入功能"
+    private fun attachmentPanelOrNull(): LinearLayout? {
+        return if (::attachmentPanel.isInitialized) attachmentPanel else null
+    }
+
+    private fun attachmentButtonOrNull(): ImageButton? {
+        return if (::attachmentButton.isInitialized) attachmentButton else null
     }
 
     private fun toggleVoiceMode() {
