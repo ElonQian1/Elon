@@ -5,6 +5,7 @@ use tracing::info;
 
 mod admin;
 mod agent;
+mod agent_prompts;
 mod ai_cli;
 mod ai_cli_environment;
 mod ai_cli_native_session;
