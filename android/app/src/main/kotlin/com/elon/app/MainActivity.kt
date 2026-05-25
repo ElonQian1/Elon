@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
+    private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -1229,76 +1230,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleTaskWorkEvent(intent: Intent) {
-        when (intent.action) {
-            TaskWorkService.ACTION_EVENT -> {
-                backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
-                val traceId = intent.getStringExtra(TaskWorkService.EXTRA_TRACE_ID)?.takeIf { it.isNotBlank() }
-                val projectId = intent.getStringExtra(TaskWorkService.EXTRA_PROJECT_ID)?.takeIf { it.isNotBlank() }
-                val conversationId = intent.getStringExtra(TaskWorkService.EXTRA_CONVERSATION_ID)?.takeIf { it.isNotBlank() }
-                val isDevelopment = if (intent.hasExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT)) {
-                    intent.getBooleanExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, true)
-                } else {
-                    null
-                }
-                when (intent.getStringExtra(TaskWorkService.EXTRA_KIND)) {
-                    "connected" -> {
-                        reconnectAttempts = 0
-                        updateFirstConversationStatus("已连接 · 点击进入开发会话")
-                        val task = updateConversationTaskFromService(
-                            traceId,
-                            projectId,
-                            conversationId,
-                            isDevelopment,
-                            pendingReconnect = false
-                        )
-                        if (task != null && activeConversationTask()?.traceId == task.traceId) {
-                            recordEvidence("connection", "连接已恢复，后台任务继续运行")
-                        }
-                        setSendEnabled(!isActiveConversationWorking())
-                    }
-                    "disconnected" -> {
-                        backendConnected = false
-                        val task = updateConversationTaskFromService(
-                            traceId,
-                            projectId,
-                            conversationId,
-                            isDevelopment,
-                            pendingReconnect = true
-                        )
-                        if (task != null && activeConversationTask()?.traceId == task.traceId) {
-                            handleActiveWorkDisconnected(task)
-                        } else {
-                            updateIdleReadyStatus()
-                            setSendEnabled(!isActiveConversationWorking())
-                        }
-                    }
-                    "message" -> {
-                        intent.getStringExtra(TaskWorkService.EXTRA_RAW_MESSAGE)?.let { raw ->
-                            traceId?.let { taskResponseTokens.remove(it) }
-                            appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
-                        }
-                    }
-                    "paused" -> {
-                        removeConversationTask(traceId, projectId, conversationId)
-                        updateIdleReadyStatus()
-                        setSendEnabled(!isActiveConversationWorking())
-                    }
-                }
-            }
-            TaskWorkService.ACTION_STATE -> {
-                backendConnected = intent.getBooleanExtra(TaskWorkService.EXTRA_CONNECTED, backendConnected)
-                val serviceWaiting = intent.getBooleanExtra(TaskWorkService.EXTRA_WAITING, waitingForReply)
-                syncActiveTasksFromServiceState(intent.getStringExtra(TaskWorkService.EXTRA_ACTIVE_TASKS))
-                if (!serviceWaiting) {
-                    runningConversationTasks.clear()
-                    runningTraceToConversation.clear()
-                    taskResponseTokens.clear()
-                    refreshActiveTaskState()
-                    updateIdleReadyStatus()
-                }
-                setSendEnabled(!isActiveConversationWorking())
-            }
-        }
+        taskWorkEventActions().handleTaskWorkEvent(intent)
+    }
+
+    private fun taskWorkEventActions(): MainTaskWorkEventActions {
+        taskWorkEventActions?.let { return it }
+        return MainTaskWorkEventActions(
+            getBackendConnected = { backendConnected },
+            setBackendConnected = { backendConnected = it },
+            getWaitingForReply = { waitingForReply },
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
+                updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
+            },
+            activeConversationTask = ::activeConversationTask,
+            recordEvidence = ::recordEvidence,
+            setSendEnabled = ::setSendEnabled,
+            isActiveConversationWorking = ::isActiveConversationWorking,
+            handleActiveWorkDisconnected = ::handleActiveWorkDisconnected,
+            updateIdleReadyStatus = ::updateIdleReadyStatus,
+            appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
+                traceId?.let { taskResponseTokens.remove(it) }
+                appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
+            },
+            removeConversationTask = ::removeConversationTask,
+            syncActiveTasksFromServiceState = ::syncActiveTasksFromServiceState,
+            clearTaskMaps = {
+                runningConversationTasks.clear()
+                runningTraceToConversation.clear()
+                taskResponseTokens.clear()
+            },
+            refreshActiveTaskState = ::refreshActiveTaskState
+        ).also { taskWorkEventActions = it }
     }
 
     private fun syncActiveTasksFromServiceState(activeTasksJson: String?) {
