@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
     private var toolActionBubbles: MainToolActionBubbles? = null
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
+    private var projectHygieneActions: MainProjectHygieneActions? = null
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var sendEnabledActions: MainSendEnabledActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
@@ -1104,21 +1105,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun normalizeProject(project: AppProject) {
-        if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
-        project.conversations.forEach {
-            if (it.messages.isEmpty()) it.messages.add(welcomeChatMessage())
-            it.messages.forEach { message -> message.evidenceWorking = false }
-            compactCliTranscriptMessages(it.messages)
-            sanitizeExistingCliLogMessages(it.messages)
-            sanitizeExistingUserVisibleMessages(it.messages)
-            removeLeakedAndRoutineWorkflowMessages(it.messages)
-            compactWorkflowStatusMessages(it.messages)
-            closeStaleWorkflowMessages(it.messages)
-        }
-        if (project.stage.isBlank()) project.stage = "待提交需求"
-        if (project.subtitle.isBlank()) project.subtitle = "点击进入会话"
-        compactCliProjectEvents(project.events)
-        project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
+        projectHygieneActions().normalizeProject(project)
     }
 
     private fun updateFirstConversationStatus(text: String) {
@@ -1553,18 +1540,18 @@ class MainActivity : AppCompatActivity() {
         ).also { toolActionBubbles = it }
     }
 
-    private fun compactCliProjectEvents(events: MutableList<String>) {
-        val cliCount = events.count { isCliProjectEvent(it) }
-        if (cliCount == 0) return
-        val compacted = events.filterNot { isCliProjectEvent(it) }.toMutableList()
-        compacted.add(0, "${timeFormatter.format(Date())}  后台日志已归类：历史 ${cliCount} 条")
-        while (compacted.size > 40) compacted.removeAt(compacted.size - 1)
-        events.clear()
-        events.addAll(compacted)
-    }
-
     private fun closeStaleWorkflowMessages(messages: MutableList<ChatMessage>) {
         workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+    }
+
+    private fun projectHygieneActions(): MainProjectHygieneActions {
+        projectHygieneActions?.let { return it }
+        return MainProjectHygieneActions(
+            timeText = { timeFormatter.format(Date()) },
+            removeLeakedAndRoutineWorkflowMessages = ::removeLeakedAndRoutineWorkflowMessages,
+            compactWorkflowStatusMessages = ::compactWorkflowStatusMessages,
+            closeStaleWorkflowMessages = ::closeStaleWorkflowMessages
+        ).also { projectHygieneActions = it }
     }
 
     private fun workflowMessageCompactor(): MainWorkflowMessageCompactor {
