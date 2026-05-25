@@ -465,6 +465,14 @@ class MainActivity : AppCompatActivity() {
         } else {
             updateProjectViews("普通消息已发送，开发项目记录保持不变。")
         }
+        appendMessage(
+            CodexInteractionPresentation.intentMessage(
+                visibleText = visibleText,
+                outgoingText = outgoingText,
+                isDevelopment = requestIsDevelopment,
+                hasAttachments = attachmentRefs.size() > 0
+            )
+        )
         appendMessage(ChatMessage("ai-working", initialWorkflowMessage(requestIsDevelopment)))
 
         // 通过前台任务服务发送 JSON（包含 user_id，服务端据此隔离工作区）
@@ -1987,7 +1995,7 @@ class MainActivity : AppCompatActivity() {
     private fun welcomeMessage(): ChatMessage {
         return ChatMessage(
             "ai",
-            "你可以直接描述想开发的 App 功能；我会把需求分析、开发实现、编译打包和交付记录同步到进度页。"
+            "你可以直接描述想开发的 App 功能；我会先说明我理解到的意图，再把需求分析、开发实现、编译打包和交付证据折叠同步给你。"
         )
     }
 
@@ -2025,7 +2033,7 @@ class MainActivity : AppCompatActivity() {
                     updatedAt = 0L,
                     messages = mutableListOf(ChatMessage(
                         "ai",
-                        "你可以直接告诉我想给 APK 加什么功能，例如「加一个深色模式切换」——我会修改服务器上的源码、重新编译并把新 APK 发给你。"
+                        "你可以直接告诉我想给 APK 加什么功能，例如「加一个深色模式切换」——我会先确认理解，再修改源码、检查结果并把新 APK 发给你。"
                     ))
                 ))
             )
@@ -4125,7 +4133,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initialWorkflowMessage(isDevelopment: Boolean): String {
-        return if (isDevelopment) "正在思考" else "正在整理回复。"
+        return if (isDevelopment) "正在按这个计划推进。" else "正在整理回复。"
     }
 
     private fun workflowProgressMessage(content: String): String {
@@ -4136,6 +4144,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun userFacingProgress(content: String): String {
         return when {
+            content.contains("已识别为开发任务") ->
+                "已确认这是开发任务，开始进入项目流程。"
+            content.contains("正在确认这是否需要进入开发流程") ->
+                "我正在确认这条消息是否需要改代码。"
+            content.startsWith("正在准备项目工作区") ->
+                "正在准备项目环境。"
+            content.contains("AI 助手正在处理") ->
+                "开发助手正在处理你的需求。"
+            content.contains("通用项目工作流") ->
+                "开发流程已启用，我会按需求确认、代码修改、验证和交付来推进。"
+            content.contains("当前会话已有任务") ->
+                "当前会话已有任务在处理，这条需求已排队。"
+            content.contains("已轮到本会话任务") ||
+                content.contains("已获得本会话执行权") ||
+                content.contains("已获得项目执行权") ->
+                "轮到本轮任务了，正在让开发助手处理项目。"
             content.startsWith("CLI 工作区") ->
                 "项目环境已准备好，正在进入开发流程。"
             content.startsWith("正在启动本地 CLI") ->
@@ -4628,6 +4652,7 @@ class MainActivity : AppCompatActivity() {
     private fun isRoutineWorkflowMessage(content: String): Boolean {
         val trimmed = content.trim()
         return trimmed == "正在思考" ||
+            trimmed == "正在按这个计划推进。" ||
             trimmed.startsWith("启动助手：") ||
             trimmed.startsWith("准备项目：") ||
             trimmed.startsWith("处理中：") ||
@@ -5090,8 +5115,16 @@ class MainActivity : AppCompatActivity() {
         return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
             !isRoutineWorkflowMessage(progress) &&
             (content.startsWith("环境提醒") ||
+                content.contains("已识别为开发任务") ||
+                content.contains("正在确认这是否需要进入开发流程") ||
+                content.startsWith("正在准备项目工作区") ||
+                content.contains("AI 助手正在处理") ||
                 content.contains("通用项目工作流") ||
+                content.contains("已轮到本会话任务") ||
+                content.contains("已获得本会话执行权") ||
+                content.contains("已获得项目执行权") ||
                 content.contains("进入队列") ||
+                content.contains("排队") ||
                 content.startsWith("未找到 APK") ||
                 content.contains("失败") ||
                 content.contains("错误") ||
