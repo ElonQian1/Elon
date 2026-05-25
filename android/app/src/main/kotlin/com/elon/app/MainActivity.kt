@@ -30,8 +30,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
-import org.json.JSONArray
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -110,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var conversationTaskRegistryActions: MainConversationTaskRegistryActions? = null
+    private var taskWorkServiceActions: MainTaskWorkServiceActions? = null
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
@@ -1172,51 +1171,25 @@ class MainActivity : AppCompatActivity() {
         isDevelopment: Boolean = activeRequestIsDevelopment,
         traceId: String? = null
     ): Boolean {
-        val intent = Intent(this, TaskWorkService::class.java).apply {
-            this.action = action
-            payload?.let { putExtra(TaskWorkService.EXTRA_PAYLOAD, it) }
-            putExtra(TaskWorkService.EXTRA_IS_DEVELOPMENT, isDevelopment)
-            traceId?.let { putExtra(TaskWorkService.EXTRA_TRACE_ID, it) }
-        }
-        return runCatching {
-            if (action == TaskWorkService.ACTION_START_WORK || action == TaskWorkService.ACTION_RESUME_PENDING) {
-                ContextCompat.startForegroundService(this, intent)
-            } else {
-                startService(intent)
-            }
-        }.recoverCatching {
-            startService(intent)
-        }.isSuccess
+        return taskWorkServiceActions().startTaskWorkService(action, payload, isDevelopment, traceId)
     }
 
     private fun setTaskAppForeground(foreground: Boolean) {
-        prefs.edit().putBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, foreground).apply()
+        taskWorkServiceActions().setTaskAppForeground(foreground)
     }
 
     private fun drainQueuedTaskEvents() {
-        val queued = prefs.getString(TaskWorkService.PREF_QUEUED_TASK_EVENTS, null)?.takeIf { it.isNotBlank() }
-            ?: return
-        prefs.edit().remove(TaskWorkService.PREF_QUEUED_TASK_EVENTS).apply()
-        runCatching {
-            val array = JSONArray(queued)
-            for (index in 0 until array.length()) {
-                val item = array.opt(index)
-                if (item is JSONObject) {
-                    val raw = item.optString("raw").takeIf { it.isNotBlank() }
-                    if (raw != null) {
-                        appendTaskMessage(
-                            raw,
-                            item.optString("trace_id").takeIf { it.isNotBlank() },
-                            item.optString("project_id").takeIf { it.isNotBlank() },
-                            item.optString("conversation_id").takeIf { it.isNotBlank() },
-                            if (item.has("is_development")) item.optBoolean("is_development", true) else null
-                        )
-                    }
-                } else {
-                    array.optString(index).takeIf { it.isNotBlank() }?.let { appendMessage(it) }
-                }
-            }
-        }
+        taskWorkServiceActions().drainQueuedTaskEvents()
+    }
+
+    private fun taskWorkServiceActions(): MainTaskWorkServiceActions {
+        taskWorkServiceActions?.let { return it }
+        return MainTaskWorkServiceActions(
+            activity = this,
+            prefs = prefs,
+            appendTaskMessage = ::appendTaskMessage,
+            appendRawMessage = { raw -> appendMessage(raw) }
+        ).also { taskWorkServiceActions = it }
     }
 
     private fun normalizeProject(project: AppProject) {
