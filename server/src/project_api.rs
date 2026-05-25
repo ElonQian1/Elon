@@ -1,22 +1,25 @@
 use axum::{
-    Json,
     extract::{
-        Path as AxumPath, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
+        Path as AxumPath, Query, State,
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
-use std::{collections::HashMap, sync::{Arc, atomic::Ordering}};
+use std::{
+    collections::HashMap,
+    sync::{atomic::Ordering, Arc},
+};
 use tokio::sync::broadcast;
 
 use crate::{
     project_attachments::append_project_attachment_notes,
     project_auth::{
-        LoginRequest, RegisterRequest, auth_from_headers, can_edit, json_error, login_inner,
-        project_access, register_inner,
+        auth_from_headers, can_edit, json_error, login_inner, project_access, register_inner,
+        LoginRequest, RegisterRequest,
     },
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_mobile::ensure_mobile_project,
@@ -290,6 +293,7 @@ async fn handle_project_ws(
         if message.is_empty() {
             continue;
         }
+        let attachments = request.attachments.clone();
         let message = append_project_attachment_notes(
             &state,
             &project,
@@ -323,6 +327,7 @@ async fn handle_project_ws(
             conversation_id.clone(),
             message,
             request.agent,
+            attachments,
             Some(trace_id.clone()),
             client_request_id.clone(),
             fingerprint,
@@ -467,4 +472,3 @@ async fn handle_project_ws(
         }
     }
 }
-

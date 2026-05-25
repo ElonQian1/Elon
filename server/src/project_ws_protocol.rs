@@ -29,12 +29,14 @@ pub struct ProjectPrewarmRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProjectAttachmentRef {
+    pub attachment_id: Option<String>,
     pub kind: Option<String>,
     pub display_name: Option<String>,
     pub file_name: Option<String>,
     pub mime_type: Option<String>,
     pub path: Option<String>,
     pub url: Option<String>,
+    pub sha256: Option<String>,
     pub size_bytes: Option<u64>,
 }
 
@@ -256,10 +258,12 @@ mod tests {
                 "attachments":[
                     {
                         "kind":"image",
+                        "attachment_id":"att_123",
                         "display_name":"screenshot.png",
                         "file_name":"screenshot.png",
                         "mime_type":"image/png",
                         "path":"D:/workspace/attachments/c1/screenshot.png",
+                        "sha256":"abc123",
                         "size_bytes":128
                     }
                 ]
@@ -277,11 +281,13 @@ mod tests {
         assert_eq!(request.client_request_id.as_deref(), Some("req_123"));
         assert_eq!(request.message, "please inspect this file");
         assert_eq!(attachment.kind.as_deref(), Some("image"));
+        assert_eq!(attachment.attachment_id.as_deref(), Some("att_123"));
         assert_eq!(attachment.display_name.as_deref(), Some("screenshot.png"));
         assert_eq!(
             attachment.path.as_deref(),
             Some("D:/workspace/attachments/c1/screenshot.png")
         );
+        assert_eq!(attachment.sha256.as_deref(), Some("abc123"));
         assert_eq!(attachment.size_bytes, Some(128));
     }
 
@@ -337,9 +343,7 @@ mod tests {
             error: None,
         };
         let events = (0..PROJECT_WS_BACKLOG_LIMIT)
-            .map(|step| {
-                WsMessage::progress(format!("step {step}")).to_json()
-            })
+            .map(|step| WsMessage::progress(format!("step {step}")).to_json())
             .collect::<Vec<_>>();
 
         let backlog = terminal_backlog_from_task(&task, events);

@@ -9,9 +9,11 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent, ai_cli, intent_router,
-    project_chat_executor::run_project_agent_in_execution_workspace,
-    project_attachments::append_project_attachment_notes,
+    project_attachments::{
+        append_project_attachment_notes, append_project_cli_attachment_artifacts,
+    },
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
+    project_chat_executor::run_project_agent_in_execution_workspace,
     project_chat_reply::chat_reply_after_intent_gate,
     project_conversation_workspace::{
         prepare_project_conversation_workspace, project_conversation_execution_key,
@@ -20,7 +22,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
-    project_ws_protocol::ProjectChatRequest,
+    project_ws_protocol::{ProjectAttachmentRef, ProjectChatRequest},
     store::ProjectAccess,
     types::{AppState, WsMessage},
 };
@@ -56,6 +58,7 @@ pub async fn chat_project(
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+    let attachments = req.attachments.clone();
     let message = append_project_attachment_notes(
         &state,
         &project,
@@ -95,6 +98,7 @@ pub async fn chat_project(
         conversation_id.clone(),
         message,
         req.agent,
+        attachments,
         Some(trace_id.clone()),
         tx,
     )
@@ -167,6 +171,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    attachments: Option<Vec<ProjectAttachmentRef>>,
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
@@ -270,15 +275,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
             reason = routing_decision.reason,
             "Skipped codex intent gate (high local confidence)"
         );
-        let _ = tx.send(
-            WsMessage::progress("已识别为开发任务，直接进入项目工作流。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("已识别为开发任务，直接进入项目工作流。").to_json());
     } else {
-        let _ = tx.send(
-            WsMessage::progress("正在确认这是否需要进入开发流程。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在确认这是否需要进入开发流程。").to_json());
         let native_session_scope = ai_cli::NativeSessionScope {
             project_id: project.id.clone(),
             user_id: user_id.clone(),
@@ -416,8 +415,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         );
                     }
                     let _ = queued_tx.send(
-                        WsMessage::progress("当前项目无法创建独立 worktree，已退回共享工作区串行执行。"
-                                )
+                        WsMessage::progress(
+                            "当前项目无法创建独立 worktree，已退回共享工作区串行执行。",
+                        )
                         .to_json(),
                     );
                 })
@@ -445,13 +445,19 @@ pub(crate) async fn run_project_agent_with_scheduler(
             }),
         );
     }
-    let _ = tx.send(
-        WsMessage::progress(message_text)
-        .to_json(),
-    );
+    let _ = tx.send(WsMessage::progress(message_text).to_json());
 
     let _keep_conversation_permit = conversation_permit;
     let _keep_shared_project_permit = shared_project_permit;
+    let message = append_project_cli_attachment_artifacts(
+        state.as_ref(),
+        &project,
+        &conversation_id,
+        message,
+        attachments.as_deref(),
+        execution_workspace.active_path(),
+    )
+    .await;
     run_project_agent_in_execution_workspace(
         state,
         user_id,
@@ -466,4 +472,3 @@ pub(crate) async fn run_project_agent_with_scheduler(
     )
     .await;
 }
-

@@ -72,6 +72,9 @@ internal fun uploadAttachmentRefsOrNull(
                 return null
             }
             array.add(JsonObject().apply {
+                uploaded.optString("attachment_id", "").takeIf { it.isNotBlank() }?.let {
+                    addProperty("attachment_id", it)
+                }
                 addProperty("kind", uploaded.optString("kind", attachment.kind))
                 addProperty("display_name", uploaded.optString("display_name", attachment.displayName))
                 addProperty("file_name", uploaded.optString("file_name", attachment.fileName))
@@ -79,6 +82,9 @@ internal fun uploadAttachmentRefsOrNull(
                 addProperty("path", uploaded.optString("path", ""))
                 uploaded.optString("url", "").takeIf { it.isNotBlank() }?.let {
                     addProperty("url", it)
+                }
+                uploaded.optString("sha256", "").takeIf { it.isNotBlank() }?.let {
+                    addProperty("sha256", it)
                 }
                 addProperty("size_bytes", uploaded.optLong("size_bytes", attachment.file.length()))
             })
