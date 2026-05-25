@@ -3153,9 +3153,7 @@ class MainActivity : AppCompatActivity() {
         return MainActionPopupRenderer(
             activity = this,
             dp = ::dp,
-            selectableForeground = ::selectableForeground,
-            createDivider = ::createPopupDivider,
-            createArrow = ::createPopupArrowView
+            selectableForeground = ::selectableForeground
         )
     }
 

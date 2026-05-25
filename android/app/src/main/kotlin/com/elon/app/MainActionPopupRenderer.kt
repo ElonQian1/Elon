@@ -1,6 +1,9 @@
 package com.elon.app
 
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -23,9 +26,7 @@ internal const val LEGACY_MESSAGE_POPUP_COLOR = "#3D3D3D"
 internal class MainActionPopupRenderer(
     private val activity: AppCompatActivity,
     private val dp: (Int) -> Int,
-    private val selectableForeground: () -> Drawable?,
-    private val createDivider: (Int) -> View,
-    private val createArrow: (Boolean, Int) -> View
+    private val selectableForeground: () -> Drawable?
 ) {
     fun showTopActionPopup(anchor: View, previousPopup: PopupWindow?, actions: List<TopAction>): PopupWindow {
         previousPopup?.dismiss()
@@ -53,7 +54,7 @@ internal class MainActionPopupRenderer(
             topMargin = arrowHeight
         })
 
-        root.addView(createArrow(true, Color.parseColor(WECHAT_POPUP_PANEL_COLOR)), FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
+        root.addView(createPopupArrowView(), FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
             gravity = Gravity.TOP or Gravity.END
             rightMargin = dp(20)
         })
@@ -62,7 +63,7 @@ internal class MainActionPopupRenderer(
         actions.forEachIndexed { index, action ->
             panel.addView(createTopActionRow(action) { popup.dismiss() })
             if (index < actions.lastIndex) {
-                panel.addView(createDivider(dp(52)))
+                panel.addView(createPopupDivider(dp(52)))
             }
         }
 
@@ -133,7 +134,7 @@ internal class MainActionPopupRenderer(
         val arrowX = (anchorCenterX - popupX - dp(9)).coerceIn(dp(18), popupWidth - dp(36))
 
         root.addView(
-            createArrow(!showAbove, Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR)),
+            createPopupArrowView(pointsUp = !showAbove, color = Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR)),
             FrameLayout.LayoutParams(dp(18), arrowHeight).apply {
                 gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
                 leftMargin = arrowX
@@ -190,6 +191,47 @@ internal class MainActionPopupRenderer(
             setOnClickListener {
                 dismissPopup()
                 action.action()
+            }
+        }
+    }
+
+    private fun createPopupDivider(marginStart: Int = 0): View {
+        return View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1
+            ).apply {
+                this.marginStart = marginStart
+            }
+            alpha = 0.55f
+            setBackgroundColor(Color.parseColor(WECHAT_POPUP_DIVIDER_COLOR))
+        }
+    }
+
+    private fun createPopupArrowView(
+        pointsUp: Boolean = true,
+        color: Int = Color.parseColor(WECHAT_POPUP_PANEL_COLOR)
+    ): View {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.FILL
+        }
+        return object : View(activity) {
+            override fun onDraw(canvas: Canvas) {
+                super.onDraw(canvas)
+                val path = Path().apply {
+                    if (pointsUp) {
+                        moveTo(width / 2f, 0f)
+                        lineTo(width.toFloat(), height.toFloat())
+                        lineTo(0f, height.toFloat())
+                    } else {
+                        moveTo(0f, 0f)
+                        lineTo(width.toFloat(), 0f)
+                        lineTo(width / 2f, height.toFloat())
+                    }
+                    close()
+                }
+                canvas.drawPath(path, paint)
             }
         }
     }
