@@ -304,7 +304,7 @@ APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现�
 {
   "type": "task_complete",
   "message": "已完成！你要的功能做好了。",
-  "apk_download_url": "https://download.example.com/apk/v1.2.3/app.apk",
+  "apk_url": "https://download.example.com/apk/v1.2.3/app.apk",
   "changes_summary": "在首页添加了一个红色按钮，点击后显示'你好'",
   "version": "1.2.3"
 }

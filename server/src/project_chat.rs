@@ -1,8 +1,8 @@
 use axum::{
-    Json,
     extract::{Path as AxumPath, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
@@ -12,17 +12,18 @@ use crate::{
     project_attachments::append_project_attachment_notes,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_reply::chat_reply_after_intent_gate,
+    project_completion::ensure_done_event_has_project_apk_url,
     project_conversation_workspace::{
-        ProjectConversationWorkspace, merge_conversation_worktree,
-        prepare_project_conversation_workspace, project_conversation_execution_key,
-        project_merge_execution_key, project_shared_execution_key,
+        merge_conversation_worktree, prepare_project_conversation_workspace,
+        project_conversation_execution_key, project_merge_execution_key,
+        project_shared_execution_key, ProjectConversationWorkspace,
     },
     project_keys::{clean_trace_id, codex_prewarm_key},
     project_mobile::ensure_mobile_project,
     project_trace_events::record_server_message,
     project_ws_protocol::{
-        ProjectChatRequest, ProjectPrewarmRequest, is_done_project_ws_message,
-        is_terminal_project_ws_message,
+        is_done_project_ws_message, is_terminal_project_ws_message, ProjectChatRequest,
+        ProjectPrewarmRequest,
     },
     store::{ProjectAccess, PublicUser},
     types::{AppState, WsMessage},
@@ -813,6 +814,32 @@ async fn run_project_agent_in_execution_workspace(
                 );
                 return;
             }
+        }
+    }
+
+    if terminal_is_done {
+        if let Some(raw) = terminal_raw.take() {
+            let original = raw.clone();
+            let mut workspaces = vec![execution_workspace.active_workspace.as_path()];
+            if execution_workspace.is_isolated() {
+                workspaces.insert(0, execution_workspace.base_workspace.as_path());
+            }
+            let (raw, apk_url) =
+                ensure_done_event_has_project_apk_url(raw, &download_base, &workspaces);
+            if raw != original {
+                if let Some(trace_id) = trace_id.as_deref() {
+                    state.server_traces.record(
+                        trace_id,
+                        "server_project_done_apk_url_filled",
+                        serde_json::json!({
+                            "project_id": &project.id,
+                            "conversation_id": &conversation_id,
+                            "apk_url": apk_url,
+                        }),
+                    );
+                }
+            }
+            terminal_raw = Some(raw);
         }
     }
 

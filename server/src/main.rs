@@ -25,6 +25,7 @@ mod project_attachments;
 mod project_auth;
 mod project_chat;
 mod project_chat_reply;
+mod project_completion;
 mod project_conversation_workspace;
 mod project_downloads;
 mod project_git;
