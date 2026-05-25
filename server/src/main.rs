@@ -21,6 +21,7 @@ mod project_auth;
 mod project_chat_reply;
 mod project_conversation_workspace;
 mod project_git;
+mod project_keys;
 mod project_mobile;
 mod project_ws_protocol;
 mod router;

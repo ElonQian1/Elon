@@ -16,7 +16,7 @@ use std::{
         Arc, LazyLock,
         atomic::{AtomicBool, Ordering},
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 use tokio::sync::{Mutex, broadcast, mpsc::UnboundedSender, watch};
 
@@ -37,6 +37,7 @@ use crate::{
         project_merge_execution_key, project_shared_execution_key,
     },
     project_git::{configure_git_remote, ensure_project_deploy_key, project_git_status_json},
+    project_keys::{clean_trace_id, codex_prewarm_key, project_ws_fingerprint, project_ws_job_key},
     project_mobile::ensure_mobile_project,
     project_ws_protocol::{
         PROJECT_WS_BACKLOG_LIMIT, ProjectChatRequest, ProjectPrewarmRequest,
@@ -62,7 +63,6 @@ struct ProjectWsJob {
     broadcaster: broadcast::Sender<String>,
     finished: AtomicBool,
 }
-
 #[derive(Deserialize)]
 pub struct CreateProjectRequest {
     pub name: String,
@@ -1291,7 +1291,6 @@ async fn download_project_attachment_impl(
         .body(Body::from(data))
         .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
-
 pub async fn user_project_deploy_key(
     State(state): State<Arc<AppState>>,
     AxumPath((user_id, project_id)): AxumPath<(String, String)>,
@@ -2089,46 +2088,6 @@ fn schedule_project_job_cleanup(key: String, job: Arc<ProjectWsJob>) {
     });
 }
 
-fn project_ws_job_key(
-    project_id: &str,
-    user_id: &str,
-    conversation_id: &str,
-    client_request_id: &str,
-) -> String {
-    format!(
-        "{}\u{1f}{}\u{1f}{}\u{1f}{}",
-        project_id, user_id, conversation_id, client_request_id
-    )
-}
-
-fn project_ws_fingerprint(
-    conversation_id: &str,
-    agent_name: Option<&str>,
-    message: &str,
-) -> String {
-    format!(
-        "{}\u{1f}{}\u{1f}{}",
-        conversation_id,
-        agent_name.unwrap_or(""),
-        message
-    )
-}
-
-fn clean_trace_id(input: Option<&str>) -> String {
-    let cleaned = input
-        .unwrap_or_default()
-        .trim()
-        .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':'))
-        .take(120)
-        .collect::<String>();
-    if cleaned.is_empty() {
-        format!("srv_{}", current_wall_time_ms())
-    } else {
-        cleaned
-    }
-}
-
 fn record_server_message(
     state: &AppState,
     trace_id: &str,
@@ -2175,13 +2134,6 @@ fn record_server_transport(
     state.server_traces.record(trace_id, phase, details);
 }
 
-fn current_wall_time_ms() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
-        .unwrap_or_default()
-}
-
 async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: &str) -> Response {
     if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
         return json_error(StatusCode::BAD_REQUEST, "invalid filename");
@@ -2215,21 +2167,4 @@ async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: 
         )
         .body(Body::from(data))
         .unwrap_or_else(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-fn codex_prewarm_key(
-    project_id: &str,
-    user_id: &str,
-    conversation_id: &str,
-    agent: Option<&str>,
-    workspace_key: &str,
-) -> String {
-    format!(
-        "{}|{}|{}|{}|{}",
-        project_id,
-        user_id,
-        conversation_id,
-        agent.unwrap_or("default"),
-        workspace_key
-    )
 }
