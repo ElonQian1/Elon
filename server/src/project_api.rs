@@ -22,7 +22,7 @@ use std::{
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{broadcast, mpsc::UnboundedSender, Mutex};
+use tokio::sync::{broadcast, mpsc::UnboundedSender, watch, Mutex};
 
 use crate::{
     agent, ai_cli, intent_router,
@@ -43,6 +43,7 @@ struct ProjectWsJob {
     fingerprint: String,
     task_id: String,
     trace_id: Option<String>,
+    cancel_tx: watch::Sender<bool>,
     backlog: Mutex<Vec<String>>,
     broadcaster: broadcast::Sender<String>,
     finished: AtomicBool,
@@ -72,7 +73,9 @@ pub struct CreateProjectRequest {
 
 #[derive(Deserialize)]
 pub struct ProjectChatRequest {
+    pub op: Option<String>,
     pub trace_id: Option<String>,
+    pub task_id: Option<String>,
     pub client_request_id: Option<String>,
     pub message: String,
     pub agent: Option<String>,
@@ -1380,19 +1383,44 @@ pub async fn user_project_git_status(
     Json(project_git_status_json(&state, &project)).into_response()
 }
 
+pub async fn upload_project_attachment(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath(project_id): AxumPath<String>,
+    Query(query): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+
+    upload_project_attachment_impl(
+        state,
+        user.id,
+        project,
+        query.get("conversation_id").map(String::as_str),
+        query.get("conversation_title").map(String::as_str),
+        query.get("kind").map(String::as_str),
+        query.get("display_name").map(String::as_str),
+        query.get("file_name").map(String::as_str),
+        query.get("mime_type").map(String::as_str),
+        body,
+        true,
+    )
+    .await
+}
+
 pub async fn upload_user_project_attachment(
     State(state): State<Arc<AppState>>,
     AxumPath((user_id, project_id)): AxumPath<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
     body: Bytes,
 ) -> Response {
-    if body.is_empty() {
-        return json_error(StatusCode::BAD_REQUEST, "attachment body is empty");
-    }
-    if body.len() > MAX_PROJECT_ATTACHMENT_BYTES {
-        return json_error(StatusCode::PAYLOAD_TOO_LARGE, "attachment is too large");
-    }
-
     let (user, project) = match ensure_mobile_project(
         &state,
         &user_id,
@@ -1403,11 +1431,47 @@ pub async fn upload_user_project_attachment(
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
 
-    let conversation_id = match state.store.ensure_conversation(
-        &project.id,
-        &user.id,
+    upload_project_attachment_impl(
+        state,
+        user.id,
+        project,
         query.get("conversation_id").map(String::as_str),
         query.get("conversation_title").map(String::as_str),
+        query.get("kind").map(String::as_str),
+        query.get("display_name").map(String::as_str),
+        query.get("file_name").map(String::as_str),
+        query.get("mime_type").map(String::as_str),
+        body,
+        false,
+    )
+    .await
+}
+
+async fn upload_project_attachment_impl(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    conversation_id_hint: Option<&str>,
+    conversation_title_hint: Option<&str>,
+    kind_hint: Option<&str>,
+    display_name_hint: Option<&str>,
+    file_name_hint: Option<&str>,
+    mime_type_hint: Option<&str>,
+    body: Bytes,
+    include_project_api_url: bool,
+) -> Response {
+    if body.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "attachment body is empty");
+    }
+    if body.len() > MAX_PROJECT_ATTACHMENT_BYTES {
+        return json_error(StatusCode::PAYLOAD_TOO_LARGE, "attachment is too large");
+    }
+
+    let conversation_id = match state.store.ensure_conversation(
+        &project.id,
+        &user_id,
+        conversation_id_hint,
+        conversation_title_hint,
     ) {
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -1422,35 +1486,42 @@ pub async fn upload_user_project_attachment(
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
 
-    let display_name = query
-        .get("display_name")
-        .or_else(|| query.get("file_name"))
-        .map(String::as_str)
+    let display_name = display_name_hint
+        .or(file_name_hint)
         .unwrap_or("attachment.bin");
-    let original_name = query
-        .get("file_name")
-        .map(String::as_str)
-        .unwrap_or(display_name);
+    let original_name = file_name_hint.unwrap_or(display_name);
     let file_name = unique_project_attachment_name(&attachments_dir, original_name);
     let path = attachments_dir.join(&file_name);
     if let Err(error) = tokio::fs::write(&path, body.as_ref()).await {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
 
-    let attachment = serde_json::json!({
-        "kind": query.get("kind").map(String::as_str).unwrap_or("attachment"),
-        "display_name": display_name,
-        "file_name": file_name,
-        "mime_type": query.get("mime_type").map(String::as_str).unwrap_or("application/octet-stream"),
-        "path": path.to_string_lossy(),
-        "url": format!(
-            "{}/api/user/{}/projects/{}/attachments/{}/{}",
+    let mut urls = vec![format!(
+        "{}/api/user/{}/projects/{}/attachments/{}/{}",
+        state.public_url.trim_end_matches('/'),
+        percent_encode_path_segment(&user_id),
+        percent_encode_path_segment(&project.id),
+        percent_encode_path_segment(&conversation_id),
+        percent_encode_path_segment(&file_name)
+    )];
+    if include_project_api_url {
+        urls.push(format!(
+            "{}/api/projects/{}/attachments/{}/{}",
             state.public_url.trim_end_matches('/'),
-            percent_encode_path_segment(&user.id),
             percent_encode_path_segment(&project.id),
             percent_encode_path_segment(&conversation_id),
             percent_encode_path_segment(&file_name)
-        ),
+        ));
+    }
+
+    let attachment = serde_json::json!({
+        "kind": kind_hint.unwrap_or("attachment"),
+        "display_name": display_name,
+        "file_name": file_name,
+        "mime_type": mime_type_hint.unwrap_or("application/octet-stream"),
+        "path": path.to_string_lossy(),
+        "url": urls[0],
+        "urls": urls,
         "size_bytes": body.len(),
     });
     Json(serde_json::json!({
@@ -1485,11 +1556,44 @@ pub async fn download_user_project_attachment(
         Ok(pair) => pair,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
+    download_project_attachment_impl(&state, &project, &conversation_id, &filename).await
+}
+
+pub async fn download_project_attachment(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath((project_id, conversation_id, filename)): AxumPath<(String, String, String)>,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
+    }
+
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    download_project_attachment_impl(&state, &project, &conversation_id, &filename).await
+}
+
+async fn download_project_attachment_impl(
+    state: &AppState,
+    project: &ProjectAccess,
+    conversation_id: &str,
+    filename: &str,
+) -> Response {
+    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
+        return json_error(StatusCode::BAD_REQUEST, "invalid filename");
+    }
+
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let attachments_dir = workspace
         .join("attachments")
-        .join(safe_project_path_part(&conversation_id, 80));
+        .join(safe_project_path_part(conversation_id, 80));
     let path = attachments_dir.join(&filename);
     let valid_path = std::fs::canonicalize(&attachments_dir)
         .ok()
@@ -1675,10 +1779,7 @@ async fn handle_project_ws(
         };
 
         let request = parse_project_message(&text);
-        let message = request.message.trim().to_string();
-        if message.is_empty() {
-            continue;
-        }
+        let op = request.op.as_deref().unwrap_or("run").to_ascii_lowercase();
 
         let conversation_id = state
             .store
@@ -1689,6 +1790,41 @@ async fn handle_project_ws(
                 request.conversation_title.as_deref(),
             )
             .unwrap_or_else(|_| "default".into());
+        if op == "cancel" {
+            let canceled_task_id = cancel_project_ws_job(
+                &project.id,
+                &user.id,
+                &conversation_id,
+                request.task_id.as_deref(),
+                request.client_request_id.as_deref(),
+            )
+            .await;
+            let payload = match canceled_task_id.as_deref() {
+                Some(task_id) => task_control_event(
+                    "cancel_requested",
+                    Some(task_id),
+                    request.client_request_id.as_deref(),
+                    Some(&conversation_id),
+                    "已接收取消请求，任务会尽快停止。",
+                ),
+                None => task_control_event(
+                    "cancel_ignored",
+                    request.task_id.as_deref(),
+                    request.client_request_id.as_deref(),
+                    Some(&conversation_id),
+                    "没有找到可取消的运行中任务。",
+                ),
+            };
+            if sender.send(Message::Text(payload)).await.is_err() {
+                break;
+            }
+            continue;
+        }
+
+        let message = request.message.trim().to_string();
+        if message.is_empty() {
+            continue;
+        }
         let message = append_project_attachment_notes(
             &state,
             &project,
@@ -1719,14 +1855,28 @@ async fn handle_project_ws(
             user.id.clone(),
             project.clone(),
             download_base.clone(),
-            conversation_id,
+            conversation_id.clone(),
             message,
             request.agent,
             Some(trace_id.clone()),
-            client_request_id,
+            client_request_id.clone(),
             fingerprint,
         )
         .await;
+
+        if sender
+            .send(Message::Text(task_control_event(
+                "accepted",
+                Some(&job.task_id),
+                Some(&client_request_id),
+                Some(&conversation_id),
+                "请求已进入任务队列。",
+            )))
+            .await
+            .is_err()
+        {
+            break;
+        }
 
         let mut job_rx = job.broadcaster.subscribe();
         let backlog = job.backlog.lock().await.clone();
@@ -1922,11 +2072,13 @@ async fn get_or_start_project_ws_job(
             .unwrap_or_default();
         let backlog = terminal_backlog_from_task(task, events);
         let (broadcast_tx, _) = broadcast::channel::<String>(256);
+        let (cancel_tx, _cancel_rx) = watch::channel(false);
         let job = Arc::new(ProjectWsJob {
             key: key.clone(),
             fingerprint,
             task_id: task.id.clone(),
             trace_id: trace_id.clone(),
+            cancel_tx,
             backlog: Mutex::new(backlog),
             broadcaster: broadcast_tx,
             finished: AtomicBool::new(true),
@@ -1969,11 +2121,13 @@ async fn get_or_start_project_ws_job(
                 }
                 .to_json();
                 let (broadcast_tx, _) = broadcast::channel::<String>(256);
+                let (cancel_tx, _cancel_rx) = watch::channel(false);
                 let job = Arc::new(ProjectWsJob {
                     key: key.clone(),
                     fingerprint,
                     task_id: "tsk_unknown".into(),
                     trace_id: trace_id.clone(),
+                    cancel_tx,
                     backlog: Mutex::new(vec![raw]),
                     broadcaster: broadcast_tx,
                     finished: AtomicBool::new(true),
@@ -1986,11 +2140,13 @@ async fn get_or_start_project_ws_job(
     };
 
     let (broadcast_tx, _) = broadcast::channel::<String>(256);
+    let (cancel_tx, cancel_rx) = watch::channel(false);
     let job = Arc::new(ProjectWsJob {
         key: key.clone(),
         fingerprint,
         task_id: task_id.clone(),
         trace_id: trace_id.clone(),
+        cancel_tx,
         backlog: Mutex::new(Vec::new()),
         broadcaster: broadcast_tx,
         finished: AtomicBool::new(false),
@@ -2011,6 +2167,7 @@ async fn get_or_start_project_ws_job(
             task_id,
             job_for_task,
             restart_notice,
+            cancel_rx,
         )
         .await;
     });
@@ -2030,6 +2187,7 @@ async fn run_project_ws_job(
     task_id: String,
     job: Arc<ProjectWsJob>,
     restart_notice: Option<String>,
+    mut cancel_rx: watch::Receiver<bool>,
 ) {
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
@@ -2053,6 +2211,19 @@ async fn run_project_ws_job(
         )
         .await;
     }
+    emit_project_job_event(
+        &state,
+        &task_id,
+        &job,
+        task_control_event(
+            "started",
+            Some(&task_id),
+            None,
+            Some(&conversation_id),
+            "任务开始执行。",
+        ),
+    )
+    .await;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let state_clone = state.clone();
@@ -2080,7 +2251,45 @@ async fn run_project_ws_job(
     let mut apk_url = None;
     let mut error = None;
     let mut saw_terminal = false;
-    while let Some(progress) = rx.recv().await {
+    loop {
+        tokio::select! {
+            changed = cancel_rx.changed() => {
+                if changed.is_ok() && *cancel_rx.borrow() {
+                    agent_task.abort();
+                    let msg = "任务已取消。".to_string();
+                    emit_project_job_event(
+                        &state,
+                        &task_id,
+                        &job,
+                        task_control_event(
+                            "canceled",
+                            Some(&task_id),
+                            None,
+                            Some(&conversation_id),
+                            &msg,
+                        ),
+                    )
+                    .await;
+                    emit_project_job_event(
+                        &state,
+                        &task_id,
+                        &job,
+                        WsMessage::Error {
+                            message: msg.clone(),
+                        }
+                        .to_json(),
+                    )
+                    .await;
+                    reply = msg.clone();
+                    error = Some(msg);
+                    saw_terminal = true;
+                    break;
+                }
+            }
+            next = rx.recv() => {
+                let Some(progress) = next else {
+                    break;
+                };
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
             match value.get("type").and_then(|t| t.as_str()) {
                 Some("done") => {
@@ -2101,6 +2310,8 @@ async fn run_project_ws_job(
         emit_project_job_event(&state, &task_id, &job, progress).await;
         if terminal {
             break;
+        }
+            }
         }
     }
     let _ = agent_task.await;
@@ -2149,6 +2360,7 @@ async fn emit_project_job_event(
     job: &Arc<ProjectWsJob>,
     raw: String,
 ) {
+    let raw = enrich_project_ws_event(raw, task_id);
     {
         let mut backlog = job.backlog.lock().await;
         backlog.push(raw.clone());
@@ -2164,6 +2376,75 @@ async fn emit_project_job_event(
         }
     }
     let _ = job.broadcaster.send(raw);
+}
+
+fn enrich_project_ws_event(raw: String, task_id: &str) -> String {
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&raw) else {
+        return raw;
+    };
+    let Some(obj) = value.as_object_mut() else {
+        return raw;
+    };
+    obj.entry("task_id")
+        .or_insert_with(|| serde_json::json!(task_id));
+    let event_kind = obj
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    obj.entry("event")
+        .or_insert_with(|| serde_json::json!(event_kind));
+    obj.insert(
+        "emitted_at_ms".into(),
+        serde_json::json!(current_wall_time_ms()),
+    );
+    serde_json::to_string(&value).unwrap_or(raw)
+}
+
+fn task_control_event(
+    event: &str,
+    task_id: Option<&str>,
+    client_request_id: Option<&str>,
+    conversation_id: Option<&str>,
+    message: &str,
+) -> String {
+    serde_json::json!({
+        "type": "task_event",
+        "event": event,
+        "task_id": task_id,
+        "client_request_id": client_request_id,
+        "conversation_id": conversation_id,
+        "message": message,
+    })
+    .to_string()
+}
+
+async fn cancel_project_ws_job(
+    project_id: &str,
+    user_id: &str,
+    conversation_id: &str,
+    task_id: Option<&str>,
+    client_request_id: Option<&str>,
+) -> Option<String> {
+    let jobs = PROJECT_WS_JOBS.lock().await;
+    if let Some(task_id) = task_id {
+        for job in jobs.values() {
+            if job.task_id == task_id && !job.finished.load(Ordering::SeqCst) {
+                let _ = job.cancel_tx.send(true);
+                return Some(job.task_id.clone());
+            }
+        }
+    }
+    if let Some(client_request_id) = client_request_id {
+        let key = project_ws_job_key(project_id, user_id, conversation_id, client_request_id);
+        if let Some(job) = jobs.get(&key) {
+            if !job.finished.load(Ordering::SeqCst) {
+                let _ = job.cancel_tx.send(true);
+                return Some(job.task_id.clone());
+            }
+        }
+    }
+    None
 }
 
 fn schedule_project_job_cleanup(key: String, job: Arc<ProjectWsJob>) {
@@ -2402,7 +2683,9 @@ fn is_done_project_ws_message(raw: &str) -> bool {
 
 fn parse_project_message(raw: &str) -> ProjectChatRequest {
     serde_json::from_str::<ProjectChatRequest>(raw).unwrap_or_else(|_| ProjectChatRequest {
+        op: None,
         trace_id: None,
+        task_id: None,
         client_request_id: None,
         message: raw.to_string(),
         agent: None,
@@ -3103,6 +3386,8 @@ mod tests {
     fn parses_project_attachment_refs() {
         let request = parse_project_message(
             r#"{
+                "op":"run",
+                "task_id":"tsk_legacy",
                 "trace_id":"ui_123",
                 "client_request_id":"req_123",
                 "message":"please inspect this file",
@@ -3124,6 +3409,8 @@ mod tests {
             .as_ref()
             .and_then(|items| items.first())
             .expect("attachment ref should be parsed");
+        assert_eq!(request.op.as_deref(), Some("run"));
+        assert_eq!(request.task_id.as_deref(), Some("tsk_legacy"));
         assert_eq!(request.trace_id.as_deref(), Some("ui_123"));
         assert_eq!(request.client_request_id.as_deref(), Some("req_123"));
         assert_eq!(request.message, "please inspect this file");
@@ -3181,6 +3468,20 @@ mod tests {
 
         assert!(first.starts_with("auto_"));
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn enriches_project_ws_event_with_task_id_and_event() {
+        let raw = WsMessage::Progress {
+            message: "running".into(),
+        }
+        .to_json();
+        let enriched = enrich_project_ws_event(raw, "tsk_123");
+        let value: serde_json::Value =
+            serde_json::from_str(&enriched).expect("enriched payload should be valid json");
+        assert_eq!(value["task_id"], "tsk_123");
+        assert_eq!(value["event"], "progress");
+        assert!(value["emitted_at_ms"].as_u64().is_some());
     }
 
     #[test]

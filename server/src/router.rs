@@ -45,6 +45,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_api::prewarm_project),
         )
         .route(
+            "/api/projects/:project_id/attachments",
+            post(project_api::upload_project_attachment),
+        )
+        .route(
+            "/api/projects/:project_id/attachments/:conversation_id/:filename",
+            get(project_api::download_project_attachment),
+        )
+        .route(
             "/ws/projects/:project_id",
             get(project_api::ws_project_handler),
         )
