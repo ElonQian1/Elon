@@ -14,7 +14,6 @@ import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
@@ -109,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
+    private var voiceModeActions: MainVoiceModeActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -737,36 +737,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyVoiceMode() {
-        if (!::voiceHoldButton.isInitialized) return
-        if (voiceMode) {
-            hideKeyboard()
-            inputModeButton.setImageResource(R.drawable.ic_input_keyboard_circle)
-            if (::inputComposerMotion.isInitialized) {
-                inputComposerMotion.setExpanded(false, animate = true)
-            }
-            voiceHoldButton.detachFromParent()
-            inputCenterContainer.removeAllViews()
-            inputCenterContainer.addView(voiceHoldButton)
-            binding.inputEdit.visibility = View.GONE
-            if (::modelButtonShell.isInitialized) modelButtonShell.visibility = View.GONE
-            voiceHoldButton.visibility = View.VISIBLE
-        } else {
-            inputModeButton.setImageResource(R.drawable.ic_input_voice_circle)
-            collapsedInputPreview.detachFromParent()
-            voiceHoldButton.detachFromParent()
-            inputCenterContainer.removeAllViews()
-            inputCenterContainer.addView(collapsedInputPreview)
-            expandedInputContainer.addView(voiceHoldButton)
-            binding.inputEdit.visibility = View.VISIBLE
-            if (::modelButtonShell.isInitialized) modelButtonShell.visibility = if (::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
-            voiceHoldButton.visibility = View.GONE
-        }
-        updateSendButtonVisual()
-        updateAdaptiveInputHeight()
+        voiceModeActions().applyVoiceMode()
+    }
+
+    private fun voiceModeActions(): MainVoiceModeActions {
+        voiceModeActions?.let { return it }
+        return MainVoiceModeActions(
+            binding = binding,
+            hideKeyboard = ::hideKeyboard,
+            inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
+            voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
+            inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
+            expandedInputContainer = { if (::expandedInputContainer.isInitialized) expandedInputContainer else null },
+            collapsedInputPreview = { if (::collapsedInputPreview.isInitialized) collapsedInputPreview else null },
+            modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            isVoiceMode = { voiceMode },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+        ).also { voiceModeActions = it }
     }
 
     private fun updateSendButtonVisual() {
@@ -1505,10 +1494,6 @@ class MainActivity : AppCompatActivity() {
         theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
         getDrawable(outValue.resourceId)
     }.getOrNull()
-
-    private fun View.detachFromParent() {
-        (parent as? ViewGroup)?.removeView(this)
-    }
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
