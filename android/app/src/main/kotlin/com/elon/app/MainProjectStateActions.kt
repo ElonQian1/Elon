@@ -11,6 +11,34 @@ internal class MainProjectStateActions(
     private val setActiveProjectIndex: (Int) -> Unit,
     private val normalizeProject: (AppProject) -> Unit
 ) {
+    val conversations: MutableList<AppConversation>
+        get() = activeProject().conversations
+
+    val projectEvents: MutableList<String>
+        get() = activeProject().events
+
+    var currentProjectTitle: String
+        get() = activeProject().title
+        set(value) {
+            val project = activeProject()
+            project.title = value
+            project.updatedAt = System.currentTimeMillis()
+        }
+
+    var currentStage: String
+        get() = activeProject().stage
+        set(value) {
+            val project = activeProject()
+            project.stage = value
+            project.updatedAt = System.currentTimeMillis()
+        }
+
+    var activeConversationIndex: Int
+        get() = activeProject().activeConversationIndex
+        set(value) {
+            activeProject().activeConversationIndex = value
+        }
+
     fun activeProject(): AppProject {
         if (projects.isEmpty()) {
             projects.add(newAppProject("一龙开发助手", "默认项目 · 点击进入会话"))

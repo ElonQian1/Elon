@@ -44,27 +44,6 @@ class MainActivity : AppCompatActivity() {
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
     private var activeProjectIndex = 0
-    private val conversations: MutableList<AppConversation> get() = projectStateActions().activeProject().conversations
-    private val projectEvents: MutableList<String> get() = projectStateActions().activeProject().events
-    private var currentProjectTitle: String
-        get() = projectStateActions().activeProject().title
-        set(value) {
-            val project = projectStateActions().activeProject()
-            project.title = value
-            project.updatedAt = System.currentTimeMillis()
-        }
-    private var currentStage: String
-        get() = projectStateActions().activeProject().stage
-        set(value) {
-            val project = projectStateActions().activeProject()
-            project.stage = value
-            project.updatedAt = System.currentTimeMillis()
-        }
-    private var activeConversationIndex: Int
-        get() = projectStateActions().activeProject().activeConversationIndex
-        set(value) {
-            projectStateActions().activeProject().activeConversationIndex = value
-        }
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
     private var modelActions: MainModelActions? = null
@@ -211,7 +190,7 @@ class MainActivity : AppCompatActivity() {
             getWaitingForReply = { waitingForReply },
             getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
-            currentStage = { currentStage },
+            currentStage = { projectStateActions().currentStage },
             updateStage = ::updateStage,
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
@@ -307,7 +286,7 @@ class MainActivity : AppCompatActivity() {
             isBackendConnected = { backendConnected },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
-            getCurrentStage = { currentStage },
+            getCurrentStage = { projectStateActions().currentStage },
             getPendingRequestPayload = { pendingRequestPayload },
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             setWaitingForReply = { waitingForReply = it },
@@ -573,7 +552,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             actionPopupProvider = { actionPopup },
             activeConversationProvider = projectStateActions()::activeConversation,
-            activeConversationIndexProvider = { activeConversationIndex },
+            activeConversationIndexProvider = { projectStateActions().activeConversationIndex },
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             renderConversationList = homeListActions()::renderConversationList,
             renderProjectList = homeListActions()::renderProjectList,
@@ -597,10 +576,10 @@ class MainActivity : AppCompatActivity() {
         return MainConversationActions(
             activity = this,
             binding = binding,
-            conversationsProvider = { conversations },
+            conversationsProvider = { projectStateActions().conversations },
             activeProjectProvider = projectStateActions()::activeProject,
-            activeConversationIndexProvider = { activeConversationIndex },
-            setActiveConversationIndex = { activeConversationIndex = it },
+            activeConversationIndexProvider = { projectStateActions().activeConversationIndex },
+            setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
             titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
             saveConversations = projectStateActions()::saveConversations,
@@ -633,11 +612,11 @@ class MainActivity : AppCompatActivity() {
         return MainConversationOpenActions(
             binding = binding,
             projects = { projects },
-            conversations = { conversations },
+            conversations = { projectStateActions().conversations },
             activeConversation = projectStateActions()::activeConversation,
-            activeConversationIndex = { activeConversationIndex },
+            activeConversationIndex = { projectStateActions().activeConversationIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
-            setActiveConversationIndex = { activeConversationIndex = it },
+            setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
             setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
@@ -778,11 +757,11 @@ class MainActivity : AppCompatActivity() {
         return MainConversationPreviewActions(
             binding = binding,
             projects = { projects },
-            conversations = { conversations },
+            conversations = { projectStateActions().conversations },
             activeProject = projectStateActions()::activeProject,
             activeConversation = projectStateActions()::activeConversation,
             activeProjectIndex = { activeProjectIndex },
-            activeConversationIndex = { activeConversationIndex },
+            activeConversationIndex = { projectStateActions().activeConversationIndex },
             chatAdapter = { chatAdapter },
             conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
             workflowTerminalRoles = workflowTerminalRoles,
@@ -803,7 +782,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             projects = { projects },
-            conversations = { conversations },
+            conversations = { projectStateActions().conversations },
             activeProject = projectStateActions()::activeProject,
             compactProjectTitle = { projectRecordActions().compactProjectTitle() },
             formatTime = { timeFormatter.format(Date(it)) },
@@ -841,7 +820,7 @@ class MainActivity : AppCompatActivity() {
             projects = projects,
             activeProjectIndexProvider = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
-            setActiveConversationIndex = { activeConversationIndex = it },
+            setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
             titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
             saveProjects = projectStateActions()::saveProjects,
             renderProjectList = homeListActions()::renderProjectList,
@@ -923,7 +902,7 @@ class MainActivity : AppCompatActivity() {
             serverUrl = serverUrl,
             userId = userId,
             projectProvider = projectStateActions()::activeProject,
-            projectTitleProvider = { currentProjectTitle },
+            projectTitleProvider = { projectStateActions().currentProjectTitle },
             addProjectEvent = ::addProjectEvent,
             openUrl = { url -> externalActions().openUrl(url) },
             copyText = { label, text -> externalActions().copyText(label, text) }
@@ -1008,7 +987,7 @@ class MainActivity : AppCompatActivity() {
     private fun foldedCliLogActions(): MainFoldedCliLogActions {
         foldedCliLogActions?.let { return it }
         return MainFoldedCliLogActions(
-            currentStage = { currentStage },
+            currentStage = { projectStateActions().currentStage },
             updateStage = ::updateStage,
             maybeAppendVisibleCliSignal = { category, line ->
                 progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
@@ -1075,7 +1054,7 @@ class MainActivity : AppCompatActivity() {
             taskResponseTokens = taskResponseTokens,
             taskForTrace = { traceId -> runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } },
             activeConversationTask = conversationTaskRegistryActions()::activeConversationTask,
-            getCurrentStage = { currentStage },
+            getCurrentStage = { projectStateActions().currentStage },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
             refreshActiveTaskState = conversationTaskRegistryActions()::refreshActiveTaskState,
             updateStage = ::updateStage,
@@ -1173,7 +1152,7 @@ class MainActivity : AppCompatActivity() {
     private fun workflowStageActions(): MainWorkflowStageActions {
         workflowStageActions?.let { return it }
         return MainWorkflowStageActions(
-            currentStage = { currentStage },
+            currentStage = { projectStateActions().currentStage },
             updateStage = ::updateStage,
             addProjectEvent = ::addProjectEvent,
             recordEvidence = { kind, detail ->
@@ -1191,7 +1170,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStage(stage: String, hint: String) {
-        currentStage = stage
+        projectStateActions().currentStage = stage
         projectStateActions().activeProject().subtitle = hint
         projectStateActions().saveProjects()
         updateProjectViews(hint)
@@ -1206,9 +1185,9 @@ class MainActivity : AppCompatActivity() {
         return MainProjectViewActions(
             activity = this,
             binding = binding,
-            currentStage = { currentStage },
-            currentProjectTitle = { currentProjectTitle },
-            projectEvents = { projectEvents },
+            currentStage = { projectStateActions().currentStage },
+            currentProjectTitle = { projectStateActions().currentProjectTitle },
+            projectEvents = { projectStateActions().projectEvents },
             currentTimeText = { timeFormatter.format(Date()) },
             renderConversationList = homeListActions()::renderConversationList,
             renderProjectList = homeListActions()::renderProjectList,
@@ -1232,12 +1211,12 @@ class MainActivity : AppCompatActivity() {
         return MainProjectRecordActions(
             activity = this,
             appName = { getString(R.string.app_name) },
-            currentProjectTitle = { currentProjectTitle },
-            setCurrentProjectTitle = { currentProjectTitle = it },
+            currentProjectTitle = { projectStateActions().currentProjectTitle },
+            setCurrentProjectTitle = { projectStateActions().currentProjectTitle = it },
             activeProject = projectStateActions()::activeProject,
-            projectEvents = { projectEvents },
-            currentStage = { currentStage },
-            conversationCount = { conversations.size },
+            projectEvents = { projectStateActions().projectEvents },
+            currentStage = { projectStateActions().currentStage },
+            conversationCount = { projectStateActions().conversations.size },
             currentTimeText = { timeFormatter.format(Date()) },
             currentStageHint = { binding.stageHintText.text.toString() },
             saveProjects = projectStateActions()::saveProjects,
