@@ -6,6 +6,7 @@ use tracing::info;
 mod admin;
 mod agent;
 mod ai_cli;
+mod ai_cli_prompts;
 mod api;
 mod app_update;
 mod codex_health;
