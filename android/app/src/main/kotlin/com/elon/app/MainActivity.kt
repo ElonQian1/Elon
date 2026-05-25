@@ -12,12 +12,10 @@ import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import com.elon.app.BuildConfig
 import com.elon.app.update.AppUpdateManager
-import com.elon.app.update.UpdateCheckWorker
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -112,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
+    private var createActions: MainCreateActions? = null
     private var resumeActions: MainResumeActions? = null
     private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
@@ -157,53 +156,41 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setupTaskCompletionAlerts(this, prefs, notificationPermissionRequest)
+        createActions().onCreate(intent)
+    }
 
-        loadProjects()
-
-        setupAttachmentLaunchers()
-        chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
-        binding.chatList.adapter = chatAdapter
-        setupNavigation()
-        setupQuickActions()
-        setupBackHandling()
-        setupInputComposer()
-        restoreCachedModelSelection()
-        updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
-        setTaskAppForeground(true)
-        registerTaskWorkReceiver()
-        restorePendingActiveWork()
-        checkAndOfferGuestImport()
-        startTaskWorkService(
-            if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
-        )
-
-        // 重连按钮
-        binding.statusText.setOnClickListener {
-            if (backendConnected || !isActiveConversationWorking()) {
-                openConversation(0)
-            } else {
-                startTaskWorkService(TaskWorkService.ACTION_CONNECT)
-            }
-        }
-
-        loadModelOptions()
-
-        // 键盘回车发送
-        binding.inputEdit.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEND) {
-                sendMessage()
-                true
-            } else false
-        }
-
-        // 自动检查更新（12 小时冷却，静默失败不打扰用户）
-        AppUpdateManager(this).autoCheck()
-        // 注册后台周期检查（APP 关闭时也能推送通知）
-        UpdateCheckWorker.schedule(this)
-        // 注册本机为同WiFi APK 种子节点（已安装用户帮助其他用户加速下载）
-        com.elon.app.update.PeerSeederManager.start(this)
-        handleLaunchIntent(intent)
+    private fun createActions(): MainCreateActions {
+        createActions?.let { return it }
+        return MainCreateActions(
+            activity = this,
+            binding = binding,
+            prefs = prefs,
+            notificationPermissionRequest = notificationPermissionRequest,
+            loadProjects = ::loadProjects,
+            setupAttachmentLaunchers = ::setupAttachmentLaunchers,
+            activeConversation = ::activeConversation,
+            pauseCurrentWork = ::pauseCurrentWork,
+            showMessageActions = ::showMessageActions,
+            setChatAdapter = { chatAdapter = it },
+            setupNavigation = ::setupNavigation,
+            setupQuickActions = ::setupQuickActions,
+            setupBackHandling = ::setupBackHandling,
+            setupInputComposer = ::setupInputComposer,
+            restoreCachedModelSelection = ::restoreCachedModelSelection,
+            updateProjectViews = ::updateProjectViews,
+            setTaskAppForeground = ::setTaskAppForeground,
+            registerTaskWorkReceiver = ::registerTaskWorkReceiver,
+            restorePendingActiveWork = ::restorePendingActiveWork,
+            checkAndOfferGuestImport = ::checkAndOfferGuestImport,
+            getWaitingForReply = { waitingForReply },
+            getBackendConnected = { backendConnected },
+            isActiveConversationWorking = ::isActiveConversationWorking,
+            startTaskWorkService = { action -> startTaskWorkService(action) },
+            openConversation = ::openConversation,
+            loadModelOptions = { loadModelOptions() },
+            sendMessage = ::sendMessage,
+            handleLaunchIntent = ::handleLaunchIntent
+        ).also { createActions = it }
     }
 
     override fun onNewIntent(intent: Intent) {
