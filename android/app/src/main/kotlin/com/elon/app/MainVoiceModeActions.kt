@@ -21,9 +21,17 @@ internal class MainVoiceModeActions(
     private val modelButtonShell: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
+    private val setVoiceMode: (Boolean) -> Unit,
+    private val collapseAttachmentPanel: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
 ) {
+    fun toggleVoiceMode() {
+        setVoiceMode(!isVoiceMode())
+        collapseAttachmentPanel()
+        applyVoiceMode()
+    }
+
     fun applyVoiceMode() {
         val modeButton = inputModeButton() ?: return
         val voiceButton = voiceHoldButton() ?: return

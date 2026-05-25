@@ -264,7 +264,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             selectedAgentForRequest = { modelActions().selectedAgentForRequest() },
             appendMessage = ::appendMessage,
-            collapseInputComposer = { collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions()::rememberConversationTask,
@@ -362,8 +362,8 @@ class MainActivity : AppCompatActivity() {
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
             isAttachmentPanelOpen = { attachmentPanelActions().isOpen },
-            toggleVoiceMode = ::toggleVoiceMode,
-            focusInputComposer = ::focusInputComposer,
+            toggleVoiceMode = { voiceModeActions().toggleVoiceMode() },
+            focusInputComposer = { inputFocusActions().focusInputComposer() },
             startSpeechToText = { speechInputActions().startSpeechToText() },
             stopSpeechToText = { speechInputActions().stopSpeechToText() },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
@@ -371,10 +371,10 @@ class MainActivity : AppCompatActivity() {
             toggleAttachmentPanel = { attachmentPanelActions().toggleAttachmentPanel() },
             buildAttachmentPanel = { attachmentPanelActions().buildAttachmentPanel() },
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
-            collapseInputComposer = { collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             updateCollapsedInputPreview = ::updateCollapsedInputPreview,
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
         ).setup()
 
         inputModeButton = views.inputModeButton
@@ -396,10 +396,6 @@ class MainActivity : AppCompatActivity() {
         voiceModeActions().applyVoiceMode()
         updateCollapsedInputPreview()
         updateSendButtonVisual()
-        updateAdaptiveInputHeight()
-    }
-
-    private fun updateAdaptiveInputHeight() {
         adaptiveInputHeightActions().updateAdaptiveInputHeight()
     }
 
@@ -430,14 +426,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun focusInputComposer() {
-        inputFocusActions().focusInputComposer()
-    }
-
-    private fun collapseInputComposer(animate: Boolean = true) {
-        inputFocusActions().collapseInputComposer(animate)
-    }
-
     private fun inputFocusActions(): MainInputFocusActions {
         inputFocusActions?.let { return it }
         return MainInputFocusActions(
@@ -450,7 +438,7 @@ class MainActivity : AppCompatActivity() {
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
         ).also { inputFocusActions = it }
     }
 
@@ -482,7 +470,7 @@ class MainActivity : AppCompatActivity() {
             activeProject = ::activeProject,
             activeConversation = ::activeConversation,
             appendMessage = ::appendMessage,
-            collapseInputComposer = { collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
                 attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
@@ -529,14 +517,6 @@ class MainActivity : AppCompatActivity() {
         ).also { pendingAttachmentActions = it }
     }
 
-    private fun handleSendOrAttachment() {
-        if (!voiceMode && (binding.inputEdit.text.toString().trim().isNotEmpty() || pendingAttachments.isNotEmpty())) {
-            sendMessageActions().sendMessage()
-        } else {
-            attachmentPanelActions().toggleAttachmentPanel()
-        }
-    }
-
     private fun attachmentPanelActions(): MainAttachmentPanelActions {
         attachmentPanelActions?.let { return it }
         return MainAttachmentPanelActions(
@@ -546,17 +526,11 @@ class MainActivity : AppCompatActivity() {
             activeConversation = ::activeConversation,
             attachmentPanel = { if (::attachmentPanel.isInitialized) attachmentPanel else null },
             attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
-            collapseInputComposer = { collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
             openCameraAttachment = { attachmentPickerActions().openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions().openPhotoAttachment() },
             openDocumentAttachment = { attachmentPickerActions().openDocumentAttachment() }
         ).also { attachmentPanelActions = it }
-    }
-
-    private fun toggleVoiceMode() {
-        voiceMode = !voiceMode
-        attachmentPanelActions().collapseAttachmentPanel()
-        voiceModeActions().applyVoiceMode()
     }
 
     private fun voiceModeActions(): MainVoiceModeActions {
@@ -572,8 +546,10 @@ class MainActivity : AppCompatActivity() {
             modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
         ).also { voiceModeActions = it }
     }
 
@@ -629,7 +605,7 @@ class MainActivity : AppCompatActivity() {
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
-            collapseInputComposer = ::collapseInputComposer,
+            collapseInputComposer = { animate -> inputFocusActions().collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
             maybePrewarmCodexSession = ::maybePrewarmCodexSession
