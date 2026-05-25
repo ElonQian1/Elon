@@ -11,6 +11,10 @@ use crate::{
     },
     agent_llm_call::{call_chat_llm, call_llm, execute_tool},
     agent_prompts::system_prompt,
+    agent_routing::{
+        api_agent_name, casual_chat_prompt, choose_backend, cli_option_id, has_api_agents,
+        is_local_cli_option, quick_casual_reply,
+    },
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     store::ProjectAccess,
@@ -346,118 +350,6 @@ async fn run_backend_with_workspace(
             )
             .await
         }
-    }
-}
-
-async fn has_api_agents(state: &Arc<AppState>) -> bool {
-    !state.agents_config.read().await.agents.is_empty()
-}
-
-fn choose_backend(
-    state: &Arc<AppState>,
-    user_config: Option<&UserAgentConfig>,
-    agent_name: Option<&str>,
-    route: CapabilityRoute,
-) -> AiBackend {
-    if state.ai_cli.codex_cli_only {
-        return AiBackend::LocalCli;
-    }
-
-    if route == CapabilityRoute::ChatAgent {
-        if state.ai_cli.enabled {
-            return AiBackend::LocalCli;
-        }
-        return AiBackend::Api;
-    }
-
-    if state.ai_cli.enabled {
-        return AiBackend::LocalCli;
-    }
-
-    if let Some(name) = agent_name {
-        if is_local_cli_option(state, name) {
-            return AiBackend::LocalCli;
-        }
-        if is_api_backend_alias(name) {
-            return AiBackend::Api;
-        }
-        return AiBackend::Api;
-    }
-
-    if route == CapabilityRoute::CodeAgent && state.ai_cli.enabled {
-        return AiBackend::LocalCli;
-    }
-
-    if let Some(cfg) = user_config {
-        if cfg.has_config() {
-            if cfg
-                .use_agent
-                .as_deref()
-                .map(|name| is_local_cli_option(state, name))
-                .unwrap_or(false)
-            {
-                return AiBackend::LocalCli;
-            }
-            return AiBackend::Api;
-        }
-    }
-
-    if state.default_backend == AiBackend::LocalCli && state.ai_cli.enabled {
-        AiBackend::LocalCli
-    } else {
-        AiBackend::Api
-    }
-}
-
-fn api_agent_name<'a>(state: &Arc<AppState>, agent_name: Option<&'a str>) -> Option<&'a str> {
-    agent_name.filter(|name| !is_local_cli_option(state, name) && !is_api_backend_alias(name))
-}
-
-fn cli_option_id(agent_name: Option<&str>) -> Option<&str> {
-    agent_name.filter(|name| !is_cli_alias(name))
-}
-
-fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
-    is_cli_alias(name) || state.ai_cli.has_option(name)
-}
-
-fn is_cli_alias(name: &str) -> bool {
-    matches!(
-        name.trim().to_ascii_lowercase().as_str(),
-        "codex" | "codex_cli" | "cli" | "local" | "local_cli"
-    )
-}
-
-fn is_api_backend_alias(name: &str) -> bool {
-    matches!(
-        name.trim().to_ascii_lowercase().as_str(),
-        "api" | "llm" | "remote"
-    )
-}
-
-fn casual_chat_prompt() -> &'static str {
-    r#"你是「一龙开发助手」，也是用户身边一个有经验、有温度的产品与开发搭档。
-用户可能只是闲聊、犹豫、没想好要做什么，或者想让你给灵感。
-
-你的回复要自然、有生命力，不要像客服模板，也不要一直重复“这里只能开发 App”。
-你可以正常聊天、共情、追问，也可以帮用户把模糊想法整理成 App 方向。
-
-重要边界：
-- 这一次是普通聊天模式，不能声称你已经修改代码、执行工具、打包 APK。
-- 如果用户还没想好，主动给 2-4 个具体方向，让用户容易继续说下去。
-- 如果用户明显想开始开发，引导他补充目标用户、核心功能、界面风格或优先级。
-- 回复以中文为主，简洁但有内容。"#
-}
-
-fn quick_casual_reply(user_message: &str) -> Option<&'static str> {
-    match user_message.trim().to_lowercase().as_str() {
-        "你好" | "你好呀" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => {
-            Some("你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。")
-        }
-        "谢谢" | "谢谢你" | "辛苦了" => {
-            Some("不客气，我在这边。你继续说下一步想怎么改就行。")
-        }
-        _ => None,
     }
 }
 
