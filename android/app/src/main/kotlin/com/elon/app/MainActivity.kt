@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.ClipData
@@ -14,9 +13,6 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.text.Editable
 import android.text.InputType
 import android.text.TextUtils
@@ -46,7 +42,6 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
@@ -138,8 +133,7 @@ class MainActivity : AppCompatActivity() {
     private var voiceMode = false
     private var inputCanSend = true
     private var suppressInputFocusAnimation = false
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var isListeningForSpeech = false
+    private var speechInputActions: MainSpeechInputActions? = null
     private val speechPermissionRequest = 4301
     private val notificationPermissionRequest = 4302
     private lateinit var cameraAttachmentLauncher: ActivityResultLauncher<Uri>
@@ -1201,72 +1195,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startSpeechToText() {
-        if (activeConversation().ended) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
-            return
-        }
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (speechRecognizer == null) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
-                setRecognitionListener(createSpeechRecognitionListener())
-            }
-        }
-        isListeningForSpeech = true
-        voiceHoldButton.text = "松开 转文字"
-        speechRecognizer?.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.CHINA.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        })
+        speechInputActions().startSpeechToText()
     }
 
     private fun stopSpeechToText() {
-        if (!isListeningForSpeech) return
-        isListeningForSpeech = false
-        voiceHoldButton.text = "识别中..."
-        speechRecognizer?.stopListening()
+        speechInputActions().stopSpeechToText()
     }
 
-    private fun createSpeechRecognitionListener(): RecognitionListener {
-        return object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {
-                voiceHoldButton.text = "正在听..."
-            }
-            override fun onBeginningOfSpeech() = Unit
-            override fun onRmsChanged(rmsdB: Float) = Unit
-            override fun onBufferReceived(buffer: ByteArray?) = Unit
-            override fun onEndOfSpeech() {
-                voiceHoldButton.text = "识别中..."
-            }
-            override fun onError(error: Int) {
-                isListeningForSpeech = false
-                voiceHoldButton.text = "按住 说话"
-                if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
-                    Toast.makeText(this@MainActivity, "语音识别失败，请重试", Toast.LENGTH_SHORT).show()
-                }
-            }
-            override fun onResults(results: Bundle?) {
-                isListeningForSpeech = false
-                voiceHoldButton.text = "按住 说话"
-                val spoken = results
-                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    ?.firstOrNull()
-                    .orEmpty()
-                    .trim()
-                if (spoken.isNotBlank()) {
-                    voiceMode = false
-                    applyVoiceMode()
-                    binding.inputEdit.setText(spoken)
-                    binding.inputEdit.setSelection(binding.inputEdit.text.length)
-                }
-            }
-            override fun onPartialResults(partialResults: Bundle?) = Unit
-            override fun onEvent(eventType: Int, params: Bundle?) = Unit
-        }
+    private fun speechInputActions(): MainSpeechInputActions {
+        speechInputActions?.let { return it }
+        return MainSpeechInputActions(
+            activity = this,
+            binding = binding,
+            speechPermissionRequest = speechPermissionRequest,
+            activeConversation = ::activeConversation,
+            voiceHoldButton = { voiceHoldButton },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = ::applyVoiceMode
+        ).also { speechInputActions = it }
     }
 
     private fun hideKeyboard() {
@@ -2991,8 +2937,8 @@ class MainActivity : AppCompatActivity() {
         stopStageHintShimmer()
         homeRows?.cancelHomeRowShimmer()
         homeRows = null
-        speechRecognizer?.destroy()
-        speechRecognizer = null
+        speechInputActions?.destroy()
+        speechInputActions = null
         if (taskWorkReceiverRegistered) {
             unregisterReceiver(taskWorkReceiver)
             taskWorkReceiverRegistered = false
