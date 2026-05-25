@@ -61,7 +61,7 @@ class TaskWorkService : Service() {
         val action = intent?.action
         val payload = intent?.getStringExtra(EXTRA_PAYLOAD)?.takeIf { it.isNotBlank() }
         val traceId = intent?.getStringExtra(EXTRA_TRACE_ID)?.takeIf { it.isNotBlank() }
-            ?: extractTraceId(payload)
+            ?: taskPayloadTraceId(payload)
         DebugTraceStore.record(
             "task_service_command",
             mapOf(
@@ -140,12 +140,12 @@ class TaskWorkService : Service() {
     }
 
     private fun startWork(payload: String, isDevelopment: Boolean, force: Boolean = false) {
-        val traceId = extractTraceId(payload) ?: "task_${System.currentTimeMillis()}"
+        val traceId = taskPayloadTraceId(payload) ?: "task_${System.currentTimeMillis()}"
         if (force) cleanupTask(traceId, disconnect = true)
         val task = activeTasks[traceId] ?: RunningTask(
             traceId = traceId,
-            projectId = extractPayloadString(payload, "project_id"),
-            conversationId = extractPayloadString(payload, "conversation_id"),
+            projectId = taskPayloadString(payload, "project_id"),
+            conversationId = taskPayloadString(payload, "conversation_id"),
             payload = payload,
             isDevelopment = isDevelopment
         ).also { activeTasks[traceId] = it }
@@ -340,7 +340,7 @@ class TaskWorkService : Service() {
 
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val messageType = parsed?.optString("type")?.takeIf { it.isNotBlank() }
-        val messagePreview = parsed?.let { jsonStringOrNull(it, "message") }?.let { preview(it) }
+        val messagePreview = parsed?.let { taskJsonStringOrNull(it, "message") }?.let { taskTextPreview(it) }
         DebugTraceStore.record(
             "task_server_message",
             mapOf(
@@ -370,7 +370,7 @@ class TaskWorkService : Service() {
                 )
             )
         }
-        if (task.firstChatReplyAtMs == 0L && isChatReplyType(messageType)) {
+        if (task.firstChatReplyAtMs == 0L && isTaskChatReplyType(messageType)) {
             task.firstChatReplyAtMs = System.currentTimeMillis()
             Log.i(
                 TAG,
@@ -400,8 +400,8 @@ class TaskWorkService : Service() {
 
     private fun finishWork(traceId: String, json: JSONObject, success: Boolean) {
         val task = activeTasks[traceId] ?: return
-        val apkUrl = jsonStringOrNull(json, "apk_url")
-        val messagePreview = jsonStringOrNull(json, "message")?.let { preview(it) }
+        val apkUrl = taskJsonStringOrNull(json, "apk_url")
+        val messagePreview = taskJsonStringOrNull(json, "message")?.let { taskTextPreview(it) }
         Log.i(
             TAG,
             "request_finish trace=${task.traceId} kind=${task.requestKind} success=$success type=${json.optString("type")} elapsed_ms=${elapsedSinceRequestStart(task)}"
@@ -443,29 +443,6 @@ class TaskWorkService : Service() {
     private fun firstChatReplyElapsedMs(task: RunningTask): Long? {
         if (task.startedAtMs <= 0L || task.firstChatReplyAtMs <= 0L) return null
         return task.firstChatReplyAtMs - task.startedAtMs
-    }
-
-    private fun extractTraceId(payload: String?): String? {
-        return extractPayloadString(payload, "trace_id")
-    }
-
-    private fun extractPayloadString(payload: String?, key: String): String? {
-        return payload
-            ?.let { runCatching { JSONObject(it).optString(key) }.getOrNull() }
-            ?.takeIf { it.isNotBlank() }
-    }
-
-    private fun isChatReplyType(type: String?): Boolean {
-        return type in setOf("progress", "done", "error", "task_event", "message", "assistant_message")
-    }
-
-    private fun preview(value: String, maxChars: Int = 160): String {
-        val singleLine = value.replace('\n', ' ').trim()
-        return if (singleLine.length <= maxChars) {
-            singleLine
-        } else {
-            singleLine.take(maxChars) + "..."
-        }
     }
 
     private fun hasActiveTasks(): Boolean {
@@ -767,12 +744,12 @@ class TaskWorkService : Service() {
                     val payload = item.optString("payload").takeIf { it.isNotBlank() } ?: continue
                     val savedAt = item.optLong("started_at", now)
                     if (savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS) continue
-                    val traceId = extractTraceId(payload) ?: continue
+                    val traceId = taskPayloadTraceId(payload) ?: continue
                     if (activeTasks.containsKey(traceId)) continue
                     restored += RunningTask(
                         traceId = traceId,
-                        projectId = extractPayloadString(payload, "project_id"),
-                        conversationId = extractPayloadString(payload, "conversation_id"),
+                        projectId = taskPayloadString(payload, "project_id"),
+                        conversationId = taskPayloadString(payload, "conversation_id"),
                         payload = payload,
                         isDevelopment = item.optBoolean("is_development", true),
                         startedAtMs = savedAt
@@ -786,12 +763,12 @@ class TaskWorkService : Service() {
             val savedAt = prefs.getLong(PREF_PENDING_WORK_TIME, 0L)
             val tooOld = savedAt <= 0L || now - savedAt > PENDING_WORK_TTL_MS
             if (payload != null && !tooOld) {
-                val traceId = extractTraceId(payload)
+                val traceId = taskPayloadTraceId(payload)
                 if (traceId != null && !activeTasks.containsKey(traceId)) {
                     restored += RunningTask(
                         traceId = traceId,
-                        projectId = extractPayloadString(payload, "project_id"),
-                        conversationId = extractPayloadString(payload, "conversation_id"),
+                        projectId = taskPayloadString(payload, "project_id"),
+                        conversationId = taskPayloadString(payload, "conversation_id"),
                         payload = payload,
                         isDevelopment = prefs.getBoolean(PREF_PENDING_WORK_IS_DEVELOPMENT, true),
                         startedAtMs = savedAt
@@ -807,13 +784,6 @@ class TaskWorkService : Service() {
     private fun pendingWorkAgeMs(tasks: List<RunningTask>): Long? {
         val oldest = tasks.map { it.startedAtMs }.filter { it > 0L }.minOrNull() ?: return null
         return System.currentTimeMillis() - oldest
-    }
-
-    private fun jsonStringOrNull(json: JSONObject, key: String): String? {
-        if (!json.has(key) || json.isNull(key)) return null
-        return json.optString(key)
-            .trim()
-            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun updateLauncherBadgeCount(count: Int) {
