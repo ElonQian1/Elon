@@ -45,6 +45,7 @@ mod server_trace;
 mod store;
 mod store_schema;
 mod tools;
+mod tools_apk;
 mod types;
 mod user_api;
 mod web;
