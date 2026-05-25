@@ -1,13 +1,13 @@
 use axum::{
-    routing::{delete, get, post},
     Router,
+    routing::{delete, get, post},
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
-use crate::{admin, api, app_update, peer_relay, project_api, user_api, web};
+use crate::{admin, api, app_update, peer_relay, project_api, project_attachments, user_api, web};
 
 pub fn build_app(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
@@ -45,11 +45,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/projects/:project_id/attachments",
-            post(project_api::upload_project_attachment),
+            post(project_attachments::upload_project_attachment),
         )
         .route(
             "/api/projects/:project_id/attachments/:conversation_id/:filename",
-            get(project_api::download_project_attachment),
+            get(project_attachments::download_project_attachment),
         )
         .route(
             "/ws/projects/:project_id",
@@ -69,11 +69,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments",
-            post(project_api::upload_user_project_attachment),
+            post(project_attachments::upload_user_project_attachment),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments/:conversation_id/:filename",
-            get(project_api::download_user_project_attachment),
+            get(project_attachments::download_user_project_attachment),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/git/deploy-key",
