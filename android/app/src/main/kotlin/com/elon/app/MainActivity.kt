@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var taskWorkServiceActions: MainTaskWorkServiceActions? = null
     private var activeWorkControlActions: MainActiveWorkControlActions? = null
     private var projectViewActions: MainProjectViewActions? = null
+    private var projectRecordActions: MainProjectRecordActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
     private var profileQuickActions: MainProfileQuickActions? = null
@@ -1709,31 +1710,14 @@ class MainActivity : AppCompatActivity() {
             currentProjectTitle = { currentProjectTitle },
             projectEvents = { projectEvents },
             currentTimeText = { timeFormatter.format(Date()) },
-            updateStageLines = ::updateStageLines,
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList,
             updateStageHintShimmer = ::updateStageHintShimmer
         ).also { projectViewActions = it }
     }
 
-    private fun updateStageLines() {
-        val active = when (currentStage) {
-            "任务排队" -> 1
-            "需求分析" -> 1
-            "开发实现" -> 2
-            "编译打包" -> 3
-            "交付完成" -> 4
-            "需要处理" -> -1
-            else -> 0
-        }
-        binding.stagePlanText.text = stageLine(1, active, "需求分析")
-        binding.stageCodeText.text = stageLine(2, active, "开发实现")
-        binding.stageBuildText.text = stageLine(3, active, "编译打包")
-        binding.stageDeliverText.text = stageLine(4, active, "交付下载")
-    }
-
     private fun compactProjectTitle(): String {
-        return currentProjectTitle.trim().ifBlank { getString(R.string.app_name) }.take(6)
+        return projectRecordActions().compactProjectTitle()
     }
 
     private companion object {
@@ -1744,27 +1728,30 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addProjectEvent(text: String) {
-        val line = "${timeFormatter.format(Date())}  $text"
-        projectEvents.add(0, line)
-        while (projectEvents.size > 40) projectEvents.removeAt(projectEvents.size - 1)
-        activeProject().updatedAt = System.currentTimeMillis()
-        saveProjects()
-        updateProjectViews(binding.stageHintText.text.toString())
+        projectRecordActions().addProjectEvent(text)
     }
 
     private fun saveProjectTitle() {
-        saveProjects()
+        projectRecordActions().saveProjectTitle()
     }
 
     private fun updateProjectTitleFromRequest(text: String) {
-        val project = activeProject()
-        val shouldAutoName = project.title.startsWith("新项目") ||
-            project.title == "一龙开发助手" ||
-            project.title == "等待你的第一个开发需求"
-        if (shouldAutoName) {
-            currentProjectTitle = summarize(text, 24)
-        }
-        project.subtitle = summarize(text, 34)
+        projectRecordActions().updateProjectTitleFromRequest(text)
+    }
+
+    private fun projectRecordActions(): MainProjectRecordActions {
+        projectRecordActions?.let { return it }
+        return MainProjectRecordActions(
+            appName = { getString(R.string.app_name) },
+            currentProjectTitle = { currentProjectTitle },
+            setCurrentProjectTitle = { currentProjectTitle = it },
+            activeProject = ::activeProject,
+            projectEvents = { projectEvents },
+            currentTimeText = { timeFormatter.format(Date()) },
+            currentStageHint = { binding.stageHintText.text.toString() },
+            saveProjects = ::saveProjects,
+            updateProjectViews = ::updateProjectViews
+        ).also { projectRecordActions = it }
     }
 
     private fun setSendEnabled(enabled: Boolean) {

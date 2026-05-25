@@ -11,7 +11,6 @@ internal class MainProjectViewActions(
     private val currentProjectTitle: () -> String,
     private val projectEvents: () -> List<String>,
     private val currentTimeText: () -> String,
-    private val updateStageLines: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val updateStageHintShimmer: () -> Unit
@@ -42,11 +41,27 @@ internal class MainProjectViewActions(
             events.joinToString("\n")
         }
         binding.projectWorkflowText.text = projectWorkflowCardText(stage)
-        updateStageLines()
+        updateStageLines(stage)
         renderConversationList()
         if (binding.projectPage.visibility == View.VISIBLE) {
             renderProjectList()
         }
         updateStageHintShimmer()
+    }
+
+    private fun updateStageLines(stage: String) {
+        val active = when (stage) {
+            "任务排队" -> 1
+            "需求分析" -> 1
+            "开发实现" -> 2
+            "编译打包" -> 3
+            "交付完成" -> 4
+            "需要处理" -> -1
+            else -> 0
+        }
+        binding.stagePlanText.text = stageLine(1, active, "需求分析")
+        binding.stageCodeText.text = stageLine(2, active, "开发实现")
+        binding.stageBuildText.text = stageLine(3, active, "编译打包")
+        binding.stageDeliverText.text = stageLine(4, active, "交付下载")
     }
 }
