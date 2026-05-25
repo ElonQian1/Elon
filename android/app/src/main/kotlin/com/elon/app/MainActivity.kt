@@ -569,7 +569,7 @@ class MainActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(18), 0, dp(18), 0)
             text = "文本内容在此输入。"
-            setTextColor(Color.parseColor("#D0D0D0"))
+            setTextColor(Color.parseColor("#E1E1E1"))
             textSize = 15f
             isClickable = true
             setOnClickListener { focusInputComposer() }
@@ -592,7 +592,7 @@ class MainActivity : AppCompatActivity() {
             setHorizontallyScrolling(false)
             setPadding(0, dp(8), 0, dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#D0D0D0"))
+            setHintTextColor(Color.parseColor("#E1E1E1"))
             textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!voiceMode) {
@@ -792,8 +792,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCollapsedInputPreview() {
         if (!::collapsedInputPreview.isInitialized) return
-        val value = binding.inputEdit.text.toString()
-        collapsedInputPreview.text = value.ifBlank { "文本内容在此输入。" }
+        collapsedInputPreview.text = "文本内容在此输入。"
     }
 
     private fun focusInputComposer() {
@@ -1796,9 +1795,9 @@ class MainActivity : AppCompatActivity() {
         val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName)) }
         val showCustomRow = !codexCliOnly
         val rowCount = selectableOptions.size + if (showCustomRow) 1 else 0
-        val popupWidth = dp(188)
+        val popupWidth = dp(176)
         val arrowHeight = dp(8)
-        val rowHeight = dp(44)
+        val rowHeight = dp(40)
         val dividerCount = (rowCount - 1).coerceAtLeast(0)
         val panelHeight = (rowHeight * rowCount.coerceAtLeast(1) + dividerCount).coerceAtMost(dp(264))
         val totalHeight = panelHeight + arrowHeight
@@ -1844,12 +1843,24 @@ class MainActivity : AppCompatActivity() {
 
         val anchorLocation = IntArray(2)
         anchor.getLocationOnScreen(anchorLocation)
+        val verticalAnchorLocation = IntArray(2)
+        val verticalAnchorTop = if (
+            ::inputBarContainer.isInitialized &&
+            ::modelButtonShell.isInitialized &&
+            anchor === modelButtonShell &&
+            inputBarContainer.isShown
+        ) {
+            inputBarContainer.getLocationOnScreen(verticalAnchorLocation)
+            verticalAnchorLocation[1] + modelButtonShell.top
+        } else {
+            anchorLocation[1]
+        }
         val anchorCenterX = anchorLocation[0] + anchor.width / 2
-        val aboveY = anchorLocation[1] - totalHeight - dp(8)
+        val aboveY = verticalAnchorTop - totalHeight - dp(8)
         val showAbove = aboveY > dp(72)
         val popupX = (anchorCenterX - popupWidth / 2)
             .coerceIn(dp(12), resources.displayMetrics.widthPixels - popupWidth - dp(12))
-        val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
+        val popupY = if (showAbove) aboveY else verticalAnchorTop + anchor.height + dp(8)
         val arrowX = (anchorCenterX - popupX - dp(8)).coerceIn(dp(16), popupWidth - dp(32))
 
         root.addView(
@@ -1903,7 +1914,7 @@ class MainActivity : AppCompatActivity() {
                 ellipsize = TextUtils.TruncateAt.END
                 text = title
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-                textSize = 15f
+                textSize = 14.5f
             })
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(22), LinearLayout.LayoutParams.WRAP_CONTENT)
