@@ -129,10 +129,7 @@ class MainActivity : AppCompatActivity() {
         set(value) {
             activeProject().activeConversationIndex = value
         }
-    private var modelOptions: List<ModelOption> = emptyList()
-    private var codexCliOnly = true
-    private var selectedAgentName: String? = null
-    private var currentModelLabel = "默认"
+    private var modelActions: MainModelActions? = null
     private var stageHintAnimator: ValueAnimator? = null
     private var stageHintShimmerToken = 0
     private var conversationHomeRowAnimator: ValueAnimator? = null
@@ -347,9 +344,7 @@ class MainActivity : AppCompatActivity() {
             addProperty("conversation_id", target.conversationId)
             addProperty("conversation_title", target.conversationTitle)
             addProperty("message", outgoingText)
-            if (!codexCliOnly) {
-                selectedAgentName?.let { addProperty("agent", it) }
-            }
+            modelActions().selectedAgentForRequest()?.let { addProperty("agent", it) }
             if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
         }
 
@@ -638,7 +633,7 @@ class MainActivity : AppCompatActivity() {
             visibility = View.GONE
             isClickable = true
             isFocusable = true
-            contentDescription = "选择模型：$currentModelLabel"
+            contentDescription = "选择模型：${modelActions().currentModelLabel}"
             setOnClickListener { showModelPopupOrLoad() }
         }
 
@@ -1679,312 +1674,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun restoreCachedModelSelection() {
-        val label = cachedModelLabel() ?: return
-        selectedAgentName = cachedModelAgentName()
-        currentModelLabel = label
-        updateModelButton()
-    }
-
-    private fun cacheModelSelection(agentName: String?, label: String) {
-        prefs.edit().apply {
-            if (agentName.isNullOrBlank()) remove(PREF_SELECTED_AGENT)
-            else putString(PREF_SELECTED_AGENT, agentName)
-            putString(PREF_SELECTED_MODEL_LABEL, label)
-        }.apply()
-    }
-
-    private fun cachedModelAgentName(): String? {
-        return prefs.getString(PREF_SELECTED_AGENT, null)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && it != "null" }
-    }
-
-    private fun cachedModelLabel(): String? {
-        return prefs.getString(PREF_SELECTED_MODEL_LABEL, null)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && it != "null" }
+        modelActions().restoreCachedModelSelection()
     }
 
     private fun loadModelOptions(afterLoad: (() -> Unit)? = null) {
-        Thread {
-            try {
-                val response = http.newCall(
-                    Request.Builder()
-                        .url("$serverUrl/api/user/$userId/agent")
-                        .get()
-                        .build()
-                ).execute()
-                val body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(body.ifBlank { "HTTP ${response.code}" })
-
-                val json = JSONObject(body)
-                val serverCodexCliOnly = json.optBoolean("codex_cli_only", false)
-                if (serverCodexCliOnly) {
-                    runOnUiThread {
-                        codexCliOnly = true
-                        modelOptions = listOf(ModelOption("Codex CLI", null))
-                        selectedAgentName = null
-                        currentModelLabel = "Codex CLI"
-                        cacheModelSelection(null, currentModelLabel)
-                        updateModelButton()
-                        afterLoad?.invoke()
-                    }
-                    return@Thread
-                }
-
-                val config = json.optJSONObject("config") ?: JSONObject()
-                val agents = json.optJSONArray("available_agents") ?: JSONArray()
-                val options = mutableListOf(ModelOption("服务器默认", null))
-
-                for (i in 0 until agents.length()) {
-                    val item = agents.getJSONObject(i)
-                    val name = item.optString("name", "")
-                    val model = item.optString("model", "")
-                    val provider = item.optString("provider", name)
-                    val label = displayModelLabel(provider, model, item.optString("label", ""))
-                    if (name.isNotBlank()) {
-                        options.add(ModelOption(label, name))
-                    }
-                }
-
-                val serverUseAgent = jsonStringOrNull(config, "use_agent")
-                    ?.takeIf { configured -> options.any { it.agentName == configured } }
-                val customModel = jsonStringOrNull(config, "model").orEmpty()
-                val customBase = jsonStringOrNull(config, "api_base").orEmpty()
-                val cachedAgent = cachedModelAgentName()
-                val effectiveUseAgent = serverUseAgent ?: cachedAgent?.takeIf { cached ->
-                    options.any { it.agentName == cached }
-                }
-                val hasCustomConfig = customModel.isNotBlank() || customBase.isNotBlank()
-                val label = when {
-                    hasCustomConfig -> "自定义模型"
-                    effectiveUseAgent != null -> options.firstOrNull { it.agentName == effectiveUseAgent }?.label ?: effectiveUseAgent
-                    else -> "服务器默认"
-                }
-                val shouldSyncCache = serverUseAgent != null ||
-                    hasCustomConfig ||
-                    cachedAgent == null ||
-                    effectiveUseAgent == null
-
-                runOnUiThread {
-                    codexCliOnly = false
-                    modelOptions = options
-                    selectedAgentName = effectiveUseAgent
-                    currentModelLabel = label
-                    if (shouldSyncCache) {
-                        cacheModelSelection(effectiveUseAgent, label)
-                    }
-                    updateModelButton()
-                    afterLoad?.invoke()
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "模型列表加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    afterLoad?.invoke()
-                }
-            }
-        }.start()
+        modelActions().loadModelOptions(afterLoad)
     }
 
     private fun showModelPopupOrLoad() {
-        if (modelOptions.isEmpty()) {
-            Toast.makeText(this, "正在加载模型列表...", Toast.LENGTH_SHORT).show()
-            loadModelOptions { showModelPopupOrLoad() }
-            return
-        }
-        showModelPopup(if (::modelButtonShell.isInitialized) modelButtonShell else binding.modelButton)
-    }
-
-    private fun showModelPopup(anchor: View) {
-        actionPopup?.dismiss()
-
-        val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName)) }
-        val showCustomRow = !codexCliOnly
-        val rowCount = selectableOptions.size + if (showCustomRow) 1 else 0
-        val popupWidth = dp(176)
-        val arrowHeight = dp(8)
-        val rowHeight = dp(40)
-        val dividerCount = (rowCount - 1).coerceAtLeast(0)
-        val panelHeight = (rowHeight * rowCount.coerceAtLeast(1) + dividerCount).coerceAtMost(dp(264))
-        val totalHeight = panelHeight + arrowHeight
-        val root = FrameLayout(this).apply {
-            layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
-            alpha = 0f
-            scaleX = 0.97f
-            scaleY = 0.97f
-        }
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
-                setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
-            }
-        }
-        root.addView(panel, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            panelHeight
-        ))
-
-        selectableOptions.forEachIndexed { index, option ->
-            panel.addView(createModelPopupRow(option.label, isModelOptionSelected(option)) {
-                actionPopup?.dismiss()
-                if (codexCliOnly) {
-                    Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
-                } else {
-                    saveModelSelection(option)
-                }
-            })
-            if (index < selectableOptions.lastIndex || showCustomRow) {
-                panel.addView(createPopupDivider(marginStart = dp(16)))
-            }
-        }
-
-        if (showCustomRow) {
-            panel.addView(createModelPopupRow("自定义模型", currentModelLabel.startsWith("自定义")) {
-                actionPopup?.dismiss()
-                openSettings()
-            })
-        }
-
-        val anchorLocation = IntArray(2)
-        anchor.getLocationOnScreen(anchorLocation)
-        val verticalAnchorLocation = IntArray(2)
-        val verticalAnchorTop = if (
-            ::inputBarContainer.isInitialized &&
-            ::modelButtonShell.isInitialized &&
-            anchor === modelButtonShell &&
-            inputBarContainer.isShown
-        ) {
-            inputBarContainer.getLocationOnScreen(verticalAnchorLocation)
-            verticalAnchorLocation[1] + modelButtonShell.top
-        } else {
-            anchorLocation[1]
-        }
-        val anchorCenterX = anchorLocation[0] + anchor.width / 2
-        val aboveY = verticalAnchorTop - totalHeight - dp(8)
-        val showAbove = aboveY > dp(72)
-        val popupX = (anchorCenterX - popupWidth / 2)
-            .coerceIn(dp(12), resources.displayMetrics.widthPixels - popupWidth - dp(12))
-        val popupY = if (showAbove) aboveY else verticalAnchorTop + anchor.height + dp(8)
-        val arrowX = (anchorCenterX - popupX - dp(8)).coerceIn(dp(16), popupWidth - dp(32))
-
-        root.addView(
-            createPopupArrowView(pointsUp = !showAbove, color = Color.parseColor(WECHAT_POPUP_PANEL_COLOR)),
-            FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
-                gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
-                leftMargin = arrowX
-            }
-        )
-        if (!showAbove) {
-            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
-        }
-
-        actionPopup = PopupWindow(root, popupWidth, totalHeight, true).apply {
-            isOutsideTouchable = true
-            elevation = dp(8).toFloat()
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
-        }
-        root.pivotX = (anchorCenterX - popupX).toFloat()
-        root.pivotY = if (showAbove) totalHeight.toFloat() else 0f
-        root.animate()
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(120L)
-            .start()
-    }
-
-    private fun isModelOptionSelected(option: ModelOption): Boolean {
-        if (currentModelLabel == option.label) return true
-        return selectedAgentName == option.agentName && !currentModelLabel.startsWith("自定义")
-    }
-
-    private fun createModelPopupRow(title: String, selected: Boolean, action: () -> Unit): View {
-        return LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(18), 0, dp(14), 0)
-            isClickable = true
-            foreground = selectableForeground()
-
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                includeFontPadding = false
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                text = title
-                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-                textSize = 14.5f
-            })
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(22), LinearLayout.LayoutParams.WRAP_CONTENT)
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = if (selected) "✓" else ""
-                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-                textSize = 16f
-            })
-            setOnClickListener { action() }
-        }
-    }
-
-    private fun saveModelSelection(option: ModelOption) {
-        if (codexCliOnly) {
-            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
-            return
-        }
-        binding.modelButton.isEnabled = false
-        if (::modelButtonShell.isInitialized) modelButtonShell.isEnabled = false
-        Thread {
-            try {
-                val payload = JSONObject().apply {
-                    put("use_agent", option.agentName ?: JSONObject.NULL)
-                    put("api_base", JSONObject.NULL)
-                    put("api_key", JSONObject.NULL)
-                    put("model", JSONObject.NULL)
-                }
-                val body = payload.toString().toRequestBody("application/json".toMediaType())
-                val response = http.newCall(
-                    Request.Builder()
-                        .url("$serverUrl/api/user/$userId/agent")
-                        .put(body)
-                        .build()
-                ).execute()
-                val responseBody = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(responseBody.ifBlank { "HTTP ${response.code}" })
-
-                runOnUiThread {
-                    selectedAgentName = option.agentName
-                    currentModelLabel = option.label
-                    cacheModelSelection(option.agentName, option.label)
-                    updateModelButton()
-                    Toast.makeText(this, "已切换模型: ${option.label}", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "模型切换失败: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                runOnUiThread {
-                    binding.modelButton.isEnabled = true
-                    if (::modelButtonShell.isInitialized) modelButtonShell.isEnabled = true
-                }
-            }
-        }.start()
+        modelActions().showModelPopupOrLoad()
     }
 
     private fun updateModelButton() {
-        binding.modelButton.text = shortModelLabel(currentModelLabel)
-        binding.modelButton.contentDescription = "选择模型：$currentModelLabel"
-        if (::modelButtonShell.isInitialized) {
-            modelButtonShell.contentDescription = "选择模型：$currentModelLabel"
-        }
+        modelActions().updateModelButton()
+    }
+
+    private fun modelActions(): MainModelActions {
+        modelActions?.let { return it }
+        return MainModelActions(
+            activity = this,
+            binding = binding,
+            prefs = prefs,
+            http = http,
+            serverUrl = serverUrl,
+            userIdProvider = { userId },
+            modelButtonShellProvider = ::modelButtonShellOrNull,
+            inputBarContainerProvider = ::inputBarContainerOrNull,
+            getActionPopup = { actionPopup },
+            setActionPopup = { actionPopup = it },
+            openSettings = ::openSettings,
+            dp = ::dp,
+            selectableForeground = ::selectableForeground
+        ).also { modelActions = it }
+    }
+
+    private fun modelButtonShellOrNull(): FrameLayout? {
+        return if (::modelButtonShell.isInitialized) modelButtonShell else null
+    }
+
+    private fun inputBarContainerOrNull(): LinearLayout? {
+        return if (::inputBarContainer.isInitialized) inputBarContainer else null
     }
 
     private fun openConversation(index: Int) {
@@ -3209,7 +2938,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (!shouldStart) return
 
-        val selectedAgent = if (codexCliOnly) null else selectedAgentName
+        val selectedAgent = modelActions().selectedAgentForRequest()
         val payload = JSONObject().apply {
             put("conversation_id", conversation.id)
             put("conversation_title", conversation.title)
@@ -3969,8 +3698,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
-        const val PREF_SELECTED_AGENT = "selected_agent_name"
-        const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
         const val PREF_PENDING_WORK_PAYLOAD = "pending_work_payload"
         const val PREF_PENDING_WORK_IS_DEVELOPMENT = "pending_work_is_development"
         const val PREF_PENDING_WORK_TIME = "pending_work_time"
