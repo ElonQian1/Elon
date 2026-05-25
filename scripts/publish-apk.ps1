@@ -381,6 +381,10 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
         Replace('__APK_STAGE__', $apkStage).
         Replace('__JSON_STAGE__', $jsonStage)
 
+    # PowerShell here-strings on Windows use CRLF; strip CR before piping to bash
+    $remoteScript = $remoteScript -replace "`r`n", "`n"
+    $remoteScript = $remoteScript -replace "`r", "`n"
+
     $remoteScript | ssh -o ProxyCommand=none $ServerHost "bash -s"
     $deployExit = $LASTEXITCODE
 
