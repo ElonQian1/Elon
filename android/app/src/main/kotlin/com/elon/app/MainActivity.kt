@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var toolActionBubbles: MainToolActionBubbles? = null
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
+    private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -2081,71 +2082,19 @@ class MainActivity : AppCompatActivity() {
                     ChatMessage("ai-intent", text)
                 }
                 "done"        -> {
-                    waitingForReply = false
-                    setSendEnabled(true)
-                    pendingRequestPayload = null
-                    pendingReconnectForActiveWork = false
-                    reconnectAttempts = 0
-                    clearPersistedActiveWork()
                     val content = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl  = jsonStringOrNull(json, "apk_url")
                     val imageUrl = jsonStringOrNull(json, "image_url")
-                    val wasDevelopment = activeRequestIsDevelopment
-                    if (wasDevelopment) {
-                        updateStage("交付完成", if (apkUrl != null) "APK 已生成，可以下载安装测试。" else "任务已完成，可以继续提出修改。")
-                        addProjectEvent(if (apkUrl != null) "生成 APK 下载链接" else "任务完成")
-                        recordEvidence("result", if (apkUrl != null) "APK 已生成：$apkUrl" else "任务完成")
-                    } else {
-                        updateProjectViews("普通消息已回复，开发项目记录保持不变。")
-                    }
-                    activeRequestIsDevelopment = false
-                    stopWorkingEvidenceForActiveConversation()
-                    resetFoldedCliLog()
-                    val visibleApkUrl = if (wasDevelopment) apkUrl else null
-                    val finalMessage = aiMessageWithCurrentEvidence(
-                        finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment),
-                        chatAttachmentFromImageUrl(imageUrl)
-                    )
-                    finalMessage
+                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl)
                 }
                 "error" -> {
-                    waitingForReply = false
-                    setSendEnabled(true)
-                    pendingRequestPayload = null
-                    pendingReconnectForActiveWork = false
-                    reconnectAttempts = 0
-                    clearPersistedActiveWork()
-                    val error = friendlyErrorMessage(jsonStringOrNull(json, "message") ?: "未知错误")
-                    val wasDevelopment = activeRequestIsDevelopment
-                    if (wasDevelopment) {
-                        updateStage("需要处理", error)
-                        addProjectEvent("发生错误：${summarize(error, 30)}")
-                        recordEvidence("result", "发生错误：$error")
-                    }
-                    activeRequestIsDevelopment = false
-                    stopWorkingEvidenceForActiveConversation()
-                    clearCurrentEvidence()
-                    ChatMessage("error", error)
+                    assistantTerminalActions().handleError(jsonStringOrNull(json, "message") ?: "未知错误")
                 }
                 else -> return
             }
             appendMessage(msg)
         } catch (_: Exception) {
-            waitingForReply = false
-            setSendEnabled(true)
-            pendingRequestPayload = null
-            pendingReconnectForActiveWork = false
-            reconnectAttempts = 0
-            clearPersistedActiveWork()
-            if (activeRequestIsDevelopment) {
-                updateStage("需要处理", "服务端返回内容无法识别。")
-                addProjectEvent("服务端返回异常")
-            }
-            appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("服务端返回内容无法识别。")))
-            activeRequestIsDevelopment = false
-            stopWorkingEvidenceForActiveConversation()
-            clearCurrentEvidence()
-            appendMessage(ChatMessage("error", "服务端返回异常，无法解析。"))
+            assistantTerminalActions().handleMalformedResponse()
         }
     }
 
@@ -2175,6 +2124,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleToolCall(tool: String) {
         workflowStageActions().handleToolCall(tool)
+    }
+
+    private fun assistantTerminalActions(): MainAssistantTerminalActions {
+        assistantTerminalActions?.let { return it }
+        return MainAssistantTerminalActions(
+            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
+            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            setWaitingForReply = { waitingForReply = it },
+            setSendEnabled = ::setSendEnabled,
+            clearPendingRequestPayload = { pendingRequestPayload = null },
+            clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            clearPersistedActiveWork = ::clearPersistedActiveWork,
+            updateStage = ::updateStage,
+            updateProjectViews = ::updateProjectViews,
+            addProjectEvent = ::addProjectEvent,
+            recordEvidence = ::recordEvidence,
+            stopWorkingEvidenceForActiveConversation = ::stopWorkingEvidenceForActiveConversation,
+            clearCurrentEvidence = ::clearCurrentEvidence,
+            resetFoldedCliLog = ::resetFoldedCliLog,
+            aiMessageWithCurrentEvidence = ::aiMessageWithCurrentEvidence,
+            appendMessage = ::appendMessage,
+            workflowStoppedMessage = { workflowStoppedMessage(it) }
+        ).also { assistantTerminalActions = it }
     }
 
     private fun workflowStageActions(): MainWorkflowStageActions {
