@@ -47,6 +47,7 @@ mod store;
 mod store_schema;
 mod tools;
 mod tools_apk;
+mod tools_git;
 mod types;
 mod user_api;
 mod web;
