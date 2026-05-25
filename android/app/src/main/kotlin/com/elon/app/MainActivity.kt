@@ -1007,15 +1007,6 @@ class MainActivity : AppCompatActivity() {
         homeListActions().renderProjectList()
     }
 
-    private fun showProjectActions(index: Int) {
-        if (index !in projects.indices) return
-        projectActions().showProjectActions(index)
-    }
-
-    private fun isConversationWorking(index: Int): Boolean {
-        return homeListActions().isConversationWorking(index)
-    }
-
     private fun homeListActions(): MainHomeListActions {
         homeListActions?.let { return it }
         return MainHomeListActions(
@@ -1409,14 +1400,6 @@ class MainActivity : AppCompatActivity() {
         ).also { workflowStageActions = it }
     }
 
-    private fun updateStageHintShimmer() {
-        stageHintShimmer().update()
-    }
-
-    private fun stopStageHintShimmer() {
-        stageHintShimmer?.stop()
-    }
-
     private fun stageHintShimmer(): MainStageHintShimmer {
         stageHintShimmer?.let { return it }
         return MainStageHintShimmer(
@@ -1447,7 +1430,7 @@ class MainActivity : AppCompatActivity() {
             currentTimeText = { timeFormatter.format(Date()) },
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList,
-            updateStageHintShimmer = ::updateStageHintShimmer
+            updateStageHintShimmer = { stageHintShimmer().update() }
         ).also { projectViewActions = it }
     }
 
@@ -1495,7 +1478,7 @@ class MainActivity : AppCompatActivity() {
             modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateStageHintShimmer = ::updateStageHintShimmer
+            updateStageHintShimmer = { stageHintShimmer().update() }
         ).also { sendEnabledActions = it }
     }
 
@@ -1531,7 +1514,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             speechPermissionRequest = speechPermissionRequest,
             notificationPermissionRequest = notificationPermissionRequest,
-            stopStageHintShimmer = ::stopStageHintShimmer,
+            stopStageHintShimmer = { stageHintShimmer?.stop() },
             cancelHomeRowShimmer = {
                 homeRows?.cancelHomeRowShimmer()
                 homeRows = null
