@@ -310,7 +310,9 @@ class MainActivity : AppCompatActivity() {
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 serverResponseWatchdogActions().scheduleFirstServerResponseWatchdog(traceId, token)
             },
-            clearPendingAttachments = { clearPendingAttachments(deleteFiles = false) }
+            clearPendingAttachments = {
+                pendingAttachmentActions().clearPendingAttachments(deleteFiles = false)
+            }
         ).also { preparedMessageActions = it }
     }
 
@@ -403,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             updateSendButtonVisual()
         }
         binding.inputLayout.addView(pendingAttachmentPreviewStrip.view, 1)
-        applyVoiceMode()
+        voiceModeActions().applyVoiceMode()
         updateCollapsedInputPreview()
         updateSendButtonVisual()
         updateAdaptiveInputHeight()
@@ -456,7 +458,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = ::activeConversation,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = ::applyVoiceMode,
+            applyVoiceMode = { voiceModeActions().applyVoiceMode() },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
             updateSendButtonVisual = ::updateSendButtonVisual,
@@ -487,7 +489,7 @@ class MainActivity : AppCompatActivity() {
         return MainSendMessageActions(
             binding = binding,
             pendingAttachments = pendingAttachments,
-            collapseAttachmentPanel = ::collapseAttachmentPanel,
+            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
             isActiveConversationWorking = ::isActiveConversationWorking,
             activeProject = ::activeProject,
             activeConversation = ::activeConversation,
@@ -534,10 +536,6 @@ class MainActivity : AppCompatActivity() {
         ).also { attachmentSendActions = it }
     }
 
-    private fun clearPendingAttachments(deleteFiles: Boolean = true) {
-        pendingAttachmentActions().clearPendingAttachments(deleteFiles)
-    }
-
     private fun pendingAttachmentActions(): MainPendingAttachmentActions {
         pendingAttachmentActions?.let { return it }
         return MainPendingAttachmentActions(
@@ -545,7 +543,7 @@ class MainActivity : AppCompatActivity() {
             pendingAttachments = pendingAttachments,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = ::applyVoiceMode,
+            applyVoiceMode = { voiceModeActions().applyVoiceMode() },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
         ).also { pendingAttachmentActions = it }
@@ -557,10 +555,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             attachmentPanelActions().toggleAttachmentPanel()
         }
-    }
-
-    private fun collapseAttachmentPanel() {
-        attachmentPanelActions().collapseAttachmentPanel()
     }
 
     private fun attachmentPanelActions(): MainAttachmentPanelActions {
@@ -581,11 +575,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleVoiceMode() {
         voiceMode = !voiceMode
-        collapseAttachmentPanel()
-        applyVoiceMode()
-    }
-
-    private fun applyVoiceMode() {
+        attachmentPanelActions().collapseAttachmentPanel()
         voiceModeActions().applyVoiceMode()
     }
 
@@ -636,7 +626,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = ::activeConversation,
             voiceHoldButton = { voiceHoldButton },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = ::applyVoiceMode
+            applyVoiceMode = { voiceModeActions().applyVoiceMode() }
         ).also { speechInputActions = it }
     }
 
