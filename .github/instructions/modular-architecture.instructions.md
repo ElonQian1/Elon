@@ -30,3 +30,69 @@ applyTo: "**"
 - `android/app/src/main/kotlin/com/elon/app/McpDebugServer.kt`：HTTP/MCP 协议、工具注册、诊断工具、任务控制、网络探测、JSON 组装、鉴权应拆分。
 - `server/src/project_api.rs`：HTTP handlers、WebSocket job、附件、Git/worktree、APK 分发、部署 key、项目状态应按领域拆分。
 - `server/src/ai_cli.rs`：prompt 构建、CLI 进程执行、stream parser、native session/prewarm、intent gate、环境检查应保持分模块。
+
+## 每次任务必做的"模块化执行清单"
+
+> 这是**强制流程**，不是建议。AI 代理改任何代码前先按下表过一遍。
+
+| # | 动作 | 命令 / 检查点 |
+|---|---|---|
+| 1 | 先看远端是否有人正在拆分 | `git fetch origin main && git log --oneline HEAD..origin/main` |
+| 2 | 看自己要改的文件当前多大 | `(Get-Content <file>).Count` 或 `wc -l <file>`，对照上方阈值 |
+| 3 | 看自己要新增的逻辑是否能落进已有模块 | 优先复用 / 扩展现有 sibling module，不另起新文件 |
+| 4 | 决策：在原文件内追加 vs 抽新模块 | 见下方"拆分决策树" |
+| 5 | 如果要抽：先做"纯搬迁"提交（行为不变），再单独提交"新功能" | 两个 commit，message 类型分别是 `refactor` 与 `feat`/`fix` |
+| 6 | 提交前再 `git fetch origin main`，避免其他 AI 已经抽走同一块 | 若已抽走则 rebase 后基于他们的拆分继续 |
+| 7 | 推送后立即 `git fetch origin main` 同步其他 AI 拆分进度 | 用 `git log --oneline --since="2 hours"` 看其他 AI 最近动作 |
+
+### 拆分决策树
+
+```
+我要新加 N 行逻辑
+  ├─ N < 50 行 且 目标文件 < 800 行 ─→ 直接加在原文件
+  ├─ N < 50 行 且 目标文件 ≥ 800 行 ─→ 看逻辑职责能否落进已有 sibling 模块；不能则新建小模块
+  ├─ 50 ≤ N < 200 行 ──────────────→ 默认新建 sibling 模块（域名清晰即可）
+  └─ N ≥ 200 行 或 涉及 ≥ 2 类职责 ─→ 必须新模块；如果原文件已 ≥ 1500 行，先拆原文件一块再加
+```
+
+### 多 AI 并发模块化的协作纪律
+
+- **同一巨型文件不要两个 AI 同时拆**：开始拆分前看 `git log --oneline --since="1 day" -- <file>`，最近 24 小时其他 AI 在改，就先选别的文件或等待。
+- **频繁 `git fetch`**：每完成一个"纯搬迁"小提交就 fetch 一次，看其他 AI 是否已经在另一个分支抽走相同代码块。
+- **抽出的模块名要稳定**：用领域名（`codex_stream`、`project_ws_protocol`、`peer_relay`），不要用 `utils`、`helpers`、`common` 这类垃圾筐名。
+- **commit message 必须显式标注**：`refactor(server): 抽取 <模块名>，瘦身 <原文件> 从 <旧行数> → <新行数>`，便于其他 AI 一眼看出拆分进度。
+- **不可强行重命名其他 AI 刚抽出的模块**：除非有充分理由（命名错误、领域混淆），否则尊重既有边界。
+
+## 禁止行为（出现即视为违规）
+
+- ❌ 在 1500 行以上文件中追加 ≥ 50 行新逻辑而没有顺手抽模块
+- ❌ 一次 commit 同时包含"重构 + 新功能"
+- ❌ 新建模块时漏掉 `mod` 声明 / import / 路由注册 / `git add`（pre-push hook 会拦截 Rust，其他语言要自查）
+- ❌ 用 `utils.rs` / `helpers.kt` / `common.ts` 这类无领域含义的命名
+- ❌ 不看 `git fetch` 结果就开始大改，导致和其他 AI 抽出的同一块代码冲突
+- ❌ 把"我只改这一个小功能"当借口在巨型文件里继续堆代码
+
+## 推荐目录形态
+
+```
+server/src/
+  main.rs                # 只声明 mod + 启动
+  router.rs              # 路由组装
+  types.rs               # 共享类型，<1200 行
+  <domain>.rs            # 每个领域一个文件，常态 < 1500 行
+  <domain>/              # 领域内继续拆分时，建子目录
+    mod.rs               # 只 re-export
+    handlers.rs
+    state.rs
+    parser.rs
+```
+
+```
+android/app/src/main/kotlin/com/elon/app/
+  MainActivity.kt        # 只做生命周期 + 顶层组装
+  ui/                    # Compose / View 组件
+  data/                  # repository / store
+  service/               # 后台服务、调度器
+  net/                   # HTTP / WS 客户端
+  feature/<name>/        # 按业务功能聚合
+```
