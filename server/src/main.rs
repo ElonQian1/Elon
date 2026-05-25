@@ -16,6 +16,7 @@ mod intent_router;
 mod peer_relay;
 mod project_api;
 mod project_attachments;
+mod project_conversation_workspace;
 mod project_git;
 mod project_ws_protocol;
 mod router;
