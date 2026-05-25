@@ -25,10 +25,7 @@ object CodexProgressNarrative {
             if (shouldExposeAssistantLine(userVisible)) {
                 return narrative(
                     key = "assistant:${userVisible.take(72)}",
-                    title = "开发说明",
-                    content = userVisible,
-                    trigger = clean,
-                    next = "继续按这个判断推进。"
+                    content = userVisible
                 )
             }
         }
@@ -36,10 +33,7 @@ object CodexProgressNarrative {
         return when {
             clean.contains("失败") || clean.contains("错误") || clean.contains("不可用") -> narrative(
                 key = "workflow_issue:${clean.take(48)}",
-                title = "遇到问题",
-                content = "当前流程遇到问题，我会先把原因定位清楚，再决定是继续修复、重试，还是需要你确认取舍。",
-                trigger = clean,
-                next = "定位失败原因。"
+                content = "当前流程遇到问题，我会先把原因定位清楚，再决定是继续修复、重试，还是需要你确认取舍。"
             )
             else -> null
         }
@@ -58,27 +52,18 @@ object CodexProgressNarrative {
             if (!shouldExposeAssistantLine(userVisible)) return null
             return narrative(
                 key = "assistant:${userVisible.take(72)}",
-                title = "开发说明",
-                content = userVisible,
-                trigger = clean,
-                next = "继续按这个判断推进。"
+                content = userVisible
             )
         }
 
         return when {
             category == "编译打包" && lower.contains("failed") -> narrative(
                 key = "cli_build_failed:${clean.take(40)}",
-                title = "构建失败",
-                content = "构建没有通过。我会根据失败原因继续修复，而不是直接把失败结果交给你。",
-                trigger = clean,
-                next = "定位构建失败原因。"
+                content = "构建没有通过。我会根据失败原因继续修复，而不是直接把失败结果交给你。"
             )
             category == "环境提示" && (lower.contains("failed") || lower.contains("error") || clean.contains("失败")) -> narrative(
                 key = "cli_environment_issue:${clean.take(40)}",
-                title = "环境阻塞",
-                content = "环境或执行过程出现了会影响任务的阻塞。我会先确认它是不是本次失败的原因。",
-                trigger = clean,
-                next = "确认是否需要修复环境或调整执行方式。"
+                content = "环境或执行过程出现了会影响任务的阻塞。我会先确认它是不是本次失败的原因。"
             )
             else -> null
         }
@@ -86,23 +71,13 @@ object CodexProgressNarrative {
 
     private fun narrative(
         key: String,
-        title: String,
-        content: String,
-        trigger: String,
-        next: String
+        content: String
     ): Narrative {
-        val evidence = listOf(
-            "阶段：$title",
-            "依据：${trigger.ifBlank { content }.cleanSignalText()}",
-            "下一步：$next"
-        ).joinToString("\n") { "· $it" }
         return Narrative(
             key = key,
             message = ChatMessage(
                 role = "ai-intent",
-                content = content,
-                evidenceTitle = "阶段说明 · $title",
-                evidenceDetails = evidence
+                content = content
             )
         )
     }

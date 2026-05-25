@@ -3773,8 +3773,8 @@ class MainActivity : AppCompatActivity() {
             else -> "开发实现"
         }
         updateStage(stage, hint)
-        maybeAppendVisibleCliSignal(category, line)
-        if (category != "模型回复") {
+        val surfaced = maybeAppendVisibleCliSignal(category, line)
+        if (!surfaced && category != "模型回复") {
             recordEvidence(evidenceKindForCliCategory(category), line)
         }
     }
@@ -3831,10 +3831,10 @@ class MainActivity : AppCompatActivity() {
         messages.addAll(compacted)
     }
 
-    private fun maybeAppendVisibleCliSignal(category: String, line: String) {
-        if (!activeRequestIsDevelopment) return
-        val narrative = CodexProgressNarrative.fromCliOutput(category, line) ?: return
-        appendProgressNarrative(narrative)
+    private fun maybeAppendVisibleCliSignal(category: String, line: String): Boolean {
+        if (!activeRequestIsDevelopment) return false
+        val narrative = CodexProgressNarrative.fromCliOutput(category, line) ?: return false
+        return appendProgressNarrative(narrative)
     }
 
     private fun maybeAppendWorkflowProgressNarrative(content: String): Boolean {
@@ -3927,7 +3927,7 @@ class MainActivity : AppCompatActivity() {
                         return
                     }
                     val surfaced = maybeAppendWorkflowProgressNarrative(content)
-                    handleProgress(content)
+                    handleProgress(content, recordProgressEvidence = !surfaced)
                     if (surfaced) return
                     if (shouldShowProgressBubble(content)) {
                         ChatMessage("ai-progress", workflowProgressMessage(content))
@@ -4046,7 +4046,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleProgress(content: String) {
+    private fun handleProgress(content: String, recordProgressEvidence: Boolean = true) {
         val lower = content.lowercase(Locale.CHINA)
         val facing = userFacingProgress(content)
         when {
@@ -4081,7 +4081,7 @@ class MainActivity : AppCompatActivity() {
             else ->
                 updateStage("开发实现", facing)
         }
-        if (!content.startsWith("CLI 仍在运行")) {
+        if (recordProgressEvidence && !content.startsWith("CLI 仍在运行")) {
             recordEvidence("progress", userFacingProgress(content))
         }
         addProjectEvent("进度更新：${summarize(content, 30)}")
