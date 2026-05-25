@@ -714,6 +714,7 @@ class MainActivity : AppCompatActivity() {
         inputComposerMotion = InputComposerMotion(
             expandedInputContainer = expandedInputContainer,
             collapsedInputContainer = inputCenterContainer,
+            collapsedText = collapsedInputPreview,
             modelButton = modelButtonShell,
             rightControls = inputRightControls
         )
@@ -792,7 +793,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateCollapsedInputPreview() {
         if (!::collapsedInputPreview.isInitialized) return
-        collapsedInputPreview.text = "文本内容在此输入。"
+        val draft = binding.inputEdit.text?.toString().orEmpty()
+        collapsedInputPreview.text = draft.ifBlank { "文本内容在此输入。" }
     }
 
     private fun focusInputComposer() {
@@ -1371,8 +1373,10 @@ class MainActivity : AppCompatActivity() {
             pageTransitionRunning = true
             WechatPageTransition.exitToRight(
                 container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage, binding.inputLayout),
-                incoming = listOf(binding.conversationPage, binding.pageTabs),
+                outgoing = listOf(binding.chatPage),
+                incoming = listOf(binding.conversationPage),
+                outgoingFull = listOf(binding.inputLayout),
+                incomingFull = listOf(binding.pageTabs),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
                     binding.inputLayout.visibility = View.GONE
@@ -1410,8 +1414,10 @@ class MainActivity : AppCompatActivity() {
             pageTransitionRunning = true
             WechatPageTransition.enterFromRight(
                 container = binding.contentContainer,
-                incoming = listOf(binding.chatPage, binding.inputLayout),
-                outgoing = listOf(binding.conversationPage, binding.pageTabs),
+                incoming = listOf(binding.chatPage),
+                outgoing = listOf(binding.conversationPage),
+                incomingFull = listOf(binding.inputLayout),
+                outgoingFull = listOf(binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
                     binding.pageTabs.visibility = View.GONE
