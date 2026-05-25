@@ -21,6 +21,7 @@ mod project_ws_protocol;
 mod router;
 mod server_trace;
 mod store;
+mod store_schema;
 mod tools;
 mod types;
 mod user_api;
