@@ -18,6 +18,7 @@ mod peer_relay;
 mod project_api;
 mod project_attachments;
 mod project_auth;
+mod project_chat_reply;
 mod project_conversation_workspace;
 mod project_git;
 mod project_mobile;
