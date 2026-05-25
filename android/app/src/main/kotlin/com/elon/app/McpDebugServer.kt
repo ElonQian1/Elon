@@ -1599,9 +1599,9 @@ object McpDebugServer {
             .put("app", statusJson(includeToken = false))
             .put("debug_session", debugSessionJson(prefs))
             .put("background_debug", backgroundDebugStatusJson())
-            .put("memory", memoryJson())
-            .put("battery", batteryJson())
-            .put("network", networkCapabilitiesJson())
+            .put("memory", memoryJson(appContext))
+            .put("battery", batteryJson(appContext))
+            .put("network", networkCapabilitiesJson(appContext))
             .put("build", buildJson())
     }
 
@@ -1611,9 +1611,9 @@ object McpDebugServer {
         val processState = processStateJson()
         val appForeground = processState.optBoolean("foreground", appForegroundRecorded)
         val keepalive = McpDebugKeepAliveService.statusJson(appContext)
-        val notificationPermission = notificationPermissionJson()
-        val batteryOptimization = batteryOptimizationJson()
-        val network = networkCapabilitiesJson()
+        val notificationPermission = notificationPermissionJson(appContext)
+        val batteryOptimization = batteryOptimizationJson(appContext)
+        val network = networkCapabilitiesJson(appContext)
         val keepaliveActive = keepalive.optBoolean("active", false)
         val caveats = JSONArray()
         val recommendations = JSONArray()
@@ -1902,144 +1902,12 @@ object McpDebugServer {
             .put("next_actions", nextActions)
     }
 
-    private fun processStateJson(): JSONObject {
-        val info = ActivityManager.RunningAppProcessInfo()
-        runCatching { ActivityManager.getMyMemoryState(info) }
-        val foreground = info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
-        val foregroundOrService = info.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE
-        return JSONObject()
-            .put("importance", info.importance)
-            .put("importance_name", processImportanceName(info.importance))
-            .put("foreground", foreground)
-            .put("foreground_or_service", foregroundOrService)
-            .put("last_trim_level", info.lastTrimLevel)
-    }
-
-    private fun processImportanceName(importance: Int): String {
-        return when (importance) {
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND -> "foreground"
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE -> "foreground_service"
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE -> "visible"
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_PERCEPTIBLE -> "perceptible"
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED -> "cached"
-            ActivityManager.RunningAppProcessInfo.IMPORTANCE_GONE -> "gone"
-            else -> "unknown_$importance"
-        }
-    }
-
-    private fun notificationPermissionJson(): JSONObject {
-        val requiresRuntimePermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        val granted = !requiresRuntimePermission ||
-            ContextCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
-        return JSONObject()
-            .put("permission", Manifest.permission.POST_NOTIFICATIONS)
-            .put("requires_runtime_permission", requiresRuntimePermission)
-            .put("granted", granted)
-    }
-
-    private fun batteryOptimizationJson(): JSONObject {
-        val powerManager = appContext.getSystemService(PowerManager::class.java)
-        val ignoring = runCatching {
-            powerManager.isIgnoringBatteryOptimizations(appContext.packageName)
-        }.getOrDefault(true)
-        val powerSaveMode = runCatching { powerManager.isPowerSaveMode }.getOrDefault(false)
-        return JSONObject()
-            .put("ignoring", ignoring)
-            .put("power_save_mode", powerSaveMode)
-            .put("request_intent_action", Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-            .put("request_intent_data", "package:${appContext.packageName}")
-    }
-
-    private fun memoryJson(): JSONObject {
-        val runtime = Runtime.getRuntime()
-        val activityManager = appContext.getSystemService(ActivityManager::class.java)
-        val memoryInfo = ActivityManager.MemoryInfo()
-        runCatching { activityManager.getMemoryInfo(memoryInfo) }
-        return JSONObject()
-            .put("runtime_max_bytes", runtime.maxMemory())
-            .put("runtime_total_bytes", runtime.totalMemory())
-            .put("runtime_free_bytes", runtime.freeMemory())
-            .put("runtime_used_bytes", runtime.totalMemory() - runtime.freeMemory())
-            .put("system_avail_bytes", memoryInfo.availMem)
-            .put("system_total_bytes", memoryInfo.totalMem)
-            .put("system_threshold_bytes", memoryInfo.threshold)
-            .put("system_low_memory", memoryInfo.lowMemory)
-    }
-
-    private fun batteryJson(): JSONObject {
-        val intent = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
-        val temperatureTenths = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
-            ?: Int.MIN_VALUE
-        return JSONObject()
-            .put("level_percent", if (level >= 0 && scale > 0) (level * 100.0 / scale) else JSONObject.NULL)
-            .put("status", batteryStatusName(status))
-            .put("plugged", plugged != 0)
-            .put("plugged_kind", batteryPluggedKind(plugged))
-            .put(
-                "temperature_c",
-                if (temperatureTenths != Int.MIN_VALUE) temperatureTenths / 10.0 else JSONObject.NULL
-            )
-            .put("voltage_mv", intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)?.takeIf { it >= 0 } ?: JSONObject.NULL)
-    }
-
-    private fun batteryStatusName(status: Int): String {
-        return when (status) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
-            BatteryManager.BATTERY_STATUS_DISCHARGING -> "discharging"
-            BatteryManager.BATTERY_STATUS_FULL -> "full"
-            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "not_charging"
-            else -> "unknown"
-        }
-    }
-
-    private fun batteryPluggedKind(plugged: Int): String {
-        return when {
-            plugged and BatteryManager.BATTERY_PLUGGED_USB != 0 -> "usb"
-            plugged and BatteryManager.BATTERY_PLUGGED_AC != 0 -> "ac"
-            plugged and BatteryManager.BATTERY_PLUGGED_WIRELESS != 0 -> "wireless"
-            else -> "none"
-        }
-    }
-
-    private fun networkCapabilitiesJson(): JSONObject {
-        val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
-        val network = connectivity.activeNetwork
-        val caps = network?.let { connectivity.getNetworkCapabilities(it) }
-        return JSONObject()
-            .put("active", network != null)
-            .put("internet", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false)
-            .put("validated", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) ?: false)
-            .put("not_metered", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) ?: false)
-            .put("transports", JSONArray().apply {
-                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) put("wifi")
-                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true) put("cellular")
-                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true) put("ethernet")
-                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) put("vpn")
-            })
-    }
-
-    private fun buildJson(): JSONObject {
-        return JSONObject()
-            .put("manufacturer", Build.MANUFACTURER)
-            .put("brand", Build.BRAND)
-            .put("model", Build.MODEL)
-            .put("device", Build.DEVICE)
-            .put("sdk_int", Build.VERSION.SDK_INT)
-            .put("release", Build.VERSION.RELEASE)
-            .put("supported_abis", JSONArray().apply { Build.SUPPORTED_ABIS.forEach { put(it) } })
-    }
-
     private fun networkCheckJson(args: JSONObject): JSONObject {
         val urls = urlsFromArgs(args)
         val tcpHost = args.optString("tcp_host").takeIf { it.isNotBlank() } ?: "43.139.149.158"
         val tcpPort = args.optInt("tcp_port", 8080).takeIf { it in 1..65535 } ?: 8080
         return JSONObject()
-            .put("network", networkCapabilitiesJson())
+            .put("network", networkCapabilitiesJson(appContext))
             .put("tcp_probe", tcpProbe(tcpHost, tcpPort))
             .put("http_probes", JSONArray().apply { urls.forEach { put(httpProbe(it)) } })
     }
