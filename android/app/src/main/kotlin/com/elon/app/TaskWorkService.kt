@@ -1,22 +1,11 @@
 package com.elon.app
 
-import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -50,7 +39,7 @@ class TaskWorkService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createChannels()
+        createTaskWorkNotificationChannels(this)
         restorePendingWork()
         if (hasActiveTasks()) connectAll()
     }
@@ -390,7 +379,7 @@ class TaskWorkService : Service() {
         when (messageType) {
             "app_update_available" -> {
                 if (!isAppInForeground()) {
-                    showAppUpdateNotification(parsed)
+                    showAppUpdateNotification(this, parsed)
                 }
             }
             "done" -> finishWork(task.traceId, parsed, success = true)
@@ -423,6 +412,8 @@ class TaskWorkService : Service() {
         persistActiveWork()
         if (!isAppInForeground()) {
             notifyBackgroundTaskCompleted(
+                context = this,
+                prefs = prefs,
                 wasDevelopment = task.isDevelopment,
                 apkUrl = apkUrl,
                 success = success
@@ -477,150 +468,7 @@ class TaskWorkService : Service() {
     }
 
     private fun enterForeground() {
-        startForeground(ACTIVE_WORK_NOTIFICATION_ID, buildActiveNotification())
-    }
-
-    private fun buildActiveNotification() =
-        NotificationCompat.Builder(this, ACTIVE_WORK_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_task_done)
-            .setContentTitle("一龙正在处理任务")
-            .setContentText("切到其他应用时，任务会继续在后台运行。")
-            .setContentIntent(mainActivityPendingIntent())
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
-
-    private fun notifyBackgroundTaskCompleted(wasDevelopment: Boolean, apkUrl: String?, success: Boolean) {
-        val count = prefs.getInt(PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
-        prefs.edit().putInt(PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
-        updateLauncherBadgeCount(count)
-        showTaskCompletedNotification(count, wasDevelopment, apkUrl, success)
-    }
-
-    private fun showTaskCompletedNotification(
-        count: Int,
-        wasDevelopment: Boolean,
-        apkUrl: String?,
-        success: Boolean
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val title = when {
-            !success -> "任务需要处理"
-            wasDevelopment -> "开发任务已完成"
-            else -> "任务已完成"
-        }
-        val text = if (apkUrl != null) {
-            "已有 $count 个任务完成，APK 可以下载测试。"
-        } else {
-            "已有 $count 个任务完成，点击查看结果。"
-        }
-        val notification = NotificationCompat.Builder(this, TASK_COMPLETE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_task_done)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setNumber(count)
-            .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
-            .setContentIntent(mainActivityPendingIntent())
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        runCatching {
-            NotificationManagerCompat.from(this).notify(TASK_COMPLETE_NOTIFICATION_ID, notification)
-        }
-    }
-
-    private fun mainActivityPendingIntent(): PendingIntent {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        return PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
-
-    private fun showAppUpdateNotification(json: JSONObject) {
-        val versionCode = json.optInt("versionCode", 0)
-        if (versionCode <= BuildConfig.VERSION_CODE) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        val versionName = json.optString("versionName").takeIf { it.isNotBlank() } ?: "新版"
-        val changelog = json.optString("changelog").takeIf { it.isNotBlank() }
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_SHOW_APP_UPDATE, true)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            2,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val notification = NotificationCompat.Builder(this, APP_UPDATE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_task_done)
-            .setContentTitle("一龙有新版本 v$versionName")
-            .setContentText(changelog ?: "点击查看并安装更新")
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        runCatching {
-            NotificationManagerCompat.from(this).notify(APP_UPDATE_NOTIFICATION_ID, notification)
-        }
-    }
-
-    private fun createChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                ACTIVE_WORK_CHANNEL_ID,
-                "后台任务运行",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "任务执行中保持后台连接"
-                setShowBadge(false)
-            }
-        )
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                TASK_COMPLETE_CHANNEL_ID,
-                "任务完成提醒",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "后台任务完成后显示桌面角标"
-                setShowBadge(true)
-            }
-        )
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                APP_UPDATE_CHANNEL_ID,
-                "应用更新提醒",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "一龙 APP 有新版本时提醒"
-                setShowBadge(true)
-            }
-        )
+        startForeground(ACTIVE_WORK_NOTIFICATION_ID, activeTaskNotification(this))
     }
 
     private fun broadcastMessage(task: RunningTask, raw: String) {
@@ -784,23 +632,6 @@ class TaskWorkService : Service() {
     private fun pendingWorkAgeMs(tasks: List<RunningTask>): Long? {
         val oldest = tasks.map { it.startedAtMs }.filter { it > 0L }.minOrNull() ?: return null
         return System.currentTimeMillis() - oldest
-    }
-
-    private fun updateLauncherBadgeCount(count: Int) {
-        val badge = count.coerceAtLeast(0)
-        val payload = Bundle().apply {
-            putString("package", packageName)
-            putString("class", MainActivity::class.java.name)
-            putInt("badgenumber", badge)
-        }
-        listOf(
-            "content://com.huawei.android.launcher.settings/badge/",
-            "content://com.hihonor.android.launcher.settings/badge/"
-        ).forEach { badgeUri ->
-            runCatching {
-                contentResolver.call(Uri.parse(badgeUri), "change_badge", null, payload)
-            }
-        }
     }
 
     companion object {
