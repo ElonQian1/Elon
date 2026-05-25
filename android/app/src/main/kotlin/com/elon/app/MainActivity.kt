@@ -129,6 +129,7 @@ class MainActivity : AppCompatActivity() {
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
     private var modelActions: MainModelActions? = null
+    private var projectActions: MainProjectActions? = null
     private var stageHintAnimator: ValueAnimator? = null
     private var stageHintShimmerToken = 0
     private var exitConfirmDialog: AlertDialog? = null
@@ -1491,36 +1492,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCreateProjectDialog() {
-        val input = titleEditText("新项目 ${projects.size + 1}")
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("新建项目")
-            .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("创建", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val title = input.text.toString().trim()
-                if (title.isBlank()) {
-                    input.error = "请输入项目名称"
-                    return@setOnClickListener
-                }
-                createProject(title)
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
-        input.selectAll()
-    }
-
-    private fun createProject(title: String) {
-        projects.add(newAppProject(title, "新项目 · 点击进入会话"))
-        activeProjectIndex = projects.lastIndex
-        activeConversationIndex = 0
-        saveProjects()
-        renderProjectList()
-        binding.tabChat.performClick()
+        projectActions().showCreateProjectDialog()
     }
 
     private fun showConversationActions(index: Int) {
@@ -2258,74 +2230,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showProjectActions(index: Int) {
         if (index !in projects.indices) return
-        val project = projects[index]
-        val actions = if (projects.size <= 1) {
-            arrayOf("编辑项目名称", "Git 仓库")
-        } else {
-            arrayOf("编辑项目名称", "Git 仓库", "删除项目")
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(project.title)
-            .setItems(actions) { _, which ->
-                when (actions[which]) {
-                    "编辑项目名称" -> showRenameProjectDialog(index)
-                    "Git 仓库" -> {
-                        openProject(index)
-                        showGitProjectDialog()
-                    }
-                    "删除项目" -> confirmDeleteProject(index)
-                }
-            }
-            .show()
-    }
-
-    private fun showRenameProjectDialog(index: Int) {
-        if (index !in projects.indices) return
-        val project = projects[index]
-        val input = titleEditText(project.title)
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("编辑项目名称")
-            .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("保存", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val title = input.text.toString().trim()
-                if (title.isBlank()) {
-                    input.error = "请输入项目名称"
-                    return@setOnClickListener
-                }
-                project.title = summarize(title, 24)
-                project.updatedAt = System.currentTimeMillis()
-                saveProjects()
-                renderProjectList()
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
-        input.selectAll()
-    }
-
-    private fun confirmDeleteProject(index: Int) {
-        if (index !in projects.indices || projects.size <= 1) return
-        AlertDialog.Builder(this)
-            .setTitle("删除项目")
-            .setMessage("删除后这个项目下的会话和进度记录会从本机移除。")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("删除") { _, _ -> deleteProject(index) }
-            .show()
-    }
-
-    private fun deleteProject(index: Int) {
-        if (index !in projects.indices || projects.size <= 1) return
-        projects.removeAt(index)
-        activeProjectIndex = activeProjectIndex.coerceAtMost(projects.lastIndex)
-        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
-        saveProjects()
-        renderProjectList()
+        projectActions().showProjectActions(index)
     }
 
     private fun isConversationWorking(index: Int): Boolean {
@@ -2348,6 +2253,23 @@ class MainActivity : AppCompatActivity() {
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { homeRows = it }
+    }
+
+    private fun projectActions(): MainProjectActions {
+        projectActions?.let { return it }
+        return MainProjectActions(
+            activity = this,
+            binding = binding,
+            projects = projects,
+            activeProjectIndexProvider = { activeProjectIndex },
+            setActiveProjectIndex = { activeProjectIndex = it },
+            setActiveConversationIndex = { activeConversationIndex = it },
+            titleEditText = ::titleEditText,
+            saveProjects = ::saveProjects,
+            renderProjectList = ::renderProjectList,
+            openProject = ::openProject,
+            showGitProjectDialog = ::showGitProjectDialog
+        ).also { projectActions = it }
     }
 
     private fun selectableForeground() = runCatching {
