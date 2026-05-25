@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -11,15 +10,11 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.text.Editable
 import android.text.InputType
-import android.text.TextUtils
-import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -470,257 +465,41 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     private fun setupInputComposer() {
-        val root = binding.inputLayout
-        val inputEdit = binding.inputEdit
-        val modelButton = binding.modelButton
-        val sendButton = binding.sendButton
+        val views = MainInputComposerSetup(
+            activity = this,
+            binding = binding,
+            dp = ::dp,
+            currentModelLabel = { modelActions().currentModelLabel },
+            isVoiceMode = { voiceMode },
+            shouldAnimateInputFocus = { !suppressInputFocusAnimation },
+            isAttachmentPanelOpen = { attachmentPanelOpen },
+            toggleVoiceMode = ::toggleVoiceMode,
+            focusInputComposer = ::focusInputComposer,
+            startSpeechToText = ::startSpeechToText,
+            stopSpeechToText = ::stopSpeechToText,
+            showModelPopupOrLoad = ::showModelPopupOrLoad,
+            sendMessage = ::sendMessage,
+            toggleAttachmentPanel = ::toggleAttachmentPanel,
+            buildAttachmentPanel = ::buildAttachmentPanel,
+            collapseAttachmentPanel = ::collapseAttachmentPanel,
+            collapseInputComposer = { collapseInputComposer() },
+            updateCollapsedInputPreview = ::updateCollapsedInputPreview,
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+        ).setup()
 
-        inputEdit.detachFromParent()
-        modelButton.detachFromParent()
-        sendButton.detachFromParent()
-        root.removeAllViews()
-        root.orientation = LinearLayout.VERTICAL
-        root.setPadding(0, 0, 0, 0)
-        root.setBackgroundColor(Color.parseColor("#1E1E1E"))
-
-        expandedInputContainer = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0
-            ).apply {
-                marginStart = dp(24)
-                marginEnd = dp(24)
-            }
-        }
-
-        inputBarContainer = LinearLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(60)
-            )
-            minimumHeight = dp(60)
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), dp(6), dp(14), dp(6))
-        }
-
-        // WeChat-scale circular controls: compact 42dp touch area with a 30dp visual icon.
-        inputModeButton = ImageButton(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                marginEnd = dp(10)
-            }
-            background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_input_voice_circle)
-            scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            contentDescription = "切换语音输入"
-            setOnClickListener { toggleVoiceMode() }
-        }
-
-        inputCenterContainer = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                dp(40),
-                1f
-            )
-            setBackgroundResource(R.drawable.bg_input_pill)
-            minimumHeight = dp(40)
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { focusInputComposer() }
-        }
-
-        collapsedInputPreview = TextView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            includeFontPadding = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(18), 0, dp(18), 0)
-            text = "文本内容在此输入。"
-            setTextColor(Color.parseColor("#A8D0D0D0"))
-            textSize = 15f
-            isClickable = true
-            setOnClickListener { focusInputComposer() }
-        }
-
-        inputEdit.apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            background = ColorDrawable(Color.TRANSPARENT)
-            hint = "文本内容在此输入。"
-            minLines = 1
-            maxLines = 4
-            setSingleLine(false)
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            isVerticalScrollBarEnabled = false
-            includeFontPadding = true
-            setHorizontallyScrolling(false)
-            setPadding(0, dp(8), 0, dp(6))
-            setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#A8D0D0D0"))
-            textSize = 15f
-            setOnFocusChangeListener { _, hasFocus ->
-                if (!voiceMode) {
-                    inputComposerMotion.setExpanded(hasFocus, animate = !suppressInputFocusAnimation)
-                    updateSendButtonVisual()
-                    updateAdaptiveInputHeight()
-                }
-            }
-        }
-
-        voiceHoldButton = TextView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = "按住 说话"
-            setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 15f
-            visibility = View.GONE
-            setOnTouchListener { _, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        startSpeechToText()
-                        true
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        stopSpeechToText()
-                        true
-                    }
-                    else -> true
-                }
-            }
-        }
-
-        modelButtonShell = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(86), dp(32)).apply {
-                marginEnd = dp(10)
-            }
-            background = getDrawable(R.drawable.bg_model_pill_light)
-            alpha = 0f
-            visibility = View.GONE
-            isClickable = true
-            isFocusable = true
-            contentDescription = "选择模型：${modelActions().currentModelLabel}"
-            setOnClickListener { showModelPopupOrLoad() }
-        }
-
-        modelButton.apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            background = ColorDrawable(Color.TRANSPARENT)
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
-            includeFontPadding = false
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(16), 0, dp(30), 0)
-            setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
-            setTextColor(Color.parseColor("#2D2D2D"))
-            textSize = 12.5f
-            setOnClickListener { showModelPopupOrLoad() }
-        }
-
-        val modelChevron = ImageView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(13), dp(13), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                marginEnd = dp(13)
-            }
-            setImageResource(R.drawable.ic_input_model_chevron)
-            scaleType = ImageView.ScaleType.CENTER
-            alpha = 0.9f
-            isClickable = false
-            isFocusable = false
-        }
-        modelButtonShell.addView(modelButton)
-        modelButtonShell.addView(modelChevron)
-
-        inputCenterContainer.addView(collapsedInputPreview)
-        expandedInputContainer.addView(inputEdit)
-        expandedInputContainer.addView(voiceHoldButton)
-
-        inputRightControls = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
-        }
-
-        attachmentButton = ImageButton(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.START or Gravity.CENTER_VERTICAL)
-            background = ColorDrawable(Color.TRANSPARENT)
-            setImageResource(R.drawable.ic_add_circle_simple)
-            scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            contentDescription = "展开更多输入功能"
-            setOnClickListener { toggleAttachmentPanel() }
-        }
-
-        sendButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END or Gravity.CENTER_VERTICAL)
-            background = getDrawable(R.drawable.ic_input_send_arrow_circle)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = ""
-            setOnClickListener { sendMessage() }
-        }
-
-        inputBarContainer.addView(inputModeButton)
-        inputBarContainer.addView(modelButtonShell)
-        inputBarContainer.addView(inputCenterContainer)
-        inputRightControls.addView(attachmentButton)
-        inputRightControls.addView(sendButton)
-        inputBarContainer.addView(inputRightControls)
-
-        attachmentPanel = buildAttachmentPanel()
-        root.addView(expandedInputContainer)
-        root.addView(inputBarContainer)
-        root.addView(attachmentPanel)
-
-        inputComposerMotion = InputComposerMotion(
-            expandedInputContainer = expandedInputContainer,
-            collapsedInputContainer = inputCenterContainer,
-            collapsedText = collapsedInputPreview,
-            modelButton = modelButtonShell,
-            rightControls = inputRightControls
-        )
-        inputEdit.setOnClickListener {
-            if (!inputComposerMotion.isExpanded && !voiceMode) {
-                inputComposerMotion.setExpanded(true, animate = true)
-            }
-        }
-
-        inputEdit.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                updateCollapsedInputPreview()
-                updateSendButtonVisual()
-                updateAdaptiveInputHeight()
-            }
-            override fun afterTextChanged(s: Editable?) = Unit
-        })
-
-        binding.chatList.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_DOWN) {
-                if (attachmentPanelOpen) {
-                    collapseAttachmentPanel()
-                }
-                collapseInputComposer()
-            }
-            false
-        }
-        binding.stageHintText.setOnClickListener {
-            collapseAttachmentPanel()
-            collapseInputComposer()
-        }
+        inputModeButton = views.inputModeButton
+        attachmentButton = views.attachmentButton
+        voiceHoldButton = views.voiceHoldButton
+        inputBarContainer = views.inputBarContainer
+        inputCenterContainer = views.inputCenterContainer
+        expandedInputContainer = views.expandedInputContainer
+        collapsedInputPreview = views.collapsedInputPreview
+        modelButtonShell = views.modelButtonShell
+        inputRightControls = views.inputRightControls
+        inputComposerMotion = views.inputComposerMotion
+        attachmentPanel = views.attachmentPanel
         applyVoiceMode()
         updateCollapsedInputPreview()
         updateSendButtonVisual()
