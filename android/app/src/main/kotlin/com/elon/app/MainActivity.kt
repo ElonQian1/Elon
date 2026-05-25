@@ -161,6 +161,7 @@ class MainActivity : AppCompatActivity() {
     private var attachmentIconAnimationToken = 0
     private var voiceMode = false
     private var inputCanSend = true
+    private var suppressInputFocusAnimation = false
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListeningForSpeech = false
     private val speechPermissionRequest = 4301
@@ -602,7 +603,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!voiceMode) {
-                    inputComposerMotion.setExpanded(hasFocus, animate = true)
+                    inputComposerMotion.setExpanded(hasFocus, animate = !suppressInputFocusAnimation)
                     updateSendButtonVisual()
                     updateAdaptiveInputHeight()
                 }
@@ -828,7 +829,12 @@ class MainActivity : AppCompatActivity() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
         if (binding.inputEdit.hasFocus()) {
-            binding.inputEdit.clearFocus()
+            suppressInputFocusAnimation = !animate
+            try {
+                binding.inputEdit.clearFocus()
+            } finally {
+                suppressInputFocusAnimation = false
+            }
         }
         if (inputComposerMotion.isExpanded) {
             inputComposerMotion.setExpanded(false, animate = animate)
@@ -1358,7 +1364,7 @@ class MainActivity : AppCompatActivity() {
     private fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
         if (binding.chatPage.visibility == View.VISIBLE) {
-            collapseInputComposer()
+            collapseInputComposer(animate = false)
             showConversationHome(animate = true)
             return
         }
@@ -1373,7 +1379,7 @@ class MainActivity : AppCompatActivity() {
             pageTransitionRunning = true
             WechatPageTransition.exitToRight(
                 container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage, binding.inputLayout),
+                outgoing = listOf(binding.chatPage),
                 incoming = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
@@ -1408,10 +1414,12 @@ class MainActivity : AppCompatActivity() {
         actionPopup?.dismiss()
         applyChatChrome()
         if (shouldAnimate) {
+            collapseInputComposer(animate = false)
+            binding.inputLayout.visibility = View.GONE
             pageTransitionRunning = true
             WechatPageTransition.enterFromRight(
                 container = binding.contentContainer,
-                incoming = listOf(binding.chatPage, binding.inputLayout),
+                incoming = listOf(binding.chatPage),
                 outgoing = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
