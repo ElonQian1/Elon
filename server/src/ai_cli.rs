@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::{
     path::Path,
     path::PathBuf,
@@ -19,6 +19,12 @@ use crate::{
         build_prewarm_cli_prompt,
     },
     ai_cli_streaming::{current_unix_millis, read_cli_stream, send_cli_heartbeat},
+    ai_cli_trace::{
+        CliTraceContext, clean_trace_id_opt, record_cli_done, record_cli_error, record_cli_retry,
+        record_cli_session_skipped, record_cli_start, record_codex_network_gate,
+        record_intent_gate_fallback, record_lightweight_chat_fallback,
+        record_native_session_repair_event, record_prewarm_session_hit,
+    },
     intent_router,
     store::ConversationMessage,
     tools,
@@ -767,21 +773,10 @@ pub async fn run_with_workspace(
     Ok(())
 }
 
-struct CliOutput {
-    success: bool,
-    stdout: String,
-    stderr: String,
-}
-
-#[derive(Clone, Copy)]
-struct CliTraceContext<'a> {
-    state: &'a Arc<AppState>,
-    trace_id: Option<&'a str>,
-    operation: &'static str,
-    attempt: &'static str,
-    route: Option<intent_router::CapabilityRoute>,
-    development_task: Option<bool>,
-    prompt_bootstrapped: Option<bool>,
+pub(crate) struct CliOutput {
+    pub(crate) success: bool,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
 }
 
 fn supports_codex_sessions(option: &AiCliOption) -> bool {
@@ -1072,227 +1067,6 @@ async fn run_cli_command_traced(
         }
     }
     result
-}
-
-fn record_codex_network_gate(
-    trace: CliTraceContext<'_>,
-    option: &AiCliOption,
-    status: &'static str,
-    error: &str,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace.trace_id) else {
-        return;
-    };
-    trace.state.server_traces.record(
-        trace_id,
-        "codex_network_gate",
-        json!({
-            "operation": trace.operation,
-            "attempt": trace.attempt,
-            "option_id": &option.id,
-            "provider": &option.provider,
-            "status": status,
-            "error": truncate_chars(error, 500),
-        }),
-    );
-}
-
-fn record_cli_start(
-    trace: CliTraceContext<'_>,
-    option: &AiCliOption,
-    workspace: &Path,
-    prompt: &str,
-    native_session_id: Option<&str>,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace.trace_id) else {
-        return;
-    };
-    trace.state.server_traces.record(
-        trace_id,
-        "codex_cli_start",
-        json!({
-            "operation": trace.operation,
-            "attempt": trace.attempt,
-            "option_id": &option.id,
-            "provider": &option.provider,
-            "route": trace.route.map(|route| format!("{route:?}")),
-            "development_task": trace.development_task,
-            "prompt_bootstrapped": trace.prompt_bootstrapped,
-            "prompt_chars": prompt.chars().count(),
-            "prompt_bytes": prompt.len(),
-            "native_session_hit": native_session_id.is_some(),
-            "native_thread_uri": native_session_id.map(codex_thread_uri),
-            "workspace": workspace.display().to_string(),
-            "timeout_secs": option.timeout_secs,
-        }),
-    );
-}
-
-fn record_cli_done(
-    trace: CliTraceContext<'_>,
-    option: &AiCliOption,
-    native_session_id: Option<&str>,
-    output: &CliOutput,
-    elapsed_ms: u128,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace.trace_id) else {
-        return;
-    };
-    let thread_id = extract_thread_id(&output.stdout);
-    trace.state.server_traces.record(
-        trace_id,
-        "codex_cli_done",
-        json!({
-            "operation": trace.operation,
-            "attempt": trace.attempt,
-            "option_id": &option.id,
-            "provider": &option.provider,
-            "route": trace.route.map(|route| format!("{route:?}")),
-            "development_task": trace.development_task,
-            "prompt_bootstrapped": trace.prompt_bootstrapped,
-            "native_session_hit": native_session_id.is_some(),
-            "native_thread_uri": native_session_id.map(codex_thread_uri),
-            "new_thread_uri": thread_id.as_deref().map(codex_thread_uri),
-            "success": output.success,
-            "elapsed_ms": elapsed_ms,
-            "stdout_bytes": output.stdout.len(),
-            "stderr_bytes": output.stderr.len(),
-            "stdout_chars": output.stdout.chars().count(),
-            "stderr_chars": output.stderr.chars().count(),
-        }),
-    );
-}
-
-fn record_cli_error(
-    trace: CliTraceContext<'_>,
-    option: &AiCliOption,
-    native_session_id: Option<&str>,
-    error: &anyhow::Error,
-    elapsed_ms: u128,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace.trace_id) else {
-        return;
-    };
-    trace.state.server_traces.record(
-        trace_id,
-        "codex_cli_error",
-        json!({
-            "operation": trace.operation,
-            "attempt": trace.attempt,
-            "option_id": &option.id,
-            "provider": &option.provider,
-            "route": trace.route.map(|route| format!("{route:?}")),
-            "development_task": trace.development_task,
-            "prompt_bootstrapped": trace.prompt_bootstrapped,
-            "native_session_hit": native_session_id.is_some(),
-            "native_thread_uri": native_session_id.map(codex_thread_uri),
-            "elapsed_ms": elapsed_ms,
-            "error": error.to_string(),
-        }),
-    );
-}
-
-fn record_cli_retry(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    operation: &'static str,
-    stale_session_id: Option<&str>,
-    reason: &'static str,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(
-        trace_id,
-        "codex_cli_retry",
-        json!({
-            "operation": operation,
-            "reason": reason,
-            "stale_thread_uri": stale_session_id.map(codex_thread_uri),
-        }),
-    );
-}
-
-fn record_cli_session_skipped(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    operation: &'static str,
-    reason: &'static str,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(
-        trace_id,
-        "codex_cli_session_skipped",
-        json!({
-            "operation": operation,
-            "reason": reason,
-        }),
-    );
-}
-
-fn record_intent_gate_fallback(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    reason: &'static str,
-    error: &str,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(
-        trace_id,
-        "codex_intent_gate_fallback",
-        json!({
-            "reason": reason,
-            "error": truncate_chars(error, 500),
-        }),
-    );
-}
-
-fn record_lightweight_chat_fallback(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    reason: &'static str,
-    error: &str,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(
-        trace_id,
-        "codex_lightweight_chat_fallback",
-        json!({
-            "reason": reason,
-            "error": truncate_chars(error, 500),
-        }),
-    );
-}
-
-fn record_prewarm_session_hit(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    scope: &NativeSessionScope,
-    workspace_key: &str,
-    native_session_id: Option<&str>,
-    elapsed_ms: u128,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(
-        trace_id,
-        "codex_prewarm_session_hit",
-        json!({
-            "project_id": &scope.project_id,
-            "user_id": &scope.user_id,
-            "conversation_id": &scope.conversation_id,
-            "workspace": workspace_key,
-            "native_thread_uri": native_session_id.map(codex_thread_uri),
-            "elapsed_ms": elapsed_ms,
-        }),
-    );
 }
 
 async fn run_cli_command(
@@ -1669,18 +1443,6 @@ fn schedule_background_native_session_repair(
     });
 }
 
-fn record_native_session_repair_event(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    phase: &'static str,
-    details: Value,
-) {
-    let Some(trace_id) = clean_trace_id_opt(trace_id) else {
-        return;
-    };
-    state.server_traces.record(trace_id, phase, details);
-}
-
 pub(crate) fn codex_thread_uri(session_id: &str) -> String {
     let session_id = session_id.trim();
     if session_id.starts_with("codex://threads/") {
@@ -1688,10 +1450,6 @@ pub(crate) fn codex_thread_uri(session_id: &str) -> String {
     } else {
         format!("codex://threads/{session_id}")
     }
-}
-
-fn clean_trace_id_opt(trace_id: Option<&str>) -> Option<&str> {
-    trace_id.map(str::trim).filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]

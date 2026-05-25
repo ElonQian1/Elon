@@ -10,6 +10,7 @@ mod ai_cli_environment;
 mod ai_cli_output;
 mod ai_cli_prompts;
 mod ai_cli_streaming;
+mod ai_cli_trace;
 mod api;
 mod app_update;
 mod codex_health;
