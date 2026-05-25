@@ -203,9 +203,9 @@ object McpDebugServer {
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> mcpDebugKeepalive(appContext, args)
             "update_status" -> mcpUpdateStatus(args)
-            "task_status" -> taskStatus(args)
-            "task_control" -> taskControl(args)
-            "task_events" -> taskEvents(args)
+            "task_status" -> mcpTaskStatus(appContext, args)
+            "task_control" -> mcpTaskControl(appContext, args)
+            "task_events" -> mcpTaskEvents(appContext, args)
             "logcat_recent" -> mcpLogcatRecent(args)
             "chat_send" -> chatSend(appContext, args)
             "chat_probe" -> chatProbe(args)
@@ -254,7 +254,7 @@ object McpDebugServer {
             .optJSONObject("structuredContent")
             ?: JSONObject()
         val trace = mcpTraceRecent(traceArgs).optJSONObject("structuredContent") ?: JSONObject()
-        val taskEvents = taskEvents(JSONObject().put("limit", args.optInt("task_event_limit", 20).coerceIn(1, 120)))
+        val taskEvents = mcpTaskEvents(appContext, JSONObject().put("limit", args.optInt("task_event_limit", 20).coerceIn(1, 120)))
             .optJSONObject("structuredContent")
             ?: JSONObject()
         val logcat = if (includeLogcat) {
@@ -461,75 +461,6 @@ object McpDebugServer {
     private fun mcpMetrics(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
         return toolResult("MCP metrics returned.", metricsJson())
     }
-
-    private fun taskStatus(args: JSONObject): JSONObject {
-        return toolResult("Task status returned.", taskStatusJson(appContext, args))
-    }
-
-    private fun taskControl(args: JSONObject): JSONObject {
-        val action = args.optString("action", "status").lowercase(Locale.ROOT)
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        when (action) {
-            "pause" -> {
-                val activeTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
-                clearPersistedTask(prefs)
-                val serviceIntent = Intent(appContext, TaskWorkService::class.java).apply {
-                    this.action = TaskWorkService.ACTION_PAUSE
-                }
-                val serviceSignal = runCatching { appContext.startService(serviceIntent) }
-                    .fold(onSuccess = { "pause_sent" }, onFailure = { "pause_start_failed:${it.javaClass.simpleName}" })
-                val stopped = if (serviceSignal.startsWith("pause_start_failed")) {
-                    runCatching { appContext.stopService(Intent(appContext, TaskWorkService::class.java)) }
-                        .getOrDefault(false)
-                } else {
-                    false
-                }
-                DebugTraceStore.record(
-                    "mcp_task_control",
-                    mapOf(
-                        "action" to action,
-                        "active_trace_id" to activeTraceId,
-                        "service_signal" to serviceSignal,
-                        "stop_service" to stopped
-                    )
-                )
-                return toolResult(
-                    "Task pause requested.",
-                    taskStatusJson(appContext, JSONObject())
-                        .put("action", action)
-                        .put("service_signal", serviceSignal)
-                        .put("stop_service", stopped)
-                )
-            }
-            "status" -> Unit
-            else -> return toolResult(
-                "Unsupported task control action: $action",
-                JSONObject().put("action", action),
-                isError = true
-            )
-        }
-        return toolResult("Task status returned.", taskStatusJson(appContext, JSONObject()).put("action", action))
-    }
-
-    private fun taskEvents(args: JSONObject): JSONObject {
-        val limit = args.optInt("limit", 40).coerceIn(1, 120)
-        val clear = args.optBoolean("clear", false)
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        val allEvents = queuedTaskEvents(prefs)
-        val returned = allEvents.takeLast(limit)
-        if (clear) {
-            prefs.edit().remove(TaskWorkService.PREF_QUEUED_TASK_EVENTS).apply()
-            DebugTraceStore.record("mcp_task_events_cleared", mapOf("cleared_count" to allEvents.size))
-        }
-        val structured = JSONObject()
-            .put("events", JSONArray().apply { returned.forEach { put(rawTaskEventJson(it)) } })
-            .put("returned_count", returned.size)
-            .put("queued_count", allEvents.size)
-            .put("limit", limit)
-            .put("cleared", clear)
-        return toolResult("Queued task events returned.", structured)
-    }
-
 
     private fun chatProbe(args: JSONObject): JSONObject {
         val message = args.optString("message").trim()
