@@ -54,8 +54,6 @@ class MainActivity : AppCompatActivity() {
     private var foldedCliLogCount = 0
     private val foldedCliLogSamples = ArrayDeque<String>()
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
-    // tool 名 -> 已派发但尚未 tool_result 的 ai-action 气泡在当前会话中的 index 队列
-    private val pendingToolActionBubbles = linkedMapOf<String, ArrayDeque<Int>>()
     private var serverResponseToken = 0
     private var appInForeground = false
     private var pendingRequestPayload: String? = null
@@ -109,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var workflowStageActions: MainWorkflowStageActions? = null
     private var evidenceActions: MainEvidenceActions? = null
     private var progressNarrativeActions: MainProgressNarrativeActions? = null
+    private var toolActionBubbles: MainToolActionBubbles? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -349,7 +348,7 @@ class MainActivity : AppCompatActivity() {
         workflowStepIndex = 0
         resetFoldedCliLog()
         clearCurrentEvidence()
-        pendingToolActionBubbles.clear()
+        toolActionBubbles().clear()
         progressNarrativeActions().clear()
         if (requestIsDevelopment) {
             updateProjectTitleFromRequest(visibleText)
@@ -394,7 +393,7 @@ class MainActivity : AppCompatActivity() {
         persistActiveWork()
         stopWorkingEvidenceForActiveConversation()
         clearCurrentEvidence()
-        pendingToolActionBubbles.clear()
+        toolActionBubbles().clear()
         setSendEnabled(true)
         if (wasDevelopment) {
             updateStage("工作暂停", "你已暂停当前任务，可以调整需求后继续发送。")
@@ -2015,6 +2014,16 @@ class MainActivity : AppCompatActivity() {
         ).also { progressNarrativeActions = it }
     }
 
+    private fun toolActionBubbles(): MainToolActionBubbles {
+        toolActionBubbles?.let { return it }
+        return MainToolActionBubbles(
+            activeConversation = ::activeConversation,
+            chatAdapter = { chatAdapter },
+            saveConversations = ::saveConversations,
+            appendMessage = ::appendMessage
+        ).also { toolActionBubbles = it }
+    }
+
     private fun compactCliProjectEvents(events: MutableList<String>) {
         val cliCount = events.count { isCliProjectEvent(it) }
         if (cliCount == 0) return
@@ -2092,16 +2101,7 @@ class MainActivity : AppCompatActivity() {
                     val args = json.get("args")?.takeIf { it.isJsonObject }?.asJsonObject
                     maybeAppendToolCallNarrative(tool)
                     handleToolCall(tool)
-                    // 真实交互感：每次 tool_call 追加一条小灰字"动作卡片"气泡，
-                    // 让用户看到 AI 正在读什么、改什么、执行什么命令。
-                    val actionText = describeToolAction(tool, args)
-                    val bubble = ChatMessage("ai-action", actionText)
-                    appendMessage(bubble)
-                    val msgs = activeConversation().messages
-                    val idx = msgs.indices.lastOrNull { msgs[it].role == "ai-action" } ?: -1
-                    if (idx >= 0) {
-                        pendingToolActionBubbles.getOrPut(tool) { ArrayDeque() }.addLast(idx)
-                    }
+                    toolActionBubbles().appendToolCallBubble(tool, args)
                     return
                 }
                 "tool_result" -> {
@@ -2113,22 +2113,7 @@ class MainActivity : AppCompatActivity() {
                         "完成：${toolLabel(tool)}，${summarize(result, 80)}"
                     }
                     recordEvidence(toolEvidenceKind(tool), evidence)
-                    // 把对应 ai-action 卡片标记为 ✓ 已完成
-                    val queue = pendingToolActionBubbles[tool]
-                    if (queue != null && queue.isNotEmpty()) {
-                        val idx = queue.removeFirst()
-                        val messages = activeConversation().messages
-                        if (idx in messages.indices && messages[idx].role == "ai-action") {
-                            val old = messages[idx]
-                            val newContent = markToolActionDone(old.content)
-                            if (newContent != old.content) {
-                                messages[idx] = old.copy(content = newContent)
-                                chatAdapter.notifyMessageUpdated(idx)
-                                saveConversations()
-                            }
-                        }
-                        if (queue.isEmpty()) pendingToolActionBubbles.remove(tool)
-                    }
+                    toolActionBubbles().markToolResultDone(tool)
                     workflowStageActions().markToolResult(tool)
                     return
                 }
