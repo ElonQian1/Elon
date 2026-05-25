@@ -978,6 +978,23 @@ pub enum WsMessage {
     },
     /// 工具执行结果
     ToolResult { tool: String, result: String },
+    /// 本次 CLI 调用消耗的 token / 费用统计（来自 codex --json 的 token_count / turn.completed.usage）
+    Usage {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        input_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cached_input_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        reasoning_output_tokens: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total_cost_usd: Option<f64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+    },
     /// 最终回复
     Done {
         message: String,
