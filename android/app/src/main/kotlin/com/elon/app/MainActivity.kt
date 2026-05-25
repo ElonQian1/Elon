@@ -2,7 +2,6 @@ package com.elon.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -46,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private var activeProjectIndex = 0
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
+    private var uiTools: MainUiTools? = null
     private var modelActions: MainModelActions? = null
     private var projectStateActions: MainProjectStateActions? = null
     private var conversationOpenActions: MainConversationOpenActions? = null
@@ -327,7 +327,7 @@ class MainActivity : AppCompatActivity() {
         val views = MainInputComposerSetup(
             activity = this,
             binding = binding,
-            dp = ::dp,
+            dp = uiTools()::dp,
             currentModelLabel = { modelActions().currentModelLabel },
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
@@ -373,7 +373,7 @@ class MainActivity : AppCompatActivity() {
         adaptiveInputHeightActions?.let { return it }
         return MainAdaptiveInputHeightActions(
             binding = binding,
-            dp = ::dp,
+            dp = uiTools()::dp,
             inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
             inputBarContainer = { if (::inputBarContainer.isInitialized) inputBarContainer else null },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
@@ -485,8 +485,8 @@ class MainActivity : AppCompatActivity() {
         attachmentPanelActions?.let { return it }
         return MainAttachmentPanelActions(
             activity = this,
-            dp = ::dp,
-            selectableForeground = ::selectableForeground,
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground,
             activeConversation = projectStateActions()::activeConversation,
             attachmentPanel = { if (::attachmentPanel.isInitialized) attachmentPanel else null },
             attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
@@ -527,7 +527,7 @@ class MainActivity : AppCompatActivity() {
         return MainSendButtonVisualActions(
             activity = this,
             binding = binding,
-            dp = ::dp,
+            dp = uiTools()::dp,
             attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             isVoiceMode = { voiceMode },
@@ -586,7 +586,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndexProvider = { projectStateActions().activeConversationIndex },
             setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
-            titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
+            titleEditText = { value -> mainTitleEditText(this, value, uiTools()::dp) },
             saveConversations = projectStateActions()::saveConversations,
             renderConversationList = homeListActions()::renderConversationList,
             setSendEnabled = sendEnabledActions()::setSendEnabled
@@ -607,8 +607,8 @@ class MainActivity : AppCompatActivity() {
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions().openSettings() },
-            dp = ::dp,
-            selectableForeground = ::selectableForeground
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground
         ).also { modelActions = it }
     }
 
@@ -787,8 +787,8 @@ class MainActivity : AppCompatActivity() {
                 runningConversationTasks.containsKey(key)
             },
             homeRows = { homeRows() },
-            dp = ::dp,
-            selectableForeground = ::selectableForeground,
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground,
             showCreateProjectDialog = { projectActions().showCreateProjectDialog() }
         ).also { homeListActions = it }
     }
@@ -803,8 +803,8 @@ class MainActivity : AppCompatActivity() {
             showProjectActions = { index -> projectActions().showProjectActions(index) },
             openConversation = conversationOpenActions()::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
-            dp = ::dp,
-            selectableForeground = ::selectableForeground
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground
         ).also { homeRows = it }
     }
 
@@ -817,7 +817,7 @@ class MainActivity : AppCompatActivity() {
             activeProjectIndexProvider = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
-            titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
+            titleEditText = { value -> mainTitleEditText(this, value, uiTools()::dp) },
             saveProjects = projectStateActions()::saveProjects,
             renderProjectList = homeListActions()::renderProjectList,
             openProject = conversationOpenActions()::openProject,
@@ -825,14 +825,9 @@ class MainActivity : AppCompatActivity() {
         ).also { projectActions = it }
     }
 
-    private fun selectableForeground() = runCatching {
-        val outValue = TypedValue()
-        theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
-        getDrawable(outValue.resourceId)
-    }.getOrNull()
-
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
+    private fun uiTools(): MainUiTools {
+        uiTools?.let { return it }
+        return MainUiTools(this).also { uiTools = it }
     }
 
     private fun accountActions(): MainAccountActions {
@@ -876,7 +871,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
-            shareActions = ::shareActions,
+            shareActions = uiTools()::shareActions,
             fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = { projectRecordActions().showProjectRecordDialog() },
@@ -886,8 +881,8 @@ class MainActivity : AppCompatActivity() {
             openSettings = { quickCommandActions().openSettings() },
             deleteMessage = { message -> messageActions().deleteMessage(message) },
             quoteMessage = { text -> messageActions().quoteMessage(text) },
-            dp = ::dp,
-            selectableForeground = ::selectableForeground
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground
         ).also { actionPopups = it }
     }
 
@@ -935,10 +930,6 @@ class MainActivity : AppCompatActivity() {
         ).also { quickCommandActions = it }
     }
 
-    private fun shareActions(): MainShareActions {
-        return MainShareActions(this, ::dp)
-    }
-
     private fun messageActions(): MainMessageActions {
         messageActions?.let { return it }
         return MainMessageActions(
@@ -952,7 +943,7 @@ class MainActivity : AppCompatActivity() {
             showMessageActionPopup = { anchor, message, text ->
                 actionPopups().showMessageActionPopup(anchor, message, text)
             },
-            shareActions = ::shareActions,
+            shareActions = uiTools()::shareActions,
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         ).also { messageActions = it }
