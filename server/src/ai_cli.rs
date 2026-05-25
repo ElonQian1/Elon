@@ -7,7 +7,9 @@ pub(crate) use crate::ai_cli_process::{
     cap_option_timeout, configured_timeout_cap, is_cli_timeout_error, run_cli_command_traced,
     supports_codex_sessions, CliOutput,
 };
-pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args, codex_thread_uri};
+#[cfg(test)]
+pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
+pub(crate) use crate::ai_cli_runner::codex_thread_uri;
 
 use crate::{
     ai_cli_chat::{
@@ -26,7 +28,7 @@ use crate::{
         record_prewarm_session_hit, CliTraceContext,
     },
     intent_router, tools,
-    types::{AiCliOption, AppState, WsMessage},
+    types::{AppState, WsMessage},
 };
 
 #[cfg(test)]
@@ -40,7 +42,7 @@ use crate::ai_cli_prompts::build_native_session_repair_prompt;
 #[cfg(test)]
 use crate::store::ConversationMessage;
 #[cfg(test)]
-use crate::types::CliPromptMode;
+use crate::types::{AiCliOption, CliPromptMode};
 
 #[derive(Debug, Clone)]
 pub struct NativeSessionScope {
