@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
     private var voiceModeActions: MainVoiceModeActions? = null
+    private var inputFocusActions: MainInputFocusActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -498,43 +499,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun focusInputComposer() {
-        if (activeConversation().ended) return
-        if (voiceMode) {
-            voiceMode = false
-            applyVoiceMode()
-        }
-        if (::inputComposerMotion.isInitialized && !inputComposerMotion.isExpanded) {
-            inputComposerMotion.setExpanded(true, animate = true)
-        }
-        binding.inputEdit.requestFocus()
-        binding.inputEdit.post {
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
-        }
-        binding.inputEdit.postDelayed({
-            if (!binding.inputEdit.hasFocus()) return@postDelayed
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
-        }, 120L)
+        inputFocusActions().focusInputComposer()
     }
 
     private fun collapseInputComposer(animate: Boolean = true) {
-        if (!::inputComposerMotion.isInitialized) return
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
-        if (binding.inputEdit.hasFocus()) {
-            suppressInputFocusAnimation = !animate
-            try {
-                binding.inputEdit.clearFocus()
-            } finally {
-                suppressInputFocusAnimation = false
-            }
-        }
-        if (inputComposerMotion.isExpanded) {
-            inputComposerMotion.setExpanded(false, animate = animate)
-        }
-        updateSendButtonVisual()
-        updateAdaptiveInputHeight()
+        inputFocusActions().collapseInputComposer(animate)
+    }
+
+    private fun inputFocusActions(): MainInputFocusActions {
+        inputFocusActions?.let { return it }
+        return MainInputFocusActions(
+            activity = this,
+            binding = binding,
+            activeConversation = ::activeConversation,
+            isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = ::applyVoiceMode,
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = ::updateAdaptiveInputHeight
+        ).also { inputFocusActions = it }
     }
 
     private fun setupAttachmentLaunchers() {
