@@ -34,6 +34,7 @@ mod project_git;
 mod project_keys;
 mod project_mobile;
 mod project_trace_events;
+mod project_ws_job;
 mod project_ws_protocol;
 mod router;
 mod server_trace;
