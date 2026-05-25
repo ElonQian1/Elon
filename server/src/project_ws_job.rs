@@ -1,4 +1,4 @@
-﻿//! 项目 WebSocket 任务调度器：管理同一项目/用户/请求的运行中任务。
+//! 项目 WebSocket 任务调度器：管理同一项目/用户/请求的运行中任务。
 //!
 //! 从 `project_api.rs` 抽出，避免单文件继续膨胀。`handle_project_ws` 调用
 //! `get_or_start_project_ws_job` 创建或附加任务；`cancel_project_ws_job` 取消任务。
@@ -8,20 +8,21 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc, LazyLock,
         atomic::{AtomicBool, Ordering},
+        Arc, LazyLock,
     },
     time::Duration,
 };
-use tokio::sync::{Mutex, broadcast, watch};
+use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::{
     project_chat::run_project_agent_with_scheduler,
     project_keys::project_ws_job_key,
     project_trace_events::record_server_message,
     project_ws_protocol::{
-        PROJECT_WS_BACKLOG_LIMIT, enrich_project_ws_event, is_terminal_project_ws_message,
-        is_terminal_task_status, task_control_event, terminal_backlog_from_task,
+        enrich_project_ws_event, is_terminal_project_ws_message, is_terminal_task_status,
+        task_control_event, terminal_backlog_from_task, ProjectAttachmentRef,
+        PROJECT_WS_BACKLOG_LIMIT,
     },
     store::ProjectAccess,
     types::{AppState, WsMessage},
@@ -49,6 +50,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    attachments: Option<Vec<ProjectAttachmentRef>>,
     trace_id: Option<String>,
     client_request_id: String,
     fingerprint: String,
@@ -80,8 +82,8 @@ pub(crate) async fn get_or_start_project_ws_job(
                     }),
                 );
             }
-            let notice = WsMessage::progress("同一个请求仍在后台处理，正在继续同步已有任务进度。")
-            .to_json();
+            let notice =
+                WsMessage::progress("同一个请求仍在后台处理，正在继续同步已有任务进度。").to_json();
             let _ = existing.broadcaster.send(notice);
             return existing.clone();
         }
@@ -199,6 +201,7 @@ pub(crate) async fn get_or_start_project_ws_job(
             conversation_id,
             message,
             agent_name,
+            attachments,
             trace_id,
             task_id,
             job_for_task,
@@ -219,6 +222,7 @@ async fn run_project_ws_job(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    attachments: Option<Vec<ProjectAttachmentRef>>,
     trace_id: Option<String>,
     task_id: String,
     job: Arc<ProjectWsJob>,
@@ -267,6 +271,7 @@ async fn run_project_ws_job(
     let task_conversation_id = conversation_id.clone();
     let task_message = message.clone();
     let task_agent_name = agent_name.clone();
+    let task_attachments = attachments.clone();
     let task_trace_id = trace_id.clone();
     let agent_task = tokio::spawn(async move {
         run_project_agent_with_scheduler(
@@ -277,6 +282,7 @@ async fn run_project_ws_job(
             task_conversation_id,
             task_message,
             task_agent_name,
+            task_attachments,
             task_trace_id,
             tx,
         )
