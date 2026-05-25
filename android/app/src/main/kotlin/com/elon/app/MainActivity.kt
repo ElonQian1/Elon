@@ -127,6 +127,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputCenterContainer: FrameLayout
     private lateinit var expandedInputContainer: FrameLayout
     private lateinit var collapsedInputPreview: TextView
+    private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
     private lateinit var modelButtonShell: FrameLayout
     private lateinit var inputRightControls: FrameLayout
     private lateinit var inputComposerMotion: InputComposerMotion
@@ -358,7 +359,7 @@ class MainActivity : AppCompatActivity() {
             persistActiveWork = ::persistActiveWork,
             updateStage = ::updateStage,
             scheduleFirstServerResponseWatchdog = ::scheduleFirstServerResponseWatchdog,
-            clearPendingAttachments = ::clearPendingAttachments
+            clearPendingAttachments = { clearPendingAttachments(deleteFiles = false) }
         ).also { preparedMessageActions = it }
     }
 
@@ -473,6 +474,11 @@ class MainActivity : AppCompatActivity() {
         inputRightControls = views.inputRightControls
         inputComposerMotion = views.inputComposerMotion
         attachmentPanel = views.attachmentPanel
+        pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(this, pendingAttachments) {
+            updateCollapsedInputPreview()
+            updateSendButtonVisual()
+        }
+        binding.inputLayout.addView(pendingAttachmentPreviewStrip.view, 1)
         applyVoiceMode()
         updateCollapsedInputPreview()
         updateSendButtonVisual()
@@ -499,8 +505,15 @@ class MainActivity : AppCompatActivity() {
         if (!::collapsedInputPreview.isInitialized) return
         val draft = binding.inputEdit.text?.toString().orEmpty()
         val hasDraft = draft.isNotBlank()
-        collapsedInputPreview.text = if (hasDraft) draft else "文本内容在此输入。"
-        collapsedInputPreview.setTextColor(Color.parseColor(if (hasDraft) "#DCDCDC" else "#A8D0D0D0"))
+        val hasAttachments = pendingAttachments.isNotEmpty()
+        collapsedInputPreview.text = when {
+            hasDraft -> draft
+            hasAttachments -> pendingAttachmentSummary(pendingAttachments)
+            else -> "文本内容在此输入。"
+        }
+        collapsedInputPreview.setTextColor(
+            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#A8D0D0D0")
+        )
     }
 
     private fun focusInputComposer() {
@@ -562,6 +575,13 @@ class MainActivity : AppCompatActivity() {
         return attachmentPanelActions().buildAttachmentPanel()
     }
 
+    private fun refreshPendingAttachmentPreview() {
+        if (!::pendingAttachmentPreviewStrip.isInitialized) return
+        pendingAttachmentPreviewStrip.refresh()
+        updateCollapsedInputPreview()
+        updateSendButtonVisual()
+    }
+
     private fun openCameraAttachment() {
         if (activeConversation().ended) return
         val attachmentDir = File(cacheDir, "attachments").apply { mkdirs() }
@@ -608,20 +628,15 @@ class MainActivity : AppCompatActivity() {
         }.getOrNull() ?: return
 
         pendingAttachments.add(attachment)
-        appendAttachmentLabel(attachment.displayLabel, attachment.displayName)
-        Toast.makeText(this, "已添加${attachment.displayLabel}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun appendAttachmentLabel(kind: String, name: String) {
         if (voiceMode) {
             voiceMode = false
             applyVoiceMode()
         }
-        val current = binding.inputEdit.text.toString()
-        val prefix = if (current.isBlank()) "" else "\n"
-        binding.inputEdit.append("${prefix}[$kind] $name")
-        binding.inputEdit.setSelection(binding.inputEdit.text.length)
-        updateSendButtonVisual()
+        if (::inputComposerMotion.isInitialized && !inputComposerMotion.isExpanded) {
+            inputComposerMotion.setExpanded(true, animate = true)
+        }
+        refreshPendingAttachmentPreview()
+        Toast.makeText(this, "已添加${attachment.displayLabel}：${attachment.displayName}", Toast.LENGTH_SHORT).show()
     }
 
     private fun currentSendTarget(): SendTarget {
@@ -669,15 +684,18 @@ class MainActivity : AppCompatActivity() {
         ).also { attachmentSendActions = it }
     }
 
-    private fun clearPendingAttachments() {
-        pendingAttachments.forEach { attachment ->
-            runCatching { attachment.file.delete() }
+    private fun clearPendingAttachments(deleteFiles: Boolean = true) {
+        if (deleteFiles) {
+            pendingAttachments.forEach { attachment ->
+                runCatching { attachment.file.delete() }
+            }
         }
         pendingAttachments.clear()
+        refreshPendingAttachmentPreview()
     }
 
     private fun handleSendOrAttachment() {
-        if (!voiceMode && binding.inputEdit.text.toString().trim().isNotEmpty()) {
+        if (!voiceMode && (binding.inputEdit.text.toString().trim().isNotEmpty() || pendingAttachments.isNotEmpty())) {
             sendMessage()
         } else {
             toggleAttachmentPanel()
@@ -762,6 +780,7 @@ class MainActivity : AppCompatActivity() {
             attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
             inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
             isVoiceMode = { voiceMode },
+            hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
             activeConversation = ::activeConversation
         ).also { sendButtonVisualActions = it }

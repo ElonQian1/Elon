@@ -80,6 +80,7 @@ internal fun uploadAttachmentRefsOrNull(
                 addProperty("file_name", uploaded.optString("file_name", attachment.fileName))
                 addProperty("mime_type", uploaded.optString("mime_type", attachment.mimeType))
                 addProperty("path", uploaded.optString("path", ""))
+                addProperty("local_path", attachment.file.absolutePath)
                 uploaded.optString("url", "").takeIf { it.isNotBlank() }?.let {
                     addProperty("url", it)
                 }

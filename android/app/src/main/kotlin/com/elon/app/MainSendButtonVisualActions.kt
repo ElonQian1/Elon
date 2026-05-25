@@ -14,13 +14,15 @@ internal class MainSendButtonVisualActions(
     private val attachmentButton: () -> ImageButton?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
+    private val hasPendingAttachments: () -> Boolean,
     private val inputCanSend: () -> Boolean,
     private val activeConversation: () -> AppConversation
 ) {
     fun updateSendButtonVisual() {
         val hasText = binding.inputEdit.text.toString().trim().isNotEmpty()
+        val hasAttachments = hasPendingAttachments()
         val composerExpanded = inputComposerMotion()?.isExpanded == true
-        val sendMode = hasText && !isVoiceMode() && composerExpanded
+        val sendMode = (hasText || hasAttachments) && !isVoiceMode() && (composerExpanded || hasAttachments)
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
             params?.width = dp(42)

@@ -70,6 +70,18 @@ internal fun visibleTextForPendingAttachments(rawText: String, attachments: List
     return defaultPendingAttachmentMessage(attachments)
 }
 
+internal fun pendingAttachmentSummary(attachments: List<PendingAttachment>): String {
+    if (attachments.isEmpty()) return "文本内容在此输入。"
+    val imageCount = attachments.count { it.mimeType.startsWith("image/") || it.kind == "image" }
+    return when {
+        attachments.size == 1 && imageCount == 1 -> "已选择 1 张图片"
+        attachments.size == imageCount -> "已选择 $imageCount 张图片"
+        attachments.size == 1 -> "已选择 1 个附件"
+        imageCount > 0 -> "已选择 ${attachments.size} 个附件，含 $imageCount 张图片"
+        else -> "已选择 ${attachments.size} 个附件"
+    }
+}
+
 private fun defaultPendingAttachmentMessage(attachments: List<PendingAttachment>): String {
     val imageCount = attachments.count { it.mimeType.startsWith("image/") || it.kind == "image" }
     return when {
