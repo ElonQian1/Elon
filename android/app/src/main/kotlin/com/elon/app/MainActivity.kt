@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity() {
     private var codexPrewarm: MainCodexPrewarm? = null
     private var externalActions: MainExternalActions? = null
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
+    private var attachmentSendActions: MainAttachmentSendActions? = null
     private var workflowStageActions: MainWorkflowStageActions? = null
     private var evidenceActions: MainEvidenceActions? = null
     private var progressNarrativeActions: MainProgressNarrativeActions? = null
@@ -682,45 +683,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
-        val attachments = pendingAttachments.toList()
-        setSendEnabled(false)
-        DebugTraceStore.record(
-            "ui_attachment_upload_start",
-            mapOf("project_id" to target.projectId, "conversation_id" to target.conversationId, "count" to attachments.size)
-        )
-        Thread {
-            val startedAt = System.currentTimeMillis()
-            val refs = uploadAttachmentRefsOrNull(
-                http = http,
-                serverUrl = serverUrl,
-                userId = userId,
-                attachments = attachments,
-                target = target,
-                maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
-                showShortToast = { message ->
-                    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
-                },
-                showLongToast = { message ->
-                    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
-                }
-            )
-            runOnUiThread {
-                if (refs == null) {
-                    setSendEnabled(true)
-                    return@runOnUiThread
-                }
-                DebugTraceStore.record(
-                    "ui_attachment_upload_done",
-                    mapOf(
-                        "project_id" to target.projectId,
-                        "conversation_id" to target.conversationId,
-                        "count" to refs.size(),
-                        "elapsed_ms" to (System.currentTimeMillis() - startedAt)
-                    )
-                )
-                startPreparedMessage(visibleText, outgoingText, refs, target, chatAttachmentsFromRefs(refs))
-            }
-        }.start()
+        attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
+    }
+
+    private fun attachmentSendActions(): MainAttachmentSendActions {
+        attachmentSendActions?.let { return it }
+        return MainAttachmentSendActions(
+            activity = this,
+            http = http,
+            serverUrl = serverUrl,
+            userId = { userId },
+            pendingAttachments = { pendingAttachments.toList() },
+            setSendEnabled = ::setSendEnabled,
+            startPreparedMessage = ::startPreparedMessage
+        ).also { attachmentSendActions = it }
     }
 
     private fun clearPendingAttachments() {
