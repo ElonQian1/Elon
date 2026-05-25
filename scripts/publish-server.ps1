@@ -223,7 +223,8 @@ git -C $RepoRoot pull --rebase origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 
 # 提前阻断：业务代码必须已 commit + push，否则脚本不应当继续（claim 会基于线上 main 的最新版本号）
-$dirty = (git -C $RepoRoot status --porcelain 2>$null).Trim()
+$dirty = (git -C $RepoRoot status --porcelain 2>$null) | Out-String
+$dirty = $dirty.Trim()
 if ($dirty) {
     Write-Host ""
     Write-Host "❌ 工作区不干净，请先 commit + push 业务改动再运行部署脚本：" -ForegroundColor Red
