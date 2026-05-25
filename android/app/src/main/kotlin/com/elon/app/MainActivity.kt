@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity() {
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
+    private var resumeActions: MainResumeActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -212,46 +213,32 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        appInForeground = true
-        setTaskAppForeground(true)
-        startMcpDebugKeepAlive()
-        drainQueuedTaskEvents()
-        clearCompletedTaskBadge(this, prefs)
-        if (::binding.isInitialized) {
-            loadModelOptions()
-            if (!backendConnected) {
-                if (waitingForReply && !pendingReconnectForActiveWork) {
-                    pendingReconnectForActiveWork = true
-                    updateStage(currentStage, "正在恢复连接，回来后会自动继续本轮任务。")
-                    recordEvidence("connection", "连接恢复中，正在继续上次任务")
-                }
-                startTaskWorkService(
-                    if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
-                )
-            } else if (!isActiveConversationWorking()) {
-                setSendEnabled(true)
-                if (binding.chatPage.visibility == View.VISIBLE) {
-                    maybePrewarmCodexSession("resume_chat")
-                }
-            }
-        }
+        resumeActions().onResume()
     }
 
-    private fun startMcpDebugKeepAlive() {
-        if (!McpDebugKeepAliveService.shouldAutoStart(this)) return
-        val intent = Intent(this, McpDebugKeepAliveService::class.java).apply {
-            action = McpDebugKeepAliveService.ACTION_START
-        }
-        runCatching {
-            ContextCompat.startForegroundService(this, intent)
-        }.onSuccess {
-            DebugTraceStore.record("mcp_keepalive_auto_start_requested")
-        }.onFailure { error ->
-            DebugTraceStore.record(
-                "mcp_keepalive_auto_start_failed",
-                mapOf("error" to (error.message ?: error.javaClass.simpleName))
-            )
-        }
+    private fun resumeActions(): MainResumeActions {
+        resumeActions?.let { return it }
+        return MainResumeActions(
+            activity = this,
+            binding = binding,
+            prefs = prefs,
+            isBindingInitialized = { ::binding.isInitialized },
+            setAppInForeground = { appInForeground = it },
+            setTaskAppForeground = ::setTaskAppForeground,
+            drainQueuedTaskEvents = ::drainQueuedTaskEvents,
+            loadModelOptions = { loadModelOptions() },
+            getBackendConnected = { backendConnected },
+            getWaitingForReply = { waitingForReply },
+            getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
+            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
+            currentStage = { currentStage },
+            updateStage = ::updateStage,
+            recordEvidence = ::recordEvidence,
+            startTaskWorkService = { action -> startTaskWorkService(action) },
+            isActiveConversationWorking = ::isActiveConversationWorking,
+            setSendEnabled = ::setSendEnabled,
+            maybePrewarmCodexSession = ::maybePrewarmCodexSession
+        ).also { resumeActions = it }
     }
 
     override fun onPause() {
