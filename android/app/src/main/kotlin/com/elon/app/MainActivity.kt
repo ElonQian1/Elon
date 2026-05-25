@@ -225,7 +225,9 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             currentStage = { currentStage },
             updateStage = ::updateStage,
-            recordEvidence = ::recordEvidence,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            },
             startTaskWorkService = { action -> startTaskWorkService(action) },
             isActiveConversationWorking = ::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
@@ -289,8 +291,8 @@ class MainActivity : AppCompatActivity() {
                 reconnectAttempts = 0
                 persistActiveWork()
                 workflowStepIndex = 0
-                resetFoldedCliLog()
-                clearCurrentEvidence()
+                foldedCliLogActions().reset()
+                evidenceActions().clearCurrentEvidence()
                 toolActionBubbles().clear()
                 progressNarrativeActions().clear()
             },
@@ -341,15 +343,19 @@ class MainActivity : AppCompatActivity() {
             persistActiveWork = ::persistActiveWork,
             clearPersistedActiveWork = ::clearPersistedActiveWork,
             refreshActiveTaskState = ::refreshActiveTaskState,
-            stopWorkingEvidenceForActiveConversation = ::stopWorkingEvidenceForActiveConversation,
-            clearCurrentEvidence = ::clearCurrentEvidence,
+            stopWorkingEvidenceForActiveConversation = {
+                evidenceActions().stopWorkingEvidenceForActiveConversation()
+            },
+            clearCurrentEvidence = { evidenceActions().clearCurrentEvidence() },
             clearToolActionBubbles = { toolActionBubbles().clear() },
             setSendEnabled = ::setSendEnabled,
             updateFirstConversationStatus = ::updateFirstConversationStatus,
             updateStage = ::updateStage,
             updateProjectViews = ::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
-            recordEvidence = ::recordEvidence,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            },
             appendMessage = ::appendMessage,
             workflowStoppedMessage = { reason, wasDevelopment -> workflowStoppedMessage(reason, wasDevelopment) },
             startTaskWorkService = ::startTaskWorkService,
@@ -948,7 +954,9 @@ class MainActivity : AppCompatActivity() {
                 updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
             },
             activeConversationTask = ::activeConversationTask,
-            recordEvidence = ::recordEvidence,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            },
             setSendEnabled = ::setSendEnabled,
             isActiveConversationWorking = ::isActiveConversationWorking,
             handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
@@ -1306,36 +1314,11 @@ class MainActivity : AppCompatActivity() {
         return "工作停止：$stage。原因：$reason"
     }
 
-    private fun resetFoldedCliLog() {
-        foldedCliLogActions().reset()
-    }
-
-    private fun recordEvidence(kind: String, detail: String) {
-        if (!activeRequestIsDevelopment) return
-        evidenceActions().recordEvidence(kind, detail)
-    }
-
-    private fun attachEvidenceToLatestAi() {
-        evidenceActions().attachEvidenceToLatestAi()
-    }
-
-    private fun finalizeEvidenceForLatestAssistant() {
-        evidenceActions().finalizeEvidenceForLatestAssistant()
-    }
-
     private fun aiMessageWithCurrentEvidence(
         content: String,
         attachments: List<ChatAttachment> = emptyList()
     ): ChatMessage {
         return evidenceActions().aiMessageWithCurrentEvidence(content, attachments)
-    }
-
-    private fun stopWorkingEvidenceForActiveConversation() {
-        evidenceActions().stopWorkingEvidenceForActiveConversation()
-    }
-
-    private fun clearCurrentEvidence() {
-        evidenceActions().clearCurrentEvidence()
     }
 
     private fun evidenceActions(): MainEvidenceActions {
@@ -1356,7 +1339,9 @@ class MainActivity : AppCompatActivity() {
             maybeAppendVisibleCliSignal = { category, line ->
                 progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
             },
-            recordEvidence = ::recordEvidence
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            }
         ).also { foldedCliLogActions = it }
     }
 
@@ -1364,9 +1349,9 @@ class MainActivity : AppCompatActivity() {
         progressNarrativeActions?.let { return it }
         return MainProgressNarrativeActions(
             isDevelopmentRequest = { activeRequestIsDevelopment },
-            finalizeEvidenceForLatestAssistant = ::finalizeEvidenceForLatestAssistant,
+            finalizeEvidenceForLatestAssistant = { evidenceActions().finalizeEvidenceForLatestAssistant() },
             appendMessage = ::appendMessage,
-            attachEvidenceToLatestAi = ::attachEvidenceToLatestAi
+            attachEvidenceToLatestAi = { evidenceActions().attachEvidenceToLatestAi() }
         ).also { progressNarrativeActions = it }
     }
 
@@ -1483,7 +1468,9 @@ class MainActivity : AppCompatActivity() {
             appendToolCallBubble = { tool, args -> toolActionBubbles().appendToolCallBubble(tool, args) },
             markToolResultDone = { toolActionBubbles().markToolResultDone(it) },
             markToolResult = { workflowStageActions().markToolResult(it) },
-            recordEvidence = ::recordEvidence,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            },
             isDevelopmentRequest = { activeRequestIsDevelopment },
             addProjectEvent = ::addProjectEvent
         ).also { assistantStreamEvents = it }
@@ -1503,10 +1490,14 @@ class MainActivity : AppCompatActivity() {
             updateStage = ::updateStage,
             updateProjectViews = ::updateProjectViews,
             addProjectEvent = ::addProjectEvent,
-            recordEvidence = ::recordEvidence,
-            stopWorkingEvidenceForActiveConversation = ::stopWorkingEvidenceForActiveConversation,
-            clearCurrentEvidence = ::clearCurrentEvidence,
-            resetFoldedCliLog = ::resetFoldedCliLog,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            },
+            stopWorkingEvidenceForActiveConversation = {
+                evidenceActions().stopWorkingEvidenceForActiveConversation()
+            },
+            clearCurrentEvidence = { evidenceActions().clearCurrentEvidence() },
+            resetFoldedCliLog = { foldedCliLogActions().reset() },
             aiMessageWithCurrentEvidence = ::aiMessageWithCurrentEvidence,
             appendMessage = ::appendMessage,
             workflowStoppedMessage = { workflowStoppedMessage(it) }
@@ -1519,7 +1510,9 @@ class MainActivity : AppCompatActivity() {
             currentStage = { currentStage },
             updateStage = ::updateStage,
             addProjectEvent = ::addProjectEvent,
-            recordEvidence = ::recordEvidence
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment) evidenceActions().recordEvidence(kind, detail)
+            }
         ).also { workflowStageActions = it }
     }
 
