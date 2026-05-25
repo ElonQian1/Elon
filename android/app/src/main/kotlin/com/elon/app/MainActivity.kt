@@ -67,10 +67,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
@@ -870,8 +868,18 @@ class MainActivity : AppCompatActivity() {
         Thread {
             val startedAt = System.currentTimeMillis()
             val refs = uploadAttachmentRefsOrNull(
+                http = http,
+                serverUrl = serverUrl,
+                userId = userId,
                 attachments = attachments,
-                target = target
+                target = target,
+                maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
+                showShortToast = { message ->
+                    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
+                },
+                showLongToast = { message ->
+                    runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
+                }
             )
             runOnUiThread {
                 if (refs == null) {
@@ -890,88 +898,6 @@ class MainActivity : AppCompatActivity() {
                 startPreparedMessage(visibleText, outgoingText, refs, target)
             }
         }.start()
-    }
-
-    private fun uploadAttachmentRefsOrNull(
-        attachments: List<PendingAttachment>,
-        target: SendTarget
-    ): com.google.gson.JsonArray? {
-        val array = com.google.gson.JsonArray()
-        for (attachment in attachments) {
-            if (!attachment.file.exists()) {
-                runOnUiThread {
-                    Toast.makeText(this, "附件已失效，请重新选择：${attachment.displayName}", Toast.LENGTH_SHORT).show()
-                }
-                return null
-            }
-            if (attachment.file.length() > MAX_ATTACHMENT_BYTES) {
-                runOnUiThread {
-                    Toast.makeText(this, "附件过大，请重新选择较小文件：${attachment.displayName}", Toast.LENGTH_SHORT).show()
-                }
-                return null
-            }
-            val url = buildString {
-                append("$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(target.projectId)}/attachments")
-                append("?title=${urlPart(target.projectTitle)}")
-                append("&conversation_id=${urlPart(target.conversationId)}")
-                append("&conversation_title=${urlPart(target.conversationTitle)}")
-                append("&kind=${urlPart(attachment.kind)}")
-                append("&display_name=${urlPart(attachment.displayName)}")
-                append("&file_name=${urlPart(attachment.fileName)}")
-                append("&mime_type=${urlPart(attachment.mimeType)}")
-            }
-            val mediaType = attachment.mimeType.toMediaTypeOrNull()
-                ?: "application/octet-stream".toMediaType()
-            val response = try {
-                http.newCall(
-                    Request.Builder()
-                        .url(url)
-                        .post(attachment.file.asRequestBody(mediaType))
-                        .build()
-                ).execute()
-            } catch (e: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this, "附件上传失败：${e.message}", Toast.LENGTH_LONG).show()
-                }
-                DebugTraceStore.record(
-                    "ui_attachment_upload_failed",
-                    mapOf("project_id" to target.projectId, "file" to attachment.displayName, "error" to e.message)
-                )
-                return null
-            }
-            response.use {
-                val body = it.body?.string().orEmpty()
-                if (!it.isSuccessful) {
-                    runOnUiThread {
-                        Toast.makeText(this, "附件上传失败：HTTP ${it.code}", Toast.LENGTH_LONG).show()
-                    }
-                    DebugTraceStore.record(
-                        "ui_attachment_upload_failed",
-                        mapOf("project_id" to target.projectId, "file" to attachment.displayName, "http_code" to it.code)
-                    )
-                    return null
-                }
-                val uploaded = runCatching { JSONObject(body).optJSONObject("attachment") }.getOrNull()
-                if (uploaded == null) {
-                    runOnUiThread {
-                        Toast.makeText(this, "附件上传响应异常：${attachment.displayName}", Toast.LENGTH_LONG).show()
-                    }
-                    return null
-                }
-                array.add(com.google.gson.JsonObject().apply {
-                    addProperty("kind", uploaded.optString("kind", attachment.kind))
-                    addProperty("display_name", uploaded.optString("display_name", attachment.displayName))
-                    addProperty("file_name", uploaded.optString("file_name", attachment.fileName))
-                    addProperty("mime_type", uploaded.optString("mime_type", attachment.mimeType))
-                    addProperty("path", uploaded.optString("path", ""))
-                    uploaded.optString("url", "").takeIf { it.isNotBlank() }?.let {
-                        addProperty("url", it)
-                    }
-                    addProperty("size_bytes", uploaded.optLong("size_bytes", attachment.file.length()))
-                })
-            }
-        }
-        return array
     }
 
     private fun clearPendingAttachments() {
