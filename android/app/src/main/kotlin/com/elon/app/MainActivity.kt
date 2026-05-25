@@ -1500,13 +1500,6 @@ class MainActivity : AppCompatActivity() {
             ?.takeIf { it.isNotBlank() && it != "null" }
     }
 
-    private fun jsonStringOrNull(json: JSONObject, name: String): String? {
-        if (!json.has(name) || json.isNull(name)) return null
-        return json.optString(name, "")
-            .trim()
-            .takeIf { it.isNotBlank() && it != "null" }
-    }
-
     private fun loadModelOptions(afterLoad: (() -> Unit)? = null) {
         Thread {
             try {
@@ -3727,12 +3720,6 @@ class MainActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(intent, "转发聊天内容"))
-    }
-
-    private fun jsonStringOrNull(json: com.google.gson.JsonObject, name: String): String? {
-        val element = json.get(name) ?: return null
-        if (element.isJsonNull) return null
-        return runCatching { element.asString }.getOrNull()
     }
 
     private fun nextWorkflowStep(label: String): String {
