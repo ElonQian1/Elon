@@ -6,6 +6,7 @@ use tracing::info;
 mod admin;
 mod admin_html;
 mod agent;
+mod agent_llm_call;
 mod agent_prompts;
 mod ai_cli;
 mod ai_cli_environment;
