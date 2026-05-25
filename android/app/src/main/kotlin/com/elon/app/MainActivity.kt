@@ -148,6 +148,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var voiceHoldButton: TextView
     private lateinit var inputBarContainer: LinearLayout
     private lateinit var inputCenterContainer: FrameLayout
+    private lateinit var expandedInputContainer: FrameLayout
+    private lateinit var collapsedInputPreview: TextView
+    private lateinit var inputRightControls: FrameLayout
+    private lateinit var inputComposerMotion: InputComposerMotion
     private lateinit var attachmentPanel: LinearLayout
     private var attachmentPanelOpen = false
     private var attachmentIconAnimationToken = 0
@@ -493,24 +497,36 @@ class MainActivity : AppCompatActivity() {
         root.setPadding(0, 0, 0, 0)
         root.setBackgroundColor(Color.parseColor("#1E1E1E"))
 
+        expandedInputContainer = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0
+            ).apply {
+                marginStart = dp(24)
+                marginEnd = dp(24)
+            }
+        }
+
         inputBarContainer = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(86)
             )
-            minimumHeight = dp(62)
-            gravity = Gravity.BOTTOM
+            minimumHeight = dp(86)
+            gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(4), dp(7), dp(4), dp(7))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
         }
 
-        // WeChat-scale circular controls: 44dp touch area with a 30dp visual icon.
+        // WeChat-scale circular controls: 46dp touch area with a 30dp visual icon.
         inputModeButton = ImageButton(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            layoutParams = LinearLayout.LayoutParams(dp(46), dp(46)).apply {
+                marginEnd = dp(12)
+            }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_circle)
             scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(7), dp(7), dp(7), dp(7))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
             contentDescription = "切换语音输入"
             setOnClickListener { toggleVoiceMode() }
         }
@@ -518,25 +534,37 @@ class MainActivity : AppCompatActivity() {
         inputCenterContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dp(40),
+                dp(48),
                 1f
-            ).apply {
-                marginStart = dp(4)
-                marginEnd = dp(4)
-            }
+            )
             setBackgroundResource(R.drawable.bg_input_pill)
-            minimumHeight = dp(40)
+            minimumHeight = dp(48)
+            isClickable = true
+            setOnClickListener { focusInputComposer() }
+        }
+
+        collapsedInputPreview = TextView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(18), 0, dp(18), 0)
+            text = "文本内容在此输入。"
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 16f
         }
 
         inputEdit.apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
-            ).apply {
-                rightMargin = dp(64)
-            }
+            )
             background = ColorDrawable(Color.TRANSPARENT)
-            hint = "描述你想开发的 App 功能"
+            hint = "文本内容在此输入。"
             minLines = 1
             maxLines = 4
             setSingleLine(false)
@@ -545,8 +573,17 @@ class MainActivity : AppCompatActivity() {
             isVerticalScrollBarEnabled = false
             includeFontPadding = true
             setHorizontallyScrolling(false)
-            setPadding(dp(14), dp(8), dp(8), dp(8))
-            textSize = 14f
+            setPadding(0, dp(8), 0, dp(6))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 16f
+            setOnFocusChangeListener { _, hasFocus ->
+                if (!voiceMode) {
+                    inputComposerMotion.setExpanded(hasFocus, animate = true)
+                    updateSendButtonVisual()
+                    updateAdaptiveInputHeight()
+                }
+            }
         }
 
         voiceHoldButton = TextView(this).apply {
@@ -576,52 +613,76 @@ class MainActivity : AppCompatActivity() {
         }
 
         modelButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(62), dp(32)).apply {
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                rightMargin = dp(4)
+            layoutParams = LinearLayout.LayoutParams(dp(96), dp(36)).apply {
+                marginEnd = dp(12)
             }
-            textSize = 12f
+            background = getDrawable(R.drawable.bg_model_pill_light)
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            compoundDrawablePadding = dp(6)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_input_model_chevron, 0)
+            setTextColor(Color.parseColor("#2D2D2D"))
+            textSize = 13f
+            alpha = 0f
+            visibility = View.GONE
             setOnClickListener { showModelDialog() }
         }
 
-        inputCenterContainer.addView(inputEdit)
-        inputCenterContainer.addView(voiceHoldButton)
-        inputCenterContainer.addView(modelButton)
+        inputCenterContainer.addView(collapsedInputPreview)
+        expandedInputContainer.addView(inputEdit)
+        expandedInputContainer.addView(voiceHoldButton)
 
-        val rightControls = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+        inputRightControls = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
         }
 
         attachmentButton = ImageButton(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(dp(46), dp(46), Gravity.START or Gravity.CENTER_VERTICAL)
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_add_circle_simple)
             scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(7), dp(7), dp(7), dp(7))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
             contentDescription = "展开更多输入功能"
             setOnClickListener { toggleAttachmentPanel() }
         }
 
         sendButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(58), dp(36), Gravity.CENTER)
+            layoutParams = FrameLayout.LayoutParams(dp(46), dp(46), Gravity.END or Gravity.CENTER_VERTICAL)
+            background = getDrawable(R.drawable.ic_input_send_arrow_circle)
             gravity = Gravity.CENTER
             includeFontPadding = false
+            text = ""
             setOnClickListener { sendMessage() }
         }
 
         inputBarContainer.addView(inputModeButton)
+        inputBarContainer.addView(modelButton)
         inputBarContainer.addView(inputCenterContainer)
-        rightControls.addView(attachmentButton)
-        rightControls.addView(sendButton)
-        inputBarContainer.addView(rightControls)
+        inputRightControls.addView(attachmentButton)
+        inputRightControls.addView(sendButton)
+        inputBarContainer.addView(inputRightControls)
 
         attachmentPanel = buildAttachmentPanel()
+        root.addView(expandedInputContainer)
         root.addView(inputBarContainer)
         root.addView(attachmentPanel)
+
+        inputComposerMotion = InputComposerMotion(
+            expandedInputContainer = expandedInputContainer,
+            collapsedInputContainer = inputCenterContainer,
+            modelButton = modelButton,
+            rightControls = inputRightControls
+        )
+        inputEdit.setOnClickListener {
+            if (!inputComposerMotion.isExpanded && !voiceMode) {
+                inputComposerMotion.setExpanded(true, animate = true)
+            }
+        }
 
         inputEdit.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                updateCollapsedInputPreview()
                 updateSendButtonVisual()
                 updateAdaptiveInputHeight()
             }
@@ -636,6 +697,7 @@ class MainActivity : AppCompatActivity() {
         }
         binding.stageHintText.setOnClickListener { collapseAttachmentPanel() }
         applyVoiceMode()
+        updateCollapsedInputPreview()
         updateSendButtonVisual()
         updateAdaptiveInputHeight()
     }
@@ -645,28 +707,55 @@ class MainActivity : AppCompatActivity() {
         val inputEdit = binding.inputEdit
         inputEdit.post {
             if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return@post
-            val minHeight = dp(40)
-            val maxHeight = dp(122)
+            val collapsedHeight = dp(48)
+            val minTextHeight = dp(58)
+            val maxTextHeight = dp(122)
             val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
-            val desiredHeight = if (voiceMode) {
-                minHeight
+            val desiredTextHeight = if (voiceMode) {
+                0
             } else {
                 val multilineTopGuard = if (rawLineCount > 1) dp(8) else 0
                 (rawLineCount.coerceAtMost(4) * inputEdit.lineHeight +
                     inputEdit.paddingTop +
                     inputEdit.paddingBottom +
-                    multilineTopGuard).coerceIn(minHeight, maxHeight)
+                    multilineTopGuard).coerceIn(minTextHeight, maxTextHeight)
             }
 
             val centerParams = inputCenterContainer.layoutParams as LinearLayout.LayoutParams
-            if (centerParams.height != desiredHeight) {
-                centerParams.height = desiredHeight
+            if (centerParams.height != collapsedHeight) {
+                centerParams.height = collapsedHeight
                 inputCenterContainer.layoutParams = centerParams
             }
 
-            val multiline = !voiceMode && desiredHeight > minHeight
+            if (::inputComposerMotion.isInitialized) {
+                inputComposerMotion.updateExpandedTextHeight(
+                    desiredTextHeight,
+                    animate = inputComposerMotion.isExpanded
+                )
+            }
+
+            val multiline = !voiceMode && rawLineCount > 1
             inputEdit.gravity = (if (multiline) Gravity.TOP else Gravity.CENTER_VERTICAL) or Gravity.START
             inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > 4
+        }
+    }
+
+    private fun updateCollapsedInputPreview() {
+        if (!::collapsedInputPreview.isInitialized) return
+        val value = binding.inputEdit.text.toString()
+        collapsedInputPreview.text = value.ifBlank { "文本内容在此输入。" }
+    }
+
+    private fun focusInputComposer() {
+        if (activeConversation().ended) return
+        if (voiceMode) {
+            voiceMode = false
+            applyVoiceMode()
+        }
+        binding.inputEdit.requestFocus()
+        binding.inputEdit.post {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
         }
     }
 
@@ -981,13 +1070,28 @@ class MainActivity : AppCompatActivity() {
         if (voiceMode) {
             hideKeyboard()
             inputModeButton.setImageResource(R.drawable.ic_input_keyboard_circle)
+            if (::inputComposerMotion.isInitialized) {
+                inputComposerMotion.setExpanded(false, animate = true)
+            }
+            voiceHoldButton.detachFromParent()
+            inputCenterContainer.removeAllViews()
+            inputCenterContainer.addView(voiceHoldButton)
             binding.inputEdit.visibility = View.GONE
             binding.modelButton.visibility = View.GONE
             voiceHoldButton.visibility = View.VISIBLE
         } else {
             inputModeButton.setImageResource(R.drawable.ic_input_voice_circle)
+            collapsedInputPreview.detachFromParent()
+            voiceHoldButton.detachFromParent()
+            inputCenterContainer.removeAllViews()
+            inputCenterContainer.addView(collapsedInputPreview)
+            expandedInputContainer.addView(voiceHoldButton)
             binding.inputEdit.visibility = View.VISIBLE
-            binding.modelButton.visibility = View.VISIBLE
+            binding.modelButton.visibility = if (::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
             voiceHoldButton.visibility = View.GONE
         }
         updateSendButtonVisual()
@@ -997,17 +1101,16 @@ class MainActivity : AppCompatActivity() {
     private fun updateSendButtonVisual() {
         if (!::binding.isInitialized) return
         val hasText = binding.inputEdit.text.toString().trim().isNotEmpty()
-        val sendMode = hasText && !voiceMode
+        val composerExpanded = ::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded
+        val sendMode = hasText && !voiceMode && composerExpanded
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
-            params?.width = dp(58)
-            binding.sendButton.background = getDrawable(R.drawable.bg_send_button)
-            binding.sendButton.text = "发送"
-            binding.sendButton.setTextColor(Color.WHITE)
-            binding.sendButton.textSize = 14f
+            params?.width = dp(46)
+            binding.sendButton.background = getDrawable(R.drawable.ic_input_send_arrow_circle)
+            binding.sendButton.text = ""
             binding.sendButton.visibility = View.VISIBLE
             if (::attachmentButton.isInitialized) {
-                attachmentButton.visibility = View.GONE
+                attachmentButton.visibility = View.VISIBLE
             }
         } else {
             binding.sendButton.visibility = View.GONE
@@ -1015,9 +1118,18 @@ class MainActivity : AppCompatActivity() {
                 attachmentButton.visibility = View.VISIBLE
             }
         }
-            params?.height = dp(36)
-        params?.gravity = Gravity.CENTER
+        params?.height = dp(46)
+        params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         params?.let { binding.sendButton.layoutParams = it }
+        if (::attachmentButton.isInitialized) {
+            val attachmentParams = attachmentButton.layoutParams as? FrameLayout.LayoutParams
+            attachmentParams?.gravity = if (sendMode) {
+                Gravity.START or Gravity.CENTER_VERTICAL
+            } else {
+                Gravity.END or Gravity.CENTER_VERTICAL
+            }
+            attachmentParams?.let { attachmentButton.layoutParams = it }
+        }
         val conversationEnded = activeConversation().ended
         binding.sendButton.isEnabled = !conversationEnded && (!sendMode || inputCanSend)
         binding.sendButton.alpha = if (!conversationEnded && (!sendMode || inputCanSend)) 1f else 0.55f
@@ -4110,7 +4222,7 @@ class MainActivity : AppCompatActivity() {
         val canSend = enabled && !conversationEnded
         inputCanSend = canSend
         binding.inputEdit.isEnabled = !conversationEnded
-        binding.inputEdit.hint = if (conversationEnded) "会话已结束，请新建会话继续" else "描述你想开发的 App 功能"
+        binding.inputEdit.hint = if (conversationEnded) "会话已结束，请新建会话继续" else "文本内容在此输入。"
         if (::inputModeButton.isInitialized) {
             inputModeButton.isEnabled = !conversationEnded
             inputModeButton.alpha = if (conversationEnded) 0.55f else 1f
