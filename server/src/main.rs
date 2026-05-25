@@ -47,6 +47,7 @@ mod project_task_scheduler;
 mod project_trace_events;
 mod project_ws_job;
 mod project_ws_protocol;
+mod release_claim;
 mod router;
 mod server_trace;
 mod store;

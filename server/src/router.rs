@@ -10,7 +10,7 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, api, app_update, peer_relay, project_api, project_attachments, project_chat,
-    project_downloads, project_git, user_api, web,
+    project_downloads, project_git, release_claim, user_api, web,
 };
 
 pub fn build_app(state: Arc<AppState>) -> Router {
@@ -31,6 +31,13 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/readyz", get(api::readyz))
         .route("/api/runtime", get(api::readyz))
         .route("/api/server/version", get(api::server_version))
+        .route("/api/release/claim", post(release_claim::claim_handler))
+        .route(
+            "/api/release/heartbeat",
+            post(release_claim::heartbeat_handler),
+        )
+        .route("/api/release/finish", post(release_claim::finish_handler))
+        .route("/api/release/status", get(release_claim::status_handler))
         .route("/api/debug/codex-health", get(api::codex_health))
         .route("/api/debug/traces/:trace_id", get(api::server_trace))
         .route("/api/image/generate", post(api::generate_image))
