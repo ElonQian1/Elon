@@ -176,9 +176,9 @@ class MainActivity : AppCompatActivity() {
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
-            setupNavigation = ::setupNavigation,
+            setupNavigation = { navigationController().setupNavigation() },
             setupQuickActions = ::setupQuickActions,
-            setupBackHandling = ::setupBackHandling,
+            setupBackHandling = { navigationController().setupBackHandling() },
             setupInputComposer = ::setupInputComposer,
             restoreCachedModelSelection = ::restoreCachedModelSelection,
             updateProjectViews = ::updateProjectViews,
@@ -691,14 +691,6 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.clearFocus()
     }
 
-    private fun setupNavigation() {
-        navigationController().setupNavigation()
-    }
-
-    private fun setupBackHandling() {
-        navigationController().setupBackHandling()
-    }
-
     private fun showConversationHome(animate: Boolean = false) {
         navigationController().showConversationHome(animate)
     }
@@ -720,27 +712,15 @@ class MainActivity : AppCompatActivity() {
             renderProjectList = ::renderProjectList,
             refreshServerVersion = ::refreshServerVersion,
             openConversation = ::openConversation,
-            showConversationActions = ::showConversationActions,
-            showHomeActionPopup = ::showHomeActionPopup,
-            showChatActionPopup = ::showChatActionPopup,
+            showConversationActions = { index -> conversationActions().showConversationActions(index) },
+            showHomeActionPopup = { anchor, tab -> actionPopups().showHomeActionPopup(anchor, tab) },
+            showChatActionPopup = { anchor -> actionPopups().showChatActionPopup(anchor) },
             updateFirstConversationStatus = ::updateFirstConversationStatus,
             collapseInputComposer = ::collapseInputComposer,
             isActiveConversationWorking = ::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
             maybePrewarmCodexSession = ::maybePrewarmCodexSession
         ).also { navigationController = it }
-    }
-
-    private fun showCreateConversationDialog() {
-        conversationActions().showCreateConversationDialog()
-    }
-
-    private fun showCreateProjectDialog() {
-        projectActions().showCreateProjectDialog()
-    }
-
-    private fun showConversationActions(index: Int) {
-        conversationActions().showConversationActions(index)
     }
 
     private fun titleEditText(value: String): EditText {
@@ -1175,7 +1155,7 @@ class MainActivity : AppCompatActivity() {
             homeRows = { homeRows() },
             dp = ::dp,
             selectableForeground = ::selectableForeground,
-            showCreateProjectDialog = ::showCreateProjectDialog
+            showCreateProjectDialog = { projectActions().showCreateProjectDialog() }
         ).also { homeListActions = it }
     }
 
@@ -1188,7 +1168,7 @@ class MainActivity : AppCompatActivity() {
             openProject = ::openProject,
             showProjectActions = ::showProjectActions,
             openConversation = ::openConversation,
-            showConversationActions = ::showConversationActions,
+            showConversationActions = { index -> conversationActions().showConversationActions(index) },
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { homeRows = it }
@@ -1278,14 +1258,6 @@ class MainActivity : AppCompatActivity() {
         ).also { profileQuickActions = it }
     }
 
-    private fun showHomeActionPopup(anchor: View, tab: TextView) {
-        actionPopups().showHomeActionPopup(anchor, tab)
-    }
-
-    private fun showChatActionPopup(anchor: View) {
-        actionPopups().showChatActionPopup(anchor)
-    }
-
     private fun actionPopups(): MainActionPopups {
         actionPopups?.let { return it }
         return MainActionPopups(
@@ -1298,8 +1270,8 @@ class MainActivity : AppCompatActivity() {
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = ::showProjectRecordDialog,
             showGitProjectDialog = ::showGitProjectDialog,
-            showCreateProjectDialog = ::showCreateProjectDialog,
-            showCreateConversationDialog = ::showCreateConversationDialog,
+            showCreateProjectDialog = { projectActions().showCreateProjectDialog() },
+            showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
             openSettings = { quickCommandActions().openSettings() },
             deleteMessage = { message -> messageActions().deleteMessage(message) },
             quoteMessage = { text -> messageActions().quoteMessage(text) },
@@ -1354,7 +1326,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             activeConversation = ::activeConversation,
-            showCreateConversationDialog = ::showCreateConversationDialog,
+            showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
             showChat = { showChat() },
             sendMessage = ::sendMessage
         ).also { quickCommandActions = it }
