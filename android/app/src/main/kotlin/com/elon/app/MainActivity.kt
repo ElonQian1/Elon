@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
             startTaskWorkService = { action -> startTaskWorkService(action) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
-            maybePrewarmCodexSession = ::maybePrewarmCodexSession
+            maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
         ).also { resumeActions = it }
     }
 
@@ -233,22 +233,6 @@ class MainActivity : AppCompatActivity() {
         taskWorkServiceActions().setTaskAppForeground(false)
         saveProjects()
         super.onStop()
-    }
-
-    private fun startPreparedMessage(
-        visibleText: String,
-        outgoingText: String,
-        attachmentRefs: com.google.gson.JsonArray,
-        target: SendTarget,
-        chatAttachments: List<ChatAttachment>
-    ) {
-        preparedMessageActions().startPreparedMessage(
-            visibleText = visibleText,
-            outgoingText = outgoingText,
-            attachmentRefs = attachmentRefs,
-            target = target,
-            chatAttachments = chatAttachments
-        )
     }
 
     private fun preparedMessageActions(): MainPreparedMessageActions {
@@ -469,7 +453,7 @@ class MainActivity : AppCompatActivity() {
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
                 attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
-            startPreparedMessage = ::startPreparedMessage
+            startPreparedMessage = preparedMessageActions()::startPreparedMessage
         ).also { sendMessageActions = it }
     }
 
@@ -495,7 +479,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             pendingAttachments = { pendingAttachments.toList() },
             setSendEnabled = ::setSendEnabled,
-            startPreparedMessage = ::startPreparedMessage
+            startPreparedMessage = preparedMessageActions()::startPreparedMessage
         ).also { attachmentSendActions = it }
     }
 
@@ -603,7 +587,7 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { animate -> inputFocusActions().collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = ::setSendEnabled,
-            maybePrewarmCodexSession = ::maybePrewarmCodexSession
+            maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
         ).also { navigationController = it }
     }
 
@@ -756,7 +740,7 @@ class MainActivity : AppCompatActivity() {
             updateIdleReadyStatus = { conversationPreviewActions().updateIdleReadyStatus() },
             appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
                 traceId?.let { taskResponseTokens.remove(it) }
-                appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
+                taskMessageRouterActions().appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
             },
             removeConversationTask = conversationTaskRegistryActions()::removeConversationTask,
             syncActiveTasksFromServiceState = { activeTasksJson ->
@@ -777,16 +761,6 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             handleTaskWorkEvent = { intent -> taskWorkEventActions().handleTaskWorkEvent(intent) }
         ).also { taskWorkReceiverActions = it }
-    }
-
-    private fun appendTaskMessage(
-        raw: String,
-        traceId: String?,
-        projectId: String?,
-        conversationId: String?,
-        isDevelopment: Boolean?
-    ) {
-        taskMessageRouterActions().appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
     }
 
     private fun taskMessageRouterActions(): MainTaskMessageRouterActions {
@@ -832,7 +806,7 @@ class MainActivity : AppCompatActivity() {
         return MainTaskWorkServiceActions(
             activity = this,
             prefs = prefs,
-            appendTaskMessage = ::appendTaskMessage,
+            appendTaskMessage = taskMessageRouterActions()::appendTaskMessage,
             appendRawMessage = { raw -> appendMessage(raw) }
         ).also { taskWorkServiceActions = it }
     }
@@ -1000,10 +974,6 @@ class MainActivity : AppCompatActivity() {
             openUrl = { url -> externalActions().openUrl(url) },
             copyText = { label, text -> externalActions().copyText(label, text) }
         ).showGitProjectDialog()
-    }
-
-    private fun maybePrewarmCodexSession(reason: String) {
-        codexPrewarm().maybePrewarmCodexSession(reason)
     }
 
     private fun codexPrewarm(): MainCodexPrewarm {
