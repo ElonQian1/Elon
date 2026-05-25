@@ -144,7 +144,7 @@ class MainActivity : AppCompatActivity() {
     private val pendingAttachments = mutableListOf<PendingAttachment>()
     private val taskWorkReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            handleTaskWorkEvent(intent)
+            taskWorkEventActions().handleTaskWorkEvent(intent)
         }
     }
 
@@ -182,9 +182,9 @@ class MainActivity : AppCompatActivity() {
             setupInputComposer = ::setupInputComposer,
             restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
             updateProjectViews = ::updateProjectViews,
-            setTaskAppForeground = ::setTaskAppForeground,
+            setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
             registerTaskWorkReceiver = ::registerTaskWorkReceiver,
-            restorePendingActiveWork = ::restorePendingActiveWork,
+            restorePendingActiveWork = { conversationTaskRegistryActions().restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             getWaitingForReply = { waitingForReply },
             getBackendConnected = { backendConnected },
@@ -216,8 +216,8 @@ class MainActivity : AppCompatActivity() {
             prefs = prefs,
             isBindingInitialized = { ::binding.isInitialized },
             setAppInForeground = { appInForeground = it },
-            setTaskAppForeground = ::setTaskAppForeground,
-            drainQueuedTaskEvents = ::drainQueuedTaskEvents,
+            setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
+            drainQueuedTaskEvents = { taskWorkServiceActions().drainQueuedTaskEvents() },
             loadModelOptions = { modelActions().loadModelOptions() },
             getBackendConnected = { backendConnected },
             getWaitingForReply = { waitingForReply },
@@ -235,13 +235,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         appInForeground = false
-        setTaskAppForeground(false)
+        taskWorkServiceActions().setTaskAppForeground(false)
         super.onPause()
     }
 
     override fun onStop() {
         appInForeground = false
-        setTaskAppForeground(false)
+        taskWorkServiceActions().setTaskAppForeground(false)
         saveProjects()
         super.onStop()
     }
@@ -899,10 +899,6 @@ class MainActivity : AppCompatActivity() {
         conversationTaskRegistryActions().clearPersistedActiveWork()
     }
 
-    private fun restorePendingActiveWork() {
-        conversationTaskRegistryActions().restorePendingActiveWork()
-    }
-
     private fun conversationTaskRegistryActions(): MainConversationTaskRegistryActions {
         conversationTaskRegistryActions?.let { return it }
         return MainConversationTaskRegistryActions(
@@ -940,10 +936,6 @@ class MainActivity : AppCompatActivity() {
         taskWorkReceiverRegistered = true
     }
 
-    private fun handleTaskWorkEvent(intent: Intent) {
-        taskWorkEventActions().handleTaskWorkEvent(intent)
-    }
-
     private fun taskWorkEventActions(): MainTaskWorkEventActions {
         taskWorkEventActions?.let { return it }
         return MainTaskWorkEventActions(
@@ -966,18 +958,16 @@ class MainActivity : AppCompatActivity() {
                 appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
             },
             removeConversationTask = ::removeConversationTask,
-            syncActiveTasksFromServiceState = ::syncActiveTasksFromServiceState,
+            syncActiveTasksFromServiceState = { activeTasksJson ->
+                conversationTaskRegistryActions().syncActiveTasksFromServiceState(activeTasksJson)
+            },
             clearTaskMaps = {
                 runningConversationTasks.clear()
                 runningTraceToConversation.clear()
                 taskResponseTokens.clear()
             },
-            refreshActiveTaskState = ::refreshActiveTaskState
+            refreshActiveTaskState = { conversationTaskRegistryActions().refreshActiveTaskState() }
         ).also { taskWorkEventActions = it }
-    }
-
-    private fun syncActiveTasksFromServiceState(activeTasksJson: String?) {
-        conversationTaskRegistryActions().syncActiveTasksFromServiceState(activeTasksJson)
     }
 
     private fun appendTaskMessage(
@@ -998,17 +988,15 @@ class MainActivity : AppCompatActivity() {
             activeConversationTaskKey = ::activeConversationTaskKey,
             taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
             appendActiveMessage = { raw -> appendMessage(raw) },
-            appendBackgroundTaskMessage = ::appendBackgroundTaskMessage,
+            appendBackgroundTaskMessage = { raw, key, isDevelopment ->
+                backgroundTaskMessageActions().appendBackgroundTaskMessage(raw, key, isDevelopment)
+            },
             removeConversationTask = ::removeConversationTask,
             persistActiveWork = ::persistActiveWork,
             updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
                 updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
             }
         ).also { taskMessageRouterActions = it }
-    }
-
-    private fun appendBackgroundTaskMessage(raw: String, key: String?, isDevelopment: Boolean) {
-        backgroundTaskMessageActions().appendBackgroundTaskMessage(raw, key, isDevelopment)
     }
 
     private fun backgroundTaskMessageActions(): MainBackgroundTaskMessageActions {
@@ -1046,14 +1034,6 @@ class MainActivity : AppCompatActivity() {
         traceId: String? = null
     ): Boolean {
         return taskWorkServiceActions().startTaskWorkService(action, payload, isDevelopment, traceId)
-    }
-
-    private fun setTaskAppForeground(foreground: Boolean) {
-        taskWorkServiceActions().setTaskAppForeground(foreground)
-    }
-
-    private fun drainQueuedTaskEvents() {
-        taskWorkServiceActions().drainQueuedTaskEvents()
     }
 
     private fun taskWorkServiceActions(): MainTaskWorkServiceActions {
