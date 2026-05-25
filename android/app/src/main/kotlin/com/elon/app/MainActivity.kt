@@ -126,6 +126,7 @@ class MainActivity : AppCompatActivity() {
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
     private var actionPopups: MainActionPopups? = null
+    private var messageActions: MainMessageActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -2346,9 +2347,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMessageActions(anchor: View, message: ChatMessage) {
-        val text = shareableMessageText(message)
-        if (text.isBlank()) return
-        showMessageActionPopup(anchor, message, text)
+        messageActions().showMessageActions(anchor, message)
     }
 
     private fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
@@ -2356,27 +2355,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun deleteMessage(message: ChatMessage) {
-        val index = activeConversation().messages.indexOf(message)
-        if (index < 0) return
-        activeConversation().messages.removeAt(index)
-        chatAdapter.notifyItemRemoved(index)
-        saveConversations()
-        renderConversationList()
-        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
+        messageActions().deleteMessage(message)
     }
 
     private fun quoteMessage(text: String) {
-        showChat()
-        binding.inputEdit.setText("> ${summarize(text, 40)}\n")
-        binding.inputEdit.setSelection(binding.inputEdit.text.length)
+        messageActions().quoteMessage(text)
     }
 
     private fun showPromotionDialog() {
-        shareActions().showPromotionDialog(apkDownloadUrl, apkDownloadPageUrl)
+        messageActions().showPromotionDialog()
     }
 
     private fun shareActions(): MainShareActions {
         return MainShareActions(this, ::dp)
+    }
+
+    private fun messageActions(): MainMessageActions {
+        messageActions?.let { return it }
+        return MainMessageActions(
+            activity = this,
+            binding = binding,
+            activeConversation = ::activeConversation,
+            chatAdapter = { chatAdapter },
+            saveConversations = ::saveConversations,
+            renderConversationList = ::renderConversationList,
+            showChat = { showChat() },
+            showMessageActionPopup = ::showMessageActionPopup,
+            shareActions = ::shareActions,
+            apkDownloadUrl = { apkDownloadUrl },
+            apkDownloadPageUrl = { apkDownloadPageUrl }
+        ).also { messageActions = it }
     }
 
     private fun nextWorkflowStep(label: String): String {
