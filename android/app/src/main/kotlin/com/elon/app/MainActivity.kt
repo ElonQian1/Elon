@@ -110,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var conversationPreviewActions: MainConversationPreviewActions? = null
+    private var profileQuickActions: MainProfileQuickActions? = null
     private var createActions: MainCreateActions? = null
     private var resumeActions: MainResumeActions? = null
     private var lifecycleEdgeActions: MainLifecycleEdgeActions? = null
@@ -1234,22 +1235,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupQuickActions() {
-        MainQuickActionBindings(
-            activity = this,
-            binding = binding,
-            fillPlanPrompt = ::fillPlanPrompt,
-            sendQuickCommand = ::sendQuickCommand,
-            showProjectRecordDialog = ::showProjectRecordDialog,
-            showGitProjectDialog = ::showGitProjectDialog,
-            openSettings = ::openSettings,
-            showPromotionDialog = ::showPromotionDialog,
-            showGuestImportDialog = ::showGuestImportDialog,
-            confirmLogout = ::confirmLogout
-        ).setupQuickActions()
-        refreshAccountUi()
-        binding.profileVersionText.text =
-            "${localAppVersionLine()}\n服务器版本读取中..."
-        refreshServerVersion()
+        profileQuickActions().setupQuickActions()
     }
 
     private fun refreshAccountUi() {
@@ -1282,15 +1268,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshServerVersion() {
-        Thread {
-            val info = fetchServerVersionInfo(http, serverVersionUrl)
-            val serverLine = info?.let { serverVersionLine(it) } ?: "服务器版本暂不可用"
-            runOnUiThread {
-                if (::binding.isInitialized) {
-                    binding.profileVersionText.text = "${localAppVersionLine()}\n$serverLine"
-                }
-            }
-        }.start()
+        profileQuickActions().refreshServerVersion()
+    }
+
+    private fun profileQuickActions(): MainProfileQuickActions {
+        profileQuickActions?.let { return it }
+        return MainProfileQuickActions(
+            activity = this,
+            binding = binding,
+            http = http,
+            serverVersionUrl = serverVersionUrl,
+            isBindingInitialized = { ::binding.isInitialized },
+            refreshAccountUi = ::refreshAccountUi,
+            fillPlanPrompt = ::fillPlanPrompt,
+            sendQuickCommand = ::sendQuickCommand,
+            showProjectRecordDialog = ::showProjectRecordDialog,
+            showGitProjectDialog = ::showGitProjectDialog,
+            openSettings = ::openSettings,
+            showPromotionDialog = ::showPromotionDialog,
+            showGuestImportDialog = ::showGuestImportDialog,
+            confirmLogout = ::confirmLogout
+        ).also { profileQuickActions = it }
     }
 
     private fun showHomeActionPopup(anchor: View, tab: TextView) {
