@@ -173,7 +173,7 @@ class MainActivity : AppCompatActivity() {
             loadProjects = ::loadProjects,
             setupAttachmentLaunchers = ::setupAttachmentLaunchers,
             activeConversation = ::activeConversation,
-            pauseCurrentWork = ::pauseCurrentWork,
+            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
             setupNavigation = ::setupNavigation,
@@ -315,22 +315,6 @@ class MainActivity : AppCompatActivity() {
             },
             clearPendingAttachments = { clearPendingAttachments(deleteFiles = false) }
         ).also { preparedMessageActions = it }
-    }
-
-    private fun pauseCurrentWork() {
-        activeWorkControlActions().pauseCurrentWork()
-    }
-
-    private fun handleActiveWorkDisconnected(task: ConversationTaskState) {
-        activeWorkControlActions().handleActiveWorkDisconnected(task)
-    }
-
-    private fun scheduleReconnectForActiveWork(traceId: String? = activeConversationTask()?.traceId) {
-        activeWorkControlActions().scheduleReconnectForActiveWork(traceId)
-    }
-
-    private fun resumePendingWorkAfterReconnect() {
-        activeWorkControlActions().resumePendingWorkAfterReconnect()
     }
 
     private fun activeWorkControlActions(): MainActiveWorkControlActions {
@@ -543,7 +527,7 @@ class MainActivity : AppCompatActivity() {
         project.activeConversationIndex = conversationIndex
         chatAdapter = ChatAdapter(
             project.conversations[conversationIndex].messages,
-            ::pauseCurrentWork,
+            { activeWorkControlActions().pauseCurrentWork() },
             { anchor, message -> messageActions().showMessageActions(anchor, message) }
         )
         binding.chatList.adapter = chatAdapter
@@ -835,7 +819,7 @@ class MainActivity : AppCompatActivity() {
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
         chatAdapter = ChatAdapter(
             activeConversation().messages,
-            ::pauseCurrentWork,
+            { activeWorkControlActions().pauseCurrentWork() },
             { anchor, message -> messageActions().showMessageActions(anchor, message) }
         )
         binding.chatList.adapter = chatAdapter
@@ -1011,7 +995,7 @@ class MainActivity : AppCompatActivity() {
             recordEvidence = ::recordEvidence,
             setSendEnabled = ::setSendEnabled,
             isActiveConversationWorking = ::isActiveConversationWorking,
-            handleActiveWorkDisconnected = ::handleActiveWorkDisconnected,
+            handleActiveWorkDisconnected = { task -> activeWorkControlActions().handleActiveWorkDisconnected(task) },
             updateIdleReadyStatus = ::updateIdleReadyStatus,
             appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
                 traceId?.let { taskResponseTokens.remove(it) }
