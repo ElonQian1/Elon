@@ -14,6 +14,7 @@ mod ai_cli_streaming;
 mod ai_cli_trace;
 mod api;
 mod app_update;
+mod cli_config;
 mod codex_health;
 mod codex_stream;
 mod homecli_agent;
