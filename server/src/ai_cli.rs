@@ -20,7 +20,7 @@ pub(crate) use crate::ai_cli_output::truncate_chars;
 
 use crate::{
     ai_cli_output::{
-        extract_json_agent_message, extract_thread_id, format_cli_reply, parse_intent_gate_result,
+        extract_thread_id, format_cli_reply, parse_intent_gate_result,
     },
     ai_cli_prompts::{
         build_cli_prompt, build_intent_gate_prompt, build_native_session_repair_prompt,
@@ -31,6 +31,9 @@ use crate::{
     tools,
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
+
+#[cfg(test)]
+use crate::ai_cli_output::extract_json_agent_message;
 
 #[derive(Debug, Clone)]
 pub struct NativeSessionScope {
