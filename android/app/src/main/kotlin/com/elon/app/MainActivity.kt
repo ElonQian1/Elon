@@ -54,7 +54,6 @@ class MainActivity : AppCompatActivity() {
     private var foldedCliLogCount = 0
     private val foldedCliLogSamples = ArrayDeque<String>()
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
-    private val currentEvidenceEntries = mutableListOf<EvidenceEntry>()
     // tool 名 -> 已派发但尚未 tool_result 的 ai-action 气泡在当前会话中的 index 队列
     private val pendingToolActionBubbles = linkedMapOf<String, ArrayDeque<Int>>()
     private val emittedProgressSignals = linkedSetOf<String>()
@@ -109,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var externalActions: MainExternalActions? = null
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
     private var workflowStageActions: MainWorkflowStageActions? = null
+    private var evidenceActions: MainEvidenceActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -348,7 +348,7 @@ class MainActivity : AppCompatActivity() {
         persistActiveWork()
         workflowStepIndex = 0
         resetFoldedCliLog()
-        currentEvidenceEntries.clear()
+        clearCurrentEvidence()
         pendingToolActionBubbles.clear()
         emittedProgressSignals.clear()
         if (requestIsDevelopment) {
@@ -393,7 +393,7 @@ class MainActivity : AppCompatActivity() {
         reconnectAttempts = 0
         persistActiveWork()
         stopWorkingEvidenceForActiveConversation()
-        currentEvidenceEntries.clear()
+        clearCurrentEvidence()
         pendingToolActionBubbles.clear()
         setSendEnabled(true)
         if (wasDevelopment) {
@@ -1876,70 +1876,40 @@ class MainActivity : AppCompatActivity() {
 
     private fun recordEvidence(kind: String, detail: String) {
         if (!activeRequestIsDevelopment) return
-        val clean = sanitizeEvidenceDetail(detail)
-        if (clean.isBlank()) return
-
-        currentEvidenceEntries.add(EvidenceEntry(kind, summarize(clean, 96)))
-        while (currentEvidenceEntries.size > 40) {
-            currentEvidenceEntries.removeAt(0)
-        }
-        attachEvidenceToLatestAi()
+        evidenceActions().recordEvidence(kind, detail)
     }
 
     private fun attachEvidenceToLatestAi() {
-        if (currentEvidenceEntries.isEmpty()) return
-        val messages = activeConversation().messages
-        val latestUserIndex = messages.indexOfLast { it.role == "user" }
-        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
-            ?: return
-
-        applyEvidenceToMessage(messages[index], currentEvidenceEntries, working = true)
-        chatAdapter.notifyMessageUpdated(index)
-        saveConversations()
+        evidenceActions().attachEvidenceToLatestAi()
     }
 
     private fun finalizeEvidenceForLatestAssistant() {
-        if (currentEvidenceEntries.isEmpty()) return
-        val messages = activeConversation().messages
-        val latestUserIndex = messages.indexOfLast { it.role == "user" }
-        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
-            ?: return
-
-        applyEvidenceToMessage(messages[index], currentEvidenceEntries, working = false)
-        currentEvidenceEntries.clear()
-        chatAdapter.notifyMessageUpdated(index)
-        saveConversations()
+        evidenceActions().finalizeEvidenceForLatestAssistant()
     }
 
     private fun aiMessageWithCurrentEvidence(
         content: String,
         attachments: List<ChatAttachment> = emptyList()
     ): ChatMessage {
-        val message = ChatMessage("ai", content, attachments.takeIf { it.isNotEmpty() })
-        if (currentEvidenceEntries.isNotEmpty()) {
-            stopWorkingEvidenceForActiveConversation()
-            applyEvidenceToMessage(message, currentEvidenceEntries, working = false)
-            currentEvidenceEntries.clear()
-        }
-        return message
-    }
-
-    private fun applyEvidenceToMessage(message: ChatMessage, entries: List<EvidenceEntry>, working: Boolean) {
-        message.evidenceTitle = evidenceTitle(entries)
-        message.evidenceDetails = evidenceDetails(entries)
-        message.evidenceWorking = working
+        return evidenceActions().aiMessageWithCurrentEvidence(content, attachments)
     }
 
     private fun stopWorkingEvidenceForActiveConversation() {
-        var changed = false
-        activeConversation().messages.forEachIndexed { index, message ->
-            if (message.evidenceWorking) {
-                message.evidenceWorking = false
-                chatAdapter.notifyMessageUpdated(index)
-                changed = true
-            }
-        }
-        if (changed) saveConversations()
+        evidenceActions().stopWorkingEvidenceForActiveConversation()
+    }
+
+    private fun clearCurrentEvidence() {
+        evidenceActions().clearCurrentEvidence()
+    }
+
+    private fun evidenceActions(): MainEvidenceActions {
+        evidenceActions?.let { return it }
+        return MainEvidenceActions(
+            activeConversation = ::activeConversation,
+            chatAdapter = { chatAdapter },
+            saveConversations = ::saveConversations,
+            assistantEvidenceRoles = assistantEvidenceRoles
+        ).also { evidenceActions = it }
     }
 
     private fun handleFoldedCliOutput(content: String) {
@@ -2222,7 +2192,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     activeRequestIsDevelopment = false
                     stopWorkingEvidenceForActiveConversation()
-                    currentEvidenceEntries.clear()
+                    clearCurrentEvidence()
                     ChatMessage("error", error)
                 }
                 else -> return
@@ -2242,7 +2212,7 @@ class MainActivity : AppCompatActivity() {
             appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("服务端返回内容无法识别。")))
             activeRequestIsDevelopment = false
             stopWorkingEvidenceForActiveConversation()
-            currentEvidenceEntries.clear()
+            clearCurrentEvidence()
             appendMessage(ChatMessage("error", "服务端返回异常，无法解析。"))
         }
     }
