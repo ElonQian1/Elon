@@ -177,7 +177,7 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             setChatAdapter = { chatAdapter = it },
             setupNavigation = { navigationController().setupNavigation() },
-            setupQuickActions = ::setupQuickActions,
+            setupQuickActions = { profileQuickActions().setupQuickActions() },
             setupBackHandling = { navigationController().setupBackHandling() },
             setupInputComposer = ::setupInputComposer,
             restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
@@ -185,7 +185,7 @@ class MainActivity : AppCompatActivity() {
             setTaskAppForeground = ::setTaskAppForeground,
             registerTaskWorkReceiver = ::registerTaskWorkReceiver,
             restorePendingActiveWork = ::restorePendingActiveWork,
-            checkAndOfferGuestImport = ::checkAndOfferGuestImport,
+            checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             getWaitingForReply = { waitingForReply },
             getBackendConnected = { backendConnected },
             isActiveConversationWorking = ::isActiveConversationWorking,
@@ -710,7 +710,7 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = ::compactProjectTitle,
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList,
-            refreshServerVersion = ::refreshServerVersion,
+            refreshServerVersion = { profileQuickActions().refreshServerVersion() },
             openConversation = ::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups().showHomeActionPopup(anchor, tab) },
@@ -1185,27 +1185,6 @@ class MainActivity : AppCompatActivity() {
         return (value * resources.displayMetrics.density).toInt()
     }
 
-    private fun setupQuickActions() {
-        profileQuickActions().setupQuickActions()
-    }
-
-    private fun refreshAccountUi() {
-        if (!::binding.isInitialized) return
-        accountActions().refreshAccountUi()
-    }
-
-    private fun checkAndOfferGuestImport() {
-        accountActions().checkAndOfferGuestImport()
-    }
-
-    private fun showGuestImportDialog() {
-        accountActions().showGuestImportDialog()
-    }
-
-    private fun confirmLogout() {
-        accountActions().confirmLogout()
-    }
-
     private fun accountActions(): MainAccountActions {
         return MainAccountActions(
             activity = this,
@@ -1218,10 +1197,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun refreshServerVersion() {
-        profileQuickActions().refreshServerVersion()
-    }
-
     private fun profileQuickActions(): MainProfileQuickActions {
         profileQuickActions?.let { return it }
         return MainProfileQuickActions(
@@ -1230,15 +1205,17 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverVersionUrl = serverVersionUrl,
             isBindingInitialized = { ::binding.isInitialized },
-            refreshAccountUi = ::refreshAccountUi,
+            refreshAccountUi = {
+                if (::binding.isInitialized) accountActions().refreshAccountUi()
+            },
             fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = ::showProjectRecordDialog,
             showGitProjectDialog = ::showGitProjectDialog,
             openSettings = { quickCommandActions().openSettings() },
             showPromotionDialog = { messageActions().showPromotionDialog() },
-            showGuestImportDialog = ::showGuestImportDialog,
-            confirmLogout = ::confirmLogout
+            showGuestImportDialog = { accountActions().showGuestImportDialog() },
+            confirmLogout = { accountActions().confirmLogout() }
         ).also { profileQuickActions = it }
     }
 
