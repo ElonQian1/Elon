@@ -2,8 +2,6 @@ package com.elon.app
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -116,6 +114,7 @@ class MainActivity : AppCompatActivity() {
     private var actionPopups: MainActionPopups? = null
     private var messageActions: MainMessageActions? = null
     private var codexPrewarm: MainCodexPrewarm? = null
+    private var externalActions: MainExternalActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -2195,17 +2194,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun copyText(label: String, text: String) {
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show()
+        externalActions().copyText(label, text)
     }
 
     private fun openUrl(url: String) {
-        runCatching {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-        }.onFailure {
-            Toast.makeText(this, "无法打开链接: ${it.message}", Toast.LENGTH_SHORT).show()
-        }
+        externalActions().openUrl(url)
+    }
+
+    private fun externalActions(): MainExternalActions {
+        externalActions?.let { return it }
+        return MainExternalActions(this).also { externalActions = it }
     }
 
     private fun fillPlanPrompt() {
