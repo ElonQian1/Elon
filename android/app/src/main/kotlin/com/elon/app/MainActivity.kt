@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
     private var modelActions: MainModelActions? = null
+    private var conversationOpenActions: MainConversationOpenActions? = null
     private var projectActions: MainProjectActions? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
@@ -177,7 +178,7 @@ class MainActivity : AppCompatActivity() {
             getBackendConnected = { backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             startTaskWorkService = { action -> startTaskWorkService(action) },
-            openConversation = ::openConversation,
+            openConversation = conversationOpenActions()::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
             sendMessage = { sendMessageActions().sendMessage() }
         ).also { createActions = it }
@@ -592,7 +593,7 @@ class MainActivity : AppCompatActivity() {
             renderConversationList = ::renderConversationList,
             renderProjectList = ::renderProjectList,
             refreshServerVersion = { profileQuickActions().refreshServerVersion() },
-            openConversation = ::openConversation,
+            openConversation = conversationOpenActions()::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups().showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups().showChatActionPopup(anchor) },
@@ -653,28 +654,22 @@ class MainActivity : AppCompatActivity() {
         ).also { modelActions = it }
     }
 
-    private fun openConversation(index: Int) {
-        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
-        activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
-        chatAdapter = ChatAdapter(
-            activeConversation().messages,
-            { activeWorkControlActions().pauseCurrentWork() },
-            { anchor, message -> messageActions().showMessageActions(anchor, message) }
-        )
-        binding.chatList.adapter = chatAdapter
-        navigationController().showChat(animate = true)
-        if (chatAdapter.itemCount > 0) {
-            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
-        }
-    }
-
-    private fun openProject(index: Int) {
-        if (index !in projects.indices) return
-        activeProjectIndex = index
-        if (conversations.isEmpty()) conversations.add(defaultAppConversation())
-        activeConversationIndex = activeConversationIndex.coerceIn(0, conversations.lastIndex)
-        saveProjects()
-        binding.tabChat.performClick()
+    private fun conversationOpenActions(): MainConversationOpenActions {
+        conversationOpenActions?.let { return it }
+        return MainConversationOpenActions(
+            binding = binding,
+            projects = { projects },
+            conversations = { conversations },
+            activeConversation = ::activeConversation,
+            activeConversationIndex = { activeConversationIndex },
+            setActiveProjectIndex = { activeProjectIndex = it },
+            setActiveConversationIndex = { activeConversationIndex = it },
+            setChatAdapter = { chatAdapter = it },
+            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
+            showChat = { animate -> navigationController().showChat(animate = animate) },
+            saveProjects = ::saveProjects
+        ).also { conversationOpenActions = it }
     }
 
     private fun activeProject(): AppProject {
@@ -901,9 +896,9 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             timeFormatter = timeFormatter,
             activeProjectIndexProvider = { activeProjectIndex },
-            openProject = ::openProject,
+            openProject = conversationOpenActions()::openProject,
             showProjectActions = { index -> projectActions().showProjectActions(index) },
-            openConversation = ::openConversation,
+            openConversation = conversationOpenActions()::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
             dp = ::dp,
             selectableForeground = ::selectableForeground
@@ -922,7 +917,7 @@ class MainActivity : AppCompatActivity() {
             titleEditText = ::titleEditText,
             saveProjects = ::saveProjects,
             renderProjectList = ::renderProjectList,
-            openProject = ::openProject,
+            openProject = conversationOpenActions()::openProject,
             showGitProjectDialog = ::showGitProjectDialog
         ).also { projectActions = it }
     }
