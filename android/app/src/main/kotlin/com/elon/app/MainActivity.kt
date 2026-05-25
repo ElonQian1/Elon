@@ -112,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private var inputFocusActions: MainInputFocusActions? = null
     private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
+    private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1165,30 +1166,24 @@ class MainActivity : AppCompatActivity() {
         conversationId: String?,
         isDevelopment: Boolean?
     ) {
-        val parsed = runCatching { JSONObject(raw) }.getOrNull()
-        val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
-        val key = when {
-            !traceId.isNullOrBlank() && runningTraceToConversation.containsKey(traceId) ->
-                runningTraceToConversation[traceId]
-            !projectId.isNullOrBlank() && !conversationId.isNullOrBlank() ->
-                conversationTaskKey(projectId, conversationId)
-            else -> activeConversationTaskKey()
-        }
-        val isActiveTarget = key == activeConversationTaskKey()
-        if (isActiveTarget) {
-            appendMessage(raw)
-        } else {
-            val effectiveIsDevelopment = isDevelopment
-                ?: key?.let { runningConversationTasks[it]?.isDevelopment }
-                ?: false
-            appendBackgroundTaskMessage(raw, key, effectiveIsDevelopment)
-        }
-        if (type == "done" || type == "error") {
-            removeConversationTask(traceId, projectId, conversationId)
-            persistActiveWork()
-        } else {
-            updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect = false)
-        }
+        taskMessageRouterActions().appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
+    }
+
+    private fun taskMessageRouterActions(): MainTaskMessageRouterActions {
+        taskMessageRouterActions?.let { return it }
+        return MainTaskMessageRouterActions(
+            keyForTrace = { traceId -> runningTraceToConversation[traceId] },
+            conversationTaskKey = ::conversationTaskKey,
+            activeConversationTaskKey = ::activeConversationTaskKey,
+            taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
+            appendActiveMessage = { raw -> appendMessage(raw) },
+            appendBackgroundTaskMessage = ::appendBackgroundTaskMessage,
+            removeConversationTask = ::removeConversationTask,
+            persistActiveWork = ::persistActiveWork,
+            updateConversationTaskFromService = { traceId, projectId, conversationId, isDevelopment, pendingReconnect ->
+                updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, pendingReconnect)
+            }
+        ).also { taskMessageRouterActions = it }
     }
 
     private fun appendBackgroundTaskMessage(raw: String, key: String?, isDevelopment: Boolean) {
