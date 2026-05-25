@@ -40,6 +40,37 @@ internal class MainPreparedMessageActions(
         attachmentRefs: JsonArray,
         target: SendTarget,
         chatAttachments: List<ChatAttachment>
+    ) = startPreparedMessageInternal(
+        visibleText,
+        outgoingText,
+        attachmentRefs,
+        target,
+        chatAttachments,
+        appendUserBubble = true
+    )
+
+    fun startPreparedMessageAfterUserBubble(
+        visibleText: String,
+        outgoingText: String,
+        attachmentRefs: JsonArray,
+        target: SendTarget,
+        chatAttachments: List<ChatAttachment>
+    ) = startPreparedMessageInternal(
+        visibleText,
+        outgoingText,
+        attachmentRefs,
+        target,
+        chatAttachments,
+        appendUserBubble = false
+    )
+
+    private fun startPreparedMessageInternal(
+        visibleText: String,
+        outgoingText: String,
+        attachmentRefs: JsonArray,
+        target: SendTarget,
+        chatAttachments: List<ChatAttachment>,
+        appendUserBubble: Boolean
     ) {
         if (!restoreSendTarget(target)) {
             Toast.makeText(activity, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
@@ -58,7 +89,7 @@ internal class MainPreparedMessageActions(
         val requestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) &&
             !looksLikeDirectImageRequest(outgoingText)
 
-        appendUserMessage(visibleText, chatAttachments)
+        if (appendUserBubble) appendUserMessage(visibleText, chatAttachments)
         recordSendTrace(traceId, target, outgoingText, attachmentRefs)
         binding.inputEdit.text.clear()
         collapseInputComposer()

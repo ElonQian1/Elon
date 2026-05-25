@@ -21,6 +21,15 @@ internal class MainMessageAppendActions(
         binding.chatList.scrollToPosition(adapter.itemCount - 1)
     }
 
+    fun updateMessage(message: ChatMessage) {
+        val index = activeConversation().messages.indexOf(message)
+        if (index < 0) return
+        chatAdapter().notifyMessageUpdated(index)
+        updateActiveConversationPreview(message)
+        saveConversations()
+        binding.chatList.scrollToPosition(index)
+    }
+
     private fun removeTransientWorkflowMessagesAfterLatestUser() {
         if (workflowMessageCompactor().removeTransientWorkflowMessagesAfterLatestUser(activeConversation().messages)) {
             chatAdapter().notifyDataSetChanged()

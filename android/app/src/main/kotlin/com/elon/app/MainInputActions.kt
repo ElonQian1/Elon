@@ -163,7 +163,9 @@ internal class MainInputActions(
             userId = userId,
             pendingAttachments = { pendingAttachments.toList() },
             setSendEnabled = sendEnabledActions::setSendEnabled,
-            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+            appendMessage = workflowActions().messageAppendActions::appendMessage,
+            updateMessage = workflowActions().messageAppendActions::updateMessage,
+            startPreparedMessageAfterUserBubble = preparedMessageActions()::startPreparedMessageAfterUserBubble
         )
     }
 

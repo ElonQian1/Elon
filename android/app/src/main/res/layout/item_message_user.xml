@@ -40,6 +40,15 @@
             android:textColor="#111111"
             android:textSize="15sp" />
 
+        <TextView
+            android:id="@+id/messageStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:textColor="#66111111"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
     </LinearLayout>
 
     <TextView

@@ -39,6 +39,21 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
     }
 }
 
+internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): List<ChatAttachment> {
+    return attachments.map { attachment ->
+        ChatAttachment(
+            kind = attachment.kind,
+            displayName = attachment.displayName,
+            fileName = attachment.fileName,
+            mimeType = attachment.mimeType,
+            localPath = attachment.file.absolutePath,
+            sizeBytes = attachment.file.length(),
+            imageWidth = attachment.imageWidth,
+            imageHeight = attachment.imageHeight
+        )
+    }
+}
+
 private fun JsonObject.stringOrNull(name: String): String? {
     return get(name)
         ?.takeIf { it.isJsonPrimitive }

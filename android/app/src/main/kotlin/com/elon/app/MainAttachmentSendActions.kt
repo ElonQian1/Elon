@@ -12,11 +12,20 @@ internal class MainAttachmentSendActions(
     private val userId: () -> String,
     private val pendingAttachments: () -> List<PendingAttachment>,
     private val setSendEnabled: (Boolean) -> Unit,
-    private val startPreparedMessage: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit
+    private val appendMessage: (ChatMessage) -> Unit,
+    private val updateMessage: (ChatMessage) -> Unit,
+    private val startPreparedMessageAfterUserBubble: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit
 ) {
     fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
         val attachments = pendingAttachments()
         setSendEnabled(false)
+        val optimisticMessage = ChatMessage(
+            role = "user",
+            content = visibleText,
+            attachments = chatAttachmentsFromPending(attachments).takeIf { it.isNotEmpty() },
+            sendStatus = "发送中..."
+        )
+        appendMessage(optimisticMessage)
         DebugTraceStore.record(
             "ui_attachment_upload_start",
             mapOf("project_id" to target.projectId, "conversation_id" to target.conversationId, "count" to attachments.size)
@@ -39,9 +48,16 @@ internal class MainAttachmentSendActions(
             )
             activity.runOnUiThread {
                 if (refs == null) {
+                    optimisticMessage.sendStatus = "发送失败，请重新发送"
+                    updateMessage(optimisticMessage)
                     setSendEnabled(true)
                     return@runOnUiThread
                 }
+                val uploadedAttachments = chatAttachmentsFromRefs(refs)
+                optimisticMessage.content = visibleText
+                optimisticMessage.attachments = uploadedAttachments.takeIf { it.isNotEmpty() }
+                optimisticMessage.sendStatus = null
+                updateMessage(optimisticMessage)
                 DebugTraceStore.record(
                     "ui_attachment_upload_done",
                     mapOf(
@@ -51,7 +67,7 @@ internal class MainAttachmentSendActions(
                         "elapsed_ms" to (System.currentTimeMillis() - startedAt)
                     )
                 )
-                startPreparedMessage(visibleText, outgoingText, refs, target, chatAttachmentsFromRefs(refs))
+                startPreparedMessageAfterUserBubble(visibleText, outgoingText, refs, target, uploadedAttachments)
             }
         }.start()
     }

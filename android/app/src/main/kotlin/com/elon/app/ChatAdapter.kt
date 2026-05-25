@@ -19,8 +19,9 @@ import kotlin.math.sin
 
 data class ChatMessage(
     val role: String,
-    val content: String,
-    val attachments: List<ChatAttachment>? = null,
+    var content: String,
+    var attachments: List<ChatAttachment>? = null,
+    var sendStatus: String? = null,
     var evidenceTitle: String? = null,
     var evidenceDetails: String? = null,
     var evidenceExpanded: Boolean = false,
@@ -36,6 +37,7 @@ class ChatAdapter(
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val text: TextView = view.findViewById(R.id.messageText)
+        val status: TextView? = view.findViewById(R.id.messageStatus)
         val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
@@ -99,6 +101,7 @@ class ChatAdapter(
         holder.text.setTextColor(messageTextColor(message.role))
         Linkify.addLinks(holder.text, Linkify.WEB_URLS)
         holder.text.movementMethod = LinkMovementMethod.getInstance()
+        bindSendStatus(holder, message)
         bindChatAttachmentViews(holder.attachmentList, message.attachments)
         bindMessageActions(holder, message)
         bindEvidence(holder, message, position)
@@ -108,6 +111,13 @@ class ChatAdapter(
         holder.pauseButton?.setOnClickListener {
             if (message.role in activeWorkflowRoles) onPauseWork?.invoke()
         }
+    }
+
+    private fun bindSendStatus(holder: VH, message: ChatMessage) {
+        val status = holder.status ?: return
+        val text = message.sendStatus?.takeIf { it.isNotBlank() }
+        status.visibility = if (text == null) View.GONE else View.VISIBLE
+        status.text = text.orEmpty()
     }
 
     override fun getItemCount() = messages.size

@@ -10,7 +10,10 @@ internal class MainProjectHygieneActions(
         if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
         project.conversations.forEach { conversation ->
             if (conversation.messages.isEmpty()) conversation.messages.add(welcomeChatMessage())
-            conversation.messages.forEach { message -> message.evidenceWorking = false }
+            conversation.messages.forEach { message ->
+                message.evidenceWorking = false
+                message.sendStatus = null
+            }
             compactCliTranscriptMessages(conversation.messages)
             sanitizeExistingCliLogMessages(conversation.messages)
             sanitizeExistingUserVisibleMessages(conversation.messages)
