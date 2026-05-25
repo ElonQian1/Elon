@@ -512,6 +512,8 @@ pub struct AppState {
     /// Best-effort Codex CLI native-session prewarm throttle, scoped by project,
     /// user, conversation, agent, and workspace.
     pub codex_prewarm: Arc<CodexPrewarmRegistry>,
+    /// Cached Codex CLI network health and circuit-breaker state.
+    pub codex_network: Arc<crate::codex_health::CodexNetworkHealth>,
     /// Short-lived in-memory debug events keyed by client trace_id.
     pub server_traces: Arc<crate::server_trace::ServerTraceStore>,
 }
@@ -782,6 +784,7 @@ impl AppState {
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
             project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
             codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),
+            codex_network: Arc::new(crate::codex_health::CodexNetworkHealth::from_env()),
             server_traces: Arc::new(crate::server_trace::ServerTraceStore::new()),
         })
     }

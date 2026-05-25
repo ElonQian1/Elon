@@ -21,6 +21,7 @@ pub struct ReadyResponse {
     pub cli_options: Vec<ReadyCliOption>,
     pub api_agents: usize,
     pub image_generation: bool,
+    pub codex_network: crate::codex_health::CodexNetworkHealthSnapshot,
 }
 
 #[derive(serde::Serialize)]
@@ -78,6 +79,12 @@ pub async fn server_trace(
     )
 }
 
+pub async fn codex_health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "codexNetwork": state.codex_network.snapshot().await,
+    }))
+}
+
 pub async fn readyz(State(state): State<Arc<AppState>>) -> Json<ReadyResponse> {
     let api_agents = state.agents_config.read().await.agents.len();
     let cli_options = state
@@ -101,6 +108,7 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Json<ReadyResponse> {
         cli_options,
         api_agents,
         image_generation: state.image_model.is_some(),
+        codex_network: state.codex_network.snapshot().await,
     })
 }
 

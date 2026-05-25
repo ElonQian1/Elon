@@ -8,6 +8,7 @@ mod agent;
 mod ai_cli;
 mod api;
 mod app_update;
+mod codex_health;
 mod codex_stream;
 mod homecli_agent;
 mod image_generation;
@@ -37,6 +38,7 @@ async fn main() -> Result<()> {
         .init();
 
     let state = Arc::new(AppState::new()?);
+    codex_health::spawn_codex_network_monitor(state.clone());
 
     // 服务启动时：将上次运行中的任务标记为已中断
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);

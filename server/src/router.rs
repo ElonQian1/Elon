@@ -27,6 +27,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/readyz", get(api::readyz))
         .route("/api/runtime", get(api::readyz))
         .route("/api/server/version", get(api::server_version))
+        .route("/api/debug/codex-health", get(api::codex_health))
         .route("/api/debug/traces/:trace_id", get(api::server_trace))
         .route("/api/image/generate", post(api::generate_image))
         .route("/api/auth/login", post(project_api::login))

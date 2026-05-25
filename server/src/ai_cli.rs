@@ -466,6 +466,13 @@ pub async fn run_with_workspace(
     .await
     {
         Ok(output) => output,
+        Err(error)
+            if lightweight_chat_task
+                && codex_network_or_timeout_error(&error)
+                && supports_codex_sessions(&option) =>
+        {
+            return Err(error);
+        }
         Err(error) if lightweight_chat_task && native_session_id.is_some() => {
             let stale_session_id = native_session_id.clone();
             record_cli_retry(
@@ -529,6 +536,12 @@ pub async fn run_with_workspace(
             .await
             {
                 Ok(output) => output,
+                Err(fresh_error)
+                    if codex_network_or_timeout_error(&fresh_error)
+                        && supports_codex_sessions(&option) =>
+                {
+                    return Err(fresh_error);
+                }
                 Err(fresh_error) => {
                     return finish_lightweight_chat_fallback(
                         state,
@@ -540,6 +553,13 @@ pub async fn run_with_workspace(
                     );
                 }
             }
+        }
+        Err(error)
+            if lightweight_chat_task
+                && codex_network_or_timeout_error(&error)
+                && supports_codex_sessions(&option) =>
+        {
+            return Err(error);
         }
         Err(error) if lightweight_chat_task => {
             return finish_lightweight_chat_fallback(
@@ -631,6 +651,13 @@ pub async fn run_with_workspace(
         .await
         {
             Ok(output) => output,
+            Err(error)
+                if lightweight_chat_task
+                    && codex_network_or_timeout_error(&error)
+                    && supports_codex_sessions(&option) =>
+            {
+                return Err(error);
+            }
             Err(error) if lightweight_chat_task => {
                 return finish_lightweight_chat_fallback(
                     state,
@@ -643,6 +670,16 @@ pub async fn run_with_workspace(
             }
             Err(error) => return Err(error),
         };
+    }
+
+    if supports_codex_sessions(&option) && !output.success {
+        let combined = format!("{}\n{}", output.stdout, output.stderr);
+        if crate::codex_health::is_codex_network_error_text(&combined) {
+            return Err(anyhow!(
+                "Codex CLI network unhealthy: {}",
+                truncate_chars(&combined, 500)
+            ));
+        }
     }
 
     let mut stored_session_id = native_session_id.clone();
@@ -840,6 +877,11 @@ fn is_cli_timeout_error(error: &anyhow::Error) -> bool {
     text.contains("timeout") || text.contains("timed out") || text.contains("执行超时")
 }
 
+fn codex_network_or_timeout_error(error: &anyhow::Error) -> bool {
+    is_cli_timeout_error(error)
+        || crate::codex_health::is_codex_network_error_text(&error.to_string())
+}
+
 #[cfg(test)]
 fn intent_gate_timeout_chat_result(user_message: &str) -> IntentGateResult {
     intent_gate_fallback_chat_result(user_message, "timeout")
@@ -956,6 +998,19 @@ async fn run_cli_command_traced(
     trace: Option<CliTraceContext<'_>>,
 ) -> Result<CliOutput> {
     let trace_started = Instant::now();
+    if supports_codex_sessions(option) {
+        if let Some(trace) = trace {
+            if let Err(error) = trace
+                .state
+                .codex_network
+                .ensure_ready(trace.operation)
+                .await
+            {
+                record_codex_network_gate(trace, option, "blocked", &error);
+                return Err(anyhow!(error));
+            }
+        }
+    }
     if let Some(trace) = trace {
         record_cli_start(trace, option, workspace, prompt, native_session_id);
     }
@@ -977,8 +1032,64 @@ async fn run_cli_command_traced(
                 trace_started.elapsed().as_millis(),
             ),
         }
+        if supports_codex_sessions(option) {
+            match &result {
+                Ok(output) if output.success => {
+                    trace
+                        .state
+                        .codex_network
+                        .mark_cli_success("codex_cli_success")
+                        .await;
+                }
+                Ok(output) => {
+                    let combined = format!("{}\n{}", output.stdout, output.stderr);
+                    if crate::codex_health::is_codex_network_error_text(&combined) {
+                        trace
+                            .state
+                            .codex_network
+                            .mark_cli_failure("codex_cli_output", &combined)
+                            .await;
+                    }
+                }
+                Err(error) => {
+                    let text = error.to_string();
+                    if is_cli_timeout_error(error)
+                        || crate::codex_health::is_codex_network_error_text(&text)
+                    {
+                        trace
+                            .state
+                            .codex_network
+                            .mark_cli_failure("codex_cli_error", &text)
+                            .await;
+                    }
+                }
+            }
+        }
     }
     result
+}
+
+fn record_codex_network_gate(
+    trace: CliTraceContext<'_>,
+    option: &AiCliOption,
+    status: &'static str,
+    error: &str,
+) {
+    let Some(trace_id) = clean_trace_id_opt(trace.trace_id) else {
+        return;
+    };
+    trace.state.server_traces.record(
+        trace_id,
+        "codex_network_gate",
+        json!({
+            "operation": trace.operation,
+            "attempt": trace.attempt,
+            "option_id": &option.id,
+            "provider": &option.provider,
+            "status": status,
+            "error": truncate_chars(error, 500),
+        }),
+    );
 }
 
 fn record_cli_start(
