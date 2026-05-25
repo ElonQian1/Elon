@@ -1,11 +1,17 @@
 package com.elon.app
 
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+
 internal class MainProjectRecordActions(
+    private val activity: AppCompatActivity,
     private val appName: () -> String,
     private val currentProjectTitle: () -> String,
     private val setCurrentProjectTitle: (String) -> Unit,
     private val activeProject: () -> AppProject,
     private val projectEvents: () -> MutableList<String>,
+    private val currentStage: () -> String,
+    private val conversationCount: () -> Int,
     private val currentTimeText: () -> String,
     private val currentStageHint: () -> String,
     private val saveProjects: () -> Unit,
@@ -13,6 +19,20 @@ internal class MainProjectRecordActions(
 ) {
     fun compactProjectTitle(): String {
         return currentProjectTitle().trim().ifBlank { appName() }.take(6)
+    }
+
+    fun showProjectRecordDialog() {
+        val events = projectEvents()
+        val recent = if (events.isEmpty()) {
+            "暂无进度记录"
+        } else {
+            events.take(12).joinToString("\n")
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("${currentProjectTitle()} · 项目记录")
+            .setMessage("阶段：${currentStage()}\n会话：${conversationCount()} 个\n\n$recent")
+            .setPositiveButton("知道了", null)
+            .show()
     }
 
     fun addProjectEvent(text: String) {

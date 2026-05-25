@@ -21,7 +21,6 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
@@ -1310,16 +1309,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showProjectRecordDialog() {
-        val recent = if (projectEvents.isEmpty()) {
-            "暂无进度记录"
-        } else {
-            projectEvents.take(12).joinToString("\n")
-        }
-        AlertDialog.Builder(this)
-            .setTitle("${currentProjectTitle} · 项目记录")
-            .setMessage("阶段：$currentStage\n会话：${conversations.size} 个\n\n$recent")
-            .setPositiveButton("知道了", null)
-            .show()
+        projectRecordActions().showProjectRecordDialog()
     }
 
     private fun showGitProjectDialog() {
@@ -1742,11 +1732,14 @@ class MainActivity : AppCompatActivity() {
     private fun projectRecordActions(): MainProjectRecordActions {
         projectRecordActions?.let { return it }
         return MainProjectRecordActions(
+            activity = this,
             appName = { getString(R.string.app_name) },
             currentProjectTitle = { currentProjectTitle },
             setCurrentProjectTitle = { currentProjectTitle = it },
             activeProject = ::activeProject,
             projectEvents = { projectEvents },
+            currentStage = { currentStage },
+            conversationCount = { conversations.size },
             currentTimeText = { timeFormatter.format(Date()) },
             currentStageHint = { binding.stageHintText.text.toString() },
             saveProjects = ::saveProjects,
