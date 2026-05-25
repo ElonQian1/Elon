@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var toolActionBubbles: MainToolActionBubbles? = null
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
+    private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -791,43 +792,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateSendButtonVisual() {
         if (!::binding.isInitialized) return
-        val hasText = binding.inputEdit.text.toString().trim().isNotEmpty()
-        val composerExpanded = ::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded
-        val sendMode = hasText && !voiceMode && composerExpanded
-        val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
-        if (sendMode) {
-            params?.width = dp(42)
-            binding.sendButton.background = getDrawable(R.drawable.ic_input_send_arrow_circle)
-            binding.sendButton.text = ""
-            binding.sendButton.visibility = View.VISIBLE
-            if (::attachmentButton.isInitialized) {
-                attachmentButton.visibility = View.VISIBLE
-            }
-        } else {
-            binding.sendButton.visibility = View.GONE
-            if (::attachmentButton.isInitialized) {
-                attachmentButton.visibility = View.VISIBLE
-            }
-        }
-        params?.height = dp(42)
-        params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
-        params?.let { binding.sendButton.layoutParams = it }
-        if (::attachmentButton.isInitialized) {
-            val attachmentParams = attachmentButton.layoutParams as? FrameLayout.LayoutParams
-            attachmentParams?.gravity = if (sendMode) {
-                Gravity.START or Gravity.CENTER_VERTICAL
-            } else {
-                Gravity.END or Gravity.CENTER_VERTICAL
-            }
-            attachmentParams?.let { attachmentButton.layoutParams = it }
-        }
-        val conversationEnded = activeConversation().ended
-        binding.sendButton.isEnabled = !conversationEnded && (!sendMode || inputCanSend)
-        binding.sendButton.alpha = if (!conversationEnded && (!sendMode || inputCanSend)) 1f else 0.55f
-        if (::attachmentButton.isInitialized) {
-            attachmentButton.isEnabled = !conversationEnded
-            attachmentButton.alpha = if (conversationEnded) 0.55f else 1f
-        }
+        sendButtonVisualActions().updateSendButtonVisual()
+    }
+
+    private fun sendButtonVisualActions(): MainSendButtonVisualActions {
+        sendButtonVisualActions?.let { return it }
+        return MainSendButtonVisualActions(
+            activity = this,
+            binding = binding,
+            dp = ::dp,
+            attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            isVoiceMode = { voiceMode },
+            inputCanSend = { inputCanSend },
+            activeConversation = ::activeConversation
+        ).also { sendButtonVisualActions = it }
     }
 
     private fun startSpeechToText() {
