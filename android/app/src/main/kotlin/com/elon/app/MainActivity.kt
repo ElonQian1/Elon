@@ -111,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private var voiceModeActions: MainVoiceModeActions? = null
     private var inputFocusActions: MainInputFocusActions? = null
     private var assistantRawMessageActions: MainAssistantRawMessageActions? = null
+    private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1191,37 +1192,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appendBackgroundTaskMessage(raw: String, key: String?, isDevelopment: Boolean) {
-        val location = key?.let { findConversationLocationByKey(it) } ?: return
-        val parsed = runCatching { JSONObject(raw) }.getOrNull() ?: return
-        val type = parsed.optString("type").takeIf { it.isNotBlank() } ?: return
-        if (type == "app_update_available") {
-            AppUpdateManager(this).realtimeCheck(parsed.optInt("versionCode", 0))
-            return
-        }
-        val message = when (type) {
-            "done" -> {
-                val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务已完成。"
-                val apkUrl = parsed.optString("apk_url").takeIf { it.isNotBlank() && it != "null" }
-                val imageUrl = parsed.optString("image_url").takeIf { it.isNotBlank() && it != "null" }
-                ChatMessage(
-                    "ai",
-                    finalReplyMessage(content, if (isDevelopment) apkUrl else null, imageUrl, isDevelopment)
-                )
-            }
-            "error" -> ChatMessage(
-                "error",
-                friendlyErrorMessage(parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务失败。")
-            )
-            "progress" -> {
-                val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: return
-                val narrative = CodexProgressNarrative.fromWorkflowProgress(content)
-                if (narrative == null && !shouldShowProgressBubble(content)) return
-                narrative?.message
-                    ?: ChatMessage("ai-progress", workflowProgressMessage(content))
-            }
-            else -> return
-        }
-        appendMessageToConversation(location.first, location.second, message)
+        backgroundTaskMessageActions().appendBackgroundTaskMessage(raw, key, isDevelopment)
+    }
+
+    private fun backgroundTaskMessageActions(): MainBackgroundTaskMessageActions {
+        backgroundTaskMessageActions?.let { return it }
+        return MainBackgroundTaskMessageActions(
+            activity = this,
+            findConversationLocationByKey = ::findConversationLocationByKey,
+            appendMessageToConversation = ::appendMessageToConversation
+        ).also { backgroundTaskMessageActions = it }
     }
 
     private fun findConversationLocationByKey(key: String): Pair<Int, Int>? {
