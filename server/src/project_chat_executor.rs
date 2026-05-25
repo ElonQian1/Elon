@@ -1,4 +1,4 @@
-//! 项目级 AI agent 在隔离执行 worktree 中的运行循环（从 project_chat.rs 抽出）。
+﻿//! 项目级 AI agent 在隔离执行 worktree 中的运行循环（从 project_chat.rs 抽出）。
 //!
 //! 这里只负责：从 ProjectConversationWorkspace 启动 agent 任务、转发 WS 事件、
 //! 在结束时回收 worktree。project_chat.rs 调用本模块发起执行。
@@ -39,6 +39,11 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     let agent_trace_id = trace_id.clone();
     let agent_workspace = execution_workspace.active_workspace.clone();
 
+    // Step 1: AI 开始理解需求
+    let _ = tx.send(
+        WsMessage::progress_step("Codex 正在分析需求，准备进入开发流程…", 1, 4, "ai_thinking").to_json(),
+    );
+
     let agent_task = tokio::spawn(async move {
         agent::run_for_project_in_workspace(
             &agent_user_id,
@@ -57,11 +62,19 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
 
     let mut terminal_raw = None;
     let mut terminal_is_done = false;
+    let mut first_agent_msg_seen = false;
     while let Some(raw) = agent_rx.recv().await {
         if is_terminal_project_ws_message(&raw) {
             terminal_is_done = is_done_project_ws_message(&raw);
             terminal_raw = Some(raw);
             break;
+        }
+        // Step 2: 收到 agent 第一条消息说明 Codex 已开始读写代码
+        if !first_agent_msg_seen {
+            first_agent_msg_seen = true;
+            let _ = tx.send(
+                WsMessage::progress_step("Codex 正在读写项目代码…", 2, 4, "code_editing").to_json(),
+            );
         }
         let _ = tx.send(raw);
     }
@@ -85,6 +98,13 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
         }
     }
 
+    if terminal_is_done {
+        // Step 3: 代码修改完成，准备提交合并
+        let _ = tx.send(
+            WsMessage::progress_step("代码修改完成，正在提交并合并…", 3, 4, "code_committing").to_json(),
+        );
+    }
+
     if terminal_is_done && execution_workspace.is_isolated() {
         let merge_key = project_merge_execution_key(&project.id);
         let merge_tx = tx.clone();
@@ -102,19 +122,13 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                     );
                 }
                 let _ = merge_tx.send(
-                    WsMessage::Progress {
-                        message: "代码已在会话分支完成，正在等待项目合并锁。".into(),
-                    }
-                    .to_json(),
+                    WsMessage::progress("代码已在会话分支完成，正在等待项目合并锁。",).to_json(),
                 );
             })
             .await;
         let _keep_merge_permit = merge_permit;
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "正在把会话分支串行合并回项目主工作区。".into(),
-            }
-            .to_json(),
+            WsMessage::progress("正在把会话分支串行合并回项目主工作区。",).to_json(),
         );
         match merge_conversation_worktree(&execution_workspace) {
             Ok(summary) => {
@@ -129,7 +143,11 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                         }),
                     );
                 }
-                let _ = tx.send(WsMessage::Progress { message: summary }.to_json());
+                // Step 4: 合并完成，任务即将交付
+                let _ = tx.send(
+                    WsMessage::progress_step("分支合并完成，任务即将交付…", 4, 4, "deploying").to_json(),
+                );
+                let _ = tx.send(WsMessage::progress(summary).to_json());
             }
             Err(error) => {
                 if let Some(trace_id) = trace_id.as_deref() {

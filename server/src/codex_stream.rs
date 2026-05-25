@@ -1,4 +1,4 @@
-//! Codex CLI `--json` 流式事件解析。
+﻿//! Codex CLI `--json` 流式事件解析。
 //!
 //! 单一职责：把 codex CLI 输出的一行 JSON 翻译成 0~N 条 WebSocket 消息
 //! （`tool_call` / `tool_result` / `usage` / `progress`）。
@@ -32,7 +32,7 @@ pub(crate) fn stream_event_to_ws_messages(line: &str) -> Vec<String> {
     };
     let mut out: Vec<String> = Vec::new();
     let push_progress = |out: &mut Vec<String>, message: String| {
-        out.push(WsMessage::Progress { message }.to_json());
+        out.push(WsMessage::progress(message).to_json());
     };
 
     match event_type {

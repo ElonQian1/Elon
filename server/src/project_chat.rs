@@ -271,16 +271,12 @@ pub(crate) async fn run_project_agent_with_scheduler(
             "Skipped codex intent gate (high local confidence)"
         );
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "已识别为开发任务，直接进入项目工作流。".into(),
-            }
+            WsMessage::progress("已识别为开发任务，直接进入项目工作流。")
             .to_json(),
         );
     } else {
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "正在确认这是否需要进入开发流程。".into(),
-            }
+            WsMessage::progress("正在确认这是否需要进入开发流程。")
             .to_json(),
         );
         let native_session_scope = ai_cli::NativeSessionScope {
@@ -364,10 +360,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
     }
 
     let _ = tx.send(
-        WsMessage::Progress {
-            message: "通用项目工作流已启用：服务器会为本会话准备独立 worktree/分支；同一会话串行，编码阶段可跨会话并行，最终合并、版本号和发布仍串行。"
-                .into(),
-        }
+        WsMessage::progress("通用项目工作流已启用：服务器会为本会话准备独立 worktree/分支；同一会话串行，编码阶段可跨会话并行，最终合并、版本号和发布仍串行。"
+                )
         .to_json(),
     );
 
@@ -392,10 +386,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 );
             }
             let _ = queued_tx.send(
-                WsMessage::Progress {
-                    message: "当前会话已有任务在运行，本次任务已进入该会话队列；其他会话仍可使用独立 worktree 并行开发。"
-                        .into(),
-                }
+                WsMessage::progress("当前会话已有任务在运行，本次任务已进入该会话队列；其他会话仍可使用独立 worktree 并行开发。"
+                        )
                 .to_json(),
             );
         })
@@ -424,10 +416,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         );
                     }
                     let _ = queued_tx.send(
-                        WsMessage::Progress {
-                            message: "当前项目无法创建独立 worktree，已退回共享工作区串行执行。"
-                                .into(),
-                        }
+                        WsMessage::progress("当前项目无法创建独立 worktree，已退回共享工作区串行执行。"
+                                )
                         .to_json(),
                     );
                 })
@@ -456,9 +446,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
         );
     }
     let _ = tx.send(
-        WsMessage::Progress {
-            message: message_text.into(),
-        }
+        WsMessage::progress(message_text)
         .to_json(),
     );
 

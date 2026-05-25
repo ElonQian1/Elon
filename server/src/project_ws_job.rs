@@ -1,4 +1,4 @@
-//! 项目 WebSocket 任务调度器：管理同一项目/用户/请求的运行中任务。
+﻿//! 项目 WebSocket 任务调度器：管理同一项目/用户/请求的运行中任务。
 //!
 //! 从 `project_api.rs` 抽出，避免单文件继续膨胀。`handle_project_ws` 调用
 //! `get_or_start_project_ws_job` 创建或附加任务；`cancel_project_ws_job` 取消任务。
@@ -80,9 +80,7 @@ pub(crate) async fn get_or_start_project_ws_job(
                     }),
                 );
             }
-            let notice = WsMessage::Progress {
-                message: "同一个请求仍在后台处理，正在继续同步已有任务进度。".into(),
-            }
+            let notice = WsMessage::progress("同一个请求仍在后台处理，正在继续同步已有任务进度。")
             .to_json();
             let _ = existing.broadcaster.send(notice);
             return existing.clone();
@@ -245,7 +243,7 @@ async fn run_project_ws_job(
             &state,
             &task_id,
             &job,
-            WsMessage::Progress { message }.to_json(),
+            WsMessage::progress(message).to_json(),
         )
         .await;
     }

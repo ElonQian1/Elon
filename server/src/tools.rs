@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+﻿use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use std::{
     path::{Path, PathBuf},
@@ -330,9 +330,7 @@ pub async fn exec_via_agent(
                 info!(%agent_id, %pid, "exec_via_agent: task started");
                 if let Some(tx) = progress_tx {
                     let _ = tx.send(
-                        WsMessage::Progress {
-                            message: format!("[PC agent] 任务启动 pid={}", pid),
-                        }
+                        WsMessage::progress(format!("[PC agent] 任务启动 pid={}", pid))
                         .to_json(),
                     );
                 }
@@ -343,9 +341,7 @@ pub async fn exec_via_agent(
                         let s = String::from_utf8_lossy(&bytes);
                         for line in s.lines().filter(|l| !l.trim().is_empty()) {
                             let _ = tx.send(
-                                WsMessage::Progress {
-                                    message: line.to_string(),
-                                }
+                                WsMessage::progress(line.to_string())
                                 .to_json(),
                             );
                         }
@@ -359,9 +355,7 @@ pub async fn exec_via_agent(
                         let s = String::from_utf8_lossy(&bytes);
                         for line in s.lines().filter(|l| !l.trim().is_empty()) {
                             let _ = tx.send(
-                                WsMessage::Progress {
-                                    message: format!("[stderr] {}", line),
-                                }
+                                WsMessage::progress(format!("[stderr] {}", line))
                                 .to_json(),
                             );
                         }

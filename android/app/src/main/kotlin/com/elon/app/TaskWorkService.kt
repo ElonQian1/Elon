@@ -31,7 +31,10 @@ class TaskWorkService : Service() {
         var firstServerEventAtMs: Long = 0L,
         var firstChatReplyAtMs: Long = 0L,
         var wsClient: ElonWsClient? = null,
-        var reconnectRunnable: Runnable? = null
+        var reconnectRunnable: Runnable? = null,
+        var lastStep: Int = 0,
+        var lastStepTotal: Int = 4,
+        var lastPhaseStartMs: Long = 0L
     ) {
         val requestKind: String
             get() = if (isDevelopment) "development" else "chat"
@@ -382,6 +385,20 @@ class TaskWorkService : Service() {
                     showAppUpdateNotification(this, parsed)
                 }
             }
+            "progress" -> {
+                val step = parsed?.optInt("step_current", 0) ?: 0
+                val total = parsed?.optInt("step_total", 0) ?: 0
+                val phase = parsed?.optString("phase")?.takeIf { it.isNotBlank() }
+                if (step > 0 && total > 0 && phase != null && !isAppInForeground()) {
+                    task.lastStep = step
+                    task.lastStepTotal = total
+                    if (task.lastPhaseStartMs == 0L) task.lastPhaseStartMs = System.currentTimeMillis()
+                    val etaText = estimateEta(task)
+                    val notif = updateProgressNotification(this, step, total, phase, etaText)
+                    getSystemService(NotificationManager::class.java)
+                        .notify(ACTIVE_WORK_NOTIFICATION_ID, notif)
+                }
+            }
             "done" -> finishWork(task.traceId, parsed, success = true)
             "error" -> finishWork(task.traceId, parsed, success = false)
         }
@@ -423,6 +440,21 @@ class TaskWorkService : Service() {
         if (!hasActiveTasks()) {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+        }
+    }
+
+    private fun estimateEta(task: RunningTask): String? {
+        val step = task.lastStep
+        val total = task.lastStepTotal
+        if (step <= 0 || step >= total) return null
+        val elapsed = System.currentTimeMillis() - task.startedAtMs
+        if (elapsed < 5_000L) return null
+        val remaining = ((elapsed.toDouble() / step) * (total - step)).toLong()
+        return when {
+            remaining < 60_000L -> "不到 1 分钟"
+            remaining < 120_000L -> "约 1 分钟"
+            remaining < 300_000L -> "约 ${remaining / 60_000} 分钟"
+            else -> null
         }
     }
 

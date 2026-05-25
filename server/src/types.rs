@@ -535,7 +535,18 @@ impl UserAgentConfig {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsMessage {
     /// AI 思考/操作进度
-    Progress { message: String },
+    Progress {
+        message: String,
+        /// 当前步骤编号（1 起），仅开发任务携带
+        #[serde(skip_serializing_if = "Option::is_none")]
+        step_current: Option<u32>,
+        /// 总步骤数（开发任务固定 5），仅开发任务携带
+        #[serde(skip_serializing_if = "Option::is_none")]
+        step_total: Option<u32>,
+        /// 阶段标识：ai_thinking / code_editing / code_committing / building / deploying
+        #[serde(skip_serializing_if = "Option::is_none")]
+        phase: Option<String>,
+    },
     /// AI 给用户的中间发言（来自 Codex CLI 的 agent_message item）。
     /// 与最终 `done.message` 不同，本类型支持任务过程中多次出现，
     /// APK 端会渲染为白底主气泡，让用户感受到"AI 正在说话"。
@@ -576,6 +587,26 @@ pub enum WsMessage {
 }
 
 impl WsMessage {
+    /// 不携带步骤信息的普通进度消息（等效于旧 Progress { message }）
+    pub fn progress(message: impl ToString) -> Self {
+        WsMessage::Progress {
+            message: message.to_string(),
+            step_current: None,
+            step_total: None,
+            phase: None,
+        }
+    }
+
+    /// 携带步骤编号的结构化进度消息
+    pub fn progress_step(message: impl ToString, step: u32, total: u32, phase: &str) -> Self {
+        WsMessage::Progress {
+            message: message.to_string(),
+            step_current: Some(step),
+            step_total: Some(total),
+            phase: Some(phase.to_string()),
+        }
+    }
+
     pub fn to_json(&self) -> String {
         serde_json::to_string(self)
             .unwrap_or_else(|_| r#"{"type":"error","message":"序列化失败"}"#.into())

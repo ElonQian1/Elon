@@ -66,6 +66,34 @@ internal fun activeTaskNotification(context: Context): Notification {
         .build()
 }
 
+internal fun updateProgressNotification(
+    context: Context,
+    step: Int,
+    total: Int,
+    phase: String,
+    etaText: String?
+): Notification {
+    val phaseLabel = when (phase) {
+        "ai_thinking" -> "理解需求"
+        "code_editing" -> "修改代码"
+        "code_committing" -> "提交代码"
+        "building" -> "编译打包"
+        "deploying" -> "部署发布"
+        else -> "处理中"
+    }
+    return NotificationCompat.Builder(context, TaskWorkService.ACTIVE_WORK_CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_notification_task_done)
+        .setContentTitle("第 $step/$total 步：$phaseLabel")
+        .setContentText(etaText?.let { "预计还有 $it" } ?: "一龙正在后台工作")
+        .setProgress(total, step, false)
+        .setContentIntent(mainActivityPendingIntent(context))
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setSilent(true)
+        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .build()
+}
+
 internal fun notifyBackgroundTaskCompleted(
     context: Context,
     prefs: SharedPreferences,

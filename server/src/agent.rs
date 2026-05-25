@@ -1,4 +1,5 @@
 use anyhow::Result;
+use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -95,23 +96,19 @@ pub async fn run_for_project_in_workspace(
                 if msg.starts_with("git pull 未成功") {
                     warn!("项目同步预检未完成，交给 AI CLI 处理: {}", msg);
                     let _ = tx.send(
-                        WsMessage::Progress {
-                            message: "同步检查遇到 Git 工作区问题，已交给 AI 助手处理。".into(),
-                        }
+                        WsMessage::progress("同步检查遇到 Git 工作区问题，已交给 AI 助手处理。")
                         .to_json(),
                     );
                     preflight_note = Some(msg);
                 } else {
-                    let _ = tx.send(WsMessage::Progress { message: msg }.to_json());
+                    let _ = tx.send(WsMessage::progress(msg).to_json());
                 }
             }
             Err(e) => {
                 let msg = format!("git pull --rebase 执行出错: {}", e);
                 warn!("项目同步预检执行出错，交给 AI CLI 处理: {}", msg);
                 let _ = tx.send(
-                    WsMessage::Progress {
-                        message: "同步检查执行出错，已交给 AI 助手处理。".into(),
-                    }
+                    WsMessage::progress("同步检查执行出错，已交给 AI 助手处理。")
                     .to_json(),
                 );
                 preflight_note = Some(msg);
@@ -212,9 +209,7 @@ async fn run_dispatch_with_workspace(
             .unwrap_or(false)
         {
             let _ = tx.send(
-                WsMessage::Progress {
-                    message: "当前已锁定使用 Codex CLI，不切换到其他 AI 代理。".into(),
-                }
+                WsMessage::progress("当前已锁定使用 Codex CLI，不切换到其他 AI 代理。")
                 .to_json(),
             );
         }
@@ -226,9 +221,7 @@ async fn run_dispatch_with_workspace(
             ));
         }
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "图片处理已切换为 Codex CLI，不调用独立图片模型。".into(),
-            }
+            WsMessage::progress("图片处理已切换为 Codex CLI，不调用独立图片模型。")
             .to_json(),
         );
         CapabilityRoute::CodeAgent
@@ -312,9 +305,7 @@ async fn run_backend_with_workspace(
                 {
                     warn!("本地 AI CLI 执行失败，回退到 API 代理: {}", e);
                     let _ = tx.send(
-                        WsMessage::Progress {
-                            message: format!("本地 AI CLI 暂不可用，正在切换原 API 代理: {}", e),
-                        }
+                        WsMessage::progress(format!("本地 AI CLI 暂不可用，正在切换原 API 代理: {}", e))
                         .to_json(),
                     );
                     run_api_inner_with_workspace(
@@ -349,4 +340,3 @@ async fn run_backend_with_workspace(
         }
     }
 }
-

@@ -365,25 +365,19 @@ pub async fn run_with_workspace(
     let android_task = development_task && looks_like_android_task(user_message);
     if development_task {
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "正在准备项目工作区。".into(),
-            }
+            WsMessage::progress("正在准备项目工作区。")
             .to_json(),
         );
         for note in environment_notes(user_message, &option) {
-            let _ = tx.send(WsMessage::Progress { message: note }.to_json());
+            let _ = tx.send(WsMessage::progress(note).to_json());
         }
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "AI 助手正在处理你的请求。".into(),
-            }
+            WsMessage::progress("AI 助手正在处理你的请求。")
             .to_json(),
         );
     } else {
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "正在思考。".into(),
-            }
+            WsMessage::progress("正在思考。")
             .to_json(),
         );
     }
@@ -437,9 +431,7 @@ pub async fn run_with_workspace(
     }
     if native_session_id.is_some() {
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "Restoring Codex CLI context for this conversation.".into(),
-            }
+            WsMessage::progress("Restoring Codex CLI context for this conversation.")
             .to_json(),
         );
     }
@@ -509,9 +501,7 @@ pub async fn run_with_workspace(
                 &error.to_string(),
             );
             let _ = tx.send(
-                WsMessage::Progress {
-                    message: "旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。".into(),
-                }
+                WsMessage::progress("旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。")
                 .to_json(),
             );
             native_session_id = None;
@@ -609,13 +599,11 @@ pub async fn run_with_workspace(
             "Codex native session reported stale or unavailable",
         );
         let _ = tx.send(
-            WsMessage::Progress {
-                message: if lightweight_chat_task {
-                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。".into()
+            WsMessage::progress(if lightweight_chat_task {
+                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
                 } else {
-                    "Codex CLI session expired; starting a fresh session.".into()
-                },
-            }
+                    "Codex CLI session expired; starting a fresh session."
+                })
             .to_json(),
         );
         native_session_id = None;
@@ -744,19 +732,15 @@ pub async fn run_with_workspace(
 
     let apk_url = if android_task && output.success {
         let _ = tx.send(
-            WsMessage::Progress {
-                message: "AI 已完成处理，正在查找 APK 安装包。".into(),
-            }
+            WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。")
             .to_json(),
         );
         let apk_url =
             tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
         if apk_url.is_none() {
             let _ = tx.send(
-                WsMessage::Progress {
-                    message: "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
-                        .into(),
-                }
+                WsMessage::progress("未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
+                        )
                 .to_json(),
             );
         }

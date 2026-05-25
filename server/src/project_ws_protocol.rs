@@ -315,10 +315,7 @@ mod tests {
 
     #[test]
     fn enriches_project_ws_event_with_task_id_and_event() {
-        let raw = WsMessage::Progress {
-            message: "running".into(),
-        }
-        .to_json();
+        let raw = WsMessage::progress("running").to_json();
         let enriched = enrich_project_ws_event(raw, "tsk_123");
         let value: serde_json::Value =
             serde_json::from_str(&enriched).expect("enriched payload should be valid json");
@@ -341,10 +338,7 @@ mod tests {
         };
         let events = (0..PROJECT_WS_BACKLOG_LIMIT)
             .map(|step| {
-                WsMessage::Progress {
-                    message: format!("step {step}"),
-                }
-                .to_json()
+                WsMessage::progress(format!("step {step}")).to_json()
             })
             .collect::<Vec<_>>();
 

@@ -1,4 +1,4 @@
-use std::{
+﻿use std::{
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -46,7 +46,7 @@ pub(crate) async fn send_cli_heartbeat(
                 elapsed_secs, silence_secs
             )
         };
-        if tx.send(WsMessage::Progress { message }.to_json()).is_err() {
+        if tx.send(WsMessage::progress(message).to_json()).is_err() {
             break;
         }
         last_heartbeat = Some(Instant::now());
