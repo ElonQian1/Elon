@@ -14,6 +14,7 @@ mod image_generation;
 mod intent_router;
 mod peer_relay;
 mod project_api;
+mod project_attachments;
 mod project_ws_protocol;
 mod router;
 mod server_trace;
