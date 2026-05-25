@@ -56,7 +56,6 @@ class MainActivity : AppCompatActivity() {
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
     // tool 名 -> 已派发但尚未 tool_result 的 ai-action 气泡在当前会话中的 index 队列
     private val pendingToolActionBubbles = linkedMapOf<String, ArrayDeque<Int>>()
-    private val emittedProgressSignals = linkedSetOf<String>()
     private var serverResponseToken = 0
     private var appInForeground = false
     private var pendingRequestPayload: String? = null
@@ -109,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
     private var workflowStageActions: MainWorkflowStageActions? = null
     private var evidenceActions: MainEvidenceActions? = null
+    private var progressNarrativeActions: MainProgressNarrativeActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -350,7 +350,7 @@ class MainActivity : AppCompatActivity() {
         resetFoldedCliLog()
         clearCurrentEvidence()
         pendingToolActionBubbles.clear()
-        emittedProgressSignals.clear()
+        progressNarrativeActions().clear()
         if (requestIsDevelopment) {
             updateProjectTitleFromRequest(visibleText)
             saveProjectTitle()
@@ -1990,35 +1990,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeAppendVisibleCliSignal(category: String, line: String): Boolean {
-        if (!activeRequestIsDevelopment) return false
-        val narrative = CodexProgressNarrative.fromCliOutput(category, line) ?: return false
-        return appendProgressNarrative(narrative)
+        return progressNarrativeActions().maybeAppendVisibleCliSignal(category, line)
     }
 
     private fun maybeAppendWorkflowProgressNarrative(content: String): Boolean {
-        if (!activeRequestIsDevelopment) return false
-        val narrative = CodexProgressNarrative.fromWorkflowProgress(content) ?: return false
-        return appendProgressNarrative(narrative)
+        return progressNarrativeActions().maybeAppendWorkflowProgressNarrative(content)
     }
 
     private fun maybeAppendTaskEventNarrative(event: String, content: String): Boolean {
-        if (!activeRequestIsDevelopment) return false
-        val narrative = CodexProgressNarrative.fromTaskEvent(event, content) ?: return false
-        return appendProgressNarrative(narrative)
+        return progressNarrativeActions().maybeAppendTaskEventNarrative(event, content)
     }
 
     private fun maybeAppendToolCallNarrative(tool: String): Boolean {
-        if (!activeRequestIsDevelopment) return false
-        val narrative = CodexProgressNarrative.fromToolCall(tool) ?: return false
-        return appendProgressNarrative(narrative)
+        return progressNarrativeActions().maybeAppendToolCallNarrative(tool)
     }
 
-    private fun appendProgressNarrative(narrative: CodexProgressNarrative.Narrative): Boolean {
-        if (!emittedProgressSignals.add(narrative.key)) return false
-        finalizeEvidenceForLatestAssistant()
-        appendMessage(narrative.message)
-        attachEvidenceToLatestAi()
-        return true
+    private fun progressNarrativeActions(): MainProgressNarrativeActions {
+        progressNarrativeActions?.let { return it }
+        return MainProgressNarrativeActions(
+            isDevelopmentRequest = { activeRequestIsDevelopment },
+            finalizeEvidenceForLatestAssistant = ::finalizeEvidenceForLatestAssistant,
+            appendMessage = ::appendMessage,
+            attachEvidenceToLatestAi = ::attachEvidenceToLatestAi
+        ).also { progressNarrativeActions = it }
     }
 
     private fun compactCliProjectEvents(events: MutableList<String>) {
