@@ -9,7 +9,7 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, api, app_update, peer_relay, project_api, project_attachments, project_downloads,
-    user_api, web,
+    project_git, user_api, web,
 };
 
 pub fn build_app(state: Arc<AppState>) -> Router {
@@ -64,7 +64,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/git/status",
-            get(project_api::user_project_git_status),
+            get(project_git::user_project_git_status),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/prewarm",
@@ -80,11 +80,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/user/:user_id/projects/:project_id/git/deploy-key",
-            post(project_api::user_project_deploy_key),
+            post(project_git::user_project_deploy_key),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/git/config",
-            post(project_api::user_project_git_config),
+            post(project_git::user_project_git_config),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/download/:filename",

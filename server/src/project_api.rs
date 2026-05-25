@@ -32,7 +32,6 @@ use crate::{
         prepare_project_conversation_workspace, project_conversation_execution_key,
         project_merge_execution_key, project_shared_execution_key,
     },
-    project_git::{configure_git_remote, ensure_project_deploy_key, project_git_status_json},
     project_keys::{clean_trace_id, codex_prewarm_key, project_ws_fingerprint, project_ws_job_key},
     project_mobile::ensure_mobile_project,
     project_ws_protocol::{
@@ -64,13 +63,6 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub template: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct GitConfigRequest {
-    pub repo_url: String,
-    pub branch: Option<String>,
-    pub auth_type: Option<String>,
 }
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequest>) -> Response {
@@ -1028,98 +1020,6 @@ pub async fn ws_user_project_handler(
         )
     })
     .into_response()
-}
-
-pub async fn user_project_git_status(
-    State(state): State<Arc<AppState>>,
-    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    let (_user, project) = match ensure_mobile_project(
-        &state,
-        &user_id,
-        &project_id,
-        query.get("title").map(String::as_str),
-    ) {
-        Ok(pair) => pair,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-    };
-
-    Json(project_git_status_json(&state, &project)).into_response()
-}
-
-pub async fn user_project_deploy_key(
-    State(state): State<Arc<AppState>>,
-    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    let (_user, project) = match ensure_mobile_project(
-        &state,
-        &user_id,
-        &project_id,
-        query.get("title").map(String::as_str),
-    ) {
-        Ok(pair) => pair,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-    };
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-
-    match ensure_project_deploy_key(&state, &project, &workspace) {
-        Ok(public_key) => Json(serde_json::json!({
-            "project_id": project.id,
-            "public_key": public_key,
-            "status": project_git_status_json(&state, &project),
-        }))
-        .into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    }
-}
-
-pub async fn user_project_git_config(
-    State(state): State<Arc<AppState>>,
-    AxumPath((user_id, project_id)): AxumPath<(String, String)>,
-    Query(query): Query<HashMap<String, String>>,
-    Json(req): Json<GitConfigRequest>,
-) -> Response {
-    let (user, project) = match ensure_mobile_project(
-        &state,
-        &user_id,
-        &project_id,
-        query.get("title").map(String::as_str),
-    ) {
-        Ok(pair) => pair,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-    };
-    if !can_edit(&project.role) {
-        return json_error(StatusCode::FORBIDDEN, "当前用户没有配置项目的权限");
-    }
-
-    let repo_url = req.repo_url.trim();
-    if repo_url.is_empty() {
-        return json_error(StatusCode::BAD_REQUEST, "Git 仓库地址不能为空");
-    }
-    let branch = req.branch.as_deref().unwrap_or("main").trim();
-    let branch = if branch.is_empty() { "main" } else { branch };
-    let auth_type = req.auth_type.as_deref().unwrap_or("deploy_key");
-
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    if let Err(e) = configure_git_remote(&state, &project, &workspace, repo_url, branch, auth_type)
-    {
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
-    }
-
-    let project =
-        match state
-            .store
-            .update_project_git_config(&user.id, &project.id, repo_url, branch)
-        {
-            Ok(project) => project,
-            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-        };
-
-    Json(project_git_status_json(&state, &project)).into_response()
 }
 
 async fn handle_project_ws(
