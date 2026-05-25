@@ -3684,7 +3684,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPromotionDialog() {
-        val text = promotionText()
+        val text = promotionText(apkDownloadUrl)
         val content = TextView(this).apply {
             setText(text)
             setTextIsSelectable(true)
@@ -3701,15 +3701,6 @@ class MainActivity : AppCompatActivity() {
             .setNeutralButton("系统分享") { _, _ -> sharePromotionText(text) }
             .setNegativeButton("打开下载页") { _, _ -> openApkDownloadPage() }
             .show()
-    }
-
-    private fun promotionText(): String {
-        return buildString {
-            append("我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。")
-            append("\n\n")
-            append("下载地址：")
-            append(apkDownloadUrl)
-        }
     }
 
     private fun copyPromotionText(text: String) {
@@ -3736,21 +3727,6 @@ class MainActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_TEXT, text)
         }
         startActivity(Intent.createChooser(intent, "转发聊天内容"))
-    }
-
-    private fun shareableMessageText(message: ChatMessage): String {
-        return buildString {
-            append(message.content.trim())
-            val details = message.evidenceDetails?.trim().orEmpty()
-            if (details.isNotBlank()) {
-                append("\n\n")
-                message.evidenceTitle?.trim()?.takeIf { it.isNotBlank() }?.let {
-                    append(it)
-                    append('\n')
-                }
-                append(details)
-            }
-        }.trim()
     }
 
     private fun jsonStringOrNull(json: com.google.gson.JsonObject, name: String): String? {
