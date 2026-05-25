@@ -41,7 +41,6 @@ class MainActivity : AppCompatActivity() {
     private var activeProjectIndex = 0
     private var conversationActions: MainConversationActions? = null
     private var homeRows: MainHomeRows? = null
-    private var uiTools: MainUiTools? = null
     private var modelActions: MainModelActions? = null
     private var projectStateActions: MainProjectStateActions? = null
     private var conversationOpenActions: MainConversationOpenActions? = null
@@ -52,7 +51,6 @@ class MainActivity : AppCompatActivity() {
     private var messageActions: MainMessageActions? = null
     private var messageAppendActions: MainMessageAppendActions? = null
     private var codexPrewarm: MainCodexPrewarm? = null
-    private var externalActions: MainExternalActions? = null
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
     private var attachmentPickerActions: MainAttachmentPickerActions? = null
     private var attachmentSendActions: MainAttachmentSendActions? = null
@@ -62,8 +60,6 @@ class MainActivity : AppCompatActivity() {
     private var progressNarrativeActions: MainProgressNarrativeActions? = null
     private var toolActionBubbles: MainToolActionBubbles? = null
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
-    private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
-    private var projectHygieneActions: MainProjectHygieneActions? = null
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var sendEnabledActions: MainSendEnabledActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
@@ -313,7 +309,7 @@ class MainActivity : AppCompatActivity() {
         val views = MainInputComposerSetup(
             activity = this,
             binding = binding,
-            dp = uiTools()::dp,
+            dp = uiTools::dp,
             currentModelLabel = { modelActions().currentModelLabel },
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
@@ -353,7 +349,7 @@ class MainActivity : AppCompatActivity() {
         adaptiveInputHeightActions?.let { return it }
         return MainAdaptiveInputHeightActions(
             binding = binding,
-            dp = uiTools()::dp,
+            dp = uiTools::dp,
             inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
             inputBarContainer = { inputComposerViewsOrNull()?.inputBarContainer },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
@@ -465,8 +461,8 @@ class MainActivity : AppCompatActivity() {
         attachmentPanelActions?.let { return it }
         return MainAttachmentPanelActions(
             activity = this,
-            dp = uiTools()::dp,
-            selectableForeground = uiTools()::selectableForeground,
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground,
             activeConversation = projectStateActions()::activeConversation,
             attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
@@ -507,7 +503,7 @@ class MainActivity : AppCompatActivity() {
         return MainSendButtonVisualActions(
             activity = this,
             binding = binding,
-            dp = uiTools()::dp,
+            dp = uiTools::dp,
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
@@ -566,7 +562,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndexProvider = { projectStateActions().activeConversationIndex },
             setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
-            titleEditText = { value -> mainTitleEditText(this, value, uiTools()::dp) },
+            titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions()::saveConversations,
             renderConversationList = homeListActions()::renderConversationList,
             setSendEnabled = sendEnabledActions()::setSendEnabled
@@ -587,8 +583,8 @@ class MainActivity : AppCompatActivity() {
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions().openSettings() },
-            dp = uiTools()::dp,
-            selectableForeground = uiTools()::selectableForeground
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground
         ).also { modelActions = it }
     }
 
@@ -618,7 +614,7 @@ class MainActivity : AppCompatActivity() {
             projects = projects,
             activeProjectIndex = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
-            normalizeProject = { project -> projectHygieneActions().normalizeProject(project) }
+            normalizeProject = { project -> projectHygieneActions.normalizeProject(project) }
         ).also { projectStateActions = it }
     }
 
@@ -742,7 +738,7 @@ class MainActivity : AppCompatActivity() {
             conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
             workflowTerminalRoles = MainWorkflowRoles.terminal,
             closeStaleWorkflowMessages = { messages ->
-                workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+                workflowMessageCompactor.closeStaleWorkflowMessages(messages)
             },
             hasRunningTasks = { runningConversationTasks.isNotEmpty() },
             saveConversations = projectStateActions()::saveConversations,
@@ -767,8 +763,8 @@ class MainActivity : AppCompatActivity() {
                 runningConversationTasks.containsKey(key)
             },
             homeRows = { homeRows() },
-            dp = uiTools()::dp,
-            selectableForeground = uiTools()::selectableForeground,
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions().showCreateProjectDialog() }
         ).also { homeListActions = it }
     }
@@ -783,8 +779,8 @@ class MainActivity : AppCompatActivity() {
             showProjectActions = { index -> projectActions().showProjectActions(index) },
             openConversation = conversationOpenActions()::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
-            dp = uiTools()::dp,
-            selectableForeground = uiTools()::selectableForeground
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground
         ).also { homeRows = it }
     }
 
@@ -797,7 +793,7 @@ class MainActivity : AppCompatActivity() {
             activeProjectIndexProvider = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions().activeConversationIndex = it },
-            titleEditText = { value -> mainTitleEditText(this, value, uiTools()::dp) },
+            titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveProjects = projectStateActions()::saveProjects,
             renderProjectList = homeListActions()::renderProjectList,
             openProject = conversationOpenActions()::openProject,
@@ -805,10 +801,7 @@ class MainActivity : AppCompatActivity() {
         ).also { projectActions = it }
     }
 
-    private fun uiTools(): MainUiTools {
-        uiTools?.let { return it }
-        return MainUiTools(this).also { uiTools = it }
-    }
+    private val uiTools: MainUiTools by lazy { MainUiTools(this) }
 
     private fun accountActions(): MainAccountActions {
         return MainAccountActions(
@@ -851,7 +844,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
-            shareActions = uiTools()::shareActions,
+            shareActions = uiTools::shareActions,
             fillPlanPrompt = { quickCommandActions().fillPlanPrompt() },
             sendQuickCommand = { text -> quickCommandActions().sendQuickCommand(text) },
             showProjectRecordDialog = { projectRecordActions().showProjectRecordDialog() },
@@ -861,8 +854,8 @@ class MainActivity : AppCompatActivity() {
             openSettings = { quickCommandActions().openSettings() },
             deleteMessage = { message -> messageActions().deleteMessage(message) },
             quoteMessage = { text -> messageActions().quoteMessage(text) },
-            dp = uiTools()::dp,
-            selectableForeground = uiTools()::selectableForeground
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground
         ).also { actionPopups = it }
     }
 
@@ -875,8 +868,8 @@ class MainActivity : AppCompatActivity() {
             projectProvider = projectStateActions()::activeProject,
             projectTitleProvider = { projectStateActions().currentProjectTitle },
             addProjectEvent = projectRecordActions()::addProjectEvent,
-            openUrl = { url -> externalActions().openUrl(url) },
-            copyText = { label, text -> externalActions().copyText(label, text) }
+            openUrl = { url -> externalActions.openUrl(url) },
+            copyText = { label, text -> externalActions.copyText(label, text) }
         ).showGitProjectDialog()
     }
 
@@ -893,10 +886,7 @@ class MainActivity : AppCompatActivity() {
         ).also { codexPrewarm = it }
     }
 
-    private fun externalActions(): MainExternalActions {
-        externalActions?.let { return it }
-        return MainExternalActions(this).also { externalActions = it }
-    }
+    private val externalActions: MainExternalActions by lazy { MainExternalActions(this) }
 
     private fun quickCommandActions(): MainQuickCommandActions {
         quickCommandActions?.let { return it }
@@ -923,7 +913,7 @@ class MainActivity : AppCompatActivity() {
             showMessageActionPopup = { anchor, message, text ->
                 actionPopups().showMessageActionPopup(anchor, message, text)
             },
-            shareActions = uiTools()::shareActions,
+            shareActions = uiTools::shareActions,
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         ).also { messageActions = it }
@@ -973,29 +963,27 @@ class MainActivity : AppCompatActivity() {
         ).also { toolActionBubbles = it }
     }
 
-    private fun projectHygieneActions(): MainProjectHygieneActions {
-        projectHygieneActions?.let { return it }
-        return MainProjectHygieneActions(
+    private val projectHygieneActions: MainProjectHygieneActions by lazy {
+        MainProjectHygieneActions(
             timeText = { timeFormatter.format(Date()) },
             removeLeakedAndRoutineWorkflowMessages = { messages ->
-                workflowMessageCompactor().removeLeakedAndRoutineWorkflowMessages(messages)
+                workflowMessageCompactor.removeLeakedAndRoutineWorkflowMessages(messages)
             },
             compactWorkflowStatusMessages = { messages ->
-                workflowMessageCompactor().compactWorkflowStatusMessages(messages)
+                workflowMessageCompactor.compactWorkflowStatusMessages(messages)
             },
             closeStaleWorkflowMessages = { messages ->
-                workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+                workflowMessageCompactor.closeStaleWorkflowMessages(messages)
             }
-        ).also { projectHygieneActions = it }
+        )
     }
 
-    private fun workflowMessageCompactor(): MainWorkflowMessageCompactor {
-        workflowMessageCompactor?.let { return it }
-        return MainWorkflowMessageCompactor(
+    private val workflowMessageCompactor: MainWorkflowMessageCompactor by lazy {
+        MainWorkflowMessageCompactor(
             staleWorkflowRoles = MainWorkflowRoles.staleWorkflow,
             workflowHistoryStatusRoles = MainWorkflowRoles.historyStatus,
             workflowTerminalRoles = MainWorkflowRoles.terminal
-        ).also { workflowMessageCompactor = it }
+        )
     }
 
     private fun serverResponseWatchdogActions(): MainServerResponseWatchdogActions {
@@ -1031,7 +1019,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             chatAdapter = { chatAdapter },
             activeConversation = projectStateActions()::activeConversation,
-            workflowMessageCompactor = { workflowMessageCompactor() },
+            workflowMessageCompactor = { workflowMessageCompactor },
             updateActiveConversationPreview = { message ->
                 conversationPreviewActions().updateActiveConversationPreview(message)
             },
@@ -1216,4 +1204,3 @@ class MainActivity : AppCompatActivity() {
         ).also { lifecycleEdgeActions = it }
     }
 }
-
