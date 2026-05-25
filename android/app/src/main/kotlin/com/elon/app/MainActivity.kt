@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
@@ -171,7 +170,7 @@ class MainActivity : AppCompatActivity() {
             prefs = prefs,
             notificationPermissionRequest = notificationPermissionRequest,
             loadProjects = ::loadProjects,
-            setupAttachmentLaunchers = ::setupAttachmentLaunchers,
+            setupAttachmentLaunchers = { attachmentPickerActions().setupAttachmentLaunchers() },
             activeConversation = ::activeConversation,
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
@@ -381,9 +380,9 @@ class MainActivity : AppCompatActivity() {
             stopSpeechToText = ::stopSpeechToText,
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             sendMessage = ::sendMessage,
-            toggleAttachmentPanel = ::toggleAttachmentPanel,
-            buildAttachmentPanel = ::buildAttachmentPanel,
-            collapseAttachmentPanel = ::collapseAttachmentPanel,
+            toggleAttachmentPanel = { attachmentPanelActions().toggleAttachmentPanel() },
+            buildAttachmentPanel = { attachmentPanelActions().buildAttachmentPanel() },
+            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
             collapseInputComposer = { collapseInputComposer() },
             updateCollapsedInputPreview = ::updateCollapsedInputPreview,
             updateSendButtonVisual = ::updateSendButtonVisual,
@@ -467,14 +466,6 @@ class MainActivity : AppCompatActivity() {
         ).also { inputFocusActions = it }
     }
 
-    private fun setupAttachmentLaunchers() {
-        attachmentPickerActions().setupAttachmentLaunchers()
-    }
-
-    private fun buildAttachmentPanel(): LinearLayout {
-        return attachmentPanelActions().buildAttachmentPanel()
-    }
-
     private fun refreshPendingAttachmentPreview() {
         if (!::pendingAttachmentPreviewStrip.isInitialized) return
         pendingAttachmentPreviewStrip.refresh()
@@ -482,29 +473,15 @@ class MainActivity : AppCompatActivity() {
         updateSendButtonVisual()
     }
 
-    private fun openCameraAttachment() {
-        attachmentPickerActions().openCameraAttachment()
-    }
-
-    private fun openPhotoAttachment() {
-        attachmentPickerActions().openPhotoAttachment()
-    }
-
-    private fun openDocumentAttachment() {
-        attachmentPickerActions().openDocumentAttachment()
-    }
-
     private fun attachmentPickerActions(): MainAttachmentPickerActions {
         attachmentPickerActions?.let { return it }
         return MainAttachmentPickerActions(
             activity = this,
             activeConversation = ::activeConversation,
-            attachPickedFile = ::attachPickedFile
+            attachPickedFile = { kind, uri, fallbackName ->
+                pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
+            }
         ).also { attachmentPickerActions = it }
-    }
-
-    private fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
-        pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
     }
 
     private fun sendMessageActions(): MainSendMessageActions {
@@ -518,7 +495,9 @@ class MainActivity : AppCompatActivity() {
             activeConversation = ::activeConversation,
             appendMessage = ::appendMessage,
             collapseInputComposer = { collapseInputComposer() },
-            uploadAttachmentsThenSend = ::uploadAttachmentsThenSend,
+            uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
+                attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
+            },
             startPreparedMessage = ::startPreparedMessage
         ).also { sendMessageActions = it }
     }
@@ -542,10 +521,6 @@ class MainActivity : AppCompatActivity() {
             binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
         return true
-    }
-
-    private fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
-        attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
     }
 
     private fun attachmentSendActions(): MainAttachmentSendActions {
@@ -582,16 +557,8 @@ class MainActivity : AppCompatActivity() {
         if (!voiceMode && (binding.inputEdit.text.toString().trim().isNotEmpty() || pendingAttachments.isNotEmpty())) {
             sendMessage()
         } else {
-            toggleAttachmentPanel()
+            attachmentPanelActions().toggleAttachmentPanel()
         }
-    }
-
-    private fun toggleAttachmentPanel() {
-        attachmentPanelActions().toggleAttachmentPanel()
-    }
-
-    private fun expandAttachmentPanel() {
-        attachmentPanelActions().expandAttachmentPanel()
     }
 
     private fun collapseAttachmentPanel() {
@@ -608,9 +575,9 @@ class MainActivity : AppCompatActivity() {
             attachmentPanel = ::attachmentPanelOrNull,
             attachmentButton = ::attachmentButtonOrNull,
             collapseInputComposer = { collapseInputComposer() },
-            openCameraAttachment = ::openCameraAttachment,
-            openPhotoAttachment = ::openPhotoAttachment,
-            openDocumentAttachment = ::openDocumentAttachment
+            openCameraAttachment = { attachmentPickerActions().openCameraAttachment() },
+            openPhotoAttachment = { attachmentPickerActions().openPhotoAttachment() },
+            openDocumentAttachment = { attachmentPickerActions().openDocumentAttachment() }
         ).also { attachmentPanelActions = it }
     }
 
