@@ -180,7 +180,7 @@ class MainActivity : AppCompatActivity() {
             setupQuickActions = ::setupQuickActions,
             setupBackHandling = { navigationController().setupBackHandling() },
             setupInputComposer = ::setupInputComposer,
-            restoreCachedModelSelection = ::restoreCachedModelSelection,
+            restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
             updateProjectViews = ::updateProjectViews,
             setTaskAppForeground = ::setTaskAppForeground,
             registerTaskWorkReceiver = ::registerTaskWorkReceiver,
@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = ::isActiveConversationWorking,
             startTaskWorkService = { action -> startTaskWorkService(action) },
             openConversation = ::openConversation,
-            loadModelOptions = { loadModelOptions() },
+            loadModelOptions = { modelActions().loadModelOptions() },
             sendMessage = ::sendMessage,
             handleLaunchIntent = ::handleLaunchIntent
         ).also { createActions = it }
@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
             setAppInForeground = { appInForeground = it },
             setTaskAppForeground = ::setTaskAppForeground,
             drainQueuedTaskEvents = ::drainQueuedTaskEvents,
-            loadModelOptions = { loadModelOptions() },
+            loadModelOptions = { modelActions().loadModelOptions() },
             getBackendConnected = { backendConnected },
             getWaitingForReply = { waitingForReply },
             getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
@@ -373,7 +373,7 @@ class MainActivity : AppCompatActivity() {
             focusInputComposer = ::focusInputComposer,
             startSpeechToText = ::startSpeechToText,
             stopSpeechToText = ::stopSpeechToText,
-            showModelPopupOrLoad = ::showModelPopupOrLoad,
+            showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             sendMessage = ::sendMessage,
             toggleAttachmentPanel = ::toggleAttachmentPanel,
             buildAttachmentPanel = ::buildAttachmentPanel,
@@ -749,22 +749,6 @@ class MainActivity : AppCompatActivity() {
             renderConversationList = ::renderConversationList,
             setSendEnabled = ::setSendEnabled
         ).also { conversationActions = it }
-    }
-
-    private fun restoreCachedModelSelection() {
-        modelActions().restoreCachedModelSelection()
-    }
-
-    private fun loadModelOptions(afterLoad: (() -> Unit)? = null) {
-        modelActions().loadModelOptions(afterLoad)
-    }
-
-    private fun showModelPopupOrLoad() {
-        modelActions().showModelPopupOrLoad()
-    }
-
-    private fun updateModelButton() {
-        modelActions().updateModelButton()
     }
 
     private fun modelActions(): MainModelActions {
