@@ -1901,39 +1901,11 @@ object McpDebugServer {
     }
 
     private fun authorized(headers: Map<String, String>, args: JSONObject): Boolean {
-        val expected = debugToken()
-        val bearer = headers["authorization"]
-            ?.trim()
-            ?.takeIf { it.lowercase(Locale.ROOT).startsWith("bearer ") }
-            ?.substringAfter(' ')
-        val customHeader = headers["x-elon-mcp-token"]?.trim()
-        val argToken = args.optString("auth_token").takeIf { it.isNotBlank() }
-        return listOfNotNull(bearer, customHeader, argToken).any { constantTimeEquals(it, expected) }
+        return mcpAuthorized(headers, args, debugToken())
     }
 
     private fun debugToken(): String {
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        return prefs.getString(PREF_MCP_TOKEN, null)
-            ?: UUID.randomUUID().toString().replace("-", "").also {
-                prefs.edit().putString(PREF_MCP_TOKEN, it).apply()
-            }
-    }
-
-    private fun constantTimeEquals(left: String, right: String): Boolean {
-        val a = left.toByteArray()
-        val b = right.toByteArray()
-        if (a.size != b.size) return false
-        var diff = 0
-        for (index in a.indices) diff = diff or (a[index].toInt() xor b[index].toInt())
-        return diff == 0
-    }
-
-    private fun redactLogLine(line: String): String {
-        return line
-            .replace(Regex("MCP debug token: [A-Za-z0-9._-]+"), "MCP debug token: <redacted>")
-            .replace(Regex("(?i)(auth[_-]?token[\\\"'=:\\s]+)[A-Za-z0-9._-]+")) {
-                it.groupValues[1] + "<redacted>"
-            }
+        return mcpDebugToken(appContext, PREF_MCP_TOKEN)
     }
 
     private fun writeResponse(
