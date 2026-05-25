@@ -4,8 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
-import com.elon.app.BuildConfig
 import android.widget.PopupWindow
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -42,15 +40,8 @@ class MainActivity : AppCompatActivity() {
     private var homeRows: MainHomeRows? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
-    private lateinit var inputComposerViews: MainInputComposerViews
-    private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
-    private var voiceMode = false
-    private var inputCanSend = true
-    private var suppressInputFocusAnimation = false
-    private var speechInputActions: MainSpeechInputActions? = null
     private val speechPermissionRequest = 4301
     private val notificationPermissionRequest = 4302
-    private val pendingAttachments = mutableListOf<PendingAttachment>()
     /**
      * 当前会话使用的 user_id。
      * - 已登录：使用服务端返回的 user.id（跨设备稳定）。
@@ -81,7 +72,7 @@ class MainActivity : AppCompatActivity() {
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
             taskWorkServiceActions = { taskActions.taskWorkServiceActions },
-            sendEnabledActions = { sendEnabledActions }
+            sendEnabledActions = { inputActions.sendEnabledActions }
         )
     }
 
@@ -101,7 +92,31 @@ class MainActivity : AppCompatActivity() {
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
             activeWorkControlActions = { activeWorkControlActions },
-            sendEnabledActions = { sendEnabledActions }
+            sendEnabledActions = { inputActions.sendEnabledActions }
+        )
+    }
+
+    private val inputActions: MainInputActions by lazy {
+        MainInputActions(
+            activity = this,
+            binding = binding,
+            http = http,
+            serverUrl = serverUrl,
+            speechPermissionRequest = speechPermissionRequest,
+            userId = { userId },
+            projects = projects,
+            setActiveProjectIndex = { activeProjectIndex = it },
+            setChatAdapter = { chatAdapter = it },
+            uiTools = { uiTools },
+            modelActions = { modelActions },
+            projectStateActions = { projectStateActions },
+            conversationTaskRegistryActions = { conversationTaskRegistryActions },
+            workflowActions = { workflowActions },
+            preparedMessageActions = { preparedMessageActions },
+            activeWorkControlActions = { activeWorkControlActions },
+            messageActions = { messageActions },
+            navigationController = { navigationController },
+            stageHintShimmer = { stageHintShimmer() }
         )
     }
 
@@ -119,7 +134,7 @@ class MainActivity : AppCompatActivity() {
             prefs = prefs,
             notificationPermissionRequest = notificationPermissionRequest,
             loadProjects = projectStateActions::loadProjects,
-            setupAttachmentLaunchers = { attachmentPickerActions.setupAttachmentLaunchers() },
+            setupAttachmentLaunchers = { inputActions.attachmentPickerActions.setupAttachmentLaunchers() },
             activeConversation = projectStateActions::activeConversation,
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
@@ -127,7 +142,7 @@ class MainActivity : AppCompatActivity() {
             setupNavigation = { navigationController.setupNavigation() },
             setupQuickActions = { profileQuickActions.setupQuickActions() },
             setupBackHandling = { navigationController.setupBackHandling() },
-            setupInputComposer = ::setupInputComposer,
+            setupInputComposer = inputActions::setupInputComposer,
             restoreCachedModelSelection = { modelActions.restoreCachedModelSelection() },
             updateProjectViews = projectViewActions::updateProjectViews,
             setTaskAppForeground = { foreground -> taskActions.taskWorkServiceActions.setTaskAppForeground(foreground) },
@@ -142,7 +157,7 @@ class MainActivity : AppCompatActivity() {
             },
             openConversation = conversationOpenActions::openConversation,
             loadModelOptions = { modelActions.loadModelOptions() },
-            sendMessage = { sendMessageActions.sendMessage() }
+            sendMessage = { inputActions.sendMessageActions.sendMessage() }
         )
     }
 
@@ -180,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                 taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = sendEnabledActions::setSendEnabled,
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
         )
     }
@@ -202,16 +217,16 @@ class MainActivity : AppCompatActivity() {
         MainPreparedMessageActions(
             activity = this,
             binding = binding,
-            restoreSendTarget = { target -> sendTargetRestoreActions.restoreSendTarget(target) },
+            restoreSendTarget = { target -> inputActions.sendTargetRestoreActions.restoreSendTarget(target) },
             isConversationTaskRunning = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks.containsKey(key)
             },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             userId = { userId },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
-            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions::rememberConversationTask,
@@ -246,7 +261,7 @@ class MainActivity : AppCompatActivity() {
                 workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             },
             clearPendingAttachments = {
-                pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
+                inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
             }
         )
     }
@@ -279,7 +294,7 @@ class MainActivity : AppCompatActivity() {
             },
             clearCurrentEvidence = { workflowActions.evidenceActions.clearCurrentEvidence() },
             clearToolActionBubbles = { workflowActions.toolActionBubbles.clear() },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -297,216 +312,6 @@ class MainActivity : AppCompatActivity() {
                 workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             }
         )
-    }
-
-    private fun setupInputComposer() {
-        val views = MainInputComposerSetup(
-            activity = this,
-            binding = binding,
-            dp = uiTools::dp,
-            currentModelLabel = { modelActions.currentModelLabel },
-            isVoiceMode = { voiceMode },
-            shouldAnimateInputFocus = { !suppressInputFocusAnimation },
-            isAttachmentPanelOpen = { attachmentPanelActions.isOpen },
-            toggleVoiceMode = { voiceModeActions.toggleVoiceMode() },
-            focusInputComposer = { inputFocusActions.focusInputComposer() },
-            startSpeechToText = { speechInputActions().startSpeechToText() },
-            stopSpeechToText = { speechInputActions().stopSpeechToText() },
-            showModelPopupOrLoad = { modelActions.showModelPopupOrLoad() },
-            sendMessage = { sendMessageActions.sendMessage() },
-            toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
-            buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
-            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
-            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
-            updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
-            updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
-        ).setup()
-
-        inputComposerViews = views
-        pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(this, pendingAttachments) {
-            collapsedInputPreviewActions.updateCollapsedInputPreview()
-            updateSendButtonVisual()
-        }
-        binding.inputLayout.addView(pendingAttachmentPreviewStrip.view, 1)
-        voiceModeActions.applyVoiceMode()
-        collapsedInputPreviewActions.updateCollapsedInputPreview()
-        updateSendButtonVisual()
-        adaptiveInputHeightActions.updateAdaptiveInputHeight()
-    }
-
-    private fun inputComposerViewsOrNull(): MainInputComposerViews? {
-        return if (::inputComposerViews.isInitialized) inputComposerViews else null
-    }
-
-    private val adaptiveInputHeightActions: MainAdaptiveInputHeightActions by lazy {
-        MainAdaptiveInputHeightActions(
-            binding = binding,
-            dp = uiTools::dp,
-            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
-            inputBarContainer = { inputComposerViewsOrNull()?.inputBarContainer },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            isVoiceMode = { voiceMode }
-        )
-    }
-
-    private val inputFocusActions: MainInputFocusActions by lazy {
-        MainInputFocusActions(
-            activity = this,
-            binding = binding,
-            activeConversation = projectStateActions::activeConversation,
-            isVoiceMode = { voiceMode },
-            setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
-            updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
-        )
-    }
-
-    private val collapsedInputPreviewActions: MainCollapsedInputPreviewActions by lazy {
-        MainCollapsedInputPreviewActions(
-            binding = binding,
-            pendingAttachments = { pendingAttachments },
-            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview }
-        )
-    }
-
-    private fun refreshPendingAttachmentPreview() {
-        if (!::pendingAttachmentPreviewStrip.isInitialized) return
-        pendingAttachmentPreviewStrip.refresh()
-        collapsedInputPreviewActions.updateCollapsedInputPreview()
-        updateSendButtonVisual()
-    }
-
-    private val attachmentPickerActions: MainAttachmentPickerActions by lazy {
-        MainAttachmentPickerActions(
-            activity = this,
-            activeConversation = projectStateActions::activeConversation,
-            attachPickedFile = { kind, uri, fallbackName ->
-                pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
-            }
-        )
-    }
-
-    private val sendMessageActions: MainSendMessageActions by lazy {
-        MainSendMessageActions(
-            binding = binding,
-            pendingAttachments = pendingAttachments,
-            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
-            isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            activeProject = projectStateActions::activeProject,
-            activeConversation = projectStateActions::activeConversation,
-            appendMessage = workflowActions.messageAppendActions::appendMessage,
-            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
-            uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
-                attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
-            },
-            startPreparedMessage = preparedMessageActions::startPreparedMessage
-        )
-    }
-
-    private val sendTargetRestoreActions: MainSendTargetRestoreActions by lazy {
-        MainSendTargetRestoreActions(
-            binding = binding,
-            projects = projects,
-            setActiveProjectIndex = { activeProjectIndex = it },
-            setChatAdapter = { chatAdapter = it },
-            pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
-            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
-            showChat = { navigationController.showChat() }
-        )
-    }
-
-    private val attachmentSendActions: MainAttachmentSendActions by lazy {
-        MainAttachmentSendActions(
-            activity = this,
-            http = http,
-            serverUrl = serverUrl,
-            userId = { userId },
-            pendingAttachments = { pendingAttachments.toList() },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
-            startPreparedMessage = preparedMessageActions::startPreparedMessage
-        )
-    }
-
-    private val pendingAttachmentActions: MainPendingAttachmentActions by lazy {
-        MainPendingAttachmentActions(
-            activity = this,
-            pendingAttachments = pendingAttachments,
-            isVoiceMode = { voiceMode },
-            setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
-        )
-    }
-
-    private val attachmentPanelActions: MainAttachmentPanelActions by lazy {
-        MainAttachmentPanelActions(
-            activity = this,
-            dp = uiTools::dp,
-            selectableForeground = uiTools::selectableForeground,
-            activeConversation = projectStateActions::activeConversation,
-            attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
-            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
-            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
-            openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
-            openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
-            openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() }
-        )
-    }
-
-    private val voiceModeActions: MainVoiceModeActions by lazy {
-        MainVoiceModeActions(
-            activity = this,
-            binding = binding,
-            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
-            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
-            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
-            expandedInputContainer = { inputComposerViewsOrNull()?.expandedInputContainer },
-            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview },
-            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            isVoiceMode = { voiceMode },
-            setVoiceMode = { voiceMode = it },
-            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
-            updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
-        )
-    }
-
-    private fun updateSendButtonVisual() {
-        if (!::binding.isInitialized) return
-        sendButtonVisualActions.updateSendButtonVisual()
-    }
-
-    private val sendButtonVisualActions: MainSendButtonVisualActions by lazy {
-        MainSendButtonVisualActions(
-            activity = this,
-            binding = binding,
-            dp = uiTools::dp,
-            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            isVoiceMode = { voiceMode },
-            hasPendingAttachments = { pendingAttachments.isNotEmpty() },
-            inputCanSend = { inputCanSend },
-            activeConversation = projectStateActions::activeConversation
-        )
-    }
-
-    private fun speechInputActions(): MainSpeechInputActions {
-        speechInputActions?.let { return it }
-        return MainSpeechInputActions(
-            activity = this,
-            binding = binding,
-            speechPermissionRequest = speechPermissionRequest,
-            activeConversation = projectStateActions::activeConversation,
-            voiceHoldButton = { inputComposerViews.voiceHoldButton },
-            setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions.applyVoiceMode() }
-        ).also { speechInputActions = it }
     }
 
     private val navigationController: MainNavigationController by lazy {
@@ -527,9 +332,9 @@ class MainActivity : AppCompatActivity() {
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
-            collapseInputComposer = { animate -> inputFocusActions.collapseInputComposer(animate) },
+            collapseInputComposer = { animate -> inputActions.inputFocusActions.collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = sendEnabledActions::setSendEnabled,
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
         )
     }
@@ -546,7 +351,7 @@ class MainActivity : AppCompatActivity() {
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            setSendEnabled = sendEnabledActions::setSendEnabled
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled
         )
     }
 
@@ -558,8 +363,8 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverUrl = serverUrl,
             userIdProvider = { userId },
-            modelButtonShellProvider = { inputComposerViewsOrNull()?.modelButtonShell },
-            inputBarContainerProvider = { inputComposerViewsOrNull()?.inputBarContainer },
+            modelButtonShellProvider = { inputActions.inputComposerViewsOrNull()?.modelButtonShell },
+            inputBarContainerProvider = { inputActions.inputComposerViewsOrNull()?.inputBarContainer },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions.openSettings() },
@@ -610,7 +415,7 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
             resetReconnectAttempts = { reconnectAttempts = 0 },
             getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            setSendEnabled = sendEnabledActions::setSendEnabled,
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             renderConversationList = homeListActions::renderConversationList,
             updateStage = projectViewActions::updateStage,
             updateProjectViews = projectViewActions::updateProjectViews
@@ -782,7 +587,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             showChat = { navigationController.showChat() },
-            sendMessage = { sendMessageActions.sendMessage() }
+            sendMessage = { inputActions.sendMessageActions.sendMessage() }
         )
     }
 
@@ -846,20 +651,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private val sendEnabledActions: MainSendEnabledActions by lazy {
-        MainSendEnabledActions(
-            binding = binding,
-            activeConversation = projectStateActions::activeConversation,
-            setInputCanSend = { inputCanSend = it },
-            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
-            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
-            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
-            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
-            updateSendButtonVisual = ::updateSendButtonVisual,
-            updateStageHintShimmer = { stageHintShimmer().update() }
-        )
-    }
-
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         return false
     }
@@ -896,10 +687,7 @@ class MainActivity : AppCompatActivity() {
                 homeRows?.cancelHomeRowShimmer()
                 homeRows = null
             },
-            destroySpeechInput = {
-                speechInputActions?.destroy()
-                speechInputActions = null
-            },
+            destroySpeechInput = inputActions::destroySpeechInput,
             isTaskWorkReceiverRegistered = { taskActions.taskWorkReceiverActions.isRegistered },
             unregisterTaskWorkReceiver = { taskActions.taskWorkReceiverActions.unregisterTaskWorkReceiver() }
         )

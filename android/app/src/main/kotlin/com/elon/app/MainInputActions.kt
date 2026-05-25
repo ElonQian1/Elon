@@ -1,0 +1,260 @@
+package com.elon.app
+
+import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.OkHttpClient
+
+internal class MainInputActions(
+    private val activity: AppCompatActivity,
+    private val binding: ActivityMainBinding,
+    private val http: OkHttpClient,
+    private val serverUrl: String,
+    private val speechPermissionRequest: Int,
+    private val userId: () -> String,
+    private val projects: MutableList<AppProject>,
+    private val setActiveProjectIndex: (Int) -> Unit,
+    private val setChatAdapter: (ChatAdapter) -> Unit,
+    private val uiTools: () -> MainUiTools,
+    private val modelActions: () -> MainModelActions,
+    private val projectStateActions: () -> MainProjectStateActions,
+    private val conversationTaskRegistryActions: () -> MainConversationTaskRegistryActions,
+    private val workflowActions: () -> MainWorkflowActions,
+    private val preparedMessageActions: () -> MainPreparedMessageActions,
+    private val activeWorkControlActions: () -> MainActiveWorkControlActions,
+    private val messageActions: () -> MainMessageActions,
+    private val navigationController: () -> MainNavigationController,
+    private val stageHintShimmer: () -> MainStageHintShimmer
+) {
+    private val pendingAttachments = mutableListOf<PendingAttachment>()
+    private var inputComposerViews: MainInputComposerViews? = null
+    private var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip? = null
+    private var voiceMode = false
+    private var inputCanSend = true
+    private var suppressInputFocusAnimation = false
+    private var speechInputActions: MainSpeechInputActions? = null
+
+    fun setupInputComposer() {
+        val views = MainInputComposerSetup(
+            activity = activity,
+            binding = binding,
+            dp = uiTools()::dp,
+            currentModelLabel = { modelActions().currentModelLabel },
+            isVoiceMode = { voiceMode },
+            shouldAnimateInputFocus = { !suppressInputFocusAnimation },
+            isAttachmentPanelOpen = { attachmentPanelActions.isOpen },
+            toggleVoiceMode = { voiceModeActions.toggleVoiceMode() },
+            focusInputComposer = { inputFocusActions.focusInputComposer() },
+            startSpeechToText = { speechInputActions().startSpeechToText() },
+            stopSpeechToText = { speechInputActions().stopSpeechToText() },
+            showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
+            sendMessage = { sendMessageActions.sendMessage() },
+            toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
+            buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+        ).setup()
+
+        inputComposerViews = views
+        pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(activity, pendingAttachments) {
+            collapsedInputPreviewActions.updateCollapsedInputPreview()
+            updateSendButtonVisual()
+        }
+        binding.inputLayout.addView(requireNotNull(pendingAttachmentPreviewStrip).view, 1)
+        voiceModeActions.applyVoiceMode()
+        collapsedInputPreviewActions.updateCollapsedInputPreview()
+        updateSendButtonVisual()
+        adaptiveInputHeightActions.updateAdaptiveInputHeight()
+    }
+
+    fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews
+
+    fun destroySpeechInput() {
+        speechInputActions?.destroy()
+        speechInputActions = null
+    }
+
+    val adaptiveInputHeightActions: MainAdaptiveInputHeightActions by lazy {
+        MainAdaptiveInputHeightActions(
+            binding = binding,
+            dp = uiTools()::dp,
+            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
+            inputBarContainer = { inputComposerViewsOrNull()?.inputBarContainer },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            isVoiceMode = { voiceMode }
+        )
+    }
+
+    val inputFocusActions: MainInputFocusActions by lazy {
+        MainInputFocusActions(
+            activity = activity,
+            binding = binding,
+            activeConversation = projectStateActions()::activeConversation,
+            isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+        )
+    }
+
+    val collapsedInputPreviewActions: MainCollapsedInputPreviewActions by lazy {
+        MainCollapsedInputPreviewActions(
+            binding = binding,
+            pendingAttachments = { pendingAttachments },
+            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview }
+        )
+    }
+
+    private fun refreshPendingAttachmentPreview() {
+        pendingAttachmentPreviewStrip?.refresh() ?: return
+        collapsedInputPreviewActions.updateCollapsedInputPreview()
+        updateSendButtonVisual()
+    }
+
+    val attachmentPickerActions: MainAttachmentPickerActions by lazy {
+        MainAttachmentPickerActions(
+            activity = activity,
+            activeConversation = projectStateActions()::activeConversation,
+            attachPickedFile = { kind, uri, fallbackName ->
+                pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
+            }
+        )
+    }
+
+    val sendMessageActions: MainSendMessageActions by lazy {
+        MainSendMessageActions(
+            binding = binding,
+            pendingAttachments = pendingAttachments,
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
+            activeProject = projectStateActions()::activeProject,
+            activeConversation = projectStateActions()::activeConversation,
+            appendMessage = workflowActions().messageAppendActions::appendMessage,
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
+                attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
+            },
+            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+        )
+    }
+
+    val sendTargetRestoreActions: MainSendTargetRestoreActions by lazy {
+        MainSendTargetRestoreActions(
+            binding = binding,
+            projects = projects,
+            setActiveProjectIndex = setActiveProjectIndex,
+            setChatAdapter = setChatAdapter,
+            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
+            showChat = { navigationController().showChat() }
+        )
+    }
+
+    val attachmentSendActions: MainAttachmentSendActions by lazy {
+        MainAttachmentSendActions(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            userId = userId,
+            pendingAttachments = { pendingAttachments.toList() },
+            setSendEnabled = sendEnabledActions::setSendEnabled,
+            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+        )
+    }
+
+    val pendingAttachmentActions: MainPendingAttachmentActions by lazy {
+        MainPendingAttachmentActions(
+            activity = activity,
+            pendingAttachments = pendingAttachments,
+            isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
+        )
+    }
+
+    val attachmentPanelActions: MainAttachmentPanelActions by lazy {
+        MainAttachmentPanelActions(
+            activity = activity,
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground,
+            activeConversation = projectStateActions()::activeConversation,
+            attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
+            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
+            openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
+            openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() }
+        )
+    }
+
+    val voiceModeActions: MainVoiceModeActions by lazy {
+        MainVoiceModeActions(
+            activity = activity,
+            binding = binding,
+            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
+            inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
+            expandedInputContainer = { inputComposerViewsOrNull()?.expandedInputContainer },
+            collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview },
+            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            isVoiceMode = { voiceMode },
+            setVoiceMode = { voiceMode = it },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+        )
+    }
+
+    private fun updateSendButtonVisual() {
+        sendButtonVisualActions.updateSendButtonVisual()
+    }
+
+    val sendButtonVisualActions: MainSendButtonVisualActions by lazy {
+        MainSendButtonVisualActions(
+            activity = activity,
+            binding = binding,
+            dp = uiTools()::dp,
+            attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            isVoiceMode = { voiceMode },
+            hasPendingAttachments = { pendingAttachments.isNotEmpty() },
+            inputCanSend = { inputCanSend },
+            activeConversation = projectStateActions()::activeConversation
+        )
+    }
+
+    private fun speechInputActions(): MainSpeechInputActions {
+        speechInputActions?.let { return it }
+        return MainSpeechInputActions(
+            activity = activity,
+            binding = binding,
+            speechPermissionRequest = speechPermissionRequest,
+            activeConversation = projectStateActions()::activeConversation,
+            voiceHoldButton = { requireNotNull(inputComposerViews).voiceHoldButton },
+            setVoiceMode = { voiceMode = it },
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() }
+        ).also { speechInputActions = it }
+    }
+
+    val sendEnabledActions: MainSendEnabledActions by lazy {
+        MainSendEnabledActions(
+            binding = binding,
+            activeConversation = projectStateActions()::activeConversation,
+            setInputCanSend = { inputCanSend = it },
+            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
+            modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateStageHintShimmer = { stageHintShimmer().update() }
+        )
+    }
+}
