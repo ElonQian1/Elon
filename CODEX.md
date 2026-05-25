@@ -100,7 +100,7 @@ APK-triggered project tasks use conversation worktrees plus shared-resource gate
 - Different `conversation_id` values inside the same project can run coding work at the same time.
 - Each development conversation gets its own Git worktree and `ai/session/...` branch; the Codex CLI should work only in that conversation worktree and push the current branch if a remote exists.
 - The same `project_id + conversation_id` still runs one task at a time so one conversation cannot race itself.
-- Merge to `main`, Android version bumps, APK release publishing, and server deployment remain serialized shared-resource steps. If a project cannot create a worktree, it falls back to project-scoped shared-workspace serialization.
+- Merge to `main`, server-allocated version claims (`/api/release/claim`), APK release publishing, and server deployment remain serialized shared-resource steps. If a project cannot create a worktree, it falls back to project-scoped shared-workspace serialization.
 - The built-in "一龙项目" follows this exact same rule as any other GitHub or `local_path` project.
 - Backend Git preflight failures are not final user failures. Pass them to the Codex CLI task context first; let CLI inspect `git status/diff` and try safe recovery. Only if CLI determines the flow cannot be recovered should the app show a friendly blocker.
 
@@ -184,20 +184,40 @@ APK:
 - Latest APK path on server: `/root/Elon/app/ElonSpeed-latest.apk`
 - Download URL: `http://43.139.149.158:8080/app/ElonSpeed-latest.apk`
 - APK release builds must run locally and upload `ElonSpeed-latest.apk` plus `version.json`; the production server should not be used as the Android build machine.
-- `scripts/publish-apk.ps1` writes APK provenance to server-side `.apk-deployed-sha` and `version.json.gitSha`. If `origin/main` advances during a slow APK build, the script must not rebase and upload the old artifact. If the server already has a deployed SHA containing this build's base commit, stop and test that newer live APK; otherwise rerun the release from latest `main`.
+- `scripts/publish-apk.ps1` writes APK provenance to server-side `.apk-deployed-sha` and `version.json.gitSha`. The script claims a version from `/api/release/claim`, temporarily writes `build.gradle`, builds, uploads, then calls `/api/release/finish`. The temporary `build.gradle` change is always restored; no release commit is created. If `origin/main` advances during a slow APK build, the script must not rebase and upload the old artifact. If the server already has a deployed SHA containing this build's base commit, stop and test that newer live APK; otherwise abort with `finish(success=false)` and rerun the release from latest `main`.
 - Remote Codex CLI must treat this as the default APK release decision flow:
   1. Sync to latest `main` before building.
-  2. Build only from a known pushed SHA.
-  3. If another machine publishes a newer APK that already contains the build's base SHA, stop local release work and verify that live APK instead.
+  2. Build only from a known pushed SHA (no `release(android)` commit is needed or allowed).
+  3. If another machine publishes a newer APK that already contains the build's base SHA, stop local release work, call `finish(success=false)`, and verify that live APK instead.
   4. If `origin/main` advances but the live APK does not prove it contains this build's base SHA, do not upload the stale artifact; restart the release from latest `main`.
-  5. Never rebase after APK compilation and then upload the old APK; the embedded `BuildConfig.VERSION_CODE` may no longer match `version.json`.
+  5. Never reuse an APK whose embedded `versionCode` came from a server claim that has already been finished — restart the claim.
 - Release signing keystore is local-only at `D:\一龙\elon-release(1).jks`; do not commit it.
 - Keystore type: `PKCS12`; key alias: `elon`.
 - For future release APP publishing, set `APK_KEYSTORE` to the JKS path and `APK_KEYSTORE_PASS` to the provided password, then build with `android\gradlew.bat assembleRelease`, run `zipalign`, sign with `apksigner --ks-key-alias elon`, verify with `apksigner verify`, and upload the signed APK to the latest APK server path above.
 
 Backend deploys should be based on a committed SHA. When the main workspace has unrelated uncommitted changes, deploy from a detached temporary worktree based on `HEAD`, not from the dirty main workspace.
 
-Backend server runtime changes must increment `server/Cargo.toml` `package.version` before commit. Use PATCH for fixes, MINOR for backward-compatible features, and MAJOR for incompatible API changes. The server exposes the deployed version at `GET /api/server/version`; deployment scripts inject the git SHA at build time, and the Android APK displays this server version dynamically on the profile page.
+### Version numbers are server-allocated, not in git (v0.3.69+)
+
+Backend and APK version numbers are **not stored in git**. `server/Cargo.toml` `package.version` and `android/app/build.gradle` `versionCode/versionName` are cold-start fallbacks only and must **never** be manually incremented and committed.
+
+The canonical flow for every release (backend or APK) is:
+
+1. Commit + push the business code change to `main`.
+2. Run `scripts/publish-server.ps1` or `scripts/publish-apk.ps1`.
+3. The script calls `POST /api/release/claim` with `{ kind, sha, builderId, bump }`. The server atomically assigns `assignedVersionName` (and `assignedVersionCode` for APK) by taking `max(lastPublished, currentReported, in_flight.assigned) + bump`.
+4. The script injects the assigned version at compile time via the `ELON_BUILD_VERSION` environment variable (server reads it through `option_env!`; the APK script temporarily writes `build.gradle`, builds, then restores it).
+5. After upload + restart succeed, the script calls `POST /api/release/finish` with `{ token, success: true }`, which monotonically advances `lastPublishedVersionName/Code`.
+6. Any failure path (compile error, CAS mismatch, scp failure, abort because server already advanced) must call `/api/release/finish` with `success: false` to release the in-flight slot.
+
+Concurrent builders never collide on version numbers: if A claims `0.3.70` and B claims simultaneously, B gets `0.3.71`. If B's build is slower and the server already deployed something newer than B's assigned version, the script aborts and calls `finish(success=false)`; nothing is pushed to git.
+
+What AI agents must NOT do:
+
+- Do not edit `server/Cargo.toml` `version` field for release purposes.
+- Do not edit `android/app/build.gradle` `versionCode` / `versionName` for release purposes.
+- Do not create a `release(android)` or `release(server)` git commit that bumps version numbers — there is no such commit anymore.
+- Do not call `publish-server.ps1` / `publish-apk.ps1` from a dirty working tree; commit and push business code first.
 
 ### ⚠️ Concurrent deployment protection (SHA ordering)
 
