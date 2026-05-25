@@ -46,7 +46,6 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -132,10 +131,9 @@ class MainActivity : AppCompatActivity() {
     private var projectActions: MainProjectActions? = null
     private var stageHintAnimator: ValueAnimator? = null
     private var stageHintShimmerToken = 0
-    private var exitConfirmDialog: AlertDialog? = null
     private var actionPopup: PopupWindow? = null
     private var actionPopups: MainActionPopups? = null
-    private var pageTransitionRunning = false
+    private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
     private lateinit var voiceHoldButton: TextView
@@ -1290,204 +1288,47 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
-
-        fun select(tab: TextView) {
-            pageTransitionRunning = false
-            clearPageTranslations()
-            tabs.forEach {
-                it.setTextColor(Color.parseColor(if (it == tab) "#07C160" else "#A5A5A5"))
-                it.textSize = if (it == tab) 12f else 11f
-            }
-            binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-            binding.chatPage.visibility = View.GONE
-            binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
-            binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
-            binding.inputLayout.visibility = View.GONE
-            binding.pageTabs.visibility = View.VISIBLE
-            binding.backButton.visibility = View.GONE
-            binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-            binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
-            binding.moreButton.visibility = View.GONE
-            binding.addButton.setOnClickListener {
-                showHomeActionPopup(binding.addButton, tab)
-            }
-            binding.topTitleText.setOnLongClickListener(null)
-            binding.topTitleText.text = when (tab) {
-                binding.tabProject -> "项目管理"
-                binding.tabProfile -> "我的"
-                else -> compactProjectTitle()
-            }
-            if (tab != binding.tabChat) {
-                renderConversationList()
-            }
-            if (tab == binding.tabProject) {
-                renderProjectList()
-            } else if (tab == binding.tabChat) {
-                renderConversationList()
-            } else if (tab == binding.tabProfile) {
-                refreshServerVersion()
-            }
-        }
-
-        binding.tabChat.setOnClickListener { select(binding.tabChat) }
-        binding.tabProject.setOnClickListener { select(binding.tabProject) }
-        binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
-        binding.conversationItem.setOnClickListener { openConversation(0) }
-        binding.conversationItem.setOnLongClickListener {
-            showConversationActions(0)
-            true
-        }
-        binding.searchButton.setOnClickListener { updateFirstConversationStatus("搜索功能准备中 · 点击进入开发会话") }
-        binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
-        binding.backButton.setOnClickListener { navigateBackOneLevel() }
-        select(binding.tabChat)
+        navigationController().setupNavigation()
     }
 
     private fun setupBackHandling() {
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                navigateBackOneLevel()
-            }
-        })
+        navigationController().setupBackHandling()
     }
 
     private fun navigateBackOneLevel() {
-        if (pageTransitionRunning) return
-        if (binding.chatPage.visibility == View.VISIBLE) {
-            collapseInputComposer(animate = false)
-            showConversationHome(animate = true)
-            return
-        }
-        showExitConfirmation()
+        navigationController().navigateBackOneLevel()
     }
 
     private fun showConversationHome(animate: Boolean = false) {
-        if (animate && binding.chatPage.visibility == View.VISIBLE) {
-            actionPopup?.dismiss()
-            renderConversationList()
-            applyConversationHomeChrome()
-            pageTransitionRunning = true
-            WechatPageTransition.exitToRight(
-                container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage),
-                incoming = listOf(binding.conversationPage),
-                outgoingFull = listOf(binding.inputLayout),
-                incomingFull = listOf(binding.pageTabs),
-                onEnd = {
-                    binding.chatPage.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.projectPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.conversationPage.visibility = View.VISIBLE
-                    binding.pageTabs.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            binding.tabChat.performClick()
-        }
-    }
-
-    private fun showExitConfirmation() {
-        if (exitConfirmDialog?.isShowing == true) return
-        exitConfirmDialog = AlertDialog.Builder(this)
-            .setTitle("退出应用")
-            .setMessage("确定要退出一龙吗？")
-            .setNegativeButton("取消", null)
-            .setPositiveButton("退出") { _, _ -> finish() }
-            .create()
-        exitConfirmDialog?.show()
+        navigationController().showConversationHome(animate)
     }
 
     private fun showChat(animate: Boolean = false) {
-        if (pageTransitionRunning) return
-        val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
-        actionPopup?.dismiss()
-        applyChatChrome()
-        if (shouldAnimate) {
-            collapseInputComposer(animate = false)
-            pageTransitionRunning = true
-            WechatPageTransition.enterFromRight(
-                container = binding.contentContainer,
-                incoming = listOf(binding.chatPage),
-                outgoing = listOf(binding.conversationPage),
-                incomingFull = listOf(binding.inputLayout),
-                outgoingFull = listOf(binding.pageTabs),
-                onEnd = {
-                    binding.conversationPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
-                    binding.projectPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.chatPage.visibility = View.VISIBLE
-                    binding.inputLayout.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
-            binding.projectPage.visibility = View.GONE
-            binding.profilePage.visibility = View.GONE
-            binding.chatPage.visibility = View.VISIBLE
-            binding.inputLayout.visibility = View.VISIBLE
-            clearPageTranslations()
-        }
-        setSendEnabled(!isActiveConversationWorking())
-        maybePrewarmCodexSession("show_chat")
+        navigationController().showChat(animate)
     }
 
-    private fun applyChatChrome() {
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.VISIBLE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.inputLayout.visibility = View.VISIBLE
-        binding.pageTabs.visibility = View.GONE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.moreButton.visibility = View.VISIBLE
-        renderConversationList()
-        binding.topTitleText.text = activeConversation().title
-        binding.topTitleText.setOnLongClickListener {
-            showConversationActions(activeConversationIndex)
-            true
-        }
-    }
-
-    private fun applyConversationHomeChrome() {
-        binding.tabChat.setTextColor(Color.parseColor("#07C160"))
-        binding.tabChat.textSize = 12f
-        binding.tabProject.setTextColor(Color.parseColor("#A5A5A5"))
-        binding.tabProject.textSize = 11f
-        binding.tabProfile.setTextColor(Color.parseColor("#A5A5A5"))
-        binding.tabProfile.textSize = 11f
-        binding.conversationPage.visibility = View.VISIBLE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
-        binding.backButton.visibility = View.GONE
-        binding.searchButton.visibility = View.VISIBLE
-        binding.addButton.visibility = View.VISIBLE
-        binding.moreButton.visibility = View.GONE
-        binding.addButton.setOnClickListener {
-            showHomeActionPopup(binding.addButton, binding.tabChat)
-        }
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = compactProjectTitle()
-    }
-
-    private fun clearPageTranslations() {
-        binding.conversationPage.translationX = 0f
-        binding.chatPage.translationX = 0f
-        binding.projectPage.translationX = 0f
-        binding.profilePage.translationX = 0f
-        binding.inputLayout.translationX = 0f
-        binding.pageTabs.translationX = 0f
+    private fun navigationController(): MainNavigationController {
+        navigationController?.let { return it }
+        return MainNavigationController(
+            activity = this,
+            binding = binding,
+            actionPopupProvider = { actionPopup },
+            activeConversationProvider = ::activeConversation,
+            activeConversationIndexProvider = { activeConversationIndex },
+            compactProjectTitle = ::compactProjectTitle,
+            renderConversationList = ::renderConversationList,
+            renderProjectList = ::renderProjectList,
+            refreshServerVersion = ::refreshServerVersion,
+            openConversation = ::openConversation,
+            showConversationActions = ::showConversationActions,
+            showHomeActionPopup = ::showHomeActionPopup,
+            showChatActionPopup = ::showChatActionPopup,
+            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            collapseInputComposer = ::collapseInputComposer,
+            isActiveConversationWorking = ::isActiveConversationWorking,
+            setSendEnabled = ::setSendEnabled,
+            maybePrewarmCodexSession = ::maybePrewarmCodexSession
+        ).also { navigationController = it }
     }
 
     private fun showCreateConversationDialog() {
