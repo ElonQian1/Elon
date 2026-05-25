@@ -63,6 +63,7 @@ mod tools_git;
 mod types;
 mod user_api;
 mod web;
+mod ws_message;
 
 pub use types::AppState;
 
