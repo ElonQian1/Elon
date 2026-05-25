@@ -231,12 +231,12 @@ object McpDebugServer {
         val filtered = allEvents.filter { event ->
             (traceId == null || event.details["trace_id"] == traceId) &&
                 (phase == null || event.phase == phase) &&
-                (contains == null || traceEventSearchText(event).contains(contains, ignoreCase = true)) &&
+                (contains == null || mcpTraceEventSearchText(event).contains(contains, ignoreCase = true)) &&
                 (sinceWallTimeMs == null || event.wallTimeMs >= sinceWallTimeMs)
         }
         val events = filtered.takeLast(limit)
         val structured = JSONObject()
-            .put("events", traceEventsJson(events))
+            .put("events", mcpTraceEventsJson(events))
             .put("limit", limit)
             .put("matched_count", filtered.size)
             .put(
@@ -343,7 +343,7 @@ object McpDebugServer {
         val taskStatus = taskStatusJson(taskStatusArgs)
         val bundleTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
             ?: taskStatus.optString("trace_id").takeIf { it.isNotBlank() && it != "null" }
-            ?: latestTraceId(DebugTraceStore.recentEvents(300))
+            ?: mcpLatestTraceId(DebugTraceStore.recentEvents(300))
         val latencyArgs = JSONObject()
             .put("timeline_limit", args.optInt("timeline_limit", 80).coerceIn(1, 300))
         bundleTraceId?.let {
@@ -1219,7 +1219,7 @@ object McpDebugServer {
         val events = DebugTraceStore.recentEvents(300)
         val traceId = requestedTraceId
             ?: pendingTask?.optString("trace_id")?.takeIf { it.isNotBlank() }
-            ?: latestTraceId(events)
+            ?: mcpLatestTraceId(events)
         val traceEvents = if (traceId == null) {
             emptyList()
         } else {
@@ -1254,9 +1254,9 @@ object McpDebugServer {
             .put("kind", pendingTaskKind(prefs))
             .put("pending_work_age_ms", pendingWorkAgeMs(prefs) ?: JSONObject.NULL)
             .put("event_count", traceEvents.size)
-            .put("sent_elapsed_ms", detailLong(traceEvents, "task_payload_sent", "elapsed_ms"))
-            .put("first_server_event_elapsed_ms", detailLong(traceEvents, "task_first_server_event", "elapsed_ms"))
-            .put("first_chat_reply_elapsed_ms", detailLong(traceEvents, "task_first_chat_reply", "elapsed_ms"))
+            .put("sent_elapsed_ms", mcpTraceDetailLong(traceEvents, "task_payload_sent", "elapsed_ms"))
+            .put("first_server_event_elapsed_ms", mcpTraceDetailLong(traceEvents, "task_first_server_event", "elapsed_ms"))
+            .put("first_chat_reply_elapsed_ms", mcpTraceDetailLong(traceEvents, "task_first_chat_reply", "elapsed_ms"))
             .put("finish_elapsed_ms", finish?.details?.get("elapsed_ms")?.toLongOrNull() ?: JSONObject.NULL)
             .put("last_message_type", lastMessage?.details?.get("type") ?: JSONObject.NULL)
             .put("last_message_preview", lastMessage?.details?.get("message_preview") ?: JSONObject.NULL)
@@ -1270,7 +1270,7 @@ object McpDebugServer {
         val allEvents = DebugTraceStore.recentEvents(300)
         val requestedTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
         val pendingTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
-        val traceId = requestedTraceId ?: pendingTraceId ?: latestTraceId(allEvents)
+        val traceId = requestedTraceId ?: pendingTraceId ?: mcpLatestTraceId(allEvents)
         val traceEvents = if (traceId == null) {
             emptyList()
         } else {
@@ -1397,7 +1397,7 @@ object McpDebugServer {
             .put("timeline_limit", timelineLimit)
             .put("milestones", milestones)
             .put("segments", segments)
-            .put("bottleneck", bottleneckJson(bottleneck))
+            .put("bottleneck", mcpBottleneckJson(bottleneck))
             .put("missing_milestones", missingMilestones)
             .put("timeline", timeline)
             .put("task_status", taskStatus)
@@ -1408,7 +1408,7 @@ object McpDebugServer {
         val events = DebugTraceStore.recentEvents(300)
         val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
             ?: pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
-            ?: latestTraceId(events)
+            ?: mcpLatestTraceId(events)
         val limit = args.optInt("limit", 120).coerceIn(1, 300)
         val baseUrl = args.optString("server_url").takeIf { it.isNotBlank() }
             ?: DEFAULT_SERVER_BASE_URL
@@ -1441,71 +1441,6 @@ object McpDebugServer {
             .put("server_url", baseUrl)
     }
 
-    private fun bottleneckJson(bottleneck: Pair<String, Long>?): JSONObject {
-        if (bottleneck == null) {
-            return JSONObject()
-                .put("available", false)
-                .put("severity", "insufficient_data")
-                .put("name", JSONObject.NULL)
-                .put("duration_ms", JSONObject.NULL)
-                .put("likely_area", JSONObject.NULL)
-                .put("recommendation", "Collect a fresh debug_session and call latency_report after the task reaches at least payload_sent.")
-        }
-        val name = bottleneck.first
-        val durationMs = bottleneck.second
-        val severity = when {
-            durationMs >= 30_000L -> "slow"
-            durationMs >= 10_000L -> "watch"
-            else -> "normal"
-        }
-        val likelyArea = when (name) {
-            "mcp_send_to_queue",
-            "mcp_queue_to_service_command",
-            "service_command_to_task_start",
-            "mcp_queue_to_task_start",
-            "mcp_queue_to_now" -> "phone_task_start"
-            "task_start_to_ws_connected" -> "phone_websocket_connect"
-            "ws_connected_to_payload_sent", "task_start_to_payload_sent" -> "phone_payload_send"
-            "payload_sent_to_first_server_event" -> "backend_or_network_first_byte"
-            "first_server_event_to_first_chat_reply" -> "backend_model_first_reply"
-            "first_chat_reply_to_finish" -> "backend_completion_or_apk_release"
-            else -> "unknown"
-        }
-        val recommendation = when (likelyArea) {
-            "phone_task_start" -> "Inspect task queue and foreground-service startup; use background_debug_status and task_events."
-            "phone_websocket_connect" -> "Compare network_check with ws_failure/ws_connected trace events; backend port or phone network may be slow."
-            "phone_payload_send" -> "Check payload_bytes and attachment handling; large payloads can delay WebSocket send."
-            "backend_or_network_first_byte" -> "Backend accepted the phone payload slowly; compare server logs for this trace_id."
-            "backend_model_first_reply" -> "Backend/model generation is the likely first-reply bottleneck."
-            "backend_completion_or_apk_release" -> "First reply arrived; remaining time is likely long-running build/deploy/completion work."
-            else -> "Inspect trace_recent for the same trace_id."
-        }
-        return JSONObject()
-            .put("available", true)
-            .put("severity", severity)
-            .put("name", name)
-            .put("duration_ms", durationMs)
-            .put("likely_area", likelyArea)
-            .put("recommendation", recommendation)
-    }
-
-    private fun latestTraceId(events: List<DebugTraceStore.TraceEvent>): String? {
-        return events.asReversed()
-            .firstNotNullOfOrNull { it.details["trace_id"]?.takeIf(String::isNotBlank) }
-    }
-
-    private fun detailLong(
-        events: List<DebugTraceStore.TraceEvent>,
-        phase: String,
-        key: String
-    ): Any {
-        return events.firstOrNull { it.phase == phase }
-            ?.details
-            ?.get(key)
-            ?.toLongOrNull()
-            ?: JSONObject.NULL
-    }
-
     private fun metricsJson(): JSONObject {
         return JSONObject()
             .put("active_connections", activeConnections.get())
@@ -1529,31 +1464,6 @@ object McpDebugServer {
         lastHttpMethod = method
         lastPath = path
         lastError = null
-    }
-
-    private fun traceEventsJson(events: List<DebugTraceStore.TraceEvent>): JSONArray {
-        return JSONArray().apply {
-            events.forEach { event ->
-                put(
-                    JSONObject()
-                        .put("wall_time_ms", event.wallTimeMs)
-                        .put("elapsed_ms", event.elapsedMs)
-                        .put("phase", event.phase)
-                        .put("details", JSONObject().apply {
-                            event.details.forEach { (key, value) -> put(key, value) }
-                        })
-                )
-            }
-        }
-    }
-
-    private fun traceEventSearchText(event: DebugTraceStore.TraceEvent): String {
-        return buildString {
-            append(event.phase)
-            event.details.forEach { (key, value) ->
-                append(' ').append(key).append('=').append(value)
-            }
-        }
     }
 
     private fun startDebugSession(
