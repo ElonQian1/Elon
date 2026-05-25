@@ -106,6 +106,7 @@ class MainActivity : AppCompatActivity() {
     private var progressNarrativeActions: MainProgressNarrativeActions? = null
     private var toolActionBubbles: MainToolActionBubbles? = null
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
+    private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
@@ -1926,43 +1927,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun removeLeakedAndRoutineWorkflowMessages(messages: MutableList<ChatMessage>) {
-        messages.removeAll { message ->
-            isLeakedPlatformPromptMessage(message.content) ||
-                isTechnicalLeakMessage(message.content) ||
-                (message.role in workflowHistoryStatusRoles && isRoutineWorkflowMessage(message.content))
-        }
+        workflowMessageCompactor().removeLeakedAndRoutineWorkflowMessages(messages)
     }
 
     private fun compactWorkflowStatusMessages(messages: MutableList<ChatMessage>) {
-        if (messages.none { it.role in workflowHistoryStatusRoles }) return
-
-        val compacted = mutableListOf<ChatMessage>()
-        var pendingStatus: ChatMessage? = null
-
-        for (message in messages) {
-            when {
-                message.role in workflowHistoryStatusRoles -> {
-                    pendingStatus = if (message.role == "ai-cli-log") {
-                        ChatMessage("ai-cli-log", genericFoldedCliLogSummary())
-                    } else {
-                        message
-                    }
-                }
-                message.role in workflowTerminalRoles -> {
-                    pendingStatus = null
-                    compacted.add(message)
-                }
-                else -> {
-                    pendingStatus?.let(compacted::add)
-                    pendingStatus = null
-                    compacted.add(message)
-                }
-            }
-        }
-
-        pendingStatus?.let(compacted::add)
-        messages.clear()
-        messages.addAll(compacted)
+        workflowMessageCompactor().compactWorkflowStatusMessages(messages)
     }
 
     private fun maybeAppendVisibleCliSignal(category: String, line: String): Boolean {
@@ -2012,9 +1981,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun closeStaleWorkflowMessages(messages: MutableList<ChatMessage>) {
-        val lastRole = messages.lastOrNull()?.role ?: return
-        if (lastRole !in staleWorkflowRoles) return
-        messages.removeAt(messages.lastIndex)
+        workflowMessageCompactor().closeStaleWorkflowMessages(messages)
+    }
+
+    private fun workflowMessageCompactor(): MainWorkflowMessageCompactor {
+        workflowMessageCompactor?.let { return it }
+        return MainWorkflowMessageCompactor(
+            staleWorkflowRoles = staleWorkflowRoles,
+            workflowHistoryStatusRoles = workflowHistoryStatusRoles,
+            workflowTerminalRoles = workflowTerminalRoles
+        ).also { workflowMessageCompactor = it }
     }
 
     private fun scheduleFirstServerResponseWatchdog(traceId: String, token: Int) {
@@ -2183,17 +2159,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun removeTransientWorkflowMessagesAfterLatestUser() {
-        val messages = activeConversation().messages
-        val latestUserIndex = messages.indexOfLast { it.role == "user" }
-        if (latestUserIndex < 0) return
-        var removed = false
-        for (index in messages.lastIndex downTo latestUserIndex + 1) {
-            if (messages[index].role in staleWorkflowRoles) {
-                messages.removeAt(index)
-                removed = true
-            }
-        }
-        if (removed) {
+        if (workflowMessageCompactor().removeTransientWorkflowMessagesAfterLatestUser(activeConversation().messages)) {
             chatAdapter.notifyDataSetChanged()
             saveConversations()
         }
