@@ -1,8 +1,8 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::{
     path::Path,
     process::Stdio,
-    sync::{Arc, atomic::AtomicU64},
+    sync::{atomic::AtomicU64, Arc},
     time::{Duration, Instant},
 };
 use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::UnboundedSender};
@@ -10,6 +10,10 @@ use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::UnboundedSender};
 pub(crate) use crate::ai_cli_output::truncate_chars;
 
 use crate::{
+    ai_cli_chat::{
+        chat_timeout_cap_secs, codex_network_or_timeout_error, finish_lightweight_chat_fallback,
+        intent_gate_fallback_chat_result, is_cli_timeout_error, is_tiny_chat_message,
+    },
     ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
     ai_cli_native_session::{
         append_native_session_continuity, native_session_continuity_note,
@@ -19,15 +23,16 @@ use crate::{
     ai_cli_prompts::{build_cli_prompt, build_intent_gate_prompt, build_prewarm_cli_prompt},
     ai_cli_streaming::{current_unix_millis, read_cli_stream, send_cli_heartbeat},
     ai_cli_trace::{
-        CliTraceContext, record_cli_done, record_cli_error, record_cli_retry,
-        record_cli_session_skipped, record_cli_start, record_codex_network_gate,
-        record_intent_gate_fallback, record_lightweight_chat_fallback, record_prewarm_session_hit,
+        record_cli_done, record_cli_error, record_cli_retry, record_cli_session_skipped,
+        record_cli_start, record_codex_network_gate, record_intent_gate_fallback,
+        record_prewarm_session_hit, CliTraceContext,
     },
-    intent_router,
-    tools,
+    intent_router, tools,
     types::{AiCliOption, AppState, CliPromptMode, WsMessage},
 };
 
+#[cfg(test)]
+use crate::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
 #[cfg(test)]
 use crate::ai_cli_native_session::build_native_session_continuity_note;
 #[cfg(test)]
@@ -61,8 +66,6 @@ pub struct PrewarmResult {
 
 const DEFAULT_PREWARM_TIMEOUT_CAP_SECS: u64 = 8;
 const DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS: u64 = 30;
-const DEFAULT_CHAT_TIMEOUT_CAP_SECS: u64 = 30;
-const DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS: u64 = 8;
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
 
@@ -804,128 +807,6 @@ pub(crate) fn cap_option_timeout(option: &mut AiCliOption, cap_secs: u64) {
     if option.timeout_secs == 0 || option.timeout_secs > cap_secs {
         option.timeout_secs = cap_secs;
     }
-}
-
-fn chat_timeout_cap_secs(tiny_chat_task: bool) -> u64 {
-    if tiny_chat_task {
-        configured_timeout_cap(
-            "AI_CLI_TINY_CHAT_TIMEOUT_SECS",
-            DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS,
-        )
-    } else {
-        configured_timeout_cap("AI_CLI_CHAT_TIMEOUT_SECS", DEFAULT_CHAT_TIMEOUT_CAP_SECS)
-    }
-}
-
-fn is_tiny_chat_message(user_message: &str) -> bool {
-    let compact: String = user_message
-        .trim()
-        .to_lowercase()
-        .chars()
-        .filter(|ch| {
-            !ch.is_whitespace()
-                && !matches!(
-                    ch,
-                    '!' | '！'
-                        | '?'
-                        | '？'
-                        | '.'
-                        | '。'
-                        | ','
-                        | '，'
-                        | ';'
-                        | '；'
-                        | ':'
-                        | '：'
-                        | '~'
-                        | '～'
-                )
-        })
-        .take(32)
-        .collect();
-    if compact.is_empty() {
-        return false;
-    }
-    let compact_chars = compact.chars().count();
-    if compact_chars <= 2 {
-        return true;
-    }
-    matches!(
-        compact.as_str(),
-        "你好"
-            | "您好"
-            | "嗨"
-            | "哈喽"
-            | "哈啰"
-            | "在吗"
-            | "在嘛"
-            | "早"
-            | "早上好"
-            | "晚上好"
-            | "hi"
-            | "hello"
-            | "hey"
-            | "yo"
-    ) || (compact_chars <= 4
-        && (compact.contains("你好")
-            || compact.contains("您好")
-            || compact.contains("哈喽")
-            || compact.contains("在吗")))
-}
-
-fn is_cli_timeout_error(error: &anyhow::Error) -> bool {
-    let text = error.to_string().to_ascii_lowercase();
-    text.contains("timeout") || text.contains("timed out") || text.contains("执行超时")
-}
-
-fn codex_network_or_timeout_error(error: &anyhow::Error) -> bool {
-    is_cli_timeout_error(error)
-        || crate::codex_health::is_codex_network_error_text(&error.to_string())
-}
-
-#[cfg(test)]
-fn intent_gate_timeout_chat_result(user_message: &str) -> IntentGateResult {
-    intent_gate_fallback_chat_result(user_message, "timeout")
-}
-
-/// 意图门控降级到普通聊天路由。
-fn intent_gate_fallback_chat_result(user_message: &str, cause: &str) -> IntentGateResult {
-    let chat_reply = if is_tiny_chat_message(user_message) {
-        "你好，我在。刚才服务端意图确认环节没完成，我先按普通聊天处理，避免误进入慢速开发流程。"
-    } else {
-        "我先按普通聊天处理，避免误进入慢速开发流程。你可以继续说；如果要我修改代码、编译或发布，请直接告诉我具体任务。"
-    };
-    IntentGateResult {
-        route: intent_router::CapabilityRoute::ChatAgent,
-        confidence: 0.5,
-        reason: format!("intent_gate_fallback:{}", cause),
-        chat_reply: Some(chat_reply.into()),
-    }
-}
-
-fn finish_lightweight_chat_fallback(
-    state: &Arc<AppState>,
-    trace_id: Option<&str>,
-    tx: &UnboundedSender<String>,
-    user_message: &str,
-    reason: &'static str,
-    error: &str,
-) -> Result<()> {
-    record_lightweight_chat_fallback(state, trace_id, reason, error);
-    let message = if is_tiny_chat_message(user_message) {
-        "你好，我在。刚才服务端 Codex CLI 会话响应超过轻量聊天限时，我先结束本轮，避免手机一直卡住；你继续发消息就可以。"
-    } else {
-        "这次服务端 Codex CLI 没有在轻量聊天限时内返回结果。我已经结束本轮，避免手机一直等待；你可以继续发消息，或直接说要进入开发流程检查原因。"
-    };
-    let _ = tx.send(
-        WsMessage::Done {
-            message: message.into(),
-            apk_url: None,
-            image_url: None,
-        }
-        .to_json(),
-    );
-    Ok(())
 }
 
 fn cli_args_for_run(option: &AiCliOption, native_session_id: Option<&str>) -> Vec<String> {
