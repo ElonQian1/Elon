@@ -208,7 +208,8 @@ internal fun toolEvidenceKind(tool: String): String {
         "read_file", "list_dir" -> "file"
         "write_file", "init_project" -> "edit"
         "build_project" -> "build"
-        "run_shell", "git_commit" -> "command"
+        "run_shell", "shell", "git_commit" -> "command"
+        "file_change" -> "edit"
         else -> "progress"
     }
 }
@@ -410,6 +411,9 @@ internal fun genericFoldedCliLogSummary(categories: Map<String, Int> = emptyMap(
 
 internal fun extractUserVisibleCliMessage(line: String): String? {
     val trimmed = line.trim()
+        .removePrefix("AI 回复片段：")
+        .removePrefix("AI 回复片段:")
+        .trim()
     val marker = when {
         trimmed.startsWith("用户可见：") -> "用户可见："
         trimmed.startsWith("用户可见:") -> "用户可见:"

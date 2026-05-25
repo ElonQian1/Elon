@@ -2,6 +2,7 @@ package com.elon.app
 
 internal fun progressStepLabel(content: String): String {
     return when {
+        content.startsWith("AI 回复片段") -> "开发说明"
         content.startsWith("CLI 工作区") -> "准备项目"
         content.startsWith("项目环境已准备好") -> "准备项目"
         content.startsWith("环境提醒") -> "环境检查"
@@ -30,7 +31,10 @@ internal fun workflowProgressMessage(content: String): String {
 }
 
 internal fun userFacingProgress(content: String): String {
+    extractUserVisibleCliMessage(content)?.let { return it }
     return when {
+        content.startsWith("AI 回复片段") ->
+            "开发助手正在给出阶段说明。"
         content.contains("已识别为开发任务") ->
             "已确认这是开发任务，开始进入项目流程。"
         content.contains("正在确认这是否需要进入开发流程") ->
@@ -87,6 +91,8 @@ internal fun toolLabel(tool: String): String = when (tool) {
     "write_file" -> "写入代码"
     "list_dir" -> "查看目录"
     "run_shell" -> "执行命令"
+    "shell" -> "执行命令"
+    "file_change" -> "修改文件"
     "git_commit" -> "保存版本"
     "build_project" -> "编译项目"
     else -> tool

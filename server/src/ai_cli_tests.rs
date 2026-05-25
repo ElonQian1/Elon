@@ -158,7 +158,8 @@ fn resumed_development_prompt_reuses_bootstrap_rules() {
 
     assert!(prompt.contains("full development workflow was already injected"));
     assert!(prompt.contains("git status is clean"));
-    assert!(!prompt.contains("开始执行前"));
+    assert!(prompt.contains("用户可见："));
+    assert!(prompt.contains("new judgment"));
 }
 
 #[test]

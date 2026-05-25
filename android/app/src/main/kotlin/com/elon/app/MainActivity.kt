@@ -94,7 +94,6 @@ class MainActivity : AppCompatActivity() {
     private val foldedCliLogCategories = linkedMapOf<String, Int>()
     private val currentEvidenceEntries = mutableListOf<EvidenceEntry>()
     private val emittedProgressSignals = linkedSetOf<String>()
-    private var visibleAssistantUpdateCount = 0
     private var serverResponseToken = 0
     private var appInForeground = false
     private var pendingRequestPayload: String? = null
@@ -372,7 +371,6 @@ class MainActivity : AppCompatActivity() {
         resetFoldedCliLog()
         currentEvidenceEntries.clear()
         emittedProgressSignals.clear()
-        visibleAssistantUpdateCount = 0
         if (requestIsDevelopment) {
             updateProjectTitleFromRequest(visibleText)
             saveProjectTitle()
@@ -2189,8 +2187,10 @@ class MainActivity : AppCompatActivity() {
             )
             "progress" -> {
                 val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: return
-                if (!shouldShowProgressBubble(content)) return
-                ChatMessage("ai-progress", workflowProgressMessage(content))
+                val narrative = CodexProgressNarrative.fromWorkflowProgress(content)
+                if (narrative == null && !shouldShowProgressBubble(content)) return
+                narrative?.message
+                    ?: ChatMessage("ai-progress", workflowProgressMessage(content))
             }
             else -> return
         }
@@ -4056,83 +4056,34 @@ class MainActivity : AppCompatActivity() {
 
     private fun maybeAppendVisibleCliSignal(category: String, line: String) {
         if (!activeRequestIsDevelopment) return
-        if (category != "模型回复") return
-        val signal = visibleCliSignal(category, line) ?: return
-        val (key, message) = signal
-        if (!emittedProgressSignals.add(key)) return
+        val narrative = CodexProgressNarrative.fromCliOutput(category, line) ?: return
+        appendProgressNarrative(narrative)
+    }
+
+    private fun maybeAppendWorkflowProgressNarrative(content: String): Boolean {
+        if (!activeRequestIsDevelopment) return false
+        val narrative = CodexProgressNarrative.fromWorkflowProgress(content) ?: return false
+        return appendProgressNarrative(narrative)
+    }
+
+    private fun maybeAppendTaskEventNarrative(event: String, content: String): Boolean {
+        if (!activeRequestIsDevelopment) return false
+        val narrative = CodexProgressNarrative.fromTaskEvent(event, content) ?: return false
+        return appendProgressNarrative(narrative)
+    }
+
+    private fun maybeAppendToolCallNarrative(tool: String): Boolean {
+        if (!activeRequestIsDevelopment) return false
+        val narrative = CodexProgressNarrative.fromToolCall(tool) ?: return false
+        return appendProgressNarrative(narrative)
+    }
+
+    private fun appendProgressNarrative(narrative: CodexProgressNarrative.Narrative): Boolean {
+        if (!emittedProgressSignals.add(narrative.key)) return false
         finalizeEvidenceForLatestAssistant()
-        visibleAssistantUpdateCount += 1
-        appendMessage(ChatMessage("ai-intent", message))
+        appendMessage(narrative.message)
         attachEvidenceToLatestAi()
-    }
-
-    private fun visibleCliSignal(category: String, line: String): Pair<String, String>? {
-        val lower = line.lowercase(Locale.CHINA)
-        val clean = userSafeCliLine(line)
-        return when (category) {
-            "模型回复" -> {
-                val userVisible = extractUserVisibleCliMessage(clean) ?: return null
-                if (!shouldExposeAssistantCliLine(userVisible)) return null
-                "assistant:${userVisible.take(64)}" to userVisible
-            }
-            "编译打包" -> when {
-                lower.contains("build successful") ->
-                    "build_success" to "编译结果：APK 构建通过，正在查找可安装文件。"
-                lower.contains("build failed") ->
-                    "build_failed" to "编译结果：打包失败。我会先根据失败原因继续修复。"
-                lower.contains("exception") || lower.contains("error") || lower.contains("failed") ->
-                    "build_issue:${clean.take(48)}" to "编译遇到问题：$clean\n我会优先判断是代码、依赖还是构建配置导致。"
-                lower.contains("assemble") || lower.contains("gradle") || line.contains("APK") ->
-                    "build_started" to "正在进入 APK 编译检查。接下来会看构建是否能通过，以及失败点是否需要继续修。"
-                else -> null
-            }
-            "环境提示" -> when {
-                lower.contains("java") ->
-                    "env_java" to "环境检查：服务器 Java 环境可能影响打包，我会先确认它是不是本次失败原因。"
-                lower.contains("android sdk") || line.contains("Android SDK") ->
-                    "env_android_sdk" to "环境检查：Android SDK 配置可能影响 APK 构建，我会优先确认构建环境。"
-                lower.contains("gradle") ->
-                    "env_gradle" to "环境检查：Gradle 构建环境有提示，我会判断它是否需要修复。"
-                else -> null
-            }
-            else -> null
-        }
-    }
-
-    private fun shouldExposeAssistantCliLine(line: String): Boolean {
-        if (visibleAssistantUpdateCount >= 3) return false
-        if (!shouldKeepCliSample(line)) return false
-        if (line.length !in 10..260) return false
-        val lower = line.lowercase(Locale.CHINA)
-        val finalLike = listOf(
-            "已完成",
-            "完成了",
-            "apk 已生成",
-            "下载链接",
-            "本轮",
-            "验证结果",
-            "改动："
-        )
-        if (finalLike.any { lower.contains(it) }) return false
-        val technical = listOf(
-            "```",
-            "/root/",
-            "/home/",
-            "http://",
-            "https://",
-            "build.gradle",
-            "androidmanifest",
-            ".kt",
-            ".xml",
-            "gradle",
-            "assemble",
-            "tokens used",
-            "不要使用固定模板",
-            "不要提",
-            "cli/后台/工作区",
-            "工作区"
-        )
-        return technical.none { lower.contains(it) }
+        return true
     }
 
     private fun compactCliProjectEvents(events: MutableList<String>) {
@@ -4185,6 +4136,7 @@ class MainActivity : AppCompatActivity() {
                     val taskId = jsonStringOrNull(json, "task_id")
                     val content = jsonStringOrNull(json, "message").orEmpty()
                     handleTaskEvent(event, taskId, content)
+                    if (maybeAppendTaskEventNarrative(event, content)) return
                     if (event == "accepted" && shouldShowProgressBubble(content)) {
                         ChatMessage("ai-progress", workflowProgressMessage(content))
                     } else {
@@ -4197,7 +4149,9 @@ class MainActivity : AppCompatActivity() {
                         handleFoldedCliOutput(content)
                         return
                     }
+                    val surfaced = maybeAppendWorkflowProgressNarrative(content)
                     handleProgress(content)
+                    if (surfaced) return
                     if (shouldShowProgressBubble(content)) {
                         ChatMessage("ai-progress", workflowProgressMessage(content))
                     } else {
@@ -4206,6 +4160,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 "tool_call"   -> {
                     val tool = jsonStringOrNull(json, "tool") ?: "工具"
+                    maybeAppendToolCallNarrative(tool)
                     handleToolCall(tool)
                     return
                 }

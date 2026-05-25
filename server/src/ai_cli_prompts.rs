@@ -296,6 +296,8 @@ The full development workflow was already injected earlier in this session. Keep
 - Preserve unrelated user/AI changes, verify work, commit and push when appropriate.
 - Server/APK release work must build locally and upload artifacts as documented by the project.
 - Shared actions such as merge/main pushes, version bumps, APK release, and server deploy remain serialized.
+- At the beginning of this turn, still give the user 1-2 short natural Chinese sentences prefixed with 「用户可见：」 that state the concrete intent you understood and what you will check or modify first.
+- During execution, add another 「用户可见：」 sentence only when you have a new judgment, blocker, build failure reason, or next-step tradeoff. Do not expose command logs or file lists in these user-facing lines.
 
 User request:
 {user_message}"#,
