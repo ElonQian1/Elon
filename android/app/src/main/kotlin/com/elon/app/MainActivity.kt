@@ -1107,7 +1107,7 @@ class MainActivity : AppCompatActivity() {
 
         fun select(tab: TextView) {
             tabs.forEach {
-                it.setTextColor(Color.parseColor(if (it == tab) "#D0D0D0" else "#A5A5A5"))
+                it.setTextColor(Color.parseColor(if (it == tab) "#07C160" else "#A5A5A5"))
                 it.textSize = if (it == tab) 12f else 11f
             }
             binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
