@@ -288,17 +288,37 @@ function Invoke-GradleReleaseBuild {
     }
 }
 
-function Push-HeadToMain {
-    git -C $RepoRoot push origin HEAD:main
-    if ($LASTEXITCODE -eq 0) { return }
+function Test-RemoteAdvanceSafeForApk {
+    param([string]$BaseSha)
+    # 检查 BaseSha..origin/main 区间是否只动了非 Android 文件；如是则 APK 不受影响，可安全 rebase。
+    git -C $RepoRoot fetch origin main 2>$null | Out-Null
+    $changed = git -C $RepoRoot diff --name-only "$BaseSha..origin/main" 2>$null
+    if (-not $changed) { return $true }
+    foreach ($p in $changed) {
+        if ($p -match '^android/' -or $p -match '^scripts/publish-apk') { return $false }
+    }
+    return $true
+}
 
-    Write-Error @"
-git push 被拒绝。APK 已经按旧 HEAD 编译，脚本不会 rebase 后继续上传旧产物。
-请同步最新 main 后重新运行：
-  git fetch origin main
-  git rebase origin/main
-  scripts\publish-apk.ps1 -Changelog "$Changelog"
-"@
+function Push-HeadToMain {
+    for ($i = 1; $i -le 4; $i++) {
+        git -C $RepoRoot push origin HEAD:main
+        if ($LASTEXITCODE -eq 0) { return }
+        Write-Host "   ⚠️  git push 被拒绝（第 $i 次），尝试 rebase 最新 origin/main 后重推..." -ForegroundColor Yellow
+        git -C $RepoRoot fetch origin main | Out-Null
+        $base = git -C $RepoRoot merge-base HEAD origin/main
+        if (-not (Test-RemoteAdvanceSafeForApk -BaseSha $base)) {
+            Write-Error "远端 origin/main 自基线后包含 Android 改动，rebase 不安全，请人工同步后重发。"
+            return
+        }
+        git -C $RepoRoot rebase origin/main
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "自动 rebase 失败，请人工解决冲突后重发。"
+            return
+        }
+        Start-Sleep -Seconds 2
+    }
+    Write-Error "连续 4 次推送均被拒绝，放弃自动重试。"
 }
 
 function Assert-ApkStillCurrentBeforeCommit {
@@ -309,7 +329,13 @@ function Assert-ApkStillCurrentBeforeCommit {
         Stop-StaleApkRelease -Success -Message "服务器已部署更新 APK（$((Format-ShortSha $freshness.DeployedSha))），且包含本次基础提交 $((Format-ShortSha $BuildBaseSha))。本次旧构建不再提交、不再上传。"
     }
 
-    Stop-StaleApkRelease -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，本次 APK 产物已过期。已还原 build.gradle，请基于最新 main 重新运行发布脚本。"
+    # 远端有新提交，但若全部都不影响 Android/发布脚本，则 APK 仍有效，允许 commit 后自动 rebase 重推
+    if (Test-RemoteAdvanceSafeForApk -BaseSha $BuildBaseSha) {
+        Write-Host "   ℹ️  origin/main 前进到 $((Format-ShortSha $freshness.RemoteHead))，但新提交仅涉及非 Android 路径，本次 APK 仍可发布（commit 后自动 rebase）。" -ForegroundColor Cyan
+        return
+    }
+
+    Stop-StaleApkRelease -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，且包含 Android 改动，本次 APK 产物已过期。已还原 build.gradle，请基于最新 main 重新运行发布脚本。"
 }
 
 function Assert-ApkStillCurrentBeforeUpload {
