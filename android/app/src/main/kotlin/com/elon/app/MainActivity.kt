@@ -107,6 +107,7 @@ class MainActivity : AppCompatActivity() {
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
+    private var sendEnabledActions: MainSendEnabledActions? = null
     private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
     private var voiceModeActions: MainVoiceModeActions? = null
     private var inputFocusActions: MainInputFocusActions? = null
@@ -2011,30 +2012,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setSendEnabled(enabled: Boolean) {
-        val conversationEnded = activeConversation().ended
-        val canSend = enabled && !conversationEnded
-        inputCanSend = canSend
-        binding.inputEdit.isEnabled = !conversationEnded
-        binding.inputEdit.hint = if (conversationEnded) "会话已结束，请新建会话继续" else "文本内容在此输入。"
-        if (::inputModeButton.isInitialized) {
-            inputModeButton.isEnabled = !conversationEnded
-            inputModeButton.alpha = if (conversationEnded) 0.55f else 1f
-        }
-        if (::voiceHoldButton.isInitialized) {
-            voiceHoldButton.isEnabled = !conversationEnded
-            voiceHoldButton.alpha = if (conversationEnded) 0.55f else 1f
-        }
-        binding.modelButton.isEnabled = !conversationEnded
-        if (::modelButtonShell.isInitialized) {
-            modelButtonShell.isEnabled = !conversationEnded
-            modelButtonShell.alpha = when {
-                conversationEnded -> 0.55f
-                ::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded -> 1f
-                else -> 0f
-            }
-        }
-        updateSendButtonVisual()
-        updateStageHintShimmer()
+        sendEnabledActions().setSendEnabled(enabled)
+    }
+
+    private fun sendEnabledActions(): MainSendEnabledActions {
+        sendEnabledActions?.let { return it }
+        return MainSendEnabledActions(
+            binding = binding,
+            activeConversation = ::activeConversation,
+            setInputCanSend = { inputCanSend = it },
+            inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
+            voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
+            modelButtonShell = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateStageHintShimmer = ::updateStageHintShimmer
+        ).also { sendEnabledActions = it }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
