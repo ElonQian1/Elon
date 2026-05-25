@@ -191,7 +191,7 @@ class MainActivity : AppCompatActivity() {
             startTaskWorkService = { action -> startTaskWorkService(action) },
             openConversation = ::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
-            sendMessage = ::sendMessage,
+            sendMessage = { sendMessageActions().sendMessage() },
             handleLaunchIntent = ::handleLaunchIntent
         ).also { createActions = it }
     }
@@ -245,10 +245,6 @@ class MainActivity : AppCompatActivity() {
         taskWorkServiceActions().setTaskAppForeground(false)
         saveProjects()
         super.onStop()
-    }
-
-    private fun sendMessage() {
-        sendMessageActions().sendMessage()
     }
 
     private fun startPreparedMessage(
@@ -379,7 +375,7 @@ class MainActivity : AppCompatActivity() {
             startSpeechToText = ::startSpeechToText,
             stopSpeechToText = ::stopSpeechToText,
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
-            sendMessage = ::sendMessage,
+            sendMessage = { sendMessageActions().sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions().toggleAttachmentPanel() },
             buildAttachmentPanel = { attachmentPanelActions().buildAttachmentPanel() },
             collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
@@ -516,7 +512,7 @@ class MainActivity : AppCompatActivity() {
             { anchor, message -> messageActions().showMessageActions(anchor, message) }
         )
         binding.chatList.adapter = chatAdapter
-        showChat()
+        navigationController().showChat()
         if (chatAdapter.itemCount > 0) {
             binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
@@ -555,7 +551,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleSendOrAttachment() {
         if (!voiceMode && (binding.inputEdit.text.toString().trim().isNotEmpty() || pendingAttachments.isNotEmpty())) {
-            sendMessage()
+            sendMessageActions().sendMessage()
         } else {
             attachmentPanelActions().toggleAttachmentPanel()
         }
@@ -664,14 +660,6 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.clearFocus()
     }
 
-    private fun showConversationHome(animate: Boolean = false) {
-        navigationController().showConversationHome(animate)
-    }
-
-    private fun showChat(animate: Boolean = false) {
-        navigationController().showChat(animate)
-    }
-
     private fun navigationController(): MainNavigationController {
         navigationController?.let { return it }
         return MainNavigationController(
@@ -760,7 +748,7 @@ class MainActivity : AppCompatActivity() {
             { anchor, message -> messageActions().showMessageActions(anchor, message) }
         )
         binding.chatList.adapter = chatAdapter
-        showChat(animate = true)
+        navigationController().showChat(animate = true)
         if (chatAdapter.itemCount > 0) {
             binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
@@ -1243,8 +1231,8 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             activeConversation = ::activeConversation,
             showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
-            showChat = { showChat() },
-            sendMessage = ::sendMessage
+            showChat = { navigationController().showChat() },
+            sendMessage = { sendMessageActions().sendMessage() }
         ).also { quickCommandActions = it }
     }
 
@@ -1261,7 +1249,7 @@ class MainActivity : AppCompatActivity() {
             chatAdapter = { chatAdapter },
             saveConversations = ::saveConversations,
             renderConversationList = ::renderConversationList,
-            showChat = { showChat() },
+            showChat = { navigationController().showChat() },
             showMessageActionPopup = { anchor, message, text ->
                 actionPopups().showMessageActionPopup(anchor, message, text)
             },
@@ -1404,22 +1392,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleProgress(content: String, recordProgressEvidence: Boolean = true) {
-        workflowStageActions().handleProgress(content, recordProgressEvidence)
-    }
-
-    private fun handleTaskEvent(event: String, taskId: String?, content: String) {
-        workflowStageActions().handleTaskEvent(event, taskId, content)
-    }
-
-    private fun handleToolCall(tool: String) {
-        workflowStageActions().handleToolCall(tool)
-    }
-
     private fun assistantStreamEvents(): MainAssistantStreamEvents {
         assistantStreamEvents?.let { return it }
         return MainAssistantStreamEvents(
-            handleTaskEvent = ::handleTaskEvent,
+            handleTaskEvent = { event, taskId, content ->
+                workflowStageActions().handleTaskEvent(event, taskId, content)
+            },
             maybeAppendTaskEventNarrative = { event, content ->
                 progressNarrativeActions().maybeAppendTaskEventNarrative(event, content)
             },
@@ -1429,9 +1407,11 @@ class MainActivity : AppCompatActivity() {
             maybeAppendToolCallNarrative = { tool ->
                 progressNarrativeActions().maybeAppendToolCallNarrative(tool)
             },
-            handleProgress = ::handleProgress,
+            handleProgress = { content, recordProgressEvidence ->
+                workflowStageActions().handleProgress(content, recordProgressEvidence)
+            },
             handleFoldedCliOutput = { content -> foldedCliLogActions().handleFoldedCliOutput(content) },
-            markToolCallStarted = ::handleToolCall,
+            markToolCallStarted = { tool -> workflowStageActions().handleToolCall(tool) },
             appendToolCallBubble = { tool, args -> toolActionBubbles().appendToolCallBubble(tool, args) },
             markToolResultDone = { toolActionBubbles().markToolResultDone(it) },
             markToolResult = { workflowStageActions().markToolResult(it) },
