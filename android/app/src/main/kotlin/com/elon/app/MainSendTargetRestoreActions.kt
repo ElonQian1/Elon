@@ -10,6 +10,7 @@ internal class MainSendTargetRestoreActions(
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val pauseCurrentWork: () -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val showChat: () -> Unit
 ) {
     fun restoreSendTarget(target: SendTarget): Boolean {
@@ -24,7 +25,8 @@ internal class MainSendTargetRestoreActions(
         val adapter = ChatAdapter(
             project.conversations[conversationIndex].messages,
             pauseCurrentWork,
-            showMessageActions
+            showMessageActions,
+            retryFailedAttachmentMessage
         )
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter

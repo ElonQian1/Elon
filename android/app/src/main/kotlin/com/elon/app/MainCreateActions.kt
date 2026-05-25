@@ -20,6 +20,7 @@ internal class MainCreateActions(
     private val activeConversation: () -> AppConversation,
     private val pauseCurrentWork: () -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val setupNavigation: () -> Unit,
     private val setupQuickActions: () -> Unit,
@@ -43,7 +44,7 @@ internal class MainCreateActions(
         setupTaskCompletionAlerts(activity, prefs, notificationPermissionRequest)
         loadProjects()
         setupAttachmentLaunchers()
-        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions)
+        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
         setupNavigation()

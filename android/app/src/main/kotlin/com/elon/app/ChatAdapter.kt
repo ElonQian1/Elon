@@ -31,7 +31,8 @@ data class ChatMessage(
 class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
     private val onPauseWork: (() -> Unit)? = null,
-    private val onMessageLongPress: ((View, ChatMessage) -> Unit)? = null
+    private val onMessageLongPress: ((View, ChatMessage) -> Unit)? = null,
+    private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null
 ) :
     RecyclerView.Adapter<ChatAdapter.VH>() {
 
@@ -116,8 +117,23 @@ class ChatAdapter(
     private fun bindSendStatus(holder: VH, message: ChatMessage) {
         val status = holder.status ?: return
         val text = message.sendStatus?.takeIf { it.isNotBlank() }
+        val canRetry = message.canRetryFailedAttachmentSend()
         status.visibility = if (text == null) View.GONE else View.VISIBLE
-        status.text = text.orEmpty()
+        status.text = if (canRetry) "发送失败，点此重试" else text.orEmpty()
+        status.setTextColor(Color.parseColor(if (canRetry) "#C62828" else "#66111111"))
+        status.isClickable = canRetry
+        status.isFocusable = canRetry
+        status.setOnClickListener(
+            if (canRetry) {
+                View.OnClickListener {
+                    val position = holder.adapterPosition
+                    val current = messages.getOrNull(position) ?: message
+                    if (current.canRetryFailedAttachmentSend()) onRetryFailedSend?.invoke(current)
+                }
+            } else {
+                null
+            }
+        )
     }
 
     override fun getItemCount() = messages.size
@@ -318,4 +334,10 @@ class ChatAdapter(
         val terminalRoles = setOf("ai", "ai-intent", "error")
         val evidenceBubbleRoles = setOf("ai", "ai-intent")
     }
+}
+
+private fun ChatMessage.canRetryFailedAttachmentSend(): Boolean {
+    return role == "user" &&
+        !attachments.isNullOrEmpty() &&
+        sendStatus.orEmpty().contains("失败")
 }

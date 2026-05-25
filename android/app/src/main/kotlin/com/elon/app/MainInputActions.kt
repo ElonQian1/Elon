@@ -1,6 +1,7 @@
 package com.elon.app
 
 import androidx.appcompat.app.AppCompatActivity
+import android.widget.Toast
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 
@@ -151,6 +152,7 @@ internal class MainInputActions(
             setChatAdapter = setChatAdapter,
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
+            retryFailedAttachmentMessage = ::retryFailedAttachmentMessage,
             showChat = { navigationController().showChat() }
         )
     }
@@ -258,5 +260,22 @@ internal class MainInputActions(
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateStageHintShimmer = { stageHintShimmer().update() }
         )
+    }
+
+    fun retryFailedAttachmentMessage(message: ChatMessage) {
+        if (conversationTaskRegistryActions().isActiveConversationWorking()) {
+            Toast.makeText(activity, "当前会话正在执行，完成后再重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val project = projectStateActions().activeProject()
+        val conversation = projectStateActions().activeConversation()
+        if (conversation.ended) {
+            Toast.makeText(activity, "这个会话已结束，请新建会话继续", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val visibleText = message.content.trim().ifBlank { "请看这张图片。" }
+        val outgoingText = expandShortDevelopmentCommand(visibleText, conversation.messages)
+        val target = SendTarget(project.id, project.title, conversation.id, conversation.title)
+        attachmentSendActions.retryFailedAttachmentMessage(message, visibleText, outgoingText, target)
     }
 }

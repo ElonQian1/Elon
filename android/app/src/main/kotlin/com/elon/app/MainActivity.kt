@@ -138,6 +138,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             setChatAdapter = { chatAdapter = it },
             setupNavigation = { navigationController.setupNavigation() },
             setupQuickActions = { profileQuickActions.setupQuickActions() },
@@ -385,6 +386,7 @@ class MainActivity : AppCompatActivity() {
             setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
             saveProjects = projectStateActions::saveProjects
         )

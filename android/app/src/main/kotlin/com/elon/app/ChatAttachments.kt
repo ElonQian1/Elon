@@ -2,6 +2,7 @@ package com.elon.app
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import java.io.File
 
 data class ChatAttachment(
     val kind: String? = null,
@@ -48,6 +49,28 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
             mimeType = attachment.mimeType,
             localPath = attachment.file.absolutePath,
             sizeBytes = attachment.file.length(),
+            imageWidth = attachment.imageWidth,
+            imageHeight = attachment.imageHeight
+        )
+    }
+}
+
+internal fun pendingAttachmentsFromChatAttachments(attachments: List<ChatAttachment>): List<PendingAttachment> {
+    return attachments.mapNotNull { attachment ->
+        val localPath = attachment.localPath?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+        val file = File(localPath)
+        if (!file.isFile) return@mapNotNull null
+        val fileName = attachment.fileName?.trim()?.takeIf { it.isNotEmpty() } ?: file.name
+        val mimeType = attachment.mimeType?.trim()?.takeIf { it.isNotEmpty() } ?: guessMimeType(fileName)
+        val kind = attachment.kind?.trim()?.takeIf { it.isNotEmpty() }
+            ?: if (mimeType.startsWith("image/")) "image" else "file"
+        PendingAttachment(
+            kind = kind,
+            displayLabel = if (kind == "image" || mimeType.startsWith("image/")) "图片" else "附件",
+            displayName = attachment.displayName?.trim()?.takeIf { it.isNotEmpty() } ?: fileName,
+            fileName = fileName,
+            mimeType = mimeType,
+            file = file,
             imageWidth = attachment.imageWidth,
             imageHeight = attachment.imageHeight
         )

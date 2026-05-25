@@ -14,6 +14,7 @@ internal class MainConversationOpenActions(
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val pauseCurrentWork: () -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val showChat: (Boolean) -> Unit,
     private val saveProjects: () -> Unit
 ) {
@@ -21,7 +22,7 @@ internal class MainConversationOpenActions(
         val currentConversations = conversations()
         if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
         setActiveConversationIndex(index.coerceIn(0, currentConversations.lastIndex))
-        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions)
+        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
         showChat(true)

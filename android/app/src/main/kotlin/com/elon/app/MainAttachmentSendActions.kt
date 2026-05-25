@@ -17,19 +17,63 @@ internal class MainAttachmentSendActions(
     private val startPreparedMessageAfterUserBubble: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit
 ) {
     fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
-        val attachments = pendingAttachments()
-        setSendEnabled(false)
-        val optimisticMessage = ChatMessage(
-            role = "user",
-            content = visibleText,
-            attachments = chatAttachmentsFromPending(attachments).takeIf { it.isNotEmpty() },
-            sendStatus = "发送中..."
+        uploadPreparedAttachments(
+            visibleText = visibleText,
+            outgoingText = outgoingText,
+            target = target,
+            attachments = pendingAttachments(),
+            existingMessage = null
         )
-        appendMessage(optimisticMessage)
+    }
+
+    fun retryFailedAttachmentMessage(
+        message: ChatMessage,
+        visibleText: String,
+        outgoingText: String,
+        target: SendTarget
+    ) {
+        val attachments = pendingAttachmentsFromChatAttachments(message.attachments.orEmpty())
+        if (attachments.isEmpty()) {
+            message.sendStatus = "原图已失效，请重新选择"
+            updateMessage(message)
+            Toast.makeText(activity, "原图已失效，请重新选择图片", Toast.LENGTH_SHORT).show()
+            return
+        }
+        uploadPreparedAttachments(
+            visibleText = visibleText,
+            outgoingText = outgoingText,
+            target = target,
+            attachments = attachments,
+            existingMessage = message
+        )
+    }
+
+    private fun uploadPreparedAttachments(
+        visibleText: String,
+        outgoingText: String,
+        target: SendTarget,
+        attachments: List<PendingAttachment>,
+        existingMessage: ChatMessage?
+    ) {
+        setSendEnabled(false)
+        val optimisticMessage = existingMessage ?: ChatMessage(role = "user", content = visibleText)
+        optimisticMessage.content = visibleText
+        optimisticMessage.attachments = chatAttachmentsFromPending(attachments).takeIf { it.isNotEmpty() }
+        optimisticMessage.sendStatus = "发送中..."
+        if (existingMessage == null) {
+            appendMessage(optimisticMessage)
+        } else {
+            updateMessage(optimisticMessage)
+        }
         val updateUploadStatus = uploadStatusUpdater(optimisticMessage)
         DebugTraceStore.record(
             "ui_attachment_upload_start",
-            mapOf("project_id" to target.projectId, "conversation_id" to target.conversationId, "count" to attachments.size)
+            mapOf(
+                "project_id" to target.projectId,
+                "conversation_id" to target.conversationId,
+                "count" to attachments.size,
+                "retry" to (existingMessage != null)
+            )
         )
         Thread {
             val startedAt = System.currentTimeMillis()
@@ -52,7 +96,7 @@ internal class MainAttachmentSendActions(
             )
             activity.runOnUiThread {
                 if (refs == null) {
-                    optimisticMessage.sendStatus = "发送失败，请重新发送"
+                    optimisticMessage.sendStatus = "发送失败，点此重试"
                     updateMessage(optimisticMessage)
                     setSendEnabled(true)
                     return@runOnUiThread
