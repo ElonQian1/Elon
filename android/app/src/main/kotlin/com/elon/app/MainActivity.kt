@@ -26,18 +26,13 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var codexPrewarm: MainCodexPrewarm? = null
     private var externalActions: MainExternalActions? = null
     private var attachmentPanelActions: MainAttachmentPanelActions? = null
+    private var attachmentPickerActions: MainAttachmentPickerActions? = null
     private var attachmentSendActions: MainAttachmentSendActions? = null
     private var workflowStageActions: MainWorkflowStageActions? = null
     private var evidenceActions: MainEvidenceActions? = null
@@ -138,11 +134,6 @@ class MainActivity : AppCompatActivity() {
     private var speechInputActions: MainSpeechInputActions? = null
     private val speechPermissionRequest = 4301
     private val notificationPermissionRequest = 4302
-    private lateinit var cameraAttachmentLauncher: ActivityResultLauncher<Uri>
-    private lateinit var photoAttachmentLauncher: ActivityResultLauncher<PickVisualMediaRequest>
-    private lateinit var documentAttachmentLauncher: ActivityResultLauncher<Array<String>>
-    private var pendingCameraUri: Uri? = null
-    private var pendingCameraName: String? = null
     private val pendingAttachments = mutableListOf<PendingAttachment>()
     private val taskWorkReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -541,34 +532,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupAttachmentLaunchers() {
-        cameraAttachmentLauncher = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-            val uri = pendingCameraUri
-            val name = pendingCameraName
-            pendingCameraUri = null
-            pendingCameraName = null
-            if (success && uri != null) {
-                attachPickedFile("相机照片", uri, name)
-            } else {
-                Toast.makeText(this, "已取消拍摄", Toast.LENGTH_SHORT).show()
-            }
-        }
-        photoAttachmentLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                attachPickedFile("相册图片", uri)
-            } else {
-                Toast.makeText(this, "已取消选择相册", Toast.LENGTH_SHORT).show()
-            }
-        }
-        documentAttachmentLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                runCatching {
-                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                attachPickedFile("文档", uri)
-            } else {
-                Toast.makeText(this, "已取消选择文档", Toast.LENGTH_SHORT).show()
-            }
-        }
+        attachmentPickerActions().setupAttachmentLaunchers()
     }
 
     private fun buildAttachmentPanel(): LinearLayout {
@@ -583,40 +547,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openCameraAttachment() {
-        if (activeConversation().ended) return
-        val attachmentDir = File(cacheDir, "attachments").apply { mkdirs() }
-        val fileName = "camera_${System.currentTimeMillis()}.jpg"
-        val file = File(attachmentDir, fileName)
-        val uri = FileProvider.getUriForFile(this, "com.elon.app.fileprovider", file)
-        pendingCameraUri = uri
-        pendingCameraName = fileName
-        runCatching {
-            cameraAttachmentLauncher.launch(uri)
-        }.onFailure {
-            pendingCameraUri = null
-            pendingCameraName = null
-            Toast.makeText(this, "无法打开相机", Toast.LENGTH_SHORT).show()
-        }
+        attachmentPickerActions().openCameraAttachment()
     }
 
     private fun openPhotoAttachment() {
-        if (activeConversation().ended) return
-        runCatching {
-            photoAttachmentLauncher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-            )
-        }.onFailure {
-            Toast.makeText(this, "无法打开相册", Toast.LENGTH_SHORT).show()
-        }
+        attachmentPickerActions().openPhotoAttachment()
     }
 
     private fun openDocumentAttachment() {
-        if (activeConversation().ended) return
-        runCatching {
-            documentAttachmentLauncher.launch(arrayOf("*/*"))
-        }.onFailure {
-            Toast.makeText(this, "无法打开文档选择器", Toast.LENGTH_SHORT).show()
-        }
+        attachmentPickerActions().openDocumentAttachment()
+    }
+
+    private fun attachmentPickerActions(): MainAttachmentPickerActions {
+        attachmentPickerActions?.let { return it }
+        return MainAttachmentPickerActions(
+            activity = this,
+            activeConversation = ::activeConversation,
+            attachPickedFile = ::attachPickedFile
+        ).also { attachmentPickerActions = it }
     }
 
     private fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
