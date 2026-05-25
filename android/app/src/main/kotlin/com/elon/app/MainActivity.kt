@@ -374,8 +374,8 @@ class MainActivity : AppCompatActivity() {
             isAttachmentPanelOpen = { attachmentPanelActions().isOpen },
             toggleVoiceMode = ::toggleVoiceMode,
             focusInputComposer = ::focusInputComposer,
-            startSpeechToText = ::startSpeechToText,
-            stopSpeechToText = ::stopSpeechToText,
+            startSpeechToText = { speechInputActions().startSpeechToText() },
+            stopSpeechToText = { speechInputActions().stopSpeechToText() },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             sendMessage = { sendMessageActions().sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions().toggleAttachmentPanel() },
@@ -570,21 +570,13 @@ class MainActivity : AppCompatActivity() {
             dp = ::dp,
             selectableForeground = ::selectableForeground,
             activeConversation = ::activeConversation,
-            attachmentPanel = ::attachmentPanelOrNull,
-            attachmentButton = ::attachmentButtonOrNull,
+            attachmentPanel = { if (::attachmentPanel.isInitialized) attachmentPanel else null },
+            attachmentButton = { if (::attachmentButton.isInitialized) attachmentButton else null },
             collapseInputComposer = { collapseInputComposer() },
             openCameraAttachment = { attachmentPickerActions().openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions().openPhotoAttachment() },
             openDocumentAttachment = { attachmentPickerActions().openDocumentAttachment() }
         ).also { attachmentPanelActions = it }
-    }
-
-    private fun attachmentPanelOrNull(): LinearLayout? {
-        return if (::attachmentPanel.isInitialized) attachmentPanel else null
-    }
-
-    private fun attachmentButtonOrNull(): ImageButton? {
-        return if (::attachmentButton.isInitialized) attachmentButton else null
     }
 
     private fun toggleVoiceMode() {
@@ -633,14 +625,6 @@ class MainActivity : AppCompatActivity() {
             inputCanSend = { inputCanSend },
             activeConversation = ::activeConversation
         ).also { sendButtonVisualActions = it }
-    }
-
-    private fun startSpeechToText() {
-        speechInputActions().startSpeechToText()
-    }
-
-    private fun stopSpeechToText() {
-        speechInputActions().stopSpeechToText()
     }
 
     private fun speechInputActions(): MainSpeechInputActions {
@@ -725,22 +709,14 @@ class MainActivity : AppCompatActivity() {
             http = http,
             serverUrl = serverUrl,
             userIdProvider = { userId },
-            modelButtonShellProvider = ::modelButtonShellOrNull,
-            inputBarContainerProvider = ::inputBarContainerOrNull,
+            modelButtonShellProvider = { if (::modelButtonShell.isInitialized) modelButtonShell else null },
+            inputBarContainerProvider = { if (::inputBarContainer.isInitialized) inputBarContainer else null },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions().openSettings() },
             dp = ::dp,
             selectableForeground = ::selectableForeground
         ).also { modelActions = it }
-    }
-
-    private fun modelButtonShellOrNull(): FrameLayout? {
-        return if (::modelButtonShell.isInitialized) modelButtonShell else null
-    }
-
-    private fun inputBarContainerOrNull(): LinearLayout? {
-        return if (::inputBarContainer.isInitialized) inputBarContainer else null
     }
 
     private fun openConversation(index: Int) {
@@ -1077,7 +1053,7 @@ class MainActivity : AppCompatActivity() {
             timeFormatter = timeFormatter,
             activeProjectIndexProvider = { activeProjectIndex },
             openProject = ::openProject,
-            showProjectActions = ::showProjectActions,
+            showProjectActions = { index -> projectActions().showProjectActions(index) },
             openConversation = ::openConversation,
             showConversationActions = { index -> conversationActions().showConversationActions(index) },
             dp = ::dp,
