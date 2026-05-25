@@ -3373,15 +3373,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
         val actions = listOf(
-            TopAction("复制", R.drawable.ic_msg_copy) { copyMessageText(text) },
-            TopAction("转发", R.drawable.ic_msg_forward) { forwardMessageText(text) },
-            TopAction("收藏", R.drawable.ic_msg_favorite) { toastMessageAction("已收藏") },
+            TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) },
+            TopAction("转发", R.drawable.ic_msg_forward) { shareActions().forwardMessageText(text) },
+            TopAction("收藏", R.drawable.ic_msg_favorite) { shareActions().toastMessageAction("已收藏") },
             TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) },
-            TopAction("多选", R.drawable.ic_msg_multi) { toastMessageAction("多选准备中") },
+            TopAction("多选", R.drawable.ic_msg_multi) { shareActions().toastMessageAction("多选准备中") },
             TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) },
-            TopAction("提醒", R.drawable.ic_msg_remind) { toastMessageAction("提醒准备中") },
-            TopAction("搜一搜", R.drawable.ic_msg_search) { searchMessageText(text) },
-            TopAction("从当前听", R.drawable.ic_msg_listen) { toastMessageAction("从当前听准备中") }
+            TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") },
+            TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) },
+            TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") }
         )
         actionPopup = popupRenderer().showMessageActionPopup(anchor, actionPopup, actions)
     }
@@ -3402,64 +3402,12 @@ class MainActivity : AppCompatActivity() {
         binding.inputEdit.setSelection(binding.inputEdit.text.length)
     }
 
-    private fun searchMessageText(text: String) {
-        Toast.makeText(this, "搜一搜：${summarize(text, 12)}", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun toastMessageAction(text: String) {
-        Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun copyMessageText(text: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("一龙聊天内容", text))
-        Toast.makeText(this, "已复制", Toast.LENGTH_SHORT).show()
-    }
-
     private fun showPromotionDialog() {
-        val text = promotionText(apkDownloadUrl)
-        val content = TextView(this).apply {
-            setText(text)
-            setTextIsSelectable(true)
-            setPadding(dp(22), dp(8), dp(22), dp(2))
-            setTextColor(Color.parseColor("#333333"))
-            textSize = 14f
-            setLineSpacing(dp(3).toFloat(), 1.0f)
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("分享推广")
-            .setView(content)
-            .setPositiveButton("复制推广语") { _, _ -> copyPromotionText(text) }
-            .setNeutralButton("系统分享") { _, _ -> sharePromotionText(text) }
-            .setNegativeButton("打开下载页") { _, _ -> openApkDownloadPage() }
-            .show()
+        shareActions().showPromotionDialog(apkDownloadUrl, apkDownloadPageUrl)
     }
 
-    private fun copyPromotionText(text: String) {
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("一龙推广语", text))
-        Toast.makeText(this, "推广语已复制", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun sharePromotionText(text: String) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        startActivity(Intent.createChooser(intent, "分享一龙 APK"))
-    }
-
-    private fun openApkDownloadPage() {
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(apkDownloadPageUrl)))
-    }
-
-    private fun forwardMessageText(text: String) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        startActivity(Intent.createChooser(intent, "转发聊天内容"))
+    private fun shareActions(): MainShareActions {
+        return MainShareActions(this, ::dp)
     }
 
     private fun nextWorkflowStep(label: String): String {
