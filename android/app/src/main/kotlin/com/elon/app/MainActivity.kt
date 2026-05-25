@@ -11,7 +11,6 @@ import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import com.elon.app.BuildConfig
 import com.elon.app.update.AppUpdateManager
@@ -582,8 +581,8 @@ class MainActivity : AppCompatActivity() {
     private fun voiceModeActions(): MainVoiceModeActions {
         voiceModeActions?.let { return it }
         return MainVoiceModeActions(
+            activity = this,
             binding = binding,
-            hideKeyboard = ::hideKeyboard,
             inputModeButton = { if (::inputModeButton.isInitialized) inputModeButton else null },
             voiceHoldButton = { if (::voiceHoldButton.isInitialized) voiceHoldButton else null },
             inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
@@ -628,12 +627,6 @@ class MainActivity : AppCompatActivity() {
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions().applyVoiceMode() }
         ).also { speechInputActions = it }
-    }
-
-    private fun hideKeyboard() {
-        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(binding.root.windowToken, 0)
-        binding.inputEdit.clearFocus()
     }
 
     private fun navigationController(): MainNavigationController {
