@@ -39,6 +39,7 @@ mod project_downloads;
 mod project_git;
 mod project_keys;
 mod project_mobile;
+mod project_prewarm;
 mod project_trace_events;
 mod project_task_scheduler;
 mod project_ws_job;
