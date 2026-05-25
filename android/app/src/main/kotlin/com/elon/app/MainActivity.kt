@@ -112,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var taskWorkReceiverActions: MainTaskWorkReceiverActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
+    private var sendTargetRestoreActions: MainSendTargetRestoreActions? = null
     private var sendMessageActions: MainSendMessageActions? = null
     private var serverResponseWatchdogActions: MainServerResponseWatchdogActions? = null
     private var navigationController: MainNavigationController? = null
@@ -254,7 +255,7 @@ class MainActivity : AppCompatActivity() {
         return MainPreparedMessageActions(
             activity = this,
             binding = binding,
-            restoreSendTarget = ::restoreSendTarget,
+            restoreSendTarget = { target -> sendTargetRestoreActions().restoreSendTarget(target) },
             isConversationTaskRunning = { target ->
                 val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks.containsKey(key)
@@ -489,25 +490,17 @@ class MainActivity : AppCompatActivity() {
         ).also { sendMessageActions = it }
     }
 
-    private fun restoreSendTarget(target: SendTarget): Boolean {
-        val projectIndex = projects.indexOfFirst { it.id == target.projectId }
-        if (projectIndex < 0) return false
-        val project = projects[projectIndex]
-        val conversationIndex = project.conversations.indexOfFirst { it.id == target.conversationId }
-        if (conversationIndex < 0) return false
-        activeProjectIndex = projectIndex
-        project.activeConversationIndex = conversationIndex
-        chatAdapter = ChatAdapter(
-            project.conversations[conversationIndex].messages,
-            { activeWorkControlActions().pauseCurrentWork() },
-            { anchor, message -> messageActions().showMessageActions(anchor, message) }
-        )
-        binding.chatList.adapter = chatAdapter
-        navigationController().showChat()
-        if (chatAdapter.itemCount > 0) {
-            binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
-        }
-        return true
+    private fun sendTargetRestoreActions(): MainSendTargetRestoreActions {
+        sendTargetRestoreActions?.let { return it }
+        return MainSendTargetRestoreActions(
+            binding = binding,
+            projects = projects,
+            setActiveProjectIndex = { activeProjectIndex = it },
+            setChatAdapter = { chatAdapter = it },
+            pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
+            showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
+            showChat = { navigationController().showChat() }
+        ).also { sendTargetRestoreActions = it }
     }
 
     private fun attachmentSendActions(): MainAttachmentSendActions {
