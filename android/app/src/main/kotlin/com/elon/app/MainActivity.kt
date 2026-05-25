@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var conversationTaskRegistryActions: MainConversationTaskRegistryActions? = null
     private var taskWorkServiceActions: MainTaskWorkServiceActions? = null
+    private var activeWorkControlActions: MainActiveWorkControlActions? = null
     private var projectViewActions: MainProjectViewActions? = null
     private var homeListActions: MainHomeListActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
@@ -355,79 +356,60 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pauseCurrentWork() {
-        val task = activeConversationTask() ?: return
-        val wasDevelopment = task.isDevelopment
-        removeConversationTask(task.traceId, task.projectId, task.conversationId)
-        reconnectAttempts = 0
-        persistActiveWork()
-        stopWorkingEvidenceForActiveConversation()
-        clearCurrentEvidence()
-        toolActionBubbles().clear()
-        setSendEnabled(true)
-        if (wasDevelopment) {
-            updateStage("工作暂停", "你已暂停当前任务，可以调整需求后继续发送。")
-            addProjectEvent("暂停当前工作")
-        } else {
-            updateProjectViews("当前回复已暂停，你可以继续输入新的消息。")
-        }
-        appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("你已暂停当前工作。", wasDevelopment)))
-        startTaskWorkService(TaskWorkService.ACTION_PAUSE, traceId = task.traceId)
+        activeWorkControlActions().pauseCurrentWork()
     }
 
     private fun handleActiveWorkDisconnected(task: ConversationTaskState) {
-        task.pendingReconnect = true
-        refreshActiveTaskState()
-        persistActiveWork()
-        setSendEnabled(false)
-        updateFirstConversationStatus("连接恢复中 · 回来后继续")
-        if (activeRequestIsDevelopment) {
-            updateStage(currentStage, "连接暂时断开，正在保留本轮任务并准备自动恢复。")
-            recordEvidence("connection", "连接暂时断开，正在自动恢复任务")
-        }
-
-        scheduleReconnectForActiveWork(task.traceId)
+        activeWorkControlActions().handleActiveWorkDisconnected(task)
     }
 
     private fun scheduleReconnectForActiveWork(traceId: String? = activeConversationTask()?.traceId) {
-        val task = traceId?.let { runningTraceToConversation[it] }?.let { runningConversationTasks[it] } ?: return
-        if (!task.pendingReconnect) return
-        reconnectAttempts += 1
-        val delay = (800L * reconnectAttempts).coerceAtMost(5_000L)
-        binding.root.postDelayed({
-            val current = runningTraceToConversation[traceId]?.let { runningConversationTasks[it] } ?: return@postDelayed
-            if (!current.pendingReconnect || backendConnected) return@postDelayed
-            startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING, traceId = current.traceId)
-        }, delay)
+        activeWorkControlActions().scheduleReconnectForActiveWork(traceId)
     }
 
     private fun resumePendingWorkAfterReconnect() {
-        val payload = pendingRequestPayload
-        if (payload.isNullOrBlank()) {
-            pendingReconnectForActiveWork = false
-            waitingForReply = false
-            activeRequestIsDevelopment = false
-            stopWorkingEvidenceForActiveConversation()
-            clearPersistedActiveWork()
-            setSendEnabled(true)
-            appendMessage(ChatMessage("ai-stopped", workflowStoppedMessage("连接已恢复，但没有找到可继续的请求。请重新发送一次。")))
-            return
-        }
+        activeWorkControlActions().resumePendingWorkAfterReconnect()
+    }
 
-        pendingReconnectForActiveWork = false
-        recordEvidence("connection", "连接已恢复，已自动继续上次任务")
-        if (activeRequestIsDevelopment) {
-            updateStage(currentStage, "连接已恢复，正在继续本轮开发任务。")
-            addProjectEvent("连接恢复，自动继续任务")
-        }
-
-        val responseToken = ++serverResponseToken
-        if (!startTaskWorkService(TaskWorkService.ACTION_RESUME_PENDING)) {
-            pendingReconnectForActiveWork = true
-            persistActiveWork()
-            scheduleReconnectForActiveWork()
-        } else {
-            activeConversationTask()?.let { scheduleFirstServerResponseWatchdog(it.traceId, responseToken) }
-        }
+    private fun activeWorkControlActions(): MainActiveWorkControlActions {
+        activeWorkControlActions?.let { return it }
+        return MainActiveWorkControlActions(
+            binding = binding,
+            activeConversationTask = ::activeConversationTask,
+            removeConversationTask = ::removeConversationTask,
+            resetReconnectAttempts = { reconnectAttempts = 0 },
+            incrementReconnectAttempts = {
+                reconnectAttempts += 1
+                reconnectAttempts
+            },
+            taskForTrace = { traceId ->
+                runningTraceToConversation[traceId]?.let { runningConversationTasks[it] }
+            },
+            isBackendConnected = { backendConnected },
+            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
+            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            getCurrentStage = { currentStage },
+            getPendingRequestPayload = { pendingRequestPayload },
+            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
+            setWaitingForReply = { waitingForReply = it },
+            persistActiveWork = ::persistActiveWork,
+            clearPersistedActiveWork = ::clearPersistedActiveWork,
+            refreshActiveTaskState = ::refreshActiveTaskState,
+            stopWorkingEvidenceForActiveConversation = ::stopWorkingEvidenceForActiveConversation,
+            clearCurrentEvidence = ::clearCurrentEvidence,
+            clearToolActionBubbles = { toolActionBubbles().clear() },
+            setSendEnabled = ::setSendEnabled,
+            updateFirstConversationStatus = ::updateFirstConversationStatus,
+            updateStage = ::updateStage,
+            updateProjectViews = ::updateProjectViews,
+            addProjectEvent = ::addProjectEvent,
+            recordEvidence = ::recordEvidence,
+            appendMessage = ::appendMessage,
+            workflowStoppedMessage = { reason, wasDevelopment -> workflowStoppedMessage(reason, wasDevelopment) },
+            startTaskWorkService = ::startTaskWorkService,
+            nextServerResponseToken = { ++serverResponseToken },
+            scheduleFirstServerResponseWatchdog = ::scheduleFirstServerResponseWatchdog
+        ).also { activeWorkControlActions = it }
     }
 
     private fun setupInputComposer() {
