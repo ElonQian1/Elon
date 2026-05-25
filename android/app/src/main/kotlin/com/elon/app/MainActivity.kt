@@ -145,6 +145,7 @@ class MainActivity : AppCompatActivity() {
     private var conversationHomeRowAnimator: ValueAnimator? = null
     private var exitConfirmDialog: AlertDialog? = null
     private var actionPopup: PopupWindow? = null
+    private var pageTransitionRunning = false
     private lateinit var inputModeButton: ImageButton
     private lateinit var attachmentButton: ImageButton
     private lateinit var voiceHoldButton: TextView
@@ -644,7 +645,7 @@ class MainActivity : AppCompatActivity() {
             isClickable = true
             isFocusable = true
             contentDescription = "选择模型：$currentModelLabel"
-            setOnClickListener { showModelDialog() }
+            setOnClickListener { showModelPopupOrLoad() }
         }
 
         modelButton.apply {
@@ -661,7 +662,7 @@ class MainActivity : AppCompatActivity() {
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
             setTextColor(Color.parseColor("#2D2D2D"))
             textSize = 12.5f
-            setOnClickListener { showModelDialog() }
+            setOnClickListener { showModelPopupOrLoad() }
         }
 
         val modelChevron = ImageView(this).apply {
@@ -1295,6 +1296,8 @@ class MainActivity : AppCompatActivity() {
         val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
 
         fun select(tab: TextView) {
+            pageTransitionRunning = false
+            clearPageTranslations()
             tabs.forEach {
                 it.setTextColor(Color.parseColor(if (it == tab) "#07C160" else "#A5A5A5"))
                 it.textSize = if (it == tab) 12f else 11f
@@ -1353,16 +1356,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateBackOneLevel() {
+        if (pageTransitionRunning) return
         if (binding.chatPage.visibility == View.VISIBLE) {
             collapseInputComposer()
-            showConversationHome()
+            showConversationHome(animate = true)
             return
         }
         showExitConfirmation()
     }
 
-    private fun showConversationHome() {
-        binding.tabChat.performClick()
+    private fun showConversationHome(animate: Boolean = false) {
+        if (animate && binding.chatPage.visibility == View.VISIBLE) {
+            actionPopup?.dismiss()
+            renderConversationList()
+            applyConversationHomeChrome()
+            pageTransitionRunning = true
+            WechatPageTransition.exitToRight(
+                container = binding.contentContainer,
+                outgoing = listOf(binding.chatPage, binding.inputLayout),
+                incoming = listOf(binding.conversationPage, binding.pageTabs),
+                onEnd = {
+                    binding.chatPage.visibility = View.GONE
+                    binding.inputLayout.visibility = View.GONE
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.conversationPage.visibility = View.VISIBLE
+                    binding.pageTabs.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            binding.tabChat.performClick()
+        }
     }
 
     private fun showExitConfirmation() {
@@ -1376,7 +1402,42 @@ class MainActivity : AppCompatActivity() {
         exitConfirmDialog?.show()
     }
 
-    private fun showChat() {
+    private fun showChat(animate: Boolean = false) {
+        if (pageTransitionRunning) return
+        val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
+        actionPopup?.dismiss()
+        applyChatChrome()
+        if (shouldAnimate) {
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromRight(
+                container = binding.contentContainer,
+                incoming = listOf(binding.chatPage, binding.inputLayout),
+                outgoing = listOf(binding.conversationPage, binding.pageTabs),
+                onEnd = {
+                    binding.conversationPage.visibility = View.GONE
+                    binding.pageTabs.visibility = View.GONE
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.chatPage.visibility = View.VISIBLE
+                    binding.inputLayout.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            binding.conversationPage.visibility = View.GONE
+            binding.pageTabs.visibility = View.GONE
+            binding.projectPage.visibility = View.GONE
+            binding.profilePage.visibility = View.GONE
+            binding.chatPage.visibility = View.VISIBLE
+            binding.inputLayout.visibility = View.VISIBLE
+            clearPageTranslations()
+        }
+        setSendEnabled(!isActiveConversationWorking())
+        maybePrewarmCodexSession("show_chat")
+    }
+
+    private fun applyChatChrome() {
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -1393,8 +1454,38 @@ class MainActivity : AppCompatActivity() {
             showConversationActions(activeConversationIndex)
             true
         }
-        setSendEnabled(!isActiveConversationWorking())
-        maybePrewarmCodexSession("show_chat")
+    }
+
+    private fun applyConversationHomeChrome() {
+        binding.tabChat.setTextColor(Color.parseColor("#07C160"))
+        binding.tabChat.textSize = 12f
+        binding.tabProject.setTextColor(Color.parseColor("#A5A5A5"))
+        binding.tabProject.textSize = 11f
+        binding.tabProfile.setTextColor(Color.parseColor("#A5A5A5"))
+        binding.tabProfile.textSize = 11f
+        binding.conversationPage.visibility = View.VISIBLE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.inputLayout.visibility = View.GONE
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.backButton.visibility = View.GONE
+        binding.searchButton.visibility = View.VISIBLE
+        binding.addButton.visibility = View.VISIBLE
+        binding.moreButton.visibility = View.GONE
+        binding.addButton.setOnClickListener {
+            showHomeActionPopup(binding.addButton, binding.tabChat)
+        }
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = compactProjectTitle()
+    }
+
+    private fun clearPageTranslations() {
+        binding.conversationPage.translationX = 0f
+        binding.chatPage.translationX = 0f
+        binding.projectPage.translationX = 0f
+        binding.profilePage.translationX = 0f
+        binding.inputLayout.translationX = 0f
+        binding.pageTabs.translationX = 0f
     }
 
     private fun showCreateConversationDialog() {
@@ -1690,32 +1781,140 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun showModelDialog() {
-        if (codexCliOnly) {
-            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
-            return
-        }
+    private fun showModelPopupOrLoad() {
         if (modelOptions.isEmpty()) {
             Toast.makeText(this, "正在加载模型列表...", Toast.LENGTH_SHORT).show()
-            loadModelOptions { showModelDialog() }
+            loadModelOptions { showModelPopupOrLoad() }
             return
         }
+        showModelPopup(if (::modelButtonShell.isInitialized) modelButtonShell else binding.modelButton)
+    }
 
-        val labels = modelOptions.map { it.label }.toTypedArray()
-        val checked = if (currentModelLabel.startsWith("自定义")) {
-            -1
-        } else {
-            modelOptions.indexOfFirst { it.agentName == selectedAgentName }.coerceAtLeast(0)
+    private fun showModelPopup(anchor: View) {
+        actionPopup?.dismiss()
+
+        val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName)) }
+        val showCustomRow = !codexCliOnly
+        val rowCount = selectableOptions.size + if (showCustomRow) 1 else 0
+        val popupWidth = dp(188)
+        val arrowHeight = dp(8)
+        val rowHeight = dp(44)
+        val dividerCount = (rowCount - 1).coerceAtLeast(0)
+        val panelHeight = (rowHeight * rowCount.coerceAtLeast(1) + dividerCount).coerceAtMost(dp(264))
+        val totalHeight = panelHeight + arrowHeight
+        val root = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
+            alpha = 0f
+            scaleX = 0.97f
+            scaleY = 0.97f
         }
-        AlertDialog.Builder(this)
-            .setTitle("选择 AI 模型")
-            .setSingleChoiceItems(labels, checked) { dialog, which ->
-                saveModelSelection(modelOptions[which])
-                dialog.dismiss()
+
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
             }
-            .setNeutralButton("自定义") { _, _ -> openSettings() }
-            .setNegativeButton("取消", null)
-            .show()
+        }
+        root.addView(panel, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            panelHeight
+        ))
+
+        selectableOptions.forEachIndexed { index, option ->
+            panel.addView(createModelPopupRow(option.label, isModelOptionSelected(option)) {
+                actionPopup?.dismiss()
+                if (codexCliOnly) {
+                    Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+                } else {
+                    saveModelSelection(option)
+                }
+            })
+            if (index < selectableOptions.lastIndex || showCustomRow) {
+                panel.addView(createPopupDivider(marginStart = dp(16)))
+            }
+        }
+
+        if (showCustomRow) {
+            panel.addView(createModelPopupRow("自定义模型", currentModelLabel.startsWith("自定义")) {
+                actionPopup?.dismiss()
+                openSettings()
+            })
+        }
+
+        val anchorLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        val anchorCenterX = anchorLocation[0] + anchor.width / 2
+        val aboveY = anchorLocation[1] - totalHeight - dp(8)
+        val showAbove = aboveY > dp(72)
+        val popupX = (anchorCenterX - popupWidth / 2)
+            .coerceIn(dp(12), resources.displayMetrics.widthPixels - popupWidth - dp(12))
+        val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
+        val arrowX = (anchorCenterX - popupX - dp(8)).coerceIn(dp(16), popupWidth - dp(32))
+
+        root.addView(
+            createPopupArrowView(pointsUp = !showAbove, color = Color.parseColor(WECHAT_POPUP_PANEL_COLOR)),
+            FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
+                gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
+                leftMargin = arrowX
+            }
+        )
+        if (!showAbove) {
+            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
+        }
+
+        actionPopup = PopupWindow(root, popupWidth, totalHeight, true).apply {
+            isOutsideTouchable = true
+            elevation = dp(8).toFloat()
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
+        }
+        root.pivotX = (anchorCenterX - popupX).toFloat()
+        root.pivotY = if (showAbove) totalHeight.toFloat() else 0f
+        root.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(120L)
+            .start()
+    }
+
+    private fun isModelOptionSelected(option: ModelOption): Boolean {
+        if (currentModelLabel == option.label) return true
+        return selectedAgentName == option.agentName && !currentModelLabel.startsWith("自定义")
+    }
+
+    private fun createModelPopupRow(title: String, selected: Boolean, action: () -> Unit): View {
+        return LinearLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(44)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(18), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                text = title
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+                textSize = 15f
+            })
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(22), LinearLayout.LayoutParams.WRAP_CONTENT)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = if (selected) "✓" else ""
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+                textSize = 16f
+            })
+            setOnClickListener { action() }
+        }
     }
 
     private fun saveModelSelection(option: ModelOption) {
@@ -1776,7 +1975,7 @@ class MainActivity : AppCompatActivity() {
         activeConversationIndex = index.coerceIn(0, conversations.lastIndex)
         chatAdapter = ChatAdapter(activeConversation().messages, ::pauseCurrentWork, ::showMessageActions)
         binding.chatList.adapter = chatAdapter
-        showChat()
+        showChat(animate = true)
         if (chatAdapter.itemCount > 0) {
             binding.chatList.scrollToPosition(chatAdapter.itemCount - 1)
         }
@@ -3083,17 +3282,20 @@ class MainActivity : AppCompatActivity() {
     private fun showTopActionPopup(anchor: View, actions: List<TopAction>) {
         actionPopup?.dismiss()
 
-        val popupWidth = dp(174)
-        val arrowHeight = dp(9)
+        val popupWidth = dp(168)
+        val arrowHeight = dp(8)
         val root = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+            alpha = 0f
+            scaleX = 0.98f
+            scaleY = 0.98f
         }
 
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                cornerRadius = dp(4).toFloat()
-                setColor(Color.parseColor("#3D3D3D"))
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
             }
         }
         root.addView(panel, FrameLayout.LayoutParams(
@@ -3103,7 +3305,7 @@ class MainActivity : AppCompatActivity() {
             topMargin = arrowHeight
         })
 
-        root.addView(createPopupArrowView(), FrameLayout.LayoutParams(dp(20), arrowHeight).apply {
+        root.addView(createPopupArrowView(), FrameLayout.LayoutParams(dp(16), arrowHeight).apply {
             gravity = Gravity.TOP or Gravity.END
             rightMargin = dp(20)
         })
@@ -3111,15 +3313,7 @@ class MainActivity : AppCompatActivity() {
         actions.forEachIndexed { index, action ->
             panel.addView(createTopActionRow(action))
             if (index < actions.lastIndex) {
-                panel.addView(View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        1
-                    ).apply {
-                        marginStart = dp(64)
-                    }
-                    setBackgroundColor(Color.parseColor("#555555"))
-                })
+                panel.addView(createPopupDivider(marginStart = dp(52)))
             }
         }
 
@@ -3134,36 +3328,44 @@ class MainActivity : AppCompatActivity() {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             showAsDropDown(anchor, anchor.width - popupWidth + dp(2), -dp(2))
         }
+        root.pivotX = (popupWidth - dp(28)).toFloat()
+        root.pivotY = 0f
+        root.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(120L)
+            .start()
     }
 
     private fun createTopActionRow(action: TopAction): View {
         return LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52)
+                dp(46)
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(22), 0, dp(12), 0)
+            setPadding(dp(16), 0, dp(12), 0)
             isClickable = true
             foreground = selectableForeground()
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
                 setImageResource(action.iconRes)
-                setColorFilter(Color.WHITE)
+                setColorFilter(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
             })
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    marginStart = dp(18)
+                    marginStart = dp(13)
                 }
                 includeFontPadding = false
                 text = action.title
-                setTextColor(Color.WHITE)
-                textSize = 18f
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+                textSize = 15.5f
             })
             setOnClickListener {
                 actionPopup?.dismiss()
@@ -3172,9 +3374,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun createPopupArrowView(pointsUp: Boolean = true): View {
+    private fun createPopupDivider(marginStart: Int = 0): View {
+        return View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1
+            ).apply {
+                this.marginStart = marginStart
+            }
+            alpha = 0.55f
+            setBackgroundColor(Color.parseColor(WECHAT_POPUP_DIVIDER_COLOR))
+        }
+    }
+
+    private fun createPopupArrowView(
+        pointsUp: Boolean = true,
+        color: Int = Color.parseColor(WECHAT_POPUP_PANEL_COLOR)
+    ): View {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#3D3D3D")
+            this.color = color
             style = Paint.Style.FILL
         }
         return object : View(this) {
@@ -3547,10 +3765,13 @@ class MainActivity : AppCompatActivity() {
         val popupY = if (showAbove) aboveY else anchorLocation[1] + anchor.height + dp(8)
         val arrowX = (anchorCenterX - popupX - dp(9)).coerceIn(dp(18), popupWidth - dp(36))
 
-        root.addView(createPopupArrowView(pointsUp = !showAbove), FrameLayout.LayoutParams(dp(18), arrowHeight).apply {
-            gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
-            leftMargin = arrowX
-        })
+        root.addView(
+            createPopupArrowView(pointsUp = !showAbove, color = Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR)),
+            FrameLayout.LayoutParams(dp(18), arrowHeight).apply {
+                gravity = if (showAbove) Gravity.BOTTOM or Gravity.START else Gravity.TOP or Gravity.START
+                leftMargin = arrowX
+            }
+        )
         if (!showAbove) {
             (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
         }
@@ -4315,6 +4536,10 @@ class MainActivity : AppCompatActivity() {
         const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
+        const val WECHAT_POPUP_PANEL_COLOR = "#BDBDBD"
+        const val WECHAT_POPUP_TEXT_COLOR = "#242424"
+        const val WECHAT_POPUP_DIVIDER_COLOR = "#A8A8A8"
+        const val LEGACY_MESSAGE_POPUP_COLOR = "#3D3D3D"
         val assistantEvidenceRoles = setOf("ai", "ai-intent")
         val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
         val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
