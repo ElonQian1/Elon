@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101010" />
+  <title>一龙 APK 下载</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101010;
+      --panel: #1f1f1f;
+      --panel-2: #292929;
+      --line: #373737;
+      --ink: #f2f2f2;
+      --ink-soft: #b8b8b8;
+      --ink-muted: #8e8e8e;
+      --brand: #07c160;
+      --brand-hover: #06ad55;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 28px 16px;
+    }
+    main {
+      width: min(100%, 520px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 64px;
+    }
+    .brand img {
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
+      display: block;
+    }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+    .sub {
+      margin-top: 2px;
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .status {
+      color: var(--ink-soft);
+      min-height: 24px;
+    }
+    .fixed-url {
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--panel-2);
+      border-radius: 6px;
+      color: var(--ink);
+      word-break: break-all;
+      user-select: all;
+    }
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .actions a,
+    .actions button {
+      height: 44px;
+      border: 0;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      background: var(--brand);
+      text-decoration: none;
+      cursor: pointer;
+      font: inherit;
+    }
+    .actions button.secondary {
+      background: var(--panel-2);
+      color: var(--ink);
+    }
+    .actions a:hover,
+    .actions button:hover { background: var(--brand-hover); }
+    .actions button.secondary:hover { background: #343434; }
+    textarea {
+      width: 100%;
+      min-height: 128px;
+      resize: vertical;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      padding: 12px;
+      outline: none;
+    }
+    .tip {
+      color: var(--ink-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 420px) {
+      body { padding: 18px 12px; }
+      h1 { font-size: 21px; }
+      .actions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="brand">
+      <img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" />
+      <div>
+        <h1>一龙 APK 下载</h1>
+        <div class="sub">每次升级后仍使用同一个固定 APK 下载地址</div>
+      </div>
+    </header>
+
+    <section class="section">
+      <div id="versionStatus" class="status">正在读取最新版本...</div>
+      <div class="fixed-url" id="apkUrl">__APK_URL__</div>
+      <div class="actions">
+        <a id="downloadBtn" href="__APK_URL__">下载最新 APK</a>
+        <button type="button" class="secondary" id="copyUrlBtn">复制下载地址</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <textarea id="promoText" readonly>我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。
+
+下载地址：__APK_URL__</textarea>
+      <div class="actions">
+        <button type="button" id="copyPromoBtn">复制推广语</button>
+        <button type="button" class="secondary" id="shareBtn">系统分享</button>
+      </div>
+    </section>
+
+    <div class="tip">下载页地址：__PAGE_URL__</div>
+  </main>
+
+  <script>
+    (function () {
+      const apkUrl = '__APK_URL__';
+      const status = document.getElementById('versionStatus');
+      const promoText = document.getElementById('promoText');
+
+      async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'fixed';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+
+      function toast(text) {
+        status.textContent = text;
+        window.setTimeout(loadVersion, 1500);
+      }
+
+      async function loadVersion() {
+        try {
+          const res = await fetch('/app/version.json', { cache: 'no-store' });
+          const data = await res.json();
+          const version = data.versionName || data.version_name || '?';
+          const code = data.versionCode || data.version_code || '?';
+          const size = data.fileSize ? ' · ' + (data.fileSize / 1048576).toFixed(1) + ' MB' : '';
+          status.textContent = '最新版本：v' + version + ' (build ' + code + ')' + size;
+        } catch {
+          status.textContent = '最新版本信息暂不可用，下载地址保持固定可用。';
+        }
+      }
+
+      document.getElementById('copyUrlBtn').addEventListener('click', async () => {
+        await copyText(apkUrl);
+        toast('下载地址已复制');
+      });
+
+      document.getElementById('copyPromoBtn').addEventListener('click', async () => {
+        await copyText(promoText.value);
+        toast('推广语已复制');
+      });
+
+      document.getElementById('shareBtn').addEventListener('click', async () => {
+        if (navigator.share) {
+          await navigator.share({ title: '一龙 APK 下载', text: promoText.value, url: apkUrl });
+        } else {
+          await copyText(promoText.value);
+          toast('当前浏览器不支持系统分享，已复制推广语');
+        }
+      });
+
+      loadVersion();
+    })();
+  </script>
+</body>
+</html>
+
