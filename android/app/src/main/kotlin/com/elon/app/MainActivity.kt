@@ -152,6 +152,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var inputCenterContainer: FrameLayout
     private lateinit var expandedInputContainer: FrameLayout
     private lateinit var collapsedInputPreview: TextView
+    private lateinit var modelButtonShell: FrameLayout
     private lateinit var inputRightControls: FrameLayout
     private lateinit var inputComposerMotion: InputComposerMotion
     private lateinit var attachmentPanel: LinearLayout
@@ -310,6 +311,7 @@ class MainActivity : AppCompatActivity() {
         }
         val outgoingText = expandShortDevelopmentCommand(text, activeConversation().messages)
         val target = currentSendTarget()
+        collapseInputComposer()
         if (pendingAttachments.isNotEmpty()) {
             uploadAttachmentsThenSend(text, outgoingText, target)
             return
@@ -363,6 +365,7 @@ class MainActivity : AppCompatActivity() {
             )
         )
         binding.inputEdit.text.clear()
+        collapseInputComposer()
         val requestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText)
         rememberConversationTask(target, traceId, payload.toString(), requestIsDevelopment)
         setSendEnabled(false)
@@ -619,21 +622,48 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        modelButton.apply {
+        modelButtonShell = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(dp(86), dp(32)).apply {
                 marginEnd = dp(10)
             }
             background = getDrawable(R.drawable.bg_model_pill_light)
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            compoundDrawablePadding = dp(6)
-            setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_input_model_chevron, 0)
-            setTextColor(Color.parseColor("#2D2D2D"))
-            textSize = 12.5f
             alpha = 0f
             visibility = View.GONE
+            isClickable = true
+            isFocusable = true
+            contentDescription = "选择模型：$currentModelLabel"
             setOnClickListener { showModelDialog() }
         }
+
+        modelButton.apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            background = ColorDrawable(Color.TRANSPARENT)
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(16), 0, dp(30), 0)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
+            setTextColor(Color.parseColor("#2D2D2D"))
+            textSize = 12.5f
+            setOnClickListener { showModelDialog() }
+        }
+
+        val modelChevron = ImageView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(13), dp(13), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = dp(13)
+            }
+            setImageResource(R.drawable.ic_input_model_chevron)
+            scaleType = ImageView.ScaleType.CENTER
+            alpha = 0.9f
+            isClickable = false
+            isFocusable = false
+        }
+        modelButtonShell.addView(modelButton)
+        modelButtonShell.addView(modelChevron)
 
         inputCenterContainer.addView(collapsedInputPreview)
         expandedInputContainer.addView(inputEdit)
@@ -663,7 +693,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         inputBarContainer.addView(inputModeButton)
-        inputBarContainer.addView(modelButton)
+        inputBarContainer.addView(modelButtonShell)
         inputBarContainer.addView(inputCenterContainer)
         inputRightControls.addView(attachmentButton)
         inputRightControls.addView(sendButton)
@@ -677,7 +707,7 @@ class MainActivity : AppCompatActivity() {
         inputComposerMotion = InputComposerMotion(
             expandedInputContainer = expandedInputContainer,
             collapsedInputContainer = inputCenterContainer,
-            modelButton = modelButton,
+            modelButton = modelButtonShell,
             rightControls = inputRightControls
         )
         inputEdit.setOnClickListener {
@@ -697,12 +727,18 @@ class MainActivity : AppCompatActivity() {
         })
 
         binding.chatList.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_DOWN && attachmentPanelOpen) {
-                collapseAttachmentPanel()
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                if (attachmentPanelOpen) {
+                    collapseAttachmentPanel()
+                }
+                collapseInputComposer()
             }
             false
         }
-        binding.stageHintText.setOnClickListener { collapseAttachmentPanel() }
+        binding.stageHintText.setOnClickListener {
+            collapseAttachmentPanel()
+            collapseInputComposer()
+        }
         applyVoiceMode()
         updateCollapsedInputPreview()
         updateSendButtonVisual()
@@ -772,6 +808,20 @@ class MainActivity : AppCompatActivity() {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
         }, 120L)
+    }
+
+    private fun collapseInputComposer(animate: Boolean = true) {
+        if (!::inputComposerMotion.isInitialized) return
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
+        if (binding.inputEdit.hasFocus()) {
+            binding.inputEdit.clearFocus()
+        }
+        if (inputComposerMotion.isExpanded) {
+            inputComposerMotion.setExpanded(false, animate = animate)
+        }
+        updateSendButtonVisual()
+        updateAdaptiveInputHeight()
     }
 
     private fun setupAttachmentLaunchers() {
@@ -1025,7 +1075,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun expandAttachmentPanel() {
         if (activeConversation().ended) return
-        hideKeyboard()
+        collapseInputComposer()
         if (attachmentPanelOpen) return
         attachmentPanelOpen = true
         attachmentPanel.visibility = View.VISIBLE
@@ -1092,7 +1142,7 @@ class MainActivity : AppCompatActivity() {
             inputCenterContainer.removeAllViews()
             inputCenterContainer.addView(voiceHoldButton)
             binding.inputEdit.visibility = View.GONE
-            binding.modelButton.visibility = View.GONE
+            if (::modelButtonShell.isInitialized) modelButtonShell.visibility = View.GONE
             voiceHoldButton.visibility = View.VISIBLE
         } else {
             inputModeButton.setImageResource(R.drawable.ic_input_voice_circle)
@@ -1102,7 +1152,7 @@ class MainActivity : AppCompatActivity() {
             inputCenterContainer.addView(collapsedInputPreview)
             expandedInputContainer.addView(voiceHoldButton)
             binding.inputEdit.visibility = View.VISIBLE
-            binding.modelButton.visibility = if (::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded) {
+            if (::modelButtonShell.isInitialized) modelButtonShell.visibility = if (::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded) {
                 View.VISIBLE
             } else {
                 View.GONE
@@ -1292,6 +1342,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateBackOneLevel() {
         if (binding.chatPage.visibility == View.VISIBLE) {
+            collapseInputComposer()
             showConversationHome()
             return
         }
@@ -1661,6 +1712,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         binding.modelButton.isEnabled = false
+        if (::modelButtonShell.isInitialized) modelButtonShell.isEnabled = false
         Thread {
             try {
                 val payload = JSONObject().apply {
@@ -1691,7 +1743,10 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "模型切换失败: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             } finally {
-                runOnUiThread { binding.modelButton.isEnabled = true }
+                runOnUiThread {
+                    binding.modelButton.isEnabled = true
+                    if (::modelButtonShell.isInitialized) modelButtonShell.isEnabled = true
+                }
             }
         }.start()
     }
@@ -1699,6 +1754,9 @@ class MainActivity : AppCompatActivity() {
     private fun updateModelButton() {
         binding.modelButton.text = shortModelLabel(currentModelLabel)
         binding.modelButton.contentDescription = "选择模型：$currentModelLabel"
+        if (::modelButtonShell.isInitialized) {
+            modelButtonShell.contentDescription = "选择模型：$currentModelLabel"
+        }
     }
 
     private fun openConversation(index: Int) {
@@ -4284,6 +4342,14 @@ class MainActivity : AppCompatActivity() {
             voiceHoldButton.alpha = if (conversationEnded) 0.55f else 1f
         }
         binding.modelButton.isEnabled = !conversationEnded
+        if (::modelButtonShell.isInitialized) {
+            modelButtonShell.isEnabled = !conversationEnded
+            modelButtonShell.alpha = when {
+                conversationEnded -> 0.55f
+                ::inputComposerMotion.isInitialized && inputComposerMotion.isExpanded -> 1f
+                else -> 0f
+            }
+        }
         updateSendButtonVisual()
         updateStageHintShimmer()
     }
