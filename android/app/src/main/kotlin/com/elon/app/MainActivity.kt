@@ -510,18 +510,18 @@ class MainActivity : AppCompatActivity() {
         inputBarContainer = LinearLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(86)
+                dp(60)
             )
-            minimumHeight = dp(86)
+            minimumHeight = dp(60)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), dp(10), dp(14), dp(10))
+            setPadding(dp(14), dp(6), dp(14), dp(6))
         }
 
-        // WeChat-scale circular controls: 46dp touch area with a 30dp visual icon.
+        // WeChat-scale circular controls: compact 42dp touch area with a 30dp visual icon.
         inputModeButton = ImageButton(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(46), dp(46)).apply {
-                marginEnd = dp(12)
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                marginEnd = dp(10)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_circle)
@@ -534,12 +534,13 @@ class MainActivity : AppCompatActivity() {
         inputCenterContainer = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dp(48),
+                dp(40),
                 1f
             )
             setBackgroundResource(R.drawable.bg_input_pill)
-            minimumHeight = dp(48)
+            minimumHeight = dp(40)
             isClickable = true
+            isFocusable = true
             setOnClickListener { focusInputComposer() }
         }
 
@@ -555,7 +556,9 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(18), 0, dp(18), 0)
             text = "文本内容在此输入。"
             setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 16f
+            textSize = 15f
+            isClickable = true
+            setOnClickListener { focusInputComposer() }
         }
 
         inputEdit.apply {
@@ -576,7 +579,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, dp(8), 0, dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 16f
+            textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!voiceMode) {
                     inputComposerMotion.setExpanded(hasFocus, animate = true)
@@ -613,8 +616,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         modelButton.apply {
-            layoutParams = LinearLayout.LayoutParams(dp(96), dp(36)).apply {
-                marginEnd = dp(12)
+            layoutParams = LinearLayout.LayoutParams(dp(86), dp(32)).apply {
+                marginEnd = dp(10)
             }
             background = getDrawable(R.drawable.bg_model_pill_light)
             gravity = Gravity.CENTER
@@ -622,7 +625,7 @@ class MainActivity : AppCompatActivity() {
             compoundDrawablePadding = dp(6)
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_input_model_chevron, 0)
             setTextColor(Color.parseColor("#2D2D2D"))
-            textSize = 13f
+            textSize = 12.5f
             alpha = 0f
             visibility = View.GONE
             setOnClickListener { showModelDialog() }
@@ -633,11 +636,11 @@ class MainActivity : AppCompatActivity() {
         expandedInputContainer.addView(voiceHoldButton)
 
         inputRightControls = FrameLayout(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
         }
 
         attachmentButton = ImageButton(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(46), dp(46), Gravity.START or Gravity.CENTER_VERTICAL)
+            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.START or Gravity.CENTER_VERTICAL)
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_add_circle_simple)
             scaleType = ImageView.ScaleType.CENTER
@@ -647,7 +650,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         sendButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(46), dp(46), Gravity.END or Gravity.CENTER_VERTICAL)
+            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END or Gravity.CENTER_VERTICAL)
             background = getDrawable(R.drawable.ic_input_send_arrow_circle)
             gravity = Gravity.CENTER
             includeFontPadding = false
@@ -707,9 +710,9 @@ class MainActivity : AppCompatActivity() {
         val inputEdit = binding.inputEdit
         inputEdit.post {
             if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return@post
-            val collapsedHeight = dp(48)
-            val minTextHeight = dp(58)
-            val maxTextHeight = dp(122)
+            val collapsedHeight = dp(40)
+            val minTextHeight = dp(46)
+            val maxTextHeight = dp(112)
             val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
             val desiredTextHeight = if (voiceMode) {
                 0
@@ -752,11 +755,19 @@ class MainActivity : AppCompatActivity() {
             voiceMode = false
             applyVoiceMode()
         }
+        if (::inputComposerMotion.isInitialized && !inputComposerMotion.isExpanded) {
+            inputComposerMotion.setExpanded(true, animate = true)
+        }
         binding.inputEdit.requestFocus()
         binding.inputEdit.post {
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
         }
+        binding.inputEdit.postDelayed({
+            if (!binding.inputEdit.hasFocus()) return@postDelayed
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
+        }, 120L)
     }
 
     private fun setupAttachmentLaunchers() {
@@ -1105,7 +1116,7 @@ class MainActivity : AppCompatActivity() {
         val sendMode = hasText && !voiceMode && composerExpanded
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
-            params?.width = dp(46)
+            params?.width = dp(42)
             binding.sendButton.background = getDrawable(R.drawable.ic_input_send_arrow_circle)
             binding.sendButton.text = ""
             binding.sendButton.visibility = View.VISIBLE
@@ -1118,7 +1129,7 @@ class MainActivity : AppCompatActivity() {
                 attachmentButton.visibility = View.VISIBLE
             }
         }
-        params?.height = dp(46)
+        params?.height = dp(42)
         params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         params?.let { binding.sendButton.layoutParams = it }
         if (::attachmentButton.isInitialized) {
