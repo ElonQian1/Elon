@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     private val prewarmingConversationKeys = mutableSetOf<String>()
     private val lastPrewarmAt = mutableMapOf<String, Long>()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
-    private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
+    private val prefs by lazy { AuthManager.userDataPrefs(this) }
     private val serverUrl = "http://43.139.149.158:8080"
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"

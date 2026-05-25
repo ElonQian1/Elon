@@ -28,6 +28,16 @@ object AuthManager {
     fun prefs(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    /**
+     * 返回当前有效用户的数据存储（项目列表、会话等），按账号 ID 隔离。
+     * 已登录账号使用 "elon_data_<userId>"；游客使用 "elon_data_<deviceUUID>"。
+     * 认证凭据本身仍存储在 prefs()（"elon"），不受影响。
+     */
+    fun userDataPrefs(ctx: Context): SharedPreferences {
+        val userId = effectiveUserId(ctx)
+        return ctx.getSharedPreferences("elon_data_$userId", Context.MODE_PRIVATE)
+    }
+
     fun isLoggedIn(ctx: Context): Boolean = !token(ctx).isNullOrBlank() && !userId(ctx).isNullOrBlank()
 
     fun token(ctx: Context): String? = prefs(ctx).getString(KEY_AUTH_TOKEN, null)?.takeIf { it.isNotBlank() }

@@ -23,7 +23,7 @@ import java.net.URLEncoder
 
 class TaskWorkService : Service() {
     private val handler = Handler(Looper.getMainLooper())
-    private val prefs by lazy { getSharedPreferences("elon", MODE_PRIVATE) }
+    private val prefs by lazy { AuthManager.userDataPrefs(this) }
     private val activeTasks = linkedMapOf<String, RunningTask>()
     private var nextClientGeneration = 0
 
@@ -247,8 +247,7 @@ class TaskWorkService : Service() {
         val userId = json
             ?.optString("user_id")
             ?.takeIf { it.isNotBlank() }
-            ?: prefs.getString(PREF_USER_ID, null)
-            ?: "default"
+            ?: AuthManager.effectiveUserId(this)
         val projectId = json
             ?.optString("project_id")
             ?.takeIf { it.isNotBlank() }
