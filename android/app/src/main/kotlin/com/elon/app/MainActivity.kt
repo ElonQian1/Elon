@@ -563,7 +563,7 @@ class MainActivity : AppCompatActivity() {
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(18), 0, dp(18), 0)
             text = "文本内容在此输入。"
-            setTextColor(Color.parseColor("#E1E1E1"))
+            setTextColor(Color.parseColor("#A8D0D0D0"))
             textSize = 15f
             isClickable = true
             setOnClickListener { focusInputComposer() }
@@ -586,7 +586,7 @@ class MainActivity : AppCompatActivity() {
             setHorizontallyScrolling(false)
             setPadding(0, dp(8), 0, dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#E1E1E1"))
+            setHintTextColor(Color.parseColor("#A8D0D0D0"))
             textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!voiceMode) {
@@ -788,7 +788,9 @@ class MainActivity : AppCompatActivity() {
     private fun updateCollapsedInputPreview() {
         if (!::collapsedInputPreview.isInitialized) return
         val draft = binding.inputEdit.text?.toString().orEmpty()
-        collapsedInputPreview.text = draft.ifBlank { "文本内容在此输入。" }
+        val hasDraft = draft.isNotBlank()
+        collapsedInputPreview.text = if (hasDraft) draft else "文本内容在此输入。"
+        collapsedInputPreview.setTextColor(Color.parseColor(if (hasDraft) "#DCDCDC" else "#A8D0D0D0"))
     }
 
     private fun focusInputComposer() {

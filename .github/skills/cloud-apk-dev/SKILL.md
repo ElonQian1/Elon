@@ -46,8 +46,8 @@ Read these files before acting:
 - Never commit secrets, `.env`, APK signing keys, or generated private credentials.
 - If push is rejected, fetch/rebase or merge, resolve conflicts while preserving both sides when compatible, then push again.
 - If uncommitted changes are unrelated or unclear, create a new worktree from `origin/main` instead of pulling in the dirty workspace.
-- For backend runtime changes, increment `server/Cargo.toml` `package.version`, deploy with `scripts/publish-server.*`, and verify `/api/server/version`.
-- For Android installable features, PR/debug build is not complete. Run `scripts\publish-apk.ps1`, then `scripts\check-task-complete.ps1 -Kind AndroidFeature`, unless the user explicitly says not to publish the APK.
+- For backend runtime changes, simply run `scripts/publish-server.*`. The script calls `POST /api/release/claim` so the server atomically allocates a new version number, injects it into the binary at compile time via `ELON_BUILD_VERSION`, deploys, then calls `POST /api/release/finish`. **Do NOT manually edit and commit `server/Cargo.toml` `package.version`** — the field is only a cold-start fallback. Verify with `/api/server/version` after deploy.
+- For Android installable features, PR/debug build is not complete. Run `scripts\publish-apk.ps1` (it claims `versionCode/versionName` from the server, temporarily writes `build.gradle`, builds, uploads, then restores `build.gradle`; nothing is committed to git). Then run `scripts\check-task-complete.ps1 -Kind AndroidFeature`, unless the user explicitly says not to publish the APK.
 - For Rust builds, do not rely on a relative `CARGO_TARGET_DIR`; use project scripts or an absolute target directory.
 - For APK update/P2P work, keep `version.json` as the public source of truth, preserve direct `downloadUrl` fallback, and verify live `/app/version.json` after publishing.
 - For Android builds on a new machine, run the speed-test below first before trying `./gradlew`; network misconfiguration will stall downloads indefinitely.
