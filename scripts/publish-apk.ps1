@@ -44,6 +44,7 @@ $LegacyKeystore  = Join-Path $AndroidDir "app\elon-release.jks"
 $UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
 $OriginalGradleContent = $null
 $BuildBaseSha = $null
+$LocalHeadSha = $null
 
 function Get-UserGradleProperty {
     param([string]$Name)
@@ -199,7 +200,9 @@ function Get-ApkBuildFreshness {
         }
     }
 
-    if ($deployedSha -and (Test-GitAncestor $BaseSha $deployedSha)) {
+    # Skip 仅当线上 APK 已包含本地全部待发布提交（含 ahead 的业务 commit）
+    $skipCandidate = if ($script:LocalHeadSha) { $script:LocalHeadSha } else { $BaseSha }
+    if ($deployedSha -and (Test-GitAncestor $skipCandidate $deployedSha)) {
         return [PSCustomObject]@{
             Action = "Skip"
             RemoteHead = $remoteHead
@@ -415,6 +418,7 @@ Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
 git -C $RepoRoot pull --rebase origin main
 if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
 $BuildBaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+$LocalHeadSha = $BuildBaseSha
 $originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()
 if ($BuildBaseSha -ne $originMainSha) {
     git -C $RepoRoot merge-base --is-ancestor $originMainSha $BuildBaseSha | Out-Null
