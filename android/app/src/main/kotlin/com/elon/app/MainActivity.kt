@@ -108,6 +108,7 @@ class MainActivity : AppCompatActivity() {
     private var foldedCliLogActions: MainFoldedCliLogActions? = null
     private var workflowMessageCompactor: MainWorkflowMessageCompactor? = null
     private var sendButtonVisualActions: MainSendButtonVisualActions? = null
+    private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -473,41 +474,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateAdaptiveInputHeight() {
-        if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return
-        val inputEdit = binding.inputEdit
-        inputEdit.post {
-            if (!::inputCenterContainer.isInitialized || !::inputBarContainer.isInitialized) return@post
-            val collapsedHeight = dp(40)
-            val minTextHeight = dp(46)
-            val maxTextHeight = dp(112)
-            val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
-            val desiredTextHeight = if (voiceMode) {
-                0
-            } else {
-                val multilineTopGuard = if (rawLineCount > 1) dp(8) else 0
-                (rawLineCount.coerceAtMost(4) * inputEdit.lineHeight +
-                    inputEdit.paddingTop +
-                    inputEdit.paddingBottom +
-                    multilineTopGuard).coerceIn(minTextHeight, maxTextHeight)
-            }
+        adaptiveInputHeightActions().updateAdaptiveInputHeight()
+    }
 
-            val centerParams = inputCenterContainer.layoutParams as LinearLayout.LayoutParams
-            if (centerParams.height != collapsedHeight) {
-                centerParams.height = collapsedHeight
-                inputCenterContainer.layoutParams = centerParams
-            }
-
-            if (::inputComposerMotion.isInitialized) {
-                inputComposerMotion.updateExpandedTextHeight(
-                    desiredTextHeight,
-                    animate = inputComposerMotion.isExpanded
-                )
-            }
-
-            val multiline = !voiceMode && rawLineCount > 1
-            inputEdit.gravity = (if (multiline) Gravity.TOP else Gravity.CENTER_VERTICAL) or Gravity.START
-            inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > 4
-        }
+    private fun adaptiveInputHeightActions(): MainAdaptiveInputHeightActions {
+        adaptiveInputHeightActions?.let { return it }
+        return MainAdaptiveInputHeightActions(
+            binding = binding,
+            dp = ::dp,
+            inputCenterContainer = { if (::inputCenterContainer.isInitialized) inputCenterContainer else null },
+            inputBarContainer = { if (::inputBarContainer.isInitialized) inputBarContainer else null },
+            inputComposerMotion = { if (::inputComposerMotion.isInitialized) inputComposerMotion else null },
+            isVoiceMode = { voiceMode }
+        ).also { adaptiveInputHeightActions = it }
     }
 
     private fun updateCollapsedInputPreview() {
