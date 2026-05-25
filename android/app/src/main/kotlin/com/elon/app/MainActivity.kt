@@ -4176,27 +4176,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun shouldShowProgressBubble(content: String): Boolean {
-        val progress = userFacingProgress(content)
-        return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
-            !isRoutineWorkflowMessage(progress) &&
-            (content.startsWith("环境提醒") ||
-                content.contains("已识别为开发任务") ||
-                content.contains("正在确认这是否需要进入开发流程") ||
-                content.startsWith("正在准备项目工作区") ||
-                content.contains("AI 助手正在处理") ||
-                content.contains("通用项目工作流") ||
-                content.contains("已轮到本会话任务") ||
-                content.contains("已获得本会话执行权") ||
-                content.contains("已获得项目执行权") ||
-                content.contains("进入队列") ||
-                content.contains("排队") ||
-                content.startsWith("未找到 APK") ||
-                content.contains("失败") ||
-                content.contains("错误") ||
-                content.contains("不可用"))
-    }
-
     private fun handleToolCall(tool: String) {
         recordEvidence(toolEvidenceKind(tool), "开始：${toolLabel(tool)}")
         when (tool) {
@@ -4205,17 +4184,6 @@ class MainActivity : AppCompatActivity() {
             else -> updateStage("开发实现", "正在执行：${toolLabel(tool)}")
         }
         addProjectEvent("执行工具：${toolLabel(tool)}")
-    }
-
-    private fun nextWorkflowHint(stage: String): String {
-        return when (stage) {
-            "需求分析" -> "定位相关文件。"
-            "开发实现" -> "继续修改并检查结果。"
-            "编译打包" -> "等待编译结果。"
-            "交付完成" -> "整理最终结果。"
-            "需要处理" -> "根据错误判断是否可修复。"
-            else -> "等待下一步结果。"
-        }
     }
 
     private fun updateStageHintShimmer() {
@@ -4342,16 +4310,6 @@ class MainActivity : AppCompatActivity() {
         binding.stageCodeText.text = stageLine(2, active, "开发实现")
         binding.stageBuildText.text = stageLine(3, active, "编译打包")
         binding.stageDeliverText.text = stageLine(4, active, "交付下载")
-    }
-
-    private fun stageLine(index: Int, active: Int, label: String): String {
-        val state = when {
-            active == -1 -> if (index == 1) "需处理" else "等待"
-            active > index -> "已完成"
-            active == index -> "进行中"
-            else -> "等待"
-        }
-        return "$index. $label：$state"
     }
 
     private fun compactProjectTitle(): String {
