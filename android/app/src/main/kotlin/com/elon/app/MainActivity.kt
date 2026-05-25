@@ -760,7 +760,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndex = { projectStateActions().activeConversationIndex },
             chatAdapter = { chatAdapter },
             conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
-            workflowTerminalRoles = workflowTerminalRoles,
+            workflowTerminalRoles = MainWorkflowRoles.terminal,
             closeStaleWorkflowMessages = { messages ->
                 workflowMessageCompactor().closeStaleWorkflowMessages(messages)
             },
@@ -955,7 +955,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions()::activeConversation,
             chatAdapter = { chatAdapter },
             saveConversations = projectStateActions()::saveConversations,
-            assistantEvidenceRoles = assistantEvidenceRoles
+            assistantEvidenceRoles = MainWorkflowRoles.assistantEvidence
         ).also { evidenceActions = it }
     }
 
@@ -1012,9 +1012,9 @@ class MainActivity : AppCompatActivity() {
     private fun workflowMessageCompactor(): MainWorkflowMessageCompactor {
         workflowMessageCompactor?.let { return it }
         return MainWorkflowMessageCompactor(
-            staleWorkflowRoles = staleWorkflowRoles,
-            workflowHistoryStatusRoles = workflowHistoryStatusRoles,
-            workflowTerminalRoles = workflowTerminalRoles
+            staleWorkflowRoles = MainWorkflowRoles.staleWorkflow,
+            workflowHistoryStatusRoles = MainWorkflowRoles.historyStatus,
+            workflowTerminalRoles = MainWorkflowRoles.terminal
         ).also { workflowMessageCompactor = it }
     }
 
@@ -1056,7 +1056,7 @@ class MainActivity : AppCompatActivity() {
                 conversationPreviewActions().updateActiveConversationPreview(message)
             },
             saveConversations = projectStateActions()::saveConversations,
-            workflowTerminalRoles = workflowTerminalRoles
+            workflowTerminalRoles = MainWorkflowRoles.terminal
         ).also { messageAppendActions = it }
     }
 
@@ -1155,13 +1155,6 @@ class MainActivity : AppCompatActivity() {
             renderProjectList = homeListActions()::renderProjectList,
             updateStageHintShimmer = { stageHintShimmer().update() }
         ).also { projectViewActions = it }
-    }
-
-    private companion object {
-        val assistantEvidenceRoles = setOf("ai", "ai-intent")
-        val staleWorkflowRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool")
-        val workflowHistoryStatusRoles = setOf("ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete")
-        val workflowTerminalRoles = setOf("ai", "ai-intent", "error", "ai-stopped")
     }
 
     private fun projectRecordActions(): MainProjectRecordActions {
