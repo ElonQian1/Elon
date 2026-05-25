@@ -50,16 +50,7 @@ class MainActivity : AppCompatActivity() {
     private var actionPopups: MainActionPopups? = null
     private var messageActions: MainMessageActions? = null
     private var codexPrewarm: MainCodexPrewarm? = null
-    private var attachmentPanelActions: MainAttachmentPanelActions? = null
-    private var attachmentPickerActions: MainAttachmentPickerActions? = null
-    private var attachmentSendActions: MainAttachmentSendActions? = null
-    private var pendingAttachmentActions: MainPendingAttachmentActions? = null
-    private var sendButtonVisualActions: MainSendButtonVisualActions? = null
     private var sendEnabledActions: MainSendEnabledActions? = null
-    private var adaptiveInputHeightActions: MainAdaptiveInputHeightActions? = null
-    private var collapsedInputPreviewActions: MainCollapsedInputPreviewActions? = null
-    private var voiceModeActions: MainVoiceModeActions? = null
-    private var inputFocusActions: MainInputFocusActions? = null
     private var backgroundTaskMessageActions: MainBackgroundTaskMessageActions? = null
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var conversationTaskRegistryActions: MainConversationTaskRegistryActions? = null
@@ -77,8 +68,6 @@ class MainActivity : AppCompatActivity() {
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
     private var taskWorkReceiverActions: MainTaskWorkReceiverActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
-    private var sendTargetRestoreActions: MainSendTargetRestoreActions? = null
-    private var sendMessageActions: MainSendMessageActions? = null
     private var navigationController: MainNavigationController? = null
     private lateinit var inputComposerViews: MainInputComposerViews
     private lateinit var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip
@@ -112,7 +101,7 @@ class MainActivity : AppCompatActivity() {
             prefs = prefs,
             notificationPermissionRequest = notificationPermissionRequest,
             loadProjects = projectStateActions()::loadProjects,
-            setupAttachmentLaunchers = { attachmentPickerActions().setupAttachmentLaunchers() },
+            setupAttachmentLaunchers = { attachmentPickerActions.setupAttachmentLaunchers() },
             activeConversation = projectStateActions()::activeConversation,
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
@@ -135,7 +124,7 @@ class MainActivity : AppCompatActivity() {
             },
             openConversation = conversationOpenActions()::openConversation,
             loadModelOptions = { modelActions().loadModelOptions() },
-            sendMessage = { sendMessageActions().sendMessage() }
+            sendMessage = { sendMessageActions.sendMessage() }
         ).also { createActions = it }
     }
 
@@ -197,7 +186,7 @@ class MainActivity : AppCompatActivity() {
         return MainPreparedMessageActions(
             activity = this,
             binding = binding,
-            restoreSendTarget = { target -> sendTargetRestoreActions().restoreSendTarget(target) },
+            restoreSendTarget = { target -> sendTargetRestoreActions.restoreSendTarget(target) },
             isConversationTaskRunning = { target ->
                 val key = conversationTaskRegistryActions().conversationTaskKey(target.projectId, target.conversationId)
                 runningConversationTasks.containsKey(key)
@@ -206,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             selectedAgentForRequest = { modelActions().selectedAgentForRequest() },
             appendMessage = messageAppendActions::appendMessage,
-            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions()::rememberConversationTask,
@@ -241,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                 serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             },
             clearPendingAttachments = {
-                pendingAttachmentActions().clearPendingAttachments(deleteFiles = false)
+                pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
             }
         ).also { preparedMessageActions = it }
     }
@@ -303,114 +292,108 @@ class MainActivity : AppCompatActivity() {
             currentModelLabel = { modelActions().currentModelLabel },
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
-            isAttachmentPanelOpen = { attachmentPanelActions().isOpen },
-            toggleVoiceMode = { voiceModeActions().toggleVoiceMode() },
-            focusInputComposer = { inputFocusActions().focusInputComposer() },
+            isAttachmentPanelOpen = { attachmentPanelActions.isOpen },
+            toggleVoiceMode = { voiceModeActions.toggleVoiceMode() },
+            focusInputComposer = { inputFocusActions.focusInputComposer() },
             startSpeechToText = { speechInputActions().startSpeechToText() },
             stopSpeechToText = { speechInputActions().stopSpeechToText() },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
-            sendMessage = { sendMessageActions().sendMessage() },
-            toggleAttachmentPanel = { attachmentPanelActions().toggleAttachmentPanel() },
-            buildAttachmentPanel = { attachmentPanelActions().buildAttachmentPanel() },
-            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
-            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
-            updateCollapsedInputPreview = { collapsedInputPreviewActions().updateCollapsedInputPreview() },
+            sendMessage = { sendMessageActions.sendMessage() },
+            toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
+            buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
         ).setup()
 
         inputComposerViews = views
         pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(this, pendingAttachments) {
-            collapsedInputPreviewActions().updateCollapsedInputPreview()
+            collapsedInputPreviewActions.updateCollapsedInputPreview()
             updateSendButtonVisual()
         }
         binding.inputLayout.addView(pendingAttachmentPreviewStrip.view, 1)
-        voiceModeActions().applyVoiceMode()
-        collapsedInputPreviewActions().updateCollapsedInputPreview()
+        voiceModeActions.applyVoiceMode()
+        collapsedInputPreviewActions.updateCollapsedInputPreview()
         updateSendButtonVisual()
-        adaptiveInputHeightActions().updateAdaptiveInputHeight()
+        adaptiveInputHeightActions.updateAdaptiveInputHeight()
     }
 
     private fun inputComposerViewsOrNull(): MainInputComposerViews? {
         return if (::inputComposerViews.isInitialized) inputComposerViews else null
     }
 
-    private fun adaptiveInputHeightActions(): MainAdaptiveInputHeightActions {
-        adaptiveInputHeightActions?.let { return it }
-        return MainAdaptiveInputHeightActions(
+    private val adaptiveInputHeightActions: MainAdaptiveInputHeightActions by lazy {
+        MainAdaptiveInputHeightActions(
             binding = binding,
             dp = uiTools::dp,
             inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
             inputBarContainer = { inputComposerViewsOrNull()?.inputBarContainer },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode }
-        ).also { adaptiveInputHeightActions = it }
+        )
     }
 
-    private fun inputFocusActions(): MainInputFocusActions {
-        inputFocusActions?.let { return it }
-        return MainInputFocusActions(
+    private val inputFocusActions: MainInputFocusActions by lazy {
+        MainInputFocusActions(
             activity = this,
             binding = binding,
             activeConversation = projectStateActions()::activeConversation,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions().applyVoiceMode() },
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
-        ).also { inputFocusActions = it }
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+        )
     }
 
-    private fun collapsedInputPreviewActions(): MainCollapsedInputPreviewActions {
-        collapsedInputPreviewActions?.let { return it }
-        return MainCollapsedInputPreviewActions(
+    private val collapsedInputPreviewActions: MainCollapsedInputPreviewActions by lazy {
+        MainCollapsedInputPreviewActions(
             binding = binding,
             pendingAttachments = { pendingAttachments },
             collapsedInputPreview = { inputComposerViewsOrNull()?.collapsedInputPreview }
-        ).also { collapsedInputPreviewActions = it }
+        )
     }
 
     private fun refreshPendingAttachmentPreview() {
         if (!::pendingAttachmentPreviewStrip.isInitialized) return
         pendingAttachmentPreviewStrip.refresh()
-        collapsedInputPreviewActions().updateCollapsedInputPreview()
+        collapsedInputPreviewActions.updateCollapsedInputPreview()
         updateSendButtonVisual()
     }
 
-    private fun attachmentPickerActions(): MainAttachmentPickerActions {
-        attachmentPickerActions?.let { return it }
-        return MainAttachmentPickerActions(
+    private val attachmentPickerActions: MainAttachmentPickerActions by lazy {
+        MainAttachmentPickerActions(
             activity = this,
             activeConversation = projectStateActions()::activeConversation,
             attachPickedFile = { kind, uri, fallbackName ->
-                pendingAttachmentActions().attachPickedFile(kind, uri, fallbackName)
+                pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
             }
-        ).also { attachmentPickerActions = it }
+        )
     }
 
-    private fun sendMessageActions(): MainSendMessageActions {
-        sendMessageActions?.let { return it }
-        return MainSendMessageActions(
+    private val sendMessageActions: MainSendMessageActions by lazy {
+        MainSendMessageActions(
             binding = binding,
             pendingAttachments = pendingAttachments,
-            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             activeProject = projectStateActions()::activeProject,
             activeConversation = projectStateActions()::activeConversation,
             appendMessage = messageAppendActions::appendMessage,
-            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
-                attachmentSendActions().uploadAttachmentsThenSend(visibleText, outgoingText, target)
+                attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
             startPreparedMessage = preparedMessageActions()::startPreparedMessage
-        ).also { sendMessageActions = it }
+        )
     }
 
-    private fun sendTargetRestoreActions(): MainSendTargetRestoreActions {
-        sendTargetRestoreActions?.let { return it }
-        return MainSendTargetRestoreActions(
+    private val sendTargetRestoreActions: MainSendTargetRestoreActions by lazy {
+        MainSendTargetRestoreActions(
             binding = binding,
             projects = projects,
             setActiveProjectIndex = { activeProjectIndex = it },
@@ -418,12 +401,11 @@ class MainActivity : AppCompatActivity() {
             pauseCurrentWork = { activeWorkControlActions().pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions().showMessageActions(anchor, message) },
             showChat = { navigationController().showChat() }
-        ).also { sendTargetRestoreActions = it }
+        )
     }
 
-    private fun attachmentSendActions(): MainAttachmentSendActions {
-        attachmentSendActions?.let { return it }
-        return MainAttachmentSendActions(
+    private val attachmentSendActions: MainAttachmentSendActions by lazy {
+        MainAttachmentSendActions(
             activity = this,
             http = http,
             serverUrl = serverUrl,
@@ -431,41 +413,38 @@ class MainActivity : AppCompatActivity() {
             pendingAttachments = { pendingAttachments.toList() },
             setSendEnabled = sendEnabledActions()::setSendEnabled,
             startPreparedMessage = preparedMessageActions()::startPreparedMessage
-        ).also { attachmentSendActions = it }
+        )
     }
 
-    private fun pendingAttachmentActions(): MainPendingAttachmentActions {
-        pendingAttachmentActions?.let { return it }
-        return MainPendingAttachmentActions(
+    private val pendingAttachmentActions: MainPendingAttachmentActions by lazy {
+        MainPendingAttachmentActions(
             activity = this,
             pendingAttachments = pendingAttachments,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions().applyVoiceMode() },
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             refreshPendingAttachmentPreview = ::refreshPendingAttachmentPreview
-        ).also { pendingAttachmentActions = it }
+        )
     }
 
-    private fun attachmentPanelActions(): MainAttachmentPanelActions {
-        attachmentPanelActions?.let { return it }
-        return MainAttachmentPanelActions(
+    private val attachmentPanelActions: MainAttachmentPanelActions by lazy {
+        MainAttachmentPanelActions(
             activity = this,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             activeConversation = projectStateActions()::activeConversation,
             attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
-            collapseInputComposer = { inputFocusActions().collapseInputComposer() },
-            openCameraAttachment = { attachmentPickerActions().openCameraAttachment() },
-            openPhotoAttachment = { attachmentPickerActions().openPhotoAttachment() },
-            openDocumentAttachment = { attachmentPickerActions().openDocumentAttachment() }
-        ).also { attachmentPanelActions = it }
+            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
+            openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
+            openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() }
+        )
     }
 
-    private fun voiceModeActions(): MainVoiceModeActions {
-        voiceModeActions?.let { return it }
-        return MainVoiceModeActions(
+    private val voiceModeActions: MainVoiceModeActions by lazy {
+        MainVoiceModeActions(
             activity = this,
             binding = binding,
             inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
@@ -477,20 +456,19 @@ class MainActivity : AppCompatActivity() {
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
-            collapseAttachmentPanel = { attachmentPanelActions().collapseAttachmentPanel() },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions().updateAdaptiveInputHeight() }
-        ).also { voiceModeActions = it }
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+        )
     }
 
     private fun updateSendButtonVisual() {
         if (!::binding.isInitialized) return
-        sendButtonVisualActions().updateSendButtonVisual()
+        sendButtonVisualActions.updateSendButtonVisual()
     }
 
-    private fun sendButtonVisualActions(): MainSendButtonVisualActions {
-        sendButtonVisualActions?.let { return it }
-        return MainSendButtonVisualActions(
+    private val sendButtonVisualActions: MainSendButtonVisualActions by lazy {
+        MainSendButtonVisualActions(
             activity = this,
             binding = binding,
             dp = uiTools::dp,
@@ -500,7 +478,7 @@ class MainActivity : AppCompatActivity() {
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
             activeConversation = projectStateActions()::activeConversation
-        ).also { sendButtonVisualActions = it }
+        )
     }
 
     private fun speechInputActions(): MainSpeechInputActions {
@@ -512,7 +490,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions()::activeConversation,
             voiceHoldButton = { inputComposerViews.voiceHoldButton },
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions().applyVoiceMode() }
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() }
         ).also { speechInputActions = it }
     }
 
@@ -535,7 +513,7 @@ class MainActivity : AppCompatActivity() {
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions().updateFirstConversationStatus(text)
             },
-            collapseInputComposer = { animate -> inputFocusActions().collapseInputComposer(animate) },
+            collapseInputComposer = { animate -> inputFocusActions.collapseInputComposer(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
             setSendEnabled = sendEnabledActions()::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm()::maybePrewarmCodexSession
@@ -886,7 +864,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions()::activeConversation,
             showCreateConversationDialog = { conversationActions().showCreateConversationDialog() },
             showChat = { navigationController().showChat() },
-            sendMessage = { sendMessageActions().sendMessage() }
+            sendMessage = { sendMessageActions.sendMessage() }
         ).also { quickCommandActions = it }
     }
 
