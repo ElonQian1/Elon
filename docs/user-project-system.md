@@ -648,25 +648,27 @@ Tabs：
 
 ## 13. 关键改造点对应当前代码
 
+> 历史记录：Phase 5（commit `1840525`）已完成 legacy 网关清理。
+> 旧文件 `client_gateway.rs`、`client_protocol.rs`，以及 `/ws`、`/api/chat`、
+> `/ws/elon`、`/api/elon/download/:filename` 等旧入口均已删除。
+> 当前所有客户端入口统一收敛到 `project_api.rs` 下的项目级 WS 与 HTTP 端点。
+
 当前文件：
 
-- `server/src/api.rs`
-  - 当前 `/api/chat` 需要升级为项目级接口。
+- `server/src/project_api.rs`
+  - 项目级 WS（`/ws/user/:user_id/projects/:project_id`）与 HTTP（聊天 / 附件 / 下载）唯一入口。
 
-- `server/src/client_gateway.rs`
-  - 当前 `/ws` 和 `/download/{user_id}/{filename}` 需要加项目权限。
-
-- `server/src/client_protocol.rs`
-  - 当前解析 `user_id/project_id`，后续应只解析 message/agent。
+- `server/src/user_api.rs`
+  - 用户/项目/会话的 REST 管理接口。
 
 - `server/src/types.rs`
-  - 当前 `get_user_workspace` 需要新增 `get_project_workspace`。
+  - `get_user_workspace` / `get_project_workspace` 已就绪。
 
 - `server/src/admin.rs`
-  - 当前用户列表来自扫描目录，后续应来自数据库。
+  - 管理后台 API，数据来自数据库。
 
 - `server/src/web.rs`
-  - 当前 Web 页需要增加登录、项目列表、新建项目、项目详情。
+  - 内置 Web 页（登录、项目列表、项目详情）。
 
 - `android/app/src/main/kotlin/com/elon/app/MainActivity.kt`
   - 当前主界面需要先进入项目列表，再进入聊天。

@@ -213,7 +213,10 @@ pub async fn confirm_project_intent(
         // 解析失败：可能是 Codex 输出不是预期的 JSON，不要让整个请求崩。
         // 降级为 chat 路由，同时记入 fallback 供 trace 追踪。
         record_intent_gate_fallback(state, trace_id, "parse_error", &error.to_string());
-        Ok(intent_gate_fallback_chat_result(user_message, "parse_error"))
+        Ok(intent_gate_fallback_chat_result(
+            user_message,
+            "parse_error",
+        ))
     })
 }
 
@@ -1232,11 +1235,12 @@ async fn run_cli_command(
         Some(last_activity_ms.clone()),
         Some(tx.clone()),
     ));
-    let stderr_task = tokio::spawn(read_cli_stream(stderr, Some(last_activity_ms.clone()), None));
-    let heartbeat_task = tokio::spawn(send_cli_heartbeat(
-        tx.clone(),
-        last_activity_ms.clone(),
+    let stderr_task = tokio::spawn(read_cli_stream(
+        stderr,
+        Some(last_activity_ms.clone()),
+        None,
     ));
+    let heartbeat_task = tokio::spawn(send_cli_heartbeat(tx.clone(), last_activity_ms.clone()));
 
     if option.prompt_mode == CliPromptMode::Stdin {
         if let Some(mut stdin) = child.stdin.take() {
@@ -1605,10 +1609,7 @@ async fn send_cli_heartbeat(tx: UnboundedSender<String>, last_activity_ms: Arc<A
                 elapsed_secs, silence_secs
             )
         };
-        if tx
-            .send(WsMessage::Progress { message }.to_json())
-            .is_err()
-        {
+        if tx.send(WsMessage::Progress { message }.to_json()).is_err() {
             break;
         }
         last_heartbeat = Some(Instant::now());

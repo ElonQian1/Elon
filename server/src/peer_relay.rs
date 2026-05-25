@@ -42,9 +42,7 @@ pub async fn peer_ws_handler(
     Query(params): Query<PeerWsQuery>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| {
-        handle_peer_ws(socket, state, params.version_code.unwrap_or(0))
-    })
+    ws.on_upgrade(move |socket| handle_peer_ws(socket, state, params.version_code.unwrap_or(0)))
 }
 
 async fn handle_peer_ws(socket: WebSocket, state: Arc<AppState>, version_code: i64) {
@@ -162,7 +160,13 @@ pub async fn relay_apk(
     };
 
     let (resp_tx, resp_rx) = oneshot::channel();
-    if tx.send(PeerRequest { response_tx: resp_tx }).await.is_err() {
+    if tx
+        .send(PeerRequest {
+            response_tx: resp_tx,
+        })
+        .await
+        .is_err()
+    {
         return (StatusCode::SERVICE_UNAVAILABLE, "种子节点忙").into_response();
     }
 
@@ -222,7 +226,10 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
     // 注入 mirrors：仅包含 versionCode >= 当前发布版本的 seeder
     let reg = state.peer_registry.read().await;
     if !reg.is_empty() {
-        let current_vc = json.get("versionCode").and_then(|v| v.as_i64()).unwrap_or(0);
+        let current_vc = json
+            .get("versionCode")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
         let mirrors: Vec<serde_json::Value> = reg
             .iter()
             .filter(|(_, e)| e.version_code >= current_vc)
