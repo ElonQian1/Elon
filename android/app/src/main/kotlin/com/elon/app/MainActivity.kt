@@ -2287,37 +2287,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupQuickActions() {
-        binding.quickPlanButton.setOnClickListener {
-            fillPlanPrompt()
-        }
-        binding.quickContinueButton.setOnClickListener {
-            sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。")
-        }
-        binding.quickBuildButton.setOnClickListener {
-            sendQuickCommand("请编译当前项目并生成 APK 下载链接。")
-        }
-        binding.quickHistoryButton.setOnClickListener { showProjectRecordDialog() }
-        binding.quickSettingsButton.setOnClickListener { openSettings() }
-
-        binding.projectContinueButton.setOnClickListener {
-            sendQuickCommand("请继续当前项目的开发，并先说明下一步要做什么。")
-        }
-        binding.projectBuildButton.setOnClickListener {
-            sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。")
-        }
-        binding.projectRecordButton.setOnClickListener { showProjectRecordDialog() }
-        binding.projectGitButton.setOnClickListener { showGitProjectDialog() }
-        binding.projectSettingsButton.setOnClickListener { openSettings() }
-        binding.profileSettingsButton.setOnClickListener { openSettings() }
-        binding.profileCheckUpdateButton.setOnClickListener {
-            AppUpdateManager(this).manualCheck()
-        }
-        binding.profileShareButton.setOnClickListener { showPromotionDialog() }
-        binding.profileImportGuestButton.setOnClickListener { showGuestImportDialog() }
-        binding.profileLoginButton.setOnClickListener {
-            startActivity(Intent(this, LoginActivity::class.java))
-        }
-        binding.profileLogoutButton.setOnClickListener { confirmLogout() }
+        MainQuickActionBindings(
+            activity = this,
+            binding = binding,
+            fillPlanPrompt = ::fillPlanPrompt,
+            sendQuickCommand = ::sendQuickCommand,
+            showProjectRecordDialog = ::showProjectRecordDialog,
+            showGitProjectDialog = ::showGitProjectDialog,
+            openSettings = ::openSettings,
+            showPromotionDialog = ::showPromotionDialog,
+            showGuestImportDialog = ::showGuestImportDialog,
+            confirmLogout = ::confirmLogout
+        ).setupQuickActions()
         refreshAccountUi()
         binding.profileVersionText.text =
             "${localAppVersionLine()}\n服务器版本读取中..."
