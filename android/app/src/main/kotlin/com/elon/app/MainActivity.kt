@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.util.TypedValue
-import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -112,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private var taskMessageRouterActions: MainTaskMessageRouterActions? = null
     private var conversationTaskRegistryActions: MainConversationTaskRegistryActions? = null
     private var projectViewActions: MainProjectViewActions? = null
+    private var homeListActions: MainHomeListActions? = null
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
@@ -1279,55 +1279,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderConversationList() {
-        if (conversations.isEmpty()) return
-        val listVisible = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE
-        if (listVisible) {
-            binding.topTitleText.text = compactProjectTitle()
-        }
-
-        val first = conversations[0]
-        binding.projectStatusText.text = first.title
-        binding.statusText.text = first.subtitle
-        binding.statusText.setTextColor(conversationSubtitleColor(first.subtitle))
-        binding.conversationTimeText.text = timeFormatter.format(Date(first.updatedAt))
-        homeRows().updateConversationRowShimmer(binding.conversationItem, listVisible && isConversationWorking(0), true)
-
-        while (binding.conversationPage.childCount > 1) {
-            binding.conversationPage.removeViewAt(1)
-        }
-        for (index in 1 until conversations.size) {
-            binding.conversationPage.addView(homeRows().createConversationDivider())
-            binding.conversationPage.addView(
-                homeRows().createConversationRow(index, conversations[index], listVisible && isConversationWorking(index))
-            )
-        }
+        homeListActions().renderConversationList()
     }
 
     private fun renderProjectList() {
-        val container = binding.projectContentLayout
-        container.removeAllViews()
-
-        container.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52)
-            ).apply {
-                bottomMargin = dp(8)
-            }
-            setBackgroundColor(Color.parseColor("#202020"))
-            gravity = Gravity.CENTER_VERTICAL
-            text = "＋ 新建项目"
-            setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 15f
-            setPadding(dp(20), 0, dp(20), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { showCreateProjectDialog() }
-        })
-
-        projects.forEachIndexed { index, project ->
-            container.addView(homeRows().createProjectRow(index, project))
-        }
+        homeListActions().renderProjectList()
     }
 
     private fun showProjectActions(index: Int) {
@@ -1336,10 +1292,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isConversationWorking(index: Int): Boolean {
-        if (index !in conversations.indices || conversations[index].ended) return false
-        return runningConversationTasks.containsKey(
-            conversationTaskKey(activeProject().id, conversations[index].id)
-        )
+        return homeListActions().isConversationWorking(index)
+    }
+
+    private fun homeListActions(): MainHomeListActions {
+        homeListActions?.let { return it }
+        return MainHomeListActions(
+            activity = this,
+            binding = binding,
+            projects = { projects },
+            conversations = { conversations },
+            activeProject = ::activeProject,
+            compactProjectTitle = ::compactProjectTitle,
+            formatTime = { timeFormatter.format(Date(it)) },
+            isTaskRunning = { projectId, conversationId ->
+                runningConversationTasks.containsKey(conversationTaskKey(projectId, conversationId))
+            },
+            homeRows = { homeRows() },
+            dp = ::dp,
+            selectableForeground = ::selectableForeground,
+            showCreateProjectDialog = ::showCreateProjectDialog
+        ).also { homeListActions = it }
     }
 
     private fun homeRows(): MainHomeRows {
