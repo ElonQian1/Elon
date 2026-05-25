@@ -2,12 +2,10 @@ package com.elon.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.text.InputType
 import android.util.TypedValue
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.EditText
 import com.elon.app.BuildConfig
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -594,17 +592,6 @@ class MainActivity : AppCompatActivity() {
         ).also { navigationController = it }
     }
 
-    private fun titleEditText(value: String): EditText {
-        return EditText(this).apply {
-            setText(value)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            maxLines = 1
-            setSingleLine(true)
-            setSelectAllOnFocus(true)
-            setPadding(dp(18), dp(8), dp(18), dp(8))
-        }
-    }
-
     private fun conversationActions(): MainConversationActions {
         conversationActions?.let { return it }
         return MainConversationActions(
@@ -615,7 +602,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndexProvider = { activeConversationIndex },
             setActiveConversationIndex = { activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
-            titleEditText = ::titleEditText,
+            titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
             saveConversations = projectStateActions()::saveConversations,
             renderConversationList = homeListActions()::renderConversationList,
             setSendEnabled = sendEnabledActions()::setSendEnabled
@@ -855,7 +842,7 @@ class MainActivity : AppCompatActivity() {
             activeProjectIndexProvider = { activeProjectIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { activeConversationIndex = it },
-            titleEditText = ::titleEditText,
+            titleEditText = { value -> mainTitleEditText(this, value, ::dp) },
             saveProjects = projectStateActions()::saveProjects,
             renderProjectList = homeListActions()::renderProjectList,
             openProject = conversationOpenActions()::openProject,
