@@ -285,6 +285,7 @@ class MainActivity : AppCompatActivity() {
         setTaskAppForeground(true)
         registerTaskWorkReceiver()
         restorePendingActiveWork()
+        checkAndOfferGuestImport()
         startTaskWorkService(
             if (waitingForReply) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
         )
@@ -3135,6 +3136,7 @@ class MainActivity : AppCompatActivity() {
             AppUpdateManager(this).manualCheck()
         }
         binding.profileShareButton.setOnClickListener { showPromotionDialog() }
+        binding.profileImportGuestButton.setOnClickListener { showGuestImportDialog() }
         binding.profileLoginButton.setOnClickListener {
             startActivity(Intent(this, LoginActivity::class.java))
         }
@@ -3150,6 +3152,8 @@ class MainActivity : AppCompatActivity() {
         val loggedIn = AuthManager.isLoggedIn(this)
         binding.profileLoginButton.visibility = if (loggedIn) View.GONE else View.VISIBLE
         binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
+        binding.profileImportGuestButton.visibility =
+            if (loggedIn && importableGuestProjects().isNotEmpty()) View.VISIBLE else View.GONE
         binding.userInfoText.text = buildAccountInfoText()
     }
 
@@ -3161,6 +3165,69 @@ class MainActivity : AppCompatActivity() {
             "我的开发工作台\n登录账号：$name$tail\n云端工作区已就绪，可在网页版和其它手机间同步。"
         } else {
             "我的开发工作台\n游客模式 · 项目仅保存在本机\n登录后可在网页版和其它手机间继续同一个项目。"
+        }
+    }
+
+    /** 返回游客 prefs 中"值得导入"的项目列表（已登录、且当前账号中不存在）。 */
+    private fun importableGuestProjects(): List<AppProject> {
+        if (!AuthManager.isLoggedIn(this)) return emptyList()
+        val json = AuthManager.guestDataPrefs(this).getString("projects_json", null) ?: return emptyList()
+        val all = runCatching {
+            gson.fromJson(json, Array<AppProject>::class.java)?.toList()
+        }.getOrNull() ?: return emptyList()
+        val existingIds = projects.map { it.id }.toSet()
+        return all.filter { p ->
+            p.id != "elon-self" &&
+            p.id !in existingIds &&
+            p.conversations.any { c -> c.messages.any { m -> m.role == "user" } }
+        }
+    }
+
+    /** 首次登录后自动弹窗询问是否导入游客记录（每个游客 ID 只弹一次）。 */
+    private fun checkAndOfferGuestImport() {
+        if (!AuthManager.isLoggedIn(this)) return
+        val guestId = AuthManager.legacyAnonymousUserId(this)
+        val offerKey = "guest_import_offered_$guestId"
+        if (prefs.getBoolean(offerKey, false)) return
+        val importable = importableGuestProjects()
+        if (importable.isEmpty()) return
+        prefs.edit().putBoolean(offerKey, true).apply()
+        AlertDialog.Builder(this)
+            .setTitle("发现游客记录")
+            .setMessage("检测到本机游客状态下有 ${importable.size} 个项目，是否导入到当前账号？")
+            .setPositiveButton("导入") { _, _ -> performGuestImport(importable) }
+            .setNegativeButton("暂不导入", null)
+            .show()
+    }
+
+    /** 手动从个人页触发的导入入口。 */
+    private fun showGuestImportDialog() {
+        val importable = importableGuestProjects()
+        if (importable.isEmpty()) {
+            android.widget.Toast.makeText(this, "没有可导入的游客记录", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("导入游客记录")
+            .setMessage("将导入 ${importable.size} 个游客项目到当前账号，是否继续？")
+            .setPositiveButton("导入") { _, _ -> performGuestImport(importable) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun performGuestImport(importable: List<AppProject>) {
+        var count = 0
+        for (p in importable) {
+            if (projects.none { it.id == p.id }) {
+                projects.add(p)
+                count++
+            }
+        }
+        if (count > 0) {
+            saveProjects()
+            renderProjectList()
+            refreshAccountUi()
+            android.widget.Toast.makeText(this, "已导入 $count 个游客项目", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 

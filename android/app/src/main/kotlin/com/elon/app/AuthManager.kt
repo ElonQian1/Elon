@@ -38,6 +38,15 @@ object AuthManager {
         return ctx.getSharedPreferences("elon_data_$userId", Context.MODE_PRIVATE)
     }
 
+    /**
+     * 返回游客（设备 UUID）专用的数据存储，始终以本机设备 UUID 命名，
+     * 不随账号登录/登出而变化。用于登录后迁移游客历史记录。
+     */
+    fun guestDataPrefs(ctx: Context): SharedPreferences {
+        val guestId = legacyAnonymousUserId(ctx)
+        return ctx.getSharedPreferences("elon_data_$guestId", Context.MODE_PRIVATE)
+    }
+
     fun isLoggedIn(ctx: Context): Boolean = !token(ctx).isNullOrBlank() && !userId(ctx).isNullOrBlank()
 
     fun token(ctx: Context): String? = prefs(ctx).getString(KEY_AUTH_TOKEN, null)?.takeIf { it.isNotBlank() }
