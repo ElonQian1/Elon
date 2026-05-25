@@ -297,6 +297,7 @@ cd e:\lodex\Elon\android
 - 执行实现：选择 `elon-implementer` agent。
 - 提交前审查：选择 `elon-reviewer` agent。
 - 可移植技能入口：启用 Agent Skills 后使用 `cloud-apk-dev` skill。
+- 跨项目模块化治理：把 `.github/skills/modular-long-term-dev` 复制到其他项目，或在支持 Agent Skills 的工具里启用 `modular-long-term-dev` skill，防止 AI 继续制造巨型文件。
 
 ## VS Code Customization 检查
 

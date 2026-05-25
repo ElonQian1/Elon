@@ -1,0 +1,4 @@
+interface:
+  display_name: "Modular Long-Term Dev"
+  short_description: "Prevent giant files with modular AI work"
+  default_prompt: "Use the modular-long-term-dev skill to keep this change modular and avoid giant files."

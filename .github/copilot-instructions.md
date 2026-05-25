@@ -75,6 +75,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - VS Code 也会识别 `AGENTS.md`、`CLAUDE.md` 和组织级 instructions；管理入口优先使用 `Chat: Open Customizations`，避免多处复制长规则。
 - 本项目已提供 `/elon-dev-task`、`/elon-apk-release` prompt，以及 `elon-planner`、`elon-implementer`、`elon-reviewer` agents；优先用这些入口执行标准工作流。
 - 本项目同时提供 `.github/skills/cloud-apk-dev/SKILL.md` 作为 VS Code 官方 Agent Skills 入口；用 diagnostics 确认 customization 加载状态。
+- 本项目还提供 `.github/skills/modular-long-term-dev/SKILL.md` 作为可复制到其他项目的模块化治理 skill；其他项目可用它约束 AI 避免巨型文件。
 - 复杂任务先用 Plan/规划思路做 discovery、alignment、design、refinement；计划确认后再进入实现。
 - 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
 
@@ -129,6 +130,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | `docs/vscode-copilot-working-model.md` | VS Code Copilot 最新 agent / instructions / prompt files / custom agents 工作方式速记 |
 | `AGENTS.md` | 多 AI 工具共享入口和 VS Code 快捷工作流索引 |
 | `.github/skills/cloud-apk-dev/SKILL.md` | VS Code 官方 Agent Skills 入口，封装云端 APK 开发/部署流程 |
+| `.github/skills/modular-long-term-dev/SKILL.md` | 可复制到其他项目的模块化长期主义 skill，约束 AI 避免巨型文件 |
 
 ---
 

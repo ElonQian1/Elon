@@ -25,6 +25,7 @@ For `local_path` and GitHub projects, the workspace must already be a real Git r
 - `.github/prompts/*.prompt.md`: VS Code slash-command prompts for recurring project workflows.
 - `.github/agents/*.agent.md`: VS Code custom agents for planning, implementation, and review roles.
 - `.github/skills/cloud-apk-dev/SKILL.md`: VS Code official Agent Skills entry for cloud APK development and deployment.
+- `.github/skills/modular-long-term-dev/SKILL.md`: portable Agent Skill for other projects to prevent giant files and keep AI-assisted work modular.
 - `.copilot/skills/cloud-apk-dev/SKILL.md`: cloud APK development and deployment workflow.
 - `docs/ai-agent-workflow.md`: full AI agent workflow from request analysis through code change, verification, commit, build, deploy, and feedback.
 - `docs/system-architecture.md`: architecture, data flow, module responsibilities, and security constraints.
