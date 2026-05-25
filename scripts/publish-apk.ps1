@@ -168,19 +168,21 @@ function Get-OriginMainSha {
 }
 
 function Get-DeployedApkSha {
+    # 优先 HTTP 查询 /app/version.json：快、不依赖 SSH、不会挂死。
+    # SSH 仅作为 fallback，且必须设连接超时避免阻塞构建/轮询。
     try {
-        $raw = ssh -o ProxyCommand=none $ServerHost "cat $ApkShaFile 2>/dev/null || true" 2>$null
-        $sha = ($raw | Out-String).Trim()
-        if ($sha -match '^[0-9a-f]{40}$') { return $sha }
-    } catch {
-        Write-Warning "无法读取服务器 APK 部署 SHA：$_"
-    }
-    try {
-        $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
+        $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
         $sha = [string]$published.gitSha
         if ($sha -match '^[0-9a-f]{40}$') { return $sha }
     } catch {
         Write-Warning "无法从 /app/version.json 读取 APK gitSha：$_"
+    }
+    try {
+        $raw = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -o BatchMode=yes $ServerHost "cat $ApkShaFile 2>/dev/null || true" 2>$null
+        $sha = ($raw | Out-String).Trim()
+        if ($sha -match '^[0-9a-f]{40}$') { return $sha }
+    } catch {
+        Write-Warning "无法读取服务器 APK 部署 SHA：$_"
     }
     return $null
 }
@@ -366,7 +368,7 @@ function Publish-ApkStaged {
     $apkStage = "$ServerDir/ElonSpeed-latest.apk.$ReleaseSha.tmp"
     $jsonStage = "$ServerDir/version.json.$ReleaseSha.tmp"
 
-    ssh -o ProxyCommand=none $ServerHost "mkdir -p $ServerDir"
+    ssh -o ProxyCommand=none -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 $ServerHost "mkdir -p $ServerDir"
     if ($LASTEXITCODE -ne 0) { Write-Error "无法创建服务器 APK 目录：$ServerDir" }
 
     scp -o ProxyCommand=none $ApkPath "${ServerHost}:${apkStage}"
@@ -414,7 +416,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
     $remoteScript = $remoteScript -replace "`r`n", "`n"
     $remoteScript = $remoteScript -replace "`r", "`n"
 
-    $remoteScript | ssh -o ProxyCommand=none $ServerHost "bash -s"
+    $remoteScript | ssh -o ProxyCommand=none -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 $ServerHost "bash -s"
     $deployExit = $LASTEXITCODE
 
     if ($deployExit -eq 42) {
