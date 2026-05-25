@@ -1,9 +1,6 @@
 package com.elon.app
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
@@ -19,7 +16,6 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 import java.text.SimpleDateFormat
@@ -32,7 +28,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatAdapter: ChatAdapter
     private var waitingForReply = false
     private var activeRequestIsDevelopment = false
-    private var workflowStepIndex = 0
     private var serverResponseToken = 0
     private var appInForeground = false
     private var pendingRequestPayload: String? = null
@@ -42,7 +37,6 @@ class MainActivity : AppCompatActivity() {
     private val runningTraceToConversation = linkedMapOf<String, String>()
     private val taskResponseTokens = linkedMapOf<String, Int>()
     private var backendConnected = false
-    private var taskWorkReceiverRegistered = false
     private val projects = mutableListOf<AppProject>()
     private val gson = com.google.gson.Gson()
     private val http = OkHttpClient()
@@ -116,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     private var assistantTerminalActions: MainAssistantTerminalActions? = null
     private var assistantStreamEvents: MainAssistantStreamEvents? = null
     private var taskWorkEventActions: MainTaskWorkEventActions? = null
+    private var taskWorkReceiverActions: MainTaskWorkReceiverActions? = null
     private var preparedMessageActions: MainPreparedMessageActions? = null
     private var sendMessageActions: MainSendMessageActions? = null
     private var serverResponseWatchdogActions: MainServerResponseWatchdogActions? = null
@@ -139,12 +134,6 @@ class MainActivity : AppCompatActivity() {
     private val speechPermissionRequest = 4301
     private val notificationPermissionRequest = 4302
     private val pendingAttachments = mutableListOf<PendingAttachment>()
-    private val taskWorkReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            taskWorkEventActions().handleTaskWorkEvent(intent)
-        }
-    }
-
     /**
      * 当前会话使用的 user_id。
      * - 已登录：使用服务端返回的 user.id（跨设备稳定）。
@@ -180,7 +169,7 @@ class MainActivity : AppCompatActivity() {
             restoreCachedModelSelection = { modelActions().restoreCachedModelSelection() },
             updateProjectViews = ::updateProjectViews,
             setTaskAppForeground = { foreground -> taskWorkServiceActions().setTaskAppForeground(foreground) },
-            registerTaskWorkReceiver = ::registerTaskWorkReceiver,
+            registerTaskWorkReceiver = { taskWorkReceiverActions().registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions().restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             getWaitingForReply = { waitingForReply },
@@ -282,7 +271,6 @@ class MainActivity : AppCompatActivity() {
                 pendingReconnectForActiveWork = false
                 reconnectAttempts = 0
                 persistActiveWork()
-                workflowStepIndex = 0
                 foldedCliLogActions().reset()
                 evidenceActions().clearCurrentEvidence()
                 toolActionBubbles().clear()
@@ -847,21 +835,6 @@ class MainActivity : AppCompatActivity() {
         ).also { conversationTaskRegistryActions = it }
     }
 
-    private fun registerTaskWorkReceiver() {
-        if (taskWorkReceiverRegistered) return
-        val filter = IntentFilter().apply {
-            addAction(TaskWorkService.ACTION_EVENT)
-            addAction(TaskWorkService.ACTION_STATE)
-        }
-        ContextCompat.registerReceiver(
-            this,
-            taskWorkReceiver,
-            filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        taskWorkReceiverRegistered = true
-    }
-
     private fun taskWorkEventActions(): MainTaskWorkEventActions {
         taskWorkEventActions?.let { return it }
         return MainTaskWorkEventActions(
@@ -898,6 +871,14 @@ class MainActivity : AppCompatActivity() {
             },
             refreshActiveTaskState = { conversationTaskRegistryActions().refreshActiveTaskState() }
         ).also { taskWorkEventActions = it }
+    }
+
+    private fun taskWorkReceiverActions(): MainTaskWorkReceiverActions {
+        taskWorkReceiverActions?.let { return it }
+        return MainTaskWorkReceiverActions(
+            activity = this,
+            handleTaskWorkEvent = { intent -> taskWorkEventActions().handleTaskWorkEvent(intent) }
+        ).also { taskWorkReceiverActions = it }
     }
 
     private fun appendTaskMessage(
@@ -1178,11 +1159,6 @@ class MainActivity : AppCompatActivity() {
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         ).also { messageActions = it }
-    }
-
-    private fun nextWorkflowStep(label: String): String {
-        workflowStepIndex += 1
-        return "步骤 $workflowStepIndex · $label"
     }
 
     private fun workflowStoppedMessage(reason: String, wasDevelopment: Boolean = activeRequestIsDevelopment): String {
@@ -1507,11 +1483,8 @@ class MainActivity : AppCompatActivity() {
                 speechInputActions?.destroy()
                 speechInputActions = null
             },
-            isTaskWorkReceiverRegistered = { taskWorkReceiverRegistered },
-            unregisterTaskWorkReceiver = {
-                unregisterReceiver(taskWorkReceiver)
-                taskWorkReceiverRegistered = false
-            }
+            isTaskWorkReceiverRegistered = { taskWorkReceiverActions().isRegistered },
+            unregisterTaskWorkReceiver = { taskWorkReceiverActions().unregisterTaskWorkReceiver() }
         ).also { lifecycleEdgeActions = it }
     }
 }
