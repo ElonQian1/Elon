@@ -5,7 +5,6 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -39,9 +38,6 @@ object McpDebugServer {
     private const val PORT = 8787
     private const val PROTOCOL_VERSION = "2025-06-18"
     private const val PREF_MCP_TOKEN = "mcp_debug_token"
-    private const val PREF_DEBUG_SESSION_ID = "mcp_debug_session_id"
-    private const val PREF_DEBUG_SESSION_STARTED_AT = "mcp_debug_session_started_at"
-    private const val PREF_DEBUG_SESSION_NOTE = "mcp_debug_session_note"
     private const val SOCKET_TIMEOUT_MS = 5_000
     private const val DEFAULT_SERVER_BASE_URL = "http://43.139.149.158:8080"
 
@@ -193,12 +189,12 @@ object McpDebugServer {
 
         val result = when (name) {
             "phone_status" -> toolResult("Phone MCP debug server is running.", statusJson(includeToken = false))
-            "trace_recent" -> traceRecent(args)
+            "trace_recent" -> mcpTraceRecent(args)
             "trace_clear" -> {
                 DebugTraceStore.clear()
                 toolResult("Trace buffer cleared.", JSONObject().put("cleared", true))
             }
-            "debug_session" -> debugSession(args)
+            "debug_session" -> mcpDebugSession(appContext, args)
             "diagnostic_bundle" -> diagnosticBundle(args)
             "device_snapshot" -> deviceSnapshot(args)
             "network_check" -> networkCheck(args)
@@ -207,8 +203,8 @@ object McpDebugServer {
             "server_trace" -> serverTrace(args)
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
-            "debug_keepalive" -> debugKeepalive(args)
-            "update_status" -> updateStatus(args)
+            "debug_keepalive" -> mcpDebugKeepalive(appContext, args)
+            "update_status" -> mcpUpdateStatus(args)
             "task_status" -> taskStatus(args)
             "task_control" -> taskControl(args)
             "task_events" -> taskEvents(args)
@@ -220,79 +216,16 @@ object McpDebugServer {
         return rpcResult(id, result)
     }
 
-    private fun traceRecent(args: JSONObject): JSONObject {
-        val limit = args.optInt("limit", 80).coerceIn(1, 300)
-        val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
-        val phase = args.optString("phase").takeIf { it.isNotBlank() }
-        val contains = args.optString("contains").takeIf { it.isNotBlank() }
-        val sinceWallTimeMs = args.optLong("since_wall_time_ms", 0L).takeIf { it > 0L }
-        val allEvents = DebugTraceStore.recentEvents(300)
-        val filtered = allEvents.filter { event ->
-            (traceId == null || event.details["trace_id"] == traceId) &&
-                (phase == null || event.phase == phase) &&
-                (contains == null || mcpTraceEventSearchText(event).contains(contains, ignoreCase = true)) &&
-                (sinceWallTimeMs == null || event.wallTimeMs >= sinceWallTimeMs)
-        }
-        val events = filtered.takeLast(limit)
-        val structured = JSONObject()
-            .put("events", mcpTraceEventsJson(events))
-            .put("limit", limit)
-            .put("matched_count", filtered.size)
-            .put(
-                "filters",
-                JSONObject()
-                    .put("trace_id", traceId ?: JSONObject.NULL)
-                    .put("phase", phase ?: JSONObject.NULL)
-                    .put("contains", contains ?: JSONObject.NULL)
-                    .put("since_wall_time_ms", sinceWallTimeMs ?: JSONObject.NULL)
-            )
-        return toolResult("Returned ${events.size} recent trace events.", structured)
-    }
-
-    private fun debugSession(args: JSONObject): JSONObject {
-        val action = args.optString("action", "status").lowercase(Locale.ROOT)
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-        val structured = when (action) {
-            "start" -> startDebugSession(
-                prefs = prefs,
-                requestedSessionId = args.optString("session_id").takeIf { it.isNotBlank() },
-                note = args.optString("note").takeIf { it.isNotBlank() }
-            ).put("action", action)
-            "end" -> {
-                val current = debugSessionJson(prefs)
-                prefs.edit()
-                    .remove(PREF_DEBUG_SESSION_ID)
-                    .remove(PREF_DEBUG_SESSION_STARTED_AT)
-                    .remove(PREF_DEBUG_SESSION_NOTE)
-                    .apply()
-                DebugTraceStore.record(
-                    "mcp_debug_session_end",
-                    mapOf("debug_session_id" to current.optString("session_id").takeIf { it.isNotBlank() })
-                )
-                debugSessionJson(prefs)
-                    .put("action", action)
-                    .put("ended_session", current)
-            }
-            "status" -> debugSessionJson(prefs).put("action", action)
-            else -> return toolResult(
-                "Unsupported debug session action: $action",
-                JSONObject().put("action", action),
-                isError = true
-            )
-        }
-        return toolResult("Debug session status returned.", structured)
-    }
-
     private fun diagnosticBundle(args: JSONObject): JSONObject {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
         val session = if (args.optBoolean("start_session", false)) {
-            startDebugSession(
+            startMcpDebugSession(
                 prefs = prefs,
                 requestedSessionId = args.optString("session_id").takeIf { it.isNotBlank() },
                 note = args.optString("note").takeIf { it.isNotBlank() }
             )
         } else {
-            debugSessionJson(prefs)
+            mcpDebugSessionJson(prefs)
         }
         val sessionStartedAt = session.optLong("started_at_ms", 0L).takeIf { it > 0L }
         val sinceWallTimeMs = args.optLong("since_wall_time_ms", 0L)
@@ -322,7 +255,7 @@ object McpDebugServer {
         val selfCheck = mcpSelfCheck(JSONObject().put("include_update_check", includeUpdateCheck))
             .optJSONObject("structuredContent")
             ?: JSONObject()
-        val trace = traceRecent(traceArgs).optJSONObject("structuredContent") ?: JSONObject()
+        val trace = mcpTraceRecent(traceArgs).optJSONObject("structuredContent") ?: JSONObject()
         val taskEvents = taskEvents(JSONObject().put("limit", args.optInt("task_event_limit", 20).coerceIn(1, 120)))
             .optJSONObject("structuredContent")
             ?: JSONObject()
@@ -506,7 +439,7 @@ object McpDebugServer {
         }
 
         val updateStatus = if (includeUpdateCheck) {
-            updateStatus(JSONObject()).optJSONObject("structuredContent") ?: JSONObject.NULL
+            mcpUpdateStatus(JSONObject()).optJSONObject("structuredContent") ?: JSONObject.NULL
         } else {
             JSONObject.NULL
         }
@@ -529,63 +462,6 @@ object McpDebugServer {
 
     private fun mcpMetrics(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
         return toolResult("MCP metrics returned.", metricsJson())
-    }
-
-    private fun debugKeepalive(args: JSONObject): JSONObject {
-        val action = args.optString("action", "status").lowercase(Locale.ROOT)
-        when (action) {
-            "start" -> {
-                appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, false)
-                    .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, true)
-                    .putLong(McpDebugKeepAliveService.PREF_STARTED_AT, System.currentTimeMillis())
-                    .apply()
-                val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
-                    this.action = McpDebugKeepAliveService.ACTION_START
-                }
-                ContextCompat.startForegroundService(appContext, intent)
-                DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "start"))
-            }
-            "stop" -> {
-                appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
-                    .edit()
-                    .putBoolean(McpDebugKeepAliveService.PREF_MANUAL_STOPPED, true)
-                    .putBoolean(McpDebugKeepAliveService.PREF_ACTIVE, false)
-                    .remove(McpDebugKeepAliveService.PREF_STARTED_AT)
-                    .apply()
-                val intent = Intent(appContext, McpDebugKeepAliveService::class.java).apply {
-                    this.action = McpDebugKeepAliveService.ACTION_STOP
-                }
-                appContext.stopService(intent)
-                DebugTraceStore.record("mcp_keepalive_requested", mapOf("action" to "stop"))
-            }
-            "status" -> Unit
-            else -> return toolResult(
-                "Unsupported keepalive action: $action",
-                JSONObject().put("action", action),
-                isError = true
-            )
-        }
-        return toolResult(
-            "MCP keepalive status returned.",
-            McpDebugKeepAliveService.statusJson(appContext).put("action", action)
-        )
-    }
-
-    private fun updateStatus(args: JSONObject): JSONObject {
-        val url = args.optString("server_url")
-            .takeIf { it.isNotBlank() }
-            ?: "http://43.139.149.158:8080/app/version.json"
-        val server = fetchJson(url)
-        val latestCode = server?.optInt("versionCode", 0) ?: 0
-        val structured = JSONObject()
-            .put("installed_version_name", BuildConfig.VERSION_NAME)
-            .put("installed_version_code", BuildConfig.VERSION_CODE)
-            .put("server_url", url)
-            .put("server_version", server ?: JSONObject.NULL)
-            .put("update_available", latestCode > BuildConfig.VERSION_CODE)
-        return toolResult("APK update status returned.", structured, isError = server == null)
     }
 
     private fun taskStatus(args: JSONObject): JSONObject {
@@ -1419,38 +1295,6 @@ object McpDebugServer {
         lastError = null
     }
 
-    private fun startDebugSession(
-        prefs: SharedPreferences,
-        requestedSessionId: String?,
-        note: String?
-    ): JSONObject {
-        val sessionId = requestedSessionId ?: "mcp_session_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
-        val startedAt = System.currentTimeMillis()
-        prefs.edit()
-            .putString(PREF_DEBUG_SESSION_ID, sessionId)
-            .putLong(PREF_DEBUG_SESSION_STARTED_AT, startedAt)
-            .apply {
-                if (note == null) remove(PREF_DEBUG_SESSION_NOTE) else putString(PREF_DEBUG_SESSION_NOTE, note)
-            }
-            .apply()
-        DebugTraceStore.record(
-            "mcp_debug_session_start",
-            mapOf("debug_session_id" to sessionId, "note" to note)
-        )
-        return debugSessionJson(prefs)
-    }
-
-    private fun debugSessionJson(prefs: SharedPreferences): JSONObject {
-        val sessionId = prefs.getString(PREF_DEBUG_SESSION_ID, null)?.takeIf { it.isNotBlank() }
-        val startedAt = prefs.getLong(PREF_DEBUG_SESSION_STARTED_AT, 0L).takeIf { it > 0L }
-        return JSONObject()
-            .put("active", sessionId != null && startedAt != null)
-            .put("session_id", sessionId ?: JSONObject.NULL)
-            .put("started_at_ms", startedAt ?: JSONObject.NULL)
-            .put("age_ms", startedAt?.let { System.currentTimeMillis() - it } ?: JSONObject.NULL)
-            .put("note", prefs.getString(PREF_DEBUG_SESSION_NOTE, null) ?: JSONObject.NULL)
-    }
-
     private fun deviceSnapshotJson(): JSONObject {
         val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
         return JSONObject()
@@ -1458,7 +1302,7 @@ object McpDebugServer {
             .put("elapsed_realtime_ms", SystemClock.elapsedRealtime())
             .put("timezone", TimeZone.getDefault().id)
             .put("app", statusJson(includeToken = false))
-            .put("debug_session", debugSessionJson(prefs))
+            .put("debug_session", mcpDebugSessionJson(prefs))
             .put("background_debug", backgroundDebugStatusJson(appContext))
             .put("memory", memoryJson(appContext))
             .put("battery", batteryJson(appContext))
