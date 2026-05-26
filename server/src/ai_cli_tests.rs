@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_cli_output::parse_intent_gate_result;
+use crate::types::{AiCliOption, CliPromptMode};
 
 #[test]
 fn codex_exec_args_enable_json_output() {
