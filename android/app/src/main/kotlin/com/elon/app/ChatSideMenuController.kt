@@ -36,6 +36,7 @@ internal class ChatSideMenuController(
     private val selectableForeground: () -> Drawable?
 ) {
     private val interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+    private lateinit var overlayHost: FrameLayout
     private lateinit var overlay: FrameLayout
     private lateinit var panel: FrameLayout
     private lateinit var settingsBubble: FrameLayout
@@ -55,6 +56,7 @@ internal class ChatSideMenuController(
     fun setup() {
         if (isSetup) return
         isSetup = true
+        overlayHost = activity.findViewById(android.R.id.content)
 
         overlay = FrameLayout(activity).apply {
             visibility = View.GONE
@@ -68,14 +70,18 @@ internal class ChatSideMenuController(
         panel = FrameLayout(activity).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.parseColor("#182029"), Color.parseColor("#101214"))
+                intArrayOf(
+                    Color.parseColor("#1B1B1B"),
+                    Color.parseColor("#151515"),
+                    Color.parseColor("#101010")
+                )
             )
             clipChildren = false
             clipToPadding = false
             elevation = dp(8).toFloat()
         }
         overlay.addView(panel)
-        binding.contentContainer.addView(
+        overlayHost.addView(
             overlay,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -235,7 +241,7 @@ internal class ChatSideMenuController(
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
                 leftMargin = dp(32)
-                topMargin = dp(56)
+                topMargin = dp(106)
             }
         )
         listOf("项目", "文件库", "设备").forEach { title ->
@@ -257,7 +263,7 @@ internal class ChatSideMenuController(
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
                 leftMargin = dp(32)
-                topMargin = dp(338)
+                topMargin = dp(388)
             }
         )
         chatGroup.addView(sectionText("当前聊天"))
@@ -416,7 +422,7 @@ internal class ChatSideMenuController(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#CACDD2"))
+            setTextColor(Color.parseColor("#C9C9C9"))
             textSize = 17.5f
         }
     }
@@ -424,7 +430,7 @@ internal class ChatSideMenuController(
     private fun sectionText(title: String): TextView {
         return menuText(title).apply {
             layoutParams = LinearLayout.LayoutParams(dp(210), dp(44))
-            setTextColor(Color.parseColor("#D0D2D6"))
+            setTextColor(Color.parseColor("#D0D0D0"))
         }
     }
 
@@ -470,6 +476,7 @@ internal class ChatSideMenuController(
 
     private fun applyPanelWidth() {
         val screenWidth = binding.contentContainer.width.takeIf { it > 0 }
+            ?: overlayHost.width.takeIf { it > 0 }
             ?: activity.resources.displayMetrics.widthPixels
         val maxWidth = (screenWidth - dp(56)).coerceAtLeast(1)
         val minWidth = min(dp(280), maxWidth)
@@ -488,7 +495,8 @@ internal class ChatSideMenuController(
 
     private fun closedTranslation(): Float {
         val width = panel.width.takeIf { it > 0 }
-            ?: ((binding.contentContainer.width.takeIf { it > 0 }
+            ?: ((overlayHost.width.takeIf { it > 0 }
+                ?: binding.contentContainer.width.takeIf { it > 0 }
                 ?: activity.resources.displayMetrics.widthPixels) - dp(84)).coerceAtLeast(dp(1))
         return -width.toFloat()
     }
