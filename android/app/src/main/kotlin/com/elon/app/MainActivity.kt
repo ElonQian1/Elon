@@ -516,7 +516,7 @@ class MainActivity : AppCompatActivity() {
         MainHomeListActions(
             activity = this,
             binding = binding,
-            projects = { projects },
+            projects = { s.projects },
             conversations = { projectStateActions.conversations },
             friends = { s.friends },
             activeProject = projectStateActions::activeProject,

@@ -33,7 +33,7 @@ class MainActivityState {
 
     // ── 数据列表 ─────────────────────────────────────────────────────────────
     val projects = mutableListOf<AppProject>()
-    val friends = mutableListOf<AppFriend>()
+    internal val friends = mutableListOf<AppFriend>()
     var activeProjectIndex = 0
 
     // ── 工具实例 ─────────────────────────────────────────────────────────────
