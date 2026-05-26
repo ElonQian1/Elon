@@ -11,6 +11,7 @@ class ElonWsClient(
     private val onMessage: (String) -> Unit,
     private val onConnected: () -> Unit,
     private val onDisconnected: () -> Unit,
+    private val onAuthRequired: () -> Unit = {},
 ) {
     private val TAG = "ElonWsClient"
     private val client = OkHttpClient.Builder()
@@ -50,11 +51,16 @@ class ElonWsClient(
                 connected.set(false)
                 if (ws == webSocket) ws = null
                 Log.e(TAG, "连接失败: ${t.message}")
+                val httpCode = response?.code
                 DebugTraceStore.record(
                     "ws_failure",
-                    mapOf("error" to t.message, "http_code" to response?.code)
+                    mapOf("error" to t.message, "http_code" to httpCode)
                 )
-                onDisconnected()
+                if (httpCode == 401) {
+                    onAuthRequired()
+                } else {
+                    onDisconnected()
+                }
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {

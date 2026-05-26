@@ -202,6 +202,23 @@ class TaskWorkService : Service() {
                 current.payloadSentForCurrentConnection = false
                 broadcastStatus("disconnected", current)
                 if (current.waitingForReply) scheduleReconnect(current)
+            },
+            onAuthRequired = onAuthRequired@{
+                val current = activeTasks[task.traceId] ?: return@onAuthRequired
+                if (generation != current.clientGeneration) return@onAuthRequired
+                DebugTraceStore.record(
+                    "task_ws_auth_required",
+                    mapOf("trace_id" to current.traceId, "server_url" to serverUrl)
+                )
+                // 停止重连，通知 UI 跳转登录
+                cleanupTask(current.traceId, disconnect = false)
+                broadcastStatus("auth_required", current)
+                persistTaskWork(prefs, activeTasks.values)
+                broadcastState()
+                if (!hasActiveTasks()) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             }
         )
         task.wsClient = created

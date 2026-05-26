@@ -19,7 +19,8 @@ internal class MainTaskWorkEventActions(
     private val removeConversationTask: (String?, String?, String?) -> ConversationTaskState?,
     private val syncActiveTasksFromServiceState: (String?) -> Unit,
     private val clearTaskMaps: () -> Unit,
-    private val refreshActiveTaskState: () -> Unit
+    private val refreshActiveTaskState: () -> Unit,
+    private val navigateToLogin: () -> Unit = {},
 ) {
     fun handleTaskWorkEvent(intent: Intent) {
         when (intent.action) {
@@ -41,6 +42,7 @@ internal class MainTaskWorkEventActions(
         when (intent.getStringExtra(TaskWorkService.EXTRA_KIND)) {
             "connected" -> handleConnected(traceId, projectId, conversationId, isDevelopment)
             "disconnected" -> handleDisconnected(traceId, projectId, conversationId, isDevelopment)
+            "auth_required" -> handleAuthRequired()
             "message" -> {
                 intent.getStringExtra(TaskWorkService.EXTRA_RAW_MESSAGE)?.let { raw ->
                     appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
@@ -95,6 +97,13 @@ internal class MainTaskWorkEventActions(
             updateIdleReadyStatus()
             setSendEnabled(!isActiveConversationWorking())
         }
+    }
+
+    private fun handleAuthRequired() {
+        setBackendConnected(false)
+        updateFirstConversationStatus("登录已失效，请重新登录")
+        setSendEnabled(false)
+        navigateToLogin()
     }
 
     private fun handleState(intent: Intent) {

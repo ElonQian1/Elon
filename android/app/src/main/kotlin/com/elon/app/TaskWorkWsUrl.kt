@@ -26,6 +26,9 @@ internal fun taskProjectWsUrl(
         ?.takeIf { it.isNotBlank() }
     val query = mutableListOf("app_version_code=${BuildConfig.VERSION_CODE}")
     projectTitle?.let { query += "title=${taskWsPathPart(it)}" }
+    // 登录后把 token 带入 WS 握手，服务器 REQUIRE_LOGIN=true 时必须
+    AuthManager.token(context)?.takeIf { it.isNotBlank() }
+        ?.let { query += "token=${URLEncoder.encode(it, "UTF-8")}" }
     return "ws://43.139.149.158:8080/ws/user/${taskWsPathPart(userId)}/projects/${taskWsPathPart(projectId)}?${query.joinToString("&")}"
 }
 

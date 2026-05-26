@@ -52,7 +52,10 @@ internal class MainTaskActions(
                 runningTraceToConversation.clear()
                 taskResponseTokens.clear()
             },
-            refreshActiveTaskState = { conversationTaskRegistryActions().refreshActiveTaskState() }
+            refreshActiveTaskState = { conversationTaskRegistryActions().refreshActiveTaskState() },
+            navigateToLogin = {
+                activity.startActivity(android.content.Intent(activity, LoginActivity::class.java))
+            }
         )
     }
 
