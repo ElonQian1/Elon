@@ -1,9 +1,10 @@
 use axum::{
-    extract::{Query, State},
+    extract::{ws::{Message, WebSocket, WebSocketUpgrade}, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
+use futures::{SinkExt, StreamExt};
 use std::{collections::HashMap, sync::Arc, sync::LazyLock};
 use tokio::sync::broadcast;
 
@@ -102,4 +103,57 @@ async fn latest_update_event(state: &AppState) -> anyhow::Result<String> {
     json["downloadPageUrl"] = serde_json::Value::String(format!("{public_url}/app/download"));
 
     Ok(serde_json::to_string(&json)?)
+}
+
+// ── 轻量通知 WS（/ws/notify） ─────────────────────────────────────────────
+// 供 APK 在首页保持一条长连接，不依赖项目会话，只接收全局推送（如版本更新）。
+
+pub async fn ws_notify_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let client_version_code = query
+        .get("version_code")
+        .and_then(|v| v.parse::<i64>().ok());
+    ws.on_upgrade(move |socket| handle_notify_ws(socket, state, client_version_code))
+}
+
+async fn handle_notify_ws(
+    socket: WebSocket,
+    state: Arc<AppState>,
+    client_version_code: Option<i64>,
+) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut update_rx = subscribe();
+
+    // 连接时若服务器已有更新版本，立即推送一次
+    if let Some(event) = latest_update_event_for_client(&state, client_version_code).await {
+        if sender.send(Message::Text(event)).await.is_err() {
+            return;
+        }
+    }
+
+    loop {
+        tokio::select! {
+            update = update_rx.recv() => {
+                if let Ok(event) = update {
+                    if is_newer_for_client(&event, client_version_code)
+                        && sender.send(Message::Text(event)).await.is_err()
+                    {
+                        break;
+                    }
+                }
+            }
+            incoming = receiver.next() => {
+                match incoming {
+                    Some(Ok(Message::Ping(p))) => {
+                        if sender.send(Message::Pong(p)).await.is_err() { break; }
+                    }
+                    Some(Ok(Message::Pong(_))) | Some(Ok(Message::Text(_))) => {}
+                    _ => break,
+                }
+            }
+        }
+    }
 }

@@ -105,6 +105,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/ws/user/:user_id/projects/:project_id",
             get(project_api::ws_user_project_handler),
         )
+        // 轻量通知 WS：首页保活，接收全局更新推送（不需要登录也不需要项目）
+        .route("/ws/notify", get(app_update::ws_notify_handler))
         .route(
             "/api/user/:user_id/projects/:project_id/git/status",
             get(project_git::user_project_git_status),

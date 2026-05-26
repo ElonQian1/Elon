@@ -174,6 +174,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumeActions.onResume()
+        notifyWsClient.start()
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -214,7 +215,12 @@ class MainActivity : AppCompatActivity() {
         appInForeground = false
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
+        notifyWsClient.stop()
         super.onStop()
+    }
+
+    private val notifyWsClient: AppNotifyWsClient by lazy {
+        AppNotifyWsClient(this, serverUrl)
     }
 
     private val preparedMessageActions: MainPreparedMessageActions by lazy {
