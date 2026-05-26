@@ -43,12 +43,16 @@ pub struct CreateProjectRequest {
 
 #[derive(Deserialize)]
 pub struct FriendSearchQuery {
-    pub phone: String,
+    pub phone: Option<String>,
+    pub query: Option<String>,
+    pub search_type: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct AddFriendRequest {
-    pub phone: String,
+    pub phone: Option<String>,
+    pub query: Option<String>,
+    pub search_type: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -156,7 +160,11 @@ pub async fn search_friend_by_phone(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    match state.store.search_friend_by_phone(&user.id, &query.phone) {
+    let search_text = friend_search_text(query.phone.as_deref(), query.query.as_deref());
+    match state
+        .store
+        .search_friend(&user.id, query.search_type.as_deref(), &search_text)
+    {
         Ok(Some(result)) => Json(serde_json::json!({
             "found": true,
             "user": result.user,
@@ -179,7 +187,11 @@ pub async fn add_friend_by_phone(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    match state.store.add_friend_by_phone(&user.id, &req.phone) {
+    let search_text = friend_search_text(req.phone.as_deref(), req.query.as_deref());
+    match state
+        .store
+        .add_friend(&user.id, req.search_type.as_deref(), &search_text)
+    {
         Ok(result) => Json(serde_json::json!({
             "friend": result.friend,
             "already_friend": result.already_friend,
@@ -195,6 +207,15 @@ pub async fn add_friend_by_phone(
             json_error(status, message)
         }
     }
+}
+
+fn friend_search_text(phone: Option<&str>, query: Option<&str>) -> String {
+    query
+        .or(phone)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or_default()
+        .to_string()
 }
 
 pub async fn list_friend_messages(

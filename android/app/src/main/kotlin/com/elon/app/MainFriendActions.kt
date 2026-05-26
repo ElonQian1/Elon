@@ -4,8 +4,12 @@ import android.content.Intent
 import android.text.InputType
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -70,18 +74,47 @@ internal class MainFriendActions(
     fun showAddFriendDialog() {
         if (!ensureLoggedIn()) return
 
+        val searchOptions = listOf(
+            FriendSearchOption("auto", "自动识别", "手机号、邮箱、账号 ID 或昵称", InputType.TYPE_CLASS_TEXT),
+            FriendSearchOption("phone", "手机号", "好友手机号", InputType.TYPE_CLASS_PHONE),
+            FriendSearchOption(
+                "email",
+                "邮箱",
+                "好友邮箱",
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            ),
+            FriendSearchOption("account_id", "账号 ID", "usr_ 开头的账号 ID", InputType.TYPE_CLASS_TEXT),
+            FriendSearchOption("nickname", "昵称", "好友昵称", InputType.TYPE_CLASS_TEXT)
+        )
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(8), dp(22), dp(2))
         }
         val hint = TextView(activity).apply {
-            text = "输入手机号，只能搜索到已注册一龙账号的用户。"
+            text = "选择搜索方式后输入关键词，只能搜索到已注册一龙账号的用户。"
             textSize = 14f
             alpha = 0.72f
         }
+        val searchTypeRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        val searchTypeLabel = TextView(activity).apply {
+            text = "搜索类型"
+            textSize = 15f
+            alpha = 0.82f
+            setPadding(0, 0, dp(12), 0)
+        }
+        val searchTypeSpinner = Spinner(activity).apply {
+            adapter = ArrayAdapter(
+                activity,
+                android.R.layout.simple_spinner_dropdown_item,
+                searchOptions
+            )
+        }
         val input = EditText(activity).apply {
-            setHint("好友手机号")
-            inputType = InputType.TYPE_CLASS_PHONE
+            setHint(searchOptions.first().hint)
+            inputType = searchOptions.first().inputType
             setSingleLine(true)
             textSize = 18f
             setSelectAllOnFocus(false)
@@ -92,6 +125,9 @@ internal class MainFriendActions(
             setPadding(0, dp(8), 0, 0)
         }
         container.addView(hint)
+        searchTypeRow.addView(searchTypeLabel)
+        searchTypeRow.addView(searchTypeSpinner)
+        container.addView(searchTypeRow)
         container.addView(input)
         container.addView(result)
 
@@ -103,25 +139,36 @@ internal class MainFriendActions(
             .create()
 
         dialog.setOnShowListener {
+            searchTypeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    val option = searchOptions.getOrElse(position) { searchOptions.first() }
+                    input.hint = option.hint
+                    input.inputType = option.inputType
+                    input.setSingleLine(true)
+                }
+
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            }
             val searchButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
             searchButton.setOnClickListener {
-                val phone = input.text?.toString()?.trim().orEmpty()
-                if (phone.isBlank()) {
-                    result.text = "请输入手机号"
+                val selected = searchOptions.getOrElse(searchTypeSpinner.selectedItemPosition) { searchOptions.first() }
+                val keyword = input.text?.toString()?.trim().orEmpty()
+                if (keyword.isBlank()) {
+                    result.text = "请输入搜索内容"
                     return@setOnClickListener
                 }
                 result.text = "正在搜索..."
                 searchButton.isEnabled = false
-                searchFriend(phone) { candidate, error ->
+                searchFriend(selected.key, keyword) { candidate, error ->
                     searchButton.isEnabled = true
                     when {
                         error != null -> result.text = error
-                        candidate == null -> result.text = "没有找到这个手机号对应的一龙账号"
+                        candidate == null -> result.text = "没有找到对应的一龙账号"
                         candidate.isSelf -> result.text = "这是你自己的账号，不能添加自己"
                         candidate.alreadyFriend -> result.text = "已经是好友：${candidate.name}"
                         else -> {
                             result.text = "找到：${candidate.name}"
-                            showConfirmAddDialog(dialog, phone, candidate)
+                            showConfirmAddDialog(dialog, selected.key, keyword, candidate)
                         }
                     }
                 }
@@ -151,11 +198,13 @@ internal class MainFriendActions(
 
     private fun showConfirmAddDialog(
         parentDialog: AlertDialog,
-        phone: String,
+        searchType: String,
+        keyword: String,
         candidate: FriendCandidate
     ) {
         val message = buildString {
             append(candidate.name)
+            candidate.account.takeIf { it.isNotBlank() }?.let { append("\n账号：").append(it) }
             candidate.phone?.takeIf { it.isNotBlank() }?.let { append("\n手机号：").append(it) }
         }
         AlertDialog.Builder(activity)
@@ -163,7 +212,7 @@ internal class MainFriendActions(
             .setMessage(message)
             .setNegativeButton("取消", null)
             .setPositiveButton("添加") { _, _ ->
-                addFriend(phone) { addedName, alreadyFriend, error ->
+                addFriend(searchType, keyword) { addedName, alreadyFriend, error ->
                     if (error != null) {
                         Toast.makeText(activity, error, Toast.LENGTH_SHORT).show()
                         return@addFriend
@@ -181,11 +230,15 @@ internal class MainFriendActions(
             .show()
     }
 
-    private fun searchFriend(phone: String, onDone: (FriendCandidate?, String?) -> Unit) {
+    private fun searchFriend(
+        searchType: String,
+        keyword: String,
+        onDone: (FriendCandidate?, String?) -> Unit
+    ) {
         thread {
             val result = runCatching {
                 val builder = Request.Builder()
-                    .url("$serverUrl/api/me/friends/search?phone=${urlPart(phone)}")
+                    .url("$serverUrl/api/me/friends/search?search_type=${urlPart(searchType)}&query=${urlPart(keyword)}")
                     .get()
                 val request = AuthManager.applyAuth(activity, builder).build()
                 http.newCall(request).execute().use { response ->
@@ -199,6 +252,7 @@ internal class MainFriendActions(
                     val nickname = user.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
                     FriendCandidate(
                         name = nickname ?: account.ifBlank { "已注册用户" },
+                        account = account,
                         phone = phoneText,
                         alreadyFriend = json.optBoolean("already_friend", false),
                         isSelf = json.optBoolean("is_self", false)
@@ -215,12 +269,16 @@ internal class MainFriendActions(
     }
 
     private fun addFriend(
-        phone: String,
+        searchType: String,
+        keyword: String,
         onDone: (name: String, alreadyFriend: Boolean, error: String?) -> Unit
     ) {
         thread {
             val result = runCatching {
-                val payload = JSONObject().put("phone", phone).toString()
+                val payload = JSONObject()
+                    .put("search_type", searchType)
+                    .put("query", keyword)
+                    .toString()
                     .toRequestBody("application/json".toMediaType())
                 val builder = Request.Builder()
                     .url("$serverUrl/api/me/friends")
@@ -279,8 +337,18 @@ internal class MainFriendActions(
 
     private data class FriendCandidate(
         val name: String,
+        val account: String,
         val phone: String?,
         val alreadyFriend: Boolean,
         val isSelf: Boolean
     )
+
+    private data class FriendSearchOption(
+        val key: String,
+        val label: String,
+        val hint: String,
+        val inputType: Int
+    ) {
+        override fun toString(): String = label
+    }
 }

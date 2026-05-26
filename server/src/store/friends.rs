@@ -4,38 +4,19 @@ use rusqlite::{params, OptionalExtension};
 use super::{normalize_account, now, AddFriendResult, FriendProfile, FriendSearchResult, Store};
 
 impl Store {
-    pub fn search_friend_by_phone(
+    pub fn search_friend(
         &self,
         user_id: &str,
-        phone: &str,
+        search_type: Option<&str>,
+        query: &str,
     ) -> Result<Option<FriendSearchResult>> {
-        let phone = normalize_friend_phone(phone)?;
+        let query = query.trim();
+        if query.is_empty() {
+            return Err(anyhow!("请输入搜索内容"));
+        }
+        let search_type = FriendSearchType::from_input(search_type)?;
         let conn = self.conn()?;
-        let mut profile = match conn
-            .query_row(
-                "SELECT id, phone, email, nickname
-                 FROM users
-                 WHERE phone = ?1 AND status = 'active' AND password_hash != 'device-user'",
-                params![phone],
-                |row| {
-                    let id: String = row.get(0)?;
-                    let phone: Option<String> = row.get(1)?;
-                    let email: Option<String> = row.get(2)?;
-                    let account = phone.clone().or(email).unwrap_or_else(|| id.clone());
-                    Ok(FriendProfile {
-                        id,
-                        account,
-                        nickname: row.get(3)?,
-                        phone,
-                        friend_since: None,
-                        last_message: None,
-                        last_message_at: None,
-                        unread_count: 0,
-                    })
-                },
-            )
-            .optional()?
-        {
+        let mut profile = match search_profile(&conn, search_type, query)? {
             Some(profile) => profile,
             None => return Ok(None),
         };
@@ -63,9 +44,14 @@ impl Store {
         }))
     }
 
-    pub fn add_friend_by_phone(&self, user_id: &str, phone: &str) -> Result<AddFriendResult> {
+    pub fn add_friend(
+        &self,
+        user_id: &str,
+        search_type: Option<&str>,
+        query: &str,
+    ) -> Result<AddFriendResult> {
         let search = self
-            .search_friend_by_phone(user_id, phone)?
+            .search_friend(user_id, search_type, query)?
             .ok_or_else(|| anyhow!("未找到已注册用户"))?;
         if search.is_self {
             return Err(anyhow!("不能添加自己"));
@@ -152,10 +138,151 @@ impl Store {
     }
 }
 
-fn normalize_friend_phone(phone: &str) -> Result<String> {
-    let phone = normalize_account(phone)?;
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum FriendSearchType {
+    Auto,
+    Phone,
+    Email,
+    AccountId,
+    Nickname,
+}
+
+impl FriendSearchType {
+    fn from_input(value: Option<&str>) -> Result<Self> {
+        match value.unwrap_or("auto").trim().to_ascii_lowercase().as_str() {
+            "" | "auto" => Ok(Self::Auto),
+            "phone" => Ok(Self::Phone),
+            "email" => Ok(Self::Email),
+            "account" | "account_id" | "id" => Ok(Self::AccountId),
+            "nickname" | "name" => Ok(Self::Nickname),
+            _ => Err(anyhow!("不支持的好友搜索方式")),
+        }
+    }
+}
+
+fn search_profile(
+    conn: &rusqlite::Connection,
+    search_type: FriendSearchType,
+    query: &str,
+) -> Result<Option<FriendProfile>> {
+    match search_type {
+        FriendSearchType::Auto => search_profile_auto(conn, query),
+        FriendSearchType::Phone => {
+            search_profile_by_column(conn, "phone", &normalize_phone(query)?)
+        }
+        FriendSearchType::Email => {
+            search_profile_by_column(conn, "email", &normalize_email(query)?)
+        }
+        FriendSearchType::AccountId => {
+            search_profile_by_column(conn, "id", &normalize_account(query)?)
+        }
+        FriendSearchType::Nickname => search_profile_by_nickname(conn, query),
+    }
+}
+
+fn search_profile_auto(conn: &rusqlite::Connection, query: &str) -> Result<Option<FriendProfile>> {
+    if query.contains('@') {
+        return search_profile_by_column(conn, "email", &normalize_email(query)?);
+    }
+
+    if query.trim().to_ascii_lowercase().starts_with("usr_") {
+        let account = normalize_account(query)?;
+        return search_profile_by_column(conn, "id", &account);
+    }
+
+    if looks_like_phone(query) {
+        if let Some(profile) = search_profile_by_column(conn, "phone", &normalize_phone(query)?)? {
+            return Ok(Some(profile));
+        }
+    }
+
+    search_profile_by_nickname(conn, query)
+}
+
+fn search_profile_by_column(
+    conn: &rusqlite::Connection,
+    column: &str,
+    value: &str,
+) -> Result<Option<FriendProfile>> {
+    let sql = format!(
+        "SELECT id, phone, email, nickname
+         FROM users
+         WHERE {column} = ?1 AND status = 'active' AND password_hash != 'device-user'"
+    );
+    conn.query_row(&sql, params![value], friend_profile_from_row)
+        .optional()
+        .map_err(Into::into)
+}
+
+fn search_profile_by_nickname(
+    conn: &rusqlite::Connection,
+    query: &str,
+) -> Result<Option<FriendProfile>> {
+    let nickname = query.trim();
+    if nickname.chars().count() < 2 {
+        return Err(anyhow!("昵称至少输入 2 个字符"));
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT id, phone, email, nickname
+         FROM users
+         WHERE nickname = ?1 AND status = 'active' AND password_hash != 'device-user'
+         ORDER BY created_at DESC
+         LIMIT 2",
+    )?;
+    let matches = stmt
+        .query_map(params![nickname], friend_profile_from_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if matches.len() > 1 {
+        return Err(anyhow!(
+            "找到多个同名用户，请改用手机号、邮箱或账号 ID 搜索"
+        ));
+    }
+    Ok(matches.into_iter().next())
+}
+
+fn friend_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FriendProfile> {
+    let id: String = row.get(0)?;
+    let phone: Option<String> = row.get(1)?;
+    let email: Option<String> = row.get(2)?;
+    let account = phone.clone().or(email).unwrap_or_else(|| id.clone());
+    Ok(FriendProfile {
+        id,
+        account,
+        nickname: row.get(3)?,
+        phone,
+        friend_since: None,
+        last_message: None,
+        last_message_at: None,
+        unread_count: 0,
+    })
+}
+
+fn normalize_phone(phone: &str) -> Result<String> {
+    let phone = normalize_account(&compact_phone(phone))?;
     if phone.contains('@') {
         return Err(anyhow!("请输入手机号"));
     }
     Ok(phone)
+}
+
+fn normalize_email(email: &str) -> Result<String> {
+    let email = normalize_account(email)?;
+    if !email.contains('@') {
+        return Err(anyhow!("请输入邮箱"));
+    }
+    Ok(email)
+}
+
+fn compact_phone(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| !matches!(ch, ' ' | '-' | '(' | ')'))
+        .collect()
+}
+
+fn looks_like_phone(value: &str) -> bool {
+    value
+        .chars()
+        .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | ' ' | '-' | '(' | ')'))
 }
