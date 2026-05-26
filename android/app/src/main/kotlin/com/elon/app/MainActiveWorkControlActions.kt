@@ -21,7 +21,6 @@ internal class MainActiveWorkControlActions(
     private val refreshActiveTaskState: () -> Unit,
     private val stopWorkingEvidenceForActiveConversation: () -> Unit,
     private val clearCurrentEvidence: () -> Unit,
-    private val clearToolActionBubbles: () -> Unit,
     private val setSendEnabled: (Boolean) -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val updateStage: (String, String) -> Unit,
@@ -42,7 +41,6 @@ internal class MainActiveWorkControlActions(
         persistActiveWork()
         stopWorkingEvidenceForActiveConversation()
         clearCurrentEvidence()
-        clearToolActionBubbles()
         setSendEnabled(true)
         if (wasDevelopment) {
             updateStage("工作暂停", "你已暂停当前任务，可以调整需求后继续发送。")

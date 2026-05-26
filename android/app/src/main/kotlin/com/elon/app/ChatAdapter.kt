@@ -72,7 +72,6 @@ class ChatAdapter(
         "ai-progress" -> 2
         "ai-cli-log"  -> 2
         "ai-tool"     -> 2
-        "ai-action"   -> 2
         "ai-complete" -> 2
         "ai-stopped"  -> 2
         "error"       -> 3
@@ -187,7 +186,7 @@ class ChatAdapter(
     private fun messageTextColor(role: String): Int = when (role) {
         "ai", "ai-intent" -> Color.parseColor("#F4F4F4")
         "ai-stopped" -> Color.parseColor("#D9B66B")
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-action", "ai-complete" -> Color.parseColor("#9A9A9A")
+        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#9A9A9A")
         "error" -> Color.parseColor("#C62828")
         else -> Color.parseColor("#111111")
     }

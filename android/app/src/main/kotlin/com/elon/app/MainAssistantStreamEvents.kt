@@ -10,8 +10,6 @@ internal class MainAssistantStreamEvents(
     private val handleProgress: (String, Boolean) -> Unit,
     private val handleFoldedCliOutput: (String) -> Unit,
     private val markToolCallStarted: (String) -> Unit,
-    private val appendToolCallBubble: (String, JsonObject?) -> Unit,
-    private val markToolResultDone: (String) -> Unit,
     private val markToolResult: (String) -> Unit,
     private val recordEvidence: (String, String) -> Unit,
     private val isDevelopmentRequest: () -> Boolean,
@@ -48,10 +46,8 @@ internal class MainAssistantStreamEvents(
 
     fun handleToolCall(json: JsonObject) {
         val tool = jsonStringOrNull(json, "tool") ?: "工具"
-        val args = json.get("args")?.takeIf { it.isJsonObject }?.asJsonObject
         maybeAppendToolCallNarrative(tool)
         markToolCallStarted(tool)
-        appendToolCallBubble(tool, args)
     }
 
     fun handleToolResult(json: JsonObject) {
@@ -63,7 +59,6 @@ internal class MainAssistantStreamEvents(
             "完成：${toolLabel(tool)}，${summarize(result, 80)}"
         }
         recordEvidence(toolEvidenceKind(tool), evidence)
-        markToolResultDone(tool)
         markToolResult(tool)
     }
 

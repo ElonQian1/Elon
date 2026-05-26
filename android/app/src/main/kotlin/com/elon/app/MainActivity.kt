@@ -238,7 +238,6 @@ class MainActivity : AppCompatActivity() {
                 conversationTaskRegistryActions.persistActiveWork()
                 workflowActions.foldedCliLogActions.reset()
                 workflowActions.evidenceActions.clearCurrentEvidence()
-                workflowActions.toolActionBubbles.clear()
                 workflowActions.progressNarrativeActions.clear()
             },
             acceptDevelopmentRequest = { text ->
@@ -294,7 +293,6 @@ class MainActivity : AppCompatActivity() {
                 workflowActions.evidenceActions.stopWorkingEvidenceForActiveConversation()
             },
             clearCurrentEvidence = { workflowActions.evidenceActions.clearCurrentEvidence() },
-            clearToolActionBubbles = { workflowActions.toolActionBubbles.clear() },
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)

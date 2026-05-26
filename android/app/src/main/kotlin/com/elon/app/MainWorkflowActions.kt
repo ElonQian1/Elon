@@ -57,15 +57,6 @@ internal class MainWorkflowActions(
         )
     }
 
-    val toolActionBubbles: MainToolActionBubbles by lazy {
-        MainToolActionBubbles(
-            activeConversation = projectStateActions()::activeConversation,
-            chatAdapter = chatAdapter,
-            saveConversations = projectStateActions()::saveConversations,
-            appendMessage = messageAppendActions::appendMessage
-        )
-    }
-
     val projectHygieneActions: MainProjectHygieneActions by lazy {
         MainProjectHygieneActions(
             timeText = currentTimeText,
@@ -147,8 +138,6 @@ internal class MainWorkflowActions(
             },
             handleFoldedCliOutput = { content -> foldedCliLogActions.handleFoldedCliOutput(content) },
             markToolCallStarted = { tool -> workflowStageActions.handleToolCall(tool) },
-            appendToolCallBubble = { tool, args -> toolActionBubbles.appendToolCallBubble(tool, args) },
-            markToolResultDone = { toolActionBubbles.markToolResultDone(it) },
             markToolResult = { workflowStageActions.markToolResult(it) },
             recordEvidence = { kind, detail ->
                 if (activeRequestIsDevelopment()) evidenceActions.recordEvidence(kind, detail)
