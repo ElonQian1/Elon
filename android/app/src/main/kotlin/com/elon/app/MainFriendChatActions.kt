@@ -23,7 +23,8 @@ internal class MainFriendChatActions(
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val showFriendChat: (String, Boolean) -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
-    private val collapseInputComposer: () -> Unit
+    private val collapseInputComposer: () -> Unit,
+    private val onFriendSummariesChanged: () -> Unit
 ) {
     private val messagesByFriend = linkedMapOf<String, MutableList<ChatMessage>>()
     private val pollHandler = Handler(Looper.getMainLooper())
@@ -64,6 +65,13 @@ internal class MainFriendChatActions(
 
     fun resumeIfActive() {
         if (activeFriend != null) startPolling()
+    }
+
+    fun handleRealtimeMessage(fromUserId: String): Boolean {
+        val friend = activeFriend ?: return false
+        if (friend.id != fromUserId) return false
+        loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+        return true
     }
 
     fun stopPolling() {
@@ -129,11 +137,18 @@ internal class MainFriendChatActions(
             activity.runOnUiThread {
                 if (activeFriend?.id != friend.id) return@runOnUiThread
                 result.onSuccess { remoteMessages ->
+                    val changed = currentMessages.size != remoteMessages.size ||
+                        currentMessages.zip(remoteMessages).any { (current, incoming) ->
+                            current.role != incoming.role || current.content != incoming.content
+                        }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)
                     activeAdapter?.notifyDataSetChanged()
                     if (scrollToBottom && currentMessages.isNotEmpty()) {
                         binding.chatList.scrollToPosition(currentMessages.lastIndex)
+                    }
+                    if (changed || !silent || allowPendingRefresh) {
+                        onFriendSummariesChanged()
                     }
                 }.onFailure { error ->
                     if (!silent) Toast.makeText(

@@ -28,8 +28,10 @@ sealed class GlobalWsEvent {
     /** 好友消息（预留，服务端支持后启用） */
     data class FriendMessage(
         val fromUserId: String,
+        val toUserId: String,
+        val messageId: String,
         val content: String,
-        val timestamp: Long,
+        val createdAt: String,
     ) : GlobalWsEvent()
 
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
@@ -48,8 +50,10 @@ sealed class GlobalWsEvent {
                 )
                 "friend_message" -> FriendMessage(
                     fromUserId = json.optString("fromUserId", ""),
+                    toUserId = json.optString("toUserId", ""),
+                    messageId = json.optString("messageId", ""),
                     content = json.optString("content", ""),
-                    timestamp = json.optLong("timestamp", 0L),
+                    createdAt = json.optString("createdAt", ""),
                 )
                 else -> Unknown(text)
             }

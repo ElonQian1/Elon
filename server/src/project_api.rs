@@ -234,7 +234,10 @@ pub async fn send_friend_message(
         .store
         .send_friend_message(&user.id, &friend_id, &req.content)
     {
-        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Ok(message) => {
+            crate::friend_events::publish_friend_message(&message);
+            Json(serde_json::json!({ "message": message })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }

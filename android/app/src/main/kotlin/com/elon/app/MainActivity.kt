@@ -239,7 +239,11 @@ class MainActivity : AppCompatActivity() {
             when (event) {
                 is GlobalWsEvent.AppUpdateAvailable ->
                     AppUpdateManager(this@MainActivity).realtimeCheck(event.versionCode)
-                else -> { /* 未来的好友消息等事件在这里路由 */ }
+                is GlobalWsEvent.FriendMessage -> {
+                    friendChatActions.handleRealtimeMessage(event.fromUserId)
+                    friendActions.loadFriends()
+                }
+                else -> Unit
             }
         }
     }
@@ -546,7 +550,8 @@ class MainActivity : AppCompatActivity() {
             setChatAdapter = { chatAdapter = it },
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
-            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() }
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
+            onFriendSummariesChanged = { friendActions.loadFriends() }
         )
     }
 

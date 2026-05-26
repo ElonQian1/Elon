@@ -44,22 +44,22 @@ internal class MainHomeRows(
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(66)
+                dp(76)
             )
             setBackgroundColor(Color.parseColor("#242424"))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), 0, dp(14), 0)
+            setPadding(dp(16), 0, dp(14), 0)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
         }
 
-        row.addView(createAvatarView(friend.name, 44, 17f))
+        row.addView(createFriendAvatar(friend))
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(10)
+                marginStart = dp(12)
             }
             orientation = LinearLayout.VERTICAL
         }
@@ -72,7 +72,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = friend.name
-            setTextColor(Color.parseColor("#D0D0D0"))
+            setTextColor(Color.parseColor("#D8D8D8"))
             textSize = 16f
         })
         middle.addView(TextView(activity).apply {
@@ -85,11 +85,28 @@ internal class MainHomeRows(
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
             maxLines = 1
-            text = friend.phone ?: friend.account
-            setTextColor(Color.parseColor("#A9A9A9"))
+            text = friend.lastMessage ?: friend.phone ?: friend.account
+            setTextColor(Color.parseColor(if (friend.unreadCount > 0) "#C8C8C8" else "#A9A9A9"))
             textSize = 13f
         })
         row.addView(middle)
+
+        friend.lastMessageAt?.let { time ->
+            row.addView(TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.TOP
+                    marginStart = dp(8)
+                    topMargin = dp(18)
+                }
+                includeFontPadding = false
+                text = timeFormatter.format(Date(time))
+                setTextColor(Color.parseColor("#9A9A9A"))
+                textSize = 12f
+            })
+        }
         return row
     }
 
@@ -399,6 +416,39 @@ internal class MainHomeRows(
             setTextColor(Color.parseColor("#333333"))
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
+        }
+    }
+
+    private fun createFriendAvatar(friend: AppFriend): View {
+        val size = dp(44)
+        return FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            val avatar = createAvatarView(friend.name, 44, 17f).apply {
+                layoutParams = FrameLayout.LayoutParams(size, size)
+            }
+            addView(avatar)
+            if (friend.unreadCount > 0) {
+                addView(TextView(activity).apply {
+                    val badgeText = if (friend.unreadCount > 99) "99+" else friend.unreadCount.toString()
+                    val badgeWidth = if (badgeText.length > 2) dp(28) else dp(19)
+                    layoutParams = FrameLayout.LayoutParams(badgeWidth, dp(19)).apply {
+                        gravity = Gravity.TOP or Gravity.END
+                        topMargin = -dp(5)
+                        rightMargin = -dp(6)
+                    }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dp(10).toFloat()
+                        setColor(Color.parseColor("#F04B4F"))
+                    }
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    text = badgeText
+                    setTextColor(Color.WHITE)
+                    textSize = 10f
+                    setTypeface(typeface, Typeface.BOLD)
+                })
+            }
         }
     }
 }

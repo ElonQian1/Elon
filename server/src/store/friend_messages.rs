@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{new_id, now, FriendChatMessage, Store};
 
@@ -51,6 +51,8 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?
         };
+        drop(stmt);
+        mark_friend_messages_read(&conn, user_id, friend_id)?;
         Ok(messages)
     }
 
@@ -110,6 +112,18 @@ impl Store {
             Err(anyhow!("只能和已添加的好友聊天"))
         }
     }
+}
+
+fn mark_friend_messages_read(conn: &Connection, user_id: &str, friend_id: &str) -> Result<()> {
+    let now = now();
+    conn.execute(
+        "INSERT INTO friend_read_states (user_id, friend_user_id, last_read_at)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(user_id, friend_user_id)
+         DO UPDATE SET last_read_at = excluded.last_read_at",
+        params![user_id, friend_id, now],
+    )?;
+    Ok(())
 }
 
 fn row_to_friend_message(

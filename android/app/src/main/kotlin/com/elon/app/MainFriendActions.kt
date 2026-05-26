@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.time.Instant
 import kotlin.concurrent.thread
 
 internal data class AppFriend(
@@ -22,7 +23,10 @@ internal data class AppFriend(
     val name: String,
     val account: String,
     val phone: String?,
-    val friendSince: String?
+    val friendSince: String?,
+    val lastMessage: String?,
+    val lastMessageAt: Long?,
+    val unreadCount: Int
 )
 
 internal class MainFriendActions(
@@ -261,8 +265,16 @@ internal class MainFriendActions(
             name = nickname ?: account.ifBlank { phone ?: "好友" },
             account = account,
             phone = phone,
-            friendSince = json.optString("friend_since", "").trim().takeIf { it.isNotEmpty() }
+            friendSince = json.optString("friend_since", "").trim().takeIf { it.isNotEmpty() },
+            lastMessage = json.optString("last_message", "").trim().takeIf { it.isNotEmpty() },
+            lastMessageAt = parseServerTime(json.optString("last_message_at", "").trim()),
+            unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0)
         )
+    }
+
+    private fun parseServerTime(value: String): Long? {
+        if (value.isBlank()) return null
+        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
     }
 
     private data class FriendCandidate(

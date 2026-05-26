@@ -28,6 +28,9 @@ impl Store {
                         nickname: row.get(3)?,
                         phone,
                         friend_since: None,
+                        last_message: None,
+                        last_message_at: None,
+                        unread_count: 0,
                     })
                 },
             )
@@ -95,11 +98,37 @@ impl Store {
     pub fn list_friends(&self, user_id: &str) -> Result<Vec<FriendProfile>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT u.id, u.phone, u.email, u.nickname, f.created_at
+            "SELECT u.id, u.phone, u.email, u.nickname, f.created_at,
+                    lm.content,
+                    lm.created_at,
+                    (
+                        SELECT COUNT(*)
+                        FROM friend_messages unread
+                        LEFT JOIN friend_read_states read_state
+                          ON read_state.user_id = ?1
+                         AND read_state.friend_user_id = u.id
+                        WHERE unread.sender_user_id = u.id
+                          AND unread.receiver_user_id = ?1
+                          AND (
+                              read_state.last_read_at IS NULL
+                              OR unread.created_at > read_state.last_read_at
+                          )
+                    ) AS unread_count
              FROM user_friends f
              JOIN users u ON u.id = f.friend_user_id
+             LEFT JOIN friend_messages lm
+               ON lm.id = (
+                   SELECT latest.id
+                   FROM friend_messages latest
+                   WHERE (
+                       (latest.sender_user_id = ?1 AND latest.receiver_user_id = u.id)
+                       OR (latest.sender_user_id = u.id AND latest.receiver_user_id = ?1)
+                   )
+                   ORDER BY latest.created_at DESC
+                   LIMIT 1
+               )
              WHERE f.user_id = ?1 AND u.status = 'active'
-             ORDER BY f.created_at DESC",
+             ORDER BY COALESCE(lm.created_at, f.created_at) DESC",
         )?;
         let friends = stmt
             .query_map(params![user_id], |row| {
@@ -113,6 +142,9 @@ impl Store {
                     nickname: row.get(3)?,
                     phone,
                     friend_since: row.get(4)?,
+                    last_message: row.get(5)?,
+                    last_message_at: row.get(6)?,
+                    unread_count: row.get(7)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

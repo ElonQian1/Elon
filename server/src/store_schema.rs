@@ -1,4 +1,4 @@
-﻿//! SQLite Schema 迁移管理器。
+//! SQLite Schema 迁移管理器。
 //!
 //! 所有表结构变更必须通过 `MIGRATIONS` 列表追加新版本。
 //! v1 包含初始全量表结构（`IF NOT EXISTS` 确保在已有数据库上幂等运行）。
@@ -31,9 +31,7 @@ pub(crate) fn apply_migrations(conn: &Connection) -> Result<()> {
         if *version > applied {
             tracing::info!("数据库迁移 v{}: {}", version, description);
             apply_fn(conn)?;
-            let now = chrono::Utc::now()
-                .format("%Y-%m-%dT%H:%M:%SZ")
-                .to_string();
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
             conn.execute(
                 "INSERT INTO schema_migrations (version, applied_at) VALUES (?1, ?2)",
                 params![version, now],
@@ -53,6 +51,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (1, "初始全量表结构（幂等）", migration_v1),
     (2, "补充缺失列与辅助索引（幂等）", migration_v2),
     (3, "将所有现有项目设为公开可见（一次性）", migration_v3),
+    (4, "好友会话已读状态与未读提醒", migration_v4),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -102,6 +101,16 @@ fn migration_v1(conn: &Connection) -> Result<()> {
           FOREIGN KEY (sender_user_id) REFERENCES users(id),
           FOREIGN KEY (receiver_user_id) REFERENCES users(id),
           CHECK (sender_user_id != receiver_user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_read_states (
+          user_id TEXT NOT NULL,
+          friend_user_id TEXT NOT NULL,
+          last_read_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, friend_user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (friend_user_id) REFERENCES users(id),
+          CHECK (user_id != friend_user_id)
         );
 
         CREATE TABLE IF NOT EXISTS projects (
@@ -242,15 +251,35 @@ fn migration_v1(conn: &Connection) -> Result<()> {
 
 fn migration_v2(conn: &Connection) -> Result<()> {
     // 这些列已内化进 v1 DDL，但对升级前的旧数据库仍需幂等补充
-    add_column_if_missing(conn, "projects", "source_type",    "source_type    TEXT NOT NULL DEFAULT 'template'")?;
-    add_column_if_missing(conn, "projects", "repo_url",       "repo_url       TEXT")?;
-    add_column_if_missing(conn, "projects", "branch",         "branch         TEXT")?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "source_type",
+        "source_type    TEXT NOT NULL DEFAULT 'template'",
+    )?;
+    add_column_if_missing(conn, "projects", "repo_url", "repo_url       TEXT")?;
+    add_column_if_missing(conn, "projects", "branch", "branch         TEXT")?;
     add_column_if_missing(conn, "projects", "workspace_path", "workspace_path TEXT")?;
-    add_column_if_missing(conn, "tasks",    "conversation_id",   "conversation_id   TEXT")?;
-    add_column_if_missing(conn, "tasks",    "client_request_id", "client_request_id TEXT")?;
-    add_column_if_missing(conn, "messages", "conversation_id",   "conversation_id   TEXT")?;
-    add_column_if_missing(conn, "agent_native_sessions", "chat_bootstrapped", "chat_bootstrapped INTEGER NOT NULL DEFAULT 0")?;
-    add_column_if_missing(conn, "agent_native_sessions", "dev_bootstrapped",  "dev_bootstrapped  INTEGER NOT NULL DEFAULT 0")?;
+    add_column_if_missing(conn, "tasks", "conversation_id", "conversation_id   TEXT")?;
+    add_column_if_missing(conn, "tasks", "client_request_id", "client_request_id TEXT")?;
+    add_column_if_missing(
+        conn,
+        "messages",
+        "conversation_id",
+        "conversation_id   TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "agent_native_sessions",
+        "chat_bootstrapped",
+        "chat_bootstrapped INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "agent_native_sessions",
+        "dev_bootstrapped",
+        "dev_bootstrapped  INTEGER NOT NULL DEFAULT 0",
+    )?;
     add_column_if_missing(conn, "sessions", "apk_version", "apk_version TEXT")?;
     // 项目商店：公开可见性 + 加入方式
     add_column_if_missing(
@@ -307,6 +336,28 @@ fn migration_v3(conn: &Connection) -> Result<()> {
     conn.execute(
         "UPDATE projects SET is_public = 1 WHERE status != 'deleted'",
         [],
+    )?;
+    Ok(())
+}
+
+// ── v4：好友会话已读状态 ─────────────────────────────────────────────────────
+
+fn migration_v4(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS friend_read_states (
+          user_id TEXT NOT NULL,
+          friend_user_id TEXT NOT NULL,
+          last_read_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, friend_user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (friend_user_id) REFERENCES users(id),
+          CHECK (user_id != friend_user_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_friend_read_states_user
+          ON friend_read_states(user_id, friend_user_id);
+        "#,
     )?;
     Ok(())
 }

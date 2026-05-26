@@ -56,6 +56,9 @@ pub struct FriendProfile {
     pub nickname: Option<String>,
     pub phone: Option<String>,
     pub friend_since: Option<String>,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+    pub unread_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
