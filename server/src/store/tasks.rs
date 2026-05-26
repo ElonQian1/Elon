@@ -2,8 +2,8 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 
 use super::{
-    clean_optional, new_id, now, safe_external_id, ConversationMessage, Store, TaskSnapshot,
-    MAX_TASK_EVENTS_PER_TASK,
+    clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
+    Store, TaskSnapshot, MAX_TASK_EVENTS_PER_TASK,
 };
 
 impl Store {
@@ -306,6 +306,57 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(messages)
+    }
+
+    /// 管理员总览：列出某项目下所有会话，附带消息数、任务数和最后任务状态
+    pub fn list_conversations_for_project_admin(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<AdminConversationEntry>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT
+               c.id,
+               c.project_id,
+               c.user_id,
+               COALESCE(u.phone, u.email, c.user_id) AS user_account,
+               c.title,
+               c.status,
+               (SELECT COUNT(*) FROM messages m
+                WHERE m.project_id = c.project_id
+                  AND m.conversation_id = c.id) AS message_count,
+               (SELECT COUNT(*) FROM tasks t
+                WHERE t.project_id = c.project_id
+                  AND t.conversation_id = c.id) AS task_count,
+               (SELECT t2.status FROM tasks t2
+                WHERE t2.project_id = c.project_id
+                  AND t2.conversation_id = c.id
+                ORDER BY t2.created_at DESC LIMIT 1) AS last_task_status,
+               c.created_at,
+               c.updated_at
+             FROM conversations c
+             LEFT JOIN users u ON u.id = c.user_id
+             WHERE c.project_id = ?1
+             ORDER BY c.updated_at DESC",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id], |row| {
+                Ok(AdminConversationEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    user_id: row.get(2)?,
+                    user_account: row.get(3)?,
+                    title: row.get(4)?,
+                    status: row.get(5)?,
+                    message_count: row.get(6)?,
+                    task_count: row.get(7)?,
+                    last_task_status: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 }
 

@@ -94,6 +94,22 @@ pub struct AdminSessionEntry {
     pub created_at: String,
 }
 
+/// 管理员后台「会话列表」，每行代表一个 conversation
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminConversationEntry {
+    pub id: String,
+    pub project_id: String,
+    pub user_id: String,
+    pub user_account: String,
+    pub title: Option<String>,
+    pub status: String,
+    pub message_count: i64,
+    pub task_count: i64,
+    pub last_task_status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectSummary {
     pub id: String,

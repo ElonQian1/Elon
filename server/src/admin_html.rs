@@ -171,9 +171,10 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
           <th style="padding:8px 12px">任务状态</th>
           <th style="padding:8px 12px">APK 下载</th>
           <th style="padding:8px 12px">更新时间</th>
+          <th style="padding:8px 12px">会话</th>
         </tr>
       </thead>
-      <tbody id="projectTableBody"><tr><td colspan="8" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
+      <tbody id="projectTableBody"><tr><td colspan="9" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -662,7 +663,7 @@ function renderProjects(data) {
   const projects = data.projects || [];
   document.getElementById('projectCount').textContent = `共 ${projects.length} 个用户项目`;
   if (projects.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-dim)">暂无项目</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-dim)">暂无项目</td></tr>';
     return;
   }
   const statusColor = s => s === 'active' ? '#52b788' : s === 'error' ? '#e76f51' : '#aaa';
@@ -687,6 +688,7 @@ function renderProjects(data) {
       <td style="padding:8px 12px">${taskStatus}</td>
       <td style="padding:8px 12px">${apkCell}</td>
       <td style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${esc(p.updated_at || '')}</td>
+      <td style="padding:8px 12px"><button onclick="loadConvs('${esc(p.id)}','${esc(p.name)}')" style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;padding:3px 8px;font-size:12px">💬</button></td>
     </tr>`;
   }).join('');
 }
@@ -712,6 +714,64 @@ function renderUsers(data) {
     </div>`;
   }).join('');
 }
+/* ── 会话 modal ── */
+function loadConvs(pid, pname) {
+  const overlay = document.getElementById('convModal');
+  overlay.style.display = 'flex';
+  document.getElementById('convModalTitle').textContent = '💬 ' + pname + ' — 会话列表';
+  document.getElementById('convTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px"><div class="loader"></div></td></tr>';
+  fetch('/api/admin/projects/' + encodeURIComponent(pid) + '/conversations', {
+    headers: {'Authorization': 'Bearer ' + token}
+  }).then(r => r.json()).then(d => renderConvs(d)).catch(e => {
+    document.getElementById('convTableBody').innerHTML = '<tr><td colspan="8" style="color:#e76f51;padding:12px">' + esc(String(e)) + '</td></tr>';
+  });
+}
+function renderConvs(data) {
+  const tbody = document.getElementById('convTableBody');
+  const convs = data.conversations || [];
+  if (convs.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">该项目暂无会话</td></tr>'; return; }
+  const sc = s => s === 'active' ? '#52b788' : s === 'error' ? '#e76f51' : '#aaa';
+  tbody.innerHTML = convs.map(c => {
+    const ls = c.last_task_status ? `<span style="color:${sc(c.last_task_status)}">${esc(c.last_task_status)}</span>` : '—';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 10px;font-size:11px;word-break:break-all">${esc(c.id)}</td>
+      <td style="padding:6px 10px">${esc(c.user_account)}</td>
+      <td style="padding:6px 10px">${esc(c.title || '—')}</td>
+      <td style="padding:6px 10px">${esc(c.status)}</td>
+      <td style="padding:6px 10px;text-align:right">${c.message_count}</td>
+      <td style="padding:6px 10px;text-align:right">${c.task_count}</td>
+      <td style="padding:6px 10px">${ls}</td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--text-dim)">${esc(c.updated_at || '')}</td>
+    </tr>`;
+  }).join('');
+}
+function closeConvModal() {
+  document.getElementById('convModal').style.display = 'none';
+}
 </script>
+
+<div id="convModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:8px;padding:24px;width:90%;max-width:1100px;max-height:80vh;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 id="convModalTitle" style="margin:0">会话列表</h3>
+      <button onclick="closeConvModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text)">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+          <th style="padding:6px 10px">会话 ID</th>
+          <th style="padding:6px 10px">用户</th>
+          <th style="padding:6px 10px">标题</th>
+          <th style="padding:6px 10px">状态</th>
+          <th style="padding:6px 10px">消息数</th>
+          <th style="padding:6px 10px">任务数</th>
+          <th style="padding:6px 10px">最后任务</th>
+          <th style="padding:6px 10px">更新时间</th>
+        </tr></thead>
+        <tbody id="convTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 </body>
 </html>"#;

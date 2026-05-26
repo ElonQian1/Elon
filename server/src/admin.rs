@@ -386,3 +386,30 @@ pub async fn list_sessions(State(state): State<Arc<AppState>>, headers: HeaderMa
             .into_response(),
     }
 }
+
+/// 列出某项目下所有会话（对话 ID、用户、消息数等），仅管理员可见
+pub async fn list_project_conversations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return auth_error();
+    }
+    match state
+        .store
+        .list_conversations_for_project_admin(&project_id)
+    {
+        Ok(convs) => Json(serde_json::json!({
+            "conversations": convs,
+            "total": convs.len(),
+            "project_id": project_id,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
