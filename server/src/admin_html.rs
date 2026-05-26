@@ -161,6 +161,7 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
         <tr style="background:var(--card);color:var(--text-dim);text-align:left">
           <th style="padding:8px 12px">项目名</th>
           <th style="padding:8px 12px">创建者</th>
+          <th style="padding:8px 12px">设备 / APK版本</th>
           <th style="padding:8px 12px">类型/模板</th>
           <th style="padding:8px 12px">服务器路径</th>
           <th style="padding:8px 12px">任务状态</th>
@@ -168,7 +169,7 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
           <th style="padding:8px 12px">更新时间</th>
         </tr>
       </thead>
-      <tbody id="projectTableBody"><tr><td colspan="7" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
+      <tbody id="projectTableBody"><tr><td colspan="8" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -579,7 +580,7 @@ function renderProjects(data) {
   const projects = data.projects || [];
   document.getElementById('projectCount').textContent = `共 ${projects.length} 个用户项目`;
   if (projects.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-dim)">暂无项目</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-dim)">暂无项目</td></tr>';
     return;
   }
   const statusColor = s => s === 'active' ? '#52b788' : s === 'error' ? '#e76f51' : '#aaa';
@@ -592,9 +593,13 @@ function renderProjects(data) {
       : '<span style="color:var(--text-dim)">—</span>';
     const path = p.workspace_dir || '—';
     const typeLabel = [p.source_type, p.template].filter(Boolean).join(' / ');
+    const deviceCell = p.last_device_name
+      ? `${esc(p.last_device_name)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(p.last_apk_version || '')}</span>`
+      : '<span style="color:var(--text-dim)">—</span>';
     return `<tr style="border-top:1px solid var(--border)">
       <td style="padding:8px 12px;font-weight:500">${esc(p.name)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(p.id)}</span></td>
       <td style="padding:8px 12px">${esc(p.created_by_account)}</td>
+      <td style="padding:8px 12px">${deviceCell}</td>
       <td style="padding:8px 12px">${esc(typeLabel)}</td>
       <td style="padding:8px 12px;font-size:11px;word-break:break-all;max-width:240px">${esc(path)}</td>
       <td style="padding:8px 12px">${taskStatus}</td>

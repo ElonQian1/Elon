@@ -348,6 +348,8 @@ pub async fn list_projects(State(state): State<Arc<AppState>>, headers: HeaderMa
                         "created_by_account": p.created_by_account,
                         "last_task_status": p.last_task_status,
                         "last_apk_url": p.last_apk_url,
+                        "last_device_name": p.last_device_name,
+                        "last_apk_version": p.last_apk_version,
                         "updated_at": p.updated_at,
                     })
                 })

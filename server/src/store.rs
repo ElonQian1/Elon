@@ -76,6 +76,10 @@ pub struct AdminProjectDetail {
     pub last_task_status: Option<String>,
     pub last_apk_url: Option<String>,
     pub updated_at: String,
+    /// 创建者最近登录设备名
+    pub last_device_name: Option<String>,
+    /// 创建者最近登录时的 APK 版本
+    pub last_apk_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

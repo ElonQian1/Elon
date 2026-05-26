@@ -208,7 +208,17 @@ impl Store {
                         WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
                         ORDER BY t.created_at DESC LIMIT 1
                     ) AS last_apk_url,
-                    p.updated_at
+                    p.updated_at,
+                    (
+                        SELECT s.device_name FROM sessions s
+                        WHERE s.user_id = p.created_by
+                        ORDER BY s.created_at DESC LIMIT 1
+                    ) AS last_device_name,
+                    (
+                        SELECT s.apk_version FROM sessions s
+                        WHERE s.user_id = p.created_by
+                        ORDER BY s.created_at DESC LIMIT 1
+                    ) AS last_apk_version
              FROM projects p
              JOIN users u ON u.id = p.created_by
              ORDER BY p.updated_at DESC",
@@ -230,6 +240,8 @@ impl Store {
                     last_task_status: row.get(9)?,
                     last_apk_url: row.get(10)?,
                     updated_at: row.get(11)?,
+                    last_device_name: row.get(12)?,
+                    last_apk_version: row.get(13)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
