@@ -81,7 +81,7 @@ internal class MainFriendChatActions(
         if (text.isBlank()) return true
 
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
-        val pending = ChatMessage("user", text, sendStatus = "发送中...")
+        val pending = ChatMessage("user", text, sendStatus = SENDING_STATUS)
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
         binding.chatList.scrollToPosition(messages.lastIndex)
@@ -92,8 +92,13 @@ internal class MainFriendChatActions(
             val result = runCatching { postMessage(friend, text) }
             activity.runOnUiThread {
                 if (activeFriend?.id != friend.id) return@runOnUiThread
-                result.onSuccess {
-                    loadMessages(friend, silent = true, scrollToBottom = true)
+                result.onSuccess { sentMessage ->
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) {
+                        messages[index] = sentMessage
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
@@ -111,9 +116,14 @@ internal class MainFriendChatActions(
         pollHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
     }
 
-    private fun loadMessages(friend: AppFriend, silent: Boolean, scrollToBottom: Boolean) {
+    private fun loadMessages(
+        friend: AppFriend,
+        silent: Boolean,
+        scrollToBottom: Boolean,
+        allowPendingRefresh: Boolean = false
+    ) {
         val currentMessages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
-        if (currentMessages.any { it.sendStatus == "发送中..." }) return
+        if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
         thread {
             val result = runCatching { fetchMessages(friend) }
             activity.runOnUiThread {
@@ -149,17 +159,12 @@ internal class MainFriendChatActions(
             val array = JSONObject(body).optJSONArray("messages") ?: JSONArray()
             return List(array.length()) { index ->
                 val json = array.optJSONObject(index) ?: JSONObject()
-                val outgoing = json.optBoolean("outgoing", false)
-                ChatMessage(
-                    role = if (outgoing) "user" else "friend",
-                    content = json.optString("content", ""),
-                    senderLabel = if (outgoing) null else friend.name
-                )
+                friendMessageFromJson(friend, json)
             }
         }
     }
 
-    private fun postMessage(friend: AppFriend, text: String) {
+    private fun postMessage(friend: AppFriend, text: String): ChatMessage {
         val payload = JSONObject().put("content", text).toString()
             .toRequestBody("application/json".toMediaType())
         val request = AuthManager.applyAuth(
@@ -171,7 +176,20 @@ internal class MainFriendChatActions(
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) error(readErrorMessage(body, "发送失败"))
+            val message = JSONObject(body).optJSONObject("message") ?: JSONObject()
+                .put("content", text)
+                .put("outgoing", true)
+            return friendMessageFromJson(friend, message)
         }
+    }
+
+    private fun friendMessageFromJson(friend: AppFriend, json: JSONObject): ChatMessage {
+        val outgoing = json.optBoolean("outgoing", false)
+        return ChatMessage(
+            role = if (outgoing) "user" else "friend",
+            content = json.optString("content", ""),
+            senderLabel = if (outgoing) null else friend.name
+        )
     }
 
     private fun readErrorMessage(body: String, fallback: String): String {
@@ -187,5 +205,6 @@ internal class MainFriendChatActions(
 
     private companion object {
         const val POLL_INTERVAL_MS = 3000L
+        const val SENDING_STATUS = "发送中..."
     }
 }
