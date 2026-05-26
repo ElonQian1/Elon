@@ -181,6 +181,7 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
         "dev_bootstrapped",
         "dev_bootstrapped INTEGER NOT NULL DEFAULT 0",
     )?;
+    add_column_if_missing(conn, "sessions", "apk_version", "apk_version TEXT")?;
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_client_request
          ON tasks(project_id, user_id, conversation_id, client_request_id)

@@ -58,6 +58,26 @@ pub struct AdminUserSummary {
     pub updated_at: String,
 }
 
+/// 管理员后台「用户项目」总览，每行代表一个项目
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminProjectDetail {
+    pub id: String,
+    pub name: String,
+    pub workspace_key: String,
+    /// 项目在服务器上的实际绝对路径（handler 层注入）
+    pub workspace_dir: String,
+    /// local_path 类型项目在 DB 里记录的自定义路径
+    pub workspace_path: Option<String>,
+    pub source_type: String,
+    pub template: String,
+    pub status: String,
+    pub created_by_id: String,
+    pub created_by_account: String,
+    pub last_task_status: Option<String>,
+    pub last_apk_url: Option<String>,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectSummary {
     pub id: String,

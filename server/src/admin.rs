@@ -320,3 +320,45 @@ pub async fn create_user(
             .into_response(),
     }
 }
+
+/// 列出所有项目及其创建者、工作区路径、最新 APK 信息（仅管理员）
+pub async fn list_projects(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return auth_error();
+    }
+
+    match state.store.list_all_projects_admin() {
+        Ok(projects) => {
+            let enriched: Vec<serde_json::Value> = projects
+                .into_iter()
+                .map(|p| {
+                    let workspace_dir = state
+                        .resolve_project_workspace(&p.workspace_key, p.workspace_path.as_deref())
+                        .to_string_lossy()
+                        .to_string();
+                    serde_json::json!({
+                        "id": p.id,
+                        "name": p.name,
+                        "workspace_key": p.workspace_key,
+                        "workspace_dir": workspace_dir,
+                        "source_type": p.source_type,
+                        "template": p.template,
+                        "status": p.status,
+                        "created_by_id": p.created_by_id,
+                        "created_by_account": p.created_by_account,
+                        "last_task_status": p.last_task_status,
+                        "last_apk_url": p.last_apk_url,
+                        "updated_at": p.updated_at,
+                    })
+                })
+                .collect();
+            Json(serde_json::json!({ "projects": enriched, "total": enriched.len() }))
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}

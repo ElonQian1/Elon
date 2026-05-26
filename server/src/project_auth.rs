@@ -16,6 +16,7 @@ pub struct LoginRequest {
     pub account: String,
     pub password: String,
     pub device_name: Option<String>,
+    pub apk_version: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -24,6 +25,7 @@ pub struct RegisterRequest {
     pub password: String,
     pub nickname: Option<String>,
     pub device_name: Option<String>,
+    pub apk_version: Option<String>,
 }
 
 pub fn login_inner(
@@ -35,7 +37,7 @@ pub fn login_inner(
         .authenticate_password(&req.account, &req.password)?;
     let (token, expires_at) = state
         .store
-        .create_session(&user.id, req.device_name.as_deref())?;
+        .create_session(&user.id, req.device_name.as_deref(), req.apk_version.as_deref())?;
     Ok((token, expires_at, user))
 }
 
@@ -51,7 +53,7 @@ pub fn register_inner(
     )?;
     let (token, expires_at) = state
         .store
-        .create_session(&user.id, req.device_name.as_deref())?;
+        .create_session(&user.id, req.device_name.as_deref(), req.apk_version.as_deref())?;
     Ok((token, expires_at, user))
 }
 

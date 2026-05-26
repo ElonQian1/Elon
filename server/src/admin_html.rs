@@ -120,6 +120,7 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
 <div class="tab-bar">
   <button class="tab-btn active" onclick="switchTab('agents',this)">🤖 AI 代理</button>
   <button class="tab-btn" onclick="switchTab('users',this)">👥 用户列表</button>
+  <button class="tab-btn" onclick="switchTab('projects',this)">📦 用户项目</button>
 </div>
 
 <!-- ── AI 代理标签页 ──────────────────────── -->
@@ -144,6 +145,32 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
     </div>
   </div>
   <div id="userList" style="display:flex;flex-direction:column;gap:10px"><div class="loader"></div></div>
+</div>
+</div>
+
+<!-- ── 用户项目标签页 ─────────────────────── -->
+<div id="tab-projects" class="tab-pane">
+<div class="container">
+  <div class="toolbar">
+    <h2 id="projectCount">用户项目列表</h2>
+    <button class="btn btn-ghost" onclick="loadProjects()">↻ 刷新</button>
+  </div>
+  <div id="projectTableWrap" style="overflow-x:auto">
+    <table id="projectTable" style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:var(--card);color:var(--text-dim);text-align:left">
+          <th style="padding:8px 12px">项目名</th>
+          <th style="padding:8px 12px">创建者</th>
+          <th style="padding:8px 12px">类型/模板</th>
+          <th style="padding:8px 12px">服务器路径</th>
+          <th style="padding:8px 12px">任务状态</th>
+          <th style="padding:8px 12px">APK 下载</th>
+          <th style="padding:8px 12px">更新时间</th>
+        </tr>
+      </thead>
+      <tbody id="projectTableBody"><tr><td colspan="7" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
+    </table>
+  </div>
 </div>
 </div>
 
@@ -479,6 +506,7 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
   if (name === 'users') loadUsers();
+  if (name === 'projects') loadProjects();
 }
 
 // ─── 用户列表 ────────────────────────────
@@ -526,6 +554,54 @@ async function loadUsers() {
   } catch(e) {
     list.innerHTML = `<p class="empty">网络错误: ${e.message}</p>`;
   }
+}
+
+// ─── 用户项目 ────────────────────────────
+async function loadProjects() {
+  const tbody = document.getElementById('projectTableBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px"><div class="loader"></div></td></tr>';
+  try {
+    const res = await apiFetch('GET', '/api/admin/projects');
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#e76f51">${esc(j.error || '加载失败')}</td></tr>`;
+      return;
+    }
+    const data = await res.json();
+    renderProjects(data);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#e76f51">网络错误: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderProjects(data) {
+  const tbody = document.getElementById('projectTableBody');
+  const projects = data.projects || [];
+  document.getElementById('projectCount').textContent = `共 ${projects.length} 个用户项目`;
+  if (projects.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text-dim)">暂无项目</td></tr>';
+    return;
+  }
+  const statusColor = s => s === 'active' ? '#52b788' : s === 'error' ? '#e76f51' : '#aaa';
+  tbody.innerHTML = projects.map(p => {
+    const apkCell = p.last_apk_url
+      ? `<a href="${esc(p.last_apk_url)}" target="_blank" style="color:var(--accent)">⬇ 下载</a>`
+      : '<span style="color:var(--text-dim)">—</span>';
+    const taskStatus = p.last_task_status
+      ? `<span style="color:${statusColor(p.last_task_status)}">${esc(p.last_task_status)}</span>`
+      : '<span style="color:var(--text-dim)">—</span>';
+    const path = p.workspace_dir || '—';
+    const typeLabel = [p.source_type, p.template].filter(Boolean).join(' / ');
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 12px;font-weight:500">${esc(p.name)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(p.id)}</span></td>
+      <td style="padding:8px 12px">${esc(p.created_by_account)}</td>
+      <td style="padding:8px 12px">${esc(typeLabel)}</td>
+      <td style="padding:8px 12px;font-size:11px;word-break:break-all;max-width:240px">${esc(path)}</td>
+      <td style="padding:8px 12px">${taskStatus}</td>
+      <td style="padding:8px 12px">${apkCell}</td>
+      <td style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${esc(p.updated_at || '')}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderUsers(data) {

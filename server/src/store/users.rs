@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
-    validate_password, verify_password, AdminUserSummary, PublicUser, Store,
+    validate_password, verify_password, AdminProjectDetail, AdminUserSummary, PublicUser, Store,
 };
 
 impl Store {
@@ -98,6 +98,7 @@ impl Store {
         &self,
         user_id: &str,
         device_name: Option<&str>,
+        apk_version: Option<&str>,
     ) -> Result<(String, String)> {
         let token = format!("tok_{}", Uuid::new_v4().simple());
         let token_hash = hash_token(&token);
@@ -106,13 +107,14 @@ impl Store {
         let expires_at = (Utc::now() + Duration::days(30)).to_rfc3339();
 
         self.conn()?.execute(
-            "INSERT INTO sessions (id, user_id, token_hash, device_name, expires_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO sessions (id, user_id, token_hash, device_name, apk_version, expires_at, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 session_id,
                 user_id,
                 token_hash,
                 clean_optional(device_name),
+                clean_optional(apk_version),
                 expires_at,
                 created_at
             ],
@@ -186,5 +188,52 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         Ok(users)
+    }
+
+    /// 管理员总览：返回所有项目列表，包含创建者信息和最近任务状态
+    pub fn list_all_projects_admin(&self) -> Result<Vec<AdminProjectDetail>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT p.id, p.name, p.workspace_key, p.workspace_path,
+                    p.source_type, p.template, p.status,
+                    u.id AS created_by_id,
+                    COALESCE(u.email, u.phone, u.id) AS created_by_account,
+                    (
+                        SELECT t.status FROM tasks t
+                        WHERE t.project_id = p.id
+                        ORDER BY t.created_at DESC LIMIT 1
+                    ) AS last_task_status,
+                    (
+                        SELECT t.apk_url FROM tasks t
+                        WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
+                        ORDER BY t.created_at DESC LIMIT 1
+                    ) AS last_apk_url,
+                    p.updated_at
+             FROM projects p
+             JOIN users u ON u.id = p.created_by
+             ORDER BY p.updated_at DESC",
+        )?;
+
+        let projects = stmt
+            .query_map([], |row| {
+                Ok(AdminProjectDetail {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    workspace_key: row.get(2)?,
+                    workspace_dir: String::new(), // handler 层填充
+                    workspace_path: row.get(3)?,
+                    source_type: row.get(4)?,
+                    template: row.get(5)?,
+                    status: row.get(6)?,
+                    created_by_id: row.get(7)?,
+                    created_by_account: row.get(8)?,
+                    last_task_status: row.get(9)?,
+                    last_apk_url: row.get(10)?,
+                    updated_at: row.get(11)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        Ok(projects)
     }
 }
