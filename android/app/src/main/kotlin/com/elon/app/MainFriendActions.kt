@@ -17,12 +17,52 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
+internal data class AppFriend(
+    val id: String,
+    val name: String,
+    val account: String,
+    val phone: String?,
+    val friendSince: String?
+)
+
 internal class MainFriendActions(
     private val activity: AppCompatActivity,
     private val http: OkHttpClient,
     private val serverUrl: String,
-    private val dp: (Int) -> Int
+    private val dp: (Int) -> Int,
+    private val setFriends: (List<AppFriend>) -> Unit,
+    private val onFriendsChanged: () -> Unit
 ) {
+    fun loadFriends() {
+        if (!AuthManager.isLoggedIn(activity)) {
+            setFriends(emptyList())
+            onFriendsChanged()
+            return
+        }
+        thread {
+            val result = runCatching {
+                val builder = Request.Builder()
+                    .url("$serverUrl/api/me/friends")
+                    .get()
+                val request = AuthManager.applyAuth(activity, builder).build()
+                http.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error(readErrorMessage(body, "加载好友失败"))
+                    val array = JSONObject(body).optJSONArray("friends") ?: org.json.JSONArray()
+                    List(array.length()) { index ->
+                        parseFriend(array.optJSONObject(index) ?: JSONObject())
+                    }
+                }
+            }
+            activity.runOnUiThread {
+                result.onSuccess {
+                    setFriends(it)
+                    onFriendsChanged()
+                }
+            }
+        }
+    }
+
     fun showAddFriendDialog() {
         if (!ensureLoggedIn()) return
 
@@ -125,6 +165,7 @@ internal class MainFriendActions(
                         return@addFriend
                     }
                     parentDialog.dismiss()
+                    loadFriends()
                     val text = if (alreadyFriend) {
                         "已经是好友：$addedName"
                     } else {
@@ -209,6 +250,19 @@ internal class MainFriendActions(
         return runCatching {
             JSONObject(body).optString("error", "").ifBlank { fallback }
         }.getOrDefault(fallback)
+    }
+
+    private fun parseFriend(json: JSONObject): AppFriend {
+        val account = json.optString("account", "").trim()
+        val phone = json.optString("phone", "").trim().takeIf { it.isNotEmpty() }
+        val nickname = json.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
+        return AppFriend(
+            id = json.optString("id", "").trim(),
+            name = nickname ?: account.ifBlank { phone ?: "好友" },
+            account = account,
+            phone = phone,
+            friendSince = json.optString("friend_since", "").trim().takeIf { it.isNotEmpty() }
+        )
     }
 
     private data class FriendCandidate(

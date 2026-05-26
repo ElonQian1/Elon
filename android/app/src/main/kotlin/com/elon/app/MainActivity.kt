@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val taskResponseTokens = linkedMapOf<String, Int>()
     private var backendConnected = false
     private val projects = mutableListOf<AppProject>()
+    private val friends = mutableListOf<AppFriend>()
     private val gson = com.google.gson.Gson()
     private val http = OkHttpClient()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
@@ -330,6 +331,8 @@ class MainActivity : AppCompatActivity() {
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
+            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            refreshFriends = { friendActions.loadFriends() },
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -347,6 +350,10 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
+            conversations = { projectStateActions.conversations },
+            activeConversationIndex = { projectStateActions.activeConversationIndex },
+            openConversation = conversationOpenActions::openConversation,
+            isConversationWorking = homeListActions::isConversationWorking,
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
                 actionPopup?.dismiss()
@@ -471,6 +478,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             projects = { projects },
             conversations = { projectStateActions.conversations },
+            friends = { friends },
             activeProject = projectStateActions::activeProject,
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             formatTime = { timeFormatter.format(Date(it)) },
@@ -481,7 +489,11 @@ class MainActivity : AppCompatActivity() {
             homeRows = { homeRows() },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
-            showCreateProjectDialog = { projectActions.showCreateProjectDialog() }
+            showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
+            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            openAssistantConversation = {
+                conversationOpenActions.openConversation(projectStateActions.activeConversationIndex)
+            }
         )
     }
 
@@ -578,7 +590,14 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             http = http,
             serverUrl = serverUrl,
-            dp = uiTools::dp
+            dp = uiTools::dp,
+            setFriends = { list ->
+                friends.clear()
+                friends.addAll(list)
+            },
+            onFriendsChanged = {
+                if (::binding.isInitialized) homeListActions.renderConversationList()
+            }
         )
     }
 

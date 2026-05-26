@@ -24,6 +24,8 @@ internal class MainNavigationController(
     private val showConversationActions: (Int) -> Unit,
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
+    private val showAddFriendDialog: () -> Unit,
+    private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
     private val isChatSideMenuOpen: () -> Boolean,
@@ -61,7 +63,7 @@ internal class MainNavigationController(
             binding.topTitleText.text = when (tab) {
                 binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
-                else -> compactProjectTitle()
+                else -> "好友"
             }
             if (tab != binding.tabChat) {
                 renderConversationList()
@@ -69,6 +71,7 @@ internal class MainNavigationController(
             if (tab == binding.tabProject) {
                 renderProjectList()
             } else if (tab == binding.tabChat) {
+                refreshFriends()
                 renderConversationList()
             } else if (tab == binding.tabProfile) {
                 refreshServerVersion()
@@ -83,7 +86,7 @@ internal class MainNavigationController(
             showConversationActions(0)
             true
         }
-        binding.searchButton.setOnClickListener { updateFirstConversationStatus("搜索功能准备中 · 点击进入开发会话") }
+        binding.searchButton.setOnClickListener { showAddFriendDialog() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
@@ -225,7 +228,8 @@ internal class MainNavigationController(
             showHomeActionPopup(binding.addButton, binding.tabChat)
         }
         binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = compactProjectTitle()
+        binding.topTitleText.text = "好友"
+        refreshFriends()
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {

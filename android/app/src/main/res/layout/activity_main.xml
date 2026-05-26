@@ -573,7 +573,7 @@
                 android:id="@+id/tabChat"
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_chat_refined"
-                android:text="会话" />
+                android:text="好友" />
 
             <TextView
                 android:id="@+id/tabProject"

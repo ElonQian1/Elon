@@ -5,6 +5,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -13,6 +14,7 @@ internal class MainHomeListActions(
     private val binding: ActivityMainBinding,
     private val projects: () -> List<AppProject>,
     private val conversations: () -> List<AppConversation>,
+    private val friends: () -> List<AppFriend>,
     private val activeProject: () -> AppProject,
     private val compactProjectTitle: () -> String,
     private val formatTime: (Long) -> String,
@@ -20,31 +22,38 @@ internal class MainHomeListActions(
     private val homeRows: () -> MainHomeRows,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
-    private val showCreateProjectDialog: () -> Unit
+    private val showCreateProjectDialog: () -> Unit,
+    private val showAddFriendDialog: () -> Unit,
+    private val openAssistantConversation: () -> Unit
 ) {
     fun renderConversationList() {
-        val conversations = conversations()
-        if (conversations.isEmpty()) return
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
             binding.chatPage.visibility != View.VISIBLE
         if (listVisible) {
-            binding.topTitleText.text = compactProjectTitle()
+            binding.topTitleText.text = "好友"
         }
 
-        val first = conversations[0]
-        binding.projectStatusText.text = first.title
-        binding.statusText.text = first.subtitle
-        binding.statusText.setTextColor(conversationSubtitleColor(first.subtitle))
-        binding.conversationTimeText.text = formatTime(first.updatedAt)
-        homeRows().updateConversationRowShimmer(binding.conversationItem, listVisible && isConversationWorking(0), true)
-
-        while (binding.conversationPage.childCount > 1) {
-            binding.conversationPage.removeViewAt(1)
-        }
-        for (index in 1 until conversations.size) {
+        homeRows().cancelHomeRowShimmer()
+        binding.conversationPage.removeAllViews()
+        binding.conversationPage.addView(
+            homeRows().createFriendRow(
+                AppFriend(
+                    id = "assistant",
+                    name = "一龙开发助手",
+                    account = "已就绪 · 点击进入开发会话",
+                    phone = null,
+                    friendSince = null
+                )
+            ) {
+                openAssistantConversation()
+            }
+        )
+        friends().forEach { friend ->
             binding.conversationPage.addView(homeRows().createConversationDivider())
             binding.conversationPage.addView(
-                homeRows().createConversationRow(index, conversations[index], listVisible && isConversationWorking(index))
+                homeRows().createFriendRow(friend) {
+                    Toast.makeText(activity, "好友会话准备中", Toast.LENGTH_SHORT).show()
+                }
             )
         }
     }

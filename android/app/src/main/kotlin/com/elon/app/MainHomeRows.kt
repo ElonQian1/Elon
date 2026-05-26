@@ -40,6 +40,98 @@ internal class MainHomeRows(
         }
     }
 
+    fun createFriendRow(friend: AppFriend, onClick: () -> Unit): View {
+        val row = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(66)
+            )
+            setBackgroundColor(Color.parseColor("#242424"))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(14), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { onClick() }
+        }
+
+        row.addView(createAvatarView(friend.name, 44, 17f))
+
+        val middle = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(10)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        middle.addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = friend.name
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 16f
+        })
+        middle.addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(4)
+            }
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = friend.phone ?: friend.account
+            setTextColor(Color.parseColor("#A9A9A9"))
+            textSize = 13f
+        })
+        row.addView(middle)
+        return row
+    }
+
+    fun createFriendPlaceholder(loggedIn: Boolean, onClick: () -> Unit): View {
+        val row = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(66)
+            )
+            setBackgroundColor(Color.parseColor("#242424"))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(14), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { onClick() }
+        }
+        row.addView(createAvatarView("+", 44, 20f))
+        val middle = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(10)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        middle.addView(TextView(activity).apply {
+            includeFontPadding = false
+            maxLines = 1
+            text = if (loggedIn) "暂无好友" else "登录后显示好友"
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 16f
+        })
+        middle.addView(TextView(activity).apply {
+            includeFontPadding = false
+            maxLines = 1
+            text = if (loggedIn) "点击右上角 + 添加好友" else "点击登录后按手机号添加好友"
+            setTextColor(Color.parseColor("#A9A9A9"))
+            textSize = 13f
+        })
+        row.addView(middle)
+        return row
+    }
+
     fun createProjectRow(index: Int, project: AppProject): View {
         val wrapper = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
