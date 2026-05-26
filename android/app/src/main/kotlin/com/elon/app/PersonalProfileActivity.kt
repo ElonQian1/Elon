@@ -14,11 +14,18 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import kotlin.concurrent.thread
 
 class PersonalProfileActivity : AppCompatActivity() {
     private lateinit var rows: LinearLayout
     private var profile: UserProfile? = null
+    private val http = OkHttpClient()
+    private val serverUrl = BuildConfig.SERVER_URL
 
     private val avatarPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) {
@@ -171,8 +178,51 @@ class PersonalProfileActivity : AppCompatActivity() {
             avatarDataUrl = avatarDataUrl,
             signature = signature ?: current.signature
         )
+        if (displayName != null && AuthManager.isLoggedIn(this)) {
+            AuthManager.updateNickname(this, displayName)
+            syncDisplayName(displayName)
+        }
         setResult(Activity.RESULT_OK)
         renderRows()
+    }
+
+    private fun syncDisplayName(displayName: String) {
+        thread(name = "profile-name-sync") {
+            val result = runCatching {
+                val body = JSONObject()
+                    .put("nickname", displayName)
+                    .toString()
+                    .toRequestBody("application/json".toMediaType())
+                val request = AuthManager.applyAuth(
+                    this,
+                    Request.Builder()
+                        .url("$serverUrl/api/me/profile")
+                        .patch(body)
+                ).build()
+                http.newCall(request).execute().use { response ->
+                    val text = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error(readErrorMessage(text, "云端资料同步失败"))
+                    val nickname = JSONObject(text)
+                        .optJSONObject("user")
+                        ?.optString("nickname", "")
+                        ?.trim()
+                        .orEmpty()
+                    if (nickname.isNotEmpty()) AuthManager.updateNickname(this, nickname)
+                }
+            }
+            runOnUiThread {
+                result.onFailure {
+                    Toast.makeText(this, "名字已本机保存，云端同步失败：${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun readErrorMessage(body: String, fallback: String): String {
+        if (body.isBlank()) return fallback
+        return runCatching {
+            JSONObject(body).optString("error", "").ifBlank { fallback }
+        }.getOrDefault(fallback)
     }
 
     private fun dp(value: Int): Int =

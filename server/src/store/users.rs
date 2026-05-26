@@ -158,6 +158,43 @@ impl Store {
             .ok_or_else(|| anyhow!("登录已过期，请重新登录"))
     }
 
+    pub fn update_user_nickname(&self, user_id: &str, nickname: &str) -> Result<PublicUser> {
+        let nickname = clean_optional(Some(nickname)).ok_or_else(|| anyhow!("昵称不能为空"))?;
+        let updated_at = now();
+        let updated = self.conn()?.execute(
+            "UPDATE users
+             SET nickname = ?1, updated_at = ?2
+             WHERE id = ?3 AND status = 'active'",
+            params![nickname, updated_at, user_id],
+        )?;
+        if updated == 0 {
+            return Err(anyhow!("用户不存在或已停用"));
+        }
+
+        self.conn()?
+            .query_row(
+                "SELECT id, phone, email, nickname, role, status
+                 FROM users
+                 WHERE id = ?1 AND status = 'active'",
+                params![user_id],
+                |row| {
+                    let phone: Option<String> = row.get(1)?;
+                    let email: Option<String> = row.get(2)?;
+                    Ok(PublicUser {
+                        id: row.get(0)?,
+                        account: email
+                            .or(phone)
+                            .unwrap_or_else(|| row.get(0).unwrap_or_default()),
+                        nickname: row.get(3)?,
+                        role: row.get(4)?,
+                        status: row.get(5)?,
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("用户不存在或已停用"))
+    }
+
     pub fn list_users(&self) -> Result<Vec<AdminUserSummary>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(

@@ -68,6 +68,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/auth/register", post(project_api::register))
         .route("/api/me", get(project_api::me))
         .route(
+            "/api/me/profile",
+            axum::routing::patch(project_api::update_profile),
+        )
+        .route(
             "/api/me/friends",
             get(project_api::list_friends).post(project_api::add_friend_by_phone),
         )

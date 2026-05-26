@@ -62,6 +62,11 @@ pub struct SendFriendMessageRequest {
     pub content: String,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateProfileRequest {
+    pub nickname: Option<String>,
+}
+
 pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequest>) -> Response {
     match login_inner(&state, req) {
         Ok((token, expires_at, user)) => Json(serde_json::json!({
@@ -100,6 +105,32 @@ pub async fn me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     match auth_from_headers(&state, &headers) {
         Ok(user) => Json(serde_json::json!({ "user": user })).into_response(),
         Err(e) => json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    }
+}
+
+pub async fn update_profile(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateProfileRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let nickname = match req.nickname {
+        Some(value) => {
+            let value = value.trim().to_string();
+            if value.is_empty() {
+                return json_error(StatusCode::BAD_REQUEST, "昵称不能为空");
+            }
+            value
+        }
+        None => return json_error(StatusCode::BAD_REQUEST, "缺少昵称"),
+    };
+
+    match state.store.update_user_nickname(&user.id, &nickname) {
+        Ok(user) => Json(serde_json::json!({ "user": user })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 

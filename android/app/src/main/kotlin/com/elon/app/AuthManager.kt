@@ -60,6 +60,10 @@ object AuthManager {
     fun displayName(ctx: Context): String =
         nickname(ctx) ?: account(ctx) ?: "未登录"
 
+    fun updateNickname(ctx: Context, nickname: String) {
+        prefs(ctx).edit().putString(KEY_AUTH_NICKNAME, nickname.trim()).apply()
+    }
+
     /** 登录后用此 ID 调用服务端所有 /api/user/:user_id/... 路由；未登录时返回本机匿名 ID。 */
     fun effectiveUserId(ctx: Context): String {
         userId(ctx)?.let { return it }
