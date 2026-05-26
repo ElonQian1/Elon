@@ -17,9 +17,10 @@
         <item name="android:textColor">#B8B8B8</item>
         <item name="android:textSize">11sp</item>
         <item name="android:includeFontPadding">false</item>
-        <item name="android:drawablePadding">1dp</item>
+        <item name="android:drawablePadding">2dp</item>
         <item name="android:paddingTop">5dp</item>
         <item name="android:paddingBottom">4dp</item>
+        <item name="android:background">@drawable/bg_bottom_tab_item</item>
         <item name="android:clickable">true</item>
         <item name="android:foreground">?attr/selectableItemBackground</item>
     </style>

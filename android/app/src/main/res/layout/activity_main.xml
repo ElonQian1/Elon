@@ -572,13 +572,13 @@
             <TextView
                 android:id="@+id/tabChat"
                 style="@style/MainTabText"
-                android:drawableTop="@drawable/ic_tab_chat_edit"
+                android:drawableTop="@drawable/ic_tab_chat_refined"
                 android:text="会话" />
 
             <TextView
                 android:id="@+id/tabProject"
                 style="@style/MainTabText"
-                android:drawableTop="@drawable/ic_tab_project_stack"
+                android:drawableTop="@drawable/ic_tab_project_refined"
                 android:text="项目" />
 
             <TextView

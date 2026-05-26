@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.view.View
 import android.widget.PopupWindow
@@ -41,8 +42,7 @@ internal class MainNavigationController(
             pageTransitionRunning = false
             clearPageTranslations()
             tabs.forEach {
-                it.setTextColor(Color.parseColor(if (it == tab) "#07C160" else "#A5A5A5"))
-                it.textSize = if (it == tab) 12f else 11f
+                updateBottomTabVisual(it, it == tab)
             }
             binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.chatPage.visibility = View.GONE
@@ -211,12 +211,7 @@ internal class MainNavigationController(
     }
 
     private fun applyConversationHomeChrome() {
-        binding.tabChat.setTextColor(Color.parseColor("#07C160"))
-        binding.tabChat.textSize = 12f
-        binding.tabProject.setTextColor(Color.parseColor("#A5A5A5"))
-        binding.tabProject.textSize = 11f
-        binding.tabProfile.setTextColor(Color.parseColor("#A5A5A5"))
-        binding.tabProfile.textSize = 11f
+        updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = View.GONE
@@ -231,6 +226,20 @@ internal class MainNavigationController(
         }
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = compactProjectTitle()
+    }
+
+    private fun updateBottomTabSelection(selectedTab: TextView) {
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach { tab ->
+            updateBottomTabVisual(tab, tab == selectedTab)
+        }
+    }
+
+    private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
+        val color = Color.parseColor(if (selected) "#E1E1E1" else "#A8A8A8")
+        tab.isSelected = selected
+        tab.setTextColor(color)
+        tab.textSize = 11f
+        tab.compoundDrawableTintList = ColorStateList.valueOf(color)
     }
 
     private fun clearPageTranslations() {
