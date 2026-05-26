@@ -1,12 +1,21 @@
 //! 局域网 PC 种子节点模块
 //!
 //! 工作流：
-//!   1. 开发 PC 在 publish-apk.ps1 发布完成后，启动 lan-apk-server.ps1（后台无窗口）
-//!   2. lan-apk-server.ps1 在本机启动 HTTP 文件服务器，并向服务器注册自身 LAN IP+端口
-//!   3. POST /app/lan-peer/register 把 {lan_ip, port, version_code} 写入 lan_peer_registry
+//!   1. 开发 PC 在 publish-*.ps1 发布完成后，调用 lan-dist-client.ps1 注册产物
+//!   2. lan-dist-client.ps1 写注册文件到 %TEMP%\lan-dist-registry\，
+//!      并启动（或复用）共享后台守护进程 lan-dist-daemon
+//!   3. 守护进程在本机启动 HTTP 服务（端口 7788），并向服务器 POST /app/lan-peer/register
+//!      注册自身 LAN IP + port + dist_path（如 "/dist/elon/user-apk"）
 //!   4. GET /app/version.json（在 peer_relay.rs 中）动态注入 LAN peer mirrors，priority=10
+//!      Mirror URL 为 http://<lan_ip>:7788<dist_path>（可精确指向具体项目/产物）
 //!   5. 手机 APK 收到 version.json 后，优先尝试 LAN 直连下载（4s 超时）
 //!   6. LAN 连接失败 → 自动回落到手机P2P中继或服务器直链
+//!
+//! 多产物支持：守护进程单进程服务所有项目所有产物，按 URL 路径区分：
+//!   - /dist/elon/user-apk     — elon 用户端 APK
+//!   - /dist/elon/admin-apk    — elon 管理端 APK
+//!   - /dist/bb64a/user-apk    — bb64a 用户端 APK
+//!   - /dist/bb64a/windows-exe — bb64a Windows 客户端
 //!
 //! 过期策略：注册后 2 小时自动过期（注入 version.json 时过滤）
 
@@ -30,8 +39,11 @@ pub struct RegisterLanPeerRequest {
     pub lan_ip: String,
     /// PC 上 HTTP 文件服务器的端口（建议固定为 7788）
     pub port: u16,
-    /// 该 PC 发布的 APK versionCode
+    /// 该 PC 发布的产物版本号（APK versionCode 或其他整数版本）
     pub version_code: i64,
+    /// 产物在本地 HTTP 服务器上的路径，如 "/dist/elon/user-apk"
+    /// 不传则向后兼容，默认 "/apk"
+    pub dist_path: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -68,10 +80,17 @@ pub async fn register_lan_peer(
     // 用 "lan-{ip}-{port}" 作为 peer_id，同一台 PC 重复注册会更新而非新增
     let peer_id = format!("lan-{}-{}", body.lan_ip.replace('.', "-"), body.port);
 
+    let dist_path = body
+        .dist_path
+        .clone()
+        .filter(|p| !p.is_empty())
+        .unwrap_or_else(|| "/apk".to_string());
+
     let entry = LanPeerEntry {
         lan_ip: body.lan_ip.clone(),
         port: body.port,
         version_code: body.version_code,
+        dist_path: dist_path.clone(),
         registered_at: std::time::Instant::now(),
     };
 
@@ -83,10 +102,11 @@ pub async fn register_lan_peer(
     }
 
     tracing::info!(
-        "🖥️  LAN PC 种子注册: {} ({}:{}, versionCode={})",
+        "🖥️  LAN PC 种子注册: {} ({}:{}{}, versionCode={})",
         peer_id,
         body.lan_ip,
         body.port,
+        dist_path,
         body.version_code
     );
 
@@ -130,7 +150,7 @@ pub async fn get_active_lan_mirrors(
         .filter(|(_, e)| e.version_code >= current_version_code)
         .map(|(_, e)| {
             serde_json::json!({
-                "url": format!("http://{}:{}/apk", e.lan_ip, e.port),
+                "url": format!("http://{}:{}{}", e.lan_ip, e.port, e.dist_path),
                 "type": "lan",
                 // priority=10，高于手机P2P中继的 priority=5，局域网直连最快优先
                 "priority": 10

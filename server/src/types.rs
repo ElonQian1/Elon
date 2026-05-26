@@ -21,14 +21,16 @@ pub struct PeerEntry {
     pub tx: mpsc::Sender<PeerRequest>,
 }
 
-/// 同WiFi 局域网 PC 种子节点（开发电脑发布 APK 后注册，直接对手机提供 HTTP 下载）
+/// 同WiFi 局域网 PC 种子节点（开发电脑发布任意产物后注册，直接对手机/客户端提供 HTTP 下载）
 pub struct LanPeerEntry {
     /// PC 在局域网中的 IP 地址（如 192.168.1.100）
     pub lan_ip: String,
     /// PC 上本地 HTTP 文件服务器监听的端口
     pub port: u16,
-    /// 该 PC 提供的 APK versionCode
+    /// 该 PC 提供的产物版本号（APK versionCode 或其他整数版本）
     pub version_code: i64,
+    /// 产物在本地 HTTP 服务器上的路径（如 "/dist/elon/user-apk"，旧版默认 "/apk"）
+    pub dist_path: String,
     /// 注册时间（用于自动过期）
     pub registered_at: std::time::Instant,
 }

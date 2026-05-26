@@ -754,28 +754,23 @@ Write-Host "   SHA:  $sha (源代码 commit，无新增 release commit)" -Foregr
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
 Write-Host ("=" * 60) -ForegroundColor Cyan
 
-# ── 启动局域网 APK 种子服务（后台无窗口）────────────────────────────────────
+# ── 启动局域网分发种子服务（后台无窗口，多项目共享守护进程）─────────────────
 
 Write-Host ""
-Write-Host "📡 启动局域网 APK 种子服务（同WiFi直接下载，无需走服务器）..." -ForegroundColor Cyan
-$lanScript = Join-Path $PSScriptRoot "lan-apk-server.ps1"
-if (Test-Path $lanScript) {
+Write-Host "📡 注册局域网分发服务（同WiFi直接下载，无需走服务器）..." -ForegroundColor Cyan
+$distClient = Join-Path $PSScriptRoot "lan-dist-client.ps1"
+if (Test-Path $distClient) {
     try {
-        # -WindowStyle Hidden：不出现控制台窗口
-        # -NonInteractive：不等待用户输入
-        Start-Process pwsh -WindowStyle Hidden -ArgumentList @(
-            "-NonInteractive",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $lanScript,
-            "-ApkPath", $apk.FullName,
-            "-VersionCode", $newCode,
-            "-ServerUrl", $ServerUrl
-        )
-        Write-Host "   ✅ LAN 种子服务已在后台启动（端口 7788，2 小时后自动退出）" -ForegroundColor Green
-        Write-Host "   📄 日志: $env:TEMP\elon-lan-apk-server.log" -ForegroundColor DarkGray
+        # 客户端模式：写注册文件并确保守护进程在后台运行（立即返回）
+        & $distClient `
+            -ProjectId         "elon" `
+            -ArtifactId        "user-apk" `
+            -FilePath          $apk.FullName `
+            -VersionCode       $newCode `
+            -ServerRegisterUrl "$ServerUrl/app/lan-peer/register"
     } catch {
-        Write-Warning "   ⚠️  LAN 种子服务启动失败: $_（不影响 APK 发布，手机仍可从服务器下载）"
+        Write-Warning "   ⚠️  LAN 分发服务启动失败: $_（不影响 APK 发布，手机仍可从服务器下载）"
     }
 } else {
-    Write-Warning "   ⚠️  未找到 $lanScript，跳过局域网种子服务"
+    Write-Warning "   ⚠️  未找到 $distClient，跳过局域网分发服务"
 }
