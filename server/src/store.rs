@@ -6,7 +6,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use crate::store_schema::init_schema;
+use crate::store_schema::apply_migrations;
 
 mod common;
 mod friend_messages;
@@ -221,7 +221,7 @@ impl Store {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "busy_timeout", 5000)?;
-        init_schema(&conn)?;
+        apply_migrations(&conn)?;
 
         Ok(Self {
             conn: Mutex::new(conn),

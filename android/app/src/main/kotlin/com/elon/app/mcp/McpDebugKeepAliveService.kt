@@ -1,5 +1,6 @@
-package com.elon.app
+﻿package com.elon.app.mcp
 
+import com.elon.app.*
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent

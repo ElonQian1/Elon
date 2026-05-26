@@ -60,6 +60,9 @@ android {
         targetSdk 34
         versionCode 75
         versionName "1.1.67"
+        // 服务器地址：可通过环境变量 ELON_SERVER_URL 覆盖，默认指向生产服务器
+        def serverUrl = signingValue("ELON_SERVER_URL", "http://43.139.149.158:8080")
+        buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
     }
 
     buildTypes {

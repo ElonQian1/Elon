@@ -1,5 +1,6 @@
-package com.elon.app
+﻿package com.elon.app.mcp
 
+import com.elon.app.*
 import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
@@ -35,7 +36,7 @@ object McpDebugServer {
     private const val PROTOCOL_VERSION = "2025-06-18"
     private const val PREF_MCP_TOKEN = "mcp_debug_token"
     private const val SOCKET_TIMEOUT_MS = 5_000
-    private const val DEFAULT_SERVER_BASE_URL = "http://43.139.149.158:8080"
+    private val serverBaseUrl: String get() = BuildConfig.SERVER_URL
 
     @Volatile private var running = false
     @Volatile private var serverSocket: ServerSocket? = null
@@ -206,7 +207,7 @@ object McpDebugServer {
             "task_events" -> mcpTaskEvents(appContext, args)
             "logcat_recent" -> mcpLogcatRecent(args)
             "chat_send" -> chatSend(appContext, args)
-            "chat_probe" -> mcpChatProbe(appContext, args, DEFAULT_SERVER_BASE_URL) { bundleArgs ->
+            "chat_probe" -> mcpChatProbe(appContext, args, serverBaseUrl) { bundleArgs ->
                 diagnosticBundle(bundleArgs).optJSONObject("structuredContent") ?: JSONObject()
             }
             else -> toolResult("Unknown tool: $name", JSONObject().put("tool", name), isError = true)
@@ -287,7 +288,7 @@ object McpDebugServer {
                 .apply {
                     args.optString("server_url").takeIf { it.isNotBlank() }?.let { put("server_url", it) }
                 }
-                .let { serverTraceJson(appContext, it, DEFAULT_SERVER_BASE_URL) }
+                .let { serverTraceJson(appContext, it, serverBaseUrl) }
         } else {
             JSONObject.NULL
         }
@@ -338,7 +339,7 @@ object McpDebugServer {
     }
 
     private fun networkCheck(args: JSONObject): JSONObject {
-        return toolResult("Network check returned.", mcpNetworkCheckJson(appContext, args, DEFAULT_SERVER_BASE_URL))
+        return toolResult("Network check returned.", mcpNetworkCheckJson(appContext, args, serverBaseUrl))
     }
 
     private fun backgroundDebugStatus(@Suppress("UNUSED_PARAMETER") args: JSONObject): JSONObject {
@@ -350,7 +351,7 @@ object McpDebugServer {
     }
 
     private fun serverTrace(args: JSONObject): JSONObject {
-        val structured = serverTraceJson(appContext, args, DEFAULT_SERVER_BASE_URL)
+        val structured = serverTraceJson(appContext, args, serverBaseUrl)
         val available = structured.optBoolean("available", false)
         return toolResult(
             if (available) "Server trace returned." else "Server trace is not available.",

@@ -1,5 +1,6 @@
-package com.elon.app
+﻿package com.elon.app.mcp
 
+import com.elon.app.*
 import android.Manifest
 import android.app.ActivityManager
 import android.content.Context

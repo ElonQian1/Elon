@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
     private val http = OkHttpClient()
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
-    private val serverUrl = "http://43.139.149.158:8080"
+    private val serverUrl = BuildConfig.SERVER_URL
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"

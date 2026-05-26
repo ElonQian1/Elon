@@ -1,4 +1,4 @@
-package com.elon.app
+﻿package com.elon.app.mcp
 
 import android.content.Context
 import android.os.SystemClock

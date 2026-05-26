@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::ServeFile;
 
 use crate::types::AppState;
@@ -14,11 +14,33 @@ use crate::{
     web,
 };
 
-pub fn build_app(state: Arc<AppState>) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
+/// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
+///
+/// - 未设置或值为 `*` → 允许所有来源（开发友好，生产环境建议显式配置）
+/// - 逗号分隔的 Origin 列表 → 仅允许列出的来源，其余拒绝
+fn build_cors() -> CorsLayer {
+    let origins_env = std::env::var("CORS_ALLOW_ORIGINS").unwrap_or_default();
+    let allow_origin = if origins_env.is_empty() || origins_env.trim() == "*" {
+        AllowOrigin::any()
+    } else {
+        let list: Vec<axum::http::HeaderValue> = origins_env
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        if list.is_empty() {
+            AllowOrigin::any()
+        } else {
+            AllowOrigin::list(list)
+        }
+    };
+    CorsLayer::new()
+        .allow_origin(allow_origin)
         .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_headers(Any)
+}
+
+pub fn build_app(state: Arc<AppState>) -> Router {
+    let cors = build_cors();
 
     // 应用自身 APK 更新文件目录（由发布脚本部署后填充）
     let app_dir = state.data_dir.join("app");

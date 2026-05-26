@@ -1,5 +1,6 @@
-package com.elon.app
+﻿package com.elon.app.mcp
 
+import com.elon.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences

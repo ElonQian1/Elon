@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.app.Application
+import com.elon.app.mcp.*
 
 class ElonApplication : Application() {
 
