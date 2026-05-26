@@ -9,6 +9,7 @@ internal class MainInputFocusActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val activeConversation: () -> AppConversation,
+    private val isFriendChatActive: () -> Boolean,
     private val isVoiceMode: () -> Boolean,
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
@@ -18,7 +19,7 @@ internal class MainInputFocusActions(
     private val updateAdaptiveInputHeight: () -> Unit
 ) {
     fun focusInputComposer() {
-        if (activeConversation().ended) return
+        if (!isFriendChatActive() && activeConversation().ended) return
         if (isVoiceMode()) {
             setVoiceMode(false)
             applyVoiceMode()

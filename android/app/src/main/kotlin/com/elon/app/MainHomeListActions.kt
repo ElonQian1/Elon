@@ -5,7 +5,6 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -23,7 +22,8 @@ internal class MainHomeListActions(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
-    private val showAddFriendDialog: () -> Unit
+    private val showAddFriendDialog: () -> Unit,
+    private val openFriend: (AppFriend) -> Unit
 ) {
     fun renderConversationList() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
@@ -49,7 +49,7 @@ internal class MainHomeListActions(
             }
             binding.conversationPage.addView(
                 homeRows().createFriendRow(friend) {
-                    Toast.makeText(activity, "好友会话准备中", Toast.LENGTH_SHORT).show()
+                    openFriend(friend)
                 }
             )
         }

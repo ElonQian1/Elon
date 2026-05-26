@@ -9,6 +9,7 @@ use std::{
 use crate::store_schema::init_schema;
 
 mod common;
+mod friend_messages;
 mod friends;
 mod native_sessions;
 mod projects;
@@ -68,6 +69,16 @@ pub struct FriendSearchResult {
 pub struct AddFriendResult {
     pub friend: FriendProfile,
     pub already_friend: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendChatMessage {
+    pub id: String,
+    pub sender_user_id: String,
+    pub receiver_user_id: String,
+    pub content: String,
+    pub created_at: String,
+    pub outgoing: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -51,6 +51,17 @@ pub struct AddFriendRequest {
     pub phone: String,
 }
 
+#[derive(Deserialize)]
+pub struct FriendMessagesQuery {
+    pub after: Option<String>,
+    pub limit: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct SendFriendMessageRequest {
+    pub content: String,
+}
+
 pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequest>) -> Response {
     match login_inner(&state, req) {
         Ok((token, expires_at, user)) => Json(serde_json::json!({
@@ -152,6 +163,48 @@ pub async fn add_friend_by_phone(
             };
             json_error(status, message)
         }
+    }
+}
+
+pub async fn list_friend_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath(friend_id): AxumPath<String>,
+    Query(query): Query<FriendMessagesQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    match state.store.list_friend_messages(
+        &user.id,
+        &friend_id,
+        query.after.as_deref(),
+        query.limit.unwrap_or(80),
+    ) {
+        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn send_friend_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath(friend_id): AxumPath<String>,
+    Json(req): Json<SendFriendMessageRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    match state
+        .store
+        .send_friend_message(&user.id, &friend_id, &req.content)
+    {
+        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 

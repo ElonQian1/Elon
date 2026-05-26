@@ -32,7 +32,8 @@ internal class MainNavigationController(
     private val closeChatSideMenu: (Boolean) -> Unit,
     private val isActiveConversationWorking: () -> Boolean,
     private val setSendEnabled: (Boolean) -> Unit,
-    private val maybePrewarmCodexSession: (String) -> Unit
+    private val maybePrewarmCodexSession: (String) -> Unit,
+    private val onFriendChatClosed: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -126,6 +127,7 @@ internal class MainNavigationController(
     }
 
     fun showConversationHome(animate: Boolean = false) {
+        onFriendChatClosed()
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
             closeChatSideMenu(false)
@@ -195,6 +197,45 @@ internal class MainNavigationController(
         }
         setSendEnabled(!isActiveConversationWorking())
         maybePrewarmCodexSession("show_chat")
+    }
+
+    fun showFriendChat(title: String, animate: Boolean = false) {
+        if (pageTransitionRunning) return
+        chatReturnTarget = ChatReturnTarget.FRIENDS
+        val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        applyFriendChatChrome(title)
+        if (shouldAnimate) {
+            collapseInputComposer(false)
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromRight(
+                container = binding.contentContainer,
+                incoming = listOf(binding.chatPage),
+                outgoing = listOf(binding.conversationPage),
+                incomingFull = listOf(binding.inputLayout),
+                outgoingFull = listOf(binding.pageTabs),
+                onEnd = {
+                    binding.conversationPage.visibility = View.GONE
+                    binding.pageTabs.visibility = View.GONE
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.chatPage.visibility = View.VISIBLE
+                    binding.inputLayout.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            binding.conversationPage.visibility = View.GONE
+            binding.pageTabs.visibility = View.GONE
+            binding.projectPage.visibility = View.GONE
+            binding.profilePage.visibility = View.GONE
+            binding.chatPage.visibility = View.VISIBLE
+            binding.inputLayout.visibility = View.VISIBLE
+            clearPageTranslations()
+        }
+        setSendEnabled(true)
     }
 
     fun showProjectChat(animate: Boolean = false) {
@@ -289,6 +330,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.moreButton.visibility = View.VISIBLE
+        binding.stageHintText.visibility = View.VISIBLE
         renderConversationList()
         binding.topTitleText.text = activeConversationProvider().title
         binding.topTitleText.setOnLongClickListener {
@@ -314,6 +356,24 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "好友"
         refreshFriends()
+    }
+
+    private fun applyFriendChatChrome(title: String) {
+        updateBottomTabSelection(binding.tabChat)
+        binding.conversationPage.visibility = View.GONE
+        binding.chatPage.visibility = View.VISIBLE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.inputLayout.visibility = View.VISIBLE
+        binding.pageTabs.visibility = View.GONE
+        binding.backButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.GONE
+        binding.moreButton.visibility = View.GONE
+        binding.quickActionStrip.visibility = View.GONE
+        binding.stageHintText.visibility = View.GONE
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = title
     }
 
     private fun applyProjectHomeChrome() {

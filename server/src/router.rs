@@ -53,6 +53,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/friends/search",
             get(project_api::search_friend_by_phone),
         )
+        .route(
+            "/api/me/friends/:friend_id/messages",
+            get(project_api::list_friend_messages).post(project_api::send_friend_message),
+        )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
         // ── 项目商店 ─────────────────────────────────────────────────────

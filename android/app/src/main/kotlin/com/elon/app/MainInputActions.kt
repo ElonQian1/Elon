@@ -24,7 +24,9 @@ internal class MainInputActions(
     private val activeWorkControlActions: () -> MainActiveWorkControlActions,
     private val messageActions: () -> MainMessageActions,
     private val navigationController: () -> MainNavigationController,
-    private val stageHintShimmer: () -> MainStageHintShimmer
+    private val stageHintShimmer: () -> MainStageHintShimmer,
+    private val isFriendChatActive: () -> Boolean,
+    private val trySendFriendMessage: (String, Boolean) -> Boolean
 ) {
     private val pendingAttachments = mutableListOf<PendingAttachment>()
     private var inputComposerViews: MainInputComposerViews? = null
@@ -93,6 +95,7 @@ internal class MainInputActions(
             activity = activity,
             binding = binding,
             activeConversation = projectStateActions()::activeConversation,
+            isFriendChatActive = isFriendChatActive,
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
@@ -140,7 +143,8 @@ internal class MainInputActions(
             uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
                 attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
-            startPreparedMessage = preparedMessageActions()::startPreparedMessage
+            startPreparedMessage = preparedMessageActions()::startPreparedMessage,
+            trySendFriendMessage = trySendFriendMessage
         )
     }
 
@@ -231,7 +235,8 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },
             inputCanSend = { inputCanSend },
-            activeConversation = projectStateActions()::activeConversation
+            activeConversation = projectStateActions()::activeConversation,
+            isFriendChatActive = isFriendChatActive
         )
     }
 
@@ -252,6 +257,7 @@ internal class MainInputActions(
         MainSendEnabledActions(
             binding = binding,
             activeConversation = projectStateActions()::activeConversation,
+            isFriendChatActive = isFriendChatActive,
             setInputCanSend = { inputCanSend = it },
             inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
             voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },

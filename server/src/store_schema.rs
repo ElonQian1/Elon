@@ -36,6 +36,17 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
           CHECK (user_id != friend_user_id)
         );
 
+        CREATE TABLE IF NOT EXISTS friend_messages (
+          id TEXT PRIMARY KEY,
+          sender_user_id TEXT NOT NULL,
+          receiver_user_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (sender_user_id) REFERENCES users(id),
+          FOREIGN KEY (receiver_user_id) REFERENCES users(id),
+          CHECK (sender_user_id != receiver_user_id)
+        );
+
         CREATE TABLE IF NOT EXISTS projects (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
@@ -225,6 +236,16 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_user_friends_friend
          ON user_friends(friend_user_id, created_at)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_friend_messages_pair_created
+         ON friend_messages(sender_user_id, receiver_user_id, created_at)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_friend_messages_receiver_created
+         ON friend_messages(receiver_user_id, sender_user_id, created_at)",
         [],
     )?;
     Ok(())

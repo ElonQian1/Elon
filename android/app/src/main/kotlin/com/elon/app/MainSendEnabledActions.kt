@@ -8,6 +8,7 @@ import com.elon.app.databinding.ActivityMainBinding
 internal class MainSendEnabledActions(
     private val binding: ActivityMainBinding,
     private val activeConversation: () -> AppConversation,
+    private val isFriendChatActive: () -> Boolean,
     private val setInputCanSend: (Boolean) -> Unit,
     private val inputModeButton: () -> ImageButton?,
     private val voiceHoldButton: () -> TextView?,
@@ -17,7 +18,7 @@ internal class MainSendEnabledActions(
     private val updateStageHintShimmer: () -> Unit
 ) {
     fun setSendEnabled(enabled: Boolean) {
-        val conversationEnded = activeConversation().ended
+        val conversationEnded = !isFriendChatActive() && activeConversation().ended
         val canSend = enabled && !conversationEnded
         setInputCanSend(canSend)
         binding.inputEdit.isEnabled = !conversationEnded

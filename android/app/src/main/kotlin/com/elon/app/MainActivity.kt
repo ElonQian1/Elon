@@ -119,7 +119,11 @@ class MainActivity : AppCompatActivity() {
             activeWorkControlActions = { activeWorkControlActions },
             messageActions = { messageActions },
             navigationController = { navigationController },
-            stageHintShimmer = { stageHintShimmer() }
+            stageHintShimmer = { stageHintShimmer() },
+            isFriendChatActive = { friendChatActions.isActive() },
+            trySendFriendMessage = { text, hasAttachments ->
+                friendChatActions.trySendMessage(text, hasAttachments)
+            }
         )
     }
 
@@ -178,6 +182,7 @@ class MainActivity : AppCompatActivity() {
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
         gws.start(this)
+        friendChatActions.resumeIfActive()
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -210,6 +215,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         appInForeground = false
+        friendChatActions.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
@@ -358,7 +364,8 @@ class MainActivity : AppCompatActivity() {
             closeChatSideMenu = { animate -> chatSideMenuController.close(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
-            maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
+            maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
+            onFriendChatClosed = { friendChatActions.closeFriendChat() }
         )
     }
 
@@ -507,7 +514,21 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showAddFriendDialog = { friendActions.showAddFriendDialog() }
+            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            openFriend = { friend -> friendChatActions.openFriend(friend, animate = true) }
+        )
+    }
+
+    private val friendChatActions: MainFriendChatActions by lazy {
+        MainFriendChatActions(
+            activity = this,
+            binding = binding,
+            http = http,
+            serverUrl = serverUrl,
+            setChatAdapter = { chatAdapter = it },
+            showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() }
         )
     }
 
@@ -775,6 +796,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        friendChatActions.stopPolling()
         lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }

@@ -16,7 +16,8 @@ internal class MainSendButtonVisualActions(
     private val isVoiceMode: () -> Boolean,
     private val hasPendingAttachments: () -> Boolean,
     private val inputCanSend: () -> Boolean,
-    private val activeConversation: () -> AppConversation
+    private val activeConversation: () -> AppConversation,
+    private val isFriendChatActive: () -> Boolean
 ) {
     fun updateSendButtonVisual() {
         val hasText = binding.inputEdit.text.toString().trim().isNotEmpty()
@@ -48,7 +49,7 @@ internal class MainSendButtonVisualActions(
             attachmentParams?.let { button.layoutParams = it }
         }
 
-        val conversationEnded = activeConversation().ended
+        val conversationEnded = !isFriendChatActive() && activeConversation().ended
         val sendEnabled = !conversationEnded && (!sendMode || inputCanSend())
         binding.sendButton.isEnabled = sendEnabled
         binding.sendButton.alpha = if (sendEnabled) 1f else 0.55f

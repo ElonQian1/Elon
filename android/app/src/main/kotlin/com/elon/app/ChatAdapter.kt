@@ -25,7 +25,8 @@ data class ChatMessage(
     var evidenceTitle: String? = null,
     var evidenceDetails: String? = null,
     var evidenceExpanded: Boolean = false,
-    var evidenceWorking: Boolean = false
+    var evidenceWorking: Boolean = false,
+    var senderLabel: String? = null
 )
 
 class ChatAdapter(
@@ -44,6 +45,7 @@ class ChatAdapter(
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val evidenceLastEntry: TextView? = view.findViewById(R.id.evidenceLastEntry)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
+        val friendAvatar: TextView? = view.findViewById(R.id.friendAvatar)
         var shimmerAnimator: ValueAnimator? = null
         var evidenceShimmerAnimator: ValueAnimator? = null
 
@@ -72,6 +74,7 @@ class ChatAdapter(
         "user"        -> 0
         "ai"          -> 1
         "ai-intent"   -> 1
+        "friend"      -> 4
         "ai-working"  -> 2
         "ai-progress" -> 2
         "ai-cli-log"  -> 2
@@ -87,6 +90,7 @@ class ChatAdapter(
             0    -> R.layout.item_message_user
             2    -> R.layout.item_message_progress
             3    -> R.layout.item_message_error
+            4    -> R.layout.item_message_friend
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
@@ -106,6 +110,7 @@ class ChatAdapter(
         Linkify.addLinks(holder.text, Linkify.WEB_URLS)
         holder.text.movementMethod = LinkMovementMethod.getInstance()
         bindSendStatus(holder, message)
+        holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
         bindChatAttachmentViews(holder.attachmentList, message.attachments)
         bindMessageActions(holder, message)
         bindEvidence(holder, message, position)
@@ -188,7 +193,7 @@ class ChatAdapter(
     }
 
     private fun messageTextColor(role: String): Int = when (role) {
-        "ai", "ai-intent" -> Color.parseColor("#F4F4F4")
+        "ai", "ai-intent", "friend" -> Color.parseColor("#F4F4F4")
         "ai-stopped" -> Color.parseColor("#D9B66B")
         "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#9A9A9A")
         "error" -> Color.parseColor("#C62828")

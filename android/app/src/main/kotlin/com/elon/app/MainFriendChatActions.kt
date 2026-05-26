@@ -1,0 +1,191 @@
+package com.elon.app
+
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.net.URLEncoder
+import kotlin.concurrent.thread
+
+internal class MainFriendChatActions(
+    private val activity: AppCompatActivity,
+    private val binding: ActivityMainBinding,
+    private val http: OkHttpClient,
+    private val serverUrl: String,
+    private val setChatAdapter: (ChatAdapter) -> Unit,
+    private val showFriendChat: (String, Boolean) -> Unit,
+    private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val collapseInputComposer: () -> Unit
+) {
+    private val messagesByFriend = linkedMapOf<String, MutableList<ChatMessage>>()
+    private val pollHandler = Handler(Looper.getMainLooper())
+    private var activeFriend: AppFriend? = null
+    private var activeAdapter: ChatAdapter? = null
+    private var polling = false
+
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            val friend = activeFriend ?: return
+            loadMessages(friend, silent = true, scrollToBottom = false)
+            if (polling) pollHandler.postDelayed(this, POLL_INTERVAL_MS)
+        }
+    }
+
+    fun openFriend(friend: AppFriend, animate: Boolean) {
+        activeFriend = friend
+        val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        val adapter = ChatAdapter(
+            messages = messages,
+            onMessageLongPress = showMessageActions
+        )
+        activeAdapter = adapter
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        showFriendChat(friend.name, animate)
+        loadMessages(friend, silent = false, scrollToBottom = true)
+        startPolling()
+    }
+
+    fun closeFriendChat() {
+        activeFriend = null
+        activeAdapter = null
+        stopPolling()
+    }
+
+    fun isActive(): Boolean = activeFriend != null
+
+    fun resumeIfActive() {
+        if (activeFriend != null) startPolling()
+    }
+
+    fun stopPolling() {
+        polling = false
+        pollHandler.removeCallbacks(pollRunnable)
+    }
+
+    fun trySendMessage(rawText: String, hasAttachments: Boolean): Boolean {
+        val friend = activeFriend ?: return false
+        val text = rawText.trim()
+        if (hasAttachments) {
+            Toast.makeText(activity, "好友聊天暂不支持发送附件", Toast.LENGTH_SHORT).show()
+            return true
+        }
+        if (text.isBlank()) return true
+
+        val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        val pending = ChatMessage("user", text, sendStatus = "发送中...")
+        messages.add(pending)
+        activeAdapter?.notifyItemInserted(messages.lastIndex)
+        binding.chatList.scrollToPosition(messages.lastIndex)
+        binding.inputEdit.text.clear()
+        collapseInputComposer()
+
+        thread {
+            val result = runCatching { postMessage(friend, text) }
+            activity.runOnUiThread {
+                if (activeFriend?.id != friend.id) return@runOnUiThread
+                result.onSuccess {
+                    loadMessages(friend, silent = true, scrollToBottom = true)
+                }.onFailure { error ->
+                    pending.sendStatus = error.message ?: "发送失败"
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                }
+            }
+        }
+        return true
+    }
+
+    private fun startPolling() {
+        if (polling) return
+        polling = true
+        pollHandler.removeCallbacks(pollRunnable)
+        pollHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
+    }
+
+    private fun loadMessages(friend: AppFriend, silent: Boolean, scrollToBottom: Boolean) {
+        val currentMessages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        if (currentMessages.any { it.sendStatus == "发送中..." }) return
+        thread {
+            val result = runCatching { fetchMessages(friend) }
+            activity.runOnUiThread {
+                if (activeFriend?.id != friend.id) return@runOnUiThread
+                result.onSuccess { remoteMessages ->
+                    currentMessages.clear()
+                    currentMessages.addAll(remoteMessages)
+                    activeAdapter?.notifyDataSetChanged()
+                    if (scrollToBottom && currentMessages.isNotEmpty()) {
+                        binding.chatList.scrollToPosition(currentMessages.lastIndex)
+                    }
+                }.onFailure { error ->
+                    if (!silent) Toast.makeText(
+                        activity,
+                        error.message ?: "加载好友消息失败",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun fetchMessages(friend: AppFriend): List<ChatMessage> {
+        val request = AuthManager.applyAuth(
+            activity,
+            Request.Builder()
+                .url("$serverUrl/api/me/friends/${urlPart(friend.id)}/messages?limit=120")
+                .get()
+        ).build()
+        http.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) error(readErrorMessage(body, "加载好友消息失败"))
+            val array = JSONObject(body).optJSONArray("messages") ?: JSONArray()
+            return List(array.length()) { index ->
+                val json = array.optJSONObject(index) ?: JSONObject()
+                val outgoing = json.optBoolean("outgoing", false)
+                ChatMessage(
+                    role = if (outgoing) "user" else "friend",
+                    content = json.optString("content", ""),
+                    senderLabel = if (outgoing) null else friend.name
+                )
+            }
+        }
+    }
+
+    private fun postMessage(friend: AppFriend, text: String) {
+        val payload = JSONObject().put("content", text).toString()
+            .toRequestBody("application/json".toMediaType())
+        val request = AuthManager.applyAuth(
+            activity,
+            Request.Builder()
+                .url("$serverUrl/api/me/friends/${urlPart(friend.id)}/messages")
+                .post(payload)
+        ).build()
+        http.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) error(readErrorMessage(body, "发送失败"))
+        }
+    }
+
+    private fun readErrorMessage(body: String, fallback: String): String {
+        if (body.isBlank()) return fallback
+        return runCatching {
+            JSONObject(body).optString("error", "").ifBlank { fallback }
+        }.getOrDefault(fallback)
+    }
+
+    private fun urlPart(value: String): String {
+        return URLEncoder.encode(value, Charsets.UTF_8.name())
+    }
+
+    private companion object {
+        const val POLL_INTERVAL_MS = 3000L
+    }
+}

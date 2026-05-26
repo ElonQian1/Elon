@@ -13,12 +13,14 @@ internal class MainSendMessageActions(
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val uploadAttachmentsThenSend: (String, String, SendTarget) -> Unit,
-    private val startPreparedMessage: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit
+    private val startPreparedMessage: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit,
+    private val trySendFriendMessage: (String, Boolean) -> Boolean
 ) {
     fun sendMessage() {
         collapseAttachmentPanel()
         val rawText = binding.inputEdit.text.toString().trim()
         if (rawText.isEmpty() && pendingAttachments.isEmpty()) return
+        if (trySendFriendMessage(rawText, pendingAttachments.isNotEmpty())) return
         if (isActiveConversationWorking()) return
         if (activeConversation().ended) {
             appendMessage(ChatMessage("error", "这个会话已结束，请新建会话继续。"))
