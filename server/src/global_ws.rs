@@ -52,6 +52,7 @@ async fn handle(
     let (mut tx, mut rx) = socket.split();
     let mut update_rx = crate::app_update::subscribe();
     let mut friend_rx = crate::friend_events::subscribe();
+    let mut group_rx = crate::friend_events::subscribe_groups();
 
     // 连接时若服务器已有更新版本，立即推送一次，无需等待下次广播
     if let Some(event) =
@@ -80,6 +81,18 @@ async fn handle(
                         if tx.send(Message::Text(payload)).await.is_err() { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次列表刷新会补齐未读状态 */ }
+                    _ => {}
+                }
+            }
+            msg = group_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id
+                        .as_ref()
+                        .is_some_and(|user_id| event.recipient_user_ids.iter().any(|id| id == user_id)) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => { /* 下次群列表刷新会补齐未读状态 */ }
                     _ => {}
                 }
             }

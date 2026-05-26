@@ -11,6 +11,7 @@ use crate::store_schema::apply_migrations;
 mod common;
 mod friend_messages;
 mod friends;
+mod groups;
 mod native_sessions;
 mod projects;
 mod tasks;
@@ -79,6 +80,28 @@ pub struct FriendChatMessage {
     pub id: String,
     pub sender_user_id: String,
     pub receiver_user_id: String,
+    pub content: String,
+    pub created_at: String,
+    pub outgoing: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendGroupProfile {
+    pub id: String,
+    pub name: String,
+    pub member_count: i64,
+    pub created_at: String,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+    pub unread_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendGroupMessage {
+    pub id: String,
+    pub group_id: String,
+    pub sender_user_id: String,
+    pub sender_name: String,
     pub content: String,
     pub created_at: String,
     pub outgoing: bool,

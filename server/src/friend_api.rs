@@ -36,6 +36,12 @@ pub struct AddFriendRequest {
 }
 
 #[derive(Deserialize)]
+pub struct CreateFriendGroupRequest {
+    pub name: Option<String>,
+    pub member_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
 pub struct FriendMessagesQuery {
     pub after: Option<String>,
     pub limit: Option<i64>,
@@ -43,6 +49,17 @@ pub struct FriendMessagesQuery {
 
 #[derive(Deserialize)]
 pub struct SendFriendMessageRequest {
+    pub content: String,
+}
+
+#[derive(Deserialize)]
+pub struct FriendGroupMessagesQuery {
+    pub after: Option<String>,
+    pub limit: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct SendFriendGroupMessageRequest {
     pub content: String,
 }
 
@@ -54,6 +71,38 @@ pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap
     match state.store.list_friends(&user.id) {
         Ok(friends) => Json(serde_json::json!({ "friends": friends })).into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+pub async fn list_friend_groups(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state.store.list_friend_groups(&user.id) {
+        Ok(groups) => Json(serde_json::json!({ "groups": groups })).into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+pub async fn create_friend_group(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<CreateFriendGroupRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state
+        .store
+        .create_friend_group(&user.id, req.name.as_deref(), &req.member_ids)
+    {
+        Ok(group) => Json(serde_json::json!({ "group": group })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 
@@ -93,7 +142,10 @@ pub async fn add_friend_by_phone(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     let search_text = friend_search_text(req.phone.as_deref(), req.query.as_deref());
-    match state.store.add_friend(&user.id, req.search_type.as_deref(), &search_text) {
+    match state
+        .store
+        .add_friend(&user.id, req.search_type.as_deref(), &search_text)
+    {
         Ok(result) => Json(serde_json::json!({
             "friend": result.friend,
             "already_friend": result.already_friend,
@@ -142,9 +194,58 @@ pub async fn send_friend_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.send_friend_message(&user.id, &friend_id, &req.content) {
+    match state
+        .store
+        .send_friend_message(&user.id, &friend_id, &req.content)
+    {
         Ok(message) => {
             crate::friend_events::publish_friend_message(&message);
+            Json(serde_json::json!({ "message": message })).into_response()
+        }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn list_friend_group_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(group_id): Path<String>,
+    Query(query): Query<FriendGroupMessagesQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state.store.list_friend_group_messages(
+        &user.id,
+        &group_id,
+        query.after.as_deref(),
+        query.limit.unwrap_or(120),
+    ) {
+        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn send_friend_group_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(group_id): Path<String>,
+    Json(req): Json<SendFriendGroupMessageRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state
+        .store
+        .send_friend_group_message(&user.id, &group_id, &req.content)
+    {
+        Ok(message) => {
+            if let Ok(recipient_user_ids) = state.store.friend_group_member_ids(&user.id, &group_id)
+            {
+                crate::friend_events::publish_group_message(&message, recipient_user_ids);
+            }
             Json(serde_json::json!({ "message": message })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),

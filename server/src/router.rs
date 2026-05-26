@@ -83,15 +83,29 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/friends/:friend_id/messages",
             get(friend_api::list_friend_messages).post(friend_api::send_friend_message),
         )
+        .route(
+            "/api/me/groups",
+            get(friend_api::list_friend_groups).post(friend_api::create_friend_group),
+        )
+        .route(
+            "/api/me/groups/:group_id/messages",
+            get(friend_api::list_friend_group_messages).post(friend_api::send_friend_group_message),
+        )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
         // ── 项目商店 ─────────────────────────────────────────────────────
-        .route("/api/store/projects", get(project_store::list_store_projects))
+        .route(
+            "/api/store/projects",
+            get(project_store::list_store_projects),
+        )
         .route(
             "/api/store/projects/:id",
             get(project_store::get_store_project),
         )
-        .route("/api/store/joined", get(project_store::list_joined_projects))
+        .route(
+            "/api/store/joined",
+            get(project_store::list_joined_projects),
+        )
         // ── 成员管理 ─────────────────────────────────────────────────────
         .route(
             "/api/projects/:id/join",

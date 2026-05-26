@@ -14,6 +14,7 @@ internal class MainHomeListActions(
     private val projects: () -> List<AppProject>,
     private val conversations: () -> List<AppConversation>,
     private val friends: () -> List<AppFriend>,
+    private val groups: () -> List<AppGroup>,
     private val activeProject: () -> AppProject,
     private val compactProjectTitle: () -> String,
     private val formatTime: (Long) -> String,
@@ -23,7 +24,8 @@ internal class MainHomeListActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
     private val showAddFriendDialog: () -> Unit,
-    private val openFriend: (AppFriend) -> Unit
+    private val openFriend: (AppFriend) -> Unit,
+    private val openGroup: (AppGroup) -> Unit
 ) {
     fun renderConversationList() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
@@ -34,8 +36,8 @@ internal class MainHomeListActions(
 
         homeRows().cancelHomeRowShimmer()
         binding.conversationPage.removeAllViews()
-        val friendList = friends()
-        if (friendList.isEmpty()) {
+        val chatItems = buildHomeChatItems()
+        if (chatItems.isEmpty()) {
             binding.conversationPage.addView(
                 homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
                     showAddFriendDialog()
@@ -43,16 +45,50 @@ internal class MainHomeListActions(
             )
             return
         }
-        friendList.forEachIndexed { index, friend ->
+        chatItems.forEachIndexed { index, item ->
             if (index > 0) {
                 binding.conversationPage.addView(homeRows().createConversationDivider())
             }
-            binding.conversationPage.addView(
-                homeRows().createFriendRow(friend) {
-                    openFriend(friend)
-                }
+            when (item) {
+                is HomeChatItem.FriendItem -> binding.conversationPage.addView(
+                    homeRows().createFriendRow(item.friend) {
+                        openFriend(item.friend)
+                    }
+                )
+                is HomeChatItem.GroupItem -> binding.conversationPage.addView(
+                    homeRows().createGroupRow(item.group) {
+                        openGroup(item.group)
+                    }
+                )
+            }
+        }
+    }
+
+    private fun buildHomeChatItems(): List<HomeChatItem> {
+        val friendItems = friends().map { friend ->
+            HomeChatItem.FriendItem(
+                friend = friend,
+                sortTime = friend.lastMessageAt ?: 0L
             )
         }
+        val groupItems = groups().map { group ->
+            HomeChatItem.GroupItem(
+                group = group,
+                sortTime = group.lastMessageAt ?: group.createdAt ?: 0L
+            )
+        }
+        return (groupItems + friendItems)
+            .sortedWith(compareByDescending<HomeChatItem> { it.sortTime }.thenBy { item ->
+                when (item) {
+                    is HomeChatItem.FriendItem -> item.friend.name
+                    is HomeChatItem.GroupItem -> item.group.name
+                }
+            })
+    }
+
+    private sealed class HomeChatItem(open val sortTime: Long) {
+        data class FriendItem(val friend: AppFriend, override val sortTime: Long) : HomeChatItem(sortTime)
+        data class GroupItem(val group: AppGroup, override val sortTime: Long) : HomeChatItem(sortTime)
     }
 
     fun renderProjectList() {

@@ -18,7 +18,7 @@ internal class MainActionPopups(
     private val showProjectRecordDialog: () -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val showCreateProjectDialog: () -> Unit,
-    private val showCreateConversationDialog: () -> Unit,
+    private val showCreateGroupDialog: () -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openSettings: () -> Unit,
     private val deleteMessage: (ChatMessage) -> Unit,
@@ -39,7 +39,7 @@ internal class MainActionPopups(
             )
         } else {
             listOf(
-                TopAction("新建会话", R.drawable.ic_popup_chat) { showCreateConversationDialog() },
+                TopAction("发起群聊", R.drawable.ic_popup_group) { showCreateGroupDialog() },
                 TopAction("添加好友", R.drawable.ic_popup_add_friend) { showAddFriendDialog() },
                 TopAction("新建项目", R.drawable.ic_popup_project) { showCreateProjectDialog() },
                 TopAction("继续开发", R.drawable.ic_popup_plan) { sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。") },

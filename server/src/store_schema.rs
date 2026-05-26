@@ -53,6 +53,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (3, "将所有现有项目设为公开可见（一次性）", migration_v3),
     (4, "好友会话已读状态与未读提醒", migration_v4),
     (5, "用户头像数据（个人资料上传）", migration_v5),
+    (6, "好友群聊基础表与未读状态", migration_v6),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -367,6 +368,50 @@ fn migration_v4(conn: &Connection) -> Result<()> {
 
 fn migration_v5(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "users", "avatar_data_url", "avatar_data_url TEXT")?;
+    Ok(())
+}
+
+// ── v6：好友群聊 ─────────────────────────────────────────────────────────────
+
+fn migration_v6(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS friend_groups (
+          id            TEXT PRIMARY KEY,
+          name          TEXT NOT NULL,
+          owner_user_id TEXT NOT NULL,
+          created_at    TEXT NOT NULL,
+          updated_at    TEXT NOT NULL,
+          FOREIGN KEY (owner_user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_group_members (
+          group_id      TEXT NOT NULL,
+          user_id       TEXT NOT NULL,
+          created_at    TEXT NOT NULL,
+          last_read_at  TEXT,
+          PRIMARY KEY (group_id, user_id),
+          FOREIGN KEY (group_id) REFERENCES friend_groups(id),
+          FOREIGN KEY (user_id)  REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_group_messages (
+          id             TEXT PRIMARY KEY,
+          group_id       TEXT NOT NULL,
+          sender_user_id TEXT NOT NULL,
+          content        TEXT NOT NULL,
+          created_at     TEXT NOT NULL,
+          FOREIGN KEY (group_id)       REFERENCES friend_groups(id),
+          FOREIGN KEY (sender_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_friend_group_members_user
+          ON friend_group_members(user_id, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_friend_group_messages_group_created
+          ON friend_group_messages(group_id, created_at);
+        "#,
+    )?;
     Ok(())
 }
 

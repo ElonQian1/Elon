@@ -34,6 +34,15 @@ sealed class GlobalWsEvent {
         val createdAt: String,
     ) : GlobalWsEvent()
 
+    /** 群聊消息 */
+    data class GroupMessage(
+        val groupId: String,
+        val fromUserId: String,
+        val messageId: String,
+        val content: String,
+        val createdAt: String,
+    ) : GlobalWsEvent()
+
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
     data class Unknown(val raw: String) : GlobalWsEvent()
 
@@ -51,6 +60,13 @@ sealed class GlobalWsEvent {
                 "friend_message" -> FriendMessage(
                     fromUserId = json.optString("fromUserId", ""),
                     toUserId = json.optString("toUserId", ""),
+                    messageId = json.optString("messageId", ""),
+                    content = json.optString("content", ""),
+                    createdAt = json.optString("createdAt", ""),
+                )
+                "group_message" -> GroupMessage(
+                    groupId = json.optString("groupId", ""),
+                    fromUserId = json.optString("fromUserId", ""),
                     messageId = json.optString("messageId", ""),
                     content = json.optString("content", ""),
                     createdAt = json.optString("createdAt", ""),

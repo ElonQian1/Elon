@@ -110,6 +110,76 @@ internal class MainHomeRows(
         return row
     }
 
+    fun createGroupRow(group: AppGroup, onClick: () -> Unit): View {
+        val row = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(76)
+            )
+            setBackgroundColor(Color.parseColor("#242424"))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(16), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { onClick() }
+        }
+
+        row.addView(createGroupAvatar(group))
+
+        val middle = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(12)
+            }
+            orientation = LinearLayout.VERTICAL
+        }
+        middle.addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = group.name
+            setTextColor(Color.parseColor("#D8D8D8"))
+            textSize = 16f
+        })
+        middle.addView(TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(4)
+            }
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = group.lastMessage ?: "${group.memberCount} 位成员"
+            setTextColor(Color.parseColor(if (group.unreadCount > 0) "#C8C8C8" else "#A9A9A9"))
+            textSize = 13f
+        })
+        row.addView(middle)
+
+        (group.lastMessageAt ?: group.createdAt)?.let { time ->
+            row.addView(TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.TOP
+                    marginStart = dp(8)
+                    topMargin = dp(18)
+                }
+                includeFontPadding = false
+                text = timeFormatter.format(Date(time))
+                setTextColor(Color.parseColor("#9A9A9A"))
+                textSize = 12f
+            })
+        }
+        return row
+    }
+
     fun createFriendPlaceholder(loggedIn: Boolean, onClick: () -> Unit): View {
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -430,6 +500,48 @@ internal class MainHomeRows(
             if (friend.unreadCount > 0) {
                 addView(TextView(activity).apply {
                     val badgeText = if (friend.unreadCount > 99) "99+" else friend.unreadCount.toString()
+                    val badgeWidth = if (badgeText.length > 2) dp(28) else dp(19)
+                    layoutParams = FrameLayout.LayoutParams(badgeWidth, dp(19)).apply {
+                        gravity = Gravity.TOP or Gravity.END
+                        topMargin = -dp(5)
+                        rightMargin = -dp(6)
+                    }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dp(10).toFloat()
+                        setColor(Color.parseColor("#F04B4F"))
+                    }
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    text = badgeText
+                    setTextColor(Color.WHITE)
+                    textSize = 10f
+                    setTypeface(typeface, Typeface.BOLD)
+                })
+            }
+        }
+    }
+
+    private fun createGroupAvatar(group: AppGroup): View {
+        val size = dp(44)
+        return FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            addView(TextView(activity).apply {
+                layoutParams = FrameLayout.LayoutParams(size, size)
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(Color.parseColor("#D6D6D6"))
+                }
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = "群"
+                setTextColor(Color.parseColor("#333333"))
+                textSize = 17f
+                setTypeface(typeface, Typeface.BOLD)
+            })
+            if (group.unreadCount > 0) {
+                addView(TextView(activity).apply {
+                    val badgeText = if (group.unreadCount > 99) "99+" else group.unreadCount.toString()
                     val badgeWidth = if (badgeText.length > 2) dp(28) else dp(19)
                     layoutParams = FrameLayout.LayoutParams(badgeWidth, dp(19)).apply {
                         gravity = Gravity.TOP or Gravity.END

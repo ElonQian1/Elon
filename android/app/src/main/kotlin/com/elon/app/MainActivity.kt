@@ -102,9 +102,10 @@ class MainActivity : AppCompatActivity() {
             messageActions = { messageActions },
             navigationController = { navigationController },
             stageHintShimmer = { stageHintShimmer() },
-            isFriendChatActive = { friendChatActions.isActive() },
+            isFriendChatActive = { friendChatActions.isActive() || groupChatActions.isActive() },
             trySendFriendMessage = { text, hasAttachments ->
-                friendChatActions.trySendMessage(text, hasAttachments)
+                groupChatActions.trySendMessage(text, hasAttachments) ||
+                    friendChatActions.trySendMessage(text, hasAttachments)
             }
         )
     }
@@ -169,6 +170,7 @@ class MainActivity : AppCompatActivity() {
             if (::chatAdapter.isInitialized) chatAdapter.refreshUserProfile()
         }
         friendChatActions.resumeIfActive()
+        groupChatActions.resumeIfActive()
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -202,6 +204,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         s.appInForeground = false
         friendChatActions.stopPolling()
+        groupChatActions.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
@@ -224,6 +227,10 @@ class MainActivity : AppCompatActivity() {
                 is GlobalWsEvent.FriendMessage -> {
                     friendChatActions.handleRealtimeMessage(event.fromUserId)
                     friendActions.loadFriends()
+                }
+                is GlobalWsEvent.GroupMessage -> {
+                    groupChatActions.handleRealtimeMessage(event.groupId)
+                    groupActions.loadGroups()
                 }
                 else -> Unit
             }
@@ -345,7 +352,10 @@ class MainActivity : AppCompatActivity() {
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
-            refreshFriends = { friendActions.loadFriends() },
+            refreshFriends = {
+                friendActions.loadFriends()
+                groupActions.loadGroups()
+            },
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -355,7 +365,10 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
-            onFriendChatClosed = { friendChatActions.closeFriendChat() },
+            onFriendChatClosed = {
+                friendChatActions.closeFriendChat()
+                groupChatActions.closeGroupChat()
+            },
             loadMarketplace = { marketplaceActions.loadProjects() }
         )
     }
@@ -519,6 +532,7 @@ class MainActivity : AppCompatActivity() {
             projects = { s.projects },
             conversations = { projectStateActions.conversations },
             friends = { s.friends },
+            groups = { s.groups },
             activeProject = projectStateActions::activeProject,
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             formatTime = { s.timeFormatter.format(Date(it)) },
@@ -531,7 +545,14 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
-            openFriend = { friend -> friendChatActions.openFriend(friend, animate = true) }
+            openFriend = { friend ->
+                groupChatActions.closeGroupChat()
+                friendChatActions.openFriend(friend, animate = true)
+            },
+            openGroup = { group ->
+                friendChatActions.closeFriendChat()
+                groupChatActions.openGroup(group, animate = true)
+            }
         )
     }
 
@@ -546,6 +567,20 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
+        )
+    }
+
+    private val groupChatActions: MainGroupChatActions by lazy {
+        MainGroupChatActions(
+            activity = this,
+            binding = binding,
+            http = s.http,
+            serverUrl = serverUrl,
+            setChatAdapter = { chatAdapter = it },
+            showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
+            onGroupSummariesChanged = { groupActions.loadGroups() }
         )
     }
 
@@ -657,7 +692,7 @@ class MainActivity : AppCompatActivity() {
             showProjectRecordDialog = { projectRecordActions.showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
+            showCreateGroupDialog = { groupActions.showCreateGroupDialog() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
             deleteMessage = { message -> messageActions.deleteMessage(message) },
@@ -680,6 +715,27 @@ class MainActivity : AppCompatActivity() {
             },
             onFriendsChanged = {
                 if (::binding.isInitialized) homeListActions.renderConversationList()
+            }
+        )
+    }
+
+    private val groupActions: MainGroupActions by lazy {
+        MainGroupActions(
+            activity = this,
+            http = s.http,
+            serverUrl = serverUrl,
+            friends = { s.friends },
+            dp = uiTools::dp,
+            setGroups = { list ->
+                s.groups.clear()
+                s.groups.addAll(list)
+            },
+            onGroupsChanged = {
+                if (::binding.isInitialized) homeListActions.renderConversationList()
+            },
+            openGroup = { group ->
+                friendChatActions.closeFriendChat()
+                groupChatActions.openGroup(group, animate = true)
             }
         )
     }
@@ -820,6 +876,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         friendChatActions.stopPolling()
+        groupChatActions.stopPolling()
         lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }
