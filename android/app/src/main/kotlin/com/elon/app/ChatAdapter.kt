@@ -14,6 +14,7 @@ import android.view.animation.LinearInterpolator
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.sin
 
@@ -36,6 +37,7 @@ class ChatAdapter(
     private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null
 ) :
     RecyclerView.Adapter<ChatAdapter.VH>() {
+    private var cachedUserProfile: UserProfile? = null
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val text: TextView = view.findViewById(R.id.messageText)
@@ -45,6 +47,7 @@ class ChatAdapter(
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val evidenceLastEntry: TextView? = view.findViewById(R.id.evidenceLastEntry)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
+        val userAvatar: TextView? = view.findViewById(R.id.userAvatar)
         val friendAvatar: TextView? = view.findViewById(R.id.friendAvatar)
         var shimmerAnimator: ValueAnimator? = null
         var evidenceShimmerAnimator: ValueAnimator? = null
@@ -110,6 +113,7 @@ class ChatAdapter(
         Linkify.addLinks(holder.text, Linkify.WEB_URLS)
         holder.text.movementMethod = LinkMovementMethod.getInstance()
         bindSendStatus(holder, message)
+        bindUserAvatar(holder.userAvatar)
         holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
         bindChatAttachmentViews(holder.attachmentList, message.attachments)
         bindMessageActions(holder, message)
@@ -155,6 +159,11 @@ class ChatAdapter(
         if (index in messages.indices) notifyItemChanged(index)
     }
 
+    fun refreshUserProfile() {
+        cachedUserProfile = null
+        notifyDataSetChanged()
+    }
+
     fun addMessage(msg: ChatMessage) {
         if (messages.isNotEmpty() && shouldDropLastTransientBefore(msg)) {
             val lastIndex = messages.lastIndex
@@ -190,6 +199,26 @@ class ChatAdapter(
         }
         holder.itemView.setOnLongClickListener(listener)
         holder.text.setOnLongClickListener(listener)
+    }
+
+    private fun bindUserAvatar(avatar: TextView?) {
+        avatar ?: return
+        val profile = cachedUserProfile ?: UserProfileStore.load(avatar.context).also {
+            cachedUserProfile = it
+        }
+        val bitmap = UserProfileStore.decodeAvatar(profile.avatarDataUrl)
+        if (bitmap != null) {
+            val radius = (6 * avatar.resources.displayMetrics.density + 0.5f).toInt()
+            avatar.background = RoundedBitmapDrawableFactory.create(avatar.resources, bitmap).apply {
+                cornerRadius = radius.toFloat()
+                setAntiAlias(true)
+            }
+            avatar.text = ""
+        } else {
+            avatar.setBackgroundResource(R.drawable.bg_avatar_user)
+            avatar.text = UserProfileStore.avatarInitial(profile.displayName)
+        }
+        avatar.contentDescription = "我的头像"
     }
 
     private fun messageTextColor(role: String): Int = when (role) {

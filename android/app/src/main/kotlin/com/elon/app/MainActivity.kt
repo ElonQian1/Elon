@@ -184,6 +184,7 @@ class MainActivity : AppCompatActivity() {
         gws.start(this)
         if (::binding.isInitialized) {
             profileQuickActions.refreshProfileSummary()
+            if (::chatAdapter.isInitialized) chatAdapter.refreshUserProfile()
         }
         friendChatActions.resumeIfActive()
     }
