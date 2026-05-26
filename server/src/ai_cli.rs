@@ -14,8 +14,7 @@ pub use crate::ai_cli_prewarm::prewarm_codex_session;
 
 use crate::{
     ai_cli_chat::{
-        chat_timeout_cap_secs, codex_network_or_timeout_error, finish_lightweight_chat_fallback,
-        is_tiny_chat_message,
+        chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message,
     },
     ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
     ai_cli_native_session::{
@@ -217,14 +216,7 @@ pub async fn run_with_workspace(
                 && codex_network_or_timeout_error(&error)
                 && supports_codex_sessions(&option) =>
         {
-            return finish_lightweight_chat_fallback(
-                state,
-                trace_id,
-                tx,
-                user_message,
-                "network_or_timeout_initial",
-                &error.to_string(),
-            );
+            return Err(error);
         }
         Err(error) if lightweight_chat_task && native_session_id.is_some() => {
             let stale_session_id = native_session_id.clone();
@@ -291,24 +283,10 @@ pub async fn run_with_workspace(
                     if codex_network_or_timeout_error(&fresh_error)
                         && supports_codex_sessions(&option) =>
                 {
-                    return finish_lightweight_chat_fallback(
-                        state,
-                        trace_id,
-                        tx,
-                        user_message,
-                        "network_or_timeout_fresh_after_resume",
-                        &fresh_error.to_string(),
-                    );
+                    return Err(fresh_error);
                 }
                 Err(fresh_error) => {
-                    return finish_lightweight_chat_fallback(
-                        state,
-                        trace_id,
-                        tx,
-                        user_message,
-                        "fresh_after_resume_error_cli_error",
-                        &fresh_error.to_string(),
-                    );
+                    return Err(fresh_error);
                 }
             }
         }
@@ -317,24 +295,10 @@ pub async fn run_with_workspace(
                 && codex_network_or_timeout_error(&error)
                 && supports_codex_sessions(&option) =>
         {
-            return finish_lightweight_chat_fallback(
-                state,
-                trace_id,
-                tx,
-                user_message,
-                "network_or_timeout_initial_alt",
-                &error.to_string(),
-            );
+            return Err(error);
         }
         Err(error) if lightweight_chat_task => {
-            return finish_lightweight_chat_fallback(
-                state,
-                trace_id,
-                tx,
-                user_message,
-                "initial_cli_error",
-                &error.to_string(),
-            );
+            return Err(error);
         }
         Err(error) => return Err(error),
     };
@@ -419,24 +383,10 @@ pub async fn run_with_workspace(
                     && codex_network_or_timeout_error(&error)
                     && supports_codex_sessions(&option) =>
             {
-                return finish_lightweight_chat_fallback(
-                    state,
-                    trace_id,
-                    tx,
-                    user_message,
-                    "network_or_timeout_fresh_after_stale",
-                    &error.to_string(),
-                );
+                return Err(error);
             }
             Err(error) if lightweight_chat_task => {
-                return finish_lightweight_chat_fallback(
-                    state,
-                    trace_id,
-                    tx,
-                    user_message,
-                    "fresh_after_stale_cli_error",
-                    &error.to_string(),
-                );
+                return Err(error);
             }
             Err(error) => return Err(error),
         };
@@ -450,6 +400,7 @@ pub async fn run_with_workspace(
                 // 则 AssistantMessage 已发给客户端，静默发 Done 结束本轮即可避免红色报错气泡。
                 // 否则使用友好降级消息，同样避免红色报错气泡。
                 if extract_json_agent_message(&output.stdout).is_some() {
+                    // agent_message 已经流式发给客户端，静默发 Done 结束本轮即可
                     let _ = tx.send(
                         WsMessage::Done {
                             message: String::new(),
@@ -460,14 +411,11 @@ pub async fn run_with_workspace(
                     );
                     return Ok(());
                 }
-                return finish_lightweight_chat_fallback(
-                    state,
-                    trace_id,
-                    tx,
-                    user_message,
-                    "codex_network_unhealthy_post_output",
-                    &combined,
-                );
+                // 未流式输出任何内容，回传 Err 让 agent.rs API fallback 接管
+                return Err(anyhow!(
+                    "Codex CLI network unhealthy: {}",
+                    truncate_chars(&combined, 500)
+                ));
             }
             return Err(anyhow!(
                 "Codex CLI network unhealthy: {}",
