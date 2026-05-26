@@ -10,9 +10,11 @@ import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.OvalShape
 import android.view.Gravity
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.graphics.BitmapFactory
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
@@ -25,10 +27,12 @@ internal class MainMarketplaceActions(
     private val serverUrl: String,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
-    private val getListContainer: () -> LinearLayout
+    private val getListContainer: () -> LinearLayout,
+    private val openJoinedProject: (StoreProject) -> Unit = {}
 ) {
 
     private val joinedIds = mutableSetOf<String>()
+    private val avatarCache = HashMap<String, android.graphics.Bitmap>()
 
     // 根据字符串生成固定色相的深色渐变（用作卡片横幅背景）
     private val BANNER_PALETTES = arrayOf(
@@ -72,7 +76,7 @@ internal class MainMarketplaceActions(
 
     // ─── 加入项目 ─────────────────────────────────────────────────────────────
 
-    private fun tryJoinProject(projectId: String, joinBtn: TextView) {
+    private fun tryJoinProject(project: StoreProject, joinBtn: TextView) {
         if (!AuthManager.isLoggedIn(activity)) {
             Toast.makeText(activity, "请先登录后加入项目", Toast.LENGTH_SHORT).show()
             return
@@ -85,17 +89,18 @@ internal class MainMarketplaceActions(
         joinBtn.text = "加入中..."
         thread {
             val result = runCatching {
-                joinStoreProject(http, serverUrl, projectId, token)
+                joinStoreProject(http, serverUrl, project.id, token)
             }
             activity.runOnUiThread {
                 result
                     .onSuccess {
-                        joinedIds.add(projectId)
-                        joinBtn.text = "已加入"
-                        joinBtn.isEnabled = false
-                        joinBtn.setTextColor(Color.parseColor("#AAAAAA"))
-                        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#2A2A2A"))
-                        Toast.makeText(activity, "成功加入项目", Toast.LENGTH_SHORT).show()
+                        joinedIds.add(project.id)
+                        joinBtn.text = "进入项目"
+                        joinBtn.isEnabled = true
+                        joinBtn.setTextColor(Color.parseColor("#FFFFFF"))
+                        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#3BA55D"))
+                        joinBtn.setOnClickListener { openJoinedProject(project) }
+                        Toast.makeText(activity, "成功加入项目，点击按钮进入", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
                         joinBtn.isEnabled = true
@@ -193,7 +198,7 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.setMargins(dp(12), dp(8), dp(12), 0)
+            lp.setMargins(dp(12), dp(12), dp(12), dp(4))
             layoutParams = lp
             clipToOutline = true
         }
@@ -210,9 +215,16 @@ internal class MainMarketplaceActions(
             ).apply { cornerRadii = floatArrayOf(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), 0f, 0f, 0f, 0f) }
         }
 
-        // 圆形头像（项目名首字）
+        // 圆形头像容器：文字头像 + 真实头像图层叠加
         val avatarSize = dp(52)
-        val avatar = TextView(activity).apply {
+        val avatarFrame = FrameLayout(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
+                leftMargin = dp(16)
+                topMargin = dp(16)
+            }
+        }
+        // 底层：文字首字母头像
+        val avatarText = TextView(activity).apply {
             text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
             textSize = 22f
             setTextColor(Color.WHITE)
@@ -220,12 +232,25 @@ internal class MainMarketplaceActions(
             background = object : ShapeDrawable(OvalShape()) {
                 init { paint.color = Color.parseColor("#00000066") }
             }
-            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
-                leftMargin = dp(16)
-                topMargin = dp(16)
-            }
+            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
         }
-        banner.addView(avatar)
+        avatarFrame.addView(avatarText)
+        // 上层：真实头像图（异步加载）
+        val avatarImg = ImageView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                cornerRadius = avatarSize / 2f
+            }
+            clipToOutline = true
+            visibility = android.view.View.GONE
+        }
+        avatarFrame.addView(avatarImg)
+        if (project.ownerUserId.isNotBlank()) {
+            loadAvatarAsync(project.ownerUserId, avatarImg)
+        }
+        banner.addView(avatarFrame)
         card.addView(banner)
 
         // ── 卡片内容区 ────────────────────────────────────────────────────────
@@ -301,7 +326,7 @@ internal class MainMarketplaceActions(
 
         // ── 加入按钮（全宽，Discord 绿色）─────────────────────────────────────
         val joinLabel = when {
-            alreadyJoined -> "已加入"
+            alreadyJoined -> "进入项目"
             project.joinMode == "open" -> "加入"
             else -> "申请加入"
         }
@@ -309,23 +334,55 @@ internal class MainMarketplaceActions(
             text = joinLabel
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(if (alreadyJoined) "#AAAAAA" else "#FFFFFF"))
+            setTextColor(Color.parseColor("#FFFFFF"))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor(if (alreadyJoined) "#2A2A2A" else "#3BA55D"))
+                setColor(Color.parseColor("#3BA55D"))
             }
-            isEnabled = !alreadyJoined
+            isEnabled = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(42)
             ).apply { topMargin = dp(12) }
         }
 
-        if (!alreadyJoined) {
-            joinBtn.setOnClickListener { tryJoinProject(project.id, joinBtn) }
+        if (alreadyJoined) {
+            joinBtn.setOnClickListener { openJoinedProject(project) }
+        } else {
+            joinBtn.setOnClickListener { tryJoinProject(project, joinBtn) }
         }
         body.addView(joinBtn)
 
         card.addView(body)
         return card
+    }
+
+    // ─── 异步加载头像 ─────────────────────────────────────────────────────────
+
+    private fun loadAvatarAsync(ownerUserId: String, imageView: ImageView) {
+        val cached = avatarCache[ownerUserId]
+        if (cached != null) {
+            imageView.setImageBitmap(cached)
+            imageView.visibility = android.view.View.VISIBLE
+            return
+        }
+        thread(name = "avatar-$ownerUserId") {
+            val result = runCatching {
+                val req = okhttp3.Request.Builder()
+                    .url("$serverUrl/api/users/$ownerUserId/avatar")
+                    .get()
+                    .build()
+                val resp = http.newCall(req).execute()
+                if (!resp.isSuccessful) return@runCatching null
+                resp.body?.byteStream()?.let { BitmapFactory.decodeStream(it) }
+            }
+            val bitmap = result.getOrNull()
+            if (bitmap != null) {
+                avatarCache[ownerUserId] = bitmap
+                activity.runOnUiThread {
+                    imageView.setImageBitmap(bitmap)
+                    imageView.visibility = android.view.View.VISIBLE
+                }
+            }
+        }
     }
 }

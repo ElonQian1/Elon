@@ -14,6 +14,7 @@ internal data class StoreProject(
     val description: String?,
     val template: String,
     val ownerAccount: String,
+    val ownerUserId: String = "",
     val memberCount: Int,
     val isPublic: Boolean,
     val joinMode: String,
@@ -118,6 +119,7 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "custom"),
     ownerAccount = obj.optString("owner_account", "?"),
+    ownerUserId = obj.optString("owner_id", ""),
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
     joinMode = obj.optString("join_mode", "open"),
@@ -139,4 +141,24 @@ internal fun fetchJoinedProjectIds(
     val obj = JSONObject(body)
     val arr = obj.optJSONArray("projects") ?: return emptySet()
     return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
+}
+
+/** PUT /api/me/avatar — 同步头像到服务器，需要登录 */
+internal fun syncAvatarToServer(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context,
+    avatarDataUrl: String
+) {
+    val body = org.json.JSONObject().put("avatar_data_url", avatarDataUrl)
+        .toString().toRequestBody("application/json".toMediaType())
+    val req = AuthManager.applyAuth(
+        ctx,
+        Request.Builder()
+            .url("$serverUrl/api/me/avatar")
+            .put(body)
+    ).build()
+    val resp = http.newCall(req).execute()
+    val respBody = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(respBody.ifBlank { "HTTP ${resp.code}" })
 }

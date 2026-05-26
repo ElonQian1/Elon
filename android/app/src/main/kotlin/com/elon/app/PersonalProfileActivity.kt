@@ -182,8 +182,24 @@ class PersonalProfileActivity : AppCompatActivity() {
             AuthManager.updateNickname(this, displayName)
             syncDisplayName(displayName)
         }
+        if (avatarDataUrl != null && AuthManager.isLoggedIn(this)) {
+            syncAvatar(avatarDataUrl)
+        }
         setResult(Activity.RESULT_OK)
         renderRows()
+    }
+
+    private fun syncAvatar(avatarDataUrl: String) {
+        thread(name = "avatar-sync") {
+            val result = runCatching {
+                syncAvatarToServer(http, serverUrl, this, avatarDataUrl)
+            }
+            runOnUiThread {
+                result.onFailure {
+                    Toast.makeText(this, "头像已本机保存，云端同步失败：${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun syncDisplayName(displayName: String) {
