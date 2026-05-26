@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.widget.PopupWindow
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -144,6 +145,7 @@ class MainActivity : AppCompatActivity() {
             setupQuickActions = { profileQuickActions.setupQuickActions() },
             setupBackHandling = { navigationController.setupBackHandling() },
             setupInputComposer = inputActions::setupInputComposer,
+            setupChatSideMenu = { chatSideMenuController.setup() },
             restoreCachedModelSelection = { modelActions.restoreCachedModelSelection() },
             updateProjectViews = projectViewActions::updateProjectViews,
             setTaskAppForeground = { foreground -> taskActions.taskWorkServiceActions.setTaskAppForeground(foreground) },
@@ -332,9 +334,22 @@ class MainActivity : AppCompatActivity() {
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
             collapseInputComposer = { animate -> inputActions.inputFocusActions.collapseInputComposer(animate) },
+            isChatSideMenuOpen = { chatSideMenuController.isOpen },
+            closeChatSideMenu = { animate -> chatSideMenuController.close(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
+        )
+    }
+
+    private val chatSideMenuController: ChatSideMenuController by lazy {
+        ChatSideMenuController(
+            activity = this,
+            binding = binding,
+            activeConversation = projectStateActions::activeConversation,
+            confirmLogout = { accountActions().confirmLogout() },
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground
         )
     }
 
@@ -661,6 +676,13 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (::binding.isInitialized && chatSideMenuController.handleDispatchTouchEvent(event)) {
+            return true
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     override fun onRequestPermissionsResult(

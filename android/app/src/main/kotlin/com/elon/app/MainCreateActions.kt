@@ -26,6 +26,7 @@ internal class MainCreateActions(
     private val setupQuickActions: () -> Unit,
     private val setupBackHandling: () -> Unit,
     private val setupInputComposer: () -> Unit,
+    private val setupChatSideMenu: () -> Unit,
     private val restoreCachedModelSelection: () -> Unit,
     private val updateProjectViews: (String) -> Unit,
     private val setTaskAppForeground: (Boolean) -> Unit,
@@ -51,6 +52,7 @@ internal class MainCreateActions(
         setupQuickActions()
         setupBackHandling()
         setupInputComposer()
+        setupChatSideMenu()
         restoreCachedModelSelection()
         updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
         setTaskAppForeground(true)

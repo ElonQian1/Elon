@@ -25,6 +25,8 @@ internal class MainNavigationController(
     private val showChatActionPopup: (View) -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
+    private val isChatSideMenuOpen: () -> Boolean,
+    private val closeChatSideMenu: (Boolean) -> Unit,
     private val isActiveConversationWorking: () -> Boolean,
     private val setSendEnabled: (Boolean) -> Unit,
     private val maybePrewarmCodexSession: (String) -> Unit
@@ -97,6 +99,10 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
+        if (isChatSideMenuOpen()) {
+            closeChatSideMenu(true)
+            return
+        }
         if (binding.chatPage.visibility == View.VISIBLE) {
             collapseInputComposer(false)
             showConversationHome(animate = true)
@@ -108,6 +114,7 @@ internal class MainNavigationController(
     fun showConversationHome(animate: Boolean = false) {
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
+            closeChatSideMenu(false)
             renderConversationList()
             applyConversationHomeChrome()
             pageTransitionRunning = true
@@ -137,6 +144,7 @@ internal class MainNavigationController(
         if (pageTransitionRunning) return
         val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
         applyChatChrome()
         if (shouldAnimate) {
             collapseInputComposer(false)
