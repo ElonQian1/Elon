@@ -24,12 +24,14 @@ internal class MainActionPopups(
     private val deleteMessage: (ChatMessage) -> Unit,
     private val quoteMessage: (String) -> Unit,
     private val dp: (Int) -> Int,
-    private val selectableForeground: () -> Drawable?
+    private val selectableForeground: () -> Drawable?,
+    private val showStoreDialog: () -> Unit
 ) {
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
             listOf(
                 TopAction("新建项目", R.drawable.ic_popup_project) { showCreateProjectDialog() },
+                TopAction("发现项目", R.drawable.ic_popup_project) { showStoreDialog() },
                 TopAction("项目记录", R.drawable.ic_popup_history) { showProjectRecordDialog() },
                 TopAction("Git 仓库", R.drawable.ic_popup_settings) { showGitProjectDialog() },
                 TopAction("打包 APK", R.drawable.ic_popup_build) { sendQuickCommand("请打包当前项目，生成可以下载安装到手机的 APK。") },

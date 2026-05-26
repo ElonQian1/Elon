@@ -524,7 +524,11 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
-            showGitProjectDialog = ::showGitProjectDialog
+            showGitProjectDialog = ::showGitProjectDialog,
+            http = http,
+            serverUrl = serverUrl,
+            tokenProvider = { AuthManager.token(this) },
+            isLoggedIn = { AuthManager.isLoggedIn(this) }
         )
     }
 
@@ -563,6 +567,26 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private val storeController: MainStoreController by lazy {
+        MainStoreController(
+            activity = this,
+            http = http,
+            serverUrl = serverUrl,
+            tokenProvider = { AuthManager.token(this) },
+            isLoggedIn = { AuthManager.isLoggedIn(this) },
+            addJoinedProject = { storeProject ->
+                val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
+                    .copy(id = storeProject.id)
+                projects.add(newProject)
+                projectStateActions.saveProjects()
+                val idx = projects.lastIndex
+                conversationOpenActions.openProject(idx)
+                homeListActions.renderProjectList()
+            },
+            dp = uiTools::dp
+        )
+    }
+
     private val actionPopups: MainActionPopups by lazy {
         MainActionPopups(
             activity = this,
@@ -581,7 +605,8 @@ class MainActivity : AppCompatActivity() {
             deleteMessage = { message -> messageActions.deleteMessage(message) },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
             dp = uiTools::dp,
-            selectableForeground = uiTools::selectableForeground
+            selectableForeground = uiTools::selectableForeground,
+            showStoreDialog = { storeController.showStoreDialog() }
         )
     }
 

@@ -1,0 +1,125 @@
+package com.elon.app
+
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+
+// ─── 数据模型 ─────────────────────────────────────────────────────────────────
+
+internal data class StoreProject(
+    val id: String,
+    val name: String,
+    val description: String?,
+    val template: String,
+    val ownerAccount: String,
+    val memberCount: Int,
+    val isPublic: Boolean,
+    val joinMode: String,
+    val lastTaskStatus: String?
+)
+
+// ─── API 函数（在调用方手动切换线程） ─────────────────────────────────────────
+
+/** GET /api/store/projects — 无需登录 */
+internal fun fetchStoreProjects(
+    http: OkHttpClient,
+    serverUrl: String,
+    search: String? = null,
+    limit: Int = 30,
+    offset: Int = 0
+): List<StoreProject> {
+    val qs = buildString {
+        append("limit=$limit&offset=$offset")
+        if (!search.isNullOrBlank()) append("&q=${java.net.URLEncoder.encode(search, "UTF-8")}")
+    }
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/store/projects?$qs")
+            .get()
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return parseStoreProjectList(JSONObject(body))
+}
+
+/** POST /api/projects/:id/join — 需要 Bearer token */
+internal fun joinStoreProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String
+) {
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects/$projectId/join")
+            .post("{}".toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+}
+
+/** DELETE /api/projects/:id/leave — 需要 Bearer token */
+internal fun leaveStoreProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String
+) {
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects/$projectId/leave")
+            .delete()
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+}
+
+/** PATCH /api/projects/:id/visibility — 仅 owner；需要 Bearer token */
+internal fun setProjectVisibility(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    isPublic: Boolean,
+    joinMode: String,
+    token: String
+) {
+    val payload = JSONObject().apply {
+        put("is_public", isPublic)
+        put("join_mode", joinMode)
+    }
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects/$projectId/visibility")
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+}
+
+// ─── 解析 ─────────────────────────────────────────────────────────────────────
+
+private fun parseStoreProjectList(json: JSONObject): List<StoreProject> {
+    val arr = json.optJSONArray("projects") ?: return emptyList()
+    return (0 until arr.length()).map { i -> parseStoreProject(arr.getJSONObject(i)) }
+}
+
+internal fun parseStoreProject(obj: JSONObject) = StoreProject(
+    id = obj.getString("id"),
+    name = obj.getString("name"),
+    description = obj.optString("description").takeIf { it.isNotBlank() },
+    template = obj.optString("template", "custom"),
+    ownerAccount = obj.optString("owner_account", "?"),
+    memberCount = obj.optInt("member_count", 0),
+    isPublic = obj.optBoolean("is_public", true),
+    joinMode = obj.optString("join_mode", "open"),
+    lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() }
+)

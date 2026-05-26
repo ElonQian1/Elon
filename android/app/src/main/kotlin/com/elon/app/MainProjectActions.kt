@@ -1,9 +1,11 @@
 package com.elon.app
 
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.OkHttpClient
 
 internal class MainProjectActions(
     private val activity: AppCompatActivity,
@@ -16,7 +18,11 @@ internal class MainProjectActions(
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val openProject: (Int) -> Unit,
-    private val showGitProjectDialog: () -> Unit
+    private val showGitProjectDialog: () -> Unit,
+    private val http: OkHttpClient,
+    private val serverUrl: String,
+    private val tokenProvider: () -> String?,
+    private val isLoggedIn: () -> Boolean
 ) {
     fun showCreateProjectDialog() {
         val input = titleEditText("新项目 ${projects.size + 1}")
@@ -45,10 +51,11 @@ internal class MainProjectActions(
     fun showProjectActions(index: Int) {
         if (index !in projects.indices) return
         val project = projects[index]
+        val visLabel = "设为公开 / 私有"
         val actions = if (projects.size <= 1) {
-            arrayOf("编辑项目名称", "Git 仓库")
+            arrayOf("编辑项目名称", "Git 仓库", visLabel)
         } else {
-            arrayOf("编辑项目名称", "Git 仓库", "删除项目")
+            arrayOf("编辑项目名称", "Git 仓库", visLabel, "删除项目")
         }
 
         AlertDialog.Builder(activity)
@@ -60,10 +67,55 @@ internal class MainProjectActions(
                         openProject(index)
                         showGitProjectDialog()
                     }
+                    visLabel -> showVisibilityDialog(project)
                     "删除项目" -> confirmDeleteProject(index)
                 }
             }
             .show()
+    }
+
+    private fun showVisibilityDialog(project: AppProject) {
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录再修改项目可见性", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val options = arrayOf("公开（任何人可加入）", "需审批加入", "私有（仅自己可见）")
+        AlertDialog.Builder(activity)
+            .setTitle("${project.title} · 可见性")
+            .setItems(options) { _, which ->
+                val (isPublic, joinMode) = when (which) {
+                    0 -> true to "open"
+                    1 -> true to "approval"
+                    else -> false to "invite"
+                }
+                doSetVisibility(project, isPublic, joinMode)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doSetVisibility(project: AppProject, isPublic: Boolean, joinMode: String) {
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "未登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Thread {
+            try {
+                setProjectVisibility(http, serverUrl, project.id, isPublic, joinMode, token)
+                val label = when {
+                    !isPublic -> "已设为私有"
+                    joinMode == "open" -> "已设为公开（直接加入）"
+                    else -> "已设为公开（需审批）"
+                }
+                activity.runOnUiThread {
+                    Toast.makeText(activity, label, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "修改失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun createProject(title: String) {
