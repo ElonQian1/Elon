@@ -42,6 +42,7 @@ class ChatAdapter(
         val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
+        val evidenceLastEntry: TextView? = view.findViewById(R.id.evidenceLastEntry)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
         var shimmerAnimator: ValueAnimator? = null
         var evidenceShimmerAnimator: ValueAnimator? = null
@@ -61,6 +62,9 @@ class ChatAdapter(
             evidenceDetails?.paint?.shader = null
             evidenceDetails?.alpha = 1f
             evidenceDetails?.invalidate()
+            evidenceLastEntry?.paint?.shader = null
+            evidenceLastEntry?.alpha = 1f
+            evidenceLastEntry?.invalidate()
         }
     }
 
@@ -238,6 +242,7 @@ class ChatAdapter(
     private fun bindEvidence(holder: VH, message: ChatMessage, position: Int) {
         val summary = holder.evidenceSummary ?: return
         val details = holder.evidenceDetails ?: return
+        val lastEntry = holder.evidenceLastEntry
         val hasEvidence = message.role in evidenceBubbleRoles &&
             !message.evidenceTitle.isNullOrBlank() &&
             !message.evidenceDetails.isNullOrBlank()
@@ -245,17 +250,50 @@ class ChatAdapter(
         if (!hasEvidence) {
             summary.visibility = View.GONE
             details.visibility = View.GONE
+            lastEntry?.visibility = View.GONE
             return
         }
 
         val marker = if (message.evidenceExpanded) "⌄" else "›"
         summary.text = "$marker ${message.evidenceTitle}"
         summary.visibility = View.VISIBLE
-        details.text = message.evidenceDetails
-        details.visibility = if (message.evidenceExpanded) View.VISIBLE else View.GONE
-        if (message.evidenceWorking) {
-            startEvidenceShimmer(holder, message)
+        // 折叠时不闪烁 summary，保持静止
+        summary.paint.shader = null
+        summary.alpha = 1f
+
+        if (message.evidenceExpanded) {
+            val lines = message.evidenceDetails!!.split("\n")
+            val allButLast = lines.dropLast(1).joinToString("\n")
+            val last = lines.last()
+
+            if (allButLast.isBlank()) {
+                details.visibility = View.GONE
+            } else {
+                details.text = allButLast
+                details.visibility = View.VISIBLE
+            }
+
+            if (lastEntry != null) {
+                lastEntry.text = last
+                lastEntry.visibility = View.VISIBLE
+                // 调整上边距：紧跟其余条目时无额外间距，单独显示时需要间距
+                val dp4 = (4 * lastEntry.resources.displayMetrics.density + 0.5f).toInt()
+                (lastEntry.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.topMargin =
+                    if (details.visibility == View.VISIBLE) 0 else dp4
+            } else {
+                // 无独立末条视图时回退：全部显示在 details
+                details.text = message.evidenceDetails
+                details.visibility = View.VISIBLE
+            }
+
+            if (message.evidenceWorking) {
+                startEvidenceShimmer(holder, message)
+            }
+        } else {
+            details.visibility = View.GONE
+            lastEntry?.visibility = View.GONE
         }
+
         summary.setOnClickListener {
             message.evidenceExpanded = !message.evidenceExpanded
             notifyItemChanged(position)
@@ -263,14 +301,15 @@ class ChatAdapter(
     }
 
     private fun startEvidenceShimmer(holder: VH, expectedMessage: ChatMessage) {
-        val summary = holder.evidenceSummary ?: return
-        val details = holder.evidenceDetails
-        summary.post {
+        // 只对最后一条 entry 的 TextView 做 shimmer；折叠时不触发
+        val lastEntry = holder.evidenceLastEntry ?: return
+        lastEntry.post {
             val position = holder.adapterPosition
             if (position == RecyclerView.NO_POSITION) return@post
             if (messages.getOrNull(position) !== expectedMessage || !expectedMessage.evidenceWorking) return@post
+            if (!expectedMessage.evidenceExpanded) return@post
 
-            val width = summary.width.coerceAtLeast(summary.measuredWidth)
+            val width = lastEntry.width.coerceAtLeast(lastEntry.measuredWidth)
             if (width <= 0) return@post
 
             val shader = LinearGradient(
@@ -299,15 +338,9 @@ class ChatAdapter(
                     val fraction = animator.animatedFraction
                     matrix.setTranslate(width * (fraction * 2f - 1f), 0f)
                     shader.setLocalMatrix(matrix)
-                    val alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
-                    summary.paint.shader = shader
-                    summary.alpha = alpha
-                    summary.invalidate()
-                    details?.takeIf { it.visibility == View.VISIBLE }?.let {
-                        it.paint.shader = shader
-                        it.alpha = alpha
-                        it.invalidate()
-                    }
+                    lastEntry.paint.shader = shader
+                    lastEntry.alpha = 0.76f + 0.24f * sin(Math.PI * fraction).toFloat()
+                    lastEntry.invalidate()
                 }
                 start()
             }

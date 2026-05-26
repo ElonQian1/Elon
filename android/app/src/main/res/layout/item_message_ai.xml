@@ -75,6 +75,18 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
+        <TextView
+            android:id="@+id/evidenceLastEntry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:lineSpacingExtra="1dp"
+            android:maxWidth="260dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:textColor="#727272"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
     </LinearLayout>
 
 </LinearLayout>
