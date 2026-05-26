@@ -31,7 +31,8 @@
 
 .NOTES
     构建缓存优先级（高→低）：
-      1. 机器级 User 环境变量 RUST_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
+      1. 机器级 User 环境变量 RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
+         兼容旧名 RUST_MUSL_TARGET_DIR。
          多个 Rust 后端项目共享同一份 musl 增量编译产物，设置一次全局生效。
       2. 仓库根 .env.local 中 ELON_BUILD_TARGET_DIR=D:\rust\shared（父目录）
          脚本追加固定子目录名 elon-server-musl，适合只有本项目需要自定义的场景。
@@ -132,6 +133,37 @@ function Resolve-BuildTargetRoot {
 
     New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
     return $fullPath
+}
+
+function Resolve-ServerMuslTargetDir {
+    param([string]$RepoRoot)
+
+    $targetVarName = $null
+    $targetDir = $null
+    if (-not [string]::IsNullOrWhiteSpace($env:RUST_SERVER_MUSL_TARGET_DIR)) {
+        $targetVarName = "RUST_SERVER_MUSL_TARGET_DIR"
+        $targetDir = $env:RUST_SERVER_MUSL_TARGET_DIR.Trim()
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:RUST_MUSL_TARGET_DIR)) {
+        $targetVarName = "RUST_MUSL_TARGET_DIR"
+        $targetDir = $env:RUST_MUSL_TARGET_DIR.Trim()
+    }
+
+    if ($targetDir) {
+        if (-not [System.IO.Path]::IsPathRooted($targetDir)) {
+            Write-Error "❌ $targetVarName 必须是绝对路径，当前值: $targetDir"
+        }
+
+        $fullPath = [System.IO.Path]::GetFullPath($targetDir)
+        $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
+        if ($pathRoot -and -not (Test-Path $pathRoot)) {
+            Write-Error "❌ server musl 构建缓存目录所在盘符不存在: $fullPath"
+        }
+
+        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+        return $fullPath
+    }
+
+    return (Join-Path (Resolve-BuildTargetRoot -RepoRoot $RepoRoot) "elon-server-musl")
 }
 
 Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
@@ -323,15 +355,10 @@ if (-not $SkipBuild) {
 # 3. 编译（临时工作树 — 确保从干净 commit 构建）
 # ─────────────────────────────────────────────────────────────
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
-# 机器级共享缓存（RUST_MUSL_TARGET_DIR）优先：多个后端项目共享同一份 musl 增量编译产物。
-# 次选：ELON_BUILD_TARGET_DIR 父目录 + 固定子目录名。最后 fallback 到 AppData。
-if (-not [string]::IsNullOrWhiteSpace($env:RUST_MUSL_TARGET_DIR)) {
-    $BuildTargetDir = [System.IO.Path]::GetFullPath($env:RUST_MUSL_TARGET_DIR.Trim())
-    New-Item -ItemType Directory -Force -Path $BuildTargetDir | Out-Null
-} else {
-    $BuildTargetRoot = Resolve-BuildTargetRoot -RepoRoot $RepoRoot
-    $BuildTargetDir  = Join-Path $BuildTargetRoot "elon-server-musl"
-}
+# 优先使用机器级中性目录，让多个 Rust 后端共享同一份 server-musl target。
+# 未配置 RUST_SERVER_MUSL_TARGET_DIR/RUST_MUSL_TARGET_DIR 时，保留旧的 ELON_BUILD_TARGET_DIR/elon-server-musl 兼容路径。
+$BuildTargetDir = Resolve-ServerMuslTargetDir -RepoRoot $RepoRoot
+$BuildTargetRoot = Split-Path $BuildTargetDir -Parent
 $BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
 Write-Host "  构建缓存: $BuildTargetDir" -ForegroundColor Gray

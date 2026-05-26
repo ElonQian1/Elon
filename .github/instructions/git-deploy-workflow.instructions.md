@@ -58,7 +58,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 在主工作区执行 `git reset --hard`、`git checkout --` | 会覆盖其他并发 AI 的未提交改动 |
 | 夹带无关文件进同一次 commit | 污染提交历史，妨碍定位问题 |
 | 编译完成后跳过"服务器是否已有更新版本"的祖先检查，强推上传 | 用旧编译覆盖别人刚发布的新版本，手机端版本倒退 |
-| 在共享脚本里写死某台机器的本机盘符（如 `E:\rust-target\...`） | 其他 PC / 远程 Codex 没有这个盘，脚本秒退；本机差异必须走 `.env.local` + `ELON_BUILD_TARGET_DIR`（详见下方 "🤝 共享脚本不绑死本机路径" 章节） |
+| 在共享脚本里写死某台机器的本机盘符（如 `E:\rust-target\...`） | 其他 PC / 远程 Codex 没有这个盘，脚本秒退；本机差异必须走 `.env.local` + `RUST_SERVER_MUSL_TARGET_DIR` / `ELON_BUILD_TARGET_DIR`（详见下方 "🤝 共享脚本不绑死本机路径" 章节） |
 
 ---
 
@@ -288,16 +288,19 @@ if ($rs) { rustfmt $rs }
 
 ```bash
 # Windows
-ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
 
 # Linux/macOS
-ELON_BUILD_TARGET_DIR=/var/tmp/elon-build-target
+RUST_SERVER_MUSL_TARGET_DIR=/var/tmp/server-musl-target
+
+# Legacy per-project root is still supported:
+# ELON_BUILD_TARGET_DIR=D:\rust\shared\target
 ```
 
 **2. 或临时通过进程环境变量覆盖**（CI / 一次性测试最方便）：
 
 ```powershell
-$env:ELON_BUILD_TARGET_DIR = "D:\rust\shared\target"
+$env:RUST_SERVER_MUSL_TARGET_DIR = "D:\rust\shared\server-musl-target"
 .\scripts\publish-server.ps1
 ```
 
@@ -307,7 +310,7 @@ $env:ELON_BUILD_TARGET_DIR = "D:\rust\shared\target"
 
 - 优先级：进程环境变量 > `.env.local` > 可移植默认值
 - 启动期校验：路径必须是绝对路径；Windows 上盘符必须存在；否则给出明确报错引导改 `.env.local`
-- 参考实现：`scripts/publish-server.ps1` 的 `Import-LocalEnvFile` + `Resolve-BuildTargetRoot` 函数
+- 参考实现：`scripts/publish-server.ps1` 的 `Import-LocalEnvFile` + `Resolve-ServerMuslTargetDir` / `Resolve-BuildTargetRoot` 函数
 
 ### 适用范围
 
@@ -333,10 +336,10 @@ $env:ELON_BUILD_TARGET_DIR = "D:\rust\shared\target"
 - 多台 PC 的盘符、缓存盘、权限策略不同，不能把某台机器的绝对路径写进共享脚本。需要本机固定构建缓存时，在仓库根创建未提交的 `.env.local` 或设置进程环境变量：
 
 ```powershell
-ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
 ```
 
-`scripts\publish-server.ps1` / `scripts\publish-server.sh` 会读取 `ELON_BUILD_TARGET_DIR` 并在其下创建 **固定名子目录 `elon-server-musl/`**（不含 SHA）；未设置时 Windows 使用 `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\`，Linux/macOS 使用 `~/.cache/elon/build/elon-server-musl/`（XDG 标准缓存路径）。两种情况下缓存都**跨 session 持久化**，支持增量编译：同一台机器首次全量（约 10 分钟），后续只改业务代码时约 30 秒。禁止手动把 `CARGO_TARGET_DIR` 设为含 SHA 的路径，那样会让每次构建都变成全量重编。
+`scripts\publish-server.ps1` / `scripts\publish-server.sh` 优先读取 `RUST_SERVER_MUSL_TARGET_DIR`，并把它作为精确 `CARGO_TARGET_DIR`，便于一台机器上的多个 Rust 后端共享 `x86_64-unknown-linux-musl` 编译产物；旧名 `RUST_MUSL_TARGET_DIR` 仍兼容。旧的 `ELON_BUILD_TARGET_DIR` 也仍兼容：脚本会在其下创建 **固定名子目录 `elon-server-musl/`**（不含 SHA）；这些变量都未设置时 Windows 使用 `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\`，Linux/macOS 使用 `~/.cache/elon/build/elon-server-musl/`（XDG 标准缓存路径）。这些缓存都**跨 session 持久化**，支持增量编译。禁止手动把 `CARGO_TARGET_DIR` 设为含 SHA 的路径，那样会让每次构建都变成全量重编。
 
 - 裸跑 `cargo check`、`cargo build`、`cargo zigbuild` 前，如果构建行为异常或机器是新环境，先检查 `CARGO_TARGET_DIR`：
 

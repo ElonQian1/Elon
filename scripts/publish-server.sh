@@ -15,8 +15,10 @@
 #    ./scripts/publish-server.sh --skip-upload   # 只本地编译，不部署
 #    ./scripts/publish-server.sh --force         # 强制部署，即使服务器已有更新版本
 #
-#  本机专用构建缓存目录可在仓库根 .env.local 中设置：
-#    ELON_BUILD_TARGET_DIR=/var/tmp/elon-build-target
+#  机器级 server-musl 缓存目录可在仓库根 .env.local 中设置：
+#    RUST_SERVER_MUSL_TARGET_DIR=/var/tmp/server-musl-target
+#  兼容旧名 RUST_MUSL_TARGET_DIR。
+#  旧的 ELON_BUILD_TARGET_DIR 仍兼容，脚本会在其下创建 elon-server-musl/
 # ================================================================
 set -euo pipefail
 
@@ -133,7 +135,19 @@ fi
 
 # ── 3. 编译（临时工作树）─────────────────────────────────────
 TMP_WORKTREE="$(dirname "$REPO_ROOT")/elon-build-$SHA"
-if [ -n "${ELON_BUILD_TARGET_DIR:-}" ]; then
+if [ -n "${RUST_SERVER_MUSL_TARGET_DIR:-}" ]; then
+  case "$RUST_SERVER_MUSL_TARGET_DIR" in
+    /*) ;;
+    *) echo -e "${RED}❌ RUST_SERVER_MUSL_TARGET_DIR 必须是绝对路径，当前值: $RUST_SERVER_MUSL_TARGET_DIR${NC}" >&2; exit 1 ;;
+  esac
+  BUILD_TARGET_DIR="$RUST_SERVER_MUSL_TARGET_DIR"
+elif [ -n "${RUST_MUSL_TARGET_DIR:-}" ]; then
+  case "$RUST_MUSL_TARGET_DIR" in
+    /*) ;;
+    *) echo -e "${RED}❌ RUST_MUSL_TARGET_DIR 必须是绝对路径，当前值: $RUST_MUSL_TARGET_DIR${NC}" >&2; exit 1 ;;
+  esac
+  BUILD_TARGET_DIR="$RUST_MUSL_TARGET_DIR"
+elif [ -n "${ELON_BUILD_TARGET_DIR:-}" ]; then
   case "$ELON_BUILD_TARGET_DIR" in
     /*) ;;
     *) echo -e "${RED}❌ ELON_BUILD_TARGET_DIR 必须是绝对路径，当前值: $ELON_BUILD_TARGET_DIR${NC}" >&2; exit 1 ;;

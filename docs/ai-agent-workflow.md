@@ -229,20 +229,22 @@ git pull --ff-only origin main
 
 服务端发布必须使用仓库脚本在本地开发机交叉编译 Linux binary，再上传到服务器。桌面版 Codex 就是在本机编译；生产服务器只负责接收 binary、替换、重启和健康检查，不承担编译。
 
-多台 PC 的本地盘符不同，不能把某台机器的构建目录写死在共享脚本里。需要固定本机构建缓存时，在仓库根创建未提交的 `.env.local`，设置 `ELON_BUILD_TARGET_DIR`：
+多台 PC 的本地盘符不同，不能把某台机器的构建目录写死在共享脚本里。需要让多个 Rust 后端项目共享同一份 musl 编译缓存时，在仓库根创建未提交的 `.env.local`，优先设置精确 target 目录 `RUST_SERVER_MUSL_TARGET_DIR`：
 
 ```powershell
-ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
 ```
 
-Windows / Linux / macOS 发布脚本都会读取这个变量，并在其下创建**固定名子目录 `elon-server-musl/`**（不含 SHA），让所有构建共享同一份 Rust 增量编译缓存。未配置时：
+Windows / Linux / macOS 发布脚本都会优先读取这个变量，并直接把它作为 `CARGO_TARGET_DIR`。旧名 `RUST_MUSL_TARGET_DIR` 仍兼容。这样 bb64a、一龙等技术栈相近的 Rust 服务端项目可以复用相同 target triple/profile/features 下的依赖编译产物。
+
+旧的 `ELON_BUILD_TARGET_DIR` 仍然兼容：脚本会在其下创建**固定名子目录 `elon-server-musl/`**（不含 SHA）。如果两个变量都未配置，默认路径为：
 
 | 系统 | 默认缓存路径 |
 |---|---|
 | Windows | `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\` |
 | Linux / macOS (Ubuntu Codex) | `~/.cache/elon/build/elon-server-musl/` (XDG 标准) |
 
-两者都跨 session 持久化。**同一台机器首次全量编译约 10 分钟，后续只改业务代码约 30 秒**。CI 或远程 Codex 也可以通过进程环境变量传入 `ELON_BUILD_TARGET_DIR` 指向持久卷。**禁止**把 `CARGO_TARGET_DIR` 手动设为含 SHA 的路径，那样会让每次都全量重编。
+两者都跨 session 持久化。**同一台机器首次全量编译约 10 分钟，后续只改业务代码约 30 秒**。CI 或远程 Codex 也可以通过进程环境变量传入 `RUST_SERVER_MUSL_TARGET_DIR` 或 `ELON_BUILD_TARGET_DIR` 指向持久卷。**禁止**把 `CARGO_TARGET_DIR` 手动设为含 SHA 的路径，那样会让每次都全量重编。
 
 ```powershell
 cd scripts
