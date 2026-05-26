@@ -272,6 +272,10 @@ internal class MainNavigationController(
         maybePrewarmCodexSession("show_project_chat")
     }
 
+    fun showProjectManagement(animate: Boolean = false) {
+        showProjectHome(animate = animate)
+    }
+
     private fun showProjectHome(animate: Boolean = false) {
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()

@@ -23,6 +23,8 @@ import android.view.ViewGroup
 import android.view.animation.PathInterpolator
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -41,6 +43,8 @@ internal class ChatSideMenuController(
     private val activeConversationIndex: () -> Int,
     private val openConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
+    private val openProjectManagement: () -> Unit,
+    private val showCreateConversationDialog: () -> Unit,
     private val confirmLogout: () -> Unit,
     private val dismissActionPopup: () -> Unit,
     private val cancelChildTouch: (MotionEvent) -> Unit,
@@ -254,13 +258,22 @@ internal class ChatSideMenuController(
                 topMargin = dp(106)
             }
         )
-        listOf("项目", "文件库", "设备").forEach { title ->
-            topMenu.addView(menuText(title).apply {
-                setOnClickListener {
-                    Toast.makeText(activity, "$title 功能准备中", Toast.LENGTH_SHORT).show()
-                }
-            })
-        }
+        topMenu.addView(
+            menuRow("项目", R.drawable.ic_side_menu_project) {
+                close(animate = true)
+                panel.postDelayed({ openProjectManagement() }, DURATION_MS)
+            }
+        )
+        topMenu.addView(
+            menuRow("文件库", R.drawable.ic_side_menu_files) {
+                Toast.makeText(activity, "文件库功能准备中", Toast.LENGTH_SHORT).show()
+            }
+        )
+        topMenu.addView(
+            menuRow("设备", R.drawable.ic_side_menu_device) {
+                Toast.makeText(activity, "设备功能准备中", Toast.LENGTH_SHORT).show()
+            }
+        )
 
         val chatScroll = ScrollView(activity).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -289,7 +302,7 @@ internal class ChatSideMenuController(
                 bottomMargin = dp(78)
             }
         )
-        conversationDirectoryGroup.addView(sectionText("当前聊天"))
+        conversationDirectoryGroup.addView(conversationHeaderRow())
 
         val settingsLabel = menuText("设置").apply {
             isClickable = true
@@ -443,10 +456,30 @@ internal class ChatSideMenuController(
         }
     }
 
-    private fun sectionText(title: String): TextView {
-        return menuText(title).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(210), dp(44))
-            setTextColor(Color.parseColor("#D0D0D0"))
+    private fun menuRow(title: String, iconRes: Int, action: () -> Unit): LinearLayout {
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(228), dp(46))
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            isClickable = true
+            foreground = selectableForeground()
+            setPadding(0, 0, dp(8), 0)
+
+            addView(
+                ImageView(activity).apply {
+                    setImageResource(iconRes)
+                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C9C9C9"))
+                    scaleType = ImageView.ScaleType.CENTER
+                },
+                LinearLayout.LayoutParams(dp(26), dp(26))
+            )
+            addView(
+                menuText(title).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    setPadding(dp(16), 0, 0, 0)
+                }
+            )
+            setOnClickListener { action() }
         }
     }
 
@@ -471,6 +504,43 @@ internal class ChatSideMenuController(
                         openConversation(index)
                     }
                 )
+            )
+        }
+    }
+
+    private fun conversationHeaderRow(): LinearLayout {
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(44)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+
+            addView(
+                menuText("当前聊天").apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    setTextColor(Color.parseColor("#D0D0D0"))
+                }
+            )
+            addView(
+                ImageButton(activity).apply {
+                    setImageResource(R.drawable.ic_add_circle_simple)
+                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#D0D0D0"))
+                    background = null
+                    scaleType = ImageView.ScaleType.CENTER
+                    contentDescription = "新建会话"
+                    isClickable = true
+                    foreground = selectableForeground()
+                    setPadding(dp(4), dp(4), dp(4), dp(4))
+                    setOnClickListener {
+                        close(animate = true)
+                        panel.postDelayed({ showCreateConversationDialog() }, DURATION_MS)
+                    }
+                },
+                LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                    rightMargin = dp(8)
+                }
             )
         }
     }

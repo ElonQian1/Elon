@@ -378,6 +378,8 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
             isConversationWorking = homeListActions::isConversationWorking,
+            openProjectManagement = { navigationController.showProjectManagement(animate = true) },
+            showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
                 actionPopup?.dismiss()
