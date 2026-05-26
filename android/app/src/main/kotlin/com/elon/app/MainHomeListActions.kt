@@ -23,8 +23,7 @@ internal class MainHomeListActions(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
-    private val showAddFriendDialog: () -> Unit,
-    private val openAssistantConversation: () -> Unit
+    private val showAddFriendDialog: () -> Unit
 ) {
     fun renderConversationList() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
@@ -35,21 +34,19 @@ internal class MainHomeListActions(
 
         homeRows().cancelHomeRowShimmer()
         binding.conversationPage.removeAllViews()
-        binding.conversationPage.addView(
-            homeRows().createFriendRow(
-                AppFriend(
-                    id = "assistant",
-                    name = "一龙开发助手",
-                    account = "已就绪 · 点击进入开发会话",
-                    phone = null,
-                    friendSince = null
-                )
-            ) {
-                openAssistantConversation()
+        val friendList = friends()
+        if (friendList.isEmpty()) {
+            binding.conversationPage.addView(
+                homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
+                    showAddFriendDialog()
+                }
+            )
+            return
+        }
+        friendList.forEachIndexed { index, friend ->
+            if (index > 0) {
+                binding.conversationPage.addView(homeRows().createConversationDivider())
             }
-        )
-        friends().forEach { friend ->
-            binding.conversationPage.addView(homeRows().createConversationDivider())
             binding.conversationPage.addView(
                 homeRows().createFriendRow(friend) {
                     Toast.makeText(activity, "好友会话准备中", Toast.LENGTH_SHORT).show()

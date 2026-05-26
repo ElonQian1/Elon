@@ -34,7 +34,13 @@ internal class MainNavigationController(
     private val setSendEnabled: (Boolean) -> Unit,
     private val maybePrewarmCodexSession: (String) -> Unit
 ) {
+    private enum class ChatReturnTarget {
+        FRIENDS,
+        PROJECTS
+    }
+
     private var pageTransitionRunning = false
+    private var chatReturnTarget = ChatReturnTarget.FRIENDS
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
@@ -108,7 +114,11 @@ internal class MainNavigationController(
         }
         if (binding.chatPage.visibility == View.VISIBLE) {
             collapseInputComposer(false)
-            showConversationHome(animate = true)
+            if (chatReturnTarget == ChatReturnTarget.PROJECTS) {
+                showProjectHome(animate = true)
+            } else {
+                showConversationHome(animate = true)
+            }
             return
         }
         showExitConfirmation()
@@ -146,6 +156,7 @@ internal class MainNavigationController(
 
     fun showChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
+        chatReturnTarget = ChatReturnTarget.FRIENDS
         val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
@@ -181,6 +192,76 @@ internal class MainNavigationController(
         }
         setSendEnabled(!isActiveConversationWorking())
         maybePrewarmCodexSession("show_chat")
+    }
+
+    fun showProjectChat(animate: Boolean = false) {
+        if (pageTransitionRunning) return
+        chatReturnTarget = ChatReturnTarget.PROJECTS
+        val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        applyChatChrome()
+        if (shouldAnimate) {
+            collapseInputComposer(false)
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromLeft(
+                container = binding.contentContainer,
+                incoming = listOf(binding.chatPage),
+                outgoing = listOf(binding.projectPage),
+                incomingFull = listOf(binding.inputLayout),
+                outgoingFull = listOf(binding.pageTabs),
+                onEnd = {
+                    binding.conversationPage.visibility = View.GONE
+                    binding.pageTabs.visibility = View.GONE
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.chatPage.visibility = View.VISIBLE
+                    binding.inputLayout.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            binding.conversationPage.visibility = View.GONE
+            binding.pageTabs.visibility = View.GONE
+            binding.projectPage.visibility = View.GONE
+            binding.profilePage.visibility = View.GONE
+            binding.chatPage.visibility = View.VISIBLE
+            binding.inputLayout.visibility = View.VISIBLE
+            clearPageTranslations()
+        }
+        setSendEnabled(!isActiveConversationWorking())
+        maybePrewarmCodexSession("show_project_chat")
+    }
+
+    private fun showProjectHome(animate: Boolean = false) {
+        if (animate && binding.chatPage.visibility == View.VISIBLE) {
+            actionPopupProvider()?.dismiss()
+            closeChatSideMenu(false)
+            renderProjectList()
+            applyProjectHomeChrome()
+            pageTransitionRunning = true
+            WechatPageTransition.exitToLeft(
+                container = binding.contentContainer,
+                outgoing = listOf(binding.chatPage),
+                incoming = listOf(binding.projectPage),
+                outgoingFull = listOf(binding.inputLayout),
+                incomingFull = listOf(binding.pageTabs),
+                onEnd = {
+                    binding.chatPage.visibility = View.GONE
+                    binding.inputLayout.visibility = View.GONE
+                    binding.conversationPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.projectPage.visibility = View.VISIBLE
+                    binding.pageTabs.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                    renderProjectList()
+                }
+            )
+        } else {
+            binding.tabProject.performClick()
+        }
     }
 
     private fun showExitConfirmation() {
@@ -230,6 +311,25 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "好友"
         refreshFriends()
+    }
+
+    private fun applyProjectHomeChrome() {
+        updateBottomTabSelection(binding.tabProject)
+        binding.conversationPage.visibility = View.GONE
+        binding.projectPage.visibility = View.VISIBLE
+        binding.profilePage.visibility = View.GONE
+        binding.inputLayout.visibility = View.GONE
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.backButton.visibility = View.GONE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.VISIBLE
+        binding.moreButton.visibility = View.GONE
+        binding.addButton.setOnClickListener {
+            showHomeActionPopup(binding.addButton, binding.tabProject)
+        }
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = "项目管理"
+        renderProjectList()
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {

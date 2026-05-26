@@ -8,7 +8,6 @@ internal class MainConversationOpenActions(
     private val projects: () -> List<AppProject>,
     private val conversations: () -> MutableList<AppConversation>,
     private val activeConversation: () -> AppConversation,
-    private val activeConversationIndex: () -> Int,
     private val setActiveProjectIndex: (Int) -> Unit,
     private val setActiveConversationIndex: (Int) -> Unit,
     private val setChatAdapter: (ChatAdapter) -> Unit,
@@ -16,19 +15,14 @@ internal class MainConversationOpenActions(
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val showChat: (Boolean) -> Unit,
+    private val showProjectChat: (Boolean) -> Unit,
     private val saveProjects: () -> Unit
 ) {
     fun openConversation(index: Int) {
         val currentConversations = conversations()
         if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
         setActiveConversationIndex(index.coerceIn(0, currentConversations.lastIndex))
-        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
-        setChatAdapter(adapter)
-        binding.chatList.adapter = adapter
-        showChat(true)
-        if (adapter.itemCount > 0) {
-            binding.chatList.scrollToPosition(adapter.itemCount - 1)
-        }
+        openActiveConversation(showChat)
     }
 
     fun openProject(index: Int) {
@@ -36,8 +30,22 @@ internal class MainConversationOpenActions(
         setActiveProjectIndex(index)
         val currentConversations = conversations()
         if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
-        setActiveConversationIndex(activeConversationIndex().coerceIn(0, currentConversations.lastIndex))
+        val recentConversationIndex = currentConversations
+            .indices
+            .maxByOrNull { currentConversations[it].updatedAt }
+            ?: 0
+        setActiveConversationIndex(recentConversationIndex)
         saveProjects()
-        binding.tabChat.performClick()
+        openActiveConversation(showProjectChat)
+    }
+
+    private fun openActiveConversation(show: (Boolean) -> Unit) {
+        val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        show(true)
+        if (adapter.itemCount > 0) {
+            binding.chatList.scrollToPosition(adapter.itemCount - 1)
+        }
     }
 }

@@ -405,7 +405,6 @@ class MainActivity : AppCompatActivity() {
             projects = { projects },
             conversations = { projectStateActions.conversations },
             activeConversation = projectStateActions::activeConversation,
-            activeConversationIndex = { projectStateActions.activeConversationIndex },
             setActiveProjectIndex = { activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             setChatAdapter = { chatAdapter = it },
@@ -413,6 +412,7 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
+            showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
             saveProjects = projectStateActions::saveProjects
         )
     }
@@ -490,10 +490,7 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showAddFriendDialog = { friendActions.showAddFriendDialog() },
-            openAssistantConversation = {
-                conversationOpenActions.openConversation(projectStateActions.activeConversationIndex)
-            }
+            showAddFriendDialog = { friendActions.showAddFriendDialog() }
         )
     }
 

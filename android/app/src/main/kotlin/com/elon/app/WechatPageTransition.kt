@@ -96,6 +96,90 @@ internal object WechatPageTransition {
         }
     }
 
+    fun enterFromLeft(
+        container: View,
+        incoming: List<View>,
+        outgoing: List<View>,
+        incomingFull: List<View> = emptyList(),
+        outgoingFull: List<View> = emptyList(),
+        onEnd: () -> Unit
+    ) {
+        runWhenMeasured(container) {
+            val width = container.width.toFloat()
+            incoming.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = -width
+            }
+            incomingFull.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = -width
+            }
+            outgoing.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = 0f
+            }
+            outgoingFull.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = 0f
+            }
+            play(
+                animators = incoming.map { slide(it, -width, 0f) } +
+                    outgoing.map { slide(it, 0f, width * UNDER_PAGE_SHIFT) } +
+                    incomingFull.map { slide(it, -width, 0f) } +
+                    outgoingFull.map { slide(it, 0f, width) },
+                onEnd = {
+                    incoming.forEach { it.translationX = 0f }
+                    incomingFull.forEach { it.translationX = 0f }
+                    outgoing.forEach { it.translationX = 0f }
+                    outgoingFull.forEach { it.translationX = 0f }
+                    onEnd()
+                }
+            )
+        }
+    }
+
+    fun exitToLeft(
+        container: View,
+        outgoing: List<View>,
+        incoming: List<View>,
+        outgoingFull: List<View> = emptyList(),
+        incomingFull: List<View> = emptyList(),
+        onEnd: () -> Unit
+    ) {
+        runWhenMeasured(container) {
+            val width = container.width.toFloat()
+            incoming.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = width * UNDER_PAGE_SHIFT
+            }
+            incomingFull.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = width
+            }
+            outgoing.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = 0f
+            }
+            outgoingFull.forEach {
+                it.visibility = View.VISIBLE
+                it.translationX = 0f
+            }
+            play(
+                animators = outgoing.map { slide(it, 0f, -width) } +
+                    incoming.map { slide(it, width * UNDER_PAGE_SHIFT, 0f) } +
+                    outgoingFull.map { slide(it, 0f, -width) } +
+                    incomingFull.map { slide(it, width, 0f) },
+                onEnd = {
+                    outgoing.forEach { it.translationX = 0f }
+                    outgoingFull.forEach { it.translationX = 0f }
+                    incoming.forEach { it.translationX = 0f }
+                    incomingFull.forEach { it.translationX = 0f }
+                    onEnd()
+                }
+            )
+        }
+    }
+
     private fun runWhenMeasured(view: View, block: () -> Unit) {
         if (view.width > 0) {
             block()
