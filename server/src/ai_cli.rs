@@ -22,7 +22,7 @@ use crate::{
         append_native_session_continuity, native_session_continuity_note,
         retire_native_session_and_schedule_repair, should_retry_without_native_session,
     },
-    ai_cli_output::{extract_thread_id, format_cli_reply},
+    ai_cli_output::{extract_json_agent_message, extract_thread_id, format_cli_reply},
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
     intent_router, tools,
@@ -33,8 +33,6 @@ use crate::{
 use crate::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
 #[cfg(test)]
 use crate::ai_cli_native_session::build_native_session_continuity_note;
-#[cfg(test)]
-use crate::ai_cli_output::extract_json_agent_message;
 #[cfg(test)]
 use crate::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
 #[cfg(test)]
@@ -219,7 +217,14 @@ pub async fn run_with_workspace(
                 && codex_network_or_timeout_error(&error)
                 && supports_codex_sessions(&option) =>
         {
-            return Err(error);
+            return finish_lightweight_chat_fallback(
+                state,
+                trace_id,
+                tx,
+                user_message,
+                "network_or_timeout_initial",
+                &error.to_string(),
+            );
         }
         Err(error) if lightweight_chat_task && native_session_id.is_some() => {
             let stale_session_id = native_session_id.clone();
@@ -286,7 +291,14 @@ pub async fn run_with_workspace(
                     if codex_network_or_timeout_error(&fresh_error)
                         && supports_codex_sessions(&option) =>
                 {
-                    return Err(fresh_error);
+                    return finish_lightweight_chat_fallback(
+                        state,
+                        trace_id,
+                        tx,
+                        user_message,
+                        "network_or_timeout_fresh_after_resume",
+                        &fresh_error.to_string(),
+                    );
                 }
                 Err(fresh_error) => {
                     return finish_lightweight_chat_fallback(
@@ -305,7 +317,14 @@ pub async fn run_with_workspace(
                 && codex_network_or_timeout_error(&error)
                 && supports_codex_sessions(&option) =>
         {
-            return Err(error);
+            return finish_lightweight_chat_fallback(
+                state,
+                trace_id,
+                tx,
+                user_message,
+                "network_or_timeout_initial_alt",
+                &error.to_string(),
+            );
         }
         Err(error) if lightweight_chat_task => {
             return finish_lightweight_chat_fallback(
@@ -400,7 +419,14 @@ pub async fn run_with_workspace(
                     && codex_network_or_timeout_error(&error)
                     && supports_codex_sessions(&option) =>
             {
-                return Err(error);
+                return finish_lightweight_chat_fallback(
+                    state,
+                    trace_id,
+                    tx,
+                    user_message,
+                    "network_or_timeout_fresh_after_stale",
+                    &error.to_string(),
+                );
             }
             Err(error) if lightweight_chat_task => {
                 return finish_lightweight_chat_fallback(
@@ -419,6 +445,30 @@ pub async fn run_with_workspace(
     if supports_codex_sessions(&option) && !output.success {
         let combined = format!("{}\n{}", output.stdout, output.stderr);
         if crate::codex_health::is_codex_network_error_text(&combined) {
+            if lightweight_chat_task {
+                // 轻量聊天遇到网络/超时错误：如果 CLI 已经流式输出了 agent_message，
+                // 则 AssistantMessage 已发给客户端，静默发 Done 结束本轮即可避免红色报错气泡。
+                // 否则使用友好降级消息，同样避免红色报错气泡。
+                if extract_json_agent_message(&output.stdout).is_some() {
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                        }
+                        .to_json(),
+                    );
+                    return Ok(());
+                }
+                return finish_lightweight_chat_fallback(
+                    state,
+                    trace_id,
+                    tx,
+                    user_message,
+                    "codex_network_unhealthy_post_output",
+                    &combined,
+                );
+            }
             return Err(anyhow!(
                 "Codex CLI network unhealthy: {}",
                 truncate_chars(&combined, 500)
