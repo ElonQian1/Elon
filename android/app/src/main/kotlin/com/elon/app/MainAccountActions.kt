@@ -16,7 +16,8 @@ internal class MainAccountActions(
     private val gson: Gson,
     private val prefs: SharedPreferences,
     private val saveProjects: () -> Unit,
-    private val renderProjectList: () -> Unit
+    private val renderProjectList: () -> Unit,
+    private val refreshProfileSummary: () -> Unit
 ) {
     fun refreshAccountUi() {
         val loggedIn = AuthManager.isLoggedIn(activity)
@@ -24,7 +25,7 @@ internal class MainAccountActions(
         binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
         binding.profileImportGuestButton.visibility =
             if (loggedIn && importableGuestProjects().isNotEmpty()) View.VISIBLE else View.GONE
-        binding.userInfoText.text = accountInfoText(activity)
+        refreshProfileSummary()
     }
 
     fun checkAndOfferGuestImport() {

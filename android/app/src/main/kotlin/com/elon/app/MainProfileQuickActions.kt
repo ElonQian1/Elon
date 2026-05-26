@@ -16,6 +16,7 @@ internal class MainProfileQuickActions(
     private val showProjectRecordDialog: () -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val openSettings: () -> Unit,
+    private val openProfileDetails: () -> Unit,
     private val showPromotionDialog: () -> Unit,
     private val showGuestImportDialog: () -> Unit,
     private val confirmLogout: () -> Unit
@@ -34,9 +35,16 @@ internal class MainProfileQuickActions(
             confirmLogout = confirmLogout
         ).setupQuickActions()
         refreshAccountUi()
+        refreshProfileSummary()
         binding.profileVersionText.text =
             "${localAppVersionLine()}\n服务器版本读取中..."
         refreshServerVersion()
+    }
+
+    fun refreshProfileSummary() {
+        if (isBindingInitialized()) {
+            UserProfileViews.renderSummary(activity, binding, openProfileDetails)
+        }
     }
 
     fun refreshServerVersion() {

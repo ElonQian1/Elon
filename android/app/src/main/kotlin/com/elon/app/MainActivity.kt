@@ -182,6 +182,9 @@ class MainActivity : AppCompatActivity() {
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
         gws.start(this)
+        if (::binding.isInitialized) {
+            profileQuickActions.refreshProfileSummary()
+        }
         friendChatActions.resumeIfActive()
     }
 
@@ -591,7 +594,10 @@ class MainActivity : AppCompatActivity() {
             gson = gson,
             prefs = prefs,
             saveProjects = projectStateActions::saveProjects,
-            renderProjectList = homeListActions::renderProjectList
+            renderProjectList = homeListActions::renderProjectList,
+            refreshProfileSummary = {
+                if (::binding.isInitialized) profileQuickActions.refreshProfileSummary()
+            }
         )
     }
 
@@ -610,6 +616,9 @@ class MainActivity : AppCompatActivity() {
             showProjectRecordDialog = { projectRecordActions.showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             openSettings = { quickCommandActions.openSettings() },
+            openProfileDetails = {
+                startActivity(Intent(this, PersonalProfileActivity::class.java))
+            },
             showPromotionDialog = { messageActions.showPromotionDialog() },
             showGuestImportDialog = { accountActions().showGuestImportDialog() },
             confirmLogout = { accountActions().confirmLogout() }
