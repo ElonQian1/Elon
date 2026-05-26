@@ -50,6 +50,7 @@ Read these files before acting:
 - For Android installable features, PR/debug build is not complete. Run `scripts\publish-apk.ps1` (it claims `versionCode/versionName` from the server, temporarily writes `build.gradle`, builds, uploads, then restores `build.gradle`; nothing is committed to git). Then run `scripts\check-task-complete.ps1 -Kind AndroidFeature`, unless the user explicitly says not to publish the APK.
 - For Rust builds, do not rely on a relative `CARGO_TARGET_DIR`; use project scripts or an absolute target directory.
 - For APK update/P2P work, keep `version.json` as the public source of truth, preserve direct `downloadUrl` fallback, and verify live `/app/version.json` after publishing.
+- For LAN distribution: after publishing APK, `scripts\publish-apk.ps1` automatically calls `scripts\lan-dist-client.ps1 -ProjectId "elon" -ArtifactId "user-apk" ...` to register the artifact with the shared daemon on port 7788. The daemon serves `GET /dist/<project>/<artifact>`, re-registers with the server every 55 min, and auto-exits when all TTLs expire. Other projects (bb64a, etc.) can join by calling the same script with their own `-ProjectId`/`-ArtifactId`/`-ServerRegisterUrl`. See user skill `p2p-app-distribution` for the full pattern.
 - For Android builds on a new machine, run the speed-test below first before trying `./gradlew`; network misconfiguration will stall downloads indefinitely.
 
 ## Android Build Environment Setup (New Machine Only)
