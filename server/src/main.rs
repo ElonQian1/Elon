@@ -5,6 +5,9 @@ use tracing::info;
 
 mod admin;
 mod admin_html;
+mod auth_api;
+mod errors;
+mod friend_api;
 mod agent;
 mod agent_api_loop;
 mod agent_intent;
@@ -22,6 +25,7 @@ mod ai_cli_process;
 mod ai_cli_prompts;
 mod ai_cli_runner;
 mod ai_cli_streaming;
+mod ai_cli_tests;
 mod ai_cli_trace;
 mod api;
 mod app_update;

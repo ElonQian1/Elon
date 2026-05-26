@@ -9,9 +9,9 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, api, app_update, global_ws, lan_peer, peer_relay, project_api, project_attachments, project_chat,
-    project_downloads, project_git, project_membership, project_store, release_claim, user_api,
-    web,
+    admin, api, app_update, auth_api, friend_api, global_ws, lan_peer, peer_relay, project_api,
+    project_attachments, project_chat, project_downloads, project_git, project_membership,
+    project_store, release_claim, user_api, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -64,24 +64,24 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/debug/codex-health", get(api::codex_health))
         .route("/api/debug/traces/:trace_id", get(api::server_trace))
         .route("/api/image/generate", post(api::generate_image))
-        .route("/api/auth/login", post(project_api::login))
-        .route("/api/auth/register", post(project_api::register))
-        .route("/api/me", get(project_api::me))
+        .route("/api/auth/login", post(auth_api::login))
+        .route("/api/auth/register", post(auth_api::register))
+        .route("/api/me", get(auth_api::me))
         .route(
             "/api/me/profile",
             axum::routing::patch(project_api::update_profile),
         )
         .route(
             "/api/me/friends",
-            get(project_api::list_friends).post(project_api::add_friend_by_phone),
+            get(friend_api::list_friends).post(friend_api::add_friend_by_phone),
         )
         .route(
             "/api/me/friends/search",
-            get(project_api::search_friend_by_phone),
+            get(friend_api::search_friend_by_phone),
         )
         .route(
             "/api/me/friends/:friend_id/messages",
-            get(project_api::list_friend_messages).post(project_api::send_friend_message),
+            get(friend_api::list_friend_messages).post(friend_api::send_friend_message),
         )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))

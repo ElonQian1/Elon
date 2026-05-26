@@ -9,37 +9,19 @@ import android.widget.PopupWindow
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
-import okhttp3.OkHttpClient
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
-    private var waitingForReply = false
-    private var activeRequestIsDevelopment = false
-    private var serverResponseToken = 0
-    private var appInForeground = false
-    private var pendingRequestPayload: String? = null
-    private var pendingReconnectForActiveWork = false
-    private var reconnectAttempts = 0
-    private val runningConversationTasks = linkedMapOf<String, ConversationTaskState>()
-    private val runningTraceToConversation = linkedMapOf<String, String>()
-    private val taskResponseTokens = linkedMapOf<String, Int>()
-    private var backendConnected = false
-    private val projects = mutableListOf<AppProject>()
-    private val friends = mutableListOf<AppFriend>()
-    private val gson = com.google.gson.Gson()
-    private val http = OkHttpClient()
-    private val timeFormatter = SimpleDateFormat("HH:mm", Locale.CHINA)
+    /** 运行时可变状态与工具实例（OkHttpClient 含超时配置）。 */
+    private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
     private val serverUrl = BuildConfig.SERVER_URL
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
-    private var activeProjectIndex = 0
     private var homeRows: MainHomeRows? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
@@ -58,17 +40,17 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             chatAdapter = { chatAdapter },
-            activeRequestIsDevelopment = { activeRequestIsDevelopment },
-            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
-            setWaitingForReply = { waitingForReply = it },
-            clearPendingRequestPayload = { pendingRequestPayload = null },
-            clearPendingReconnectForActiveWork = { pendingReconnectForActiveWork = false },
-            resetReconnectAttempts = { reconnectAttempts = 0 },
-            incrementServerResponseToken = { serverResponseToken += 1 },
-            currentTimeText = { timeFormatter.format(Date()) },
-            taskResponseTokens = taskResponseTokens,
-            runningTraceToConversation = runningTraceToConversation,
-            runningConversationTasks = runningConversationTasks,
+            activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
+            setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
+            setWaitingForReply = { s.waitingForReply = it },
+            clearPendingRequestPayload = { s.pendingRequestPayload = null },
+            clearPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = false },
+            resetReconnectAttempts = { s.reconnectAttempts = 0 },
+            incrementServerResponseToken = { s.serverResponseToken += 1 },
+            currentTimeText = { s.timeFormatter.format(Date()) },
+            taskResponseTokens = s.taskResponseTokens,
+            runningTraceToConversation = s.runningTraceToConversation,
+            runningConversationTasks = s.runningConversationTasks,
             projectStateActions = { projectStateActions },
             projectViewActions = { projectViewActions },
             projectRecordActions = { projectRecordActions },
@@ -83,14 +65,14 @@ class MainActivity : AppCompatActivity() {
         MainTaskActions(
             activity = this,
             prefs = prefs,
-            backendConnected = { backendConnected },
-            setBackendConnected = { backendConnected = it },
-            waitingForReply = { waitingForReply },
-            resetReconnectAttempts = { reconnectAttempts = 0 },
-            taskResponseTokens = taskResponseTokens,
-            runningTraceToConversation = runningTraceToConversation,
-            runningConversationTasks = runningConversationTasks,
-            activeRequestIsDevelopment = { activeRequestIsDevelopment },
+            backendConnected = { s.backendConnected },
+            setBackendConnected = { s.backendConnected = it },
+            waitingForReply = { s.waitingForReply },
+            resetReconnectAttempts = { s.reconnectAttempts = 0 },
+            taskResponseTokens = s.taskResponseTokens,
+            runningTraceToConversation = s.runningTraceToConversation,
+            runningConversationTasks = s.runningConversationTasks,
+            activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
             workflowActions = { workflowActions },
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
@@ -103,12 +85,12 @@ class MainActivity : AppCompatActivity() {
         MainInputActions(
             activity = this,
             binding = binding,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             speechPermissionRequest = speechPermissionRequest,
             userId = { userId },
-            projects = projects,
-            setActiveProjectIndex = { activeProjectIndex = it },
+            projects = s.projects,
+            setActiveProjectIndex = { s.activeProjectIndex = it },
             setChatAdapter = { chatAdapter = it },
             uiTools = { uiTools },
             modelActions = { modelActions },
@@ -158,11 +140,11 @@ class MainActivity : AppCompatActivity() {
             registerTaskWorkReceiver = { taskActions.taskWorkReceiverActions.registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
-            getWaitingForReply = { waitingForReply },
-            getBackendConnected = { backendConnected },
+            getWaitingForReply = { s.waitingForReply },
+            getBackendConnected = { s.backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             startTaskWorkService = { action ->
-                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = s.activeRequestIsDevelopment)
             },
             openConversation = conversationOpenActions::openConversation,
             loadModelOptions = { modelActions.loadModelOptions() },
@@ -195,21 +177,21 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             prefs = prefs,
             isBindingInitialized = { ::binding.isInitialized },
-            setAppInForeground = { appInForeground = it },
+            setAppInForeground = { s.appInForeground = it },
             setTaskAppForeground = { foreground -> taskActions.taskWorkServiceActions.setTaskAppForeground(foreground) },
             drainQueuedTaskEvents = { taskActions.taskWorkServiceActions.drainQueuedTaskEvents() },
             loadModelOptions = { modelActions.loadModelOptions() },
-            getBackendConnected = { backendConnected },
-            getWaitingForReply = { waitingForReply },
-            getPendingReconnectForActiveWork = { pendingReconnectForActiveWork },
-            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
+            getBackendConnected = { s.backendConnected },
+            getWaitingForReply = { s.waitingForReply },
+            getPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork },
+            setPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = it },
             currentStage = { projectStateActions.currentStage },
             updateStage = projectViewActions::updateStage,
             recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
+                if (s.activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
             startTaskWorkService = { action ->
-                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = activeRequestIsDevelopment)
+                taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = s.activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
@@ -218,14 +200,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
-        appInForeground = false
+        s.appInForeground = false
         friendChatActions.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
 
     override fun onStop() {
-        appInForeground = false
+        s.appInForeground = false
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
         val gws = (application as ElonApplication).globalWs
@@ -255,7 +237,7 @@ class MainActivity : AppCompatActivity() {
             restoreSendTarget = { target -> inputActions.sendTargetRestoreActions.restoreSendTarget(target) },
             isConversationTaskRunning = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
-                runningConversationTasks.containsKey(key)
+                s.runningConversationTasks.containsKey(key)
             },
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             userId = { userId },
@@ -265,10 +247,10 @@ class MainActivity : AppCompatActivity() {
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions::rememberConversationTask,
-            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
             resetRequestState = {
-                pendingReconnectForActiveWork = false
-                reconnectAttempts = 0
+                s.pendingReconnectForActiveWork = false
+                s.reconnectAttempts = 0
                 conversationTaskRegistryActions.persistActiveWork()
                 workflowActions.foldedCliLogActions.reset()
                 workflowActions.evidenceActions.clearCurrentEvidence()
@@ -281,12 +263,12 @@ class MainActivity : AppCompatActivity() {
                 projectViewActions.updateStage("需求分析", "已收到需求，正在拆解功能和实现路径。")
             },
             updateProjectViews = projectViewActions::updateProjectViews,
-            nextServerResponseToken = { ++serverResponseToken },
-            putTaskResponseToken = { traceId, token -> taskResponseTokens[traceId] = token },
+            nextServerResponseToken = { ++s.serverResponseToken },
+            putTaskResponseToken = { traceId, token -> s.taskResponseTokens[traceId] = token },
             startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
             markTaskPendingReconnect = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
-                runningConversationTasks[key]?.pendingReconnect = true
+                s.runningConversationTasks[key]?.pendingReconnect = true
             },
             refreshActiveTaskState = conversationTaskRegistryActions::refreshActiveTaskState,
             persistActiveWork = conversationTaskRegistryActions::persistActiveWork,
@@ -305,21 +287,21 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
             removeConversationTask = conversationTaskRegistryActions::removeConversationTask,
-            resetReconnectAttempts = { reconnectAttempts = 0 },
+            resetReconnectAttempts = { s.reconnectAttempts = 0 },
             incrementReconnectAttempts = {
-                reconnectAttempts += 1
-                reconnectAttempts
+                s.reconnectAttempts += 1
+                s.reconnectAttempts
             },
             taskForTrace = { traceId ->
-                runningTraceToConversation[traceId]?.let { runningConversationTasks[it] }
+                s.runningTraceToConversation[traceId]?.let { s.runningConversationTasks[it] }
             },
-            isBackendConnected = { backendConnected },
-            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
-            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
+            isBackendConnected = { s.backendConnected },
+            getActiveRequestIsDevelopment = { s.activeRequestIsDevelopment },
+            setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
             getCurrentStage = { projectStateActions.currentStage },
-            getPendingRequestPayload = { pendingRequestPayload },
-            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
-            setWaitingForReply = { waitingForReply = it },
+            getPendingRequestPayload = { s.pendingRequestPayload },
+            setPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = it },
+            setWaitingForReply = { s.waitingForReply = it },
             persistActiveWork = conversationTaskRegistryActions::persistActiveWork,
             clearPersistedActiveWork = conversationTaskRegistryActions::clearPersistedActiveWork,
             refreshActiveTaskState = conversationTaskRegistryActions::refreshActiveTaskState,
@@ -335,12 +317,12 @@ class MainActivity : AppCompatActivity() {
             updateProjectViews = projectViewActions::updateProjectViews,
             addProjectEvent = projectRecordActions::addProjectEvent,
             recordEvidence = { kind, detail ->
-                if (activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
+                if (s.activeRequestIsDevelopment) workflowActions.evidenceActions.recordEvidence(kind, detail)
             },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
             workflowStoppedMessage = ::mainWorkflowStoppedMessage,
             startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
-            nextServerResponseToken = { ++serverResponseToken },
+            nextServerResponseToken = { ++s.serverResponseToken },
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             }
@@ -381,7 +363,7 @@ class MainActivity : AppCompatActivity() {
     private val marketplaceActions: MainMarketplaceActions by lazy {
         MainMarketplaceActions(
             activity = this,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
@@ -432,7 +414,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             prefs = prefs,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             userIdProvider = { userId },
             modelButtonShellProvider = { inputActions.inputComposerViewsOrNull()?.modelButtonShell },
@@ -448,10 +430,10 @@ class MainActivity : AppCompatActivity() {
     private val conversationOpenActions: MainConversationOpenActions by lazy {
         MainConversationOpenActions(
             binding = binding,
-            projects = { projects },
+            projects = { s.projects },
             conversations = { projectStateActions.conversations },
             activeConversation = projectStateActions::activeConversation,
-            setActiveProjectIndex = { activeProjectIndex = it },
+            setActiveProjectIndex = { s.activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
@@ -466,10 +448,10 @@ class MainActivity : AppCompatActivity() {
     private val projectStateActions: MainProjectStateActions by lazy {
         MainProjectStateActions(
             prefs = prefs,
-            gson = gson,
-            projects = projects,
-            activeProjectIndex = { activeProjectIndex },
-            setActiveProjectIndex = { activeProjectIndex = it },
+            gson = s.gson,
+            projects = s.projects,
+            activeProjectIndex = { s.activeProjectIndex },
+            setActiveProjectIndex = { s.activeProjectIndex = it },
             normalizeProject = { project -> workflowActions.projectHygieneActions.normalizeProject(project) }
         )
     }
@@ -477,17 +459,17 @@ class MainActivity : AppCompatActivity() {
     private val conversationTaskRegistryActions: MainConversationTaskRegistryActions by lazy {
         MainConversationTaskRegistryActions(
             prefs = prefs,
-            runningConversationTasks = runningConversationTasks,
-            runningTraceToConversation = runningTraceToConversation,
-            taskResponseTokens = taskResponseTokens,
+            runningConversationTasks = s.runningConversationTasks,
+            runningTraceToConversation = s.runningTraceToConversation,
+            taskResponseTokens = s.taskResponseTokens,
             activeProject = projectStateActions::activeProject,
             activeConversation = projectStateActions::activeConversation,
-            setWaitingForReply = { waitingForReply = it },
-            setActiveRequestIsDevelopment = { activeRequestIsDevelopment = it },
-            setPendingRequestPayload = { pendingRequestPayload = it },
-            setPendingReconnectForActiveWork = { pendingReconnectForActiveWork = it },
-            resetReconnectAttempts = { reconnectAttempts = 0 },
-            getActiveRequestIsDevelopment = { activeRequestIsDevelopment },
+            setWaitingForReply = { s.waitingForReply = it },
+            setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
+            setPendingRequestPayload = { s.pendingRequestPayload = it },
+            setPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = it },
+            resetReconnectAttempts = { s.reconnectAttempts = 0 },
+            getActiveRequestIsDevelopment = { s.activeRequestIsDevelopment },
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             renderConversationList = homeListActions::renderConversationList,
             updateStage = projectViewActions::updateStage,
@@ -498,11 +480,11 @@ class MainActivity : AppCompatActivity() {
     private val conversationPreviewActions: MainConversationPreviewActions by lazy {
         MainConversationPreviewActions(
             binding = binding,
-            projects = { projects },
+            projects = { s.projects },
             conversations = { projectStateActions.conversations },
             activeProject = projectStateActions::activeProject,
             activeConversation = projectStateActions::activeConversation,
-            activeProjectIndex = { activeProjectIndex },
+            activeProjectIndex = { s.activeProjectIndex },
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             chatAdapter = { chatAdapter },
             conversationTaskKey = conversationTaskRegistryActions::conversationTaskKey,
@@ -510,7 +492,7 @@ class MainActivity : AppCompatActivity() {
             closeStaleWorkflowMessages = { messages ->
                 workflowActions.workflowMessageCompactor.closeStaleWorkflowMessages(messages)
             },
-            hasRunningTasks = { runningConversationTasks.isNotEmpty() },
+            hasRunningTasks = { s.runningConversationTasks.isNotEmpty() },
             saveConversations = projectStateActions::saveConversations,
             saveProjects = projectStateActions::saveProjects,
             renderConversationList = homeListActions::renderConversationList,
@@ -524,13 +506,13 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             projects = { projects },
             conversations = { projectStateActions.conversations },
-            friends = { friends },
+            friends = { s.friends },
             activeProject = projectStateActions::activeProject,
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
-            formatTime = { timeFormatter.format(Date(it)) },
+            formatTime = { s.timeFormatter.format(Date(it)) },
             isTaskRunning = { projectId, conversationId ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(projectId, conversationId)
-                runningConversationTasks.containsKey(key)
+                s.runningConversationTasks.containsKey(key)
             },
             homeRows = { homeRows() },
             dp = uiTools::dp,
@@ -545,7 +527,7 @@ class MainActivity : AppCompatActivity() {
         MainFriendChatActions(
             activity = this,
             binding = binding,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             setChatAdapter = { chatAdapter = it },
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
@@ -559,8 +541,8 @@ class MainActivity : AppCompatActivity() {
         homeRows?.let { return it }
         return MainHomeRows(
             activity = this,
-            timeFormatter = timeFormatter,
-            activeProjectIndexProvider = { activeProjectIndex },
+            timeFormatter = s.timeFormatter,
+            activeProjectIndexProvider = { s.activeProjectIndex },
             openProject = conversationOpenActions::openProject,
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
@@ -574,16 +556,16 @@ class MainActivity : AppCompatActivity() {
         MainProjectActions(
             activity = this,
             binding = binding,
-            projects = projects,
-            activeProjectIndexProvider = { activeProjectIndex },
-            setActiveProjectIndex = { activeProjectIndex = it },
+            projects = s.projects,
+            activeProjectIndexProvider = { s.activeProjectIndex },
+            setActiveProjectIndex = { s.activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
             showGitProjectDialog = ::showGitProjectDialog,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             tokenProvider = { AuthManager.token(this) },
             isLoggedIn = { AuthManager.isLoggedIn(this) }
@@ -596,8 +578,8 @@ class MainActivity : AppCompatActivity() {
         return MainAccountActions(
             activity = this,
             binding = binding,
-            projects = projects,
-            gson = gson,
+            projects = s.projects,
+            gson = s.gson,
             prefs = prefs,
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
@@ -611,7 +593,7 @@ class MainActivity : AppCompatActivity() {
         MainProfileQuickActions(
             activity = this,
             binding = binding,
-            http = http,
+            http = s.http,
             serverVersionUrl = serverVersionUrl,
             isBindingInitialized = { ::binding.isInitialized },
             refreshAccountUi = {
@@ -634,16 +616,16 @@ class MainActivity : AppCompatActivity() {
     private val storeController: MainStoreController by lazy {
         MainStoreController(
             activity = this,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             tokenProvider = { AuthManager.token(this) },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             addJoinedProject = { storeProject ->
                 val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
                     .copy(id = storeProject.id)
-                projects.add(newProject)
+                s.projects.add(newProject)
                 projectStateActions.saveProjects()
-                val idx = projects.lastIndex
+                val idx = s.projects.lastIndex
                 conversationOpenActions.openProject(idx)
                 homeListActions.renderProjectList()
             },
@@ -677,12 +659,12 @@ class MainActivity : AppCompatActivity() {
     private val friendActions: MainFriendActions by lazy {
         MainFriendActions(
             activity = this,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             dp = uiTools::dp,
             setFriends = { list ->
-                friends.clear()
-                friends.addAll(list)
+                s.friends.clear()
+                s.friends.addAll(list)
             },
             onFriendsChanged = {
                 if (::binding.isInitialized) homeListActions.renderConversationList()
@@ -693,7 +675,7 @@ class MainActivity : AppCompatActivity() {
     private fun showGitProjectDialog() {
         MainProjectGitDialogs(
             activity = this,
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             userId = userId,
             projectProvider = projectStateActions::activeProject,
@@ -706,7 +688,7 @@ class MainActivity : AppCompatActivity() {
 
     private val codexPrewarm: MainCodexPrewarm by lazy {
         MainCodexPrewarm(
-            http = http,
+            http = s.http,
             serverUrl = serverUrl,
             userId = userId,
             activeProject = projectStateActions::activeProject,
@@ -764,7 +746,7 @@ class MainActivity : AppCompatActivity() {
             setActiveProjectSubtitle = { projectStateActions.activeProject().subtitle = it },
             currentProjectTitle = { projectStateActions.currentProjectTitle },
             projectEvents = { projectStateActions.projectEvents },
-            currentTimeText = { timeFormatter.format(Date()) },
+            currentTimeText = { s.timeFormatter.format(Date()) },
             saveProjects = projectStateActions::saveProjects,
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList,
@@ -782,7 +764,7 @@ class MainActivity : AppCompatActivity() {
             projectEvents = { projectStateActions.projectEvents },
             currentStage = { projectStateActions.currentStage },
             conversationCount = { projectStateActions.conversations.size },
-            currentTimeText = { timeFormatter.format(Date()) },
+            currentTimeText = { s.timeFormatter.format(Date()) },
             currentStageHint = { binding.stageHintText.text.toString() },
             saveProjects = projectStateActions::saveProjects,
             updateProjectViews = projectViewActions::updateProjectViews
