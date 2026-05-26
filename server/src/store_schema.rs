@@ -182,6 +182,25 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
         "dev_bootstrapped INTEGER NOT NULL DEFAULT 0",
     )?;
     add_column_if_missing(conn, "sessions", "apk_version", "apk_version TEXT")?;
+    // 项目商店：公开可见性 + 加入方式
+    add_column_if_missing(
+        conn,
+        "projects",
+        "is_public",
+        "is_public INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "join_mode",
+        "join_mode TEXT NOT NULL DEFAULT 'open'",
+    )?;
+    // 项目成员角色补全（role 字段已存在，仅确保索引存在）
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_members_user
+         ON project_members(user_id)",
+        [],
+    )?;
     conn.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_client_request
          ON tasks(project_id, user_id, conversation_id, client_request_id)

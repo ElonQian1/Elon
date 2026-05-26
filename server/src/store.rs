@@ -10,6 +10,7 @@ use crate::store_schema::init_schema;
 
 mod common;
 mod native_sessions;
+mod projects;
 mod tasks;
 mod users;
 
@@ -108,6 +109,31 @@ pub struct AdminConversationEntry {
     pub last_task_status: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// 项目商店卡片：公开展示的项目摘要（不含敏感路径信息）
+#[derive(Debug, Clone, Serialize)]
+pub struct PublicProjectItem {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub template: String,
+    pub owner_account: String,
+    pub member_count: i64,
+    pub is_public: bool,
+    pub join_mode: String, // "open" | "approval" | "invite"
+    pub last_task_status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// 项目成员条目（商店/成员列表用）
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberEntry {
+    pub user_id: String,
+    pub account: String,
+    pub role: String, // "owner" | "member" | "observer"
+    pub joined_at: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

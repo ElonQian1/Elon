@@ -10,7 +10,8 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, api, app_update, peer_relay, project_api, project_attachments, project_chat,
-    project_downloads, project_git, release_claim, user_api, web,
+    project_downloads, project_git, project_membership, project_store, release_claim, user_api,
+    web,
 };
 
 pub fn build_app(state: Arc<AppState>) -> Router {
@@ -46,6 +47,30 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/me", get(project_api::me))
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
+        // ── 项目商店 ─────────────────────────────────────────────────────
+        .route("/api/store/projects", get(project_store::list_store_projects))
+        .route(
+            "/api/store/projects/:id",
+            get(project_store::get_store_project),
+        )
+        .route("/api/store/joined", get(project_store::list_joined_projects))
+        // ── 成员管理 ─────────────────────────────────────────────────────
+        .route(
+            "/api/projects/:id/join",
+            post(project_membership::join_project),
+        )
+        .route(
+            "/api/projects/:id/leave",
+            delete(project_membership::leave_project),
+        )
+        .route(
+            "/api/projects/:id/members",
+            get(project_membership::list_members),
+        )
+        .route(
+            "/api/projects/:id/visibility",
+            axum::routing::patch(project_membership::update_visibility),
+        )
         .route(
             "/api/projects/:project_id/chat",
             post(project_chat::chat_project),
