@@ -336,7 +336,7 @@ $env:ELON_BUILD_TARGET_DIR = "D:\rust\shared\target"
 ELON_BUILD_TARGET_DIR=D:\rust\shared\target
 ```
 
-`scripts\publish-server.ps1` / `scripts\publish-server.sh` 会读取 `ELON_BUILD_TARGET_DIR` 并在其下创建 `elon-build-<sha>`；未设置时 Windows 使用当前用户的本地缓存目录，Linux/macOS 使用临时构建 worktree 下的 `target`。
+`scripts\publish-server.ps1` / `scripts\publish-server.sh` 会读取 `ELON_BUILD_TARGET_DIR` 并在其下创建 **固定名子目录 `elon-server-musl/`**（不含 SHA）；未设置时 Windows 使用 `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\`，Linux/macOS 使用 `~/.cache/elon/build/elon-server-musl/`（XDG 标准缓存路径）。两种情况下缓存都**跨 session 持久化**，支持增量编译：同一台机器首次全量（约 10 分钟），后续只改业务代码时约 30 秒。禁止手动把 `CARGO_TARGET_DIR` 设为含 SHA 的路径，那样会让每次构建都变成全量重编。
 
 - 裸跑 `cargo check`、`cargo build`、`cargo zigbuild` 前，如果构建行为异常或机器是新环境，先检查 `CARGO_TARGET_DIR`：
 

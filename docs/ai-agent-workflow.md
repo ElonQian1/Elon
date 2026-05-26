@@ -235,7 +235,14 @@ git pull --ff-only origin main
 ELON_BUILD_TARGET_DIR=D:\rust\shared\target
 ```
 
-Windows / Linux / macOS 发布脚本都会读取这个变量。未配置时 Windows 发布脚本会使用当前用户的本地缓存目录，Linux/macOS 发布脚本会使用临时构建 worktree 下的 `target`；CI 或服务器 Codex 也可以直接通过进程环境变量传入 `ELON_BUILD_TARGET_DIR`。
+Windows / Linux / macOS 发布脚本都会读取这个变量，并在其下创建**固定名子目录 `elon-server-musl/`**（不含 SHA），让所有构建共享同一份 Rust 增量编译缓存。未配置时：
+
+| 系统 | 默认缓存路径 |
+|---|---|
+| Windows | `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\` |
+| Linux / macOS (Ubuntu Codex) | `~/.cache/elon/build/elon-server-musl/` (XDG 标准) |
+
+两者都跨 session 持久化。**同一台机器首次全量编译约 10 分钟，后续只改业务代码约 30 秒**。CI 或远程 Codex 也可以通过进程环境变量传入 `ELON_BUILD_TARGET_DIR` 指向持久卷。**禁止**把 `CARGO_TARGET_DIR` 手动设为含 SHA 的路径，那样会让每次都全量重编。
 
 ```powershell
 cd scripts
