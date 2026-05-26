@@ -170,8 +170,8 @@ pub async fn relay_apk(
         return (StatusCode::SERVICE_UNAVAILABLE, "种子节点忙").into_response();
     }
 
-    // 等待 seeder 传输（最多 120 秒）
-    match tokio::time::timeout(std::time::Duration::from_secs(120), resp_rx).await {
+    // 等待 seeder 传输（最多 15 秒，避免半死 peer 长时间挂住下载方）
+    match tokio::time::timeout(std::time::Duration::from_secs(15), resp_rx).await {
         Ok(Ok(Ok(data))) => {
             let mut headers = axum::http::HeaderMap::new();
             headers.insert(

@@ -60,10 +60,10 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    /** 对同WiFi 种子节点使用较短连接超时（对方可能不在线，快速失败即可） */
+    /** 对同WiFi 种子节点使用较短超时（对方可能离线或半死状态，快速失败回落服务器） */
     private val mirrorHttp = OkHttpClient.Builder()
         .connectTimeout(4, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     // ── 数据类 ──────────────────────────────────────────────
