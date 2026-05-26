@@ -52,6 +52,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (2, "补充缺失列与辅助索引（幂等）", migration_v2),
     (3, "将所有现有项目设为公开可见（一次性）", migration_v3),
     (4, "好友会话已读状态与未读提醒", migration_v4),
+    (5, "用户头像数据（个人资料上传）", migration_v5),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -359,6 +360,13 @@ fn migration_v4(conn: &Connection) -> Result<()> {
           ON friend_read_states(user_id, friend_user_id);
         "#,
     )?;
+    Ok(())
+}
+
+// ── v5：用户头像 ─────────────────────────────────────────────────────────────
+
+fn migration_v5(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "users", "avatar_data_url", "avatar_data_url TEXT")?;
     Ok(())
 }
 

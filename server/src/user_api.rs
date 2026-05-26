@@ -9,13 +9,14 @@
 ///   PUT /api/user/:user_id/agent   → 保存配置
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 
+use crate::project_auth::{auth_from_headers, json_error};
 use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
@@ -300,6 +301,74 @@ fn copilot_model_friendly_name(model: &str) -> &str {
         "gemini-2.0-flash" | "gemini-2.0-flash-001" => "Gemini 2.0 Flash",
         "gemini-2.5-pro" | "gemini-2.5-pro-preview" => "Gemini 2.5 Pro",
         other => other,
+    }
+}
+
+/// GET /api/users/:user_id/avatar
+/// 公开接口——返回用户头像（PNG/JPEG 原始字节，无需认证）
+pub async fn get_user_avatar(
+    State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+) -> Response {
+    let data_url = match state.store.get_user_avatar(&user_id) {
+        Ok(Some(v)) => v,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "用户没有设置头像"),
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    // 解析 "data:<mime>;base64,<data>"
+    let (mime, b64) = match data_url.split_once(',') {
+        Some((prefix, data)) => {
+            let mime = prefix
+                .strip_prefix("data:")
+                .and_then(|s| s.split(';').next())
+                .unwrap_or("image/png")
+                .to_string();
+            (mime, data)
+        }
+        None => ("image/png".to_string(), data_url.as_str()),
+    };
+
+    use base64::{engine::general_purpose, Engine};
+    let bytes = match general_purpose::STANDARD.decode(b64.trim()) {
+        Ok(b) => b,
+        Err(_) => return json_error(StatusCode::BAD_REQUEST, "头像数据无效"),
+    };
+
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, mime)],
+        bytes,
+    )
+        .into_response()
+}
+
+#[derive(Deserialize)]
+pub struct PutAvatarRequest {
+    pub avatar_data_url: String,
+}
+
+/// PUT /api/me/avatar
+/// 登录用户上传自己的头像（存为 data URL，限制 500KB）
+pub async fn put_my_avatar(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<PutAvatarRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if req.avatar_data_url.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "头像不能为空");
+    }
+    const MAX_AVATAR_LEN: usize = 700_000; // ~500 KB base64
+    if req.avatar_data_url.len() > MAX_AVATAR_LEN {
+        return json_error(StatusCode::BAD_REQUEST, "头像数据太大（最大约 500 KB）");
+    }
+    match state.store.save_user_avatar(&user.id, &req.avatar_data_url) {
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }
 

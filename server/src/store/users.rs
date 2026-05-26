@@ -316,4 +316,28 @@ impl Store {
 
         Ok(sessions)
     }
+
+    // ─── 用户头像 ─────────────────────────────────────────────────────────────
+
+    /// 保存用户头像（data URL 格式，如 `data:image/png;base64,...`）
+    pub fn save_user_avatar(&self, user_id: &str, avatar_data_url: &str) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE users SET avatar_data_url = ?1 WHERE id = ?2",
+            params![avatar_data_url, user_id],
+        )?;
+        Ok(())
+    }
+
+    /// 获取用户头像 data URL，不存在时返回 None
+    pub fn get_user_avatar(&self, user_id: &str) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        let result = conn
+            .query_row(
+                "SELECT avatar_data_url FROM users WHERE id = ?1",
+                params![user_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?;
+        Ok(result.flatten())
+    }
 }

@@ -218,6 +218,12 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )
+        // ── 用户头像（公开查看 / 登录后上传）─────────────────────────────────
+        .route(
+            "/api/users/:user_id/avatar",
+            get(user_api::get_user_avatar),
+        )
+        .route("/api/me/avatar", axum::routing::put(user_api::put_my_avatar))
         .layer(cors)
         .with_state(state)
 }

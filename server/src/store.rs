@@ -156,6 +156,7 @@ pub struct PublicProjectItem {
     pub description: Option<String>,
     pub template: String,
     pub owner_account: String,
+    pub owner_id: String,
     pub member_count: i64,
     pub is_public: bool,
     pub join_mode: String, // "open" | "approval" | "invite"
