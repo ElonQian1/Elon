@@ -30,6 +30,15 @@ internal class MainHomeRows(
     private val selectableForeground: () -> Drawable?
 ) {
     private var conversationHomeRowAnimator: ValueAnimator? = null
+    private var conversationHomeRowTarget: View? = null
+    private val conversationHomeRowDetachListener = object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) = Unit
+        override fun onViewDetachedFromWindow(v: View) {
+            if (conversationHomeRowTarget === v) {
+                cancelHomeRowShimmer()
+            }
+        }
+    }
 
     fun createProjectRow(index: Int, project: AppProject): View {
         val wrapper = FrameLayout(activity).apply {
@@ -224,14 +233,20 @@ internal class MainHomeRows(
     fun cancelHomeRowShimmer() {
         conversationHomeRowAnimator?.cancel()
         conversationHomeRowAnimator = null
+        conversationHomeRowTarget?.removeOnAttachStateChangeListener(conversationHomeRowDetachListener)
+        conversationHomeRowTarget = null
     }
 
     private fun startConversationRowShimmer(row: View, homeRow: Boolean) {
-        if (homeRow && conversationHomeRowAnimator?.isRunning == true) {
+        if (
+            homeRow &&
+            conversationHomeRowTarget === row &&
+            conversationHomeRowAnimator?.isRunning == true
+        ) {
             return
         }
         if (homeRow) {
-            conversationHomeRowAnimator?.cancel()
+            cancelHomeRowShimmer()
         }
 
         val baseColor = Color.parseColor("#242424")
@@ -252,6 +267,8 @@ internal class MainHomeRows(
 
         if (homeRow) {
             conversationHomeRowAnimator = animator
+            conversationHomeRowTarget = row
+            row.addOnAttachStateChangeListener(conversationHomeRowDetachListener)
         } else {
             row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) = Unit

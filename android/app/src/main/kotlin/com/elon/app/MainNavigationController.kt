@@ -133,6 +133,7 @@ internal class MainNavigationController(
                     binding.pageTabs.visibility = View.VISIBLE
                     clearPageTranslations()
                     pageTransitionRunning = false
+                    renderConversationList()
                 }
             )
         } else {

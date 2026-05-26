@@ -69,7 +69,14 @@ internal class MainConversationTaskRegistryActions(
                 conversationTaskKey(projectId, conversationId)
             else -> null
         } ?: return null
-        val existing = runningConversationTasks[key] ?: return null
+        val existing = runningConversationTasks[key] ?: createConversationTaskFromService(
+            key = key,
+            traceId = traceId,
+            projectId = projectId,
+            conversationId = conversationId,
+            isDevelopment = isDevelopment,
+            pendingReconnect = pendingReconnect
+        ) ?: return null
         if (!traceId.isNullOrBlank()) runningTraceToConversation[traceId] = key
         isDevelopment?.let { existing.isDevelopment = it }
         pendingReconnect?.let { existing.pendingReconnect = it }
@@ -168,5 +175,26 @@ internal class MainConversationTaskRegistryActions(
             existing.isDevelopment = item.optBoolean("is_development", existing.isDevelopment)
         }
         refreshActiveTaskState()
+    }
+
+    private fun createConversationTaskFromService(
+        key: String,
+        traceId: String?,
+        projectId: String?,
+        conversationId: String?,
+        isDevelopment: Boolean?,
+        pendingReconnect: Boolean?
+    ): ConversationTaskState? {
+        if (traceId.isNullOrBlank() || projectId.isNullOrBlank() || conversationId.isNullOrBlank()) {
+            return null
+        }
+        return ConversationTaskState(
+            traceId = traceId,
+            projectId = projectId,
+            conversationId = conversationId,
+            payload = "",
+            isDevelopment = isDevelopment ?: true,
+            pendingReconnect = pendingReconnect ?: false
+        ).also { runningConversationTasks[key] = it }
     }
 }
