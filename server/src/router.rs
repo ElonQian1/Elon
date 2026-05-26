@@ -9,7 +9,7 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, api, app_update, peer_relay, project_api, project_attachments, project_chat,
+    admin, api, app_update, global_ws, peer_relay, project_api, project_attachments, project_chat,
     project_downloads, project_git, project_membership, project_store, release_claim, user_api,
     web,
 };
@@ -105,8 +105,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/ws/user/:user_id/projects/:project_id",
             get(project_api::ws_user_project_handler),
         )
-        // 轻量通知 WS：首页保活，接收全局更新推送（不需要登录也不需要项目）
+        // 轻量通知 WS（保留，兼容旧版 APK）
         .route("/ws/notify", get(app_update::ws_notify_handler))
+        // 全局 WS 通道：统一实时推送（更新 + 未来好友消息等）
+        .route("/ws/app", get(global_ws::global_ws_handler))
         .route(
             "/api/user/:user_id/projects/:project_id/git/status",
             get(project_git::user_project_git_status),

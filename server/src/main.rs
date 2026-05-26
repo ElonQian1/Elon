@@ -28,6 +28,7 @@ mod app_update;
 mod cli_config;
 mod codex_health;
 mod codex_stream;
+mod global_ws;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;
