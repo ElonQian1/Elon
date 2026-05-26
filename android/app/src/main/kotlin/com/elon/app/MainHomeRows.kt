@@ -235,7 +235,7 @@ internal class MainHomeRows(
         }
 
         val baseColor = Color.parseColor("#242424")
-        val highlightColor = Color.parseColor("#303030")
+        val highlightColor = Color.parseColor("#363636")
         row.setBackgroundColor(baseColor)
 
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {

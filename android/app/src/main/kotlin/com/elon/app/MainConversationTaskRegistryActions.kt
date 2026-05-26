@@ -152,7 +152,17 @@ internal class MainConversationTaskRegistryActions(
             val projectId = item.optString("project_id").takeIf { it.isNotBlank() } ?: continue
             val conversationId = item.optString("conversation_id").takeIf { it.isNotBlank() } ?: continue
             val key = conversationTaskKey(projectId, conversationId)
-            val existing = runningConversationTasks[key] ?: continue
+            val existing = runningConversationTasks[key] ?: ConversationTaskState(
+                traceId = traceId,
+                projectId = projectId,
+                conversationId = conversationId,
+                payload = "",
+                isDevelopment = item.optBoolean("is_development", true),
+                pendingReconnect = false,
+                startedAt = item.optLong("started_at", System.currentTimeMillis())
+            ).also {
+                runningConversationTasks[key] = it
+            }
             runningTraceToConversation[traceId] = key
             existing.pendingReconnect = false
             existing.isDevelopment = item.optBoolean("is_development", existing.isDevelopment)

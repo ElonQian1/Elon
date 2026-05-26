@@ -14,7 +14,7 @@ internal fun persistActiveWorkTasks(
     tasks: Collection<ConversationTaskState>
 ) {
     val array = JSONArray()
-    tasks.forEach { task ->
+    tasks.filter { it.payload.isNotBlank() }.forEach { task ->
         array.put(
             JSONObject()
                 .put("payload", task.payload)
