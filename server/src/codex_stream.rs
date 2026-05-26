@@ -124,10 +124,14 @@ where
         "agent_message" => {
             if let Some(text) = item.get("text").and_then(Value::as_str) {
                 let trimmed = text.trim();
-                if !trimmed.is_empty() {
+                let display = trimmed
+                    .strip_prefix("\u7528\u6237\u53ef\u89c1\uff1a")
+                    .unwrap_or(trimmed)
+                    .trim();
+                if !display.is_empty() {
                     out.push(
                         WsMessage::AssistantMessage {
-                            text: trimmed.to_string(),
+                            text: display.to_string(),
                         }
                         .to_json(),
                     );
@@ -344,6 +348,22 @@ mod tests {
         let value: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(value["type"], "assistant_message");
         assert_eq!(value["text"], "我已经读完了 main.rs，准备开始改造。");
+    }
+
+    #[test]
+    fn stream_event_strips_yonghu_kejian_prefix() {
+        let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：正在读取 main.rs，马上修改。"}}"#;
+        let msgs = stream_event_to_ws_messages(line);
+        assert_eq!(msgs.len(), 1);
+        let value: Value = serde_json::from_str(&msgs[0]).unwrap();
+        assert_eq!(value["type"], "assistant_message");
+        assert_eq!(value["text"], "正在读取 main.rs，马上修改。");
+    }
+
+    #[test]
+    fn stream_event_skips_blank_after_prefix_strip() {
+        let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：   "}}"#;
+        assert!(stream_event_to_ws_messages(line).is_empty());
     }
 
     #[test]

@@ -26,6 +26,14 @@ internal class MainEvidenceActions(
         val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
             ?: return
 
+        // 清除其他消息上遗留的 evidenceWorking 标志，避免旧折叠层误触发闪烁动画
+        messages.forEachIndexed { i, msg ->
+            if (i != index && msg.evidenceWorking) {
+                msg.evidenceWorking = false
+                chatAdapter().notifyMessageUpdated(i)
+            }
+        }
+
         applyEvidenceToMessage(messages[index], entries, working = true)
         chatAdapter().notifyMessageUpdated(index)
         saveConversations()
