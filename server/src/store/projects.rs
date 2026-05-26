@@ -42,7 +42,8 @@ impl Store {
                WHERE t.project_id = p.id
                ORDER BY t.created_at DESC LIMIT 1) AS last_task_status,
               p.created_at,
-              p.updated_at
+              p.updated_at,
+              p.created_by AS owner_id
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
             WHERE p.is_public = 1
@@ -66,6 +67,8 @@ impl Store {
                     last_task_status: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
+                    owner_id: row.get(11).unwrap_or_default(),
+
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -85,7 +88,8 @@ impl Store {
                (SELECT t.status FROM tasks t WHERE t.project_id = p.id
                 ORDER BY t.created_at DESC LIMIT 1),
                p.created_at,
-               p.updated_at
+               p.updated_at,
+               p.created_by AS owner_id
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
              WHERE p.id = ?1 AND p.is_public = 1 AND p.status != 'deleted'",
@@ -103,6 +107,7 @@ impl Store {
                     last_task_status: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
+                    owner_id: row.get(11).unwrap_or_default(),
                 })
             },
         )
@@ -217,7 +222,8 @@ impl Store {
                p.is_public, p.join_mode,
                (SELECT t.status FROM tasks t WHERE t.project_id = p.id
                 ORDER BY t.created_at DESC LIMIT 1),
-               p.created_at, p.updated_at
+               p.created_at, p.updated_at,
+               p.created_by AS owner_id
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -240,6 +246,7 @@ impl Store {
                     last_task_status: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
+                    owner_id: row.get(11).unwrap_or_default(),
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
