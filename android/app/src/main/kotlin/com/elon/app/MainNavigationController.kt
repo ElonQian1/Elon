@@ -136,10 +136,8 @@ internal class MainNavigationController(
             pageTransitionRunning = true
             WechatPageTransition.exitToRight(
                 container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage),
-                incoming = listOf(binding.conversationPage),
-                outgoingFull = listOf(binding.inputLayout),
-                incomingFull = listOf(binding.pageTabs),
+                outgoing = listOf(binding.chatPage, binding.inputLayout),
+                incoming = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
                     binding.inputLayout.visibility = View.GONE
@@ -171,10 +169,8 @@ internal class MainNavigationController(
             pageTransitionRunning = true
             WechatPageTransition.enterFromRight(
                 container = binding.contentContainer,
-                incoming = listOf(binding.chatPage),
-                outgoing = listOf(binding.conversationPage),
-                incomingFull = listOf(binding.inputLayout),
-                outgoingFull = listOf(binding.pageTabs),
+                incoming = listOf(binding.chatPage, binding.inputLayout),
+                outgoing = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
                     binding.pageTabs.visibility = View.GONE
@@ -250,10 +246,8 @@ internal class MainNavigationController(
             pageTransitionRunning = true
             WechatPageTransition.enterFromLeft(
                 container = binding.contentContainer,
-                incoming = listOf(binding.chatPage),
-                outgoing = listOf(binding.projectPage),
-                incomingFull = listOf(binding.inputLayout),
-                outgoingFull = listOf(binding.pageTabs),
+                incoming = listOf(binding.chatPage, binding.inputLayout),
+                outgoing = listOf(binding.projectPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
                     binding.pageTabs.visibility = View.GONE
@@ -287,10 +281,8 @@ internal class MainNavigationController(
             pageTransitionRunning = true
             WechatPageTransition.exitToLeft(
                 container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage),
-                incoming = listOf(binding.projectPage),
-                outgoingFull = listOf(binding.inputLayout),
-                incomingFull = listOf(binding.pageTabs),
+                outgoing = listOf(binding.chatPage, binding.inputLayout),
+                incoming = listOf(binding.projectPage, binding.pageTabs),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
                     binding.inputLayout.visibility = View.GONE
