@@ -21,6 +21,18 @@ pub struct PeerEntry {
     pub tx: mpsc::Sender<PeerRequest>,
 }
 
+/// 同WiFi 局域网 PC 种子节点（开发电脑发布 APK 后注册，直接对手机提供 HTTP 下载）
+pub struct LanPeerEntry {
+    /// PC 在局域网中的 IP 地址（如 192.168.1.100）
+    pub lan_ip: String,
+    /// PC 上本地 HTTP 文件服务器监听的端口
+    pub port: u16,
+    /// 该 PC 提供的 APK versionCode
+    pub version_code: i64,
+    /// 注册时间（用于自动过期）
+    pub registered_at: std::time::Instant,
+}
+
 /// 单个 AI 代理的配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
@@ -167,6 +179,8 @@ pub struct AppState {
     pub image_model: Option<ImageModelConfig>,
     /// 已注册的同WiFi种子节点（peer_id → PeerEntry）
     pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
+    /// 已注册的局域网 PC 种子节点（peer_id → LanPeerEntry）
+    pub lan_peer_registry: Arc<RwLock<HashMap<String, LanPeerEntry>>>,
     /// 反向 WSS 通道接入的 homecli PC agents（agent_id → AgentEntry）
     pub agent_manager: Arc<crate::homecli_agent::AgentManager>,
     /// Short-lived execution gates keyed by project/conversation/merge scope.
@@ -365,6 +379,7 @@ impl AppState {
             config_path,
             image_model,
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
+            lan_peer_registry: Arc::new(RwLock::new(HashMap::new())),
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
             project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
             codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),

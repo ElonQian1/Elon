@@ -9,7 +9,7 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, api, app_update, global_ws, peer_relay, project_api, project_attachments, project_chat,
+    admin, api, app_update, global_ws, lan_peer, peer_relay, project_api, project_attachments, project_chat,
     project_downloads, project_git, project_membership, project_store, release_claim, user_api,
     web,
 };
@@ -188,6 +188,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/app/peer/ws", get(peer_relay::peer_ws_handler))
         // 下载方通过服务器中继获取对应 seeder 的 APK
         .route("/app/relay/peer/:peer_id/apk", get(peer_relay::relay_apk))
+        // ── 局域网 PC 种子节点（开发 PC 发布 APK 后直接在 WiFi 内提供下载）
+        .route("/app/lan-peer/register", post(lan_peer::register_lan_peer))
         // ── homecli PC agent 反向 WSS 通道 ────────────────────────────
         .route("/agent/ws", get(crate::homecli_agent::agent_ws_handler))
         .route(

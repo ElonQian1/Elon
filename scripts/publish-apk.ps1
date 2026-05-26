@@ -753,3 +753,29 @@ Write-Host "   版本: v$versionName (build $newCode) — 服务器分配，未�
 Write-Host "   SHA:  $sha (源代码 commit，无新增 release commit)" -ForegroundColor White
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
 Write-Host ("=" * 60) -ForegroundColor Cyan
+
+# ── 启动局域网 APK 种子服务（后台无窗口）────────────────────────────────────
+
+Write-Host ""
+Write-Host "📡 启动局域网 APK 种子服务（同WiFi直接下载，无需走服务器）..." -ForegroundColor Cyan
+$lanScript = Join-Path $PSScriptRoot "lan-apk-server.ps1"
+if (Test-Path $lanScript) {
+    try {
+        # -WindowStyle Hidden：不出现控制台窗口
+        # -NonInteractive：不等待用户输入
+        Start-Process pwsh -WindowStyle Hidden -ArgumentList @(
+            "-NonInteractive",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $lanScript,
+            "-ApkPath", $apk.FullName,
+            "-VersionCode", $newCode,
+            "-ServerUrl", $ServerUrl
+        )
+        Write-Host "   ✅ LAN 种子服务已在后台启动（端口 7788，2 小时后自动退出）" -ForegroundColor Green
+        Write-Host "   📄 日志: $env:TEMP\elon-lan-apk-server.log" -ForegroundColor DarkGray
+    } catch {
+        Write-Warning "   ⚠️  LAN 种子服务启动失败: $_（不影响 APK 发布，手机仍可从服务器下载）"
+    }
+} else {
+    Write-Warning "   ⚠️  未找到 $lanScript，跳过局域网种子服务"
+}

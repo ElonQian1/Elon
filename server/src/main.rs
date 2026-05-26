@@ -32,6 +32,7 @@ mod global_ws;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;
+mod lan_peer;
 mod peer_relay;
 mod project_api;
 mod project_attachment_notes;

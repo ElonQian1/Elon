@@ -223,14 +223,20 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
         serde_json::Value::String(format!("{public_url}/app/ElonSpeed-latest.apk"));
     json["downloadPageUrl"] = serde_json::Value::String(format!("{public_url}/app/download"));
 
-    // 注入 mirrors：仅包含 versionCode >= 当前发布版本的 seeder
+    // 注入 mirrors：优先注入 LAN PC 种子（priority=10），再注入手机P2P中继（priority=5）
+    let current_vc = json
+        .get("versionCode")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+
+    // LAN PC 直连 mirrors（开发电脑，局域网下载最快）
+    let mut all_mirrors: Vec<serde_json::Value> =
+        crate::lan_peer::get_active_lan_mirrors(&state, current_vc).await;
+
+    // 手机P2P 中继 mirrors
     let reg = state.peer_registry.read().await;
     if !reg.is_empty() {
-        let current_vc = json
-            .get("versionCode")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(0);
-        let mirrors: Vec<serde_json::Value> = reg
+        let phone_mirrors: Vec<serde_json::Value> = reg
             .iter()
             .filter(|(_, e)| e.version_code >= current_vc)
             .map(|(id, _)| {
@@ -241,12 +247,13 @@ pub async fn version_json(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 })
             })
             .collect();
-
-        if !mirrors.is_empty() {
-            json["mirrors"] = serde_json::Value::Array(mirrors);
-        }
+        all_mirrors.extend(phone_mirrors);
     }
     drop(reg);
+
+    if !all_mirrors.is_empty() {
+        json["mirrors"] = serde_json::Value::Array(all_mirrors);
+    }
 
     let body = serde_json::to_string(&json).unwrap_or(content);
     (
