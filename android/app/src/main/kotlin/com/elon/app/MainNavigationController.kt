@@ -157,7 +157,9 @@ internal class MainNavigationController(
 
     fun showChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
-        chatReturnTarget = ChatReturnTarget.FRIENDS
+        if (binding.chatPage.visibility != View.VISIBLE) {
+            chatReturnTarget = ChatReturnTarget.FRIENDS
+        }
         val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
