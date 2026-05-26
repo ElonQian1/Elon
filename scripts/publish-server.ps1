@@ -320,7 +320,9 @@ if (-not $SkipBuild) {
 # ─────────────────────────────────────────────────────────────
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
 $BuildTargetRoot = Resolve-BuildTargetRoot -RepoRoot $RepoRoot
-$BuildTargetDir = Join-Path $BuildTargetRoot "elon-build-$Sha"
+# 固定子目录名（不含 SHA），让所有 builder 共享同一份增量编译缓存；
+# 第一次全量编译后，后续只重编有变动的 crate（通常就 elon-server 本身，约 30s）。
+$BuildTargetDir = Join-Path $BuildTargetRoot "elon-server-musl"
 $BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
 Write-Host "  构建缓存: $BuildTargetRoot" -ForegroundColor Gray

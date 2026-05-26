@@ -139,13 +139,16 @@ if [ -n "${ELON_BUILD_TARGET_DIR:-}" ]; then
     *) echo -e "${RED}❌ ELON_BUILD_TARGET_DIR 必须是绝对路径，当前值: $ELON_BUILD_TARGET_DIR${NC}" >&2; exit 1 ;;
   esac
   mkdir -p "$ELON_BUILD_TARGET_DIR"
-  BUILD_TARGET_DIR="$ELON_BUILD_TARGET_DIR/elon-build-$SHA"
+  # 固定子目录名，让所有 builder 共享同一份增量编译缓存
+  BUILD_TARGET_DIR="$ELON_BUILD_TARGET_DIR/elon-server-musl"
 else
-  BUILD_TARGET_DIR="$TMP_WORKTREE/server/target"
+  # 无自定义路径时，用 XDG 标准缓存目录（Ubuntu/macOS 通用，无需手动配置）
+  BUILD_TARGET_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/elon/build/elon-server-musl"
 fi
+mkdir -p "$BUILD_TARGET_DIR"
 BUILD_BIN="$BUILD_TARGET_DIR/$TARGET/release/elon-server"
 BINARY="$BUILD_BIN"
-echo -e "${GRAY}  构建缓存: ${ELON_BUILD_TARGET_DIR:-$TMP_WORKTREE/server/target}${NC}"
+echo -e "${GRAY}  构建缓存: $BUILD_TARGET_DIR${NC}"
 
 if [ "$SKIP_BUILD" -eq 0 ]; then
   # 清理残留工作树
