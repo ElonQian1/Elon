@@ -121,6 +121,7 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
   <button class="tab-btn active" onclick="switchTab('agents',this)">🤖 AI 代理</button>
   <button class="tab-btn" onclick="switchTab('users',this)">👥 用户列表</button>
   <button class="tab-btn" onclick="switchTab('projects',this)">📦 用户项目</button>
+  <button class="tab-btn" onclick="switchTab('sessions',this)">📱 活跃设备</button>
 </div>
 
 <!-- ── AI 代理标签页 ──────────────────────── -->
@@ -153,7 +154,10 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
 <div class="container">
   <div class="toolbar">
     <h2 id="projectCount">用户项目列表</h2>
-    <button class="btn btn-ghost" onclick="loadProjects()">↻ 刷新</button>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span id="platformApkLink" style="font-size:13px;color:var(--text-dim)"></span>
+      <button class="btn btn-ghost" onclick="loadProjects()">↻ 刷新</button>
+    </div>
   </div>
   <div id="projectTableWrap" style="overflow-x:auto">
     <table id="projectTable" style="width:100%;border-collapse:collapse;font-size:13px">
@@ -170,6 +174,33 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
         </tr>
       </thead>
       <tbody id="projectTableBody"><tr><td colspan="8" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ── 活跃设备标签页 ────────────────────── -->
+<div id="tab-sessions" class="tab-pane">
+<div class="container">
+  <div class="toolbar">
+    <div>
+      <h2 id="sessionCount">活跃设备</h2>
+      <div id="sessionEnvBanner" style="margin-top:4px;font-size:13px;color:var(--text-dim)"></div>
+    </div>
+    <button class="btn btn-ghost" onclick="loadSessions()">↻ 刷新</button>
+  </div>
+  <div id="sessionTableWrap" style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:var(--card);color:var(--text-dim);text-align:left">
+          <th style="padding:8px 12px">用户账号</th>
+          <th style="padding:8px 12px">设备名</th>
+          <th style="padding:8px 12px">APK 版本</th>
+          <th style="padding:8px 12px">登录时间</th>
+          <th style="padding:8px 12px">过期时间</th>
+        </tr>
+      </thead>
+      <tbody id="sessionTableBody"><tr><td colspan="5" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
     </table>
   </div>
 </div>
@@ -508,6 +539,7 @@ function switchTab(name, btn) {
   btn.classList.add('active');
   if (name === 'users') loadUsers();
   if (name === 'projects') loadProjects();
+  if (name === 'sessions') loadSessions();
 }
 
 // ─── 用户列表 ────────────────────────────
@@ -573,6 +605,56 @@ async function loadProjects() {
   } catch(e) {
     tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:#e76f51">网络错误: ${esc(e.message)}</td></tr>`;
   }
+}
+
+// ─── 活跃设备 ────────────────────────────
+async function loadSessions() {
+  const tbody = document.getElementById('sessionTableBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px"><div class="loader"></div></td></tr>';
+  try {
+    const res = await apiFetch('GET', '/api/admin/sessions');
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;color:#e76f51">${esc(j.error || '加载失败')}</td></tr>`;
+      return;
+    }
+    const data = await res.json();
+    // 显示服务器配置状态
+    const banner = document.getElementById('sessionEnvBanner');
+    const rl = data.require_login ? '🔴 强制登录已开启' : '🟡 强制登录未开启（旧版 APK 可不登录直接用）';
+    const minVc = data.min_apk_version_code > 0 ? `· 最低版本: ${data.min_apk_version_code}` : '· 没有版本限制';
+    const apkUrl = data.platform_apk_url || '';
+    banner.innerHTML = `${rl} ${minVc} &nbsp;· 平台 APK: <a href="${esc(apkUrl)}" target="_blank" style="color:var(--accent)">${esc(apkUrl)}</a>`;
+    // 同时更新项目页的平台 APK 链接
+    const platformEl = document.getElementById('platformApkLink');
+    if (platformEl && apkUrl) {
+      platformEl.innerHTML = `平台 APK: <a href="${esc(apkUrl)}" target="_blank" style="color:var(--accent)">${esc(apkUrl)}</a>`;
+    }
+    renderSessions(data);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;color:#e76f51">网络错误: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderSessions(data) {
+  const tbody = document.getElementById('sessionTableBody');
+  const sessions = data.sessions || [];
+  document.getElementById('sessionCount').textContent = `活跃设备 共 ${sessions.length} 条记录`;
+  if (sessions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-dim)">暂无活跃登录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sessions.map(s => {
+    const device = s.device_name || '<span style="color:var(--text-dim)">未知设备</span>';
+    const apkVer = s.apk_version || '<span style="color:var(--text-dim)">未知版本</span>';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 12px;font-weight:500">${esc(s.user_account)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(s.user_id)}</span></td>
+      <td style="padding:8px 12px">${typeof device === 'string' && s.device_name ? esc(device) : device}</td>
+      <td style="padding:8px 12px">${typeof apkVer === 'string' && s.apk_version ? esc(apkVer) : apkVer}</td>
+      <td style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${esc(s.created_at || '')}</td>
+      <td style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${esc(s.expires_at || '')}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderProjects(data) {

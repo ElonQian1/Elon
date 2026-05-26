@@ -9,7 +9,8 @@ use uuid::Uuid;
 
 use super::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
-    validate_password, verify_password, AdminProjectDetail, AdminUserSummary, PublicUser, Store,
+    validate_password, verify_password, AdminProjectDetail, AdminSessionEntry, AdminUserSummary,
+    PublicUser, Store,
 };
 
 impl Store {
@@ -247,5 +248,35 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         Ok(projects)
+    }
+
+    /// 管理员总览：返回所有未过期的 session（活跃设备）
+    pub fn list_active_sessions_admin(&self) -> Result<Vec<AdminSessionEntry>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT s.id, s.user_id,
+                    COALESCE(u.email, u.phone, s.user_id) AS user_account,
+                    s.device_name, s.apk_version, s.expires_at, s.created_at
+             FROM sessions s
+             LEFT JOIN users u ON u.id = s.user_id
+             WHERE s.expires_at > ?1
+             ORDER BY s.created_at DESC",
+        )?;
+
+        let sessions = stmt
+            .query_map([now()], |row| {
+                Ok(AdminSessionEntry {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    user_account: row.get(2)?,
+                    device_name: row.get(3)?,
+                    apk_version: row.get(4)?,
+                    expires_at: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        Ok(sessions)
     }
 }

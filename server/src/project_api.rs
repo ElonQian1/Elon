@@ -169,15 +169,58 @@ pub async fn ws_user_project_handler(
     AxumPath((user_id, project_id)): AxumPath<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let (user, project) = match ensure_mobile_project(
-        &state,
-        &user_id,
-        &project_id,
-        query.get("title").map(String::as_str),
-    ) {
-        Ok(pair) => pair,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    // ── APK 最低版本门控 ────────────────────────────────────────────────────
+    if state.min_apk_version_code > 0 {
+        let client_vc = query
+            .get("app_version_code")
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(0);
+        if client_vc > 0 && client_vc < state.min_apk_version_code {
+            return json_error(
+                StatusCode::UPGRADE_REQUIRED,
+                format!(
+                    "您的 APP 版本过低（当前 {}，最低要求 {}），请前往 {}/app/download 升级后再使用",
+                    client_vc, state.min_apk_version_code, state.public_url
+                ),
+            );
+        }
+    }
+
+    // ── 身份验证（REQUIRE_LOGIN=true 时强制） ───────────────────────────────
+    let (user, project) = if state.require_login {
+        let token = query.get("token").map(String::as_str).unwrap_or("");
+        let authed_user = match state.store.authenticate_token(token) {
+            Ok(u) => u,
+            Err(e) => {
+                return json_error(
+                    StatusCode::UNAUTHORIZED,
+                    format!("请先登录后再使用（{}）", e),
+                );
+            }
+        };
+        // token 验证通过后，用 token 对应的用户身份获取/创建项目
+        match ensure_mobile_project(
+            &state,
+            &authed_user.id,
+            &project_id,
+            query.get("title").map(String::as_str),
+        ) {
+            Ok(pair) => pair,
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        }
+    } else {
+        // 旧兼容模式：device UUID 直接当 user_id，自动创建账号
+        match ensure_mobile_project(
+            &state,
+            &user_id,
+            &project_id,
+            query.get("title").map(String::as_str),
+        ) {
+            Ok(pair) => pair,
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        }
     };
+
     let download_base = format!(
         "{}/api/user/{}/projects/{}/download",
         state.public_url, user.id, project.id

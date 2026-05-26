@@ -364,3 +364,25 @@ pub async fn list_projects(State(state): State<Arc<AppState>>, headers: HeaderMa
             .into_response(),
     }
 }
+
+/// 列出所有活跃 Session（未过期的登录记录，即在线设备），仅管理员可见
+pub async fn list_sessions(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return auth_error();
+    }
+    match state.store.list_active_sessions_admin() {
+        Ok(sessions) => Json(serde_json::json!({
+            "sessions": sessions,
+            "total": sessions.len(),
+            "require_login": state.require_login,
+            "min_apk_version_code": state.min_apk_version_code,
+            "platform_apk_url": format!("{}/app/ElonSpeed-latest.apk", state.public_url),
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}

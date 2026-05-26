@@ -140,6 +140,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(admin::list_users).post(admin::create_user),
         )
         .route("/api/admin/projects", get(admin::list_projects))
+        .route("/api/admin/sessions", get(admin::list_sessions))
         .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),

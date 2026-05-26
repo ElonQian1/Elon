@@ -82,6 +82,18 @@ pub struct AdminProjectDetail {
     pub last_apk_version: Option<String>,
 }
 
+/// 管理员后台「活跃设备」总览，每行代表一个登录 session
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminSessionEntry {
+    pub id: String,
+    pub user_id: String,
+    pub user_account: String,
+    pub device_name: Option<String>,
+    pub apk_version: Option<String>,
+    pub expires_at: String,
+    pub created_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ProjectSummary {
     pub id: String,

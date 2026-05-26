@@ -155,6 +155,12 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// 管理后台访问令牌（对应 .env 中的 ADMIN_TOKEN）
     pub admin_token: String,
+    /// 是否强制所有 WebSocket 连接需要登录 token（ENV: REQUIRE_LOGIN=true）
+    /// 设为 true 后，旧版无登录功能的 APK 将被拒绝连接
+    pub require_login: bool,
+    /// 最低允许接入的 APK versionCode（ENV: MIN_APK_VERSION_CODE，0=不限）
+    /// 低于此版本的 APK 建立 WS 连接时会收到升级提示并被断开
+    pub min_apk_version_code: i64,
     /// agents.json 持久化路径
     pub config_path: std::path::PathBuf,
     /// 可选文生图模型配置
@@ -295,6 +301,20 @@ impl AppState {
             "elon-admin".into()
         });
 
+        let require_login = std::env::var("REQUIRE_LOGIN")
+            .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
+            .unwrap_or(false);
+        let min_apk_version_code = std::env::var("MIN_APK_VERSION_CODE")
+            .ok()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(0);
+        if require_login {
+            tracing::info!("已启用强制登录：旧版无登录 APK 将被拒绝");
+        }
+        if min_apk_version_code > 0 {
+            tracing::info!("最低 APK 版本门控: versionCode >= {}", min_apk_version_code);
+        }
+
         tracing::info!("默认 AI 后端: {}", default_backend.as_str());
         if ai_cli.enabled {
             tracing::info!(
@@ -340,6 +360,8 @@ impl AppState {
             public_url,
             http_client,
             admin_token,
+            require_login,
+            min_apk_version_code,
             config_path,
             image_model,
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
