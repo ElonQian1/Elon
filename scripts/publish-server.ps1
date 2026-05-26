@@ -30,8 +30,12 @@
     [DEPRECATED] 旧流程参数，已无意义（版本号由服务器分配）。保留只为兼容，会打印一条提示。
 
 .NOTES
-    本机专用构建缓存目录可在仓库根 .env.local 中设置：
-      ELON_BUILD_TARGET_DIR=D:\rust\shared\target
+    构建缓存优先级（高→低）：
+      1. 机器级 User 环境变量 RUST_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
+         多个 Rust 后端项目共享同一份 musl 增量编译产物，设置一次全局生效。
+      2. 仓库根 .env.local 中 ELON_BUILD_TARGET_DIR=D:\rust\shared（父目录）
+         脚本追加固定子目录名 elon-server-musl，适合只有本项目需要自定义的场景。
+      3. 未设置时：%LOCALAPPDATA%\Elon\build-target\elon-server-musl（Windows 默认）
 
 .EXAMPLE
     .\scripts\publish-server.ps1                          # 正常流程（claim → 编译 → 部署 → finish）
@@ -319,13 +323,18 @@ if (-not $SkipBuild) {
 # 3. 编译（临时工作树 — 确保从干净 commit 构建）
 # ─────────────────────────────────────────────────────────────
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
-$BuildTargetRoot = Resolve-BuildTargetRoot -RepoRoot $RepoRoot
-# 固定子目录名（不含 SHA），让所有 builder 共享同一份增量编译缓存；
-# 第一次全量编译后，后续只重编有变动的 crate（通常就 elon-server 本身，约 30s）。
-$BuildTargetDir = Join-Path $BuildTargetRoot "elon-server-musl"
+# 机器级共享缓存（RUST_MUSL_TARGET_DIR）优先：多个后端项目共享同一份 musl 增量编译产物。
+# 次选：ELON_BUILD_TARGET_DIR 父目录 + 固定子目录名。最后 fallback 到 AppData。
+if (-not [string]::IsNullOrWhiteSpace($env:RUST_MUSL_TARGET_DIR)) {
+    $BuildTargetDir = [System.IO.Path]::GetFullPath($env:RUST_MUSL_TARGET_DIR.Trim())
+    New-Item -ItemType Directory -Force -Path $BuildTargetDir | Out-Null
+} else {
+    $BuildTargetRoot = Resolve-BuildTargetRoot -RepoRoot $RepoRoot
+    $BuildTargetDir  = Join-Path $BuildTargetRoot "elon-server-musl"
+}
 $BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"
-Write-Host "  构建缓存: $BuildTargetRoot" -ForegroundColor Gray
+Write-Host "  构建缓存: $BuildTargetDir" -ForegroundColor Gray
 
 function Remove-Worktree {
     if (Test-Path $TmpWorktree) {
