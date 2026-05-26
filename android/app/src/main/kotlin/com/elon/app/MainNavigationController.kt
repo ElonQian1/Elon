@@ -47,6 +47,7 @@ internal class MainNavigationController(
         val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
 
         fun select(tab: TextView) {
+            WechatPageTransition.cancelActive()
             pageTransitionRunning = false
             clearPageTranslations()
             tabs.forEach {
