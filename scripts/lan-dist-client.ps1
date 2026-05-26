@@ -134,10 +134,10 @@ if ($DaemonMode) {
     }
     Write-Log "🖥️  LAN IP: $LanIp"
 
-    $Listener = [System.Net.HttpListener]::new()
-    $Listener.Prefixes.Add("http://+:$DaemonPort/")
+    # TcpListener 不需要管理员权限（HttpListener 的 http://+:port/ 需要 URL ACL 或管理员）
+    $TcpListener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $DaemonPort)
     try {
-        $Listener.Start()
+        $TcpListener.Start()
         Write-Log "✅ HTTP 服务已启动，监听 :$DaemonPort"
     } catch {
         Write-Log "❌ 无法绑定端口 $DaemonPort : $_"
@@ -169,14 +169,25 @@ if ($DaemonMode) {
         }
     }
 
-    function Send-File {
-        param($Response, $FilePath, $FileName)
-        $bytes = [System.IO.File]::ReadAllBytes($FilePath)
-        $Response.ContentType          = 'application/octet-stream'
-        $Response.ContentLength64      = $bytes.Length
-        $Response.AddHeader('Content-Disposition', "attachment; filename=""$FileName""")
-        $Response.OutputStream.Write($bytes, 0, $bytes.Length)
-        return $bytes.Length
+    function Send-HttpResponse {
+        param($TcpClient, $StatusCode, $ContentType, [byte[]]$Bytes, $FileName)
+        try {
+            $TcpClient.ReceiveTimeout = 5000
+            $TcpClient.SendTimeout   = 120000   # 大文件传输留足时间
+            $ns  = $TcpClient.GetStream()
+            $w   = [System.IO.StreamWriter]::new($ns, [System.Text.Encoding]::ASCII)
+            $w.AutoFlush = $true
+            $statusText  = if ($StatusCode -eq 200) { 'OK' } else { 'Not Found' }
+            $w.WriteLine("HTTP/1.1 $StatusCode $statusText")
+            $w.WriteLine("Content-Type: $ContentType")
+            $w.WriteLine("Content-Length: $($Bytes.Length)")
+            if ($FileName) { $w.WriteLine("Content-Disposition: attachment; filename=""$FileName""") }
+            $w.WriteLine("Connection: close")
+            $w.WriteLine("")
+            $ns.Write($Bytes, 0, $Bytes.Length)
+            $ns.Flush()
+        } catch {}
+        finally { try { $TcpClient.Close() } catch {} }
     }
 
     # ── 初次注册 ─────────────────────────────────────────────────────────────
@@ -187,6 +198,7 @@ if ($DaemonMode) {
 
     $PollIntervalMs = 30000
     $LastPoll       = (Get-Date).AddMilliseconds(-$PollIntervalMs)
+    $AcceptTask     = $TcpListener.AcceptTcpClientAsync()   # 挂起第一个 accept
 
     try {
         while ($true) {
@@ -211,19 +223,28 @@ if ($DaemonMode) {
                 }
             }
 
-            # 等待 HTTP 请求（最多 30 秒，超时后重新检查过期/注册）
-            $ar = $Listener.BeginGetContext($null, $null)
-            if (-not $ar.AsyncWaitHandle.WaitOne(30000)) { continue }
+            # 等待新连接（1 秒轮询；累计 ~30 秒做一次定期检查）
+            if (-not $AcceptTask.Wait(1000)) { continue }
 
-            $ctx = $Listener.EndGetContext($ar)
-            $req = $ctx.Request
-            $rsp = $ctx.Response
+            $tcpClient  = $AcceptTask.Result
+            $AcceptTask = $TcpListener.AcceptTcpClientAsync()   # 立即挂起下一个 accept
 
             try {
-                $path = $req.Url.AbsolutePath.TrimEnd('/')
+                $tcpClient.ReceiveTimeout = 5000
+                $ns     = $tcpClient.GetStream()
+                $reader = [System.IO.StreamReader]::new($ns, [System.Text.Encoding]::ASCII)
 
-                # GET /dist/<project>/<artifact>
-                if ($req.HttpMethod -eq 'GET' -and $path -match '^/dist/([^/]+)/([^/]+)$') {
+                # 读取 HTTP 请求行
+                $requestLine = $reader.ReadLine()
+                # 排空请求头（避免 socket 残留数据影响下次读取）
+                while ($true) {
+                    $hdr = $reader.ReadLine()
+                    if ($null -eq $hdr -or $hdr -eq '') { break }
+                }
+
+                $remoteIp = $tcpClient.Client.RemoteEndPoint.Address
+
+                if ($requestLine -and $requestLine -match '^GET\s+/dist/([^/\s]+)/([^/\s]+)') {
                     $proj  = $Matches[1]
                     $art   = $Matches[2]
                     $entry = Get-ActiveEntries |
@@ -232,28 +253,24 @@ if ($DaemonMode) {
 
                     if ($entry) {
                         $fname = Split-Path $entry.file_path -Leaf
-                        $size  = Send-File $rsp $entry.file_path $fname
-                        Write-Log "📤 $proj/$art → $($req.RemoteEndPoint.Address) ($([math]::Round($size/1MB,1)) MB)"
+                        $bytes = [System.IO.File]::ReadAllBytes($entry.file_path)
+                        Send-HttpResponse $tcpClient 200 'application/octet-stream' $bytes $fname
+                        Write-Log "📤 $proj/$art → $remoteIp ($([math]::Round($bytes.Length/1MB,1)) MB)"
                     } else {
-                        $rsp.StatusCode = 404
                         $err = [System.Text.Encoding]::UTF8.GetBytes('{"error":"artifact not found or expired"}')
-                        $rsp.ContentType = 'application/json'
-                        $rsp.OutputStream.Write($err, 0, $err.Length)
+                        Send-HttpResponse $tcpClient 404 'application/json' $err $null
                     }
                 } else {
-                    $rsp.StatusCode = 404
                     $err = [System.Text.Encoding]::UTF8.GetBytes('{"error":"not found"}')
-                    $rsp.ContentType = 'application/json'
-                    $rsp.OutputStream.Write($err, 0, $err.Length)
+                    Send-HttpResponse $tcpClient 404 'application/json' $err $null
                 }
             } catch {
                 Write-Log "⚠️  处理请求异常: $_"
-            } finally {
-                try { $rsp.Close() } catch {}
+                try { $tcpClient.Close() } catch {}
             }
         }
     } finally {
-        $Listener.Stop()
+        $TcpListener.Stop()
         Remove-Item $PidFile -ErrorAction SilentlyContinue
         Write-Log "🛑 守护进程已停止"
     }
@@ -298,6 +315,22 @@ if (Test-Path $PidFile) {
 }
 
 if (-not $daemonRunning) {
+    # 首次启动：尝试添加 Windows 防火墙规则，允许手机通过 LAN 访问守护进程端口
+    # 需要管理员权限；静默失败，仅打印手动命令供参考
+    try {
+        $ruleName = "LAN-Dist Port $DaemonPort"
+        $chk = (netsh advfirewall firewall show rule name="$ruleName" 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            netsh advfirewall firewall add rule name="$ruleName" dir=in action=allow `
+                protocol=TCP localport=$DaemonPort profile=private 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   🔓 已添加防火墙规则（允许 LAN 端口 $DaemonPort 入站）" -ForegroundColor DarkGray
+            } else {
+                Write-Host "   ⚠️  防火墙规则未能自动添加（需管理员），如手机无法连接请手动运行：" -ForegroundColor DarkYellow
+                Write-Host "       netsh advfirewall firewall add rule name=`"$ruleName`" dir=in action=allow protocol=TCP localport=$DaemonPort profile=private" -ForegroundColor DarkYellow
+            }
+        }
+    } catch {}
     $proc = Start-Process pwsh -WindowStyle Hidden -PassThru -ArgumentList @(
         "-NonInteractive",
         "-ExecutionPolicy", "Bypass",
