@@ -348,6 +348,11 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
             confirmLogout = { accountActions().confirmLogout() },
+            dismissActionPopup = {
+                actionPopup?.dismiss()
+                actionPopup = null
+            },
+            cancelChildTouch = ::cancelActiveChildTouch,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )
@@ -683,6 +688,13 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.dispatchTouchEvent(event)
+    }
+
+    private fun cancelActiveChildTouch(event: MotionEvent) {
+        val cancelEvent = MotionEvent.obtain(event)
+        cancelEvent.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(cancelEvent)
+        cancelEvent.recycle()
     }
 
     override fun onRequestPermissionsResult(

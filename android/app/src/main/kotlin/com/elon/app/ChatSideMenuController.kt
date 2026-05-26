@@ -23,12 +23,15 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.abs
+import kotlin.math.min
 
 internal class ChatSideMenuController(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val activeConversation: () -> AppConversation,
     private val confirmLogout: () -> Unit,
+    private val dismissActionPopup: () -> Unit,
+    private val cancelChildTouch: (MotionEvent) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
@@ -59,13 +62,13 @@ internal class ChatSideMenuController(
             isClickable = true
             clipChildren = false
             clipToPadding = false
-            setOnClickListener { eventlessCloseIfNeeded() }
+            setOnClickListener { close() }
         }
 
         panel = FrameLayout(activity).apply {
             background = GradientDrawable(
                 GradientDrawable.Orientation.LEFT_RIGHT,
-                intArrayOf(Color.parseColor("#172027"), Color.parseColor("#0F1012"))
+                intArrayOf(Color.parseColor("#182029"), Color.parseColor("#101214"))
             )
             clipChildren = false
             clipToPadding = false
@@ -125,7 +128,9 @@ internal class ChatSideMenuController(
                 startRawX = event.rawX
                 startRawY = event.rawY
                 startInsideContent = isInsideContent(event.rawX, event.rawY)
-                startOutsidePanel = startInsideContent && overlay.visibility == View.VISIBLE && isOutsidePanel(event.rawX)
+                startOutsidePanel = startInsideContent &&
+                    overlay.visibility == View.VISIBLE &&
+                    isOutsidePanel(event.rawX)
                 touchTracking = startInsideContent
                 consumingGesture = false
                 return false
@@ -136,17 +141,17 @@ internal class ChatSideMenuController(
                 if (consumingGesture) return true
                 val dx = event.rawX - startRawX
                 val dy = event.rawY - startRawY
-                val horizontalEnough = abs(dx) > dp(24) && abs(dx) > abs(dy) * 1.18f
+                val horizontalEnough = abs(dx) > dp(9) && abs(dx) > abs(dy) * 1.08f
                 if (!horizontalEnough) return false
 
                 if (overlay.visibility != View.VISIBLE && dx > 0f) {
+                    beginConsumingDrawerGesture(event)
                     show()
-                    consumingGesture = true
                     return true
                 }
                 if (overlay.visibility == View.VISIBLE && dx < 0f) {
+                    beginConsumingDrawerGesture(event)
                     close()
-                    consumingGesture = true
                     return true
                 }
                 touchTracking = false
@@ -160,7 +165,11 @@ internal class ChatSideMenuController(
                 touchTracking = false
                 consumingGesture = false
                 if (wasConsuming) return true
-                if (overlay.visibility == View.VISIBLE && startOutsidePanel && abs(dx) < dp(8) && abs(dy) < dp(8)) {
+                if (overlay.visibility == View.VISIBLE &&
+                    startOutsidePanel &&
+                    abs(dx) < dp(8) &&
+                    abs(dy) < dp(8)
+                ) {
                     close()
                     return true
                 }
@@ -177,8 +186,16 @@ internal class ChatSideMenuController(
         return consumingGesture
     }
 
+    private fun beginConsumingDrawerGesture(event: MotionEvent) {
+        if (consumingGesture) return
+        consumingGesture = true
+        dismissActionPopup()
+        cancelChildTouch(event)
+    }
+
     private fun show() {
         if (!isSetup || isAnimating || overlay.visibility == View.VISIBLE) return
+        dismissActionPopup()
         updateConversationSummaries()
         hideSettingsBubble(animate = false)
         applyPanelWidth()
@@ -217,8 +234,8 @@ internal class ChatSideMenuController(
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                leftMargin = dp(28)
-                topMargin = dp(54)
+                leftMargin = dp(32)
+                topMargin = dp(56)
             }
         )
         listOf("项目", "文件库", "设备").forEach { title ->
@@ -238,15 +255,15 @@ internal class ChatSideMenuController(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                gravity = Gravity.BOTTOM or Gravity.START
-                leftMargin = dp(28)
-                bottomMargin = dp(136)
+                gravity = Gravity.TOP or Gravity.START
+                leftMargin = dp(32)
+                topMargin = dp(338)
             }
         )
         chatGroup.addView(sectionText("当前聊天"))
         repeat(4) {
             val row = menuText("聊天内容缩写").apply {
-                layoutParams = LinearLayout.LayoutParams(dp(168), dp(26))
+                layoutParams = LinearLayout.LayoutParams(dp(210), dp(40))
             }
             summaryRows += row
             chatGroup.addView(row)
@@ -260,9 +277,9 @@ internal class ChatSideMenuController(
         }
         panel.addView(
             settingsLabel,
-            FrameLayout.LayoutParams(dp(88), dp(30)).apply {
+            FrameLayout.LayoutParams(dp(110), dp(40)).apply {
                 gravity = Gravity.BOTTOM or Gravity.START
-                leftMargin = dp(28)
+                leftMargin = dp(32)
                 bottomMargin = dp(18)
             }
         )
@@ -270,10 +287,10 @@ internal class ChatSideMenuController(
         settingsBubble = buildSettingsBubble()
         panel.addView(
             settingsBubble,
-            FrameLayout.LayoutParams(dp(210), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            FrameLayout.LayoutParams(dp(266), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.BOTTOM or Gravity.START
-                leftMargin = dp(24)
-                bottomMargin = dp(52)
+                leftMargin = dp(26)
+                bottomMargin = dp(58)
             }
         )
     }
@@ -282,9 +299,9 @@ internal class ChatSideMenuController(
         val bubble = FrameLayout(activity).apply {
             visibility = View.GONE
             alpha = 0f
-            scaleX = 0.96f
-            scaleY = 0.96f
-            translationY = dp(6).toFloat()
+            scaleX = 0.98f
+            scaleY = 0.98f
+            translationY = dp(5).toFloat()
             clipChildren = false
             clipToPadding = false
         }
@@ -292,10 +309,10 @@ internal class ChatSideMenuController(
         val panelBody = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
-                cornerRadius = dp(7).toFloat()
+                cornerRadius = dp(10).toFloat()
                 setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
             }
-            setPadding(0, dp(7), 0, dp(7))
+            setPadding(0, dp(11), 0, dp(11))
         }
         bubble.addView(
             panelBody,
@@ -303,14 +320,14 @@ internal class ChatSideMenuController(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                bottomMargin = dp(8)
+                bottomMargin = dp(9)
             }
         )
         bubble.addView(
             TrianglePointerView(activity, Color.parseColor(WECHAT_POPUP_PANEL_COLOR), pointsDown = true),
-            FrameLayout.LayoutParams(dp(18), dp(9)).apply {
+            FrameLayout.LayoutParams(dp(20), dp(10)).apply {
                 gravity = Gravity.BOTTOM or Gravity.START
-                leftMargin = dp(34)
+                leftMargin = dp(22)
             }
         )
 
@@ -333,15 +350,15 @@ internal class ChatSideMenuController(
         settingsBubble.visibility = View.VISIBLE
         settingsBubble.animate().cancel()
         settingsBubble.alpha = 0f
-        settingsBubble.scaleX = 0.96f
-        settingsBubble.scaleY = 0.96f
-        settingsBubble.translationY = dp(6).toFloat()
+        settingsBubble.scaleX = 0.98f
+        settingsBubble.scaleY = 0.98f
+        settingsBubble.translationY = dp(5).toFloat()
         settingsBubble.animate()
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
             .translationY(0f)
-            .setDuration(150L)
+            .setDuration(160L)
             .setInterpolator(interpolator)
             .start()
     }
@@ -356,9 +373,9 @@ internal class ChatSideMenuController(
         }
         settingsBubble.animate()
             .alpha(0f)
-            .scaleX(0.96f)
-            .scaleY(0.96f)
-            .translationY(dp(6).toFloat())
+            .scaleX(0.98f)
+            .scaleY(0.98f)
+            .translationY(dp(5).toFloat())
             .setDuration(120L)
             .setInterpolator(interpolator)
             .setListener(object : AnimatorListenerAdapter() {
@@ -374,14 +391,14 @@ internal class ChatSideMenuController(
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(25)
+                dp(38)
             )
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             includeFontPadding = false
-            setPadding(dp(16), 0, dp(16), 0)
+            setPadding(dp(22), 0, dp(22), 0)
             text = title
             setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
-            textSize = 12.5f
+            textSize = 17f
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
@@ -393,20 +410,21 @@ internal class ChatSideMenuController(
 
     private fun menuText(title: String): TextView {
         return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(150), dp(27))
+            layoutParams = LinearLayout.LayoutParams(dp(190), dp(42))
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#B8B8B8"))
-            textSize = 12.5f
+            setTextColor(Color.parseColor("#CACDD2"))
+            textSize = 17.5f
         }
     }
 
     private fun sectionText(title: String): TextView {
         return menuText(title).apply {
-            setTextColor(Color.parseColor("#C4C4C4"))
+            layoutParams = LinearLayout.LayoutParams(dp(210), dp(44))
+            setTextColor(Color.parseColor("#D0D2D6"))
         }
     }
 
@@ -427,7 +445,7 @@ internal class ChatSideMenuController(
             .replace(Regex("\\s+"), " ")
             .trim()
         if (compact.isEmpty()) return null
-        return if (compact.length > 12) compact.take(12) + "…" else compact
+        return if (compact.length > 12) compact.take(12) + "..." else compact
     }
 
     private fun showAccountInfo() {
@@ -450,14 +468,12 @@ internal class ChatSideMenuController(
         Toast.makeText(activity, "剩余用量统计准备中", Toast.LENGTH_SHORT).show()
     }
 
-    private fun eventlessCloseIfNeeded() {
-        if (overlay.visibility == View.VISIBLE) close()
-    }
-
     private fun applyPanelWidth() {
         val screenWidth = binding.contentContainer.width.takeIf { it > 0 }
             ?: activity.resources.displayMetrics.widthPixels
-        val panelWidth = (screenWidth - dp(74)).coerceAtLeast(dp(252))
+        val maxWidth = (screenWidth - dp(56)).coerceAtLeast(1)
+        val minWidth = min(dp(280), maxWidth)
+        val panelWidth = (screenWidth - dp(84)).coerceIn(minWidth, maxWidth)
         val params = panel.layoutParams as FrameLayout.LayoutParams
         if (params.width != panelWidth) {
             params.width = panelWidth
@@ -471,9 +487,10 @@ internal class ChatSideMenuController(
     }
 
     private fun closedTranslation(): Float {
-        val screenWidth = binding.contentContainer.width.takeIf { it > 0 }
-            ?: activity.resources.displayMetrics.widthPixels
-        return screenWidth.toFloat()
+        val width = panel.width.takeIf { it > 0 }
+            ?: ((binding.contentContainer.width.takeIf { it > 0 }
+                ?: activity.resources.displayMetrics.widthPixels) - dp(84)).coerceAtLeast(dp(1))
+        return -width.toFloat()
     }
 
     private fun isInsideContent(rawX: Float, rawY: Float): Boolean {
