@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.widget.PopupWindow
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.update.AppUpdateManager
 import okhttp3.OkHttpClient
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -174,7 +175,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumeActions.onResume()
-        notifyWsClient.start()
+        val gws = (application as ElonApplication).globalWs
+        gws.addListener(globalWsListener)
+        gws.start(this)
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -215,12 +218,20 @@ class MainActivity : AppCompatActivity() {
         appInForeground = false
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
-        notifyWsClient.stop()
+        val gws = (application as ElonApplication).globalWs
+        gws.removeListener(globalWsListener)
+        gws.stop()
         super.onStop()
     }
 
-    private val notifyWsClient: AppNotifyWsClient by lazy {
-        AppNotifyWsClient(this, serverUrl)
+    private val globalWsListener = object : GlobalWsManager.Listener {
+        override fun onGlobalWsEvent(event: GlobalWsEvent) {
+            when (event) {
+                is GlobalWsEvent.AppUpdateAvailable ->
+                    AppUpdateManager(this@MainActivity).realtimeCheck(event.versionCode)
+                else -> { /* 未来的好友消息等事件在这里路由 */ }
+            }
+        }
     }
 
     private val preparedMessageActions: MainPreparedMessageActions by lazy {
