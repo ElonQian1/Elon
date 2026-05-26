@@ -1,9 +1,15 @@
 package com.elon.app
 
 import android.content.res.ColorStateList
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ShapeDrawable
+import android.graphics.drawable.shapes.OvalShape
 import android.view.Gravity
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -23,6 +29,23 @@ internal class MainMarketplaceActions(
 ) {
 
     private val joinedIds = mutableSetOf<String>()
+
+    // 根据字符串生成固定色相的深色渐变（用作卡片横幅背景）
+    private val BANNER_PALETTES = arrayOf(
+        intArrayOf(0xFF3B4F8A.toInt(), 0xFF2A3A73.toInt()),  // 深蓝紫
+        intArrayOf(0xFF5A3070.toInt(), 0xFF3E1F5A.toInt()),  // 深紫
+        intArrayOf(0xFF2D6A4A.toInt(), 0xFF1B4A33.toInt()),  // 深绿
+        intArrayOf(0xFF7A3535.toInt(), 0xFF5A2020.toInt()),  // 深红
+        intArrayOf(0xFF5A4A1A.toInt(), 0xFF3A3010.toInt()),  // 深金
+        intArrayOf(0xFF1A5A6A.toInt(), 0xFF0F3A4A.toInt()),  // 深青
+        intArrayOf(0xFF6A3A1A.toInt(), 0xFF4A260F.toInt()),  // 深橙
+        intArrayOf(0xFF2A4A6A.toInt(), 0xFF1A3050.toInt()),  // 深天蓝
+    )
+
+    private fun paletteFor(key: String): IntArray {
+        val hash = key.fold(0) { acc, c -> acc * 31 + c.code }
+        return BANNER_PALETTES[Math.abs(hash) % BANNER_PALETTES.size]
+    }
 
     // ─── 加载公开项目列表 ─────────────────────────────────────────────────────
 
@@ -70,8 +93,8 @@ internal class MainMarketplaceActions(
                         joinedIds.add(projectId)
                         joinBtn.text = "已加入"
                         joinBtn.isEnabled = false
-                        joinBtn.setTextColor(Color.parseColor("#888888"))
-                        joinBtn.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#2A2A2A"))
+                        joinBtn.setTextColor(Color.parseColor("#AAAAAA"))
+                        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#2A2A2A"))
                         Toast.makeText(activity, "成功加入项目", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
@@ -93,7 +116,7 @@ internal class MainMarketplaceActions(
             textSize = 14f
             setTextColor(Color.parseColor("#888888"))
             gravity = Gravity.CENTER
-            setPadding(0, dp(40), 0, dp(40))
+            setPadding(0, dp(60), 0, dp(60))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -109,7 +132,7 @@ internal class MainMarketplaceActions(
             textSize = 14f
             setTextColor(Color.parseColor("#FF7A7A"))
             gravity = Gravity.CENTER
-            setPadding(dp(20), dp(40), dp(20), dp(40))
+            setPadding(dp(20), dp(60), dp(20), dp(60))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -123,11 +146,11 @@ internal class MainMarketplaceActions(
 
         if (projects.isEmpty()) {
             container.addView(TextView(activity).apply {
-                text = "暂无公开项目\n在[项目管理]中可将项目设为公开，欢迎其他用户加入。"
-                textSize = 14f
+                text = "暂无公开项目"
+                textSize = 15f
                 setTextColor(Color.parseColor("#888888"))
                 gravity = Gravity.CENTER
-                setPadding(dp(24), dp(40), dp(24), dp(40))
+                setPadding(dp(24), dp(60), dp(24), dp(60))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -136,11 +159,16 @@ internal class MainMarketplaceActions(
             return
         }
 
+        // 顶部标题栏
         container.addView(TextView(activity).apply {
-            text = "发现公开项目 · 加入即可参与开发"
+            text = "公开项目广场 · ${projects.size} 个项目"
             textSize = 12f
             setTextColor(Color.parseColor("#666666"))
-            setPadding(dp(16), dp(14), dp(16), dp(6))
+            setPadding(dp(16), dp(16), dp(16), dp(8))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         })
 
         for (project in projects) {
@@ -148,91 +176,156 @@ internal class MainMarketplaceActions(
         }
     }
 
-    // ─── 卡片构建 ─────────────────────────────────────────────────────────────
+    // ─── Discord 风格卡片 ─────────────────────────────────────────────────────
 
     private fun buildProjectCard(project: StoreProject): LinearLayout {
         val alreadyJoined = joinedIds.contains(project.id)
+        val palette = paletteFor(project.id)
 
+        // 外层卡片容器（圆角 + 深色背景）
         val card = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#1C1C1C"))
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(Color.parseColor("#1E1E1E"))
+            }
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.setMargins(dp(12), dp(6), dp(12), 0)
+            lp.setMargins(dp(12), dp(8), dp(12), 0)
             layoutParams = lp
-            setPadding(dp(14), dp(14), dp(14), dp(14))
+            clipToOutline = true
         }
 
-        val textColumn = LinearLayout(activity).apply {
+        // ── 顶部彩色横幅 ──────────────────────────────────────────────────────
+        val bannerHeight = dp(80)
+        val banner = FrameLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, bannerHeight
+            )
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                palette
+            ).apply { cornerRadii = floatArrayOf(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), 0f, 0f, 0f, 0f) }
+        }
+
+        // 圆形头像（项目名首字）
+        val avatarSize = dp(52)
+        val avatar = TextView(activity).apply {
+            text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+            textSize = 22f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            background = object : ShapeDrawable(OvalShape()) {
+                init { paint.color = Color.parseColor("#00000066") }
+            }
+            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
+                leftMargin = dp(16)
+                topMargin = dp(16)
+            }
+        }
+        banner.addView(avatar)
+        card.addView(banner)
+
+        // ── 卡片内容区 ────────────────────────────────────────────────────────
+        val body = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(dp(16), dp(12), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
-        textColumn.addView(TextView(activity).apply {
+        // 项目名
+        body.addView(TextView(activity).apply {
             text = project.name
-            textSize = 16f
-            setTextColor(Color.parseColor("#E0E0E0"))
+            textSize = 17f
+            setTextColor(Color.parseColor("#F0F0F0"))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         })
 
+        // 在线人数 & 作者行
+        val metaRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(5) }
+        }
+
+        // 绿点 + 成员数
+        metaRow.addView(TextView(activity).apply {
+            val dot = "\u25CF"  // ●
+            text = "$dot  ${project.memberCount} 位成员"
+            textSize = 12f
+            setTextColor(Color.parseColor("#3BA55D"))  // Discord 绿
+        })
+
+        // 作者
+        val owner = project.ownerAccount.takeIf { it != "?" && it.isNotBlank() }
+        if (owner != null) {
+            metaRow.addView(TextView(activity).apply {
+                text = "  ·  创建者: $owner"
+                textSize = 12f
+                setTextColor(Color.parseColor("#888888"))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+        }
+        body.addView(metaRow)
+
+        // 描述
         val desc = project.description?.takeIf { it.isNotBlank() }
         if (desc != null) {
-            textColumn.addView(TextView(activity).apply {
+            body.addView(TextView(activity).apply {
                 text = desc
                 textSize = 13f
                 setTextColor(Color.parseColor("#A0A0A0"))
-                maxLines = 2
+                maxLines = 3
                 ellipsize = android.text.TextUtils.TruncateAt.END
-                val lp = LinearLayout.LayoutParams(
+                layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                lp.topMargin = dp(3)
-                layoutParams = lp
+                ).apply { topMargin = dp(8) }
             })
         }
 
-        textColumn.addView(TextView(activity).apply {
-            val owner = project.ownerAccount.takeIf { it != "?" }?.let { " · $it" } ?: ""
-            text = "${project.memberCount} 人参与$owner"
-            textSize = 11f
-            setTextColor(Color.parseColor("#666666"))
-            val lp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            lp.topMargin = dp(5)
-            layoutParams = lp
-        })
-
-        card.addView(textColumn)
-
-        val joinLabel = if (alreadyJoined) "已加入" else if (project.joinMode == "open") "加入" else "申请"
+        // ── 加入按钮（全宽，Discord 绿色）─────────────────────────────────────
+        val joinLabel = when {
+            alreadyJoined -> "已加入"
+            project.joinMode == "open" -> "加入"
+            else -> "申请加入"
+        }
         val joinBtn = TextView(activity).apply {
             text = joinLabel
-            textSize = 13f
+            textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(if (alreadyJoined) "#888888" else "#E0E0E0"))
-            backgroundTintList = ColorStateList.valueOf(
-                Color.parseColor(if (alreadyJoined) "#2A2A2A" else "#3A6BDE")
-            )
-            setBackgroundResource(android.R.drawable.btn_default)
+            setTextColor(Color.parseColor(if (alreadyJoined) "#AAAAAA" else "#FFFFFF"))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(6).toFloat()
+                setColor(Color.parseColor(if (alreadyJoined) "#2A2A2A" else "#3BA55D"))
+            }
             isEnabled = !alreadyJoined
-            val lp = LinearLayout.LayoutParams(dp(60), dp(34))
-            lp.gravity = Gravity.CENTER_VERTICAL
-            lp.marginStart = dp(10)
-            layoutParams = lp
-            setPadding(dp(4), 0, dp(4), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)
+            ).apply { topMargin = dp(12) }
         }
 
         if (!alreadyJoined) {
             joinBtn.setOnClickListener { tryJoinProject(project.id, joinBtn) }
         }
+        body.addView(joinBtn)
 
-        card.addView(joinBtn)
+        card.addView(body)
         return card
     }
 }

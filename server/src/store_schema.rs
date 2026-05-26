@@ -52,6 +52,7 @@ pub(crate) fn apply_migrations(conn: &Connection) -> Result<()> {
 static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (1, "初始全量表结构（幂等）", migration_v1),
     (2, "补充缺失列与辅助索引（幂等）", migration_v2),
+    (3, "将所有现有项目设为公开可见（一次性）", migration_v3),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -294,6 +295,17 @@ fn migration_v2(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_friend_messages_receiver_created
          ON friend_messages(receiver_user_id, sender_user_id, created_at)",
+        [],
+    )?;
+    Ok(())
+}
+
+// ── v3：将所有现有项目设为公开 ────────────────────────────────────────────────
+
+fn migration_v3(conn: &Connection) -> Result<()> {
+    // 将迁移前已存在的项目全部设为公开（is_public=0 的都是历史默认値，并非用户主动设为私有）
+    conn.execute(
+        "UPDATE projects SET is_public = 1 WHERE status != 'deleted'",
         [],
     )?;
     Ok(())
