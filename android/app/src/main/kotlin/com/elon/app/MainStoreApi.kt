@@ -123,3 +123,20 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     joinMode = obj.optString("join_mode", "open"),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() }
 )
+
+/** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */
+internal fun fetchJoinedProjectIds(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context
+): Set<String> {
+    val req = AuthManager.applyAuth(ctx, Request.Builder()
+        .url("$serverUrl/api/store/joined")
+        .get())
+    val resp = http.newCall(req.build()).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    val obj = JSONObject(body)
+    val arr = obj.optJSONArray("projects") ?: return emptySet()
+    return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
+}

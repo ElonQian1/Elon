@@ -494,6 +494,22 @@
                     android:textSize="12sp" />
             </LinearLayout>
         </ScrollView>
+
+        <ScrollView
+            android:id="@+id/marketplacePage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#101010"
+            android:fillViewport="true"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/marketplaceListContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp" />
+        </ScrollView>
     </FrameLayout>
 
     <FrameLayout
@@ -586,6 +602,12 @@
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_profile_user"
                 android:text="我的" />
+
+            <TextView
+                android:id="@+id/tabMarket"
+                style="@style/MainTabText"
+                android:drawableTop="@drawable/ic_tab_store"
+                android:text="商城" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

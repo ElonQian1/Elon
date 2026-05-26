@@ -33,7 +33,8 @@ internal class MainNavigationController(
     private val isActiveConversationWorking: () -> Boolean,
     private val setSendEnabled: (Boolean) -> Unit,
     private val maybePrewarmCodexSession: (String) -> Unit,
-    private val onFriendChatClosed: () -> Unit
+    private val onFriendChatClosed: () -> Unit,
+    private val loadMarketplace: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -45,7 +46,7 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
+        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket)
 
         fun select(tab: TextView) {
             WechatPageTransition.cancelActive()
@@ -58,6 +59,7 @@ internal class MainNavigationController(
             binding.chatPage.visibility = View.GONE
             binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
+            binding.marketplacePage.visibility = if (tab == binding.tabMarket) View.VISIBLE else View.GONE
             binding.inputLayout.visibility = View.GONE
             binding.pageTabs.visibility = View.VISIBLE
             binding.backButton.visibility = View.GONE
@@ -71,6 +73,7 @@ internal class MainNavigationController(
             binding.topTitleText.text = when (tab) {
                 binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
+                binding.tabMarket -> "商城"
                 else -> "好友"
             }
             if (tab != binding.tabChat) {
@@ -83,12 +86,15 @@ internal class MainNavigationController(
                 renderConversationList()
             } else if (tab == binding.tabProfile) {
                 refreshServerVersion()
+            } else if (tab == binding.tabMarket) {
+                loadMarketplace()
             }
         }
 
         binding.tabChat.setOnClickListener { select(binding.tabChat) }
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
+        binding.tabMarket.setOnClickListener { select(binding.tabMarket) }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
@@ -143,6 +149,7 @@ internal class MainNavigationController(
                     binding.inputLayout.visibility = View.GONE
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
                     binding.conversationPage.visibility = View.VISIBLE
                     binding.pageTabs.visibility = View.VISIBLE
                     clearPageTranslations()
@@ -176,6 +183,7 @@ internal class MainNavigationController(
                     binding.pageTabs.visibility = View.GONE
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
                     binding.chatPage.visibility = View.VISIBLE
                     binding.inputLayout.visibility = View.VISIBLE
                     clearPageTranslations()
@@ -187,6 +195,7 @@ internal class MainNavigationController(
             binding.pageTabs.visibility = View.GONE
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
+            binding.marketplacePage.visibility = View.GONE
             binding.chatPage.visibility = View.VISIBLE
             binding.inputLayout.visibility = View.VISIBLE
             clearPageTranslations()
@@ -216,6 +225,7 @@ internal class MainNavigationController(
                     binding.pageTabs.visibility = View.GONE
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
                     binding.chatPage.visibility = View.VISIBLE
                     binding.inputLayout.visibility = View.VISIBLE
                     clearPageTranslations()
@@ -227,6 +237,7 @@ internal class MainNavigationController(
             binding.pageTabs.visibility = View.GONE
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
+            binding.marketplacePage.visibility = View.GONE
             binding.chatPage.visibility = View.VISIBLE
             binding.inputLayout.visibility = View.VISIBLE
             clearPageTranslations()
@@ -253,6 +264,7 @@ internal class MainNavigationController(
                     binding.pageTabs.visibility = View.GONE
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
                     binding.chatPage.visibility = View.VISIBLE
                     binding.inputLayout.visibility = View.VISIBLE
                     clearPageTranslations()
@@ -264,6 +276,7 @@ internal class MainNavigationController(
             binding.pageTabs.visibility = View.GONE
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
+            binding.marketplacePage.visibility = View.GONE
             binding.chatPage.visibility = View.VISIBLE
             binding.inputLayout.visibility = View.VISIBLE
             clearPageTranslations()
@@ -320,6 +333,7 @@ internal class MainNavigationController(
         binding.chatPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
         binding.pageTabs.visibility = View.GONE
         binding.backButton.visibility = View.VISIBLE
@@ -340,6 +354,7 @@ internal class MainNavigationController(
         binding.conversationPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         binding.pageTabs.visibility = View.VISIBLE
         binding.backButton.visibility = View.GONE
@@ -377,6 +392,7 @@ internal class MainNavigationController(
         binding.conversationPage.visibility = View.GONE
         binding.projectPage.visibility = View.VISIBLE
         binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         binding.pageTabs.visibility = View.VISIBLE
         binding.backButton.visibility = View.GONE
@@ -392,7 +408,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach { tab ->
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket).forEach { tab ->
             updateBottomTabVisual(tab, tab == selectedTab)
         }
     }
@@ -410,6 +426,7 @@ internal class MainNavigationController(
         binding.chatPage.translationX = 0f
         binding.projectPage.translationX = 0f
         binding.profilePage.translationX = 0f
+        binding.marketplacePage.translationX = 0f
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
     }

@@ -365,7 +365,19 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
-            onFriendChatClosed = { friendChatActions.closeFriendChat() }
+            onFriendChatClosed = { friendChatActions.closeFriendChat() },
+            loadMarketplace = { marketplaceActions.loadProjects() }
+        )
+    }
+
+    private val marketplaceActions: MainMarketplaceActions by lazy {
+        MainMarketplaceActions(
+            activity = this,
+            http = http,
+            serverUrl = serverUrl,
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground,
+            getListContainer = { binding.marketplaceListContainer }
         )
     }
 
