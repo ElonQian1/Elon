@@ -125,7 +125,7 @@ where
             if let Some(text) = item.get("text").and_then(Value::as_str) {
                 let trimmed = text.trim();
                 let display = trimmed
-                    .strip_prefix("\u7528\u6237\u53ef\u89c1\uff1a")
+                    .strip_prefix("用户可见：")
                     .unwrap_or(trimmed)
                     .trim();
                 if !display.is_empty() {

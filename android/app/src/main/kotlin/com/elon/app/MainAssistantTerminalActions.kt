@@ -20,7 +20,7 @@ internal class MainAssistantTerminalActions(
     private val appendMessage: (ChatMessage) -> Unit,
     private val workflowStoppedMessage: (String) -> String
 ) {
-    fun handleDone(content: String, apkUrl: String?, imageUrl: String?): ChatMessage {
+    fun handleDone(content: String, apkUrl: String?, imageUrl: String?): ChatMessage? {
         resetPendingRequestState()
         val wasDevelopment = getActiveRequestIsDevelopment()
         if (wasDevelopment) {
@@ -37,6 +37,11 @@ internal class MainAssistantTerminalActions(
         stopWorkingEvidenceForActiveConversation()
         resetFoldedCliLog()
         val visibleApkUrl = if (wasDevelopment) apkUrl else null
+        // 若服务端已通过 assistant_message 流式推送过 AI 回复（Done.message 为空），
+        // 非开发任务无需再额外追加一条"回复已完成"气泡；开发任务仍创建气泡以附上证据。
+        if (content.isBlank() && !wasDevelopment && visibleApkUrl == null && imageUrl == null) {
+            return null
+        }
         return aiMessageWithCurrentEvidence(
             finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment),
             chatAttachmentFromImageUrl(imageUrl)

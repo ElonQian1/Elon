@@ -11,6 +11,11 @@ internal class MainAssistantRawMessageActions(
     private val incrementServerResponseToken: () -> Unit,
     private val appendMessage: (ChatMessage) -> Unit
 ) {
+    // 追踪当前 turn 是否已通过流式 assistant_message 推送过 AI 回复。
+    // 若是，done 事件里的 message 字段是相同内容的冗余副本，传 "" 给 handleDone 避免重复气泡。
+    // background 任务走 MainBackgroundTaskMessageActions，此标志不影响那条路径。
+    private var receivedStreamingReplyThisTurn = false
+
     fun appendMessage(raw: String) {
         try {
             val json = JsonParser.parseString(raw).asJsonObject
@@ -35,14 +40,22 @@ internal class MainAssistantRawMessageActions(
                     assistantStreamEvents().handleToolResult(json)
                     return
                 }
-                "assistant_message" -> assistantStreamEvents().assistantMessage(json) ?: return
+                "assistant_message" -> {
+                    receivedStreamingReplyThisTurn = true
+                    assistantStreamEvents().assistantMessage(json) ?: return
+                }
                 "done" -> {
-                    val content = jsonStringOrNull(json, "message") ?: ""
+                    val rawContent = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl = jsonStringOrNull(json, "apk_url")
                     val imageUrl = jsonStringOrNull(json, "image_url")
-                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl)
+                    // 若已收到流式 AI 回复，done.message 与最后一条 assistant_message 相同，
+                    // 传空串给 handleDone 避免重复气泡
+                    val content = if (receivedStreamingReplyThisTurn) "" else rawContent
+                    receivedStreamingReplyThisTurn = false
+                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl) ?: return
                 }
                 "error" -> {
+                    receivedStreamingReplyThisTurn = false
                     assistantTerminalActions().handleError(jsonStringOrNull(json, "message") ?: "未知错误")
                 }
                 else -> return
