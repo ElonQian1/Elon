@@ -26,6 +26,16 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
           FOREIGN KEY (user_id) REFERENCES users(id)
         );
 
+        CREATE TABLE IF NOT EXISTS user_friends (
+          user_id TEXT NOT NULL,
+          friend_user_id TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (user_id, friend_user_id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (friend_user_id) REFERENCES users(id),
+          CHECK (user_id != friend_user_id)
+        );
+
         CREATE TABLE IF NOT EXISTS projects (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
@@ -210,6 +220,11 @@ pub(crate) fn init_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_task_events_task_id
          ON task_events(task_id, created_at)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_user_friends_friend
+         ON user_friends(friend_user_id, created_at)",
         [],
     )?;
     Ok(())

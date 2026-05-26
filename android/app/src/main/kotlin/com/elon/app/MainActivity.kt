@@ -564,11 +564,21 @@ class MainActivity : AppCompatActivity() {
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
+            showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
             deleteMessage = { message -> messageActions.deleteMessage(message) },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
+        )
+    }
+
+    private val friendActions: MainFriendActions by lazy {
+        MainFriendActions(
+            activity = this,
+            http = http,
+            serverUrl = serverUrl,
+            dp = uiTools::dp
         )
     }
 

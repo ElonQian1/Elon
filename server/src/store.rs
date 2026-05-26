@@ -9,6 +9,7 @@ use std::{
 use crate::store_schema::init_schema;
 
 mod common;
+mod friends;
 mod native_sessions;
 mod projects;
 mod tasks;
@@ -45,6 +46,28 @@ pub struct PublicUser {
     pub nickname: Option<String>,
     pub role: String,
     pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendProfile {
+    pub id: String,
+    pub account: String,
+    pub nickname: Option<String>,
+    pub phone: Option<String>,
+    pub friend_since: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FriendSearchResult {
+    pub user: FriendProfile,
+    pub already_friend: bool,
+    pub is_self: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AddFriendResult {
+    pub friend: FriendProfile,
+    pub already_friend: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

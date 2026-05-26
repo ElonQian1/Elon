@@ -1,25 +1,25 @@
 use axum::{
-    Json,
     extract::{
-        Path as AxumPath, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
+        Path as AxumPath, Query, State,
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
-    sync::{Arc, atomic::Ordering},
+    sync::{atomic::Ordering, Arc},
 };
 use tokio::sync::broadcast;
 
 use crate::{
     project_attachment_notes::append_project_attachment_notes,
     project_auth::{
-        LoginRequest, RegisterRequest, auth_from_headers, can_edit, json_error, login_inner,
-        project_access, register_inner,
+        auth_from_headers, can_edit, json_error, login_inner, project_access, register_inner,
+        LoginRequest, RegisterRequest,
     },
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_mobile::ensure_mobile_project,
@@ -39,6 +39,16 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub template: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct FriendSearchQuery {
+    pub phone: String,
+}
+
+#[derive(Deserialize)]
+pub struct AddFriendRequest {
+    pub phone: String,
 }
 
 pub async fn login(State(state): State<Arc<AppState>>, Json(req): Json<LoginRequest>) -> Response {
@@ -79,6 +89,69 @@ pub async fn me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     match auth_from_headers(&state, &headers) {
         Ok(user) => Json(serde_json::json!({ "user": user })).into_response(),
         Err(e) => json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    }
+}
+
+pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    match state.store.list_friends(&user.id) {
+        Ok(friends) => Json(serde_json::json!({ "friends": friends })).into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+pub async fn search_friend_by_phone(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<FriendSearchQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    match state.store.search_friend_by_phone(&user.id, &query.phone) {
+        Ok(Some(result)) => Json(serde_json::json!({
+            "found": true,
+            "user": result.user,
+            "already_friend": result.already_friend,
+            "is_self": result.is_self,
+        }))
+        .into_response(),
+        Ok(None) => Json(serde_json::json!({ "found": false })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn add_friend_by_phone(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<AddFriendRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    match state.store.add_friend_by_phone(&user.id, &req.phone) {
+        Ok(result) => Json(serde_json::json!({
+            "friend": result.friend,
+            "already_friend": result.already_friend,
+        }))
+        .into_response(),
+        Err(e) => {
+            let message = e.to_string();
+            let status = if message.contains("未找到") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            json_error(status, message)
+        }
     }
 }
 

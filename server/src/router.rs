@@ -45,6 +45,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/auth/login", post(project_api::login))
         .route("/api/auth/register", post(project_api::register))
         .route("/api/me", get(project_api::me))
+        .route(
+            "/api/me/friends",
+            get(project_api::list_friends).post(project_api::add_friend_by_phone),
+        )
+        .route(
+            "/api/me/friends/search",
+            get(project_api::search_friend_by_phone),
+        )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
         // ── 项目商店 ─────────────────────────────────────────────────────

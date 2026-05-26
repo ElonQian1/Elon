@@ -1,0 +1,220 @@
+package com.elon.app
+
+import android.content.Intent
+import android.text.InputType
+import android.view.inputmethod.InputMethodManager
+import android.content.Context
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import kotlin.concurrent.thread
+
+internal class MainFriendActions(
+    private val activity: AppCompatActivity,
+    private val http: OkHttpClient,
+    private val serverUrl: String,
+    private val dp: (Int) -> Int
+) {
+    fun showAddFriendDialog() {
+        if (!ensureLoggedIn()) return
+
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(8), dp(22), dp(2))
+        }
+        val hint = TextView(activity).apply {
+            text = "输入手机号，只能搜索到已注册一龙账号的用户。"
+            textSize = 14f
+            alpha = 0.72f
+        }
+        val input = EditText(activity).apply {
+            setHint("好友手机号")
+            inputType = InputType.TYPE_CLASS_PHONE
+            setSingleLine(true)
+            textSize = 18f
+            setSelectAllOnFocus(false)
+        }
+        val result = TextView(activity).apply {
+            textSize = 14f
+            alpha = 0.82f
+            setPadding(0, dp(8), 0, 0)
+        }
+        container.addView(hint)
+        container.addView(input)
+        container.addView(result)
+
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("添加好友")
+            .setView(container)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("搜索", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val searchButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            searchButton.setOnClickListener {
+                val phone = input.text?.toString()?.trim().orEmpty()
+                if (phone.isBlank()) {
+                    result.text = "请输入手机号"
+                    return@setOnClickListener
+                }
+                result.text = "正在搜索..."
+                searchButton.isEnabled = false
+                searchFriend(phone) { candidate, error ->
+                    searchButton.isEnabled = true
+                    when {
+                        error != null -> result.text = error
+                        candidate == null -> result.text = "没有找到这个手机号对应的一龙账号"
+                        candidate.isSelf -> result.text = "这是你自己的账号，不能添加自己"
+                        candidate.alreadyFriend -> result.text = "已经是好友：${candidate.name}"
+                        else -> {
+                            result.text = "找到：${candidate.name}"
+                            showConfirmAddDialog(dialog, phone, candidate)
+                        }
+                    }
+                }
+            }
+            input.requestFocus()
+            input.postDelayed({
+                val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+            }, 160)
+        }
+
+        dialog.show()
+    }
+
+    private fun ensureLoggedIn(): Boolean {
+        if (AuthManager.isLoggedIn(activity)) return true
+        AlertDialog.Builder(activity)
+            .setTitle("需要登录")
+            .setMessage("添加好友需要先登录账号。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("去登录") { _, _ ->
+                activity.startActivity(Intent(activity, LoginActivity::class.java))
+            }
+            .show()
+        return false
+    }
+
+    private fun showConfirmAddDialog(
+        parentDialog: AlertDialog,
+        phone: String,
+        candidate: FriendCandidate
+    ) {
+        val message = buildString {
+            append(candidate.name)
+            candidate.phone?.takeIf { it.isNotBlank() }?.let { append("\n手机号：").append(it) }
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("添加好友")
+            .setMessage(message)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("添加") { _, _ ->
+                addFriend(phone) { addedName, alreadyFriend, error ->
+                    if (error != null) {
+                        Toast.makeText(activity, error, Toast.LENGTH_SHORT).show()
+                        return@addFriend
+                    }
+                    parentDialog.dismiss()
+                    val text = if (alreadyFriend) {
+                        "已经是好友：$addedName"
+                    } else {
+                        "已添加好友：$addedName"
+                    }
+                    Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .show()
+    }
+
+    private fun searchFriend(phone: String, onDone: (FriendCandidate?, String?) -> Unit) {
+        thread {
+            val result = runCatching {
+                val builder = Request.Builder()
+                    .url("$serverUrl/api/me/friends/search?phone=${urlPart(phone)}")
+                    .get()
+                val request = AuthManager.applyAuth(activity, builder).build()
+                http.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error(readErrorMessage(body, "搜索失败：HTTP ${response.code}"))
+                    val json = JSONObject(body)
+                    if (!json.optBoolean("found", false)) return@runCatching null
+                    val user = json.optJSONObject("user") ?: JSONObject()
+                    val account = user.optString("account", "").trim()
+                    val phoneText = user.optString("phone", "").trim().takeIf { it.isNotEmpty() }
+                    val nickname = user.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
+                    FriendCandidate(
+                        name = nickname ?: account.ifBlank { "已注册用户" },
+                        phone = phoneText,
+                        alreadyFriend = json.optBoolean("already_friend", false),
+                        isSelf = json.optBoolean("is_self", false)
+                    )
+                }
+            }
+            activity.runOnUiThread {
+                result.fold(
+                    onSuccess = { onDone(it, null) },
+                    onFailure = { onDone(null, it.message ?: "搜索失败") }
+                )
+            }
+        }
+    }
+
+    private fun addFriend(
+        phone: String,
+        onDone: (name: String, alreadyFriend: Boolean, error: String?) -> Unit
+    ) {
+        thread {
+            val result = runCatching {
+                val payload = JSONObject().put("phone", phone).toString()
+                    .toRequestBody("application/json".toMediaType())
+                val builder = Request.Builder()
+                    .url("$serverUrl/api/me/friends")
+                    .post(payload)
+                val request = AuthManager.applyAuth(activity, builder).build()
+                http.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error(readErrorMessage(body, "添加失败：HTTP ${response.code}"))
+                    val json = JSONObject(body)
+                    val friend = json.optJSONObject("friend") ?: JSONObject()
+                    val nickname = friend.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
+                    val account = friend.optString("account", "").trim()
+                    Triple(
+                        nickname ?: account.ifBlank { "好友" },
+                        json.optBoolean("already_friend", false),
+                        null as String?
+                    )
+                }
+            }
+            activity.runOnUiThread {
+                result.fold(
+                    onSuccess = { onDone(it.first, it.second, null) },
+                    onFailure = { onDone("", false, it.message ?: "添加失败") }
+                )
+            }
+        }
+    }
+
+    private fun readErrorMessage(body: String, fallback: String): String {
+        if (body.isBlank()) return fallback
+        return runCatching {
+            JSONObject(body).optString("error", "").ifBlank { fallback }
+        }.getOrDefault(fallback)
+    }
+
+    private data class FriendCandidate(
+        val name: String,
+        val phone: String?,
+        val alreadyFriend: Boolean,
+        val isSelf: Boolean
+    )
+}
