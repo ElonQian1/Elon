@@ -57,8 +57,8 @@ pub fn create_project_workspace(
         match project_type {
             "android" => {
                 if let Some(template_dir) = template_dir("android") {
-                    copy_dir_all(&template_dir, project_root)?;
-                } else {
+                    copy_dir_all(&template_dir, project_root)?;                    let pkg = derive_android_package_id(project_root);
+                    patch_android_application_id(project_root, &pkg)?;                } else {
                     std::fs::write(
                         project_root.join("README.md"),
                         format!(
@@ -193,6 +193,8 @@ pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
                 ));
             };
             copy_dir_all(&template_dir, project_root)?;
+            let pkg = derive_android_package_id(project_root);
+            patch_android_application_id(project_root, &pkg)?;
             Ok("Android 项目模板已初始化。\n\
                  现在请用 write_file 修改以下文件实现具体功能:\n\
                  - app/src/main/kotlin/com/template/app/MainActivity.kt\n\
@@ -238,6 +240,54 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
         } else {
             std::fs::copy(entry.path(), &dst_path)?;
         }
+    }
+    Ok(())
+}
+
+/// 从项目工作区路径派生唯一的 Android applicationId。
+/// 例：project_root 最后一段 "prj_8f3a92c1" → "com.elon.prj8f3a92c1"
+fn derive_android_package_id(project_root: &Path) -> String {
+    let raw = project_root
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+    // Android 包名每段必须以字母开头
+    let segment = if raw.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        raw
+    } else {
+        format!("p{}", raw)
+    };
+    format!("com.elon.{}", segment)
+}
+
+/// 把 Android 模板里的占位 applicationId/namespace 替换为项目专属包名。
+/// 只修改 app/build.gradle，源码目录结构保持不变（applicationId 与源码包名可以不同）。
+fn patch_android_application_id(project_root: &Path, package_id: &str) -> Result<()> {
+    let build_gradle = project_root.join("app").join("build.gradle");
+    if !build_gradle.exists() {
+        return Ok(());
+    }
+    let content = std::fs::read_to_string(&build_gradle)?;
+    let patched = content
+        .replace(
+            "applicationId \"com.template.app\"",
+            &format!("applicationId \"{}\"", package_id),
+        )
+        .replace(
+            "namespace 'com.template.app'",
+            &format!("namespace '{}'", package_id),
+        )
+        .replace(
+            "namespace \"com.template.app\"",
+            &format!("namespace \"{}\"", package_id),
+        );
+    if patched != content {
+        std::fs::write(&build_gradle, patched)?;
+        info!("[工具] 已设置 applicationId: {}", package_id);
     }
     Ok(())
 }
