@@ -4,6 +4,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
@@ -13,7 +14,8 @@ import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainKeyboardInsetsAnimationActions(
-    private val binding: ActivityMainBinding
+    private val binding: ActivityMainBinding,
+    private val onKeyboardDismissed: () -> Unit = {}
 ) {
     private val fallbackInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var bottomOffsetAnimator: ValueAnimator? = null
@@ -22,6 +24,9 @@ internal class MainKeyboardInsetsAnimationActions(
     private var baselineHiddenHeight = -1
     private var lastKeyboardHeight = -1
     private var usingEstimatedKeyboardHeight = false
+    private var liftRequestedAt = 0L
+    private var dispatchingKeyboardDismissal = false
+    private var suppressKeyboardDismissal = false
     private val visibleFrame = Rect()
 
     fun install() {
@@ -82,6 +87,7 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     fun requestKeyboardLift() {
+        liftRequestedAt = SystemClock.uptimeMillis()
         binding.bottomBarContainer.bringToFront()
         applyKnownOrEstimatedKeyboardHeight()
         binding.root.post {
@@ -92,8 +98,13 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     fun releaseKeyboardLift() {
-        usingEstimatedKeyboardHeight = false
-        applyKeyboardHeight(0, animate = true)
+        suppressKeyboardDismissal = true
+        try {
+            usingEstimatedKeyboardHeight = false
+            applyKeyboardHeight(0, animate = true)
+        } finally {
+            suppressKeyboardDismissal = false
+        }
     }
 
     private fun installVisibleFrameFallback() {
@@ -152,6 +163,9 @@ internal class MainKeyboardInsetsAnimationActions(
             usingEstimatedKeyboardHeight = false
         }
         if (target == 0) {
+            if (lastKeyboardHeight > 0 && binding.inputEdit.hasFocus()) {
+                dispatchKeyboardDismissed()
+            }
             usingEstimatedKeyboardHeight = false
         }
         lastKeyboardHeight = target
@@ -223,7 +237,18 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     private fun shouldIgnoreZeroKeyboardHeight(keyboardHeight: Int): Boolean {
-        return keyboardHeight == 0 && usingEstimatedKeyboardHeight && binding.inputEdit.hasFocus()
+        if (keyboardHeight != 0 || !binding.inputEdit.hasFocus()) {
+            return false
+        }
+        val elapsed = SystemClock.uptimeMillis() - liftRequestedAt
+        if (usingEstimatedKeyboardHeight && elapsed < ZERO_HEIGHT_GRACE_MS) {
+            return true
+        }
+        if (usingEstimatedKeyboardHeight) {
+            dispatchKeyboardDismissed()
+            return true
+        }
+        return false
     }
 
     private fun keyboardHeight(insets: WindowInsetsCompat): Int {
@@ -236,5 +261,21 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private fun WindowInsetsAnimationCompat.includesIme(): Boolean {
         return typeMask and WindowInsetsCompat.Type.ime() != 0
+    }
+
+    private fun dispatchKeyboardDismissed() {
+        if (suppressKeyboardDismissal || dispatchingKeyboardDismissal) return
+        dispatchingKeyboardDismissal = true
+        binding.root.post {
+            try {
+                onKeyboardDismissed()
+            } finally {
+                dispatchingKeyboardDismissal = false
+            }
+        }
+    }
+
+    private companion object {
+        private const val ZERO_HEIGHT_GRACE_MS = 450L
     }
 }

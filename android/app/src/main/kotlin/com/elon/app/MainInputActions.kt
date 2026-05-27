@@ -71,7 +71,10 @@ internal class MainInputActions(
         collapsedInputPreviewActions.updateCollapsedInputPreview()
         updateSendButtonVisual()
         adaptiveInputHeightActions.updateAdaptiveInputHeight()
-        keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(binding).also { it.install() }
+        keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(
+            binding = binding,
+            onKeyboardDismissed = { inputFocusActions.collapseInputComposer() }
+        ).also { it.install() }
     }
 
     fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews
