@@ -116,6 +116,7 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("按入口里的任务路由读取细则"));
     assert!(!prompt.contains("必须先阅读这些项目说明，再编辑文件"));
     assert!(!prompt.contains(".github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md"));
+
     assert!(prompt.contains("scripts/publish-apk.ps1"));
     assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind AndroidFeature"));
     assert!(prompt.contains("scripts/publish-server.ps1"));

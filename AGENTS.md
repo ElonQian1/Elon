@@ -1,6 +1,5 @@
-# 一龙项目 AI 工作入口
+﻿# 一龙项目 AI 工作入口
 
-最后更新：2026-05-28
 
 本文件是所有 AI 工具（Codex / Codex CLI / Copilot / Copilot CLI）的共享路由层。
 

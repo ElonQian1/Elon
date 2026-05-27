@@ -1,4 +1,4 @@
-# CODEX Project Entry
+﻿# CODEX Project Entry
 
 Last updated: 2026-05-28
 
