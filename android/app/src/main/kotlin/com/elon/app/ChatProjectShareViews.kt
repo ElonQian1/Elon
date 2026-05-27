@@ -94,14 +94,14 @@ internal fun bindChatProjectShareView(
     container ?: return true
     container.removeAllViews()
     container.visibility = View.VISIBLE
-    container.addView(
-        buildChatProjectShareCard(
-            parent = container,
-            share = share,
-            role = message.role,
-            onProjectShareAction = onProjectShareAction
-        )
+    val card = buildChatProjectShareCard(
+        parent = container,
+        share = share,
+        role = message.role,
+        onProjectShareAction = onProjectShareAction
     )
+    container.addView(card)
+    container.addView(projectShareInitiatorView(container, card, share, message))
     return true
 }
 
@@ -246,6 +246,42 @@ private fun projectShareActionLabel(share: ChatProjectShare, role: String): Stri
     return when {
         share.joinMode == "open" || role == "user" || share.source == "local" -> "加入项目"
         else -> "申请加入"
+    }
+}
+
+private fun projectShareInitiatorView(
+    parent: LinearLayout,
+    card: View,
+    share: ChatProjectShare,
+    message: ChatMessage
+): TextView {
+    val context = parent.context
+    val cardWidth = (card.layoutParams as? LinearLayout.LayoutParams)?.width
+        ?.takeIf { it > 0 }
+        ?: LinearLayout.LayoutParams.WRAP_CONTENT
+    return TextView(context).apply {
+        text = "发起者：${projectShareInitiatorName(share, message)}"
+        textSize = 11.5f
+        includeFontPadding = false
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
+        gravity = Gravity.CENTER
+        setTextColor(Color.parseColor("#777777"))
+        layoutParams = LinearLayout.LayoutParams(cardWidth, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = context.projectDp(7)
+        }
+    }
+}
+
+private fun projectShareInitiatorName(share: ChatProjectShare, message: ChatMessage): String {
+    val sender = message.senderLabel?.trim()?.takeIf { it.isNotBlank() }
+    val owner = share.ownerAccount?.trim()?.takeIf { it.isNotBlank() }
+    return when {
+        sender != null -> sender
+        message.role == "user" -> "我"
+        owner != null -> owner
+        else -> "未知"
     }
 }
 
