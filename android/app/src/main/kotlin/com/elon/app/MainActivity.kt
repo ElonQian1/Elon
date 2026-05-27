@@ -774,6 +774,7 @@ class MainActivity : AppCompatActivity() {
             setActiveProjectIndex = { s.activeProjectIndex = it },
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
+            openLocalProject = conversationOpenActions::openProject,
             openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
             sendMessage = { inputActions.sendMessageActions.sendMessage() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },

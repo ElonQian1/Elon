@@ -15,6 +15,7 @@ internal class MainChatProjectShareActions(
     private val setActiveProjectIndex: (Int) -> Unit,
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
+    private val openLocalProject: (Int) -> Unit,
     private val openProjectSpace: (String, String) -> Unit,
     private val sendMessage: () -> Unit,
     private val isLoggedIn: () -> Boolean,
@@ -29,7 +30,13 @@ internal class MainChatProjectShareActions(
     fun handleCardAction(share: ChatProjectShare) {
         val existingIndex = projects.indexOfFirst { it.id == share.id }
         if (existingIndex >= 0) {
-            activateAndOpen(existingIndex)
+            activateAndOpen(existingIndex, share)
+            return
+        }
+        if (share.source == "local") {
+            val index = ensureProjectExists(share)
+            Toast.makeText(activity, "已加入「${share.name}」", Toast.LENGTH_SHORT).show()
+            activateAndOpenLocal(index)
             return
         }
         if (!isLoggedIn()) {
@@ -50,7 +57,7 @@ internal class MainChatProjectShareActions(
                     .onSuccess {
                         val index = ensureProjectExists(share)
                         Toast.makeText(activity, "已加入「${share.name}」", Toast.LENGTH_SHORT).show()
-                        activateAndOpen(index)
+                        activateAndOpenProjectSpace(index)
                     }
                     .onFailure { error ->
                         Toast.makeText(activity, error.message ?: "加入失败", Toast.LENGTH_LONG).show()
@@ -69,7 +76,22 @@ internal class MainChatProjectShareActions(
         return projects.lastIndex
     }
 
-    private fun activateAndOpen(index: Int) {
+    private fun activateAndOpen(index: Int, share: ChatProjectShare) {
+        if (share.source == "local") {
+            activateAndOpenLocal(index)
+        } else {
+            activateAndOpenProjectSpace(index)
+        }
+    }
+
+    private fun activateAndOpenLocal(index: Int) {
+        if (index !in projects.indices) return
+        setActiveProjectIndex(index)
+        saveProjects()
+        openLocalProject(index)
+    }
+
+    private fun activateAndOpenProjectSpace(index: Int) {
         if (index !in projects.indices) return
         setActiveProjectIndex(index)
         saveProjects()
