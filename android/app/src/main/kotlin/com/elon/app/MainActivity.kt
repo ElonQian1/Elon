@@ -437,6 +437,7 @@ class MainActivity : AppCompatActivity() {
             showProjectSpace = { title, animate -> navigationController.showProjectSpace(title, animate) },
             showProjectChannelChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            onProjectShareAction = chatProjectShareActions::handleCardAction,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             openPersonalAiChat = {
                 val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
@@ -457,7 +458,19 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
             isConversationWorking = homeListActions::isConversationWorking,
+            projects = { s.projects },
+            activeProjectIndex = { s.activeProjectIndex },
+            openProject = { index ->
+                if (index in s.projects.indices) {
+                    s.activeProjectIndex = index
+                    projectStateActions.saveProjects()
+                    val project = s.projects[index]
+                    projectSpaceController.openProjectSpace(project.id, project.title, true)
+                }
+            },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
+            showCreateJointProjectDialog = { projectActions.showCreateProjectDialog() },
+            sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
@@ -619,6 +632,7 @@ class MainActivity : AppCompatActivity() {
             setChatAdapter = { chatAdapter = it },
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            onProjectShareAction = chatProjectShareActions::handleCardAction,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
         )
@@ -633,6 +647,7 @@ class MainActivity : AppCompatActivity() {
             setChatAdapter = { chatAdapter = it },
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            onProjectShareAction = chatProjectShareActions::handleCardAction,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onGroupSummariesChanged = { groupActions.loadGroups() }
         )
@@ -741,6 +756,23 @@ class MainActivity : AppCompatActivity() {
                 projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
             },
             dp = uiTools::dp
+        )
+    }
+
+    private val chatProjectShareActions: MainChatProjectShareActions by lazy {
+        MainChatProjectShareActions(
+            activity = this,
+            binding = binding,
+            http = s.http,
+            serverUrl = serverUrl,
+            projects = s.projects,
+            setActiveProjectIndex = { s.activeProjectIndex = it },
+            saveProjects = projectStateActions::saveProjects,
+            renderProjectList = homeListActions::renderProjectList,
+            openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
+            sendMessage = { inputActions.sendMessageActions.sendMessage() },
+            isLoggedIn = { AuthManager.isLoggedIn(this) },
+            tokenProvider = { AuthManager.token(this) }
         )
     }
 

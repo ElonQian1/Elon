@@ -23,6 +23,7 @@ internal class MainGroupChatActions(
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val showFriendChat: (String, Boolean) -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val onGroupSummariesChanged: () -> Unit
 ) {
@@ -45,7 +46,8 @@ internal class MainGroupChatActions(
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
-            onMessageLongPress = showMessageActions
+            onMessageLongPress = showMessageActions,
+            onProjectShareAction = onProjectShareAction
         )
         activeAdapter = adapter
         setChatAdapter(adapter)

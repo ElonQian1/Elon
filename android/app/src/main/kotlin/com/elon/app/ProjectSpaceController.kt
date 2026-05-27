@@ -24,6 +24,7 @@ internal class ProjectSpaceController(
     private val showProjectSpace: (String, Boolean) -> Unit,
     private val showProjectChannelChat: (String, Boolean) -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
+    private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val openPersonalAiChat: () -> Unit,
     private val dp: (Int) -> Int,
@@ -151,7 +152,11 @@ internal class ProjectSpaceController(
     private fun openChannel(channel: ProjectChannel) {
         activeChannel = channel
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
-        val adapter = ChatAdapter(messages, onMessageLongPress = showMessageActions)
+        val adapter = ChatAdapter(
+            messages = messages,
+            onMessageLongPress = showMessageActions,
+            onProjectShareAction = onProjectShareAction
+        )
         activeAdapter = adapter
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter

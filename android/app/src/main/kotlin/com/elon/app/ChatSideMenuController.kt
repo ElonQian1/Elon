@@ -17,6 +17,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -43,7 +44,12 @@ internal class ChatSideMenuController(
     private val activeConversationIndex: () -> Int,
     private val openConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
+    private val projects: () -> List<AppProject>,
+    private val activeProjectIndex: () -> Int,
+    private val openProject: (Int) -> Unit,
     private val openProjectManagement: () -> Unit,
+    private val showCreateJointProjectDialog: () -> Unit,
+    private val sendProjectShare: (ChatProjectShare) -> Unit,
     private val showCreateConversationDialog: () -> Unit,
     private val confirmLogout: () -> Unit,
     private val dismissActionPopup: () -> Unit,
@@ -56,6 +62,7 @@ internal class ChatSideMenuController(
     private lateinit var overlay: FrameLayout
     private lateinit var panel: FrameLayout
     private lateinit var settingsBubble: FrameLayout
+    private lateinit var projectMenuView: ChatProjectSideMenuView
     private lateinit var conversationDirectoryGroup: LinearLayout
     private val directoryRowAnimators = mutableMapOf<View, ValueAnimator>()
     private var isSetup = false
@@ -84,6 +91,7 @@ internal class ChatSideMenuController(
             elevation = dp(48).toFloat()
             translationZ = dp(48).toFloat()
             setOnClickListener { close() }
+            setOnDragListener { _, event -> handleProjectDrag(event) }
         }
 
         panel = FrameLayout(activity).apply {
@@ -215,7 +223,7 @@ internal class ChatSideMenuController(
     private fun show() {
         if (!isSetup || isAnimating || overlay.visibility == View.VISIBLE) return
         dismissActionPopup()
-        updateConversationSummaries()
+        projectMenuView.render()
         hideSettingsBubble(animate = false)
         applyPanelWidth()
         overlay.visibility = View.VISIBLE
@@ -243,66 +251,44 @@ internal class ChatSideMenuController(
             .start()
     }
 
-    private fun buildPanelContent() {
-        val topMenu = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
+    private fun handleProjectDrag(event: DragEvent): Boolean {
+        val share = event.localState as? ChatProjectShare ?: return false
+        return when (event.action) {
+            DragEvent.ACTION_DRAG_STARTED -> true
+            DragEvent.ACTION_DROP -> {
+                if (event.x > panel.width) {
+                    showChatProjectDropRipple(overlay, binding.contentContainer, share, event.x, event.y)
+                    close(animate = true)
+                    overlay.postDelayed({ sendProjectShare(share) }, 140L)
+                }
+                true
+            }
+            DragEvent.ACTION_DRAG_ENDED -> true
+            else -> true
         }
-        panel.addView(
-            topMenu,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                leftMargin = dp(32)
-                topMargin = dp(106)
-            }
-        )
-        topMenu.addView(
-            menuRow("项目", R.drawable.ic_side_menu_project) {
-                close(animate = true)
-                panel.postDelayed({ openProjectManagement() }, DURATION_MS)
-            }
-        )
-        topMenu.addView(
-            menuRow("文件库", R.drawable.ic_side_menu_files) {
-                Toast.makeText(activity, "文件库功能准备中", Toast.LENGTH_SHORT).show()
-            }
-        )
-        topMenu.addView(
-            menuRow("设备", R.drawable.ic_side_menu_device) {
-                Toast.makeText(activity, "设备功能准备中", Toast.LENGTH_SHORT).show()
-            }
-        )
+    }
 
-        val chatScroll = ScrollView(activity).apply {
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isFillViewport = false
-        }
-        conversationDirectoryGroup = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        chatScroll.addView(
-            conversationDirectoryGroup,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+    private fun buildPanelContent() {
+        projectMenuView = ChatProjectSideMenuView(
+            context = activity,
+            projects = projects,
+            activeProjectIndex = activeProjectIndex,
+            openProject = openProject,
+            showCreateJointProjectDialog = showCreateJointProjectDialog,
+            requestClose = { animate -> close(animate) },
+            dp = dp,
+            selectableForeground = selectableForeground
         )
         panel.addView(
-            chatScroll,
+            projectMenuView,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                leftMargin = dp(32)
-                rightMargin = dp(18)
-                topMargin = dp(388)
                 bottomMargin = dp(78)
             }
         )
-        conversationDirectoryGroup.addView(conversationHeaderRow())
 
         val settingsLabel = menuText("设置").apply {
             isClickable = true

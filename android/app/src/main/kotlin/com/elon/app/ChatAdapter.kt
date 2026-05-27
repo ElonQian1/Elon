@@ -34,7 +34,8 @@ class ChatAdapter(
     private val messages: MutableList<ChatMessage>,
     private val onPauseWork: (() -> Unit)? = null,
     private val onMessageLongPress: ((View, ChatMessage) -> Unit)? = null,
-    private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null
+    private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null,
+    private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null
 ) :
     RecyclerView.Adapter<ChatAdapter.VH>() {
     private var cachedUserProfile: UserProfile? = null
@@ -43,6 +44,7 @@ class ChatAdapter(
         val text: TextView = view.findViewById(R.id.messageText)
         val status: TextView? = view.findViewById(R.id.messageStatus)
         val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
+        val bubble: LinearLayout? = view.findViewById(R.id.messageBubble)
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val evidenceLastEntry: TextView? = view.findViewById(R.id.evidenceLastEntry)
@@ -103,19 +105,28 @@ class ChatAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val message = messages[position]
         holder.stopShimmer()
-        holder.text.text = message.content
-        holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
-            View.GONE
-        } else {
-            View.VISIBLE
+        bindChatAttachmentViews(holder.attachmentList, message.attachments)
+        val projectCardBound = bindChatProjectShareView(
+            holder.attachmentList,
+            holder.text,
+            message,
+            onProjectShareAction
+        )
+        applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
+        if (!projectCardBound) {
+            holder.text.text = message.content
+            holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
+                View.GONE
+            } else {
+                View.VISIBLE
+            }
+            holder.text.setTextColor(messageTextColor(message.role))
+            Linkify.addLinks(holder.text, Linkify.WEB_URLS)
+            holder.text.movementMethod = LinkMovementMethod.getInstance()
         }
-        holder.text.setTextColor(messageTextColor(message.role))
-        Linkify.addLinks(holder.text, Linkify.WEB_URLS)
-        holder.text.movementMethod = LinkMovementMethod.getInstance()
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
         holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
-        bindChatAttachmentViews(holder.attachmentList, message.attachments)
         bindMessageActions(holder, message)
         bindEvidence(holder, message, position)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
