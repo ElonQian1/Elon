@@ -645,6 +645,9 @@ class MainActivity : AppCompatActivity() {
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
+            onProjectShareLongPress = { anchor, message, share ->
+                actionPopups.showProjectShareActionPopup(anchor, message, share)
+            },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
         )
@@ -660,6 +663,9 @@ class MainActivity : AppCompatActivity() {
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
+            onProjectShareLongPress = { anchor, message, share ->
+                actionPopups.showProjectShareActionPopup(anchor, message, share)
+            },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onGroupSummariesChanged = { groupActions.loadGroups() }
         )
@@ -784,6 +790,12 @@ class MainActivity : AppCompatActivity() {
             renderProjectList = homeListActions::renderProjectList,
             openLocalProject = conversationOpenActions::openProject,
             openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
+            deleteActiveChatMessage = { message, onDeleted ->
+                when {
+                    friendChatActions.isActive() -> friendChatActions.deleteCurrentMessage(message, onDeleted)
+                    groupChatActions.isActive() -> groupChatActions.deleteCurrentMessage(message, onDeleted)
+                }
+            },
             sendMessage = { inputActions.sendMessageActions.sendMessage() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             tokenProvider = { AuthManager.token(this) }
@@ -806,6 +818,10 @@ class MainActivity : AppCompatActivity() {
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
             deleteMessage = { message -> messageActions.deleteMessage(message) },
+            revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
+            restorePersonalProject = { message, share ->
+                chatProjectShareActions.restorePersonalProject(message, share)
+            },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,

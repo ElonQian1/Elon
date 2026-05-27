@@ -90,6 +90,27 @@ impl Store {
         })
     }
 
+    pub fn delete_friend_message(
+        &self,
+        user_id: &str,
+        friend_id: &str,
+        message_id: &str,
+    ) -> Result<()> {
+        self.ensure_friend_pair(user_id, friend_id)?;
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "DELETE FROM friend_messages
+             WHERE id = ?1
+               AND sender_user_id = ?2
+               AND receiver_user_id = ?3",
+            params![message_id, user_id, friend_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("only the sender can delete this message"));
+        }
+        Ok(())
+    }
+
     fn ensure_friend_pair(&self, user_id: &str, friend_id: &str) -> Result<()> {
         if user_id == friend_id {
             return Err(anyhow!("不能和自己聊天"));

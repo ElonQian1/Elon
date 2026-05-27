@@ -92,9 +92,16 @@ internal class MainActionPopupRenderer(
     fun showMessageActionPopup(anchor: View, previousPopup: PopupWindow?, actions: List<TopAction>): PopupWindow {
         previousPopup?.dismiss()
 
-        val popupWidth = minOf(activity.resources.displayMetrics.widthPixels - dp(24), dp(282))
+        val compact = actions.size <= 3
+        val columnCount = if (compact) actions.size.coerceAtLeast(1) else 5
+        val rowCount = ((actions.size + columnCount - 1) / columnCount).coerceAtLeast(1)
+        val popupWidth = if (compact) {
+            minOf(activity.resources.displayMetrics.widthPixels - dp(24), dp(72) * columnCount + dp(20))
+        } else {
+            minOf(activity.resources.displayMetrics.widthPixels - dp(24), dp(282))
+        }
         val arrowHeight = dp(8)
-        val panelHeight = dp(132)
+        val panelHeight = dp(16) + dp(58) * rowCount
         val totalHeight = panelHeight + arrowHeight
         val root = FrameLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
@@ -103,8 +110,8 @@ internal class MainActionPopupRenderer(
             scaleY = 0.96f
         }
         val panel = GridLayout(activity).apply {
-            columnCount = 5
-            rowCount = 2
+            this.columnCount = columnCount
+            this.rowCount = rowCount
             background = GradientDrawable().apply {
                 cornerRadius = dp(4).toFloat()
                 setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
@@ -118,7 +125,7 @@ internal class MainActionPopupRenderer(
         lateinit var popup: PopupWindow
         actions.forEach { action ->
             panel.addView(createMessageActionCell(action) { popup.dismiss() }, GridLayout.LayoutParams().apply {
-                width = (popupWidth - dp(20)) / 5
+                width = (popupWidth - dp(20)) / columnCount
                 height = dp(58)
             })
         }

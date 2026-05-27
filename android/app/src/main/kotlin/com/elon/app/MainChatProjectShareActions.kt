@@ -17,6 +17,7 @@ internal class MainChatProjectShareActions(
     private val renderProjectList: () -> Unit,
     private val openLocalProject: (Int) -> Unit,
     private val openProjectSpace: (String, String) -> Unit,
+    private val deleteActiveChatMessage: (ChatMessage, () -> Unit) -> Unit,
     private val sendMessage: () -> Unit,
     private val isLoggedIn: () -> Boolean,
     private val tokenProvider: () -> String?
@@ -69,6 +70,69 @@ internal class MainChatProjectShareActions(
                     }
                     .onFailure { error ->
                         Toast.makeText(activity, error.message ?: "加入失败", Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    fun revokePublishedShare(message: ChatMessage, share: ChatProjectShare) {
+        if (message.role != "user") return
+        deleteActiveChatMessage(message) {
+            Toast.makeText(activity, "已撤销「${share.name}」发布", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun restorePersonalProject(message: ChatMessage, share: ChatProjectShare) {
+        if (message.role != "user") return
+        val index = findProjectIndex(share.id)
+        if (index < 0) {
+            Toast.makeText(activity, "未找到本地项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val project = projects[index]
+        if (!project.isJointDevelopmentProject()) {
+            deleteActiveChatMessage(message) {
+                Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        val remoteProjectId = project.projectSpaceId()
+        if (remoteProjectId == project.id || remoteProjectId.isBlank()) {
+            Toast.makeText(activity, "该项目不能恢复为个人项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录后恢复个人项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "正在恢复个人项目...", Toast.LENGTH_SHORT).show()
+        thread {
+            val result = runCatching {
+                setProjectVisibility(http, serverUrl, remoteProjectId, false, "request", token)
+            }
+            activity.runOnUiThread {
+                result
+                    .onSuccess {
+                        val currentIndex = findProjectIndex(share.id)
+                        if (currentIndex >= 0) {
+                            projects[currentIndex].markPersonalDevelopment()
+                            saveProjects()
+                            renderProjectList()
+                        }
+                        deleteActiveChatMessage(message) {
+                            Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            error.message ?: "恢复个人项目失败",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
             }
         }

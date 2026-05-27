@@ -219,6 +219,31 @@ impl Store {
         })
     }
 
+    pub fn delete_friend_group_message(
+        &self,
+        user_id: &str,
+        group_id: &str,
+        message_id: &str,
+    ) -> Result<()> {
+        self.ensure_group_member(user_id, group_id)?;
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "DELETE FROM friend_group_messages
+             WHERE id = ?1
+               AND group_id = ?2
+               AND sender_user_id = ?3",
+            params![message_id, group_id, user_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("only the sender can delete this message"));
+        }
+        conn.execute(
+            "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
+            params![now(), group_id],
+        )?;
+        Ok(())
+    }
+
     pub fn friend_group_member_ids(&self, user_id: &str, group_id: &str) -> Result<Vec<String>> {
         self.ensure_group_member(user_id, group_id)?;
         let conn = self.conn()?;

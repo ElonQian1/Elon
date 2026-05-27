@@ -206,6 +206,24 @@ pub async fn send_friend_message(
     }
 }
 
+pub async fn delete_friend_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((friend_id, message_id)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state
+        .store
+        .delete_friend_message(&user.id, &friend_id, &message_id)
+    {
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
 pub async fn list_friend_group_messages(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -248,6 +266,24 @@ pub async fn send_friend_group_message(
             }
             Json(serde_json::json!({ "message": message })).into_response()
         }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn delete_friend_group_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((group_id, message_id)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state
+        .store
+        .delete_friend_group_message(&user.id, &group_id, &message_id)
+    {
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }

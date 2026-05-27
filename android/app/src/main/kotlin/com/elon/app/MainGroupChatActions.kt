@@ -24,6 +24,7 @@ internal class MainGroupChatActions(
     private val showFriendChat: (String, Boolean) -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
+    private val onProjectShareLongPress: (View, ChatMessage, ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val onGroupSummariesChanged: () -> Unit
 ) {
@@ -47,7 +48,8 @@ internal class MainGroupChatActions(
         val adapter = ChatAdapter(
             messages = messages,
             onMessageLongPress = showMessageActions,
-            onProjectShareAction = onProjectShareAction
+            onProjectShareAction = onProjectShareAction,
+            onProjectShareLongPress = onProjectShareLongPress
         )
         activeAdapter = adapter
         setChatAdapter(adapter)
@@ -126,6 +128,39 @@ internal class MainGroupChatActions(
             }
         }
         return true
+    }
+
+    fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {
+        val group = activeGroup ?: return
+        val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
+        if (messageId == null) {
+            Toast.makeText(activity, "消息尚未同步，稍后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        thread {
+            val result = runCatching { deleteMessage(group, messageId) }
+            activity.runOnUiThread {
+                if (activeGroup?.id != group.id) return@runOnUiThread
+                result
+                    .onSuccess {
+                        val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
+                        val index = messages.indexOfFirst { it.id == messageId }
+                        if (index >= 0) {
+                            messages.removeAt(index)
+                            activeAdapter?.notifyItemRemoved(index)
+                        }
+                        onGroupSummariesChanged()
+                        onDeleted()
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            error.message ?: "撤销发布失败",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+        }
     }
 
     private fun startPolling() {
@@ -211,13 +246,27 @@ internal class MainGroupChatActions(
         }
     }
 
+    private fun deleteMessage(group: AppGroup, messageId: String) {
+        val request = AuthManager.applyAuth(
+            activity,
+            Request.Builder()
+                .url("$serverUrl/api/me/groups/${urlPart(group.id)}/messages/${urlPart(messageId)}")
+                .delete()
+        ).build()
+        http.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) error(readErrorMessage(body, "撤销发布失败"))
+        }
+    }
+
     private fun groupMessageFromJson(json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
         val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
         return ChatMessage(
             role = if (outgoing) "user" else "friend",
             content = json.optString("content", ""),
-            senderLabel = if (outgoing) null else senderName
+            senderLabel = if (outgoing) null else senderName,
+            id = json.optString("id").trim().takeIf { it.isNotEmpty() }
         )
     }
 

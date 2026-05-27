@@ -22,6 +22,8 @@ internal class MainActionPopups(
     private val showAddFriendDialog: () -> Unit,
     private val openSettings: () -> Unit,
     private val deleteMessage: (ChatMessage) -> Unit,
+    private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
+    private val restorePersonalProject: (ChatMessage, ChatProjectShare) -> Unit,
     private val quoteMessage: (String) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
@@ -73,6 +75,18 @@ internal class MainActionPopups(
             TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") },
             TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) },
             TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") }
+        )
+        setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
+    }
+
+    fun showProjectShareActionPopup(anchor: View, message: ChatMessage, share: ChatProjectShare) {
+        val actions = listOf(
+            TopAction("撤销发布", R.drawable.ic_msg_delete) {
+                revokeProjectShare(message, share)
+            },
+            TopAction("恢复个人项目", R.drawable.ic_popup_project) {
+                restorePersonalProject(message, share)
+            }
         )
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
     }

@@ -87,7 +87,8 @@ internal fun bindChatProjectShareView(
     container: LinearLayout?,
     text: TextView,
     message: ChatMessage,
-    onProjectShareAction: ((ChatProjectShare) -> Unit)?
+    onProjectShareAction: ((ChatProjectShare) -> Unit)?,
+    onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)?
 ): Boolean {
     val share = parseChatProjectShareMessage(message.content) ?: return false
     text.text = ""
@@ -99,7 +100,9 @@ internal fun bindChatProjectShareView(
         parent = container,
         share = share,
         role = message.role,
-        onProjectShareAction = onProjectShareAction
+        message = message,
+        onProjectShareAction = onProjectShareAction,
+        onProjectShareLongPress = onProjectShareLongPress
     )
     container.addView(card)
     container.addView(projectShareInitiatorView(container, card, share, message))
@@ -133,7 +136,9 @@ private fun buildChatProjectShareCard(
     parent: LinearLayout,
     share: ChatProjectShare,
     role: String,
-    onProjectShareAction: ((ChatProjectShare) -> Unit)?
+    message: ChatMessage,
+    onProjectShareAction: ((ChatProjectShare) -> Unit)?,
+    onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)?
 ): View {
     val context = parent.context
     val width = context.resources.displayMetrics.widthPixels
@@ -148,6 +153,16 @@ private fun buildChatProjectShareCard(
         }
         clipToOutline = true
         layoutParams = LinearLayout.LayoutParams(width.coerceAtLeast(context.projectDp(210)), LinearLayout.LayoutParams.WRAP_CONTENT)
+        if (message.role == "user" && onProjectShareLongPress != null) {
+            isLongClickable = true
+            setOnLongClickListener {
+                onProjectShareLongPress.invoke(this, message, share)
+                true
+            }
+        } else {
+            isLongClickable = false
+            setOnLongClickListener(null)
+        }
     }
 
     val banner = FrameLayout(context).apply {

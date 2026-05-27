@@ -24,6 +24,7 @@ internal class MainFriendChatActions(
     private val showFriendChat: (String, Boolean) -> Unit,
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
+    private val onProjectShareLongPress: (View, ChatMessage, ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val onFriendSummariesChanged: () -> Unit
 ) {
@@ -47,7 +48,8 @@ internal class MainFriendChatActions(
         val adapter = ChatAdapter(
             messages = messages,
             onMessageLongPress = showMessageActions,
-            onProjectShareAction = onProjectShareAction
+            onProjectShareAction = onProjectShareAction,
+            onProjectShareLongPress = onProjectShareLongPress
         )
         activeAdapter = adapter
         setChatAdapter(adapter)
@@ -126,6 +128,39 @@ internal class MainFriendChatActions(
             }
         }
         return true
+    }
+
+    fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {
+        val friend = activeFriend ?: return
+        val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
+        if (messageId == null) {
+            Toast.makeText(activity, "消息尚未同步，稍后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        thread {
+            val result = runCatching { deleteMessage(friend, messageId) }
+            activity.runOnUiThread {
+                if (activeFriend?.id != friend.id) return@runOnUiThread
+                result
+                    .onSuccess {
+                        val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+                        val index = messages.indexOfFirst { it.id == messageId }
+                        if (index >= 0) {
+                            messages.removeAt(index)
+                            activeAdapter?.notifyItemRemoved(index)
+                        }
+                        onFriendSummariesChanged()
+                        onDeleted()
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            error.message ?: "撤销发布失败",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+        }
     }
 
     private fun startPolling() {
@@ -209,12 +244,26 @@ internal class MainFriendChatActions(
         }
     }
 
+    private fun deleteMessage(friend: AppFriend, messageId: String) {
+        val request = AuthManager.applyAuth(
+            activity,
+            Request.Builder()
+                .url("$serverUrl/api/me/friends/${urlPart(friend.id)}/messages/${urlPart(messageId)}")
+                .delete()
+        ).build()
+        http.newCall(request).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) error(readErrorMessage(body, "撤销发布失败"))
+        }
+    }
+
     private fun friendMessageFromJson(friend: AppFriend, json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
         return ChatMessage(
             role = if (outgoing) "user" else "friend",
             content = json.optString("content", ""),
-            senderLabel = if (outgoing) null else friend.name
+            senderLabel = if (outgoing) null else friend.name,
+            id = json.optString("id").trim().takeIf { it.isNotEmpty() }
         )
     }
 

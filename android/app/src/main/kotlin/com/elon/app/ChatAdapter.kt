@@ -27,7 +27,8 @@ data class ChatMessage(
     var evidenceDetails: String? = null,
     var evidenceExpanded: Boolean = false,
     var evidenceWorking: Boolean = false,
-    var senderLabel: String? = null
+    var senderLabel: String? = null,
+    var id: String? = null
 )
 
 class ChatAdapter(
@@ -35,7 +36,8 @@ class ChatAdapter(
     private val onPauseWork: (() -> Unit)? = null,
     private val onMessageLongPress: ((View, ChatMessage) -> Unit)? = null,
     private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null,
-    private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null
+    private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
+    private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
 ) :
     RecyclerView.Adapter<ChatAdapter.VH>() {
     private var cachedUserProfile: UserProfile? = null
@@ -114,7 +116,8 @@ class ChatAdapter(
             holder.attachmentList,
             holder.text,
             message,
-            onProjectShareAction
+            onProjectShareAction,
+            onProjectShareLongPress
         )
         applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
         if (!projectCardBound) {
@@ -131,7 +134,7 @@ class ChatAdapter(
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
         holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
-        bindMessageActions(holder, message)
+        bindMessageActions(holder, message, projectCardBound)
         bindEvidence(holder, message, position)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
         val canPause = position == messages.lastIndex && message.role in activeWorkflowRoles && onPauseWork != null
@@ -197,8 +200,8 @@ class ChatAdapter(
         notifyItemInserted(messages.size - 1)
     }
 
-    private fun bindMessageActions(holder: VH, message: ChatMessage) {
-        val canAct = onMessageLongPress != null && message.content.isNotBlank()
+    private fun bindMessageActions(holder: VH, message: ChatMessage, projectCardBound: Boolean) {
+        val canAct = !projectCardBound && onMessageLongPress != null && message.content.isNotBlank()
         holder.itemView.isLongClickable = canAct
         holder.text.isLongClickable = canAct
 
