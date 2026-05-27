@@ -3,7 +3,9 @@ package com.elon.app
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.graphics.Rect
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.animation.PathInterpolator
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
@@ -17,15 +19,22 @@ internal class MainKeyboardInsetsAnimationActions(
     private var bottomOffsetAnimator: ValueAnimator? = null
     private var runningImeAnimation = false
     private var baseChatListPaddingBottom = 0
+    private var baselineHiddenHeight = -1
+    private var lastKeyboardHeight = -1
+    private var usingEstimatedKeyboardHeight = false
+    private val visibleFrame = Rect()
 
     fun install() {
         baseChatListPaddingBottom = binding.chatList.paddingBottom
+        installVisibleFrameFallback()
+        installFocusFallback()
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             if (!runningImeAnimation) {
-                val keyboardHeight = keyboardHeight(insets)
-                animateBottomBarOffset(keyboardHeight)
-                applyChatBottomPadding(keyboardHeight)
+                val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
+                if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight)) {
+                    applyKeyboardHeight(keyboardHeight, animate = true)
+                }
             }
             insets
         }
@@ -45,7 +54,10 @@ internal class MainKeyboardInsetsAnimationActions(
                     runningAnimations: MutableList<WindowInsetsAnimationCompat>
                 ): WindowInsetsCompat {
                     if (runningAnimations.any { it.includesIme() }) {
-                        applyBottomBarOffset(keyboardHeight(insets))
+                        val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
+                        if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight)) {
+                            applyKeyboardHeight(keyboardHeight, animate = false)
+                        }
                     }
                     return insets
                 }
@@ -56,9 +68,10 @@ internal class MainKeyboardInsetsAnimationActions(
                     binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_NONE, null)
 
                     val insets = ViewCompat.getRootWindowInsets(binding.root)
-                    val keyboardHeight = insets?.let(::keyboardHeight) ?: 0
-                    applyBottomBarOffset(keyboardHeight)
-                    applyChatBottomPadding(keyboardHeight)
+                    val keyboardHeight = insets?.let(::keyboardHeightFromInsetsOrFrame) ?: keyboardHeightFromVisibleFrame()
+                    if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight)) {
+                        applyKeyboardHeight(keyboardHeight, animate = false)
+                    }
                 }
             }
         )
@@ -66,6 +79,60 @@ internal class MainKeyboardInsetsAnimationActions(
         binding.root.post {
             ViewCompat.requestApplyInsets(binding.root)
         }
+    }
+
+    private fun installVisibleFrameFallback() {
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                val keyboardHeight = keyboardHeightFromVisibleFrame()
+                if (shouldIgnoreZeroKeyboardHeight(keyboardHeight)) return
+                if (keyboardHeight == lastKeyboardHeight) return
+                applyKeyboardHeight(keyboardHeight, animate = !runningImeAnimation)
+            }
+        })
+    }
+
+    private fun installFocusFallback() {
+        binding.root.viewTreeObserver.addOnGlobalFocusChangeListener { _, newFocus ->
+            if (newFocus == binding.inputEdit) {
+                scheduleEstimatedKeyboardLift()
+            } else if (!binding.inputEdit.hasFocus() && usingEstimatedKeyboardHeight) {
+                usingEstimatedKeyboardHeight = false
+                applyKeyboardHeight(0, animate = true)
+            }
+        }
+    }
+
+    private fun scheduleEstimatedKeyboardLift() {
+        binding.root.postDelayed({ applyEstimatedKeyboardLiftIfNeeded() }, 80L)
+        binding.root.postDelayed({ applyEstimatedKeyboardLiftIfNeeded() }, 180L)
+    }
+
+    private fun applyEstimatedKeyboardLiftIfNeeded() {
+        if (!binding.inputEdit.hasFocus()) return
+        if (keyboardHeightFromVisibleFrame() > 0) return
+        val insetsHeight = ViewCompat.getRootWindowInsets(binding.root)?.let(::keyboardHeight).orEmpty()
+        if (insetsHeight > 0) return
+
+        usingEstimatedKeyboardHeight = true
+        applyKeyboardHeight(estimatedKeyboardHeight(), animate = true)
+    }
+
+    private fun applyKeyboardHeight(keyboardHeight: Int, animate: Boolean) {
+        val target = keyboardHeight.coerceAtLeast(0)
+        if (target > 0 && target != estimatedKeyboardHeight()) {
+            usingEstimatedKeyboardHeight = false
+        }
+        if (target == 0) {
+            usingEstimatedKeyboardHeight = false
+        }
+        lastKeyboardHeight = target
+        if (animate) {
+            animateBottomBarOffset(target)
+        } else {
+            applyBottomBarOffset(target)
+        }
+        applyChatBottomPadding(target)
     }
 
     private fun applyBottomBarOffset(keyboardHeight: Int) {
@@ -105,11 +172,39 @@ internal class MainKeyboardInsetsAnimationActions(
         )
     }
 
+    private fun keyboardHeightFromVisibleFrame(): Int {
+        binding.root.getWindowVisibleDisplayFrame(visibleFrame)
+        val rootHeight = binding.root.rootView.height
+        if (rootHeight <= 0 || visibleFrame.bottom <= 0) return 0
+
+        val hiddenHeight = (rootHeight - visibleFrame.bottom).coerceAtLeast(0)
+        if (baselineHiddenHeight < 0 || hiddenHeight < baselineHiddenHeight) {
+            baselineHiddenHeight = hiddenHeight
+        }
+        return (hiddenHeight - baselineHiddenHeight.coerceAtLeast(0)).coerceAtLeast(0)
+    }
+
+    private fun keyboardHeightFromInsetsOrFrame(insets: WindowInsetsCompat): Int {
+        return maxOf(keyboardHeight(insets), keyboardHeightFromVisibleFrame())
+    }
+
+    private fun estimatedKeyboardHeight(): Int {
+        val rootHeight = binding.root.rootView.height
+        if (rootHeight <= 0) return 0
+        return (rootHeight * 0.42f).toInt()
+    }
+
+    private fun shouldIgnoreZeroKeyboardHeight(keyboardHeight: Int): Boolean {
+        return keyboardHeight == 0 && usingEstimatedKeyboardHeight && binding.inputEdit.hasFocus()
+    }
+
     private fun keyboardHeight(insets: WindowInsetsCompat): Int {
         val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
         val systemBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
         return (imeBottom - systemBottom).coerceAtLeast(0)
     }
+
+    private fun Int?.orEmpty(): Int = this ?: 0
 
     private fun WindowInsetsAnimationCompat.includesIme(): Boolean {
         return typeMask and WindowInsetsCompat.Type.ime() != 0
