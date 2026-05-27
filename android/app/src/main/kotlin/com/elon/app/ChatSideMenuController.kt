@@ -322,7 +322,7 @@ internal class ChatSideMenuController(
         settingsBubble = buildSettingsBubble()
         panel.addView(
             settingsBubble,
-            FrameLayout.LayoutParams(dp(266), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            FrameLayout.LayoutParams(dp(232), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                 gravity = Gravity.BOTTOM or Gravity.START
                 leftMargin = dp(26)
                 bottomMargin = dp(58)
@@ -373,6 +373,26 @@ internal class ChatSideMenuController(
         return bubble
     }
 
+    private fun updateSettingsBubbleBounds() {
+        if (!::settingsBubble.isInitialized) return
+        val panelWidth = panel.layoutParams?.width?.takeIf { it > 0 }
+            ?: panel.width.takeIf { it > 0 }
+            ?: return
+        val desiredLeft = dp(26)
+        val desiredRight = dp(22)
+        val maxWidth = (panelWidth - desiredLeft - desiredRight).coerceAtLeast(dp(188))
+        val targetWidth = min(dp(232), maxWidth)
+        val targetLeft = desiredLeft
+            .coerceAtMost((panelWidth - targetWidth - desiredRight).coerceAtLeast(0))
+        val params = settingsBubble.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (params.width != targetWidth || params.leftMargin != targetLeft) {
+            params.width = targetWidth
+            params.leftMargin = targetLeft
+            params.gravity = Gravity.BOTTOM or Gravity.START
+            settingsBubble.layoutParams = params
+        }
+    }
+
     private fun toggleSettingsBubble() {
         if (settingsBubble.visibility == View.VISIBLE) {
             hideSettingsBubble()
@@ -382,6 +402,7 @@ internal class ChatSideMenuController(
     }
 
     private fun showSettingsBubble() {
+        updateSettingsBubbleBounds()
         settingsBubble.visibility = View.VISIBLE
         settingsBubble.animate().cancel()
         settingsBubble.alpha = 0f
@@ -641,6 +662,7 @@ internal class ChatSideMenuController(
             params.gravity = Gravity.START
             panel.layoutParams = params
         }
+        updateSettingsBubbleBounds()
         if (overlay.visibility != View.VISIBLE) {
             panel.translationX = closedTranslation()
         }
