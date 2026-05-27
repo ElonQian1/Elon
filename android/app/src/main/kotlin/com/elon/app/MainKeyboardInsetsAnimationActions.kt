@@ -81,6 +81,21 @@ internal class MainKeyboardInsetsAnimationActions(
         }
     }
 
+    fun requestKeyboardLift() {
+        binding.bottomBarContainer.bringToFront()
+        applyKnownOrEstimatedKeyboardHeight()
+        binding.root.post {
+            applyKnownOrEstimatedKeyboardHeight()
+        }
+        binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, 90L)
+        binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, 220L)
+    }
+
+    fun releaseKeyboardLift() {
+        usingEstimatedKeyboardHeight = false
+        applyKeyboardHeight(0, animate = true)
+    }
+
     private fun installVisibleFrameFallback() {
         binding.root.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
@@ -114,6 +129,19 @@ internal class MainKeyboardInsetsAnimationActions(
         val insetsHeight = ViewCompat.getRootWindowInsets(binding.root)?.let(::keyboardHeight).orEmpty()
         if (insetsHeight > 0) return
 
+        usingEstimatedKeyboardHeight = true
+        applyKeyboardHeight(estimatedKeyboardHeight(), animate = true)
+    }
+
+    private fun applyKnownOrEstimatedKeyboardHeight() {
+        if (!binding.inputEdit.hasFocus()) return
+        val knownHeight = ViewCompat.getRootWindowInsets(binding.root)
+            ?.let(::keyboardHeightFromInsetsOrFrame)
+            ?: keyboardHeightFromVisibleFrame()
+        if (knownHeight > 0) {
+            applyKeyboardHeight(knownHeight, animate = true)
+            return
+        }
         usingEstimatedKeyboardHeight = true
         applyKeyboardHeight(estimatedKeyboardHeight(), animate = true)
     }

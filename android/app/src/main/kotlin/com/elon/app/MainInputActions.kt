@@ -35,6 +35,7 @@ internal class MainInputActions(
     private var inputCanSend = true
     private var suppressInputFocusAnimation = false
     private var speechInputActions: MainSpeechInputActions? = null
+    private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
 
     fun setupInputComposer() {
         val views = MainInputComposerSetup(
@@ -70,6 +71,7 @@ internal class MainInputActions(
         collapsedInputPreviewActions.updateCollapsedInputPreview()
         updateSendButtonVisual()
         adaptiveInputHeightActions.updateAdaptiveInputHeight()
+        keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(binding).also { it.install() }
     }
 
     fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews
@@ -100,6 +102,8 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            requestKeyboardLift = { keyboardInsetsAnimationActions?.requestKeyboardLift() },
+            releaseKeyboardLift = { keyboardInsetsAnimationActions?.releaseKeyboardLift() },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }

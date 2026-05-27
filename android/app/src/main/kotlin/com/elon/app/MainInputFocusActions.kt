@@ -15,6 +15,8 @@ internal class MainInputFocusActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val inputComposerMotion: () -> InputComposerMotion?,
+    private val requestKeyboardLift: () -> Unit,
+    private val releaseKeyboardLift: () -> Unit,
     private val setSuppressInputFocusAnimation: (Boolean) -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
@@ -34,6 +36,7 @@ internal class MainInputFocusActions(
                 motion.setExpanded(true, animate = true)
             }
         }
+        requestKeyboardLift()
         focusAndShowKeyboard()
         binding.inputEdit.post { focusAndShowKeyboard() }
         binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 90L)
@@ -52,6 +55,7 @@ internal class MainInputFocusActions(
         val motion = inputComposerMotion() ?: return
         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
+        releaseKeyboardLift()
         if (binding.inputEdit.hasFocus()) {
             setSuppressInputFocusAnimation(!animate)
             try {
