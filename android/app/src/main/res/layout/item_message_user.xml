@@ -8,6 +8,21 @@
     android:paddingEnd="4dp"
     android:paddingBottom="6dp">
 
+    <TextView
+        android:id="@+id/messageSelectionCheck"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:background="@drawable/bg_message_selection_off"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/messageBubble"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/messageBubble" />
+
     <LinearLayout
         android:id="@+id/messageBubble"
         android:layout_width="wrap_content"

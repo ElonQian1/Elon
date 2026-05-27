@@ -71,12 +71,14 @@ internal class MainChatSelectionActions(
 
     private fun deleteSelectedMessages() {
         val adapter = currentAdapterOrNull() ?: return
-        val selected = selectedMessagesOrToast() ?: return
+        selectedMessagesOrToast() ?: return
         val messages = activeConversation().messages
-        val indices = selected
-            .mapNotNull { message -> messages.indexOf(message).takeIf { it >= 0 } }
-            .distinct()
-            .sortedDescending()
+        if (!adapter.ownsMessages(messages)) {
+            Toast.makeText(activity, "当前聊天暂不支持批量删除服务器消息", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val indices = adapter.selectedPositionsDescending()
+            .filter { index -> index in messages.indices }
 
         if (indices.isEmpty()) {
             Toast.makeText(activity, "当前聊天暂不支持批量删除服务器消息", Toast.LENGTH_SHORT).show()
