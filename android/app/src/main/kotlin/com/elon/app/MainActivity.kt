@@ -458,6 +458,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
             isConversationWorking = homeListActions::isConversationWorking,
+            showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
             projects = { s.projects },
             activeProjectIndex = { s.activeProjectIndex },
             openProject = { index ->

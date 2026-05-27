@@ -2,7 +2,6 @@ package com.elon.app
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
-import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Canvas
@@ -22,19 +21,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.PathInterpolator
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
-import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.abs
 import kotlin.math.min
-import kotlin.math.sin
 
 internal class ChatSideMenuController(
     private val activity: AppCompatActivity,
@@ -44,6 +38,7 @@ internal class ChatSideMenuController(
     private val activeConversationIndex: () -> Int,
     private val openConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
+    private val showProjectShareSideMenu: () -> Boolean,
     private val projects: () -> List<AppProject>,
     private val activeProjectIndex: () -> Int,
     private val openProject: (Int) -> Unit,
@@ -62,9 +57,8 @@ internal class ChatSideMenuController(
     private lateinit var overlay: FrameLayout
     private lateinit var panel: FrameLayout
     private lateinit var settingsBubble: FrameLayout
+    private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
-    private lateinit var conversationDirectoryGroup: LinearLayout
-    private val directoryRowAnimators = mutableMapOf<View, ValueAnimator>()
     private var isSetup = false
     private var isAnimating = false
     private var touchTracking = false
@@ -116,7 +110,7 @@ internal class ChatSideMenuController(
     fun close(animate: Boolean = true) {
         if (!isSetup || overlay.visibility != View.VISIBLE) return
         hideSettingsBubble(animate = false)
-        clearDirectoryRowAnimators()
+        aiMenuView.stopAnimations()
         if (!animate || panel.width == 0) {
             overlay.visibility = View.GONE
             overlay.alpha = 0f
@@ -223,7 +217,7 @@ internal class ChatSideMenuController(
     private fun show() {
         if (!isSetup || isAnimating || overlay.visibility == View.VISIBLE) return
         dismissActionPopup()
-        projectMenuView.render()
+        applyContentMode()
         hideSettingsBubble(animate = false)
         applyPanelWidth()
         overlay.visibility = View.VISIBLE
@@ -252,6 +246,7 @@ internal class ChatSideMenuController(
     }
 
     private fun handleProjectDrag(event: DragEvent): Boolean {
+        if (!showProjectShareSideMenu()) return false
         val share = event.localState as? ChatProjectShare ?: return false
         return when (event.action) {
             DragEvent.ACTION_DRAG_STARTED -> true
@@ -269,6 +264,26 @@ internal class ChatSideMenuController(
     }
 
     private fun buildPanelContent() {
+        aiMenuView = ChatAiSideMenuView(
+            context = activity,
+            conversations = conversations,
+            activeConversationIndex = activeConversationIndex,
+            openConversation = openConversation,
+            isConversationWorking = isConversationWorking,
+            openProjectManagement = openProjectManagement,
+            showCreateConversationDialog = showCreateConversationDialog,
+            requestClose = { animate -> close(animate) },
+            dp = dp,
+            selectableForeground = selectableForeground
+        )
+        panel.addView(
+            aiMenuView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
         projectMenuView = ChatProjectSideMenuView(
             context = activity,
             projects = projects,
@@ -289,6 +304,7 @@ internal class ChatSideMenuController(
                 bottomMargin = dp(78)
             }
         )
+        projectMenuView.visibility = View.GONE
 
         val settingsLabel = menuText("设置").apply {
             isClickable = true
@@ -314,6 +330,19 @@ internal class ChatSideMenuController(
                 bottomMargin = dp(58)
             }
         )
+    }
+
+    private fun applyContentMode() {
+        if (showProjectShareSideMenu()) {
+            aiMenuView.visibility = View.GONE
+            aiMenuView.stopAnimations()
+            projectMenuView.visibility = View.VISIBLE
+            projectMenuView.render()
+        } else {
+            projectMenuView.visibility = View.GONE
+            aiMenuView.visibility = View.VISIBLE
+            aiMenuView.render()
+        }
     }
 
     private fun buildSettingsBubble(): FrameLayout {
@@ -461,157 +490,6 @@ internal class ChatSideMenuController(
             setTextColor(Color.parseColor("#C9C9C9"))
             textSize = 17.5f
         }
-    }
-
-    private fun menuRow(title: String, iconRes: Int, action: () -> Unit): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(228), dp(46))
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            isClickable = true
-            foreground = selectableForeground()
-            setPadding(0, 0, dp(8), 0)
-
-            addView(
-                ImageView(activity).apply {
-                    setImageResource(iconRes)
-                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C9C9C9"))
-                    scaleType = ImageView.ScaleType.CENTER
-                },
-                LinearLayout.LayoutParams(dp(26), dp(26))
-            )
-            addView(
-                menuText(title).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                    setPadding(dp(16), 0, 0, 0)
-                }
-            )
-            setOnClickListener { action() }
-        }
-    }
-
-    private fun updateConversationSummaries() {
-        clearDirectoryRowAnimators()
-        while (conversationDirectoryGroup.childCount > 1) {
-            conversationDirectoryGroup.removeViewAt(1)
-        }
-        val items = conversations()
-        if (items.isEmpty()) {
-            conversationDirectoryGroup.addView(directoryRow("暂无会话", active = false, working = false, onClick = {}))
-            return
-        }
-        items.forEachIndexed { index, conversation ->
-            conversationDirectoryGroup.addView(
-                directoryRow(
-                    title = conversation.title,
-                    active = index == activeConversationIndex(),
-                    working = isConversationWorking(index),
-                    onClick = {
-                        close(animate = true)
-                        openConversation(index)
-                    }
-                )
-            )
-        }
-    }
-
-    private fun conversationHeaderRow(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-
-            addView(
-                menuText("当前聊天").apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                    setTextColor(Color.parseColor("#D0D0D0"))
-                }
-            )
-            addView(
-                ImageButton(activity).apply {
-                    setImageResource(R.drawable.ic_add_circle_simple)
-                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#D0D0D0"))
-                    background = null
-                    scaleType = ImageView.ScaleType.CENTER
-                    contentDescription = "新建会话"
-                    isClickable = true
-                    foreground = selectableForeground()
-                    setPadding(dp(4), dp(4), dp(4), dp(4))
-                    setOnClickListener {
-                        close(animate = true)
-                        panel.postDelayed({ showCreateConversationDialog() }, DURATION_MS)
-                    }
-                },
-                LinearLayout.LayoutParams(dp(38), dp(38)).apply {
-                    rightMargin = dp(8)
-                }
-            )
-        }
-    }
-
-    private fun directoryRow(
-        title: String,
-        active: Boolean,
-        working: Boolean,
-        onClick: () -> Unit
-    ): TextView {
-        return menuText(title).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
-            ).apply {
-                topMargin = dp(4)
-            }
-            setPadding(dp(10), 0, dp(10), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            setTextColor(Color.parseColor(if (active) "#E0E0E0" else "#C9C9C9"))
-            if (working) {
-                startDirectoryRowShimmer(this)
-            } else if (active) {
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#242424"))
-                }
-            }
-            setOnClickListener { onClick() }
-        }
-    }
-
-    private fun startDirectoryRowShimmer(row: View) {
-        val baseColor = Color.parseColor("#242424")
-        val highlightColor = Color.parseColor("#363636")
-        val background = GradientDrawable().apply {
-            cornerRadius = dp(8).toFloat()
-            setColor(baseColor)
-        }
-        row.background = background
-        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1350L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            interpolator = LinearInterpolator()
-            addUpdateListener { valueAnimator ->
-                val pulse = sin(Math.PI * valueAnimator.animatedFraction).toFloat()
-                background.setColor(blendColor(baseColor, highlightColor, pulse))
-            }
-        }
-        directoryRowAnimators[row] = animator
-        row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(v: View) = Unit
-            override fun onViewDetachedFromWindow(v: View) {
-                directoryRowAnimators.remove(v)?.cancel()
-            }
-        })
-        animator.start()
-    }
-
-    private fun clearDirectoryRowAnimators() {
-        directoryRowAnimators.values.forEach { it.cancel() }
-        directoryRowAnimators.clear()
     }
 
     private fun showAccountInfo() {
