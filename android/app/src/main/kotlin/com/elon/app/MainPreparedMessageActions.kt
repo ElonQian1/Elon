@@ -27,6 +27,7 @@ internal class MainPreparedMessageActions(
     private val nextServerResponseToken: () -> Int,
     private val putTaskResponseToken: (String, Int) -> Unit,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean,
+    private val ensureBackgroundKeepAlive: (Boolean) -> Unit,
     private val markTaskPendingReconnect: (SendTarget) -> Unit,
     private val refreshActiveTaskState: () -> Unit,
     private val persistActiveWork: () -> Unit,
@@ -99,6 +100,7 @@ internal class MainPreparedMessageActions(
         setActiveRequestIsDevelopment(requestIsDevelopment)
         resetRequestState()
         updateRequestPresentation(visibleText, outgoingText, requestIsDevelopment, attachmentRefs)
+        ensureBackgroundKeepAlive(requestIsDevelopment)
 
         val responseToken = nextServerResponseToken()
         putTaskResponseToken(traceId, responseToken)

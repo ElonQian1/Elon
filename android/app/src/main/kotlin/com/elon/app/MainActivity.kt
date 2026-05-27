@@ -278,6 +278,9 @@ class MainActivity : AppCompatActivity() {
             nextServerResponseToken = { ++s.serverResponseToken },
             putTaskResponseToken = { traceId, token -> s.taskResponseTokens[traceId] = token },
             startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
+            ensureBackgroundKeepAlive = { isDevelopment ->
+                TaskBackgroundKeepAlive.maybePromptForDevelopmentTask(this, prefs, isDevelopment)
+            },
             markTaskPendingReconnect = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 s.runningConversationTasks[key]?.pendingReconnect = true

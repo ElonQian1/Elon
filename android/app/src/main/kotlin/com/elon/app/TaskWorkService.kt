@@ -19,7 +19,10 @@ class TaskWorkService : Service() {
         super.onCreate()
         createTaskWorkNotificationChannels(this)
         restorePersistedTaskWork(prefs, activeTasks)
-        if (hasActiveTasks()) connectAll()
+        if (hasActiveTasks()) {
+            enterForeground("restore")
+            connectAll()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -70,7 +73,7 @@ class TaskWorkService : Service() {
                             "pending_age_ms" to taskPendingWorkAgeMs(tasksToResume)
                         )
                     )
-                    enterForeground()
+                    enterForeground("resume_pending")
                     tasksToResume.forEach {
                         it.payloadSentForCurrentConnection = false
                         connect(it)
@@ -80,7 +83,7 @@ class TaskWorkService : Service() {
                 }
             }
             ACTION_CONNECT -> {
-                if (hasActiveTasks()) enterForeground()
+                if (hasActiveTasks()) enterForeground("connect")
                 traceId?.let { activeTasks[it] }?.let { connect(it) } ?: connectAll()
             }
             ACTION_PAUSE -> pauseWork(traceId)
@@ -88,7 +91,7 @@ class TaskWorkService : Service() {
             else -> {
                 restorePersistedTaskWork(prefs, activeTasks)
                 if (hasActiveTasks()) {
-                    enterForeground()
+                    enterForeground("implicit_resume")
                     activeTasks.values.forEach { it.payloadSentForCurrentConnection = false }
                     connectAll()
                 } else {
@@ -138,7 +141,7 @@ class TaskWorkService : Service() {
             )
         )
         persistTaskWork(prefs, activeTasks.values)
-        enterForeground()
+        enterForeground("start_work")
         connect(task)
     }
 
@@ -442,7 +445,11 @@ class TaskWorkService : Service() {
         }
     }
 
-    private fun enterForeground() {
+    private fun enterForeground(reason: String) {
+        DebugTraceStore.record(
+            "task_foreground_entered",
+            mapOf("reason" to reason, "active_task_count" to activeTasks.size)
+        )
         startForeground(ACTIVE_WORK_NOTIFICATION_ID, activeTaskNotification(this))
     }
 
