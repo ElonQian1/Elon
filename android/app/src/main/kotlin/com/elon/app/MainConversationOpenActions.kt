@@ -16,6 +16,7 @@ internal class MainConversationOpenActions(
     private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val showChat: (Boolean) -> Unit,
     private val showProjectChat: (Boolean) -> Unit,
+    private val showProjectSpaceChat: (String, Boolean) -> Unit,
     private val saveProjects: () -> Unit
 ) {
     fun openConversation(index: Int) {
@@ -37,6 +38,23 @@ internal class MainConversationOpenActions(
         setActiveConversationIndex(recentConversationIndex)
         saveProjects()
         openActiveConversation(showProjectChat)
+    }
+
+    fun openProjectSpaceConversation(projectIndex: Int, conversationIndex: Int) {
+        if (projectIndex !in projects().indices) return
+        setActiveProjectIndex(projectIndex)
+        val currentConversations = conversations()
+        if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
+        setActiveConversationIndex(conversationIndex.coerceIn(0, currentConversations.lastIndex))
+        saveProjects()
+        val conversation = activeConversation()
+        val adapter = ChatAdapter(conversation.messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        showProjectSpaceChat(conversation.title, true)
+        if (adapter.itemCount > 0) {
+            binding.chatList.scrollToPosition(adapter.itemCount - 1)
+        }
     }
 
     private fun openActiveConversation(show: (Boolean) -> Unit) {

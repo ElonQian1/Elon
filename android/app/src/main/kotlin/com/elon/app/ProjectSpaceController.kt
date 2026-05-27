@@ -26,7 +26,11 @@ internal class ProjectSpaceController(
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
-    private val openPersonalAiChat: () -> Unit,
+    private val personalConversations: () -> List<AppConversation>,
+    private val activePersonalConversationIndex: () -> Int,
+    private val openPersonalAiChat: (Int) -> Unit,
+    private val showPersonalConversationActions: (Int) -> Unit,
+    private val showCreatePersonalConversation: () -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
@@ -83,9 +87,10 @@ internal class ProjectSpaceController(
         space.channels.forEach { channel ->
             container.addView(channelRow(channel))
         }
+        container.addView(sectionTitle("个人会话"))
+        renderPersonalConversations(container)
         container.addView(sectionTitle("成员"))
         container.addView(memberSummary(space.members))
-        container.addView(personalAiEntry())
     }
 
     fun isChannelActive(): Boolean = activeChannel != null
@@ -317,16 +322,86 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun personalAiEntry(): TextView {
-        return TextView(activity).apply {
-            text = "个人 AI 会话"
-            textSize = 16f
-            setTextColor(Color.parseColor("#E2E2E2"))
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-            background = panelBackground("#1A1A1A")
+    private fun renderPersonalConversations(container: LinearLayout) {
+        val conversations = personalConversations()
+        if (conversations.isEmpty()) {
+            container.addView(emptyPersonalConversationRow())
+        } else {
+            val activeIndex = activePersonalConversationIndex()
+            conversations.forEachIndexed { index, conversation ->
+                container.addView(personalConversationRow(index, conversation, index == activeIndex))
+            }
+        }
+        container.addView(createPersonalConversationRow())
+    }
+
+    private fun personalConversationRow(
+        index: Int,
+        conversation: AppConversation,
+        active: Boolean
+    ): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            background = panelBackground(if (active) "#232323" else "#1A1A1A")
             isClickable = true
             foreground = selectableForeground()
-            setOnClickListener { openPersonalAiChat() }
+            setOnClickListener { openPersonalAiChat(index) }
+            setOnLongClickListener {
+                showPersonalConversationActions(index)
+                true
+            }
+            addView(TextView(activity).apply {
+                text = buildString {
+                    append(conversation.title.ifBlank { "个人会话 ${index + 1}" })
+                    if (active) append("  ·  当前")
+                    if (conversation.ended) append("  ·  已结束")
+                }
+                textSize = 16f
+                setTextColor(Color.parseColor("#E2E2E2"))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            addView(TextView(activity).apply {
+                text = personalConversationHint(conversation)
+                textSize = 12f
+                setTextColor(Color.parseColor("#8E8E8E"))
+                setPadding(0, dp(5), 0, 0)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    private fun createPersonalConversationRow(): TextView {
+        return TextView(activity).apply {
+            text = "+ 新建个人 AI 会话"
+            textSize = 15f
+            setTextColor(Color.parseColor("#D8D8D8"))
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            background = panelBackground("#171717")
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { showCreatePersonalConversation() }
+        }
+    }
+
+    private fun emptyPersonalConversationRow(): TextView {
+        return TextView(activity).apply {
+            text = "暂无个人会话"
+            textSize = 13f
+            setTextColor(Color.parseColor("#8E8E8E"))
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            background = panelBackground("#1A1A1A")
+        }
+    }
+
+    private fun personalConversationHint(conversation: AppConversation): String {
+        val subtitle = conversation.subtitle.takeIf { it.isNotBlank() } ?: "还没有消息"
+        return if (conversation.messages.isEmpty()) {
+            subtitle
+        } else {
+            "${conversation.messages.size} 条消息 · $subtitle"
         }
     }
 

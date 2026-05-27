@@ -442,11 +442,15 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            openPersonalAiChat = {
+            personalConversations = { projectStateActions.conversations },
+            activePersonalConversationIndex = { projectStateActions.activeConversationIndex },
+            openPersonalAiChat = { conversationIndex ->
                 val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
-                conversationOpenActions.openProject(idx)
+                conversationOpenActions.openProjectSpaceConversation(idx, conversationIndex)
             },
+            showPersonalConversationActions = { index -> conversationActions.showConversationActions(index) },
+            showCreatePersonalConversation = { conversationActions.showCreateConversationDialog() },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )
@@ -499,7 +503,8 @@ class MainActivity : AppCompatActivity() {
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            onConversationsChanged = { projectSpaceController.renderActiveSpace() }
         )
     }
 
@@ -535,6 +540,7 @@ class MainActivity : AppCompatActivity() {
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
             showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
+            showProjectSpaceChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
             saveProjects = projectStateActions::saveProjects
         )
     }

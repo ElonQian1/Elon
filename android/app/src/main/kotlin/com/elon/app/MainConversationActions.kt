@@ -17,7 +17,8 @@ internal class MainConversationActions(
     private val titleEditText: (String) -> EditText,
     private val saveConversations: () -> Unit,
     private val renderConversationList: () -> Unit,
-    private val setSendEnabled: (Boolean) -> Unit
+    private val setSendEnabled: (Boolean) -> Unit,
+    private val onConversationsChanged: () -> Unit = {}
 ) {
     fun showCreateConversationDialog() {
         val conversations = conversationsProvider()
@@ -74,6 +75,7 @@ internal class MainConversationActions(
         project.subtitle = "${conversations.size} 个会话"
         saveConversations()
         renderConversationList()
+        onConversationsChanged()
     }
 
     private fun showRenameConversationDialog(index: Int) {
@@ -99,6 +101,7 @@ internal class MainConversationActions(
                 conversation.updatedAt = System.currentTimeMillis()
                 saveConversations()
                 renderConversationList()
+                onConversationsChanged()
                 if (activeConversationIndexProvider() == index && binding.chatPage.visibility == View.VISIBLE) {
                     binding.topTitleText.text = conversation.title
                 }
@@ -132,6 +135,7 @@ internal class MainConversationActions(
         conversation.messages.add(ChatMessage("ai", "本会话已结束，可以在会话列表长按删除，或新建会话继续。"))
         saveConversations()
         renderConversationList()
+        onConversationsChanged()
 
         if (activeConversationIndexProvider() == index && binding.chatPage.visibility == View.VISIBLE) {
             val chatAdapter = chatAdapterProvider()
@@ -165,6 +169,7 @@ internal class MainConversationActions(
         setActiveConversationIndex(activeConversationIndexProvider().coerceAtMost(conversations.lastIndex))
         saveConversations()
         renderConversationList()
+        onConversationsChanged()
         if (binding.chatPage.visibility == View.VISIBLE) {
             binding.tabChat.performClick()
         }
