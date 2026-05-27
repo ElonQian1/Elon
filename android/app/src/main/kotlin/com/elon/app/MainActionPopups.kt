@@ -81,14 +81,14 @@ internal class MainActionPopups(
 
     fun showProjectShareActionPopup(anchor: View, message: ChatMessage, share: ChatProjectShare) {
         val actions = listOf(
-            TopAction("撤销发布", R.drawable.ic_msg_delete) {
+            TopAction("撤销", R.drawable.ic_msg_delete) {
                 revokeProjectShare(message, share)
             },
-            TopAction("恢复个人项目", R.drawable.ic_popup_project) {
+            TopAction("恢复", R.drawable.ic_popup_project) {
                 restorePersonalProject(message, share)
             }
         )
-        setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
+        setActionPopup(renderer().showProjectCardActionPopup(anchor, getActionPopup(), actions))
     }
 
     private fun showTopActionPopup(anchor: View, actions: List<TopAction>) {

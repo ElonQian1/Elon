@@ -166,6 +166,72 @@ internal class MainActionPopupRenderer(
         return popup
     }
 
+    fun showProjectCardActionPopup(anchor: View, previousPopup: PopupWindow?, actions: List<TopAction>): PopupWindow {
+        previousPopup?.dismiss()
+
+        val visibleActions = actions.take(3).ifEmpty { actions }
+        val actionWidth = dp(62)
+        val popupWidth = (actionWidth * visibleActions.size + dp(20))
+            .coerceAtMost(activity.resources.displayMetrics.widthPixels - dp(24))
+        val popupHeight = dp(46)
+        val root = FrameLayout(activity).apply {
+            layoutParams = ViewGroup.LayoutParams(popupWidth, popupHeight)
+            alpha = 0f
+            scaleX = 0.96f
+            scaleY = 0.96f
+        }
+        val panel = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                cornerRadius = dp(10).toFloat()
+                setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
+            }
+            setPadding(dp(10), 0, dp(10), 0)
+        }
+        root.addView(
+            panel,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        lateinit var popup: PopupWindow
+        visibleActions.forEachIndexed { index, action ->
+            panel.addView(
+                createProjectCardActionCell(action) { popup.dismiss() },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            )
+            if (index < visibleActions.lastIndex) {
+                panel.addView(createProjectCardDivider())
+            }
+        }
+
+        val anchorLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        val popupX = (anchorLocation[0] + dp(16))
+            .coerceIn(dp(12), activity.resources.displayMetrics.widthPixels - popupWidth - dp(12))
+        val aboveY = anchorLocation[1] - popupHeight
+        val popupY = if (aboveY > dp(76)) aboveY else anchorLocation[1] + anchor.height + dp(8)
+
+        popup = PopupWindow(root, popupWidth, popupHeight, true).apply {
+            isOutsideTouchable = true
+            elevation = dp(8).toFloat()
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY)
+        }
+        root.pivotX = dp(28).toFloat()
+        root.pivotY = popupHeight.toFloat()
+        root.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(120L)
+            .start()
+        return popup
+    }
+
     private fun createTopActionRow(action: TopAction, dismissPopup: () -> Unit): View {
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -270,6 +336,30 @@ internal class MainActionPopupRenderer(
                 dismissPopup()
                 action.action()
             }
+        }
+    }
+
+    private fun createProjectCardActionCell(action: TopAction, dismissPopup: () -> Unit): View {
+        return TextView(activity).apply {
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            isClickable = true
+            foreground = selectableForeground()
+            text = action.title
+            setTextColor(Color.parseColor("#D0D0D0"))
+            textSize = 18f
+            setOnClickListener {
+                dismissPopup()
+                action.action()
+            }
+        }
+    }
+
+    private fun createProjectCardDivider(): View {
+        return View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(1, dp(28))
+            alpha = 0.75f
+            setBackgroundColor(Color.parseColor("#AFAFAF"))
         }
     }
 }
