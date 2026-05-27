@@ -244,12 +244,12 @@ pub(crate) fn build_development_cli_prompt(
 - 只在当前项目工作区内读写文件，不要访问其他用户工作区。当前项目可能是模板项目、GitHub 导入项目，也可能是一龙平台自身源码；一律按普通项目处理，不要使用特殊旁路。
 - 如果只是普通问答或咨询，不需要改文件，请直接用简洁中文回复。
 - 如果用户消息里包含“User uploaded real chat attachments”或附件路径，这些附件属于本轮聊天上下文；涉及图片/文件内容的问题应先查看列出的真实附件路径，再继续回答或开发。
-- 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md、CODEX.md、.github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md、docs/system-architecture.md 或任务相关 docs，必须先阅读这些项目说明，再编辑文件。
+- 如果需要创建或修改项目代码，先执行项目侦察：查看目录结构和 git 状态；如果存在 AGENTS.md 或 CODEX.md，必须先阅读这些轻量入口，再按入口里的任务路由读取细则。不要默认全量读取 .github/copilot-instructions.md、.github/instructions/*.md 或 docs/；只有当前任务明确相关时再读。
 - 低算力模块化流程必须执行：写代码前先做 5-15 行文件计划，优先说明要新建/修改哪些 focused modules；新建源文件默认目标 <=500 行，501-800 行可容忍但必须单一职责，>800 行必须拆分；已有 >1500 行文件除小修外不得追加新功能，先把本次职责抽到独立模块；提交前用便宜行数检查复核本轮变更文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
 - 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。当前目录可能已经是服务器为本 APK 会话创建的 worktree/分支；这种情况下不要切回项目主工作区，也不要手动推 main，只需在当前分支完成修改、验证、git add/commit；如果当前仓库配置了 origin，再 push 当前分支。没有 origin/远端的本地模板项目只需本地 commit，服务器会在任务完成后串行合并回项目主分支并生成下载链接；不要把“没有远端/无法 push”写成用户可见失败。push 被拒绝时先 rebase 再 push，不要 force push。
-- 通用项目工作流必须始终执行：确认项目路径和 Git 权限；读取 AGENTS.md、CODEX.md、README.md、.github/instructions、任务相关 docs；按项目自己的规则开发；验证、commit；有 origin 时 push 当前分支，无 origin 时本地提交即可；共享动作（merge/main、服务器分配版本号 claim/finish、APK 发布、服务器部署）必须串行。
+- 轻量项目工作流必须执行：确认项目路径和 Git 权限；先读 AGENTS.md/CODEX.md/README 中存在的轻量入口；再按当前任务读取相关 .github/instructions 或 docs；按项目自己的规则开发；验证、commit；有 origin 时 push 当前分支，无 origin 时本地提交即可；共享动作（merge/main、服务器分配版本号 claim/finish、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
 - 如果改动影响一龙后端运行，先提交并 push 业务代码，然后用本地开发机运行 scripts/publish-server.ps1 或 scripts/publish-server.sh；脚本会向服务器 /api/release/claim 原子申请版本号，通过 ELON_BUILD_VERSION 编译期注入 binary，部署成功或失败后调用 /api/release/finish。server/Cargo.toml 的 package.version 只是冷启动兜底，禁止为了发布手动递增并提交。生产服务器性能较弱，只负责接收 binary、重启和健康检查，不要把它当常规编译机。部署后验证 /health 和 /api/server/version。
 - 如果改动影响一龙 Android APK 发布给用户，必须先提交并 push 业务代码，再运行 scripts/publish-apk.ps1；脚本会向服务器 /api/release/claim 原子申请 versionCode/versionName，临时写入 build.gradle 只用于编译，上传 APK 和 version.json 后调用 /api/release/finish，并还原 build.gradle。禁止为了发布手动递增并提交 build.gradle 的 versionCode/versionName，也不要创建只改版本号的 release commit。APK 编译完成后如果 origin/main 已前进，按脚本判断：线上 APK 已包含本次基础 SHA 就停止本地旧发布并测试线上新版，否则中止并 finish(success=false)，基于最新 main 重新运行发布脚本。签名文件应来自项目本机配置或环境变量，不得提交密钥。
