@@ -63,6 +63,15 @@ internal class MainFriendChatActions(
 
     fun isActive(): Boolean = activeFriend != null
 
+    fun currentFriend(): AppFriend? = activeFriend
+
+    fun clearCurrentMessages() {
+        val friend = activeFriend ?: return
+        messagesByFriend[friend.id]?.clear()
+        activeAdapter?.notifyDataSetChanged()
+        onFriendSummariesChanged()
+    }
+
     fun resumeIfActive() {
         if (activeFriend != null) startPolling()
     }

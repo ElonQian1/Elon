@@ -357,6 +357,7 @@ class MainActivity : AppCompatActivity() {
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
+            showContactChatSettings = { showActiveContactChatSettings() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             refreshFriends = {
                 friendActions.loadFriends()
@@ -379,6 +380,26 @@ class MainActivity : AppCompatActivity() {
             onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
             loadMarketplace = { marketplaceActions.loadProjects() }
         )
+    }
+
+    private val chatSettingsActions: MainChatSettingsActions by lazy {
+        MainChatSettingsActions(
+            activity = this,
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground,
+            clearFriendMessages = { friendChatActions.clearCurrentMessages() },
+            clearGroupMessages = { groupChatActions.clearCurrentMessages() }
+        )
+    }
+
+    private fun showActiveContactChatSettings() {
+        groupChatActions.currentGroup()?.let {
+            chatSettingsActions.showGroupSettings(it)
+            return
+        }
+        friendChatActions.currentFriend()?.let {
+            chatSettingsActions.showFriendSettings(it)
+        }
     }
 
     private val marketplaceActions: MainMarketplaceActions by lazy {

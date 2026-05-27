@@ -25,6 +25,7 @@ internal class MainNavigationController(
     private val showConversationActions: (Int) -> Unit,
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
+    private val showContactChatSettings: () -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
@@ -421,6 +422,8 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
+        binding.moreButton.contentDescription = "聊天功能"
         binding.stageHintText.visibility = View.VISIBLE
         renderConversationList()
         binding.topTitleText.text = activeConversationProvider().title
@@ -461,7 +464,9 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
-        binding.moreButton.visibility = View.GONE
+        binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.setOnClickListener { showContactChatSettings() }
+        binding.moreButton.contentDescription = "聊天设置"
         binding.quickActionStrip.visibility = View.GONE
         binding.stageHintText.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)

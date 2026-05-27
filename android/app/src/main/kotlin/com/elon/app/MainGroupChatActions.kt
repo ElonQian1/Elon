@@ -63,6 +63,15 @@ internal class MainGroupChatActions(
 
     fun isActive(): Boolean = activeGroup != null
 
+    fun currentGroup(): AppGroup? = activeGroup
+
+    fun clearCurrentMessages() {
+        val group = activeGroup ?: return
+        messagesByGroup[group.id]?.clear()
+        activeAdapter?.notifyDataSetChanged()
+        onGroupSummariesChanged()
+    }
+
     fun resumeIfActive() {
         if (activeGroup != null) startPolling()
     }
