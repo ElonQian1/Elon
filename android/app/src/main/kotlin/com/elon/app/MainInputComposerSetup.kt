@@ -111,7 +111,7 @@ internal class MainInputComposerSetup(
             setBackgroundResource(R.drawable.bg_input_pill)
             minimumHeight = dp(40)
             isClickable = true
-            isFocusable = true
+            isFocusable = false
             setOnClickListener { focusInputComposer() }
         }
 

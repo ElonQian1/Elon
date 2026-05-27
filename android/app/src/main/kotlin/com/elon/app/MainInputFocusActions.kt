@@ -36,8 +36,8 @@ internal class MainInputFocusActions(
         }
         focusAndShowKeyboard()
         binding.inputEdit.post { focusAndShowKeyboard() }
-        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfStillFocused() }, 90L)
-        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfStillFocused() }, 220L)
+        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 90L)
+        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 220L)
     }
 
     fun collapseInputComposerForBack(): Boolean {
@@ -69,16 +69,20 @@ internal class MainInputFocusActions(
 
     private fun focusAndShowKeyboard() {
         if (!binding.inputEdit.hasFocus()) {
-            binding.inputEdit.requestFocus()
+            binding.inputEdit.requestFocusFromTouch()
+            if (!binding.inputEdit.hasFocus()) {
+                binding.inputEdit.requestFocus()
+            }
         }
+        binding.inputEdit.isCursorVisible = true
         binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
         showKeyboard()
     }
 
-    private fun focusAndShowKeyboardIfStillFocused() {
-        if (!binding.inputEdit.hasFocus()) return
-        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
-        showKeyboard()
+    private fun focusAndShowKeyboardIfComposerOpen() {
+        if (isVoiceMode()) return
+        if (inputComposerMotion()?.isExpanded != true) return
+        focusAndShowKeyboard()
     }
 
     private fun showKeyboard() {
