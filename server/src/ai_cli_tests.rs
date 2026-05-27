@@ -82,7 +82,7 @@ fn chat_prompt_uses_lightweight_mode() {
     );
 
     assert!(prompt.contains("轻量聊天模式"));
-    assert!(!prompt.contains("通用项目工作流必须始终执行"));
+    assert!(!prompt.contains("轻量项目工作流必须执行"));
     assert!(!prompt.contains("git pull --rebase"));
 }
 
@@ -107,7 +107,11 @@ fn development_prompt_keeps_project_workflow() {
         false,
     );
 
-    assert!(prompt.contains("通用项目工作流必须始终执行"));
+    assert!(prompt.contains("轻量项目工作流必须执行"));
+    assert!(prompt.contains("先阅读这些轻量入口"));
+    assert!(prompt.contains("按入口里的任务路由读取细则"));
+    assert!(!prompt.contains("必须先阅读这些项目说明，再编辑文件"));
+    assert!(!prompt.contains(".github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md"));
     assert!(prompt.contains("git pull --rebase"));
     assert!(prompt.contains("scripts/publish-apk.ps1"));
     assert!(prompt.contains("/api/release/claim"));
@@ -287,7 +291,7 @@ fn repair_prompt_creates_background_summary_without_project_workflow() {
     assert!(prompt.contains("后台恢复摘要接力"));
     assert!(prompt.contains("Do not inspect files"));
     assert!(!prompt.contains("git pull --rebase"));
-    assert!(!prompt.contains("通用项目工作流必须始终执行"));
+    assert!(!prompt.contains("轻量项目工作流必须执行"));
 }
 
 #[test]
