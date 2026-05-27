@@ -97,14 +97,15 @@ internal class MainGroupChatActions(
 
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         val group = activeGroup ?: return false
-        val text = visibleTextForPendingAttachments(rawText, pendingAttachments)
+        val attachmentsToSend = pendingAttachments.toList()
+        val text = visibleTextForPendingAttachments(rawText, attachmentsToSend)
         if (text.isBlank()) return true
 
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val pending = ChatMessage(
             role = "user",
             content = text,
-            attachments = chatAttachmentsFromPending(pendingAttachments).takeIf { it.isNotEmpty() },
+            attachments = chatAttachmentsFromPending(attachmentsToSend).takeIf { it.isNotEmpty() },
             sendStatus = SENDING_STATUS
         )
         messages.add(pending)
@@ -116,7 +117,7 @@ internal class MainGroupChatActions(
 
         thread {
             val result = runCatching {
-                val attachments = uploadGroupAttachments(group, pendingAttachments)
+                val attachments = uploadGroupAttachments(group, attachmentsToSend)
                 postMessage(group, text, attachments)
             }
             activity.runOnUiThread {

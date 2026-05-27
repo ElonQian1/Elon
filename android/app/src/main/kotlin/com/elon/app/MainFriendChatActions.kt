@@ -97,14 +97,15 @@ internal class MainFriendChatActions(
 
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         val friend = activeFriend ?: return false
-        val text = visibleTextForPendingAttachments(rawText, pendingAttachments)
+        val attachmentsToSend = pendingAttachments.toList()
+        val text = visibleTextForPendingAttachments(rawText, attachmentsToSend)
         if (text.isBlank()) return true
 
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         val pending = ChatMessage(
             role = "user",
             content = text,
-            attachments = chatAttachmentsFromPending(pendingAttachments).takeIf { it.isNotEmpty() },
+            attachments = chatAttachmentsFromPending(attachmentsToSend).takeIf { it.isNotEmpty() },
             sendStatus = SENDING_STATUS
         )
         messages.add(pending)
@@ -116,7 +117,7 @@ internal class MainFriendChatActions(
 
         thread {
             val result = runCatching {
-                val attachments = uploadFriendAttachments(friend, pendingAttachments)
+                val attachments = uploadFriendAttachments(friend, attachmentsToSend)
                 postMessage(friend, text, attachments)
             }
             activity.runOnUiThread {
