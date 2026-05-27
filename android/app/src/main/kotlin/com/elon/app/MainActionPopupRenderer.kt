@@ -170,7 +170,7 @@ internal class MainActionPopupRenderer(
         previousPopup?.dismiss()
 
         val visibleActions = actions.take(3).ifEmpty { actions }
-        val actionWidth = dp(62)
+        val actionWidth = dp(58)
         val popupWidth = (actionWidth * visibleActions.size + dp(20))
             .coerceAtMost(activity.resources.displayMetrics.widthPixels - dp(24))
         val popupHeight = dp(46)
@@ -344,8 +344,8 @@ internal class MainActionPopupRenderer(
             isClickable = true
             foreground = selectableForeground()
             text = action.title
-            setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 18f
+            setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+            textSize = 15.5f
             setOnClickListener {
                 dismissPopup()
                 action.action()
@@ -356,15 +356,15 @@ internal class MainActionPopupRenderer(
     private fun createProjectCardDivider(): View {
         return View(activity).apply {
             layoutParams = LinearLayout.LayoutParams(1, dp(28))
-            alpha = 0.75f
-            setBackgroundColor(Color.parseColor("#AFAFAF"))
+            alpha = 0.55f
+            setBackgroundColor(Color.parseColor(WECHAT_POPUP_DIVIDER_COLOR))
         }
     }
 
     private fun createProjectCardPopupBackground(): GradientDrawable {
         val radius = dp(10).toFloat()
         return GradientDrawable().apply {
-            setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
+            setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
             cornerRadii = floatArrayOf(
                 radius, radius,
                 radius, radius,
