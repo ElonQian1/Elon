@@ -99,7 +99,7 @@ internal class MainGroupChatActions(
         val group = activeGroup ?: return false
         val attachmentsToSend = pendingAttachments.toList()
         val text = visibleTextForPendingAttachments(rawText, attachmentsToSend)
-        if (text.isBlank()) return true
+        if (text.isBlank() && attachmentsToSend.isEmpty()) return true
 
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
         val pending = ChatMessage(

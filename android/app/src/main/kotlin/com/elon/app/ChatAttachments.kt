@@ -20,7 +20,6 @@ data class ChatAttachment(
         return kind == "image" || mimeType.orEmpty().startsWith("image/")
     }
 }
-
 internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
     return refs.mapNotNull { element ->
         if (!element.isJsonObject) return@mapNotNull null
@@ -40,7 +39,6 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
         )
     }
 }
-
 internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachment> {
     array ?: return emptyList()
     return List(array.length()) { index -> array.optJSONObject(index) }
@@ -134,8 +132,7 @@ internal fun visibleTextForPendingAttachments(rawText: String, attachments: List
         }
         .joinToString("\n")
         .trim()
-    if (cleaned.isNotBlank() || attachments.isEmpty()) return cleaned
-    return defaultPendingAttachmentMessage(attachments)
+    return cleaned
 }
 
 internal fun pendingAttachmentSummary(attachments: List<PendingAttachment>): String {
@@ -147,15 +144,5 @@ internal fun pendingAttachmentSummary(attachments: List<PendingAttachment>): Str
         attachments.size == 1 -> "已选择 1 个附件"
         imageCount > 0 -> "已选择 ${attachments.size} 个附件，含 $imageCount 张图片"
         else -> "已选择 ${attachments.size} 个附件"
-    }
-}
-
-private fun defaultPendingAttachmentMessage(attachments: List<PendingAttachment>): String {
-    val imageCount = attachments.count { it.mimeType.startsWith("image/") || it.kind == "image" }
-    return when {
-        attachments.size == 1 && imageCount == 1 -> "请看这张图片。"
-        attachments.size == imageCount -> "请看这些图片。"
-        attachments.size == 1 -> "请看这个附件。"
-        else -> "请看这些附件。"
     }
 }

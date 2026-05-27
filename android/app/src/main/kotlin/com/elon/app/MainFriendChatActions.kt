@@ -99,7 +99,7 @@ internal class MainFriendChatActions(
         val friend = activeFriend ?: return false
         val attachmentsToSend = pendingAttachments.toList()
         val text = visibleTextForPendingAttachments(rawText, attachmentsToSend)
-        if (text.isBlank()) return true
+        if (text.isBlank() && attachmentsToSend.isEmpty()) return true
 
         val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
         val pending = ChatMessage(

@@ -650,7 +650,7 @@ class MainActivity : AppCompatActivity() {
                 actionPopups.showProjectShareActionPopup(anchor, message, share)
             },
             userId = { AuthManager.effectiveUserId(this) },
-            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments() },
+            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
         )
@@ -670,7 +670,7 @@ class MainActivity : AppCompatActivity() {
                 actionPopups.showProjectShareActionPopup(anchor, message, share)
             },
             userId = { AuthManager.effectiveUserId(this) },
-            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments() },
+            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onGroupSummariesChanged = { groupActions.loadGroups() }
         )
