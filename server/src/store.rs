@@ -13,6 +13,7 @@ mod friend_messages;
 mod friends;
 mod groups;
 mod native_sessions;
+mod project_space;
 mod projects;
 mod tasks;
 mod users;
@@ -204,6 +205,42 @@ pub struct ProjectMemberEntry {
     pub account: String,
     pub role: String, // "owner" | "member" | "observer"
     pub joined_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectSpaceSummary {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub role: String,
+    pub member_count: i64,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectChannel {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub kind: String,
+    pub position: i64,
+    pub last_message: Option<String>,
+    pub last_message_at: Option<String>,
+    pub unread_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectChannelMessage {
+    pub id: String,
+    pub project_id: String,
+    pub channel_id: String,
+    pub sender_user_id: Option<String>,
+    pub sender_name: Option<String>,
+    pub kind: String,
+    pub content: String,
+    pub task_id: Option<String>,
+    pub created_at: String,
+    pub outgoing: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

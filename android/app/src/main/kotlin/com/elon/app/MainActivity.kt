@@ -102,9 +102,12 @@ class MainActivity : AppCompatActivity() {
             messageActions = { messageActions },
             navigationController = { navigationController },
             stageHintShimmer = { stageHintShimmer() },
-            isFriendChatActive = { friendChatActions.isActive() || groupChatActions.isActive() },
+            isFriendChatActive = {
+                friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
+            },
             trySendFriendMessage = { text, hasAttachments ->
-                groupChatActions.trySendMessage(text, hasAttachments) ||
+                projectSpaceController.trySendMessage(text, hasAttachments) ||
+                    groupChatActions.trySendMessage(text, hasAttachments) ||
                     friendChatActions.trySendMessage(text, hasAttachments)
             }
         )
@@ -171,6 +174,7 @@ class MainActivity : AppCompatActivity() {
         }
         friendChatActions.resumeIfActive()
         groupChatActions.resumeIfActive()
+        projectSpaceController.resumeIfActive()
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -205,6 +209,7 @@ class MainActivity : AppCompatActivity() {
         s.appInForeground = false
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
+        projectSpaceController.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
@@ -346,6 +351,7 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList,
+            renderProjectSpace = { projectSpaceController.renderActiveSpace() },
             refreshServerVersion = { profileQuickActions.refreshServerVersion() },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -368,7 +374,9 @@ class MainActivity : AppCompatActivity() {
             onFriendChatClosed = {
                 friendChatActions.closeFriendChat()
                 groupChatActions.closeGroupChat()
+                projectSpaceController.closeChannelChat()
             },
+            onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
             loadMarketplace = { marketplaceActions.loadProjects() }
         )
     }
@@ -390,9 +398,32 @@ class MainActivity : AppCompatActivity() {
                 }
                 val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }
                     ?: s.projects.lastIndex
-                conversationOpenActions.openProject(idx)
+                s.activeProjectIndex = idx
+                projectStateActions.saveProjects()
                 homeListActions.renderProjectList()
+                projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
             }
+        )
+    }
+
+    private val projectSpaceController: ProjectSpaceController by lazy {
+        ProjectSpaceController(
+            activity = this,
+            binding = binding,
+            http = s.http,
+            serverUrl = serverUrl,
+            setChatAdapter = { chatAdapter = it },
+            showProjectSpace = { title, animate -> navigationController.showProjectSpace(title, animate) },
+            showProjectChannelChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
+            openPersonalAiChat = {
+                val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
+                    .takeIf { it >= 0 } ?: s.activeProjectIndex
+                conversationOpenActions.openProject(idx)
+            },
+            dp = uiTools::dp,
+            selectableForeground = uiTools::selectableForeground
         )
     }
 
@@ -547,10 +578,12 @@ class MainActivity : AppCompatActivity() {
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
                 groupChatActions.closeGroupChat()
+                projectSpaceController.closeChannelChat()
                 friendChatActions.openFriend(friend, animate = true)
             },
             openGroup = { group ->
                 friendChatActions.closeFriendChat()
+                projectSpaceController.closeChannelChat()
                 groupChatActions.openGroup(group, animate = true)
             }
         )
@@ -590,7 +623,14 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             timeFormatter = s.timeFormatter,
             activeProjectIndexProvider = { s.activeProjectIndex },
-            openProject = conversationOpenActions::openProject,
+            openProject = { index ->
+                if (index in s.projects.indices) {
+                    s.activeProjectIndex = index
+                    projectStateActions.saveProjects()
+                    val project = s.projects[index]
+                    projectSpaceController.openProjectSpace(project.id, project.title, true)
+                }
+            },
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -670,11 +710,14 @@ class MainActivity : AppCompatActivity() {
             addJoinedProject = { storeProject ->
                 val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
                     .copy(id = storeProject.id)
-                s.projects.add(newProject)
+                if (s.projects.none { it.id == storeProject.id }) s.projects.add(newProject)
                 projectStateActions.saveProjects()
-                val idx = s.projects.lastIndex
-                conversationOpenActions.openProject(idx)
+                val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }
+                    ?: s.projects.lastIndex
+                s.activeProjectIndex = idx
+                projectStateActions.saveProjects()
                 homeListActions.renderProjectList()
+                projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
             },
             dp = uiTools::dp
         )
@@ -735,6 +778,7 @@ class MainActivity : AppCompatActivity() {
             },
             openGroup = { group ->
                 friendChatActions.closeFriendChat()
+                projectSpaceController.closeChannelChat()
                 groupChatActions.openGroup(group, animate = true)
             }
         )
@@ -877,6 +921,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
+        projectSpaceController.stopPolling()
         lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }

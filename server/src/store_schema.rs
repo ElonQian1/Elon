@@ -54,6 +54,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (4, "好友会话已读状态与未读提醒", migration_v4),
     (5, "用户头像数据（个人资料上传）", migration_v5),
     (6, "好友群聊基础表与未读状态", migration_v6),
+    (7, "项目空间频道与共享频道消息", migration_v7),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -410,6 +411,62 @@ fn migration_v6(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_friend_group_messages_group_created
           ON friend_group_messages(group_id, created_at);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v7：项目空间频道 ───────────────────────────────────────────────────────
+
+fn migration_v7(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_channels (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name       TEXT NOT NULL,
+          kind       TEXT NOT NULL,
+          position   INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, kind),
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_channel_messages (
+          id             TEXT PRIMARY KEY,
+          project_id     TEXT NOT NULL,
+          channel_id     TEXT NOT NULL,
+          sender_user_id TEXT,
+          kind           TEXT NOT NULL DEFAULT 'text',
+          content        TEXT NOT NULL,
+          task_id        TEXT,
+          created_at     TEXT NOT NULL,
+          FOREIGN KEY (project_id)     REFERENCES projects(id),
+          FOREIGN KEY (channel_id)     REFERENCES project_channels(id),
+          FOREIGN KEY (sender_user_id) REFERENCES users(id),
+          FOREIGN KEY (task_id)        REFERENCES tasks(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_channel_read_states (
+          project_id   TEXT NOT NULL,
+          channel_id   TEXT NOT NULL,
+          user_id      TEXT NOT NULL,
+          last_read_at TEXT NOT NULL,
+          PRIMARY KEY (project_id, channel_id, user_id),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (channel_id) REFERENCES project_channels(id),
+          FOREIGN KEY (user_id)    REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_channels_project_position
+          ON project_channels(project_id, position);
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_messages_channel_created
+          ON project_channel_messages(project_id, channel_id, created_at);
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_read_states_user
+          ON project_channel_read_states(user_id, project_id);
         "#,
     )?;
     Ok(())

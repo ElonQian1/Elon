@@ -11,7 +11,7 @@ use crate::types::AppState;
 use crate::{
     admin, api, app_update, auth_api, friend_api, global_ws, lan_peer, peer_relay, project_api,
     project_attachments, project_chat, project_downloads, project_git, project_membership,
-    project_store, release_claim, user_api, web,
+    project_space, project_store, release_claim, user_api, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -123,6 +123,19 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/projects/:id/visibility",
             axum::routing::patch(project_membership::update_visibility),
         )
+        // ── 项目空间：频道、成员协作、集体 AI 开发 ───────────────────────────
+        .route(
+            "/api/projects/:project_id/space",
+            get(project_space::get_project_space),
+        )
+        .route(
+            "/api/projects/:project_id/channels/:channel_id/messages",
+            get(project_space::list_channel_messages).post(project_space::send_channel_message),
+        )
+        .route(
+            "/api/projects/:project_id/channels/:channel_id/ai-tasks",
+            post(project_space::start_channel_ai_task),
+        )
         .route(
             "/api/projects/:project_id/chat",
             post(project_chat::chat_project),
@@ -233,11 +246,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )
         // ── 用户头像（公开查看 / 登录后上传）─────────────────────────────────
+        .route("/api/users/:user_id/avatar", get(user_api::get_user_avatar))
         .route(
-            "/api/users/:user_id/avatar",
-            get(user_api::get_user_avatar),
+            "/api/me/avatar",
+            axum::routing::put(user_api::put_my_avatar),
         )
-        .route("/api/me/avatar", axum::routing::put(user_api::put_my_avatar))
         .layer(cors)
         .with_state(state)
 }
