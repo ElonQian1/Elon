@@ -112,13 +112,16 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("按入口里的任务路由读取细则"));
     assert!(!prompt.contains("必须先阅读这些项目说明，再编辑文件"));
     assert!(!prompt.contains(".github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md"));
-    assert!(prompt.contains("git pull --rebase"));
     assert!(prompt.contains("scripts/publish-apk.ps1"));
-    assert!(prompt.contains("/api/release/claim"));
-    assert!(prompt.contains("/api/release/finish"));
-    assert!(prompt.contains("ELON_BUILD_VERSION"));
-    assert!(prompt.contains("临时写入 build.gradle"));
-    assert!(prompt.contains("禁止为了发布手动递增并提交"));
+    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind AndroidFeature"));
+    assert!(prompt.contains("scripts/publish-server.ps1"));
+    assert!(prompt.contains("脚本负责版本分配、构建、上传、并发保护和 finish"));
+    assert!(prompt.contains("脚本负责版本分配、临时构建配置、上传、并发保护和 finish"));
+    assert!(prompt.contains("不要手动改 `server/Cargo.toml` 版本"));
+    assert!(prompt.contains("不要手动改或提交 `build.gradle` 版本字段"));
+    assert!(!prompt.contains("/api/release/claim"));
+    assert!(!prompt.contains("ELON_BUILD_VERSION"));
+    assert!(!prompt.contains("临时写入 build.gradle"));
     assert!(prompt.contains("新建源文件默认目标 <=500 行"));
     assert!(prompt.contains("501-800 行可容忍"));
     assert!(prompt.contains(">800 行必须拆分"));
@@ -126,8 +129,8 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("5-15 行文件计划"));
     assert!(!prompt.contains("必须递增 server/Cargo.toml 的 package.version"));
     assert!(!prompt.contains("递增 versionCode/versionName"));
-    assert!(prompt.contains("服务器为本 APK 会话创建的 worktree/分支"));
-    assert!(prompt.contains("服务器会在任务完成后串行合并回项目主分支"));
+    assert!(prompt.contains("服务器创建的会话 worktree/分支"));
+    assert!(prompt.contains("没有远端的本地模板项目只需本地 commit"));
 }
 
 #[test]
@@ -159,9 +162,9 @@ fn development_prompt_includes_preflight_note() {
         false,
     );
 
-    assert!(prompt.contains("项目预检结果"));
+    assert!(prompt.contains("项目预检与约束摘要"));
     assert!(prompt.contains("这不是最终失败"));
-    assert!(prompt.contains("不要反复盲目执行同一个失败命令"));
+    assert!(prompt.contains("保护已有改动"));
 }
 
 #[test]
@@ -192,8 +195,7 @@ fn resumed_development_prompt_reuses_bootstrap_rules() {
     );
 
     assert!(prompt.contains("full development workflow was already injected"));
-    assert!(prompt.contains("/api/release/claim"));
-    assert!(prompt.contains("/api/release/finish"));
+    assert!(prompt.contains("use the publish scripts after commit + push"));
     assert!(prompt.contains("do not manually bump or commit"));
     assert!(prompt.contains("git status is clean"));
     assert!(prompt.contains("用户可见："));

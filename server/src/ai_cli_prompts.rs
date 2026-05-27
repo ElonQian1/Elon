@@ -248,11 +248,11 @@ pub(crate) fn build_development_cli_prompt(
 - 低算力模块化流程必须执行：写代码前先做 5-15 行文件计划，优先说明要新建/修改哪些 focused modules；新建源文件默认目标 <=500 行，501-800 行可容忍但必须单一职责，>800 行必须拆分；已有 >1500 行文件除小修外不得追加新功能，先把本次职责抽到独立模块；提交前用便宜行数检查复核本轮变更文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 如果以后服务端把其他 AI 模型的分类、摘要、图片或特殊分析结果交给你，它们只是旁路证据；你仍然是当前 APK 会话的主执行上下文，必须把这些结论纳入当前 Codex CLI 原生 session 后继续处理，不要另起独立主会话。
-- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 git pull --rebase origin main。如果上方项目预检结果提示 pull 失败或工作区有未提交改动，不要反复盲目执行同一个失败命令；先查看 git status/diff 处理现场。本任务自己的未提交改动可 stash/rebase/pop；其他任务或来源不明的未提交改动必须从 origin/main 新建 worktree。当前目录可能已经是服务器为本 APK 会话创建的 worktree/分支；这种情况下不要切回项目主工作区，也不要手动推 main，只需在当前分支完成修改、验证、git add/commit；如果当前仓库配置了 origin，再 push 当前分支。没有 origin/远端的本地模板项目只需本地 commit，服务器会在任务完成后串行合并回项目主分支并生成下载链接；不要把“没有远端/无法 push”写成用户可见失败。push 被拒绝时先 rebase 再 push，不要 force push。
+- 对已有 Git 项目或 local_path/GitHub 项目：修改前先 fetch 并查看 git 状态；工作区干净才 rebase 到最新 main；本任务改动可按项目规则 stash/rebase/pop，其他任务或来源不明的改动必须隔离到新 worktree。当前目录可能已经是服务器创建的会话 worktree/分支；这种情况下不要切回主工作区，也不要手动推 main，只需在当前分支完成修改、验证、commit，并在有 origin 时 push 当前分支。没有远端的本地模板项目只需本地 commit；不要把“没有远端/无法 push”写成用户可见失败。push 被拒绝时先 rebase 再 push，不要 force push。
 - 轻量项目工作流必须执行：确认项目路径和 Git 权限；先读 AGENTS.md/CODEX.md/README 中存在的轻量入口；再按当前任务读取相关 .github/instructions 或 docs；按项目自己的规则开发；验证、commit；有 origin 时 push 当前分支，无 origin 时本地提交即可；共享动作（merge/main、服务器分配版本号 claim/finish、APK 发布、服务器部署）必须串行。
 - 新项目是未知的，不能假装有长期记忆；如果没有项目说明文档，使用平台默认流程并建议用户补充项目说明。不要把一龙自项目当特殊项目，也不要把一龙自项目的发布规则套到无关项目。
-- 如果改动影响一龙后端运行，先提交并 push 业务代码，然后用本地开发机运行 scripts/publish-server.ps1 或 scripts/publish-server.sh；脚本会向服务器 /api/release/claim 原子申请版本号，通过 ELON_BUILD_VERSION 编译期注入 binary，部署成功或失败后调用 /api/release/finish。server/Cargo.toml 的 package.version 只是冷启动兜底，禁止为了发布手动递增并提交。生产服务器性能较弱，只负责接收 binary、重启和健康检查，不要把它当常规编译机。部署后验证 /health 和 /api/server/version。
-- 如果改动影响一龙 Android APK 发布给用户，必须先提交并 push 业务代码，再运行 scripts/publish-apk.ps1；脚本会向服务器 /api/release/claim 原子申请 versionCode/versionName，临时写入 build.gradle 只用于编译，上传 APK 和 version.json 后调用 /api/release/finish，并还原 build.gradle。禁止为了发布手动递增并提交 build.gradle 的 versionCode/versionName，也不要创建只改版本号的 release commit。APK 编译完成后如果 origin/main 已前进，按脚本判断：线上 APK 已包含本次基础 SHA 就停止本地旧发布并测试线上新版，否则中止并 finish(success=false)，基于最新 main 重新运行发布脚本。签名文件应来自项目本机配置或环境变量，不得提交密钥。
+- 如果改动影响一龙后端运行，先提交并 push 业务代码，再运行 `scripts/publish-server.ps1` 或 `scripts/publish-server.sh`；脚本负责版本分配、构建、上传、并发保护和 finish。不要手动改 `server/Cargo.toml` 版本；部署后验证 `/health` 和 `/api/server/version`。
+- 如果改动影响一龙 Android APK 发布给用户，先提交并 push 业务代码，再运行 `scripts/publish-apk.ps1` 和 `scripts/check-task-complete.ps1 -Kind AndroidFeature`；脚本负责版本分配、临时构建配置、上传、并发保护和 finish。不要手动改或提交 `build.gradle` 版本字段；签名文件只来自本机配置或环境变量。
 - 对普通用户项目，遵循该项目自己的 README/AGENTS/CODEX/文档；不要把一龙自项目的服务器发布规则套到无关项目，除非该项目文档要求。
 - 开始执行前，先用 1-2 句自然中文回应用户：说清楚你理解到的具体需求，以及接下来会先检查或修改哪里。为了让客户端识别，这一行必须以「用户可见：」开头。不要使用固定模板，不要提“CLI/后台/工作区”，不要承诺还没有完成的结果。
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。
@@ -297,7 +297,7 @@ The full development workflow was already injected earlier in this session. Keep
 - Keep the source-size guardrail active even on resumed turns: new source files target <=500 lines, 501-800 lines are tolerated only for one focused responsibility, >800 lines must be split, and existing >1500-line files must not receive new feature logic except tiny fixes.
 - Preserve unrelated user/AI changes, verify work, commit and push when appropriate.
 - Server/APK release work must build locally and upload artifacts as documented by the project.
-- For the Elon project v0.3.69+ flow, release versions are server-allocated through /api/release/claim and completed through /api/release/finish; do not manually bump or commit server/Cargo.toml or build.gradle version fields for release purposes.
+- For the Elon project release flow, use the publish scripts after commit + push; do not manually bump or commit server/Cargo.toml or build.gradle version fields for release purposes.
 - Shared actions such as merge/main pushes, server version claims, APK release, and server deploy remain serialized.
 - At the beginning of this turn, still give the user 1-2 short natural Chinese sentences prefixed with 「用户可见：」 that state the concrete intent you understood and what you will check or modify first.
 - During execution, add another 「用户可见：」 sentence only when you have a new judgment, blocker, build failure reason, or next-step tradeoff. Do not expose command logs or file lists in these user-facing lines.
