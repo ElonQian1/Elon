@@ -73,11 +73,13 @@ internal class ChatProjectSideMenuView(
     private fun addPersonalProjects() {
         content.addView(sectionHeader("个人项目", showAddButton = false))
         val list = projects()
+            .mapIndexed { index, project -> index to project }
+            .filter { (_, project) -> !project.isJointDevelopmentProject() }
         if (list.isEmpty()) {
             content.addView(emptyRow("暂无个人项目"))
             return
         }
-        list.forEachIndexed { index, project ->
+        list.forEach { (index, project) ->
             content.addView(projectNameRow(project, active = index == activeProjectIndex()) {
                 requestClose(true)
                 postDelayed({ openPersonalProject(index) }, CLOSE_DELAY_MS)
@@ -90,7 +92,7 @@ internal class ChatProjectSideMenuView(
         content.addView(sectionHeader("联合项目", showAddButton = true))
         val jointProjects = projects()
             .mapIndexed { index, project -> index to project }
-            .filter { (_, project) -> project.looksLikeJointProject() }
+            .filter { (_, project) -> project.isJointDevelopmentProject() }
         if (jointProjects.isEmpty()) {
             content.addView(emptyRow("暂无联合项目"))
             return
@@ -173,7 +175,7 @@ internal class ChatProjectSideMenuView(
     }
 
     private fun jointProjectRow(index: Int, project: AppProject): LinearLayout {
-        val share = project.toChatProjectShare().copy(source = "store")
+        val share = project.toChatProjectShare()
         val expanded = expandedProjectIds.contains(project.id)
         return LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -284,13 +286,6 @@ internal class ChatProjectSideMenuView(
         return View(context).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(heightDp))
         }
-    }
-
-    private fun AppProject.looksLikeJointProject(): Boolean {
-        return subtitle.contains("商城") ||
-            subtitle.contains("商店") ||
-            title.contains("联合") ||
-            events.isNotEmpty()
     }
 
     private fun AppProject.latestProjectLog(): String {

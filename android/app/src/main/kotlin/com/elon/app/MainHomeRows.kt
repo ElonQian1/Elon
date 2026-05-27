@@ -278,7 +278,8 @@ internal class MainHomeRows(
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
             maxLines = 1
-            text = "${project.conversations.size} 个会话 · ${project.stage}"
+            val projectKind = if (project.isJointDevelopmentProject()) "联合开发" else "个人独立"
+            text = "$projectKind · ${project.conversations.size} 个会话 · ${project.stage}"
             setTextColor(Color.parseColor("#A9A9A9"))
             textSize = 13f
         })

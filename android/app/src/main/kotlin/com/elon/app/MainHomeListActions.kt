@@ -95,7 +95,23 @@ internal class MainHomeListActions(
         val container = binding.projectContentLayout
         container.removeAllViews()
         container.addView(createNewProjectRow())
-        projects().forEachIndexed { index, project ->
+        val indexedProjects = projects().mapIndexed { index, project -> index to project }
+        val personalProjects = indexedProjects.filter { (_, project) -> !project.isJointDevelopmentProject() }
+        val jointProjects = indexedProjects.filter { (_, project) -> project.isJointDevelopmentProject() }
+
+        container.addView(createProjectSectionTitle("个人独立项目"))
+        if (personalProjects.isEmpty()) {
+            container.addView(createEmptyProjectRow("暂无个人独立项目"))
+        }
+        personalProjects.forEach { (index, project) ->
+            container.addView(homeRows().createProjectRow(index, project))
+        }
+
+        container.addView(createProjectSectionTitle("联合开发项目"))
+        if (jointProjects.isEmpty()) {
+            container.addView(createEmptyProjectRow("暂无联合开发项目"))
+        }
+        jointProjects.forEach { (index, project) ->
             container.addView(homeRows().createProjectRow(index, project))
         }
     }
@@ -123,6 +139,36 @@ internal class MainHomeListActions(
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { showCreateProjectDialog() }
+        }
+    }
+
+    private fun createProjectSectionTitle(title: String): TextView {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(38)
+            ).apply {
+                topMargin = dp(10)
+            }
+            gravity = Gravity.CENTER_VERTICAL
+            text = title
+            setTextColor(Color.parseColor("#8E8E8E"))
+            textSize = 13f
+            setPadding(dp(20), 0, dp(20), 0)
+        }
+    }
+
+    private fun createEmptyProjectRow(textValue: String): TextView {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(44)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            text = textValue
+            setTextColor(Color.parseColor("#6F6F6F"))
+            textSize = 14f
+            setPadding(dp(20), 0, dp(20), 0)
         }
     }
 }

@@ -22,13 +22,21 @@ internal class MainChatProjectShareActions(
     private val tokenProvider: () -> String?
 ) {
     fun sendToCurrentChat(share: ChatProjectShare) {
+        if (share.source == "local") {
+            publishLocalProjectShare(share)
+            return
+        }
+        sendShareMessage(share)
+    }
+
+    private fun sendShareMessage(share: ChatProjectShare) {
         binding.inputEdit.setText(share.toMessageText())
         binding.inputEdit.setSelection(binding.inputEdit.text.length)
         sendMessage()
     }
 
     fun handleCardAction(share: ChatProjectShare) {
-        val existingIndex = projects.indexOfFirst { it.id == share.id }
+        val existingIndex = findProjectIndex(share.id)
         if (existingIndex >= 0) {
             activateAndOpen(existingIndex, share)
             return
@@ -66,10 +74,77 @@ internal class MainChatProjectShareActions(
         }
     }
 
+    private fun publishLocalProjectShare(share: ChatProjectShare) {
+        val index = findProjectIndex(share.id)
+        if (index < 0) {
+            sendShareMessage(share)
+            return
+        }
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录后发布联合项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val project = projects[index]
+        if (project.isJointDevelopmentProject()) {
+            sendShareMessage(project.toChatProjectShare().copy(ownerAccount = AuthManager.displayName(activity)))
+            return
+        }
+
+        Toast.makeText(activity, "正在发布为联合项目...", Toast.LENGTH_SHORT).show()
+        val ownerAccount = AuthManager.displayName(activity)
+        thread {
+            val result = runCatching {
+                val created = createStoreProject(
+                    http = http,
+                    serverUrl = serverUrl,
+                    name = project.title,
+                    description = project.subtitle.takeIf { it.isNotBlank() },
+                    token = token,
+                    ownerAccount = ownerAccount
+                )
+                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                created
+            }
+            activity.runOnUiThread {
+                result
+                    .onSuccess { created ->
+                        val currentIndex = findProjectIndex(share.id)
+                        if (currentIndex >= 0) {
+                            projects[currentIndex].markJointDevelopment(created.id)
+                            saveProjects()
+                            renderProjectList()
+                        }
+                        sendShareMessage(
+                            created.toChatProjectShare().copy(
+                                ownerAccount = ownerAccount,
+                                latestLog = share.latestLog
+                            )
+                        )
+                        Toast.makeText(activity, "已发布为联合项目", Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(
+                            activity,
+                            error.message ?: "发布联合项目失败",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            }
+        }
+    }
+
     private fun ensureProjectExists(share: ChatProjectShare): Int {
-        val existingIndex = projects.indexOfFirst { it.id == share.id }
+        val existingIndex = findProjectIndex(share.id)
         if (existingIndex >= 0) return existingIndex
-        val project = newAppProject(share.name, share.description ?: "联合项目").copy(id = share.id)
+        val project = newAppProject(share.name, share.description ?: "联合项目").copy(
+            id = share.id,
+            isJointProject = share.source != "local",
+            collaborationProjectId = share.id.takeIf { share.source != "local" }
+        )
         projects.add(project)
         saveProjects()
         renderProjectList()
@@ -77,7 +152,7 @@ internal class MainChatProjectShareActions(
     }
 
     private fun activateAndOpen(index: Int, share: ChatProjectShare) {
-        if (share.source == "local") {
+        if (share.source == "local" && !projects[index].isJointDevelopmentProject()) {
             activateAndOpenLocal(index)
         } else {
             activateAndOpenProjectSpace(index)
@@ -96,6 +171,12 @@ internal class MainChatProjectShareActions(
         setActiveProjectIndex(index)
         saveProjects()
         val project = projects[index]
-        openProjectSpace(project.id, project.title)
+        openProjectSpace(project.projectSpaceId(), project.title)
+    }
+
+    private fun findProjectIndex(projectId: String): Int {
+        return projects.indexOfFirst {
+            it.id == projectId || it.projectSpaceId() == projectId
+        }
     }
 }

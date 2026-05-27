@@ -24,15 +24,16 @@ data class ChatProjectShare(
 )
 
 internal fun AppProject.toChatProjectShare(): ChatProjectShare {
+    val isJoint = isJointDevelopmentProject()
     return ChatProjectShare(
-        id = id,
+        id = if (isJoint) projectSpaceId() else id,
         name = title,
         description = subtitle.takeIf { it.isNotBlank() },
         ownerAccount = null,
         memberCount = conversations.size.coerceAtLeast(1),
         joinMode = "open",
         latestLog = events.firstOrNull()?.trim()?.takeIf { it.isNotBlank() },
-        source = "local"
+        source = if (isJoint) "store" else "local"
     )
 }
 

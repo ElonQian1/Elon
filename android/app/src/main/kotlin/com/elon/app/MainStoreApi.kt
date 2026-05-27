@@ -21,6 +21,14 @@ internal data class StoreProject(
     val lastTaskStatus: String?
 )
 
+internal fun StoreProject.toJointAppProject(): AppProject {
+    return newAppProject(name, description ?: "联合项目").copy(
+        id = id,
+        isJointProject = true,
+        collaborationProjectId = id
+    )
+}
+
 // ─── API 函数（在调用方手动切换线程） ─────────────────────────────────────────
 
 /** GET /api/store/projects — 无需登录 */
@@ -44,6 +52,34 @@ internal fun fetchStoreProjects(
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
     return parseStoreProjectList(JSONObject(body))
+}
+
+/** POST /api/projects — 创建私有服务器项目，发布为联合项目时再设置公开 */
+internal fun createStoreProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    name: String,
+    description: String?,
+    token: String,
+    ownerAccount: String? = null
+): StoreProject {
+    val payload = JSONObject().apply {
+        put("name", name)
+        put("description", description ?: "")
+        put("template", "android")
+    }
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    val project = JSONObject(body).optJSONObject("project")
+        ?: error("响应缺少 project")
+    return parseCreatedStoreProject(project, ownerAccount)
 }
 
 /** POST /api/projects/:id/join — 需要 Bearer token */
@@ -124,6 +160,19 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     isPublic = obj.optBoolean("is_public", true),
     joinMode = obj.optString("join_mode", "open"),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() }
+)
+
+private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
+    id = obj.getString("id"),
+    name = obj.optString("name", "联合项目"),
+    description = obj.optString("description").takeIf { it.isNotBlank() },
+    template = obj.optString("template", "android"),
+    ownerAccount = ownerAccount?.takeIf { it.isNotBlank() } ?: "?",
+    ownerUserId = "",
+    memberCount = 1,
+    isPublic = false,
+    joinMode = "open",
+    lastTaskStatus = null
 )
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */

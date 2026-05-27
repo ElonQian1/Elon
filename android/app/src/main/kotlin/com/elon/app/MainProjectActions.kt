@@ -16,6 +16,7 @@ internal class MainProjectActions(
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val openProject: (Int) -> Unit,
+    private val openProjectSpace: (String, String) -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val http: OkHttpClient,
     private val serverUrl: String,
@@ -39,6 +40,34 @@ internal class MainProjectActions(
                     return@setOnClickListener
                 }
                 createProject(title)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+        input.selectAll()
+    }
+
+    fun showCreateJointProjectDialog() {
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录后发起联合项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val input = titleEditText("联合项目 ${projects.size + 1}")
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("发起联合项目")
+            .setView(input)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("创建", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val title = input.text.toString().trim()
+                if (title.isBlank()) {
+                    input.error = "请输入项目名称"
+                    return@setOnClickListener
+                }
+                createJointProject(title)
                 dialog.dismiss()
             }
         }
@@ -97,15 +126,42 @@ internal class MainProjectActions(
             Toast.makeText(activity, "未登录", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!isPublic && !project.isJointDevelopmentProject()) {
+            project.markPersonalDevelopment()
+            saveProjects()
+            renderProjectList()
+            Toast.makeText(activity, "已设为私有", Toast.LENGTH_SHORT).show()
+            return
+        }
         Thread {
             try {
-                setProjectVisibility(http, serverUrl, project.id, isPublic, joinMode, token)
+                val remoteProjectId = if (isPublic && !project.isJointDevelopmentProject()) {
+                    val created = createStoreProject(
+                        http = http,
+                        serverUrl = serverUrl,
+                        name = project.title,
+                        description = project.subtitle.takeIf { it.isNotBlank() },
+                        token = token,
+                        ownerAccount = AuthManager.displayName(activity)
+                    )
+                    setProjectVisibility(http, serverUrl, created.id, true, joinMode, token)
+                    created.id
+                } else {
+                    val targetId = project.projectSpaceId()
+                    setProjectVisibility(http, serverUrl, targetId, isPublic, joinMode, token)
+                    targetId
+                }
                 val label = when {
                     !isPublic -> "已设为私有"
                     joinMode == "open" -> "已设为公开（直接加入）"
                     else -> "已设为公开（需审批）"
                 }
                 activity.runOnUiThread {
+                    if (isPublic) {
+                        project.markJointDevelopment(remoteProjectId)
+                        saveProjects()
+                        renderProjectList()
+                    }
                     Toast.makeText(activity, label, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
@@ -122,6 +178,48 @@ internal class MainProjectActions(
         setActiveConversationIndex(0)
         saveProjects()
         renderProjectList()
+    }
+
+    private fun createJointProject(title: String) {
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "正在创建联合项目...", Toast.LENGTH_SHORT).show()
+        val ownerAccount = AuthManager.displayName(activity)
+        Thread {
+            try {
+                val created = createStoreProject(
+                    http = http,
+                    serverUrl = serverUrl,
+                    name = title,
+                    description = "联合开发项目",
+                    token = token,
+                    ownerAccount = ownerAccount
+                )
+                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                activity.runOnUiThread {
+                    val existingIndex = projects.indexOfFirst { it.projectSpaceId() == created.id }
+                    val index = if (existingIndex >= 0) {
+                        existingIndex
+                    } else {
+                        projects.add(created.toJointAppProject())
+                        projects.lastIndex
+                    }
+                    projects[index].markJointDevelopment(created.id)
+                    setActiveProjectIndex(index)
+                    setActiveConversationIndex(0)
+                    saveProjects()
+                    renderProjectList()
+                    openProjectSpace(created.id, created.name)
+                    Toast.makeText(activity, "联合项目已创建", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "创建联合项目失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun showRenameProjectDialog(index: Int) {

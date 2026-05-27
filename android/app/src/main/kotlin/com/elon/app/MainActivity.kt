@@ -414,8 +414,7 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             getListContainer = { binding.marketplaceListContainer },
             openJoinedProject = { storeProject ->
-                val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
-                    .copy(id = storeProject.id)
+                val newProject = storeProject.toJointAppProject()
                 if (s.projects.none { it.id == storeProject.id }) {
                     s.projects.add(newProject)
                     projectStateActions.saveProjects()
@@ -476,11 +475,11 @@ class MainActivity : AppCompatActivity() {
                     s.activeProjectIndex = index
                     projectStateActions.saveProjects()
                     val project = s.projects[index]
-                    projectSpaceController.openProjectSpace(project.id, project.title, true)
+                    projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, true)
                 }
             },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
-            showCreateJointProjectDialog = { projectActions.showCreateProjectDialog() },
+            showCreateJointProjectDialog = { projectActions.showCreateJointProjectDialog() },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             confirmLogout = { accountActions().confirmLogout() },
@@ -672,7 +671,16 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             timeFormatter = s.timeFormatter,
             activeProjectIndexProvider = { s.activeProjectIndex },
-            openProject = conversationOpenActions::openProject,
+            openProject = { index ->
+                if (index in s.projects.indices && s.projects[index].isJointDevelopmentProject()) {
+                    val project = s.projects[index]
+                    s.activeProjectIndex = index
+                    projectStateActions.saveProjects()
+                    projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, true)
+                } else {
+                    conversationOpenActions.openProject(index)
+                }
+            },
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -692,6 +700,7 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
+            openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
             showGitProjectDialog = ::showGitProjectDialog,
             http = s.http,
             serverUrl = serverUrl,
@@ -749,8 +758,7 @@ class MainActivity : AppCompatActivity() {
             tokenProvider = { AuthManager.token(this) },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             addJoinedProject = { storeProject ->
-                val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
-                    .copy(id = storeProject.id)
+                val newProject = storeProject.toJointAppProject()
                 if (s.projects.none { it.id == storeProject.id }) s.projects.add(newProject)
                 projectStateActions.saveProjects()
                 val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }

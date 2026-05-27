@@ -17,10 +17,35 @@ data class AppProject(
     var subtitle: String,
     var updatedAt: Long,
     var stage: String = "待提交需求",
+    var isJointProject: Boolean = false,
+    var collaborationProjectId: String? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()
 )
+
+internal fun AppProject.isJointDevelopmentProject(): Boolean {
+    val remoteId = collaborationProjectId?.trim().orEmpty()
+    return isJointProject || remoteId.isNotBlank() || id.startsWith("prj_")
+}
+
+internal fun AppProject.projectSpaceId(): String {
+    return collaborationProjectId?.trim()?.takeIf { it.isNotBlank() } ?: id
+}
+
+internal fun AppProject.markJointDevelopment(remoteProjectId: String? = null) {
+    remoteProjectId?.trim()?.takeIf { it.isNotBlank() }?.let {
+        collaborationProjectId = it
+    }
+    isJointProject = true
+    updatedAt = System.currentTimeMillis()
+}
+
+internal fun AppProject.markPersonalDevelopment() {
+    isJointProject = false
+    collaborationProjectId = null
+    updatedAt = System.currentTimeMillis()
+}
 
 data class ModelOption(
     val label: String,
