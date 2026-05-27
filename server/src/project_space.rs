@@ -12,8 +12,8 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
-    agent_api_loop::{resolve_agent, run_casual_chat},
     project_auth::{auth_from_headers, json_error, project_access},
+    project_channel_summary::{ChannelSummaryTask, spawn_channel_summary},
     project_chat::run_project_agent_with_scheduler,
     project_keys::clean_trace_id,
     types::AppState,
@@ -278,17 +278,6 @@ struct ChannelAiTask {
     trace_id: String,
 }
 
-struct ChannelSummaryTask {
-    state: Arc<AppState>,
-    user_id: String,
-    project: crate::store::ProjectAccess,
-    project_id: String,
-    channel_id: String,
-    prompt: String,
-    agent: Option<String>,
-    trace_id: String,
-}
-
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -386,46 +375,6 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
             Some(&final_reply),
             apk_url.as_deref(),
             error.as_deref(),
-        );
-    });
-}
-
-fn spawn_channel_summary(task: ChannelSummaryTask) {
-    tokio::spawn(async move {
-        let _ = task.state.store.insert_project_channel_message(
-            &task.project_id,
-            &task.channel_id,
-            None,
-            "ai_progress",
-            "AI 正在总结这些聊天记录...",
-            None,
-        );
-        let user_workspace = task.state.get_user_workspace(&task.user_id);
-        let result = match resolve_agent(&task.state, &user_workspace, task.agent.as_deref()).await
-        {
-            Ok(agent) => run_casual_chat(&task.state, &agent, &task.prompt).await,
-            Err(error) => Err(error),
-        };
-        let content = match result {
-            Ok(reply) => format!("AI 总结\n{}", reply.trim()),
-            Err(error) => format!("AI 总结失败：{}", error),
-        };
-        let _ = task.state.store.insert_project_channel_message(
-            &task.project_id,
-            &task.channel_id,
-            None,
-            "ai_result",
-            &content,
-            None,
-        );
-        task.state.server_traces.record(
-            &task.trace_id,
-            "channel_summary_done",
-            serde_json::json!({
-                "project_id": &task.project.id,
-                "channel_id": &task.channel_id,
-                "ok": content.starts_with("AI 总结\n"),
-            }),
         );
     });
 }

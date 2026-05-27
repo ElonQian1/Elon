@@ -37,7 +37,7 @@ pub(crate) async fn resolve_agent(
         .ok_or_else(|| anyhow::anyhow!("未配置 API 代理，请设置 AGENT_* 或使用 Codex CLI"))
 }
 
-pub(crate) async fn run_casual_chat(
+async fn run_casual_chat(
     state: &Arc<AppState>,
     agent: &AgentConfig,
     user_message: &str,

@@ -44,6 +44,7 @@ mod project_attachment_notes;
 mod project_attachment_paths;
 mod project_attachments;
 mod project_auth;
+mod project_channel_summary;
 mod project_chat;
 mod project_chat_executor;
 mod project_chat_reply;
