@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.content.Context
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -23,9 +24,11 @@ internal class MainInputFocusActions(
 ) {
     private var keyboardWatcherInstalled = false
     private var lastKeyboardVisible = false
+    private var focusRequestedAt = 0L
 
     fun focusInputComposer() {
         if (!isFriendChatActive() && activeConversation().ended) return
+        focusRequestedAt = SystemClock.uptimeMillis()
         installKeyboardCollapseWatcher()
         if (isVoiceMode()) {
             setVoiceMode(false)
@@ -105,7 +108,8 @@ internal class MainInputFocusActions(
                 lastKeyboardVisible &&
                 !keyboardVisible &&
                 binding.inputEdit.hasFocus() &&
-                inputComposerMotion()?.isExpanded == true
+                inputComposerMotion()?.isExpanded == true &&
+                !recentlyRequestedFocus()
             ) {
                 collapseInputComposer(animate = true)
             }
@@ -120,5 +124,14 @@ internal class MainInputFocusActions(
         val hiddenHeight = rootHeight - visibleFrame.bottom
         val threshold = (binding.root.resources.displayMetrics.density * 120f).toInt()
         return hiddenHeight > threshold
+    }
+
+    private fun recentlyRequestedFocus(): Boolean {
+        val elapsed = SystemClock.uptimeMillis() - focusRequestedAt
+        return elapsed >= 0L && elapsed < KEYBOARD_OPEN_GRACE_MS
+    }
+
+    private companion object {
+        private const val KEYBOARD_OPEN_GRACE_MS = 900L
     }
 }
