@@ -177,16 +177,14 @@ internal class MainActionPopupRenderer(
         val root = FrameLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, popupHeight)
             alpha = 0f
-            scaleX = 0.96f
-            scaleY = 0.96f
+            scaleX = 0.98f
+            scaleY = 0.82f
+            translationY = dp(8).toFloat()
         }
         val panel = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                cornerRadius = dp(10).toFloat()
-                setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
-            }
+            background = createProjectCardPopupBackground()
             setPadding(dp(10), 0, dp(10), 0)
         }
         root.addView(
@@ -212,8 +210,7 @@ internal class MainActionPopupRenderer(
         anchor.getLocationOnScreen(anchorLocation)
         val popupX = (anchorLocation[0] + dp(16))
             .coerceIn(dp(12), activity.resources.displayMetrics.widthPixels - popupWidth - dp(12))
-        val aboveY = anchorLocation[1] - popupHeight
-        val popupY = if (aboveY > dp(76)) aboveY else anchorLocation[1] + anchor.height + dp(8)
+        val popupY = (anchorLocation[1] - popupHeight).coerceAtLeast(dp(76))
 
         popup = PopupWindow(root, popupWidth, popupHeight, true).apply {
             isOutsideTouchable = true
@@ -227,6 +224,7 @@ internal class MainActionPopupRenderer(
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
+            .translationY(0f)
             .setDuration(120L)
             .start()
         return popup
@@ -360,6 +358,19 @@ internal class MainActionPopupRenderer(
             layoutParams = LinearLayout.LayoutParams(1, dp(28))
             alpha = 0.75f
             setBackgroundColor(Color.parseColor("#AFAFAF"))
+        }
+    }
+
+    private fun createProjectCardPopupBackground(): GradientDrawable {
+        val radius = dp(10).toFloat()
+        return GradientDrawable().apply {
+            setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
+            cornerRadii = floatArrayOf(
+                radius, radius,
+                radius, radius,
+                0f, 0f,
+                0f, 0f
+            )
         }
     }
 }
