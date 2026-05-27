@@ -27,7 +27,8 @@ internal class ChatProjectSideMenuView(
     context: Context,
     private val projects: () -> List<AppProject>,
     private val activeProjectIndex: () -> Int,
-    private val openProject: (Int) -> Unit,
+    private val openPersonalProject: (Int) -> Unit,
+    private val openJointProject: (Int) -> Unit,
     private val showCreateJointProjectDialog: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
@@ -79,7 +80,7 @@ internal class ChatProjectSideMenuView(
         list.forEachIndexed { index, project ->
             content.addView(projectNameRow(project, active = index == activeProjectIndex()) {
                 requestClose(true)
-                postDelayed({ openProject(index) }, CLOSE_DELAY_MS)
+                postDelayed({ openPersonalProject(index) }, CLOSE_DELAY_MS)
             })
         }
         content.addView(space(34))
@@ -190,7 +191,7 @@ internal class ChatProjectSideMenuView(
                 setPadding(dp(10), 0, 0, 0)
                 setOnClickListener {
                     requestClose(true)
-                    postDelayed({ openProject(index) }, CLOSE_DELAY_MS)
+                    postDelayed({ openJointProject(index) }, CLOSE_DELAY_MS)
                 }
                 setOnLongClickListener {
                     startProjectDrag(it, share)

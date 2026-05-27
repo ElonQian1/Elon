@@ -468,7 +468,10 @@ class MainActivity : AppCompatActivity() {
             showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
             projects = { s.projects },
             activeProjectIndex = { s.activeProjectIndex },
-            openProject = { index ->
+            openPersonalProject = { index ->
+                conversationOpenActions.openProject(index)
+            },
+            openJointProject = { index ->
                 if (index in s.projects.indices) {
                     s.activeProjectIndex = index
                     projectStateActions.saveProjects()

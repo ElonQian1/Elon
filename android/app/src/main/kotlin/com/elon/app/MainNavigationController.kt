@@ -259,6 +259,7 @@ internal class MainNavigationController(
 
     fun showProjectChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
+        onFriendChatClosed()
         chatReturnTarget = ChatReturnTarget.PROJECTS
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
