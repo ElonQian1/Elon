@@ -1,5 +1,5 @@
 ---
-applyTo: "**"
+applyTo: "**/*.{rs,kt,java,ts,tsx,js,jsx,toml,gradle}"
 ---
 
 # 一龙项目 — 模块化与长期维护规则

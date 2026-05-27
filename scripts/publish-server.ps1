@@ -38,6 +38,22 @@
          脚本追加固定子目录名 elon-server-musl，适合只有本项目需要自定义的场景。
       3. 未设置时：%LOCALAPPDATA%\Elon\build-target\elon-server-musl（Windows 默认）
 
+    并发安全模型（出现中止提示时参考）：
+      T0  git pull --rebase origin main        ← 基于最新 main 编译
+      T1  本地编译（几分钟到几十分钟）            ← 窗口期，其他 PC 可能抢先发布
+      T2  服务器祖先检查：serverSha 是 localSha 的祖先 → 继续；否则 → 中止（exit 0）
+      T3  flock 锁内 CAS 二次校验（最后防线）
+      T4  替换 binary + 重启
+      T5  HTTP 健康检查
+      中止提示"部署已中止：服务器版本更新"是正常的并发保护，不是失败。
+      直接验证线上版本；强制覆盖用 -Force 参数。
+
+    共享脚本路径规则（调试脚本或写新脚本时注意）：
+      绝不能在共享脚本里写死某台 PC 的盘符/用户名（如 E:\、C:\Users\Alice\）。
+      机器差异走 .env.local（已在 .gitignore）或进程环境变量覆盖，
+      可参考 .env.local.example 了解可配置项。
+      CARGO_TARGET_DIR 不能是相对路径，否则随 cwd 漂移产生鬼影 target 目录。
+
 .EXAMPLE
     .\scripts\publish-server.ps1                          # 正常流程（claim → 编译 → 部署 → finish）
     .\scripts\publish-server.ps1 -SkipBuild               # 只用上次产物重新部署
