@@ -67,20 +67,6 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ---
 
-## VS Code Copilot 工作方式记忆
-
-- 把 VS Code Copilot 理解为 agent loop：先组装上下文，再用工具读取/编辑/运行命令，工具结果回到上下文后继续迭代，最后验证和交付。
-- 上下文来自系统指令、customizations、用户消息、会话历史、隐式编辑器/Git 状态、显式 `#` 引用和工具输出；没有进入上下文的内容对模型不可见。
-- 项目级稳定规则放在 `.github/copilot-instructions.md`；局部规则放在 `.github/instructions/*.instructions.md`；重复任务放在 `.github/prompts/*.prompt.md`；角色和工具受限的流程放在 `.github/agents/*.agent.md`。
-- VS Code 也会识别 `AGENTS.md`、`CLAUDE.md` 和组织级 instructions；管理入口优先使用 `Chat: Open Customizations`，避免多处复制长规则。
-- 本项目已提供 `/elon-dev-task`、`/elon-apk-release` prompt，以及 `elon-planner`、`elon-implementer`、`elon-reviewer` agents；优先用这些入口执行标准工作流。
-- 本项目同时提供 `.github/skills/cloud-apk-dev/SKILL.md` 作为 VS Code 官方 Agent Skills 入口；用 diagnostics 确认 customization 加载状态。
-- 本项目还提供 `.github/skills/modular-long-term-dev/SKILL.md` 作为可复制到其他项目的模块化治理 skill；其他项目可用它约束 AI 避免巨型文件。
-- 复杂任务先用 Plan/规划思路做 discovery、alignment、design、refinement；计划确认后再进入实现。
-- 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
-
----
-
 ## 关键原则（AI 代理必须遵守）
 
 - **每次修改都要 git commit**，commit message 用中文描述用户的需求
@@ -127,24 +113,10 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | `.github/instructions/modular-architecture.instructions.md` | 模块化、巨型文件治理、多 AI 并行拆分边界 |
 | `docs/system-architecture.md` | 系统架构详细设计、组件交互、数据流 |
 | `docs/ai-agent-workflow.md` | AI代理如何执行代码修改→编译→部署的完整流程 |
+| `docs/android-setup.md` | Android 新机器首次配置：Gradle 测速、缓存修复、全局镜像 |
 | `docs/vscode-copilot-working-model.md` | VS Code Copilot 最新 agent / instructions / prompt files / custom agents 工作方式速记 |
 | `AGENTS.md` | 多 AI 工具共享入口和 VS Code 快捷工作流索引 |
 | `.github/skills/cloud-apk-dev/SKILL.md` | VS Code 官方 Agent Skills 入口，封装云端 APK 开发/部署流程 |
 | `.github/skills/modular-long-term-dev/SKILL.md` | 可复制到其他项目的模块化长期主义 skill，约束 AI 避免巨型文件 |
 
----
 
-## 当前开发状态（2026-05-24 更新）
-
-- [x] 项目整体架构设计
-- [x] Rust 服务端基础框架（axum + tokio，运行中）
-- [x] Android APK 基础框架（Kotlin + Jetpack Compose）
-- [x] 本地交叉编译部署脚本（`scripts/publish-server.ps1`）
-- [x] 服务器 systemd 服务（自动重启，日志 `/root/elon-server.log`）
-- [x] P2P 同 WiFi APK 中继（`server/src/peer_relay.rs` + Android `PeerSeederManager.kt`）
-- [x] APK 分发机制（P2P mirrors + 直链回退）
-- [x] Web/APK 模型选择展示已简化为直接显示模型名
-- [ ] AI 对话后端集成（待实现）
-- [ ] 用户项目隔离系统（待实现）
-
-> AI 代理在修改任何代码时，请先 `git fetch origin main` 和 `git status --short --branch`；工作区干净才 `git pull --rebase origin main`，否则按归属 stash 或使用 `origin/main` 新 worktree。

@@ -80,14 +80,7 @@ T4  替换产物 + 重启 / 写 version.json
 T5  HTTP 健康检查
 ```
 
-**中止时本机的正确处理**：
-
-1. 已经 `git push` 的版本号 commit / 后端版本号 commit **保留**，不回退（远端历史无损失）。
-2. 本次编译的产物（APK / binary）**作废**，不要上传。
-3. 直接信任服务器上的新版本：
-   - 后端：`curl --noproxy '*' http://43.139.149.158:8080/api/server/version` 查看
-   - APK：`curl --noproxy '*' http://43.139.149.158:8080/app/version.json` 或直接下载 `ElonSpeed-latest.apk`
-4. 如果**确认**必须用本机版本覆盖（极少数情况，如对方推了错误版本）：重跑脚本加 `-Force`。
+**中止时**：git push 的提交保留不回退；本次编译产物作废；直接验证线上版本；如需强制覆盖加 `-Force`。
 
 ### 各脚本当前实现
 
@@ -395,9 +388,6 @@ curl --noproxy '*' http://43.139.149.158:8080/health
 curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
 
-`publish-server.ps1` / `publish-server.sh` 会自动完成：`git pull --rebase origin main`、基于干净 `HEAD` 创建临时 worktree、在本地开发机用 `cargo zigbuild --target x86_64-unknown-linux-musl` 交叉编译、把编译好的 `elon-server` binary 上传到服务器 staging 路径、通过服务器 `flock` + CAS 替换 binary、重启服务并验证。
-
-> 生产服务器只负责接收 binary、替换、重启和健康检查，不承担编译。**不要**恢复“rsync 源码到服务器后 `cargo build --release`”的旧流程；服务器性能弱，远端编译慢且容易和并发部署互相覆盖。
 
 ### 仅本地验证 binary（不部署）
 
@@ -470,15 +460,6 @@ scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-### ⚠️ 并发发布冲突：服务器 claim 已天然防撞，无需手动 rebase
-
-旧版死循环（"build.gradle commit push 被拒 → pull rebase 丢弃版本号 commit → 再次撞号"）已不存在。
-新版多 PC / 多 AI 同时跑 `publish-apk.ps1`：
-- A 先 claim 拿到 `build 70`；B 同时 claim 自动拿到 `build 71`。
-- A 上传成功 → finish 写 `last_published_version_code=70`；B 上传成功 → finish 写 `last_published_version_code=71`。
-- 如果 B 慢于 A 上传，且服务器 `version.json` 已经是 `build 70`，B 上传时会看到 `serverNowCode=70 < 71`，正常覆盖发布 71。
-- 如果 B 编译时间过长，A 已发布 build 71 之后又有人发布 build 72，B 拿到的 build 71 < server 72，脚本会自动中止并 `finish(success=false)`，释放占用，不污染 git。
-
 ### ⚠️ APK 慢构建防覆盖规则
 
 `scripts\publish-apk.ps1` 必须把 APK 发布视为基于明确 git SHA + 服务器 token 的原子动作：
@@ -517,12 +498,6 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 # ❌ 禁止：手动递增 server/Cargo.toml 的 version 并 commit
 ```
 
-**服务器 `/api/release/claim` 协议要点**：
-- 请求体：`{ kind, sha, builderId, builderLabel, bump, currentVersionName, currentVersionCode? }`
-- 响应：`{ action: "build", token, assignedVersionName, assignedVersionCode?, inFlightCount }`
-- 状态持久化在 `<data_dir>/release-state.json`（每 lane 独立 LaneState）
-- finish 必须带 token + success；success=true 时单调更新 `lastPublishedVersionName/Code`
-
 **禁止**：
 - 手动递增 `versionCode` / `versionName` / `Cargo.toml` 的 version 并 commit
 - `versionCode` 减小或重复（设备会拒绝安装；服务器 claim 已天然单调递增防重复）
@@ -532,94 +507,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ## 🌐 Android 编译环境首次配置（每台新机器必做）
 
-每台远程开发机网络环境不同，**必须先测速再决定下载方式**，否则 Gradle 构建会因下载卡死。
-
-### 第一步：测速（选择最快的下载路径）
-
-```powershell
-# 分别测试官方直连、官方不走代理、腾讯镜像，取 speed 最大的
-$cases = @(
-  @{Name='official-noproxy';   Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$true},
-  @{Name='tencent-mirror';     Url='https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip';  NoProxy=$true},
-  @{Name='official-with-proxy';Url='https://services.gradle.org/distributions/gradle-8.6-bin.zip'; NoProxy=$false}
-)
-foreach ($c in $cases) {
-  Write-Host "=== $($c.Name) ==="
-  $a = @('-L','-r','0-10485759','-o','NUL','-s','-w','speed=%{speed_download}B/s total=%{time_total}s code=%{http_code}\n')
-  if ($c.NoProxy) { $a += @('--noproxy','*') }
-  $a += $c.Url
-  & curl.exe @a
-}
-```
-
-判断标准：
-- `speed` 最大（> 3MB/s）且 `code=206` → 使用那条路径
-- 官方源 `code=307` 且 speed=0 → 说明最终跳转到 GitHub，国内基本不可用，必须用镜像
-- `code=000` → 路由不通
-
-### 第二步：修复 Gradle Wrapper 缓存（如果卡下载）
-
-如果 `~/.gradle/wrapper/dists/gradle-8.6-bin/` 下只有 `.part/.lck` 文件（无完整 zip），说明历史下载中断，必须手动用镜像重新灌入：
-
-```powershell
-$d = "$HOME\.gradle\wrapper\dists\gradle-8.6-bin\afr5mpiioh2wthjmwnkmdsd5w"
-if (!(Test-Path $d)) { New-Item -ItemType Directory -Path $d | Out-Null }
-Remove-Item "$d\*.part","$d\*.lck" -ErrorAction SilentlyContinue
-# 按测速结果选择最快的 URL（中国大陆一般是腾讯镜像）
-curl.exe -L --noproxy '*' -o "$d\gradle-8.6-bin.zip" "https://mirrors.cloud.tencent.com/gradle/gradle-8.6-bin.zip"
-```
-
-### 第三步：配置全局 Gradle 镜像（一次性，永久生效）
-
-```powershell
-# 1. 创建 ~/.gradle/init.gradle — 重定向所有 Maven 仓库到阿里云
-# 注意：现代 AGP 用 FAIL_ON_PROJECT_REPOS，需用 settingsEvaluated 注入依赖仓库
-$initFile = "$HOME\.gradle\init.gradle"
-Set-Content $initFile -Encoding UTF8 @'
-// buildscript classpath（插件解析）走 allprojects.buildscript
-allprojects {
-    buildscript {
-        repositories {
-            maven { url "https://maven.aliyun.com/repository/google" }
-            maven { url "https://maven.aliyun.com/repository/central" }
-            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
-            maven { url "https://maven.aliyun.com/repository/public" }
-        }
-    }
-}
-// 依赖仓库通过 settingsEvaluated 注入，避免与 FAIL_ON_PROJECT_REPOS 冲突
-settingsEvaluated { settings ->
-    settings.dependencyResolutionManagement {
-        repositories {
-            maven { url "https://maven.aliyun.com/repository/google" }
-            maven { url "https://maven.aliyun.com/repository/central" }
-            maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
-            maven { url "https://maven.aliyun.com/repository/public" }
-        }
-    }
-}
-'@
-
-# 2. 向 ~/.gradle/gradle.properties 添加禁用 JVM 系统代理
-# （JVM 会读取系统 SOCKS 代理导致访问超时，必须关闭）
-$props = "$HOME\.gradle\gradle.properties"
-if (!(Test-Path $props)) { New-Item -ItemType File -Path $props | Out-Null }
-$content = Get-Content $props | Where-Object { $_ -notmatch '^systemProp\.' }
-$content += "systemProp.java.net.useSystemProxies=false"
-Set-Content $props $content -Encoding UTF8
-```
-
-### 验证
-
-```powershell
-cd e:\lodex\Elon\android
-.\gradlew.bat --version --no-daemon   # 应在几秒内输出 Gradle 版本，无下载提示
-.\gradlew.bat :app:assembleRelease --no-daemon   # 首次编译会下载插件/依赖，通过阿里云镜像约 2-5 分钟
-```
-
-> **为什么不把镜像配置提交到仓库？**
-> `init.gradle` 写入用户级 `~/.gradle/`，不进入 git，不影响其他团队成员或 CI 环境。
-> 每台机器自行按网络测速决定镜像策略，符合"本地环境自治"原则。
+> 详见 `docs/android-setup.md`。
 
 ---
 
