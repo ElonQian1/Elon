@@ -1,5 +1,9 @@
 package com.elon.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.app.Dialog
 import android.graphics.Color
 import android.graphics.Typeface
@@ -9,6 +13,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -27,6 +32,7 @@ internal class MainChatSettingsActions(
     private val clearGroupMessages: () -> Unit
 ) {
     private val prefs by lazy { AuthManager.userDataPrefs(activity) }
+    private var pageAnimator: AnimatorSet? = null
 
     fun showFriendSettings(friend: AppFriend) {
         showSettingsPage("聊天信息") { dialog ->
@@ -107,7 +113,7 @@ internal class MainChatSettingsActions(
     }
 
     private fun showSettingsPage(title: String, contentBuilder: LinearLayout.(Dialog) -> Unit) {
-        val dialog = Dialog(activity)
+        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -130,15 +136,20 @@ internal class MainChatSettingsActions(
         })
         dialog.setContentView(root)
         dialog.setOnShowListener {
-            dialog.window?.setLayout(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            root.animate()
-                .translationX(0f)
-                .setDuration(PAGE_ANIMATION_MS)
-                .start()
+            dialog.window?.let { window ->
+                window.setLayout(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                window.attributes = window.attributes.apply {
+                    dimAmount = 0f
+                    windowAnimations = 0
+                }
+            }
+            root.post {
+                playPageSlide(root, pageWidth(root), 0f)
+            }
         }
         dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog.show()
@@ -151,11 +162,40 @@ internal class MainChatSettingsActions(
             dialog.dismiss()
             return
         }
-        root.animate()
-            .translationX(activity.resources.displayMetrics.widthPixels.toFloat())
-            .setDuration(PAGE_ANIMATION_MS)
-            .withEndAction { dialog.dismiss() }
-            .start()
+        playPageSlide(root, root.translationX, pageWidth(root)) {
+            dialog.dismiss()
+        }
+    }
+
+    private fun pageWidth(page: View): Float {
+        return (page.width.takeIf { it > 0 } ?: activity.resources.displayMetrics.widthPixels).toFloat()
+    }
+
+    private fun playPageSlide(page: View, from: Float, to: Float, onEnd: () -> Unit = {}) {
+        pageAnimator?.cancel()
+        page.translationX = from
+        page.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        AnimatorSet().apply {
+            pageAnimator = this
+            duration = PAGE_ANIMATION_MS
+            interpolator = PAGE_INTERPOLATOR
+            playTogether(ObjectAnimator.ofFloat(page, View.TRANSLATION_X, from, to))
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                    if (pageAnimator === animation) pageAnimator = null
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    if (pageAnimator === animation) pageAnimator = null
+                    page.setLayerType(View.LAYER_TYPE_NONE, null)
+                    if (!cancelled) onEnd()
+                }
+            })
+            start()
+        }
     }
 
     private fun topBar(title: String, onBack: () -> Unit): View {
@@ -451,6 +491,7 @@ internal class MainChatSettingsActions(
     }
 
     private companion object {
-        const val PAGE_ANIMATION_MS = 220L
+        const val PAGE_ANIMATION_MS = 260L
+        val PAGE_INTERPOLATOR = PathInterpolator(0.2f, 0f, 0f, 1f)
     }
 }
