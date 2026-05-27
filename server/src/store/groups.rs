@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::BTreeSet;
 
-use super::{new_id, now, FriendGroupMessage, FriendGroupProfile, Store};
+use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
 impl Store {
     pub fn list_friend_groups(&self, user_id: &str) -> Result<Vec<FriendGroupProfile>> {
@@ -39,19 +39,27 @@ impl Store {
              WHERE gm.user_id = ?1
              ORDER BY COALESCE(latest.created_at, g.updated_at) DESC",
         )?;
-        let groups = stmt
+        let rows = stmt
             .query_map(params![user_id], |row| {
                 Ok(FriendGroupProfile {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     created_at: row.get(2)?,
                     member_count: row.get(3)?,
+                    members: Vec::new(),
                     last_message: row.get(4)?,
                     last_message_at: row.get(5)?,
                     unread_count: row.get(6)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let groups = rows
+            .into_iter()
+            .map(|mut group| {
+                group.members = list_group_member_previews(&conn, &group.id)?;
+                Ok(group)
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(groups)
     }
 
@@ -100,10 +108,12 @@ impl Store {
         }
         tx.commit()?;
 
+        let members_preview = list_group_member_previews(&conn, &group_id)?;
         Ok(FriendGroupProfile {
             id: group_id,
             name: group_name,
             member_count: members.len() as i64,
+            members: members_preview,
             created_at,
             last_message: None,
             last_message_at: None,
@@ -265,6 +275,32 @@ impl Store {
             Err(anyhow!("你不在这个群聊中"))
         }
     }
+}
+
+fn list_group_member_previews(
+    conn: &Connection,
+    group_id: &str,
+) -> Result<Vec<FriendGroupMemberPreview>> {
+    let mut stmt = conn.prepare(
+        "SELECT u.id,
+                COALESCE(u.nickname, u.email, u.phone, u.id) AS display_name,
+                u.avatar_data_url
+         FROM friend_group_members gm
+         JOIN users u ON u.id = gm.user_id
+         WHERE gm.group_id = ?1
+         ORDER BY gm.created_at ASC, u.id ASC
+         LIMIT 9",
+    )?;
+    let members = stmt
+        .query_map(params![group_id], |row| {
+            Ok(FriendGroupMemberPreview {
+                id: row.get(0)?,
+                display_name: row.get(1)?,
+                avatar_data_url: row.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(members)
 }
 
 fn normalize_group_name(name: Option<&str>, members: &BTreeSet<String>) -> Result<String> {

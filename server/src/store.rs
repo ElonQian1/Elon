@@ -86,10 +86,18 @@ pub struct FriendChatMessage {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct FriendGroupMemberPreview {
+    pub id: String,
+    pub display_name: String,
+    pub avatar_data_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct FriendGroupProfile {
     pub id: String,
     pub name: String,
     pub member_count: i64,
+    pub members: Vec<FriendGroupMemberPreview>,
     pub created_at: String,
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,

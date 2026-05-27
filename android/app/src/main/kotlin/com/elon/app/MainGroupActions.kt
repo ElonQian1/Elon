@@ -23,10 +23,17 @@ internal data class AppGroup(
     val id: String,
     val name: String,
     val memberCount: Int,
+    val members: List<AppGroupMember>,
     val createdAt: Long?,
     val lastMessage: String?,
     val lastMessageAt: Long?,
     val unreadCount: Int
+)
+
+internal data class AppGroupMember(
+    val id: String,
+    val displayName: String,
+    val avatarDataUrl: String?
 )
 
 internal class MainGroupActions(
@@ -198,11 +205,24 @@ internal class MainGroupActions(
             id = json.optString("id", "").trim(),
             name = json.optString("name", "").trim().ifBlank { "群聊" },
             memberCount = json.optInt("member_count", 0).coerceAtLeast(0),
+            members = parseGroupMembers(json.optJSONArray("members")),
             createdAt = parseServerTime(json.optString("created_at", "").trim()),
             lastMessage = json.optString("last_message", "").trim().takeIf { it.isNotEmpty() },
             lastMessageAt = parseServerTime(json.optString("last_message_at", "").trim()),
             unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0)
         )
+    }
+
+    private fun parseGroupMembers(array: JSONArray?): List<AppGroupMember> {
+        if (array == null) return emptyList()
+        return List(array.length()) { index ->
+            val item = array.optJSONObject(index) ?: JSONObject()
+            AppGroupMember(
+                id = item.optString("id", "").trim(),
+                displayName = item.optString("display_name", "").trim().ifBlank { "成员" },
+                avatarDataUrl = item.optString("avatar_data_url", "").trim().takeIf { it.isNotEmpty() }
+            )
+        }
     }
 
     private fun parseServerTime(value: String): Long? {

@@ -14,6 +14,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.sin
@@ -526,19 +527,10 @@ internal class MainHomeRows(
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            addView(TextView(activity).apply {
-                layoutParams = FrameLayout.LayoutParams(size, size)
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#D6D6D6"))
-                }
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = "群"
-                setTextColor(Color.parseColor("#333333"))
-                textSize = 17f
-                setTypeface(typeface, Typeface.BOLD)
-            })
+            addView(
+                if (group.members.isEmpty()) createGroupFallbackAvatar(size)
+                else createGroupMemberGrid(group.members.take(9), size)
+            )
             if (group.unreadCount > 0) {
                 addView(TextView(activity).apply {
                     val badgeText = if (group.unreadCount > 99) "99+" else group.unreadCount.toString()
@@ -561,6 +553,104 @@ internal class MainHomeRows(
                     setTypeface(typeface, Typeface.BOLD)
                 })
             }
+        }
+    }
+
+    private fun createGroupFallbackAvatar(size: Int): View {
+        return TextView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(Color.parseColor("#D6D6D6"))
+            }
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            text = "群"
+            setTextColor(Color.parseColor("#333333"))
+            textSize = 17f
+            setTypeface(typeface, Typeface.BOLD)
+        }
+    }
+
+    private fun createGroupMemberGrid(members: List<AppGroupMember>, size: Int): View {
+        return FrameLayout(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(Color.parseColor("#D8D8D8"))
+            }
+
+            val compactGrid = members.size <= 4
+            val tileSize = if (compactGrid) dp(18) else dp(12)
+            val gap = if (compactGrid) dp(3) else dp(2)
+            val textSize = if (compactGrid) 9.5f else 7.5f
+            val positions = groupAvatarPositions(members.size, size, tileSize, gap)
+            members.forEachIndexed { index, member ->
+                val position = positions.getOrNull(index) ?: return@forEachIndexed
+                addView(
+                    createGroupMemberTile(member, textSize),
+                    FrameLayout.LayoutParams(tileSize, tileSize).apply {
+                        leftMargin = position.first
+                        topMargin = position.second
+                    }
+                )
+            }
+        }
+    }
+
+    private fun groupAvatarPositions(count: Int, size: Int, tileSize: Int, gap: Int): List<Pair<Int, Int>> {
+        if (count == 2) {
+            val contentWidth = tileSize * 2 + gap
+            val left = (size - contentWidth) / 2
+            val top = (size - tileSize) / 2
+            return listOf(left to top, (left + tileSize + gap) to top)
+        }
+        if (count == 3) {
+            val contentWidth = tileSize * 2 + gap
+            val left = (size - contentWidth) / 2
+            val top = (size - (tileSize * 2 + gap)) / 2
+            return listOf(
+                ((size - tileSize) / 2) to top,
+                left to (top + tileSize + gap),
+                (left + tileSize + gap) to (top + tileSize + gap)
+            )
+        }
+
+        val columns = if (count <= 4) 2 else 3
+        val rows = ((count + columns - 1) / columns).coerceAtMost(columns)
+        val contentWidth = tileSize * columns + gap * (columns - 1)
+        val contentHeight = tileSize * rows + gap * (rows - 1)
+        val startLeft = (size - contentWidth) / 2
+        val startTop = (size - contentHeight) / 2
+        return List(count) { index ->
+            val row = index / columns
+            val col = index % columns
+            (startLeft + col * (tileSize + gap)) to (startTop + row * (tileSize + gap))
+        }
+    }
+
+    private fun createGroupMemberTile(member: AppGroupMember, textSizeSp: Float): View {
+        val bitmap = UserProfileStore.decodeAvatar(member.avatarDataUrl)
+        if (bitmap != null) {
+            return ImageView(activity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    cornerRadius = dp(3).toFloat()
+                })
+            }
+        }
+        return TextView(activity).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(3).toFloat()
+                setColor(Color.parseColor("#EFEFEF"))
+            }
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            text = UserProfileStore.avatarInitial(member.displayName)
+            setTextColor(Color.parseColor("#333333"))
+            textSize = textSizeSp
+            setTypeface(typeface, Typeface.BOLD)
+            maxLines = 1
         }
     }
 }
