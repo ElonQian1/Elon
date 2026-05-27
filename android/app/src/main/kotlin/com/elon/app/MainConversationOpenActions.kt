@@ -16,7 +16,7 @@ internal class MainConversationOpenActions(
     private val retryFailedAttachmentMessage: (ChatMessage) -> Unit,
     private val showChat: (Boolean) -> Unit,
     private val showProjectChat: (Boolean) -> Unit,
-    private val showProjectSpaceChat: (String, Boolean) -> Unit,
+    private val showProjectPersonalChat: (String, Boolean) -> Unit,
     private val saveProjects: () -> Unit
 ) {
     fun openConversation(index: Int) {
@@ -51,7 +51,7 @@ internal class MainConversationOpenActions(
         val adapter = ChatAdapter(conversation.messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
-        showProjectSpaceChat(conversation.title, true)
+        showProjectPersonalChat(conversation.title, true)
         if (adapter.itemCount > 0) {
             binding.chatList.scrollToPosition(adapter.itemCount - 1)
         }

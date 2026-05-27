@@ -339,6 +339,50 @@ internal class MainNavigationController(
         setSendEnabled(true)
     }
 
+    fun showProjectPersonalChat(title: String, animate: Boolean = false) {
+        if (pageTransitionRunning) return
+        onFriendChatClosed()
+        chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
+        val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        applyChatChrome()
+        binding.topTitleText.text = title.ifBlank { activeConversationProvider().title }
+        if (shouldAnimate) {
+            collapseInputComposer(false)
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromRight(
+                container = binding.contentContainer,
+                incoming = listOf(binding.chatPage, binding.inputLayout),
+                outgoing = listOf(binding.projectPage),
+                incomingFull = emptyList(),
+                outgoingFull = listOf(binding.pageTabs),
+                onEnd = {
+                    binding.projectPage.visibility = View.GONE
+                    binding.pageTabs.visibility = View.GONE
+                    binding.conversationPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
+                    binding.chatPage.visibility = View.VISIBLE
+                    binding.inputLayout.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            binding.conversationPage.visibility = View.GONE
+            binding.pageTabs.visibility = View.GONE
+            binding.projectPage.visibility = View.GONE
+            binding.profilePage.visibility = View.GONE
+            binding.marketplacePage.visibility = View.GONE
+            binding.chatPage.visibility = View.VISIBLE
+            binding.inputLayout.visibility = View.VISIBLE
+            clearPageTranslations()
+        }
+        setSendEnabled(!isActiveConversationWorking())
+        maybePrewarmCodexSession("show_project_personal_chat")
+    }
+
     fun showProjectManagement(animate: Boolean = false) {
         showProjectHome(animate = animate)
     }

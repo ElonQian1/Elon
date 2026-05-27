@@ -4,12 +4,10 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 
 internal class MainProjectActions(
     private val activity: AppCompatActivity,
-    private val binding: ActivityMainBinding,
     private val projects: MutableList<AppProject>,
     private val activeProjectIndexProvider: () -> Int,
     private val setActiveProjectIndex: (Int) -> Unit,
@@ -124,7 +122,6 @@ internal class MainProjectActions(
         setActiveConversationIndex(0)
         saveProjects()
         renderProjectList()
-        binding.tabChat.performClick()
     }
 
     private fun showRenameProjectDialog(index: Int) {

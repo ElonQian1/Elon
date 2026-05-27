@@ -543,7 +543,7 @@ class MainActivity : AppCompatActivity() {
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
             showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
-            showProjectSpaceChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
+            showProjectPersonalChat = { title, animate -> navigationController.showProjectPersonalChat(title, animate) },
             saveProjects = projectStateActions::saveProjects
         )
     }
@@ -672,14 +672,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             timeFormatter = s.timeFormatter,
             activeProjectIndexProvider = { s.activeProjectIndex },
-            openProject = { index ->
-                if (index in s.projects.indices) {
-                    s.activeProjectIndex = index
-                    projectStateActions.saveProjects()
-                    val project = s.projects[index]
-                    projectSpaceController.openProjectSpace(project.id, project.title, true)
-                }
-            },
+            openProject = conversationOpenActions::openProject,
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -691,7 +684,6 @@ class MainActivity : AppCompatActivity() {
     private val projectActions: MainProjectActions by lazy {
         MainProjectActions(
             activity = this,
-            binding = binding,
             projects = s.projects,
             activeProjectIndexProvider = { s.activeProjectIndex },
             setActiveProjectIndex = { s.activeProjectIndex = it },
