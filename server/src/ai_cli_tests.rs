@@ -107,7 +107,7 @@ fn development_prompt_keeps_project_workflow() {
         false,
     );
 
-    assert!(prompt.contains("轻量项目工作流必须执行"));
+    assert!(prompt.contains("轻量项目工作流"));
     assert!(prompt.contains("先阅读这些轻量入口"));
     assert!(prompt.contains("按入口里的任务路由读取细则"));
     assert!(!prompt.contains("必须先阅读这些项目说明，再编辑文件"));
@@ -117,6 +117,7 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("scripts/publish-server.ps1"));
     assert!(prompt.contains("脚本负责版本分配、构建、上传、并发保护和 finish"));
     assert!(prompt.contains("脚本负责版本分配、临时构建配置、上传、并发保护和 finish"));
+    assert!(prompt.contains("脚本输出 `NEXT=`、`ERROR_CODE=`、`DOC=`"));
     assert!(prompt.contains("不要手动改 `server/Cargo.toml` 版本"));
     assert!(prompt.contains("不要手动改或提交 `build.gradle` 版本字段"));
     assert!(!prompt.contains("/api/release/claim"));
@@ -129,8 +130,8 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("5-15 行文件计划"));
     assert!(!prompt.contains("必须递增 server/Cargo.toml 的 package.version"));
     assert!(!prompt.contains("递增 versionCode/versionName"));
-    assert!(prompt.contains("服务器创建的会话 worktree/分支"));
-    assert!(prompt.contains("没有远端的本地模板项目只需本地 commit"));
+    assert!(prompt.contains("会话 worktree/分支"));
+    assert!(prompt.contains("无 origin 项目本地 commit 即可"));
 }
 
 #[test]
@@ -197,6 +198,7 @@ fn resumed_development_prompt_reuses_bootstrap_rules() {
     assert!(prompt.contains("full development workflow was already injected"));
     assert!(prompt.contains("use the publish scripts after commit + push"));
     assert!(prompt.contains("do not manually bump or commit"));
+    assert!(prompt.contains("If scripts print NEXT=, ERROR_CODE=, DOC="));
     assert!(prompt.contains("git status is clean"));
     assert!(prompt.contains("用户可见："));
     assert!(prompt.contains("new judgment"));
