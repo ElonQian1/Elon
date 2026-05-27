@@ -84,7 +84,7 @@ impl Store {
     pub fn list_friends(&self, user_id: &str) -> Result<Vec<FriendProfile>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT u.id, u.phone, u.email, u.nickname, f.created_at,
+            "SELECT u.id, u.phone, u.email, u.nickname, u.avatar_data_url, f.created_at,
                     lm.content,
                     lm.created_at,
                     (
@@ -127,10 +127,11 @@ impl Store {
                     account,
                     nickname: row.get(3)?,
                     phone,
-                    friend_since: row.get(4)?,
-                    last_message: row.get(5)?,
-                    last_message_at: row.get(6)?,
-                    unread_count: row.get(7)?,
+                    avatar_data_url: row.get(4)?,
+                    friend_since: row.get(5)?,
+                    last_message: row.get(6)?,
+                    last_message_at: row.get(7)?,
+                    unread_count: row.get(8)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -205,7 +206,7 @@ fn search_profile_by_column(
     value: &str,
 ) -> Result<Option<FriendProfile>> {
     let sql = format!(
-        "SELECT id, phone, email, nickname
+        "SELECT id, phone, email, nickname, avatar_data_url
          FROM users
          WHERE {column} = ?1 AND status = 'active' AND password_hash != 'device-user'"
     );
@@ -224,7 +225,7 @@ fn search_profile_by_nickname(
     }
 
     let mut stmt = conn.prepare(
-        "SELECT id, phone, email, nickname
+        "SELECT id, phone, email, nickname, avatar_data_url
          FROM users
          WHERE nickname = ?1 AND status = 'active' AND password_hash != 'device-user'
          ORDER BY created_at DESC
@@ -251,6 +252,7 @@ fn friend_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FriendPr
         account,
         nickname: row.get(3)?,
         phone,
+        avatar_data_url: row.get(4)?,
         friend_since: None,
         last_message: None,
         last_message_at: None,

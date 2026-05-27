@@ -467,7 +467,12 @@ internal class MainHomeRows(
         row.setBackgroundColor(Color.parseColor("#242424"))
     }
 
-    private fun createAvatarView(title: String, sizeDp: Int, textSizeSp: Float): View {
+    private fun createAvatarView(
+        title: String,
+        sizeDp: Int,
+        textSizeSp: Float,
+        avatarDataUrl: String? = null
+    ): View {
         val size = dp(sizeDp)
         if (title.startsWith(activity.getString(R.string.app_name))) {
             return ImageView(activity).apply {
@@ -475,6 +480,17 @@ internal class MainHomeRows(
                 contentDescription = activity.getString(R.string.app_name)
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 setImageResource(R.drawable.ic_app_brand)
+            }
+        }
+
+        val bitmap = UserProfileStore.decodeAvatar(avatarDataUrl)
+        if (bitmap != null) {
+            return ImageView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(size, size)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    cornerRadius = dp(8).toFloat()
+                })
             }
         }
 
@@ -494,7 +510,7 @@ internal class MainHomeRows(
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            val avatar = createAvatarView(friend.name, 44, 17f).apply {
+            val avatar = createAvatarView(friend.name, 44, 17f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
             addView(avatar)
@@ -630,7 +646,7 @@ internal class MainHomeRows(
     }
 
     private fun createGroupMemberTile(member: AppGroupMember, textSizeSp: Float): View {
-        val bitmap = UserProfileStore.decodeAvatar(member.avatarDataUrl)
+        val bitmap = UserProfileStore.decodeAvatar(groupMemberAvatarDataUrl(member))
         if (bitmap != null) {
             return ImageView(activity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -652,5 +668,13 @@ internal class MainHomeRows(
             setTypeface(typeface, Typeface.BOLD)
             maxLines = 1
         }
+    }
+
+    private fun groupMemberAvatarDataUrl(member: AppGroupMember): String? {
+        member.avatarDataUrl?.takeIf { it.isNotBlank() }?.let { return it }
+        if (member.id.isNotBlank() && member.id == AuthManager.effectiveUserId(activity)) {
+            return UserProfileStore.load(activity).avatarDataUrl
+        }
+        return null
     }
 }

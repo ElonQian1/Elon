@@ -56,6 +56,7 @@ pub struct FriendProfile {
     pub account: String,
     pub nickname: Option<String>,
     pub phone: Option<String>,
+    pub avatar_data_url: Option<String>,
     pub friend_since: Option<String>,
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,
