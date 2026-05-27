@@ -82,6 +82,7 @@ internal class MainInputFocusActions(
     private fun focusAndShowKeyboardIfComposerOpen() {
         if (isVoiceMode()) return
         if (inputComposerMotion()?.isExpanded != true) return
+        if (binding.inputEdit.hasFocus() && isKeyboardVisible()) return
         focusAndShowKeyboard()
     }
 

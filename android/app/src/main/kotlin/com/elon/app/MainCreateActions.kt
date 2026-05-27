@@ -52,6 +52,7 @@ internal class MainCreateActions(
         setupQuickActions()
         setupBackHandling()
         setupInputComposer()
+        MainKeyboardInsetsAnimationActions(binding).install()
         setupChatSideMenu()
         restoreCachedModelSelection()
         updateProjectViews("像聊天一样发需求，我会同步整理开发进度和项目记录。")
