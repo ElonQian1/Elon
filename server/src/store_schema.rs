@@ -55,6 +55,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (5, "用户头像数据（个人资料上传）", migration_v5),
     (6, "好友群聊基础表与未读状态", migration_v6),
     (7, "项目空间频道与共享频道消息", migration_v7),
+    (8, "好友与群聊消息附件引用", migration_v8),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -473,6 +474,22 @@ fn migration_v7(conn: &Connection) -> Result<()> {
 }
 
 // ── 内部工具 ──────────────────────────────────────────────────────────────────
+
+fn migration_v8(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "friend_messages",
+        "attachments_json",
+        "attachments_json TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "friend_group_messages",
+        "attachments_json",
+        "attachments_json TEXT",
+    )?;
+    Ok(())
+}
 
 fn add_column_if_missing(
     conn: &Connection,

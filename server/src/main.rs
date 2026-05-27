@@ -26,6 +26,7 @@ mod ai_cli_trace;
 mod api;
 mod app_update;
 mod auth_api;
+mod chat_attachments;
 mod cli_config;
 mod codex_health;
 mod codex_stream;

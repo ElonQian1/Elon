@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+use crate::project_ws_protocol::ProjectAttachmentRef;
+
 use super::{new_id, now, FriendChatMessage, Store};
 
 impl Store {
@@ -16,7 +18,7 @@ impl Store {
         let after = after.map(str::trim).filter(|value| !value.is_empty());
         let conn = self.conn()?;
         let sql = if after.is_some() {
-            "SELECT id, sender_user_id, receiver_user_id, content, created_at
+            "SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
              FROM friend_messages
              WHERE (
                  (sender_user_id = ?1 AND receiver_user_id = ?2)
@@ -26,9 +28,9 @@ impl Store {
              ORDER BY created_at ASC
              LIMIT ?4"
         } else {
-            "SELECT id, sender_user_id, receiver_user_id, content, created_at
+            "SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
              FROM (
-                 SELECT id, sender_user_id, receiver_user_id, content, created_at
+                 SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
                  FROM friend_messages
                  WHERE (
                      (sender_user_id = ?1 AND receiver_user_id = ?2)
@@ -61,10 +63,12 @@ impl Store {
         user_id: &str,
         friend_id: &str,
         content: &str,
+        attachments: Option<&[ProjectAttachmentRef]>,
     ) -> Result<FriendChatMessage> {
         self.ensure_friend_pair(user_id, friend_id)?;
         let content = content.trim();
-        if content.is_empty() {
+        let attachments_json = attachments_to_json(attachments)?;
+        if content.is_empty() && attachments_json.is_none() {
             return Err(anyhow!("消息不能为空"));
         }
         if content.chars().count() > 4000 {
@@ -75,9 +79,18 @@ impl Store {
         let created_at = now();
         let conn = self.conn()?;
         conn.execute(
-            "INSERT INTO friend_messages (id, sender_user_id, receiver_user_id, content, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, user_id, friend_id, content, created_at],
+            "INSERT INTO friend_messages (
+                id, sender_user_id, receiver_user_id, content, attachments_json, created_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                id,
+                user_id,
+                friend_id,
+                content,
+                attachments_json,
+                created_at
+            ],
         )?;
 
         Ok(FriendChatMessage {
@@ -85,6 +98,7 @@ impl Store {
             sender_user_id: user_id.to_string(),
             receiver_user_id: friend_id.to_string(),
             content: content.to_string(),
+            attachments: attachments.unwrap_or(&[]).to_vec(),
             created_at,
             outgoing: true,
         })
@@ -106,7 +120,7 @@ impl Store {
             params![message_id, user_id, friend_id],
         )?;
         if changed == 0 {
-            return Err(anyhow!("only the sender can delete this message"));
+            return Err(anyhow!("只能撤销自己发送的消息"));
         }
         Ok(())
     }
@@ -156,8 +170,29 @@ fn row_to_friend_message(
         id: row.get(0)?,
         receiver_user_id: row.get(2)?,
         content: row.get(3)?,
-        created_at: row.get(4)?,
+        attachments: parse_attachments(row.get::<_, Option<String>>(4)?.as_deref())?,
+        created_at: row.get(5)?,
         outgoing: sender_user_id == user_id,
         sender_user_id,
+    })
+}
+
+pub(super) fn attachments_to_json(
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> Result<Option<String>> {
+    let Some(attachments) = attachments.filter(|items| !items.is_empty()) else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::to_string(attachments)?))
+}
+
+pub(super) fn parse_attachments(
+    value: Option<&str>,
+) -> rusqlite::Result<Vec<ProjectAttachmentRef>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(Vec::new());
+    };
+    serde_json::from_str(value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error))
     })
 }

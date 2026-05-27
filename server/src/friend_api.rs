@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
+    project_ws_protocol::ProjectAttachmentRef,
     types::AppState,
 };
 
@@ -50,6 +51,7 @@ pub struct FriendMessagesQuery {
 #[derive(Deserialize)]
 pub struct SendFriendMessageRequest {
     pub content: String,
+    pub attachments: Option<Vec<ProjectAttachmentRef>>,
 }
 
 #[derive(Deserialize)]
@@ -61,6 +63,7 @@ pub struct FriendGroupMessagesQuery {
 #[derive(Deserialize)]
 pub struct SendFriendGroupMessageRequest {
     pub content: String,
+    pub attachments: Option<Vec<ProjectAttachmentRef>>,
 }
 
 pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -194,10 +197,12 @@ pub async fn send_friend_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state
-        .store
-        .send_friend_message(&user.id, &friend_id, &req.content)
-    {
+    match state.store.send_friend_message(
+        &user.id,
+        &friend_id,
+        &req.content,
+        req.attachments.as_deref(),
+    ) {
         Ok(message) => {
             crate::friend_events::publish_friend_message(&message);
             Json(serde_json::json!({ "message": message })).into_response()
@@ -255,10 +260,12 @@ pub async fn send_friend_group_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state
-        .store
-        .send_friend_group_message(&user.id, &group_id, &req.content)
-    {
+    match state.store.send_friend_group_message(
+        &user.id,
+        &group_id,
+        &req.content,
+        req.attachments.as_deref(),
+    ) {
         Ok(message) => {
             if let Ok(recipient_user_ids) = state.store.friend_group_member_ids(&user.id, &group_id)
             {

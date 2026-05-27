@@ -27,7 +27,7 @@ pub struct ProjectPrewarmRequest {
     pub conversation_title: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct ProjectAttachmentRef {
     pub attachment_id: Option<String>,
     pub kind: Option<String>,

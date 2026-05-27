@@ -105,10 +105,10 @@ class MainActivity : AppCompatActivity() {
             isFriendChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
             },
-            trySendFriendMessage = { text, hasAttachments ->
-                projectSpaceController.trySendMessage(text, hasAttachments) ||
-                    groupChatActions.trySendMessage(text, hasAttachments) ||
-                    friendChatActions.trySendMessage(text, hasAttachments)
+            trySendFriendMessage = { text, attachments ->
+                projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
+                    groupChatActions.trySendMessage(text, attachments) ||
+                    friendChatActions.trySendMessage(text, attachments)
             }
         )
     }
@@ -648,6 +648,8 @@ class MainActivity : AppCompatActivity() {
             onProjectShareLongPress = { anchor, message, share ->
                 actionPopups.showProjectShareActionPopup(anchor, message, share)
             },
+            userId = { AuthManager.effectiveUserId(this) },
+            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments() },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
         )
@@ -666,6 +668,8 @@ class MainActivity : AppCompatActivity() {
             onProjectShareLongPress = { anchor, message, share ->
                 actionPopups.showProjectShareActionPopup(anchor, message, share)
             },
+            userId = { AuthManager.effectiveUserId(this) },
+            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments() },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onGroupSummariesChanged = { groupActions.loadGroups() }
         )

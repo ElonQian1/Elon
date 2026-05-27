@@ -8,6 +8,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+internal const val CHAT_ATTACHMENT_TARGET_ID = "__chat_attachments__"
+
 internal fun uploadAttachmentRefsOrNull(
     http: OkHttpClient,
     serverUrl: String,
@@ -29,18 +31,7 @@ internal fun uploadAttachmentRefsOrNull(
             showShortToast("附件过大，请重新选择较小文件：${attachment.displayName}")
             return null
         }
-        val url = buildString {
-            append("$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(target.projectId)}/attachments")
-            append("?title=${urlPart(target.projectTitle)}")
-            append("&conversation_id=${urlPart(target.conversationId)}")
-            append("&conversation_title=${urlPart(target.conversationTitle)}")
-            append("&kind=${urlPart(attachment.kind)}")
-            append("&display_name=${urlPart(attachment.displayName)}")
-            append("&file_name=${urlPart(attachment.fileName)}")
-            append("&mime_type=${urlPart(attachment.mimeType)}")
-            attachment.imageWidth?.let { append("&image_width=$it") }
-            attachment.imageHeight?.let { append("&image_height=$it") }
-        }
+        val url = attachmentUploadUrl(serverUrl, userId, target, attachment)
         val mediaType = attachment.mimeType.toMediaTypeOrNull()
             ?: "application/octet-stream".toMediaType()
         val response = try {
@@ -107,6 +98,31 @@ internal fun uploadAttachmentRefsOrNull(
         }
     }
     return array
+}
+
+private fun attachmentUploadUrl(
+    serverUrl: String,
+    userId: String,
+    target: SendTarget,
+    attachment: PendingAttachment
+): String {
+    return buildString {
+        if (target.projectId == CHAT_ATTACHMENT_TARGET_ID) {
+            append("$serverUrl/api/user/${urlPart(userId)}/chat-attachments")
+        } else {
+            append("$serverUrl/api/user/${urlPart(userId)}/projects/${urlPart(target.projectId)}/attachments")
+            append("?title=${urlPart(target.projectTitle)}")
+        }
+        append(if (contains("?")) "&" else "?")
+        append("conversation_id=${urlPart(target.conversationId)}")
+        append("&conversation_title=${urlPart(target.conversationTitle)}")
+        append("&kind=${urlPart(attachment.kind)}")
+        append("&display_name=${urlPart(attachment.displayName)}")
+        append("&file_name=${urlPart(attachment.fileName)}")
+        append("&mime_type=${urlPart(attachment.mimeType)}")
+        attachment.imageWidth?.let { append("&image_width=$it") }
+        attachment.imageHeight?.let { append("&image_height=$it") }
+    }
 }
 
 private fun JSONObject.optIntOrNull(name: String, fallback: Int?): Int? {

@@ -2,6 +2,7 @@ package com.elon.app
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import org.json.JSONArray
 import java.io.File
 
 data class ChatAttachment(
@@ -38,6 +39,25 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
             imageHeight = item.positiveIntOrNull("image_height")
         )
     }
+}
+
+internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachment> {
+    array ?: return emptyList()
+    return List(array.length()) { index -> array.optJSONObject(index) }
+        .mapNotNull { item ->
+            item ?: return@mapNotNull null
+            ChatAttachment(
+                kind = item.optString("kind").takeIf { it.isNotBlank() },
+                displayName = item.optString("display_name").takeIf { it.isNotBlank() },
+                fileName = item.optString("file_name").takeIf { it.isNotBlank() },
+                mimeType = item.optString("mime_type").takeIf { it.isNotBlank() },
+                url = item.optString("url").takeIf { it.isNotBlank() },
+                localPath = item.optString("local_path").takeIf { it.isNotBlank() },
+                sizeBytes = item.optLong("size_bytes", 0L).takeIf { it > 0L },
+                imageWidth = item.optInt("image_width", 0).takeIf { it > 0 },
+                imageHeight = item.optInt("image_height", 0).takeIf { it > 0 }
+            )
+        }
 }
 
 internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): List<ChatAttachment> {

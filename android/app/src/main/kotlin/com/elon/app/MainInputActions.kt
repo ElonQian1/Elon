@@ -26,7 +26,7 @@ internal class MainInputActions(
     private val navigationController: () -> MainNavigationController,
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
-    private val trySendFriendMessage: (String, Boolean) -> Boolean
+    private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean
 ) {
     private val pendingAttachments = mutableListOf<PendingAttachment>()
     private var inputComposerViews: MainInputComposerViews? = null

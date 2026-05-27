@@ -2,6 +2,9 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::BTreeSet;
 
+use crate::project_ws_protocol::ProjectAttachmentRef;
+
+use super::friend_messages::{attachments_to_json, parse_attachments};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
 impl Store {
@@ -135,18 +138,18 @@ impl Store {
         let sql = if after.is_some() {
             "SELECT m.id, m.group_id, m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content, m.created_at
+                    m.content, m.attachments_json, m.created_at
              FROM friend_group_messages m
              JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1 AND m.created_at > ?2
              ORDER BY m.created_at ASC
              LIMIT ?3"
         } else {
-            "SELECT id, group_id, sender_user_id, sender_name, content, created_at
+            "SELECT id, group_id, sender_user_id, sender_name, content, attachments_json, created_at
              FROM (
                  SELECT m.id, m.group_id, m.sender_user_id,
                         COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                        m.content, m.created_at
+                        m.content, m.attachments_json, m.created_at
                  FROM friend_group_messages m
                  JOIN users u ON u.id = m.sender_user_id
                  WHERE m.group_id = ?1
@@ -177,10 +180,12 @@ impl Store {
         user_id: &str,
         group_id: &str,
         content: &str,
+        attachments: Option<&[ProjectAttachmentRef]>,
     ) -> Result<FriendGroupMessage> {
         self.ensure_group_member(user_id, group_id)?;
         let content = content.trim();
-        if content.is_empty() {
+        let attachments_json = attachments_to_json(attachments)?;
+        if content.is_empty() && attachments_json.is_none() {
             return Err(anyhow!("消息不能为空"));
         }
         if content.chars().count() > 4000 {
@@ -198,9 +203,11 @@ impl Store {
             |row| row.get::<_, String>(0),
         )?;
         conn.execute(
-            "INSERT INTO friend_group_messages (id, group_id, sender_user_id, content, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![id, group_id, user_id, content, created_at],
+            "INSERT INTO friend_group_messages (
+                id, group_id, sender_user_id, content, attachments_json, created_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, group_id, user_id, content, attachments_json, created_at],
         )?;
         conn.execute(
             "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
@@ -214,6 +221,7 @@ impl Store {
             sender_user_id: user_id.to_string(),
             sender_name,
             content: content.to_string(),
+            attachments: attachments.unwrap_or(&[]).to_vec(),
             created_at,
             outgoing: true,
         })
@@ -235,7 +243,7 @@ impl Store {
             params![message_id, group_id, user_id],
         )?;
         if changed == 0 {
-            return Err(anyhow!("only the sender can delete this message"));
+            return Err(anyhow!("只能撤销自己发送的消息"));
         }
         conn.execute(
             "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
@@ -359,7 +367,8 @@ fn row_to_group_message(
         group_id: row.get(1)?,
         sender_name: row.get(3)?,
         content: row.get(4)?,
-        created_at: row.get(5)?,
+        attachments: parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?,
+        created_at: row.get(6)?,
         outgoing: sender_user_id == user_id,
         sender_user_id,
     })

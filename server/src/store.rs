@@ -6,6 +6,7 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
+use crate::project_ws_protocol::ProjectAttachmentRef;
 use crate::store_schema::apply_migrations;
 
 mod common;
@@ -83,6 +84,7 @@ pub struct FriendChatMessage {
     pub sender_user_id: String,
     pub receiver_user_id: String,
     pub content: String,
+    pub attachments: Vec<ProjectAttachmentRef>,
     pub created_at: String,
     pub outgoing: bool,
 }
@@ -113,6 +115,7 @@ pub struct FriendGroupMessage {
     pub sender_user_id: String,
     pub sender_name: String,
     pub content: String,
+    pub attachments: Vec<ProjectAttachmentRef>,
     pub created_at: String,
     pub outgoing: bool,
 }

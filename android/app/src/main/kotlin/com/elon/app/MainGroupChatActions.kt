@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import com.google.gson.JsonArray
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,6 +26,8 @@ internal class MainGroupChatActions(
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val onProjectShareLongPress: (View, ChatMessage, ChatProjectShare) -> Unit,
+    private val userId: () -> String,
+    private val clearPendingAttachments: () -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val onGroupSummariesChanged: () -> Unit
 ) {
@@ -92,25 +95,30 @@ internal class MainGroupChatActions(
         pollHandler.removeCallbacks(pollRunnable)
     }
 
-    fun trySendMessage(rawText: String, hasAttachments: Boolean): Boolean {
+    fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         val group = activeGroup ?: return false
-        val text = rawText.trim()
-        if (hasAttachments) {
-            Toast.makeText(activity, "群聊暂不支持发送附件", Toast.LENGTH_SHORT).show()
-            return true
-        }
+        val text = visibleTextForPendingAttachments(rawText, pendingAttachments)
         if (text.isBlank()) return true
 
         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
-        val pending = ChatMessage("user", text, sendStatus = SENDING_STATUS)
+        val pending = ChatMessage(
+            role = "user",
+            content = text,
+            attachments = chatAttachmentsFromPending(pendingAttachments).takeIf { it.isNotEmpty() },
+            sendStatus = SENDING_STATUS
+        )
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
         binding.chatList.scrollToPosition(messages.lastIndex)
         binding.inputEdit.text.clear()
+        clearPendingAttachments()
         collapseInputComposer()
 
         thread {
-            val result = runCatching { postMessage(group, text) }
+            val result = runCatching {
+                val attachments = uploadGroupAttachments(group, pendingAttachments)
+                postMessage(group, text, attachments)
+            }
             activity.runOnUiThread {
                 if (activeGroup?.id != group.id) return@runOnUiThread
                 result.onSuccess { sentMessage ->
@@ -187,7 +195,8 @@ internal class MainGroupChatActions(
                         currentMessages.zip(remoteMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
-                                current.senderLabel != incoming.senderLabel
+                                current.senderLabel != incoming.senderLabel ||
+                                current.attachments != incoming.attachments
                         }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)
@@ -227,8 +236,38 @@ internal class MainGroupChatActions(
         }
     }
 
-    private fun postMessage(group: AppGroup, text: String): ChatMessage {
-        val payload = JSONObject().put("content", text).toString()
+    private fun uploadGroupAttachments(
+        group: AppGroup,
+        attachments: List<PendingAttachment>
+    ): JsonArray {
+        if (attachments.isEmpty()) return JsonArray()
+        return uploadAttachmentRefsOrNull(
+            http = http,
+            serverUrl = serverUrl,
+            userId = userId(),
+            attachments = attachments,
+            target = SendTarget(
+                projectId = CHAT_ATTACHMENT_TARGET_ID,
+                projectTitle = "群聊附件",
+                conversationId = "group-${group.id}",
+                conversationTitle = group.name
+            ),
+            maxAttachmentBytes = MAX_ATTACHMENT_BYTES,
+            showShortToast = { message ->
+                activity.runOnUiThread { Toast.makeText(activity, message, Toast.LENGTH_SHORT).show() }
+            },
+            showLongToast = { message ->
+                activity.runOnUiThread { Toast.makeText(activity, message, Toast.LENGTH_LONG).show() }
+            }
+        ) ?: error("附件上传失败")
+    }
+
+    private fun postMessage(group: AppGroup, text: String, attachments: JsonArray): ChatMessage {
+        val payloadJson = JSONObject().put("content", text)
+        if (attachments.size() > 0) {
+            payloadJson.put("attachments", JSONArray(attachments.toString()))
+        }
+        val payload = payloadJson.toString()
             .toRequestBody("application/json".toMediaType())
         val request = AuthManager.applyAuth(
             activity,
@@ -242,6 +281,11 @@ internal class MainGroupChatActions(
             val message = JSONObject(body).optJSONObject("message") ?: JSONObject()
                 .put("content", text)
                 .put("outgoing", true)
+                .also { fallback ->
+                    if (attachments.size() > 0) {
+                        fallback.put("attachments", JSONArray(attachments.toString()))
+                    }
+                }
             return groupMessageFromJson(message)
         }
     }
@@ -265,6 +309,7 @@ internal class MainGroupChatActions(
         return ChatMessage(
             role = if (outgoing) "user" else "friend",
             content = json.optString("content", ""),
+            attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
             senderLabel = if (outgoing) null else senderName,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() }
         )
@@ -284,5 +329,6 @@ internal class MainGroupChatActions(
     private companion object {
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
+        const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024
     }
 }
