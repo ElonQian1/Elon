@@ -22,13 +22,19 @@ import kotlin.math.max
 internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List<ChatAttachment>?) {
     if (container == null) return
     val items = attachments.orEmpty()
+    val visibleItems = items.take(MAX_CHAT_ATTACHMENTS)
+    val signature = visibleItems.attachmentRenderSignature()
+    if (signature.isNotEmpty() && container.tag == signature && container.childCount == visibleItems.size) {
+        container.visibility = View.VISIBLE
+        return
+    }
+    container.tag = signature
     container.removeAllViews()
     if (items.isEmpty()) {
         container.visibility = View.GONE
         return
     }
     container.visibility = View.VISIBLE
-    val visibleItems = items.take(MAX_CHAT_ATTACHMENTS)
     visibleItems.forEachIndexed { index, attachment ->
         val view = if (attachment.isImage()) {
             createImageAttachmentView(container.context, attachment)
@@ -61,14 +67,20 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
     }
 
     image.tag = source
-    image.setImageResource(android.R.drawable.ic_menu_gallery)
     image.setOnClickListener {
         ChatImageViewer.show(context, attachment)
     }
-    ChatImagePreviewLoader.load(source) { bitmap ->
-        image.post {
-            if (image.tag == source) {
-                image.setImageBitmap(bitmap)
+
+    val cached = ChatImagePreviewLoader.cached(source)
+    if (cached != null) {
+        image.setImageBitmap(cached)
+    } else {
+        image.setImageResource(android.R.drawable.ic_menu_gallery)
+        ChatImagePreviewLoader.load(source) { bitmap ->
+            image.post {
+                if (image.tag == source) {
+                    image.setImageBitmap(bitmap)
+                }
             }
         }
     }
@@ -166,6 +178,8 @@ internal object ChatImagePreviewLoader {
         }.start()
     }
 
+    fun cached(source: String): Bitmap? = cache.get(source)
+
     private fun loadBitmap(source: String): Bitmap {
         val bytes = if (source.startsWith("http://") || source.startsWith("https://")) {
             readUrlBytes(source)
@@ -212,6 +226,22 @@ internal object ChatImagePreviewLoader {
             sample *= 2
         }
         return sample
+    }
+}
+
+private fun List<ChatAttachment>.attachmentRenderSignature(): String {
+    return joinToString(separator = "\u001F") { attachment ->
+        val source = if (attachment.isImage()) chatAttachmentImageSource(attachment).orEmpty() else attachment.url.orEmpty()
+        listOf(
+            attachment.kind.orEmpty(),
+            attachment.mimeType.orEmpty(),
+            source,
+            attachment.displayName.orEmpty(),
+            attachment.fileName.orEmpty(),
+            attachment.sizeBytes?.toString().orEmpty(),
+            attachment.imageWidth?.toString().orEmpty(),
+            attachment.imageHeight?.toString().orEmpty()
+        ).joinToString(separator = "\u001E")
     }
 }
 
