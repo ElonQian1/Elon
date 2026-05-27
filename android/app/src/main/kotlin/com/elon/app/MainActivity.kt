@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         createActions.onCreate(intent)
+        messageSelectionActions.setup()
     }
 
     private val createActions: MainCreateActions by lazy {
@@ -374,6 +375,8 @@ class MainActivity : AppCompatActivity() {
             isChatSideMenuOpen = { chatSideMenuController.isOpen },
             closeChatSideMenu = { animate -> chatSideMenuController.close(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
+            isMessageSelectionActive = { messageSelectionActions.isSelectionActive() },
+            clearMessageSelection = { messageSelectionActions.cancelSelection() },
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
             onFriendChatClosed = {
@@ -823,6 +826,7 @@ class MainActivity : AppCompatActivity() {
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
             deleteMessage = { message -> messageActions.deleteMessage(message) },
+            startMultiSelect = { message -> messageSelectionActions.startSelection(message) },
             revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
             restorePersonalProject = { message, share ->
                 chatProjectShareActions.restorePersonalProject(message, share)
@@ -927,6 +931,33 @@ class MainActivity : AppCompatActivity() {
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         )
+    }
+
+    private val messageSelectionActions: MainChatSelectionActions by lazy {
+        MainChatSelectionActions(
+            activity = this,
+            binding = binding,
+            chatAdapter = { chatAdapter },
+            activeConversation = projectStateActions::activeConversation,
+            saveConversations = projectStateActions::saveConversations,
+            renderConversationList = homeListActions::renderConversationList,
+            shareActions = uiTools::shareActions,
+            sendAiSummaryPrompt = { prompt -> sendSelectedDiscussionToAi(prompt) }
+        )
+    }
+
+    private fun sendSelectedDiscussionToAi(prompt: String) {
+        if (projectStateActions.activeConversation().ended) {
+            conversationActions.showCreateConversationDialog()
+            return
+        }
+        friendChatActions.closeFriendChat()
+        groupChatActions.closeGroupChat()
+        projectSpaceController.closeChannelChat()
+        navigationController.showProjectChat()
+        binding.inputEdit.setText(prompt)
+        binding.inputEdit.setSelection(binding.inputEdit.text.length)
+        inputActions.sendMessageActions.sendMessage()
     }
 
     private fun stageHintShimmer(): MainStageHintShimmer {

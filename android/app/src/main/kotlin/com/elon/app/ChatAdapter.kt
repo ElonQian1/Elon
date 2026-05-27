@@ -17,6 +17,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
+import java.util.Collections
+import java.util.IdentityHashMap
 import kotlin.math.sin
 
 data class ChatMessage(
@@ -42,6 +44,10 @@ class ChatAdapter(
 ) :
     RecyclerView.Adapter<ChatAdapter.VH>() {
     private var cachedUserProfile: UserProfile? = null
+    private var selectionMode = false
+    private var selectionChangedListener: ((Int) -> Unit)? = null
+    private val selectedMessages: MutableSet<ChatMessage> =
+        Collections.newSetFromMap(IdentityHashMap<ChatMessage, Boolean>())
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val text: TextView = view.findViewById(R.id.messageText)
@@ -136,6 +142,7 @@ class ChatAdapter(
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
         holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
+        bindSelectionVisual(holder, message, projectCardBound)
         bindMessageActions(holder, message, projectCardBound)
         bindEvidence(holder, message, position)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
@@ -194,6 +201,34 @@ class ChatAdapter(
         notifyDataSetChanged()
     }
 
+    fun setSelectionChangedListener(listener: ((Int) -> Unit)?) {
+        selectionChangedListener = listener
+        if (selectionMode) selectionChangedListener?.invoke(selectedMessages.size)
+    }
+
+    fun startSelection(message: ChatMessage) {
+        if (!isSelectableMessage(message)) return
+        selectionMode = true
+        selectedMessages.clear()
+        selectedMessages.add(message)
+        notifyDataSetChanged()
+        notifySelectionChanged()
+    }
+
+    fun exitSelection() {
+        if (!selectionMode && selectedMessages.isEmpty()) return
+        selectionMode = false
+        selectedMessages.clear()
+        notifyDataSetChanged()
+        notifySelectionChanged()
+    }
+
+    fun isSelectionModeActive(): Boolean = selectionMode
+
+    fun selectedMessagesInOrder(): List<ChatMessage> {
+        return messages.filter { selectedMessages.contains(it) }
+    }
+
     fun addMessage(msg: ChatMessage) {
         if (messages.isNotEmpty() && shouldDropLastTransientBefore(msg)) {
             val lastIndex = messages.lastIndex
@@ -213,7 +248,29 @@ class ChatAdapter(
     }
 
     private fun bindMessageActions(holder: VH, message: ChatMessage, projectCardBound: Boolean) {
-        val canAct = !projectCardBound && onMessageLongPress != null && message.content.isNotBlank()
+        val canSelect = !projectCardBound && isSelectableMessage(message)
+        if (selectionMode) {
+            val clickListener = if (canSelect) {
+                View.OnClickListener {
+                    val position = holder.adapterPosition
+                    val current = messages.getOrNull(position) ?: return@OnClickListener
+                    toggleSelection(current, position)
+                }
+            } else {
+                null
+            }
+            holder.itemView.setOnClickListener(clickListener)
+            holder.text.setOnClickListener(clickListener)
+            holder.itemView.setOnLongClickListener(null)
+            holder.text.setOnLongClickListener(null)
+            holder.itemView.isLongClickable = false
+            holder.text.isLongClickable = false
+            return
+        }
+
+        holder.itemView.setOnClickListener(null)
+        holder.text.setOnClickListener(null)
+        val canAct = canSelect && onMessageLongPress != null
         holder.itemView.isLongClickable = canAct
         holder.text.isLongClickable = canAct
 
@@ -229,6 +286,44 @@ class ChatAdapter(
         }
         holder.itemView.setOnLongClickListener(listener)
         holder.text.setOnLongClickListener(listener)
+    }
+
+    private fun bindSelectionVisual(holder: VH, message: ChatMessage, projectCardBound: Boolean) {
+        val canSelect = !projectCardBound && isSelectableMessage(message)
+        val selected = selectionMode && selectedMessages.contains(message)
+        holder.itemView.setBackgroundColor(
+            if (selected) Color.parseColor("#24392D") else Color.TRANSPARENT
+        )
+        holder.itemView.alpha = if (selectionMode && !canSelect) 0.62f else 1f
+        holder.bubble?.alpha = if (selected) 0.94f else 1f
+        holder.itemView.contentDescription = if (selectionMode && canSelect) {
+            if (selected) "已选中消息，点击取消选择" else "未选中消息，点击选择"
+        } else {
+            null
+        }
+    }
+
+    private fun toggleSelection(message: ChatMessage, position: Int) {
+        if (!isSelectableMessage(message)) return
+        if (selectedMessages.contains(message)) {
+            selectedMessages.remove(message)
+        } else {
+            selectedMessages.add(message)
+        }
+        if (selectedMessages.isEmpty()) {
+            exitSelection()
+            return
+        }
+        if (position != RecyclerView.NO_POSITION) notifyItemChanged(position)
+        notifySelectionChanged()
+    }
+
+    private fun isSelectableMessage(message: ChatMessage): Boolean {
+        return message.content.isNotBlank() || !message.attachments.isNullOrEmpty()
+    }
+
+    private fun notifySelectionChanged() {
+        selectionChangedListener?.invoke(selectedMessages.size)
     }
 
     private fun bindUserAvatar(avatar: TextView?) {

@@ -34,6 +34,8 @@ internal class MainNavigationController(
     private val isChatSideMenuOpen: () -> Boolean,
     private val closeChatSideMenu: (Boolean) -> Unit,
     private val isActiveConversationWorking: () -> Boolean,
+    private val isMessageSelectionActive: () -> Boolean,
+    private val clearMessageSelection: () -> Unit,
     private val setSendEnabled: (Boolean) -> Unit,
     private val maybePrewarmCodexSession: (String) -> Unit,
     private val onFriendChatClosed: () -> Unit,
@@ -122,6 +124,10 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
+        if (isMessageSelectionActive()) {
+            clearMessageSelection()
+            return
+        }
         if (isChatSideMenuOpen()) {
             closeChatSideMenu(true)
             return
@@ -147,6 +153,7 @@ internal class MainNavigationController(
     }
 
     fun showConversationHome(animate: Boolean = false) {
+        clearMessageSelection()
         onFriendChatClosed()
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
@@ -178,6 +185,7 @@ internal class MainNavigationController(
 
     fun showChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
+        clearMessageSelection()
         if (binding.chatPage.visibility != View.VISIBLE) {
             chatReturnTarget = ChatReturnTarget.FRIENDS
         }
@@ -220,6 +228,7 @@ internal class MainNavigationController(
 
     fun showFriendChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
+        clearMessageSelection()
         chatReturnTarget = ChatReturnTarget.FRIENDS
         val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
@@ -261,6 +270,7 @@ internal class MainNavigationController(
 
     fun showProjectChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
+        clearMessageSelection()
         onFriendChatClosed()
         chatReturnTarget = ChatReturnTarget.PROJECTS
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
@@ -302,6 +312,7 @@ internal class MainNavigationController(
 
     fun showProjectChannelChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
+        clearMessageSelection()
         chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
@@ -343,6 +354,7 @@ internal class MainNavigationController(
 
     fun showProjectPersonalChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
+        clearMessageSelection()
         onFriendChatClosed()
         chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
@@ -390,6 +402,7 @@ internal class MainNavigationController(
     }
 
     fun showProjectSpace(title: String, animate: Boolean = false) {
+        clearMessageSelection()
         projectSpaceTitle = title.ifBlank { "项目空间" }
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
