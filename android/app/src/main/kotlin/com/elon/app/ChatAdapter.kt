@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Shader
+import android.graphics.drawable.ColorDrawable
 import android.text.method.LinkMovementMethod
 import android.text.util.Linkify
 import android.view.LayoutInflater
@@ -120,6 +121,7 @@ class ChatAdapter(
             onProjectShareLongPress
         )
         applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
+        applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
             holder.text.text = message.content
             holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
@@ -142,6 +144,16 @@ class ChatAdapter(
         holder.pauseButton?.setOnClickListener {
             if (message.role in activeWorkflowRoles) onPauseWork?.invoke()
         }
+    }
+
+    private fun applyImageOnlyBubbleStyle(
+        bubble: LinearLayout?,
+        message: ChatMessage,
+        projectCardBound: Boolean
+    ) {
+        if (bubble == null || projectCardBound || !message.isImageOnlyMessage()) return
+        bubble.background = ColorDrawable(Color.TRANSPARENT)
+        bubble.setPadding(0, 0, 0, 0)
     }
 
     private fun bindSendStatus(holder: VH, message: ChatMessage) {
@@ -457,4 +469,9 @@ private fun ChatMessage.canRetryFailedAttachmentSend(): Boolean {
     return role == "user" &&
         !attachments.isNullOrEmpty() &&
         sendStatus.orEmpty().contains("失败")
+}
+
+private fun ChatMessage.isImageOnlyMessage(): Boolean {
+    val items = attachments.orEmpty()
+    return content.isBlank() && items.isNotEmpty() && items.all { it.isImage() }
 }

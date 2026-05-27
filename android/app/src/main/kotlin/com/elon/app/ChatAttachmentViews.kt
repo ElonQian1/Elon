@@ -28,14 +28,15 @@ internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List
         return
     }
     container.visibility = View.VISIBLE
-    items.take(MAX_CHAT_ATTACHMENTS).forEach { attachment ->
+    val visibleItems = items.take(MAX_CHAT_ATTACHMENTS)
+    visibleItems.forEachIndexed { index, attachment ->
         val view = if (attachment.isImage()) {
             createImageAttachmentView(container.context, attachment)
         } else {
             createFileAttachmentView(container.context, attachment)
         }
         view.layoutParams = (view.layoutParams as LinearLayout.LayoutParams).apply {
-            bottomMargin = container.context.dp(6)
+            bottomMargin = if (index == visibleItems.lastIndex) 0 else container.context.dp(6)
         }
         container.addView(view)
     }
