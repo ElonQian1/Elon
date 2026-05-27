@@ -30,6 +30,7 @@ internal class MainNavigationController(
     private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
+    private val collapseInputComposerForBack: () -> Boolean,
     private val isChatSideMenuOpen: () -> Boolean,
     private val closeChatSideMenu: (Boolean) -> Unit,
     private val isActiveConversationWorking: () -> Boolean,
@@ -126,6 +127,7 @@ internal class MainNavigationController(
             return
         }
         if (binding.chatPage.visibility == View.VISIBLE) {
+            if (collapseInputComposerForBack()) return
             collapseInputComposer(false)
             when (chatReturnTarget) {
                 ChatReturnTarget.PROJECTS -> showProjectHome(animate = true)

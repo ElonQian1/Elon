@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.content.Context
+import android.graphics.Rect
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -18,8 +19,12 @@ internal class MainInputFocusActions(
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
 ) {
+    private var keyboardWatcherInstalled = false
+    private var lastKeyboardVisible = false
+
     fun focusInputComposer() {
         if (!isFriendChatActive() && activeConversation().ended) return
+        installKeyboardCollapseWatcher()
         if (isVoiceMode()) {
             setVoiceMode(false)
             applyVoiceMode()
@@ -29,14 +34,18 @@ internal class MainInputFocusActions(
                 motion.setExpanded(true, animate = true)
             }
         }
-        binding.inputEdit.requestFocus()
-        binding.inputEdit.post {
-            showKeyboard()
-        }
-        binding.inputEdit.postDelayed({
-            if (!binding.inputEdit.hasFocus()) return@postDelayed
-            showKeyboard()
-        }, 120L)
+        focusAndShowKeyboard()
+        binding.inputEdit.post { focusAndShowKeyboard() }
+        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfStillFocused() }, 90L)
+        binding.inputEdit.postDelayed({ focusAndShowKeyboardIfStillFocused() }, 220L)
+    }
+
+    fun collapseInputComposerForBack(): Boolean {
+        val motion = inputComposerMotion()
+        val shouldCollapse = binding.inputEdit.hasFocus() || motion?.isExpanded == true
+        if (!shouldCollapse) return false
+        collapseInputComposer(animate = true)
+        return true
     }
 
     fun collapseInputComposer(animate: Boolean = true) {
@@ -58,8 +67,49 @@ internal class MainInputFocusActions(
         updateAdaptiveInputHeight()
     }
 
+    private fun focusAndShowKeyboard() {
+        if (!binding.inputEdit.hasFocus()) {
+            binding.inputEdit.requestFocus()
+        }
+        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        showKeyboard()
+    }
+
+    private fun focusAndShowKeyboardIfStillFocused() {
+        if (!binding.inputEdit.hasFocus()) return
+        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        showKeyboard()
+    }
+
     private fun showKeyboard() {
         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun installKeyboardCollapseWatcher() {
+        if (keyboardWatcherInstalled) return
+        keyboardWatcherInstalled = true
+        lastKeyboardVisible = isKeyboardVisible()
+        binding.root.viewTreeObserver.addOnGlobalLayoutListener {
+            val keyboardVisible = isKeyboardVisible()
+            if (
+                lastKeyboardVisible &&
+                !keyboardVisible &&
+                binding.inputEdit.hasFocus() &&
+                inputComposerMotion()?.isExpanded == true
+            ) {
+                collapseInputComposer(animate = true)
+            }
+            lastKeyboardVisible = keyboardVisible
+        }
+    }
+
+    private fun isKeyboardVisible(): Boolean {
+        val visibleFrame = Rect()
+        binding.root.getWindowVisibleDisplayFrame(visibleFrame)
+        val rootHeight = binding.root.rootView.height
+        val hiddenHeight = rootHeight - visibleFrame.bottom
+        val threshold = (binding.root.resources.displayMetrics.density * 120f).toInt()
+        return hiddenHeight > threshold
     }
 }
