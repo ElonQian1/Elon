@@ -1,7 +1,7 @@
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
     routing::{delete, get, post},
-    Router,
 };
 use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -143,6 +143,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/channels/:channel_id/ai-tasks",
             post(project_space::start_channel_ai_task),
+        )
+        .route(
+            "/api/projects/:project_id/channels/:channel_id/summaries",
+            post(project_space::summarize_channel_selection),
         )
         .route(
             "/api/projects/:project_id/chat",

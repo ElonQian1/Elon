@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.view.View
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -13,7 +14,10 @@ internal class MainChatSelectionActions(
     private val saveConversations: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val shareActions: () -> MainShareActions,
-    private val sendAiSummaryPrompt: (String) -> Unit
+    private val isProjectChannelActive: () -> Boolean,
+    private val summarizeInCurrentChannel: (SelectedDiscussionSummary) -> Boolean,
+    private val summarizeInPersonalChat: (String) -> Unit,
+    private val summarizeInNewPersonalChat: (String) -> Unit
 ) {
     fun setup() {
         binding.selectionCancelButton.setOnClickListener { cancelSelection() }
@@ -64,9 +68,35 @@ internal class MainChatSelectionActions(
 
     private fun summarizeSelectedMessages() {
         val selected = selectedMessagesOrToast() ?: return
-        val prompt = selectedDiscussionSummaryPrompt(selected)
+        val summary = buildSelectedDiscussionSummary(selected)
+        if (isProjectChannelActive()) {
+            showChannelSummaryTargetDialog(summary)
+            return
+        }
         cancelSelection()
-        sendAiSummaryPrompt(prompt)
+        summarizeInPersonalChat(summary.personalPrompt)
+    }
+
+    private fun showChannelSummaryTargetDialog(summary: SelectedDiscussionSummary) {
+        AlertDialog.Builder(activity)
+            .setTitle("AI 总结")
+            .setItems(arrayOf("在当前频道发帖总结", "新个人会话总结")) { _, which ->
+                when (which) {
+                    0 -> {
+                        val handled = summarizeInCurrentChannel(summary)
+                        if (handled) {
+                            cancelSelection()
+                        } else {
+                            Toast.makeText(activity, "当前频道暂不能总结", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    1 -> {
+                        cancelSelection()
+                        summarizeInNewPersonalChat(summary.personalPrompt)
+                    }
+                }
+            }
+            .show()
     }
 
     private fun deleteSelectedMessages() {
@@ -131,55 +161,3 @@ internal class MainChatSelectionActions(
         return runCatching { chatAdapter() }.getOrNull()
     }
 }
-
-private fun selectedDiscussionSummaryPrompt(messages: List<ChatMessage>): String {
-    return """
-        请总结下面我多选的聊天讨论，直接给出中文结论。
-
-        输出结构：
-        1. 核心结论
-        2. 已决定事项
-        3. 待确认问题
-        4. 下一步行动
-
-        选中的讨论：
-        ${selectedDiscussionTranscript(messages)}
-    """.trimIndent()
-}
-
-private fun selectedDiscussionTranscript(messages: List<ChatMessage>): String {
-    val builder = StringBuilder()
-    messages.forEachIndexed { index, message ->
-        if (builder.length >= MAX_SELECTED_DISCUSSION_CHARS) return@forEachIndexed
-        val line = "${index + 1}. ${message.selectionSpeakerLabel()}: ${message.selectionContent()}"
-        val remaining = MAX_SELECTED_DISCUSSION_CHARS - builder.length
-        builder.appendLine(line.take(remaining))
-    }
-    if (builder.length >= MAX_SELECTED_DISCUSSION_CHARS) {
-        builder.appendLine("（后续内容过长，已截断）")
-    }
-    return builder.toString().trim()
-}
-
-private fun ChatMessage.selectionSpeakerLabel(): String {
-    return when (role) {
-        "user" -> "我"
-        "friend" -> senderLabel?.takeIf { it.isNotBlank() } ?: "对方"
-        "ai", "ai-intent", "ai-complete" -> "AI"
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-stopped" -> "开发进度"
-        "error" -> "错误"
-        else -> role
-    }
-}
-
-private fun ChatMessage.selectionContent(): String {
-    val attachmentText = attachments
-        ?.takeIf { it.isNotEmpty() }
-        ?.let { " [附件 ${it.size} 个]" }
-        .orEmpty()
-    val text = content.replace(Regex("\\s+"), " ").trim().ifBlank { "（无文字内容）" }
-    return "${summarize(text, MAX_SELECTED_MESSAGE_CHARS)}$attachmentText"
-}
-
-private const val MAX_SELECTED_MESSAGE_CHARS = 1200
-private const val MAX_SELECTED_DISCUSSION_CHARS = 7000

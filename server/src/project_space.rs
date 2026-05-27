@@ -3,15 +3,16 @@
 /// 这是商城“加入项目”之后的协作空间入口。普通频道消息写入共享频道；
 /// AI 开发频道可以把一次成员发起的开发任务写回同一频道，供项目成员共同跟进。
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
+    agent_api_loop::{resolve_agent, run_casual_chat},
     project_auth::{auth_from_headers, json_error, project_access},
     project_chat::run_project_agent_with_scheduler,
     project_keys::clean_trace_id,
@@ -31,6 +32,14 @@ pub struct SendChannelMessageRequest {
 #[derive(Deserialize)]
 pub struct StartChannelAiTaskRequest {
     pub content: String,
+    pub agent: Option<String>,
+    pub trace_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct SummarizeChannelSelectionRequest {
+    pub post_content: String,
+    pub summary_prompt: String,
     pub agent: Option<String>,
     pub trace_id: Option<String>,
 }
@@ -143,7 +152,10 @@ pub async fn start_channel_ai_task(
         Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
     };
     if channel_kind != "ai_development" {
-        return json_error(StatusCode::BAD_REQUEST, "只有 AI开发 频道可以发起项目 AI 开发任务");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "只有 AI开发 频道可以发起项目 AI 开发任务",
+        );
     }
     let content = req.content.trim().to_string();
     if content.is_empty() {
@@ -203,6 +215,56 @@ pub async fn start_channel_ai_task(
     .into_response()
 }
 
+pub async fn summarize_channel_selection(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id)): Path<(String, String)>,
+    Json(req): Json<SummarizeChannelSelectionRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    let post_content = req.post_content.trim().to_string();
+    let summary_prompt = req.summary_prompt.trim().to_string();
+    if post_content.is_empty() || summary_prompt.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "summary content 不能为空");
+    }
+
+    let post_message = match state.store.insert_project_channel_message(
+        &project_id,
+        &channel_id,
+        Some(&user.id),
+        "text",
+        &post_content,
+        None,
+    ) {
+        Ok(message) => message,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    let trace_id = clean_trace_id(req.trace_id.as_deref());
+    spawn_channel_summary(ChannelSummaryTask {
+        state: state.clone(),
+        user_id: user.id,
+        project,
+        project_id,
+        channel_id,
+        prompt: summary_prompt,
+        agent: req.agent,
+        trace_id: trace_id.clone(),
+    });
+
+    Json(serde_json::json!({
+        "trace_id": trace_id,
+        "message": post_message,
+    }))
+    .into_response()
+}
+
 struct ChannelAiTask {
     state: Arc<AppState>,
     user_id: String,
@@ -212,6 +274,17 @@ struct ChannelAiTask {
     conversation_id: String,
     task_id: String,
     content: String,
+    agent: Option<String>,
+    trace_id: String,
+}
+
+struct ChannelSummaryTask {
+    state: Arc<AppState>,
+    user_id: String,
+    project: crate::store::ProjectAccess,
+    project_id: String,
+    channel_id: String,
+    prompt: String,
     agent: Option<String>,
     trace_id: String,
 }
@@ -313,6 +386,46 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
             Some(&final_reply),
             apk_url.as_deref(),
             error.as_deref(),
+        );
+    });
+}
+
+fn spawn_channel_summary(task: ChannelSummaryTask) {
+    tokio::spawn(async move {
+        let _ = task.state.store.insert_project_channel_message(
+            &task.project_id,
+            &task.channel_id,
+            None,
+            "ai_progress",
+            "AI 正在总结这些聊天记录...",
+            None,
+        );
+        let user_workspace = task.state.get_user_workspace(&task.user_id);
+        let result = match resolve_agent(&task.state, &user_workspace, task.agent.as_deref()).await
+        {
+            Ok(agent) => run_casual_chat(&task.state, &agent, &task.prompt).await,
+            Err(error) => Err(error),
+        };
+        let content = match result {
+            Ok(reply) => format!("AI 总结\n{}", reply.trim()),
+            Err(error) => format!("AI 总结失败：{}", error),
+        };
+        let _ = task.state.store.insert_project_channel_message(
+            &task.project_id,
+            &task.channel_id,
+            None,
+            "ai_result",
+            &content,
+            None,
+        );
+        task.state.server_traces.record(
+            &task.trace_id,
+            "channel_summary_done",
+            serde_json::json!({
+                "project_id": &task.project.id,
+                "channel_id": &task.channel_id,
+                "ok": content.starts_with("AI 总结\n"),
+            }),
         );
     });
 }

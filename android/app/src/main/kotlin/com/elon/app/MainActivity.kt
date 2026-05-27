@@ -942,8 +942,21 @@ class MainActivity : AppCompatActivity() {
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
             shareActions = uiTools::shareActions,
-            sendAiSummaryPrompt = { prompt -> sendSelectedDiscussionToAi(prompt) }
+            isProjectChannelActive = projectSpaceController::isChannelActive,
+            summarizeInCurrentChannel = projectSpaceController::summarizeSelectedDiscussion,
+            summarizeInPersonalChat = { prompt -> sendSelectedDiscussionToAi(prompt) },
+            summarizeInNewPersonalChat = { prompt -> sendSelectedDiscussionToNewAiChat(prompt) }
         )
+    }
+
+    private fun sendSelectedDiscussionToNewAiChat(prompt: String) {
+        val project = projectStateActions.activeProject()
+        project.conversations.add(newAppConversation("多选讨论总结", "AI 总结多选聊天记录"))
+        project.activeConversationIndex = project.conversations.lastIndex
+        project.updatedAt = System.currentTimeMillis()
+        projectStateActions.saveConversations()
+        homeListActions.renderConversationList()
+        sendSelectedDiscussionToAi(prompt)
     }
 
     private fun sendSelectedDiscussionToAi(prompt: String) {

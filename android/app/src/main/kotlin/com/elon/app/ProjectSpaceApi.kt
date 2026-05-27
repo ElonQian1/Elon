@@ -88,6 +88,28 @@ internal fun startProjectChannelAiTask(
     )
 }
 
+internal fun summarizeProjectChannelMessages(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    channelId: String,
+    postContent: String,
+    summaryPrompt: String
+): ProjectChannelMessage {
+    return postProjectChannelPayload(
+        http = http,
+        serverUrl = serverUrl,
+        context = context,
+        projectId = projectId,
+        channelId = channelId,
+        suffix = "summaries",
+        payload = JSONObject()
+            .put("post_content", postContent)
+            .put("summary_prompt", summaryPrompt)
+    )
+}
+
 private fun postProjectChannelPayload(
     http: OkHttpClient,
     serverUrl: String,

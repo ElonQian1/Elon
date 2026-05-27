@@ -154,6 +154,46 @@ internal class ProjectSpaceController(
         return true
     }
 
+    fun summarizeSelectedDiscussion(summary: SelectedDiscussionSummary): Boolean {
+        val channel = activeChannel ?: return false
+        val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val pending = ChatMessage("user", summary.channelPost, sendStatus = SENDING_STATUS)
+        messages.add(pending)
+        activeAdapter?.notifyItemInserted(messages.lastIndex)
+        binding.chatList.scrollToPosition(messages.lastIndex)
+        collapseInputComposer()
+
+        thread {
+            val result = runCatching {
+                summarizeProjectChannelMessages(
+                    http = http,
+                    serverUrl = serverUrl,
+                    context = activity,
+                    projectId = channel.projectId,
+                    channelId = channel.id,
+                    postContent = summary.channelPost,
+                    summaryPrompt = summary.channelPrompt
+                )
+            }
+            activity.runOnUiThread {
+                if (activeChannel?.id != channel.id) return@runOnUiThread
+                result.onSuccess { sent ->
+                    val index = messages.indexOfFirst { it === pending }
+                    if (index >= 0) {
+                        messages[index] = sent.toChatMessage()
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+                }.onFailure { error ->
+                    pending.sendStatus = error.message ?: "总结失败"
+                    val index = messages.indexOfFirst { it === pending }
+                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                }
+            }
+        }
+        return true
+    }
+
     private fun openChannel(channel: ProjectChannel) {
         activeChannel = channel
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
