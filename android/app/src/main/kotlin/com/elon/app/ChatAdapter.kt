@@ -75,19 +75,22 @@ class ChatAdapter(
         }
     }
 
-    override fun getItemViewType(position: Int): Int = when (messages[position].role) {
-        "user"        -> 0
-        "ai"          -> 1
-        "ai-intent"   -> 1
-        "friend"      -> 4
-        "ai-working"  -> 2
-        "ai-progress" -> 2
-        "ai-cli-log"  -> 2
-        "ai-tool"     -> 2
-        "ai-complete" -> 2
-        "ai-stopped"  -> 2
-        "error"       -> 3
-        else          -> 1
+    override fun getItemViewType(position: Int): Int {
+        if (parseChatProjectShareMessage(messages[position].content) != null) return 5
+        return when (messages[position].role) {
+            "user"        -> 0
+            "ai"          -> 1
+            "ai-intent"   -> 1
+            "friend"      -> 4
+            "ai-working"  -> 2
+            "ai-progress" -> 2
+            "ai-cli-log"  -> 2
+            "ai-tool"     -> 2
+            "ai-complete" -> 2
+            "ai-stopped"  -> 2
+            "error"       -> 3
+            else          -> 1
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -96,6 +99,7 @@ class ChatAdapter(
             2    -> R.layout.item_message_progress
             3    -> R.layout.item_message_error
             4    -> R.layout.item_message_friend
+            5    -> R.layout.item_message_project_share
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)

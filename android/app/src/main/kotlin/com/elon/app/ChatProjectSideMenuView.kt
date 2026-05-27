@@ -41,6 +41,7 @@ internal class ChatProjectSideMenuView(
 
     init {
         overScrollMode = OVER_SCROLL_NEVER
+        isVerticalScrollBarEnabled = false
         isFillViewport = false
         addView(
             content,

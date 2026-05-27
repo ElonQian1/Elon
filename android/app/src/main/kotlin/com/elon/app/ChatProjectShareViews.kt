@@ -244,8 +244,7 @@ private fun projectShareMetaText(share: ChatProjectShare): String {
 
 private fun projectShareActionLabel(share: ChatProjectShare, role: String): String {
     return when {
-        role == "user" || share.source == "local" -> "打开项目"
-        share.joinMode == "open" -> "加入"
+        share.joinMode == "open" || role == "user" || share.source == "local" -> "加入项目"
         else -> "申请加入"
     }
 }
