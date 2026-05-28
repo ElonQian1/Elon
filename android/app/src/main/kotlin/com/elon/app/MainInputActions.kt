@@ -27,7 +27,7 @@ internal class MainInputActions(
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
-    private val forkForRunningInput: (String) -> SendTarget,
+    private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean
 ) {
     private val pendingAttachments = mutableListOf<PendingAttachment>()

@@ -137,7 +137,9 @@ class MainActivity : AppCompatActivity() {
                     groupChatActions.trySendMessage(text, attachments) ||
                     friendChatActions.trySendMessage(text, attachments)
             },
-            forkForRunningInput = { text -> conversationForkActions.forkForRunningInput(text) },
+            forkForRunningInput = { text, outgoingText ->
+                conversationForkActions.forkForRunningInput(text, outgoingText)
+            },
             startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService
         )
     }
@@ -549,6 +551,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             activeProject = projectStateActions::activeProject,
             activeConversation = projectStateActions::activeConversation,
+            activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             saveProjects = projectStateActions::saveProjects,
             renderConversationList = homeListActions::renderConversationList,

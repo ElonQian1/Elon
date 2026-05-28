@@ -15,7 +15,7 @@ internal class MainRunningInputActions(
     private val startPreparedMessageAfterUserBubble:
         (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean,
-    private val forkForRunningInput: (String) -> SendTarget,
+    private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val expandOutgoing: (String, MutableList<ChatMessage>) -> String
 ) {
     fun handleRunningInput(
@@ -85,13 +85,13 @@ internal class MainRunningInputActions(
     }
 
     private fun forkAndSend(visibleText: String, outgoingText: String) {
-        val target = forkForRunningInput(visibleText)
+        val fork = forkForRunningInput(visibleText, outgoingText)
         appendMessage(ChatMessage("user", visibleText))
         startPreparedMessageAfterUserBubble(
             visibleText,
-            outgoingText,
+            fork.outgoingText,
             JsonArray(),
-            target,
+            fork.target,
             emptyList()
         )
     }
