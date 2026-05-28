@@ -155,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         createActions.onCreate(intent)
         messageSelectionActions.setup()
+        com.elon.app.VoiceEngineBootstrap.scheduleSilentProbeIfNeeded(this)
     }
 
     private val createActions: MainCreateActions by lazy {

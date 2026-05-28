@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.SpeechRecognizer
 import android.util.Log
+import com.elon.app.agent.infrastructure.voice.EngineHealth
+import com.elon.app.agent.infrastructure.voice.EnginePreference
 import com.elon.app.agent.infrastructure.voice.RecognitionEngine
 import com.elon.app.agent.infrastructure.voice.RecognitionEngineSelector
 import com.elon.app.agent.infrastructure.voice.StreamingASR
@@ -80,6 +82,10 @@ internal class AgentVoiceBridge(context: Context) {
             override fun onFinalResult(text: String) {
                 isRunning = false
                 val clean = text.trim()
+                // 任何识别成功都记录当前引擎为 OK
+                candidates.getOrNull(candidateIndex)?.let { eng ->
+                    EnginePreference.setHealth(appContext, eng.key(), EngineHealth.OK)
+                }
                 if (clean.isEmpty()) {
                     main.post { onEnd() }
                     return
@@ -106,7 +112,7 @@ internal class AgentVoiceBridge(context: Context) {
         if (isRunning) return
         isRunning = true
         sawAnyPartial = false
-        candidates = RecognitionEngineSelector.list(appContext)
+        candidates = RecognitionEngineSelector.listForUse(appContext)
         candidateIndex = 0
         transitionSeq += 1
         busyRetryOnSame = 0
@@ -220,6 +226,10 @@ internal class AgentVoiceBridge(context: Context) {
         val retryable = isEngineFailure(code) && !sawAnyPartial && current != null
         if (!retryable) {
             isRunning = false
+            // 当前引擎确认失败：记录健康状态供 UI 显示
+            if (current != null) {
+                EnginePreference.setHealth(appContext, current.key(), EngineHealth.FAILED, code, message)
+            }
             val friendly = if (candidateIndex >= candidates.size - 1)
                 "本机所有语音引擎暂时都不可用，请稍后再试或在设置切换为云端识别"
             else message
@@ -230,6 +240,10 @@ internal class AgentVoiceBridge(context: Context) {
             return
         }
 
+        // 当前引擎放弃了，标记 FAILED，然后切下一个
+        if (current != null) {
+            EnginePreference.setHealth(appContext, current.key(), EngineHealth.FAILED, code, message)
+        }
         candidateIndex += 1
         busyRetryOnSame = 0
         coldStartRetryOnSame = 0

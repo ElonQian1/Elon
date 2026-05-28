@@ -55,6 +55,9 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.checkUpdateButton).setOnClickListener {
             AppUpdateManager(this).manualCheck()
         }
+        findViewById<Button>(R.id.manageEngineButton).setOnClickListener {
+            startActivity(android.content.Intent(this, VoiceEngineActivity::class.java))
+        }
     }
 
     // ── 语音输入模式切换 ──────────────────────

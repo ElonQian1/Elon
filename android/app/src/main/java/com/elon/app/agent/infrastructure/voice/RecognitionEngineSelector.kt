@@ -120,6 +120,28 @@ object RecognitionEngineSelector {
     }
 
     /**
+     * 在 [list] 基础上叠加"用户偏好 + 上次探测结果"重新排序：
+     *  - 用户主动选中的引擎排第一（如果它在列表里）
+     *  - 上次探测 OK 的优先于 UNKNOWN
+     *  - 上次探测 FAILED 的放最后（但仍然保留，不永久封禁，因为环境可能变）
+     */
+    fun listForUse(context: Context): List<RecognitionEngine> {
+        val base = list(context)
+        val preferredKey = EnginePreference.getPreferredKey(context)
+        return base.sortedWith(compareBy(
+            { e -> if (e.key() == preferredKey) 0 else 1 }, // 偏好优先
+            { e ->
+                when (EnginePreference.getHealth(context, e.key())) {
+                    EngineHealth.OK -> 0
+                    EngineHealth.UNKNOWN, EngineHealth.PROBING -> 1
+                    EngineHealth.FAILED -> 2
+                }
+            },
+            { e -> -(PACKAGE_PRIORITY[e.packageName] ?: 0) } // 厂商优先级降序
+        ))
+    }
+
+    /**
      * 引擎是否真的可用：
      *  - 包必须 enabled；
      *  - 包必须已被授予 RECORD_AUDIO（很多预装但未被用过的 RecognitionService 没有授权）。
