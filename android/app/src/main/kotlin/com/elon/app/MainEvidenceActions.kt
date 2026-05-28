@@ -58,6 +58,7 @@ internal class MainEvidenceActions(
     ): ChatMessage {
         val message = ChatMessage("ai", content, attachments.takeIf { it.isNotEmpty() })
         if (entries.isNotEmpty()) {
+            clearDuplicateCurrentEvidenceFromActiveConversation(entries)
             stopWorkingEvidenceForActiveConversation()
             applyEvidenceToMessage(message, entries, working = false)
             entries.clear()
@@ -85,5 +86,25 @@ internal class MainEvidenceActions(
         message.evidenceTitle = evidenceTitle(entries)
         message.evidenceDetails = evidenceDetails(entries)
         message.evidenceWorking = working
+    }
+
+    private fun clearDuplicateCurrentEvidenceFromActiveConversation(currentEntries: List<EvidenceEntry>) {
+        val title = evidenceTitle(currentEntries)
+        val details = evidenceDetails(currentEntries)
+        var changed = false
+        activeConversation().messages.forEachIndexed { index, message ->
+            val sameCurrentEvidence = message.role in assistantEvidenceRoles &&
+                message.evidenceTitle == title &&
+                message.evidenceDetails == details
+            if (sameCurrentEvidence) {
+                message.evidenceTitle = null
+                message.evidenceDetails = null
+                message.evidenceExpanded = false
+                message.evidenceWorking = false
+                chatAdapter().notifyMessageUpdated(index)
+                changed = true
+            }
+        }
+        if (changed) saveConversations()
     }
 }
