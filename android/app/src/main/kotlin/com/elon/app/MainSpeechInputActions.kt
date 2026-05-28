@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -19,6 +20,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.File
 
 internal class MainSpeechInputActions(
     private val activity: AppCompatActivity,
@@ -76,6 +78,12 @@ internal class MainSpeechInputActions(
                 if (startRealtimeVoice()) return
                 // 云端模式下无 projectId 时也退回系统 SpeechRecognizer
             }
+            VoiceInputMode.VOICE_MESSAGE -> {
+                // 语音消息模式：录音并以语音气泡发送，不走 ASR 流程
+                if (startVoiceMessageRecording()) return
+                // 录音无法启动时（权限问题等）不决策
+                return
+            }
         }
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
@@ -91,7 +99,12 @@ internal class MainSpeechInputActions(
         if (stopAgentVoice()) return
         if (stopRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
-            stopDirectVoiceRecording()
+            // VOICE_MESSAGE 模式：发送语音气泡；其他情况（直接录音模式）也走此分支
+            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
+                stopVoiceMessageRecording()
+            } else {
+                stopDirectVoiceRecording()
+            }
             return
         }
         isHoldActive = false
@@ -116,7 +129,11 @@ internal class MainSpeechInputActions(
         if (cancelAgentVoice()) return
         if (cancelRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
-            cancelDirectVoiceRecording()
+            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
+                cancelVoiceMessageRecording()
+            } else {
+                cancelDirectVoiceRecording()
+            }
             return
         }
         if (!isListeningForSpeech && speechRecognizer == null) return
@@ -378,6 +395,88 @@ internal class MainSpeechInputActions(
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+
+    /** 语音消息模式：开始录音。成功返回 true。 */
+    private fun startVoiceMessageRecording(): Boolean {
+        translationGeneration += 1
+        isHoldActive = true
+        isSpeechCanceled = false
+        val started = voiceRecorder.start()
+        if (!started) {
+            Toast.makeText(activity, "麦克风启动失败，请重试", Toast.LENGTH_SHORT).show()
+            DebugTraceStore.record("voice_message_record_start_failed", emptyMap())
+            return false
+        }
+        DebugTraceStore.record("voice_message_record_start", emptyMap())
+        voiceHoldButton().text = "松开 发送语音"
+        return true
+    }
+
+    /** 语音消息模式：录音结束，将音频以语音气泡发送。 */
+    private fun stopVoiceMessageRecording() {
+        isHoldActive = false
+        voiceHoldButton().text = "上传中..."
+        val attachment = voiceRecorder.stopToAttachment()
+        voiceHoldButton().text = "按住 说话"
+        if (attachment == null) {
+            DebugTraceStore.record("voice_message_record_empty", emptyMap())
+            Toast.makeText(activity, "语音太短，请轻追再试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        DebugTraceStore.record(
+            "voice_message_record_done",
+            mapOf("bytes" to attachment.file.length(), "duration_sec" to (attachment.durationSeconds ?: 0))
+        )
+        // 空消息和附件发送：以语音气泡展示，同时将音频发送给 AI
+        sendVoiceAttachment(attachment, VOICE_MESSAGE_TEXT)
+    }
+
+    /** 语音消息模式：取消录音。 */
+    private fun cancelVoiceMessageRecording() {
+        isHoldActive = false
+        translationGeneration += 1
+        isSpeechCanceled = true
+        voiceRecorder.cancel()
+        voiceHoldButton().text = "按住 说话"
+        DebugTraceStore.record("voice_message_record_canceled", emptyMap())
+    }
+
+    /**
+     * 长按语音气泡时弹出操作菜单（转文字 / 取消）。
+     * 由 Activity 通过 [ChatAdapter.onVoiceAttachmentLongPress] 调用。
+     */
+    fun showVoiceAttachmentActions(message: ChatMessage, attachment: ChatAttachment) {
+        val localFile = attachment.localPath?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { File(it) }
+            ?.takeIf { it.isFile }
+        val items = mutableListOf<Pair<String, () -> Unit>>()
+        if (localFile != null) {
+            items.add("转文字（发给 AI 转写）" to {
+                val pending = PendingAttachment(
+                    kind = "audio",
+                    displayLabel = "语音",
+                    displayName = attachment.displayName ?: "语音消息",
+                    fileName = attachment.fileName ?: localFile.name,
+                    mimeType = attachment.mimeType ?: "audio/mp4",
+                    file = localFile,
+                    durationSeconds = attachment.durationSeconds
+                )
+                sendVoiceAttachment(pending, "请帮我把这段语音消息转写成文字。")
+            })
+        } else {
+            items.add("转文字（本地文件已清除，暂不支持）" to {
+                Toast.makeText(activity, "本地语音文件已被清理，无法重新转文字", Toast.LENGTH_SHORT).show()
+            })
+        }
+        items.add("取消" to {})
+        AlertDialog.Builder(activity)
+            .setTitle("语音消息")
+            .setItems(items.map { it.first }.toTypedArray()) { _, which ->
+                items[which].second.invoke()
+            }
+            .show()
+    }
 
     private fun startDirectVoiceRecording(): Boolean {
         translationGeneration += 1
@@ -665,6 +764,10 @@ internal class MainSpeechInputActions(
         private const val SPEECH_RETRY_DELAY_MS = 180L
         private const val DIRECT_VOICE_MESSAGE =
             "我上传了一段原始语音，请优先根据语音附件理解我的需求。"
+
+        // 语音消息模式：AI 可以对语音内容做出回应，但不强制执行命令
+        private const val VOICE_MESSAGE_TEXT =
+            "我发送了一条语音消息，请根据语音内容做出回应。"
     }
 
     private data class SpeechAttempt(

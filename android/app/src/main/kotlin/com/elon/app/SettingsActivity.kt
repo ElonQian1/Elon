@@ -65,22 +65,25 @@ class SettingsActivity : AppCompatActivity() {
         val group = findViewById<RadioGroup>(R.id.voiceModeGroup)
         val current = VoiceInputModeSettings.get(this)
         group.check(
-            if (current == VoiceInputMode.CLOUD_REALTIME) R.id.voiceModeCloud
-            else R.id.voiceModeAgent
+            when (current) {
+                VoiceInputMode.CLOUD_REALTIME -> R.id.voiceModeCloud
+                VoiceInputMode.VOICE_MESSAGE  -> R.id.voiceModeVoiceMsg
+                else                          -> R.id.voiceModeAgent
+            }
         )
         group.setOnCheckedChangeListener { _, checkedId ->
-            val mode = if (checkedId == R.id.voiceModeCloud) {
-                VoiceInputMode.CLOUD_REALTIME
-            } else {
-                VoiceInputMode.LOCAL_AGENT_ASR
+            val mode = when (checkedId) {
+                R.id.voiceModeCloud    -> VoiceInputMode.CLOUD_REALTIME
+                R.id.voiceModeVoiceMsg -> VoiceInputMode.VOICE_MESSAGE
+                else                   -> VoiceInputMode.LOCAL_AGENT_ASR
             }
             VoiceInputModeSettings.set(this, mode)
-            Toast.makeText(
-                this,
-                if (mode == VoiceInputMode.LOCAL_AGENT_ASR) "已切换：端上识别"
-                else "已切换：云端直连",
-                Toast.LENGTH_SHORT
-            ).show()
+            val label = when (mode) {
+                VoiceInputMode.LOCAL_AGENT_ASR -> "已切换：端上识别"
+                VoiceInputMode.CLOUD_REALTIME  -> "已切换：云端直连"
+                VoiceInputMode.VOICE_MESSAGE   -> "已切换：语音消息"
+            }
+            Toast.makeText(this, label, Toast.LENGTH_SHORT).show()
         }
     }
 

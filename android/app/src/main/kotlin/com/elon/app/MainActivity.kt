@@ -19,6 +19,9 @@ class MainActivity : AppCompatActivity() {
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
         adapter.onApkAction = { action, url -> handleApkChatAction(action, url) }
+        adapter.onVoiceAttachmentLongPress = { message, attachment ->
+            inputActions.speechInputActions().showVoiceAttachmentActions(message, attachment)
+        }
         chatAdapter = adapter
     }
 

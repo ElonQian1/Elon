@@ -12,6 +12,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -19,7 +20,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.max
 
-internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List<ChatAttachment>?) {
+internal fun bindChatAttachmentViews(
+    container: LinearLayout?,
+    attachments: List<ChatAttachment>?,
+    onVoiceLongPress: ((ChatAttachment) -> Unit)? = null
+) {
     if (container == null) return
     val items = attachments.orEmpty()
     val visibleItems = items.take(MAX_CHAT_ATTACHMENTS)
@@ -36,10 +41,10 @@ internal fun bindChatAttachmentViews(container: LinearLayout?, attachments: List
     }
     container.visibility = View.VISIBLE
     visibleItems.forEachIndexed { index, attachment ->
-        val view = if (attachment.isImage()) {
-            createImageAttachmentView(container.context, attachment)
-        } else {
-            createFileAttachmentView(container.context, attachment)
+        val view = when {
+            attachment.isImage() -> createImageAttachmentView(container.context, attachment)
+            attachment.isVoice() -> createVoiceAttachmentView(container.context, attachment, onVoiceLongPress)
+            else -> createFileAttachmentView(container.context, attachment)
         }
         view.layoutParams = (view.layoutParams as LinearLayout.LayoutParams).apply {
             bottomMargin = if (index == visibleItems.lastIndex) 0 else container.context.dp(6)
@@ -107,6 +112,124 @@ private fun imageAttachmentLayoutParams(
         targetWidth.coerceIn(minSide, maxWidth),
         targetHeight.coerceIn(minSide, maxHeight)
     )
+}
+
+/**
+ * 语音消息气泡：显示 ▶/⏸ 播放按钮 + 进度条 + 时长。
+ * 宽度按录音时长动态伸缩（最窄 100dp，最宽 220dp）。
+ */
+private fun createVoiceAttachmentView(
+    context: Context,
+    attachment: ChatAttachment,
+    onLongPress: ((ChatAttachment) -> Unit)?
+): View {
+    val source = attachment.playbackSource() ?: ""
+    val durationSec = attachment.durationSeconds ?: 0
+    val durationText = formatVoiceDuration(durationSec)
+
+    // 宽度按时长动态计算：1 秒 = +2dp，最小 100dp，最大 220dp
+    val widthDp = (100 + durationSec.coerceIn(0, 60) * 2).coerceIn(100, 220)
+
+    val container = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), LinearLayout.LayoutParams.WRAP_CONTENT)
+        setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
+        background = GradientDrawable().apply {
+            cornerRadius = context.dp(20).toFloat()
+            setColor(Color.parseColor("#1A73E8"))
+        }
+        isClickable = true
+        isFocusable = true
+    }
+
+    // ▶ / ⏸ 播放按钮
+    val playBtn = TextView(context).apply {
+        text = if (VoiceMessagePlayer.isCurrentlyPlaying(source)) "⏸" else "▶"
+        textSize = 16f
+        setTextColor(Color.WHITE)
+        gravity = Gravity.CENTER
+        layoutParams = LinearLayout.LayoutParams(context.dp(28), context.dp(28))
+    }
+
+    // 播放进度条
+    val progressBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+        layoutParams = LinearLayout.LayoutParams(0, context.dp(3), 1f).apply {
+            marginStart = context.dp(6)
+            marginEnd = context.dp(6)
+        }
+        max = 1000
+        progress = 0
+        progressTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+        progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#66FFFFFF"))
+    }
+
+    // 时长文字（固定宽度避免气泡跳动）
+    val durationView = TextView(context).apply {
+        text = durationText
+        textSize = 11f
+        setTextColor(Color.WHITE)
+        gravity = Gravity.CENTER
+        layoutParams = LinearLayout.LayoutParams(context.dp(30), LinearLayout.LayoutParams.WRAP_CONTENT)
+        includeFontPadding = false
+    }
+
+    container.addView(playBtn)
+    container.addView(progressBar)
+    container.addView(durationView)
+
+    // 注册播放状态监听，随时更新此气泡的 UI
+    val stateListener: (String, Boolean, Int, Int) -> Unit = listener@{ src, isPlaying, posMs, durMs ->
+        if (src != source) return@listener
+        container.post {
+            playBtn.text = if (isPlaying) "⏸" else "▶"
+            if (durMs > 0) {
+                progressBar.progress = (posMs * 1000L / durMs).toInt()
+            } else {
+                progressBar.progress = 0
+            }
+            if (!isPlaying) {
+                progressBar.progress = 0
+            }
+        }
+    }
+    VoiceMessagePlayer.addStateListener(stateListener)
+
+    // 视图从窗口 detach 时移除监听，防止内存泄漏
+    container.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+        override fun onViewAttachedToWindow(v: View) = Unit
+        override fun onViewDetachedFromWindow(v: View) {
+            VoiceMessagePlayer.removeStateListener(stateListener)
+        }
+    })
+
+    // 点击：播放 / 暂停
+    container.setOnClickListener {
+        if (source.isBlank()) return@setOnClickListener
+        VoiceMessagePlayer.playOrPause(source) {
+            // 播放自然结束时重置按钮（completionAction 在主线程回调）
+            playBtn.text = "▶"
+            progressBar.progress = 0
+        }
+        // 立即乐观更新按钮
+        playBtn.text = if (VoiceMessagePlayer.isCurrentlyPlaying(source)) "⏸" else "▶"
+    }
+
+    // 长按：转文字 / 取消
+    if (onLongPress != null) {
+        container.setOnLongClickListener {
+            onLongPress(attachment)
+            true
+        }
+    }
+
+    return container
+}
+
+private fun formatVoiceDuration(seconds: Int): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "%d:%02d".format(m, s)
 }
 
 private fun createFileAttachmentView(context: Context, attachment: ChatAttachment): View {

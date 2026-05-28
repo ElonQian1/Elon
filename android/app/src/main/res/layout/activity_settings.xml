@@ -207,6 +207,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="云端直连（PCM 流→服务器→AI 直发）" />
+            <RadioButton
+                android:id="@+id/voiceModeVoiceMsg"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🎤 语音消息（录音发送气泡，可播放）" />
         </RadioGroup>
 
         <Button

@@ -44,6 +44,8 @@ class ChatAdapter(
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
+    /** 语音附件长按回调（转文字 / 其他操作），由 Activity 通过 setAdapterAndWireApkActions 注入。 */
+    var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var selectionMode = false
     private var selectionChangedListener: ((Int) -> Unit)? = null
@@ -122,7 +124,13 @@ class ChatAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val message = messages[position]
         holder.stopShimmer()
-        bindChatAttachmentViews(holder.attachmentList, message.attachments)
+        bindChatAttachmentViews(
+            holder.attachmentList,
+            message.attachments,
+            onVoiceLongPress = if (onVoiceAttachmentLongPress != null) {
+                { attachment -> onVoiceAttachmentLongPress.invoke(message, attachment) }
+            } else null
+        )
         val projectCardBound = bindChatProjectShareView(
             holder.attachmentList,
             holder.text,

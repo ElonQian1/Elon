@@ -91,7 +91,8 @@ data class PendingAttachment(
     val mimeType: String,
     val file: File,
     val imageWidth: Int? = null,
-    val imageHeight: Int? = null
+    val imageHeight: Int? = null,
+    val durationSeconds: Int? = null
 )
 
 data class SendTarget(

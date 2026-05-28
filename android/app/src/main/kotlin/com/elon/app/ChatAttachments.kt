@@ -14,10 +14,21 @@ data class ChatAttachment(
     val localPath: String? = null,
     val sizeBytes: Long? = null,
     val imageWidth: Int? = null,
-    val imageHeight: Int? = null
+    val imageHeight: Int? = null,
+    val durationSeconds: Int? = null
 ) {
     fun isImage(): Boolean {
         return kind == "image" || mimeType.orEmpty().startsWith("image/")
+    }
+
+    fun isVoice(): Boolean {
+        return kind == "audio" || mimeType.orEmpty().startsWith("audio/")
+    }
+
+    /** 优先使用本地文件路径（文件存在时），否则退回服务器 URL。 */
+    fun playbackSource(): String? {
+        val local = localPath?.trim()?.takeIf { it.isNotEmpty() && java.io.File(it).exists() }
+        return local ?: url?.trim()?.takeIf { it.isNotEmpty() }
     }
 }
 internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
@@ -35,7 +46,8 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
                 item.get("size_bytes")?.takeIf { it.isJsonPrimitive }?.asLong
             }.getOrNull(),
             imageWidth = item.positiveIntOrNull("image_width"),
-            imageHeight = item.positiveIntOrNull("image_height")
+            imageHeight = item.positiveIntOrNull("image_height"),
+            durationSeconds = item.positiveIntOrNull("duration_seconds")
         )
     }
 }
@@ -53,7 +65,8 @@ internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachmen
                 localPath = item.optString("local_path").takeIf { it.isNotBlank() },
                 sizeBytes = item.optLong("size_bytes", 0L).takeIf { it > 0L },
                 imageWidth = item.optInt("image_width", 0).takeIf { it > 0 },
-                imageHeight = item.optInt("image_height", 0).takeIf { it > 0 }
+                imageHeight = item.optInt("image_height", 0).takeIf { it > 0 },
+                durationSeconds = item.optInt("duration_seconds", 0).takeIf { it > 0 }
             )
         }
 }
@@ -68,7 +81,8 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
             localPath = attachment.file.absolutePath,
             sizeBytes = attachment.file.length(),
             imageWidth = attachment.imageWidth,
-            imageHeight = attachment.imageHeight
+            imageHeight = attachment.imageHeight,
+            durationSeconds = attachment.durationSeconds
         )
     }
 }

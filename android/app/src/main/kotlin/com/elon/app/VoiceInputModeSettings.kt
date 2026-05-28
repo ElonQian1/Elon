@@ -17,11 +17,18 @@ import android.content.Context
  */
 enum class VoiceInputMode {
     LOCAL_AGENT_ASR,
-    CLOUD_REALTIME;
+    CLOUD_REALTIME,
+
+    /**
+     * 语音消息模式：长按麦克风录音，松开后以语音气泡发送到聊天，可点击收听。
+     * 不经过 ASR，音频原始文件上传到服务器。
+     */
+    VOICE_MESSAGE;
 
     companion object {
         fun fromKey(key: String?): VoiceInputMode = when (key) {
             CLOUD_REALTIME.name -> CLOUD_REALTIME
+            VOICE_MESSAGE.name -> VOICE_MESSAGE
             else -> LOCAL_AGENT_ASR
         }
     }
