@@ -51,6 +51,33 @@ pub(crate) fn is_project_delivery_request(user_message: &str, workspace: &Path) 
     asks_for_apk && asks_for_delivery
 }
 
+/// 消息是否**纯粹**只在问 APK 下载地址，不含任何额外的开发需求。
+///
+/// 用于区分两种情形：
+/// - 纯交付（"apk在哪里"、"下载地址是什么"）→ 立即返回链接，无需 AI
+/// - 混合（"发我APK，然后再帮我加第8步"）→ 先发链接，再走 AI 继续完成开发
+pub(crate) fn is_pure_apk_delivery_request(user_message: &str, workspace: &Path) -> bool {
+    if !is_project_delivery_request(user_message, workspace) {
+        return false;
+    }
+    let normalized = user_message.trim().to_lowercase();
+    // 含以下开发关键词说明是混合请求，不能直接短路
+    let has_dev_keywords = normalized.contains("帮我")
+        || normalized.contains("添加")
+        || normalized.contains("增加")
+        || normalized.contains("修改")
+        || normalized.contains("改一下")
+        || normalized.contains("加一个")
+        || normalized.contains("加第")
+        || normalized.contains("新增")
+        || normalized.contains("实现")
+        || normalized.contains("开发")
+        || normalized.contains("做一个")
+        || normalized.contains("编写")
+        || normalized.contains("功能");
+    !has_dev_keywords
+}
+
 pub(crate) fn is_short_build_command(user_message: &str, workspace: &Path) -> bool {
     if !is_project_workspace(workspace) {
         return false;

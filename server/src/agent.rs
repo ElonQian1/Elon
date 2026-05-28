@@ -8,7 +8,7 @@ use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{
         has_origin_remote, is_project_delivery_request, is_project_workspace,
-        is_short_build_command, is_short_resume_command,
+        is_pure_apk_delivery_request, is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
         api_agent_name, choose_backend, cli_option_id, has_api_agents, is_local_cli_option,
@@ -161,17 +161,35 @@ async fn run_dispatch_with_workspace(
     let resume_command = is_short_resume_command(user_message, workspace);
     let delivery_request = is_project_delivery_request(user_message, workspace);
     if delivery_request && !resume_command {
-        if tools::find_latest_apk(workspace).is_some() {
+        // 优先用数据库判断项目是否有成功构建的 APK，避免跨会话 worktree 时误判为无 APK
+        let project_has_apk = native_session_scope
+            .as_ref()
+            .and_then(|s| state.store.project_has_built_apk(&s.project_id).ok())
+            .unwrap_or_else(|| tools::find_latest_apk(workspace).is_some());
+        if project_has_apk {
             let apk_url = tools::stable_apk_url(download_base);
+            if is_pure_apk_delivery_request(user_message, workspace) {
+                // 纯交付请求：立即返回下载链接，无需启动 AI
+                info!("delivery fast-path: pure apk delivery, returning url immediately");
+                let _ = tx.send(
+                    WsMessage::Done {
+                        message: "APK 已就绪，下载安装后即可体验最新版本。".into(),
+                        apk_url: Some(apk_url),
+                        image_url: None,
+                    }
+                    .to_json(),
+                );
+                return Ok(());
+            }
+            // 混合请求（交付意图 + 其他开发需求）：先立即把链接发出去，再让 AI 处理其余部分
+            info!("delivery fast-path: mixed request, pre-sending apk url before ai");
             let _ = tx.send(
-                WsMessage::Done {
-                    message: "我看了当前项目状态，APK 已经生成了。你现在最需要的是下载安装测试，所以我先把下载链接给你。".into(),
-                    apk_url: Some(apk_url),
-                    image_url: None,
+                WsMessage::AssistantMessage {
+                    text: format!("APK 已就绪，你可以先下载：{}\n\n继续处理你的其他需求……", apk_url),
                 }
                 .to_json(),
             );
-            return Ok(());
+            // fall through：继续走 AI 完成开发需求
         }
     }
 

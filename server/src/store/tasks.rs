@@ -247,6 +247,17 @@ impl Store {
         Ok(events)
     }
 
+    /// 检查该项目是否有过成功构建并产出 APK 的历史记录。
+    /// 用于跨会话 worktree 判断——不依赖当前 worktree 的文件系统。
+    pub fn project_has_built_apk(&self, project_id: &str) -> Result<bool> {
+        let count: i64 = self.conn()?.query_row(
+            "SELECT COUNT(*) FROM tasks WHERE project_id = ?1 AND apk_url IS NOT NULL AND apk_url != ''",
+            params![project_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
     pub fn add_message(
         &self,
         project_id: &str,
