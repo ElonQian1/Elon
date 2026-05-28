@@ -127,9 +127,9 @@ class ChatAdapter(
         bindChatAttachmentViews(
             holder.attachmentList,
             message.attachments,
-            onVoiceLongPress = if (onVoiceAttachmentLongPress != null) {
-                { attachment -> onVoiceAttachmentLongPress.invoke(message, attachment) }
-            } else null
+            onVoiceLongPress = onVoiceAttachmentLongPress?.let { cb ->
+                { attachment -> cb.invoke(message, attachment) }
+            }
         )
         val projectCardBound = bindChatProjectShareView(
             holder.attachmentList,

@@ -20,7 +20,7 @@ class MainActivity : AppCompatActivity() {
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
         adapter.onApkAction = { action, url -> handleApkChatAction(action, url) }
         adapter.onVoiceAttachmentLongPress = { message, attachment ->
-            inputActions.speechInputActions().showVoiceAttachmentActions(message, attachment)
+            inputActions.showVoiceAttachmentActions(message, attachment)
         }
         chatAdapter = adapter
     }

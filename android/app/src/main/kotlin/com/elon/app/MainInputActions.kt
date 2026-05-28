@@ -119,6 +119,10 @@ internal class MainInputActions(
         speechInputActions = null
     }
 
+    fun showVoiceAttachmentActions(message: ChatMessage, attachment: ChatAttachment) {
+        speechInputActions().showVoiceAttachmentActions(message, attachment)
+    }
+
     private fun sendVoiceAttachment(attachment: PendingAttachment, message: String) {
         if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
             attachment.file.delete()
