@@ -4,6 +4,9 @@
 > **用途**：诊断用户投诉"为什么这么慢"、"中间说了什么"、"APK地址在哪"等问题时，快速定位数据库和日志中的真实聊天记录。  
 > **加载时机**：用户要求"查看聊天记录"、"分析对话时间线"、"找到某个会话的历史"时按需加载本文档。
 
+**完整对话内容 = SQLite messages + task_events + `/root/.codex/sessions/**/*.jsonl`（Codex 内部 LLM 记录）**  
+**最快路径**：用 `conversation_timeline` VIEW 一条 SQL 得到合并时间线，再通过 `codex_thread_id` 找 Codex JSONL 文件读取 AI 内部思考过程。
+
 ---
 
 ## 1. 数据存储位置速查
@@ -73,6 +76,31 @@ Android 端日志只包含 UI 渲染和网络状态，**不含服务器消息文
 | `status` | `"done"` / `"failed"` / `"running"` |
 | `apk_url` | 生成的 APK 公网下载地址（如有） |
 | `error` | 错误信息（如有） |
+| `codex_thread_id` | ⭐ Codex/CopilotCLI 的 thread UUID，可用来定位 `/root/.codex/sessions/**/*<uuid>.jsonl` |
+
+### `task_events` — Codex 执行步骤流水
+
+| 字段 | 说明 |
+|---|---|
+| `task_id` | 关联任务 |
+| `event_json` | JSON 格式的事件，`type` 字段常见值：`progress`、`done`、`error` |
+| `created_at` | UTC 时间戳 |
+
+> 注：`task_events` 每个任务最多保留最近 200 条，超出后滚动删除。完整 Codex 内部日志（含 LLM 对话）需查 JSONL 文件。
+
+### `agent_native_sessions` — Codex/CopilotCLI 会话管理
+
+| 字段 | 说明 |
+|---|---|
+| `project_id` | 所属项目 |
+| `user_id` | 所属用户 |
+| `conversation_id` | 所属会话 |
+| `provider` | 目前固定为 `"codex"` |
+| `native_session_id` | ⭐ Codex thread UUID（与 `tasks.codex_thread_id` 同一个值） |
+| `status` | `"active"` / `"inactive"` |
+| `updated_at` | 最后活跃时间 |
+
+> 用途：找到某个 project+conversation 对应的 Codex thread UUID，进而定位 JSONL 文件。
 
 ---
 
@@ -170,7 +198,139 @@ ORDER BY first ASC;
 
 ---
 
-## 5. 日志与数据库结合分析
+## 5. `conversation_timeline` VIEW — 一条 SQL 查完整时间线
+
+**这是诊断时最快的入口**，把 `messages` 和 `task_events` 合并为按时间排序的统一视图，并附带 `codex_thread_id`。
+
+```sql
+-- 查某个会话的完整时间线（含用户消息、AI回复、Codex工具调用步骤）
+SELECT time, kind, role, event_type, codex_thread_id,
+       substr(content, 1, 200) AS content_preview
+FROM conversation_timeline
+WHERE conversation_id = 'YOUR_CONVERSATION_ID'
+ORDER BY time;
+```
+
+字段说明：
+
+| 字段 | 说明 |
+|---|---|
+| `time` | UTC 时间戳（需+8小时换北京时间） |
+| `kind` | `"message"`（用户/AI 消息）或 `"task_event"`（Codex 执行步骤） |
+| `role` | `"user"` / `"assistant"`（task_event 行此字段为 NULL） |
+| `event_type` | task_event 类型，如 `"progress"`、`"done"`（message 行为 NULL） |
+| `codex_thread_id` | Codex thread UUID，用来找 JSONL 文件 |
+| `project_name` | 项目名称（无需额外 JOIN） |
+| `task_id` | 关联任务 ID |
+
+### 5.1 按项目ID查所有会话的合并时间线
+
+```sql
+SELECT time, kind, role, event_type, conversation_id,
+       codex_thread_id, substr(content, 1, 150) AS preview
+FROM conversation_timeline
+WHERE project_id = 'prj_5530f285db7646b9bb18ab3bcbab1cae'
+ORDER BY time;
+```
+
+### 5.2 只看用户和 AI 的对话（过滤掉执行步骤）
+
+```sql
+SELECT time, role, substr(content, 1, 300) AS content
+FROM conversation_timeline
+WHERE conversation_id = 'YOUR_CONVERSATION_ID'
+  AND kind = 'message'
+ORDER BY time;
+```
+
+### 5.3 只看 Codex 工具调用步骤（诊断卡顿/超时）
+
+```sql
+SELECT time, event_type, task_id, substr(content, 1, 200) AS detail
+FROM conversation_timeline
+WHERE conversation_id = 'YOUR_CONVERSATION_ID'
+  AND kind = 'task_event'
+ORDER BY time;
+```
+
+---
+
+## 6. 查阅 Codex 内部完整对话（JSONL 文件）
+
+SQLite 里存的是服务端收发的消息摘要，**Codex 内部每一轮 LLM 的 input/output、工具调用、系统 prompt** 都存在服务器的 JSONL 文件里，不在数据库中。
+
+### 6.1 获取 thread UUID
+
+方法一：从 `conversation_timeline` 里直接读（最方便）
+```sql
+SELECT DISTINCT codex_thread_id, task_id
+FROM conversation_timeline
+WHERE conversation_id = 'YOUR_CONVERSATION_ID'
+  AND codex_thread_id IS NOT NULL;
+```
+
+方法二：查 `agent_native_sessions`
+```sql
+SELECT native_session_id, conversation_id, updated_at
+FROM agent_native_sessions
+WHERE project_id = 'YOUR_PROJECT_ID'
+ORDER BY updated_at DESC;
+```
+
+### 6.2 找到并读取 JSONL 文件
+
+文件路径格式：
+```
+/root/.codex/sessions/YYYY/MM/DD/rollout-<日期时间>-<thread_uuid>.jsonl
+```
+
+```bash
+# 服务端：用 thread UUID 找文件
+find /root/.codex/sessions -name "*019e6a19-d623-7d83-af6e-3bef562500ea*"
+
+# 读取文件（每行一个 JSON 事件）
+cat /root/.codex/sessions/2026/05/27/rollout-...-<thread_uuid>.jsonl | python3 -c "
+import sys, json
+for line in sys.stdin:
+    if not line.strip(): continue
+    ev = json.loads(line)
+    if ev['type'] in ('response_item', 'tool_call', 'tool_result'):
+        p = ev.get('payload', {})
+        role = p.get('role', ev['type'])
+        for item in p.get('content', []):
+            if 'text' in item:
+                print(f'[{ev[\"timestamp\"]}] [{role}] {item[\"text\"][:300]}')
+"
+```
+
+PowerShell 查询：
+```powershell
+$SSH = "C:\Windows\System32\OpenSSH\ssh.exe"
+$tid = "019e6a19-d623-7d83-af6e-3bef562500ea"  # 替换为实际 thread UUID
+& $SSH -o ProxyCommand=none root@43.139.149.158 "find /root/.codex/sessions -name '*$tid*'"
+```
+
+### 6.3 JSONL 关键 type 说明
+
+| type | 说明 |
+|---|---|
+| `session_meta` | 会话元数据（cwd 含 project_id + conversation_id、model） |
+| `event_msg` | 任务开始/结束 |
+| `response_item` | ⭐ LLM 对话内容（role: developer/user/assistant） |
+| `tool_call` | ⭐ 工具调用（shell 命令、文件读写） |
+| `tool_result` | 工具执行结果（包含 stdout/stderr） |
+| `turn_context` | 当前工作目录、时区等上下文 |
+
+### 6.4 数据库丢失时如何恢复
+
+如果 `/opt/elon/data/elon.db` 损坏：
+1. `/root/.codex/sessions/` 保留了所有 Codex 内部记录（LLM 对话、工具调用）
+2. JSONL 里 `session_meta.payload.cwd` 包含 `project_id` 和 `conversation_id`，可重建对应关系
+3. `agent_native_sessions` 存有 `native_session_id`，已知的 thread UUID 仍然可以找到文件
+
+---
+
+## 7. 日志与数据库结合分析
 
 ### 5.1 服务器日志能告诉你的
 
@@ -199,27 +359,34 @@ grep -n "prj_5530f285\|4390d6d0" /root/elon-server.log | grep "2026-05-27"
 
 ---
 
-## 6. 诊断工作流（AI 代理标准步骤）
+## 8. 诊断工作流（AI 代理标准步骤）
 
 当用户说"为什么没有回复"、"中间说了什么"、"聊天记录在哪"时，按以下顺序操作：
 
 ```
 Step 1. 按项目名找项目ID（注意同名多项目）
   ↓
-Step 2. 查该项目的所有会话（conversations）
+Step 2. 查该项目的所有会话（conversations），确认 conversation_id
   ↓
-Step 3. 查该项目的全部消息（messages），按时间排序
+★ Step 3. 用 conversation_timeline VIEW 一条 SQL 查完整时间线
+          → 包含用户消息、AI回复、Codex 执行步骤，全部按时间排列
   ↓
-Step 4. 查该项目的任务列表（tasks），确认 apk_url 和 status
+Step 4. 从时间线里找到 codex_thread_id（有卡顿/异常时才需要往下）
   ↓
-Step 5. 对照服务器日志，找重启/网络中断/耗时事件
+Step 5. SSH 到服务器，find /root/.codex/sessions -name "*<thread_id>*" 找 JSONL
   ↓
-Step 6. 用数据库时间换算北京时间，呈现完整时间线
+Step 6. 读 JSONL 获得 Codex 内部完整 LLM 对话和工具调用
+  ↓
+Step 7. 对照服务器日志，找重启/网络中断/耗时事件
+  ↓
+Step 8. 用数据库时间换算北京时间（UTC+8），呈现完整时间线
 ```
+
+> 绝大多数诊断问题在 Step 3 就能解决。只有需要看 AI 内部思考、具体工具调用失败原因时才需要 Step 5-6。
 
 ---
 
-## 7. 典型陷阱与注意事项
+## 9. 典型陷阱与注意事项
 
 ### 7.1 同名项目问题
 用户可能在不同时间创建了多个同名项目。**必须先列出所有同名项目及其创建时间**，再询问或根据消息内容判断用户所指的是哪一个。
@@ -244,20 +411,43 @@ AI 回复文本里的 `/root/workspaces/...` 是服务器本地路径，**手机
 
 ---
 
-## 8. 快速参考命令集
+## 10. 快速参考命令集
 
 ```powershell
 # Windows SSH 连接（绕代理）
 $SSH = "C:\Windows\System32\OpenSSH\ssh.exe"
 
+# ★ 最常用：conversation_timeline 一条查完整会话（用 python3 heredoc 避免引号问题）
+$q = @'
+import sqlite3
+c = sqlite3.connect('/opt/elon/data/elon.db')
+rows = c.execute("""
+    SELECT time, kind, role, event_type, codex_thread_id,
+           substr(content, 1, 200) AS preview
+    FROM conversation_timeline
+    WHERE conversation_id = 'YOUR_CONVERSATION_ID'
+    ORDER BY time
+""").fetchall()
+for r in rows:
+    print(r)
+'@
+$q | & $SSH -o ProxyCommand=none root@43.139.149.158 "python3"
+
 # 查所有同名项目
 & $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT id, name, created_at FROM projects WHERE name LIKE ''%蟑螂%'' ORDER BY created_at;" | sqlite3 /opt/elon/data/elon.db'
 
-# 查项目全部消息
-& $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT role, created_at, conversation_id, substr(content,1,200) FROM messages WHERE project_id=''PROJECT_ID'' ORDER BY created_at ASC;" | sqlite3 /opt/elon/data/elon.db'
+# 查项目全部会话
+& $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT id, title, created_at FROM conversations WHERE project_id=''PROJECT_ID'' ORDER BY created_at;" | sqlite3 /opt/elon/data/elon.db'
 
-# 查任务列表（含 APK URL）
-& $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT id, status, apk_url, substr(message,1,60), created_at FROM tasks WHERE project_id=''PROJECT_ID'' ORDER BY created_at ASC;" | sqlite3 /opt/elon/data/elon.db'
+# 查任务列表（含 APK URL 和 codex_thread_id）
+& $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT id, status, codex_thread_id, apk_url, substr(message,1,60), created_at FROM tasks WHERE project_id=''PROJECT_ID'' ORDER BY created_at ASC;" | sqlite3 /opt/elon/data/elon.db'
+
+# 通过 conversation 找 Codex thread UUID
+& $SSH -o ProxyCommand=none root@43.139.149.158 'echo "SELECT native_session_id, conversation_id, updated_at FROM agent_native_sessions WHERE project_id=''PROJECT_ID'' ORDER BY updated_at DESC;" | sqlite3 /opt/elon/data/elon.db'
+
+# 通过 thread UUID 找 Codex JSONL 文件路径
+$tid = "019e6a19-d623-7d83-af6e-3bef562500ea"  # 替换为实际值
+& $SSH -o ProxyCommand=none root@43.139.149.158 "find /root/.codex/sessions -name '*$tid*'"
 
 # 查当天服务器日志（按项目ID）
 & $SSH -o ProxyCommand=none root@43.139.149.158 'grep "PROJECT_ID" /root/elon-server.log | grep "2026-05-27"'
@@ -270,7 +460,17 @@ $SSH = "C:\Windows\System32\OpenSSH\ssh.exe"
 ```
 
 ```bash
-# Linux / Codex CLI 服务端直接执行
-sqlite3 /opt/elon/data/elon.db "SELECT id, name FROM projects WHERE name LIKE '%蟑螂%';"
+# Linux / Codex CLI 服务端直接执行（最简洁）
+sqlite3 /opt/elon/data/elon.db <<'EOF'
+SELECT time, kind, role, event_type, codex_thread_id, substr(content,1,200)
+FROM conversation_timeline
+WHERE project_id = 'prj_5530f285db7646b9bb18ab3bcbab1cae'
+ORDER BY time;
+EOF
+
+# 找 Codex JSONL 文件（替换 thread UUID）
+find /root/.codex/sessions -name "*019e6a19*"
+
+# 查服务日志
 grep "PROJECT_ID" /root/elon-server.log | tail -50
 ```
