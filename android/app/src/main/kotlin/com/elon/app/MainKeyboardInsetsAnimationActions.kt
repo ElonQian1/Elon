@@ -39,7 +39,7 @@ internal class MainKeyboardInsetsAnimationActions(
             if (!runningImeAnimation) {
                 val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
                 val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-                markKeyboardVisibleIfNeeded(keyboardHeight, imeVisible)
+                markKeyboardVisibleIfNeeded(keyboardHeight)
                 if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) {
                     applyKeyboardHeight(keyboardHeight, animate = true)
                 }
@@ -64,7 +64,7 @@ internal class MainKeyboardInsetsAnimationActions(
                     if (runningAnimations.any { it.includesIme() }) {
                         val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
                         val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
-                        markKeyboardVisibleIfNeeded(keyboardHeight, imeVisible)
+                        markKeyboardVisibleIfNeeded(keyboardHeight)
                         if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) {
                             applyKeyboardHeight(keyboardHeight, animate = false)
                         }
@@ -80,7 +80,7 @@ internal class MainKeyboardInsetsAnimationActions(
                     val insets = ViewCompat.getRootWindowInsets(binding.root)
                     val keyboardHeight = insets?.let(::keyboardHeightFromInsetsOrFrame) ?: keyboardHeightFromVisibleFrame()
                     val imeVisible = insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
-                    markKeyboardVisibleIfNeeded(keyboardHeight, imeVisible)
+                    markKeyboardVisibleIfNeeded(keyboardHeight)
                     if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) {
                         applyKeyboardHeight(keyboardHeight, animate = false)
                     }
@@ -121,7 +121,7 @@ internal class MainKeyboardInsetsAnimationActions(
             override fun onGlobalLayout() {
                 val keyboardHeight = keyboardHeightFromVisibleFrame()
                 val imeVisible = isImeVisible()
-                markKeyboardVisibleIfNeeded(keyboardHeight, imeVisible)
+                markKeyboardVisibleIfNeeded(keyboardHeight)
                 if (shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) return
                 if (keyboardHeight == lastKeyboardHeight) return
                 applyKeyboardHeight(keyboardHeight, animate = !runningImeAnimation)
@@ -149,19 +149,15 @@ internal class MainKeyboardInsetsAnimationActions(
         if (!binding.inputEdit.hasFocus()) return
         val frameHeight = keyboardHeightFromVisibleFrame()
         if (frameHeight > 0) {
-            markKeyboardVisibleIfNeeded(frameHeight, imeVisible = false)
+            markKeyboardVisibleIfNeeded(frameHeight)
             return
         }
         val insets = ViewCompat.getRootWindowInsets(binding.root)
         val insetsHeight = insets?.let(::keyboardHeight).orEmpty()
         if (insetsHeight > 0) {
-            markKeyboardVisibleIfNeeded(insetsHeight, imeVisible = true)
+            markKeyboardVisibleIfNeeded(insetsHeight)
             return
         }
-        if (insets?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
-            keyboardWasVisibleSinceLift = true
-        }
-
         usingEstimatedKeyboardHeight = true
         applyKeyboardHeight(estimatedKeyboardHeight(), animate = true)
     }
@@ -170,10 +166,7 @@ internal class MainKeyboardInsetsAnimationActions(
         if (!binding.inputEdit.hasFocus()) return
         val insets = ViewCompat.getRootWindowInsets(binding.root)
         val knownHeight = insets?.let(::keyboardHeightFromInsetsOrFrame) ?: keyboardHeightFromVisibleFrame()
-        markKeyboardVisibleIfNeeded(
-            keyboardHeight = knownHeight,
-            imeVisible = insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
-        )
+        markKeyboardVisibleIfNeeded(knownHeight)
         if (knownHeight > 0) {
             applyKeyboardHeight(knownHeight, animate = true)
             return
@@ -266,24 +259,21 @@ internal class MainKeyboardInsetsAnimationActions(
         if (keyboardHeight != 0 || !binding.inputEdit.hasFocus()) {
             return false
         }
+        if (keyboardWasVisibleSinceLift) {
+            return false
+        }
         if (imeVisible || recentlyRequestedKeyboardLift()) {
             return true
         }
-        if (usingEstimatedKeyboardHeight && !keyboardWasVisibleSinceLift) {
-            return true
-        }
-        if (usingEstimatedKeyboardHeight && keyboardWasVisibleSinceLift) {
-            dispatchKeyboardDismissed()
+        if (usingEstimatedKeyboardHeight) {
             return true
         }
         return false
     }
 
-    private fun markKeyboardVisibleIfNeeded(keyboardHeight: Int, imeVisible: Boolean) {
-        if (keyboardHeight > 0 || imeVisible) {
-            keyboardWasVisibleSinceLift = true
-        }
+    private fun markKeyboardVisibleIfNeeded(keyboardHeight: Int) {
         if (keyboardHeight > 0) {
+            keyboardWasVisibleSinceLift = true
             usingEstimatedKeyboardHeight = false
         }
     }
