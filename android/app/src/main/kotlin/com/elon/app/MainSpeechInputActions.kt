@@ -520,7 +520,7 @@ internal class MainSpeechInputActions(
         } else {
             AlertDialog.Builder(activity)
                 .setTitle("语音消息")
-                .setMessage("暂无原文（录音时语音识别未成功，可切换到"云端直连"模式后重试）")
+                .setMessage("暂无原文（录音时语音识别未成功，可切换到[云端直连]模式后重试）")
                 .setPositiveButton("关闭", null)
                 .show()
         }
