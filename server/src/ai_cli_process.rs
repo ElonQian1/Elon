@@ -171,10 +171,12 @@ async fn run_cli_command(
     {
         cmd.process_group(0);
     }
-    // 为每个 worktree 隔离 Gradle 守护进程和缓存，防止同一项目的多个并发
-    // 编译任务争抢 ~/.gradle/daemon 文件锁导致 CLI 卡死。
-    // 使用 /opt/elon/gradle-homes/<workspace目录名> 作为独立的 GRADLE_USER_HOME，
-    // 不同 conversation worktree 目录名不同，自然隔离；共享工作区已有串行锁不受影响。
+    // 为每个 worktree 隔离 Gradle 守护进程，防止同一项目多个并发编译任务争抢
+    // ~/.gradle/daemon 文件锁导致 CLI 卡死。
+    // - GRADLE_USER_HOME 按 worktree 隔离：/opt/elon/gradle-homes/<workspace_key>/
+    // - wrapper/dists（发行版 zip，约 100MB）符号链接到共享目录，只下载一次
+    // - daemon/ 和 caches/ 各自独立，无锁竞争
+    // - worktree 合并完成后，project_conversation_workspace 会异步删除对应的 gradle-home
     {
         let workspace_key = workspace
             .file_name()
@@ -182,6 +184,19 @@ async fn run_cli_command(
             .unwrap_or("default");
         let gradle_home =
             std::path::PathBuf::from("/opt/elon/gradle-homes").join(workspace_key);
+        // 共享 Gradle 发行版目录：所有 worktree 复用已下载的 zip，节省带宽和时间
+        #[cfg(unix)]
+        {
+            let shared_dists =
+                std::path::PathBuf::from("/opt/elon/gradle-distributions/wrapper/dists");
+            let _ = std::fs::create_dir_all(&shared_dists);
+            let wrapper_dir = gradle_home.join("wrapper");
+            let _ = std::fs::create_dir_all(&wrapper_dir);
+            let dists_link = wrapper_dir.join("dists");
+            if !dists_link.exists() {
+                let _ = std::os::unix::fs::symlink(&shared_dists, &dists_link);
+            }
+        }
         cmd.env("GRADLE_USER_HOME", &gradle_home);
     }
 

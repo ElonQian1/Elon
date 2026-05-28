@@ -154,6 +154,22 @@ pub(crate) fn merge_conversation_worktree(
         );
     }
     let after = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
+    // 合并完成后异步清理该 worktree 对应的 Gradle home，防止磁盘持续增长。
+    // wrapper/dists 是指向共享目录的符号链接，删除 gradle-home 不会丢失发行版缓存。
+    let active_workspace_for_cleanup = workspace.active_workspace.clone();
+    std::thread::spawn(move || {
+        let workspace_key = active_workspace_for_cleanup
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if !workspace_key.is_empty() {
+            let gradle_home =
+                std::path::PathBuf::from("/opt/elon/gradle-homes").join(workspace_key);
+            if gradle_home.exists() {
+                let _ = std::fs::remove_dir_all(&gradle_home);
+            }
+        }
+    });
     if before == after {
         Ok("会话分支没有新的提交需要合并。".into())
     } else {
