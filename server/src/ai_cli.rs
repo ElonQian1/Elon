@@ -487,18 +487,7 @@ pub async fn run_with_workspace(
     );
 
     let apk_url = if android_task && output.success {
-        let _ = tx.send(WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。").to_json());
-        let apk_url =
-            tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
-        if apk_url.is_none() {
-            let _ = tx.send(
-                WsMessage::progress(
-                    "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。",
-                )
-                .to_json(),
-            );
-        }
-        apk_url
+        tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base))
     } else {
         None
     };
