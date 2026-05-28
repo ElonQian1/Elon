@@ -365,6 +365,46 @@ if (-not $SkipBuild) {
         rustup target add $Target
         if ($LASTEXITCODE -ne 0) { Write-Error "rustup target add 失败" }
     }
+
+    # ── 安全检查：禁止 target-cpu=native 污染交叉编译产物 ──────────────────
+    # target-cpu=native 让编译器按本机 CPU（可能含 AVX-512 等指令）优化，
+    # 交叉编译到 Linux 后在服务器上会因指令集不兼容 SIGILL 崩溃。
+    $nativeDetected = $false
+    $nativeSources  = @()
+
+    # 1) 环境变量 RUSTFLAGS
+    $rfEnv = [Environment]::GetEnvironmentVariable("RUSTFLAGS", "Process")
+    if ($rfEnv -match "target-cpu=native") {
+        $nativeDetected = $true
+        $nativeSources += "环境变量 RUSTFLAGS=`"$rfEnv`""
+    }
+
+    # 2) ~/.cargo/config.toml（全局）
+    $globalCargo = Join-Path $env:USERPROFILE ".cargo\config.toml"
+    if ((Test-Path $globalCargo) -and ((Get-Content $globalCargo -Raw -ErrorAction SilentlyContinue) -match "target-cpu=native")) {
+        $nativeDetected = $true
+        $nativeSources += "全局配置 $globalCargo"
+    }
+
+    # 3) 仓库 .cargo/config.toml（项目级）
+    $repoCargo = Join-Path $RepoRoot ".cargo\config.toml"
+    if ((Test-Path $repoCargo) -and ((Get-Content $repoCargo -Raw -ErrorAction SilentlyContinue) -match "target-cpu=native")) {
+        $nativeDetected = $true
+        $nativeSources += "项目配置 $repoCargo"
+    }
+
+    if ($nativeDetected) {
+        Write-Host ""
+        Write-Host "❌ 检测到 target-cpu=native，禁止继续编译！" -ForegroundColor Red
+        Write-Host "   target-cpu=native 让产物针对本机 CPU 优化，部署到服务器后因指令集不兼容会 SIGILL 崩溃。" -ForegroundColor Red
+        Write-Host "   发现位置：" -ForegroundColor Yellow
+        foreach ($src in $nativeSources) {
+            Write-Host "     - $src" -ForegroundColor Yellow
+        }
+        Write-Host "   修复方法：删除或注释掉上述位置中 rustflags 里的 -C target-cpu=native。" -ForegroundColor Yellow
+        Complete-Release -Success $false -ErrorMessage "target-cpu=native detected, SIGILL risk"
+        exit 1
+    }
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -403,17 +443,23 @@ if (-not $SkipBuild) {
         $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
         $env:ELON_BUILD_VERSION  = $AssignedVersion
-        # 清除 target-cpu=native：全局 .cargo/config.toml 可能含 target-cpu=native，
-        # 交叉编译 musl 产物若带本机专有指令集（AVX-512 等），上传到服务器后会 SIGILL 崩溃。
-        # 用空字符串覆盖 RUSTFLAGS，让 cargo 对本次构建忽略全局 rustflags。
+        # 强制中性 CPU target：即使上游环境变量残留 target-cpu=native，
+        # 也确保产物可在任何 x86-64 服务器上运行，不依赖编译机的高级指令集。
         $savedRustflags = $env:RUSTFLAGS
-        $env:RUSTFLAGS = ""
+        $env:RUSTFLAGS = ($env:RUSTFLAGS -replace "-C\s+target-cpu=\S+", "").Trim()
+        if ($env:RUSTFLAGS) {
+            $env:RUSTFLAGS = "$env:RUSTFLAGS -C target-cpu=x86-64"
+        } else {
+            $env:RUSTFLAGS = "-C target-cpu=x86-64"
+        }
+        Write-Host "   RUSTFLAGS=$env:RUSTFLAGS" -ForegroundColor Gray
         cargo zigbuild --release --target $Target
         $env:RUSTFLAGS = $savedRustflags
         if ($LASTEXITCODE -ne 0) {
             Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
             Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
             Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+            if ($null -ne $savedRustflags) { $env:RUSTFLAGS = $savedRustflags } else { Remove-Item Env:RUSTFLAGS -ErrorAction SilentlyContinue }
             Pop-Location
             Remove-Worktree
             Complete-Release -Success $false -ErrorMessage "cargo zigbuild failed"
@@ -422,11 +468,13 @@ if (-not $SkipBuild) {
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
         Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+        if ($null -ne $savedRustflags) { $env:RUSTFLAGS = $savedRustflags } else { Remove-Item Env:RUSTFLAGS -ErrorAction SilentlyContinue }
     } catch {
         $env:RUSTFLAGS = $savedRustflags
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
         Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
+        if ($null -ne $savedRustflags) { $env:RUSTFLAGS = $savedRustflags } else { Remove-Item Env:RUSTFLAGS -ErrorAction SilentlyContinue }
         Pop-Location -ErrorAction SilentlyContinue
         Remove-Worktree
         Complete-Release -Success $false -ErrorMessage "cargo zigbuild exception: $_"

@@ -356,6 +356,34 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     echo -e "${YELLOW}📦 添加 rustup target $TARGET...${NC}"
     rustup target add "$TARGET"
   fi
+
+  # ── 安全检查：禁止 target-cpu=native 污染交叉编译产物 ──────────────────
+  # target-cpu=native 让产物依赖编译机 CPU 的高级指令集，上传到服务器后 SIGILL 崩溃。
+  _native_found=0
+  _native_sources=""
+  if echo "${RUSTFLAGS:-}" | grep -q 'target-cpu=native'; then
+    _native_found=1
+    _native_sources="$_native_sources\n  - 环境变量 RUSTFLAGS=\"${RUSTFLAGS:-}\""
+  fi
+  _global_cargo="${CARGO_HOME:-$HOME/.cargo}/config.toml"
+  if [ -f "$_global_cargo" ] && grep -q 'target-cpu=native' "$_global_cargo" 2>/dev/null; then
+    _native_found=1
+    _native_sources="$_native_sources\n  - 全局配置 $_global_cargo"
+  fi
+  _repo_cargo="$REPO_ROOT/.cargo/config.toml"
+  if [ -f "$_repo_cargo" ] && grep -q 'target-cpu=native' "$_repo_cargo" 2>/dev/null; then
+    _native_found=1
+    _native_sources="$_native_sources\n  - 项目配置 $_repo_cargo"
+  fi
+  if [ "$_native_found" -eq 1 ]; then
+    echo -e "${RED}❌ 检测到 target-cpu=native，禁止继续编译！${NC}" >&2
+    echo -e "${RED}   target-cpu=native 按本机 CPU 优化，部署到服务器后因指令集不兼容会 SIGILL 崩溃。${NC}" >&2
+    echo -e "${YELLOW}   发现位置：${NC}" >&2
+    printf "${YELLOW}%b${NC}\n" "$_native_sources" >&2
+    echo -e "${YELLOW}   修复方法：删除或注释掉上述位置中 rustflags 里的 -C target-cpu=native。${NC}" >&2
+    complete_release false "" "" "target-cpu=native detected, SIGILL risk"
+    exit 1
+  fi
 fi
 
 # ── 3. 编译（临时工作树）─────────────────────────────────────
@@ -401,15 +429,26 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   echo -e "${YELLOW}3⃣  交叉编译 → $TARGET...${NC}"
   TMP_SERVER_DIR="$TMP_WORKTREE/server"
   export CARGO_TARGET_DIR="$BUILD_TARGET_DIR"
+  # 强制中性 CPU target：无论环境变量如何，确保产物可在任何 x86-64 服务器运行。
+  _saved_rustflags="${RUSTFLAGS:-}"
+  RUSTFLAGS=$(echo "${RUSTFLAGS:-}" | sed 's/-C[[:space:]]\+target-cpu=[^[:space:]]\+//g' | xargs)
+  if [ -n "$RUSTFLAGS" ]; then
+    export RUSTFLAGS="$RUSTFLAGS -C target-cpu=x86-64"
+  else
+    export RUSTFLAGS="-C target-cpu=x86-64"
+  fi
+  echo -e "${GRAY}   RUSTFLAGS=$RUSTFLAGS${NC}"
   if ! (
     cd "$TMP_SERVER_DIR"
     ELON_SERVER_GIT_SHA="$SHA_BIG" ELON_BUILD_VERSION="$ASSIGNED_VERSION" cargo zigbuild --release --target "$TARGET"
   ); then
+    RUSTFLAGS="$_saved_rustflags"
     unset CARGO_TARGET_DIR
     complete_release false "" "" "cargo zigbuild failed"
     echo -e "${RED}❌ 编译失败${NC}" >&2
     exit 1
   fi
+  RUSTFLAGS="$_saved_rustflags"
   unset CARGO_TARGET_DIR
 
   if [ ! -f "$BINARY" ]; then
