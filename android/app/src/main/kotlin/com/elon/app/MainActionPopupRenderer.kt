@@ -7,6 +7,8 @@ import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -22,6 +24,16 @@ internal const val WECHAT_POPUP_PANEL_COLOR = "#BDBDBD"
 internal const val WECHAT_POPUP_TEXT_COLOR = "#242424"
 internal const val WECHAT_POPUP_DIVIDER_COLOR = "#A8A8A8"
 internal const val LEGACY_MESSAGE_POPUP_COLOR = "#3D3D3D"
+
+private const val MESSAGE_POPUP_DEFAULT_COLUMNS = 5
+private const val MESSAGE_POPUP_CELL_WIDTH_DP = 54
+private const val MESSAGE_POPUP_COMPACT_CELL_WIDTH_DP = 62
+private const val MESSAGE_POPUP_CELL_HEIGHT_DP = 52
+private const val MESSAGE_POPUP_HORIZONTAL_PADDING_DP = 9
+private const val MESSAGE_POPUP_VERTICAL_PADDING_DP = 8
+private const val MESSAGE_POPUP_ICON_SIZE_DP = 20
+private const val MESSAGE_POPUP_LABEL_TOP_MARGIN_DP = 5
+private const val MESSAGE_POPUP_LABEL_TEXT_SIZE_DP = 11.5f
 
 internal class MainActionPopupRenderer(
     private val activity: AppCompatActivity,
@@ -93,15 +105,22 @@ internal class MainActionPopupRenderer(
         previousPopup?.dismiss()
 
         val compact = actions.size <= 3
-        val columnCount = if (compact) actions.size.coerceAtLeast(1) else 5
+        val columnCount = if (compact) actions.size.coerceAtLeast(1) else MESSAGE_POPUP_DEFAULT_COLUMNS
         val rowCount = ((actions.size + columnCount - 1) / columnCount).coerceAtLeast(1)
+        val horizontalPadding = dp(MESSAGE_POPUP_HORIZONTAL_PADDING_DP)
+        val verticalPadding = dp(MESSAGE_POPUP_VERTICAL_PADDING_DP)
+        val targetCellWidth = dp(
+            if (compact) MESSAGE_POPUP_COMPACT_CELL_WIDTH_DP else MESSAGE_POPUP_CELL_WIDTH_DP
+        )
+        val screenMaxWidth = activity.resources.displayMetrics.widthPixels - dp(32)
         val popupWidth = if (compact) {
-            minOf(activity.resources.displayMetrics.widthPixels - dp(24), dp(72) * columnCount + dp(20))
+            minOf(screenMaxWidth, targetCellWidth * columnCount + horizontalPadding * 2)
         } else {
-            minOf(activity.resources.displayMetrics.widthPixels - dp(24), dp(282))
+            minOf(screenMaxWidth, targetCellWidth * columnCount + horizontalPadding * 2)
         }
         val arrowHeight = dp(8)
-        val panelHeight = dp(16) + dp(58) * rowCount
+        val cellHeight = dp(MESSAGE_POPUP_CELL_HEIGHT_DP)
+        val panelHeight = verticalPadding * 2 + cellHeight * rowCount
         val totalHeight = panelHeight + arrowHeight
         val root = FrameLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
@@ -116,17 +135,18 @@ internal class MainActionPopupRenderer(
                 cornerRadius = dp(4).toFloat()
                 setColor(Color.parseColor(LEGACY_MESSAGE_POPUP_COLOR))
             }
-            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding)
         }
         root.addView(panel, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             panelHeight
         ))
         lateinit var popup: PopupWindow
+        val cellWidth = (popupWidth - horizontalPadding * 2) / columnCount
         actions.forEach { action ->
             panel.addView(createMessageActionCell(action) { popup.dismiss() }, GridLayout.LayoutParams().apply {
-                width = (popupWidth - dp(20)) / columnCount
-                height = dp(58)
+                width = cellWidth
+                height = cellHeight
             })
         }
 
@@ -313,22 +333,27 @@ internal class MainActionPopupRenderer(
             orientation = LinearLayout.VERTICAL
             isClickable = true
             foreground = selectableForeground()
+            setPadding(0, dp(2), 0, 0)
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
+                val iconSize = dp(MESSAGE_POPUP_ICON_SIZE_DP)
+                layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
                 setImageResource(action.iconRes)
             })
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(4)
+                    topMargin = dp(MESSAGE_POPUP_LABEL_TOP_MARGIN_DP)
                 }
                 includeFontPadding = false
                 text = action.title
                 setTextColor(Color.parseColor("#EAEAEA"))
-                textSize = 13f
+                setTextSize(TypedValue.COMPLEX_UNIT_DIP, MESSAGE_POPUP_LABEL_TEXT_SIZE_DP)
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
             })
             setOnClickListener {
                 dismissPopup()
