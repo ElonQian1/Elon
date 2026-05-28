@@ -127,6 +127,7 @@ class ChatAdapter(
         bindChatAttachmentViews(
             holder.attachmentList,
             message.attachments,
+            isSent = message.role == "user",
             onVoiceLongPress = onVoiceAttachmentLongPress?.let { cb ->
                 { attachment -> cb.invoke(message, attachment) }
             }

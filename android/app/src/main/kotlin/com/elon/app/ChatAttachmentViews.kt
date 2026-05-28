@@ -1,18 +1,22 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.util.LruCache
 import android.view.Gravity
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -23,6 +27,7 @@ import kotlin.math.max
 internal fun bindChatAttachmentViews(
     container: LinearLayout?,
     attachments: List<ChatAttachment>?,
+    isSent: Boolean = false,
     onVoiceLongPress: ((ChatAttachment) -> Unit)? = null
 ) {
     if (container == null) return
@@ -43,7 +48,7 @@ internal fun bindChatAttachmentViews(
     visibleItems.forEachIndexed { index, attachment ->
         val view = when {
             attachment.isImage() -> createImageAttachmentView(container.context, attachment)
-            attachment.isVoice() -> createVoiceAttachmentView(container.context, attachment, onVoiceLongPress)
+            attachment.isVoice() -> createVoiceAttachmentView(container.context, attachment, isSent, onVoiceLongPress)
             else -> createFileAttachmentView(container.context, attachment)
         }
         view.layoutParams = (view.layoutParams as LinearLayout.LayoutParams).apply {
@@ -115,82 +120,77 @@ private fun imageAttachmentLayoutParams(
 }
 
 /**
- * 语音消息气泡：显示 ▶/⏸ 播放按钮 + 进度条 + 时长。
- * 宽度按录音时长动态伸缩（最窄 100dp，最宽 220dp）。
+ * 微信风格语音消息气泡：发送方绿色（右），接收方深色（左）。
+ * 发送方布局：[时长] [波形图标]；接收方：[波形图标] [时长]。
+ * 宽度按录音时长动态伸缩（最窄 68dp，最宽 190dp）。
  */
 private fun createVoiceAttachmentView(
     context: Context,
     attachment: ChatAttachment,
+    isSent: Boolean,
     onLongPress: ((ChatAttachment) -> Unit)?
 ): View {
     val source = attachment.playbackSource() ?: ""
     val durationSec = attachment.durationSeconds ?: 0
-    val durationText = formatVoiceDuration(durationSec)
+    // 微信风格时长：N"
+    val durationText = "${durationSec.coerceAtLeast(1)}\""
 
-    // 宽度按时长动态计算：1 秒 = +2dp，最小 100dp，最大 220dp
-    val widthDp = (100 + durationSec.coerceIn(0, 60) * 2).coerceIn(100, 220)
+    // 宽度按时长动态计算：1 秒 = +4dp，最小 68dp，最大 190dp
+    val widthDp = (68 + durationSec.coerceIn(0, 60) * 4).coerceIn(68, 190)
+
+    // 颜色匹配气泡：发送方绿色，接收方深色半透明
+    val bgColor = if (isSent) Color.parseColor("#95EC69") else Color.parseColor("#3D3D3D")
+    val textColor = if (isSent) Color.parseColor("#1A1A1A") else Color.WHITE
+    val waveColor = if (isSent) Color.parseColor("#1A1A1A") else Color.WHITE
 
     val container = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), LinearLayout.LayoutParams.WRAP_CONTENT)
-        setPadding(context.dp(10), context.dp(10), context.dp(10), context.dp(10))
+        layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), context.dp(42))
+        setPadding(context.dp(11), context.dp(8), context.dp(11), context.dp(8))
         background = GradientDrawable().apply {
             cornerRadius = context.dp(20).toFloat()
-            setColor(Color.parseColor("#1A73E8"))
+            setColor(bgColor)
         }
         isClickable = true
         isFocusable = true
     }
 
-    // ▶ / ⏸ 播放按钮
-    val playBtn = TextView(context).apply {
-        text = if (VoiceMessagePlayer.isCurrentlyPlaying(source)) "⏸" else "▶"
-        textSize = 16f
-        setTextColor(Color.WHITE)
-        gravity = Gravity.CENTER
-        layoutParams = LinearLayout.LayoutParams(context.dp(28), context.dp(28))
+    // 波形图标（仿微信 3 道弧线，播放时动画）
+    val waveIcon = VoiceWaveIconView(context, waveColor, faceRight = !isSent).apply {
+        layoutParams = LinearLayout.LayoutParams(context.dp(20), context.dp(20))
+        isPlaying = VoiceMessagePlayer.isCurrentlyPlaying(source)
     }
 
-    // 播放进度条
-    val progressBar = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
-        layoutParams = LinearLayout.LayoutParams(0, context.dp(3), 1f).apply {
-            marginStart = context.dp(6)
-            marginEnd = context.dp(6)
-        }
-        max = 1000
-        progress = 0
-        progressTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
-        progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#66FFFFFF"))
-    }
-
-    // 时长文字（固定宽度避免气泡跳动）
+    // 时长文字
     val durationView = TextView(context).apply {
         text = durationText
-        textSize = 11f
-        setTextColor(Color.WHITE)
-        gravity = Gravity.CENTER
-        layoutParams = LinearLayout.LayoutParams(context.dp(30), LinearLayout.LayoutParams.WRAP_CONTENT)
+        textSize = 14f
+        setTextColor(textColor)
+        gravity = Gravity.CENTER_VERTICAL
         includeFontPadding = false
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            if (isSent) marginEnd = context.dp(6) else marginStart = context.dp(6)
+        }
     }
 
-    container.addView(playBtn)
-    container.addView(progressBar)
-    container.addView(durationView)
+    // 发送方：[时长] [波形]；接收方：[波形] [时长]
+    if (isSent) {
+        container.addView(durationView)
+        container.addView(waveIcon)
+    } else {
+        container.addView(waveIcon)
+        container.addView(durationView)
+    }
 
     // 注册播放状态监听，随时更新此气泡的 UI
-    val stateListener: (String, Boolean, Int, Int) -> Unit = listener@{ src, isPlaying, posMs, durMs ->
+    val stateListener: (String, Boolean, Int, Int) -> Unit = listener@{ src, isPlaying, _, _ ->
         if (src != source) return@listener
         container.post {
-            playBtn.text = if (isPlaying) "⏸" else "▶"
-            if (durMs > 0) {
-                progressBar.progress = (posMs * 1000L / durMs).toInt()
-            } else {
-                progressBar.progress = 0
-            }
-            if (!isPlaying) {
-                progressBar.progress = 0
-            }
+            waveIcon.isPlaying = isPlaying
         }
     }
     VoiceMessagePlayer.addStateListener(stateListener)
@@ -207,15 +207,12 @@ private fun createVoiceAttachmentView(
     container.setOnClickListener {
         if (source.isBlank()) return@setOnClickListener
         VoiceMessagePlayer.playOrPause(source) {
-            // 播放自然结束时重置按钮（completionAction 在主线程回调）
-            playBtn.text = "▶"
-            progressBar.progress = 0
+            waveIcon.isPlaying = false
         }
-        // 立即乐观更新按钮
-        playBtn.text = if (VoiceMessagePlayer.isCurrentlyPlaying(source)) "⏸" else "▶"
+        waveIcon.isPlaying = VoiceMessagePlayer.isCurrentlyPlaying(source)
     }
 
-    // 长按：转文字 / 取消
+    // 长按：转文字
     if (onLongPress != null) {
         container.setOnLongClickListener {
             onLongPress(attachment)
@@ -226,10 +223,68 @@ private fun createVoiceAttachmentView(
     return container
 }
 
-private fun formatVoiceDuration(seconds: Int): String {
-    val m = seconds / 60
-    val s = seconds % 60
-    return "%d:%02d".format(m, s)
+/**
+ * 仿微信语音波形图标：3 道半弧，播放时依次循环点亮动画。
+ * [faceRight]=true 弧口朝右（接收方），false 朝左（发送方）。
+ */
+private class VoiceWaveIconView(
+    context: Context,
+    private val iconColor: Int,
+    private val faceRight: Boolean
+) : View(context) {
+
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = iconColor
+    }
+
+    private var animPhase = 0f
+    private val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+        duration = 900
+        repeatCount = ValueAnimator.INFINITE
+        repeatMode = ValueAnimator.RESTART
+        interpolator = LinearInterpolator()
+        addUpdateListener { animPhase = it.animatedFraction; invalidate() }
+    }
+
+    var isPlaying: Boolean = false
+        set(v) {
+            if (field == v) return
+            field = v
+            if (v) { if (!animator.isRunning) animator.start() }
+            else { animator.cancel(); animPhase = 0f; invalidate() }
+        }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        animator.cancel()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        paint.strokeWidth = (w * 0.11f).coerceAtLeast(1.5f)
+
+        for (i in 0..2) {
+            val r = (i + 1) * w / 4.5f
+            val alpha: Float = if (isPlaying) {
+                // 三道弧依次循环点亮
+                val t = ((animPhase - i * 0.25f + 1f) % 1f)
+                val sin = Math.sin(t * Math.PI * 2).toFloat()
+                (0.3f + 0.7f * ((sin + 1f) / 2f)).coerceIn(0.2f, 1f)
+            } else {
+                // 静止：从内到外渐亮
+                0.35f + i * 0.32f
+            }
+            paint.alpha = (alpha * 255).toInt()
+
+            val cx = if (faceRight) r * 0.5f else w - r * 0.5f
+            val oval = RectF(cx - r, h / 2f - r, cx + r, h / 2f + r)
+            val startAngle = if (faceRight) -50f else 130f
+            canvas.drawArc(oval, startAngle, 100f, false, paint)
+        }
+    }
 }
 
 private fun createFileAttachmentView(context: Context, attachment: ChatAttachment): View {
