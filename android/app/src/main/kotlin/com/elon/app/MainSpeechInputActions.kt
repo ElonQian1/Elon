@@ -33,7 +33,8 @@ internal class MainSpeechInputActions(
     private val voiceHoldButton: () -> TextView,
     private val sendVoiceAttachment: (PendingAttachment, String) -> Unit,
     private val setVoiceMode: (Boolean) -> Unit,
-    private val applyVoiceMode: () -> Unit
+    private val applyVoiceMode: () -> Unit,
+    private val sendTextDirect: ((String) -> Unit)? = null
 ) {
     private val voiceRecorder = VoiceAudioRecorder(activity)
     private var speechRecognizer: SpeechRecognizer? = null
@@ -47,6 +48,10 @@ internal class MainSpeechInputActions(
     // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
     private var agentBridge: AgentVoiceBridge? = null
     private var agentVoiceActive = false
+    private var agentLastFinalText: String = ""
+    private var agentLastPartialText: String = ""
+    // 仿微信全屏麦克风遮罩（在端上模式下启用）
+    private var voiceOverlay: VoiceRecordingOverlay? = null
 
     fun startSpeechToText() {
         if (activeConversation().ended) return
@@ -129,6 +134,15 @@ internal class MainSpeechInputActions(
         agentBridge?.destroy()
         agentBridge = null
         agentVoiceActive = false
+        voiceOverlay?.hide()
+        voiceOverlay = null
+    }
+
+    // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
+
+    /** 手指以 ACTION_DOWN 点为零点、向上的位移（像素）。仅在 agent 语音中生效。 */
+    fun onVoiceTouchMoveDyUp(dyUp: Float) {
+        voiceOverlay?.updateZone(dyUp)
     }
 
     // ─── 方案 A：端上 Agent 流式识别 → 文字 → 走 elon 正常发送链路 ─────────────
@@ -140,22 +154,26 @@ internal class MainSpeechInputActions(
         isHoldActive = true
         isSpeechCanceled = false
         agentVoiceActive = true
+        agentLastFinalText = ""
+        agentLastPartialText = ""
         translationGeneration += 1
+        val overlay = voiceOverlay ?: VoiceRecordingOverlay(activity).also { voiceOverlay = it }
+        overlay.show()
         bridge.onStart = {
             voiceHoldButton().text = "正在听..."
         }
         bridge.onPartial = { text ->
             if (text.isNotBlank()) {
+                agentLastPartialText = text
                 voiceHoldButton().text = text.take(24)
+                voiceOverlay?.updatePartial(text)
             }
         }
         bridge.onFinal = { text ->
-            agentVoiceActive = false
-            if (!isSpeechCanceled && text.isNotBlank()) {
-                // 复用现有文字识别管线：填入输入框 + 自动转简体
-                handleRecognizedSpeech(text)
-            }
-            voiceHoldButton().text = "按住 说话"
+            agentLastFinalText = text
+            voiceOverlay?.updatePartial(text)
+            // 不在这里自动处理发送/预览，等 ACTION_UP 手势决定跳转。
+            // 但如果用户已经松开且在 SEND 区送出（常规路径），stopAgentVoice 会取走它。
         }
         bridge.onEnd = {
             if (!agentVoiceActive) {
@@ -164,6 +182,7 @@ internal class MainSpeechInputActions(
         }
         bridge.onError = { msg ->
             agentVoiceActive = false
+            voiceOverlay?.hide()
             voiceHoldButton().text = "按住 说话"
             if (!isSpeechCanceled) {
                 Toast.makeText(activity, "语音识别失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
@@ -174,14 +193,77 @@ internal class MainSpeechInputActions(
         return true
     }
 
-    /** 松开按钮：通知 ASR 结束（SmartVAD 通常已经判定完）。 */
+    /**
+     * 松开按钮：根据遵照 [voiceOverlay] 当前区域决定动作。
+     *  - SEND: 直接发送转写文字
+     *  - TRANSLATE: 回填输入框供用户查看/编辑
+     *  - CANCEL: 丢弃
+     */
     private fun stopAgentVoice(): Boolean {
         val bridge = agentBridge ?: return false
         if (!agentVoiceActive && !bridge.isRunning) return false
+        val zone = voiceOverlay?.currentZone ?: VoiceRecordingOverlay.Zone.SEND
         isHoldActive = false
-        voiceHoldButton().text = "识别中..."
+        if (zone == VoiceRecordingOverlay.Zone.CANCEL) {
+            isSpeechCanceled = true
+            agentVoiceActive = false
+            bridge.cancel()
+            voiceOverlay?.hide()
+            voiceHoldButton().text = "按住 说话"
+            return true
+        }
+        // 让 ASR 赶紧出最终结果。bridge.onFinal 可能同步或异步回调。
         bridge.stop()
+        val targetZone = zone
+        // 如果 onFinal 已提前到达（agentLastFinalText 非空）则立即处理，
+        // 否则等待一个上限 1500ms 的窗口后用 partial 兑现。
+        val deadline = activity.window?.decorView
+        deadline?.postDelayed({
+            if (!agentVoiceActive) return@postDelayed
+            commitAgentVoiceFinal(targetZone)
+        }, 250L)
+        deadline?.postDelayed({
+            if (!agentVoiceActive) return@postDelayed
+            // 安全网：其他路径仍未完成时兑现 partial
+            commitAgentVoiceFinal(targetZone)
+        }, 1500L)
+        // 同步绑定 onFinal，立即拿到结果就立即提交，跳过安全网调度
+        bridge.onFinal = { text ->
+            agentLastFinalText = text
+            voiceOverlay?.updatePartial(text)
+            if (agentVoiceActive) commitAgentVoiceFinal(targetZone)
+        }
         return true
+    }
+
+    private fun commitAgentVoiceFinal(zone: VoiceRecordingOverlay.Zone) {
+        if (!agentVoiceActive) return
+        agentVoiceActive = false
+        val finalText = agentLastFinalText.ifBlank { agentLastPartialText }.trim()
+        voiceOverlay?.hide()
+        voiceHoldButton().text = "按住 说话"
+        if (finalText.isBlank()) {
+            Toast.makeText(activity, "没听清，请重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        when (zone) {
+            VoiceRecordingOverlay.Zone.SEND -> {
+                // 直发：走现有文字发送链路（后台只看到文字）
+                val sender = sendTextDirect
+                if (sender != null) {
+                    setVoiceMode(false)
+                    applyVoiceMode()
+                    sender(finalText)
+                } else {
+                    handleRecognizedSpeech(finalText)
+                }
+            }
+            VoiceRecordingOverlay.Zone.TRANSLATE -> {
+                // 回填输入框（用户阅读/翻译/修改）
+                handleRecognizedSpeech(finalText)
+            }
+            VoiceRecordingOverlay.Zone.CANCEL -> Unit
+        }
     }
 
     /** 取消：立即关闭。 */
@@ -192,6 +274,7 @@ internal class MainSpeechInputActions(
         isSpeechCanceled = true
         agentVoiceActive = false
         bridge.cancel()
+        voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
         return true
     }
