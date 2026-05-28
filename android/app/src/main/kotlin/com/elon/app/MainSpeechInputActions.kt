@@ -34,6 +34,7 @@ internal class MainSpeechInputActions(
 ) {
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListeningForSpeech = false
+    private var isHoldActive = false
     private var isSpeechCanceled = false
     private var speechSessionId = 0
     private var translationGeneration = 0
@@ -49,27 +50,13 @@ internal class MainSpeechInputActions(
             return
         }
         translationGeneration += 1
-        val sessionId = ++speechSessionId
+        isHoldActive = true
         isSpeechCanceled = false
-        resetSpeechRecognizer()
-        isListeningForSpeech = true
-        voiceHoldButton().text = "松开 转文字"
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
-            setRecognitionListener(createSpeechRecognitionListener(sessionId))
-        }
-        runCatching {
-            speechRecognizer?.startListening(recognizerIntent())
-        }.onFailure { error ->
-            if (sessionId != speechSessionId) return
-            DebugTraceStore.record("speech_start_failed", mapOf("error" to error.message))
-            isListeningForSpeech = false
-            voiceHoldButton().text = "按住 说话"
-            resetSpeechRecognizer()
-            Toast.makeText(activity, "语音识别启动失败，请重试", Toast.LENGTH_SHORT).show()
-        }
+        startSpeechSession(preferLanguage = true)
     }
 
     fun stopSpeechToText() {
+        isHoldActive = false
         if (!isListeningForSpeech) return
         isListeningForSpeech = false
         voiceHoldButton().text = "识别中..."
@@ -79,12 +66,13 @@ internal class MainSpeechInputActions(
             DebugTraceStore.record("speech_stop_failed", mapOf("error" to error.message))
             voiceHoldButton().text = "按住 说话"
             resetSpeechRecognizer()
-            Toast.makeText(activity, "语音识别失败，请重试", Toast.LENGTH_SHORT).show()
+            showSpeechFailureToast("停止识别失败")
         }
     }
 
     fun cancelSpeechToText() {
         if (!isListeningForSpeech && speechRecognizer == null) return
+        isHoldActive = false
         speechSessionId += 1
         translationGeneration += 1
         isSpeechCanceled = true
@@ -97,11 +85,36 @@ internal class MainSpeechInputActions(
     fun destroy() {
         speechSessionId += 1
         translationGeneration += 1
+        isHoldActive = false
         resetSpeechRecognizer()
         isListeningForSpeech = false
     }
 
-    private fun createSpeechRecognitionListener(sessionId: Int): RecognitionListener {
+    private fun startSpeechSession(preferLanguage: Boolean) {
+        val sessionId = ++speechSessionId
+        resetSpeechRecognizer()
+        isListeningForSpeech = true
+        voiceHoldButton().text = if (preferLanguage) "松开 转文字" else "松开 转文字"
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
+            setRecognitionListener(createSpeechRecognitionListener(sessionId, preferLanguage))
+        }
+        runCatching {
+            speechRecognizer?.startListening(recognizerIntent(preferLanguage))
+        }.onFailure { error ->
+            if (sessionId != speechSessionId) return
+            DebugTraceStore.record("speech_start_failed", mapOf("error" to error.message))
+            isListeningForSpeech = false
+            resetSpeechRecognizer()
+            if (isHoldActive && preferLanguage) {
+                retryWithoutLanguage(sessionId, "start_exception")
+            } else {
+                voiceHoldButton().text = "按住 说话"
+                showSpeechFailureToast("启动失败")
+            }
+        }
+    }
+
+    private fun createSpeechRecognitionListener(sessionId: Int, preferLanguage: Boolean): RecognitionListener {
         return object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 if (!isCurrentSpeechSession(sessionId)) return
@@ -116,13 +129,22 @@ internal class MainSpeechInputActions(
             }
             override fun onError(error: Int) {
                 if (!isCurrentSpeechSession(sessionId)) return
-                DebugTraceStore.record("speech_error", mapOf("code" to error))
+                DebugTraceStore.record(
+                    "speech_error",
+                    mapOf("code" to error, "message" to speechErrorMessage(error), "prefer_language" to preferLanguage)
+                )
                 isListeningForSpeech = false
-                voiceHoldButton().text = "按住 说话"
                 resetSpeechRecognizer()
-                if (!isSpeechCanceled && shouldShowSpeechError(error)) {
-                    Toast.makeText(activity, "语音识别失败，请重试", Toast.LENGTH_SHORT).show()
+                if (isSpeechCanceled) {
+                    voiceHoldButton().text = "按住 说话"
+                    return
                 }
+                if (isHoldActive && shouldRetryWithoutLanguage(error, preferLanguage)) {
+                    retryWithoutLanguage(sessionId, "error_$error")
+                    return
+                }
+                voiceHoldButton().text = "按住 说话"
+                showSpeechFailureToast(speechErrorMessage(error), error)
             }
             override fun onResults(results: Bundle?) {
                 if (!isCurrentSpeechSession(sessionId)) return
@@ -144,12 +166,13 @@ internal class MainSpeechInputActions(
         }
     }
 
-    private fun recognizerIntent(): Intent {
+    private fun recognizerIntent(preferLanguage: Boolean): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, SPEECH_LANGUAGE_TAG)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.packageName)
+            if (preferLanguage) {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, SPEECH_LANGUAGE_TAG)
+            }
         }
     }
 
@@ -207,10 +230,49 @@ internal class MainSpeechInputActions(
         return sessionId == speechSessionId
     }
 
-    private fun shouldShowSpeechError(error: Int): Boolean {
-        return error != SpeechRecognizer.ERROR_NO_MATCH &&
-            error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT &&
-            error != SpeechRecognizer.ERROR_CLIENT
+    private fun shouldRetryWithoutLanguage(error: Int, preferLanguage: Boolean): Boolean {
+        if (!preferLanguage) return false
+        return error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+            error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+            error == SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT ||
+            error == SpeechRecognizer.ERROR_SERVER ||
+            error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
+            error == SpeechRecognizer.ERROR_CLIENT
+    }
+
+    private fun retryWithoutLanguage(previousSessionId: Int, reason: String) {
+        DebugTraceStore.record("speech_retry_without_language", mapOf("reason" to reason))
+        voiceHoldButton().text = "正在重试..."
+        binding.root.postDelayed({
+            if (previousSessionId != speechSessionId || !isHoldActive || isSpeechCanceled) return@postDelayed
+            startSpeechSession(preferLanguage = false)
+        }, SPEECH_RETRY_DELAY_MS)
+    }
+
+    private fun showSpeechFailureToast(message: String, error: Int? = null) {
+        val suffix = error?.let { "（$it）" }.orEmpty()
+        Toast.makeText(activity, "语音识别失败：$message$suffix", Toast.LENGTH_LONG).show()
+    }
+
+    private fun speechErrorMessage(error: Int): String {
+        return when (error) {
+            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "网络超时"
+            SpeechRecognizer.ERROR_NETWORK -> "网络不可用"
+            SpeechRecognizer.ERROR_AUDIO -> "麦克风录音失败"
+            SpeechRecognizer.ERROR_SERVER -> "系统语音服务异常"
+            SpeechRecognizer.ERROR_CLIENT -> "识别服务客户端异常"
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "没有检测到语音"
+            SpeechRecognizer.ERROR_NO_MATCH -> "没有听清"
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务正忙"
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "麦克风权限不足"
+            SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> "请求过于频繁"
+            SpeechRecognizer.ERROR_SERVER_DISCONNECTED -> "语音服务断开"
+            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "系统不支持当前识别语言"
+            SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> "当前识别语言不可用"
+            SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT -> "无法检查系统识别能力"
+            SpeechRecognizer.ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS -> "无法监听语言包下载"
+            else -> "未知错误"
+        }
     }
 
     private fun resetSpeechRecognizer() {
@@ -223,5 +285,6 @@ internal class MainSpeechInputActions(
     private companion object {
         // Android speech engines are much more consistent with zh-CN than zh-Hans-CN.
         private const val SPEECH_LANGUAGE_TAG = "zh-CN"
+        private const val SPEECH_RETRY_DELAY_MS = 180L
     }
 }
