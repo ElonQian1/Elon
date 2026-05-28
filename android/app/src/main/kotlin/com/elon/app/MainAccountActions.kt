@@ -8,6 +8,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import com.google.gson.Gson
+import okhttp3.OkHttpClient
+import kotlin.concurrent.thread
 
 internal class MainAccountActions(
     private val activity: AppCompatActivity,
@@ -15,10 +17,41 @@ internal class MainAccountActions(
     private val projects: MutableList<AppProject>,
     private val gson: Gson,
     private val prefs: SharedPreferences,
+    private val http: OkHttpClient,
+    private val serverUrl: String,
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val refreshProfileSummary: () -> Unit
 ) {
+    /**
+     * 登录后从服务器拉取项目列表，恢复本地丢失的项目（换机/重装场景）。
+     * 已存在（按 collaborationProjectId 匹配）的项目不会被覆盖。
+     */
+    fun syncProjectsFromServer() {
+        if (!AuthManager.isLoggedIn(activity)) return
+        thread(name = "sync-my-projects") {
+            try {
+                val serverProjects = fetchMyProjects(http, serverUrl, activity)
+                val existingIds = projects
+                    .mapNotNull { it.collaborationProjectId?.takeIf { id -> id.isNotBlank() } }
+                    .toSet()
+                val toAdd = serverProjects.filter { sp ->
+                    sp.id != ELON_SELF_PROJECT_ID && sp.id !in existingIds
+                }
+                if (toAdd.isEmpty()) return@thread
+                activity.runOnUiThread {
+                    for (sp in toAdd) {
+                        projects.add(sp.toJointAppProject())
+                    }
+                    saveProjects()
+                    renderProjectList()
+                }
+            } catch (_: Throwable) {
+                // 网络不可用时静默失败，不影响正常使用
+            }
+        }
+    }
+
     fun refreshAccountUi() {
         val loggedIn = AuthManager.isLoggedIn(activity)
         binding.profileLoginButton.visibility = if (loggedIn) View.GONE else View.VISIBLE

@@ -222,6 +222,21 @@ internal fun fetchJoinedProjectIds(
     return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
 }
 
+/** GET /api/me/projects — 返回当前用户拥有或加入的项目列表，需要登录 */
+internal fun fetchMyProjects(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context
+): List<StoreProject> {
+    val req = AuthManager.applyAuth(ctx, Request.Builder()
+        .url("$serverUrl/api/me/projects")
+        .get())
+    val resp = http.newCall(req.build()).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return parseStoreProjectList(JSONObject(body))
+}
+
 /** PUT /api/me/avatar — 同步头像到服务器，需要登录 */
 internal fun syncAvatarToServer(
     http: OkHttpClient,

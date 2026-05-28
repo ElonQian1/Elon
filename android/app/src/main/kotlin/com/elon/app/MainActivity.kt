@@ -176,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             registerTaskWorkReceiver = { taskActions.taskWorkReceiverActions.registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
+            syncProjectsFromServer = { accountActions().syncProjectsFromServer() },
             getWaitingForReply = { s.waitingForReply },
             getBackendConnected = { s.backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
@@ -794,6 +795,8 @@ class MainActivity : AppCompatActivity() {
             projects = s.projects,
             gson = s.gson,
             prefs = prefs,
+            http = s.http,
+            serverUrl = serverUrl,
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             refreshProfileSummary = {

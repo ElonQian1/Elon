@@ -33,6 +33,7 @@ internal class MainCreateActions(
     private val registerTaskWorkReceiver: () -> Unit,
     private val restorePendingActiveWork: () -> Unit,
     private val checkAndOfferGuestImport: () -> Unit,
+    private val syncProjectsFromServer: () -> Unit,
     private val getWaitingForReply: () -> Boolean,
     private val getBackendConnected: () -> Boolean,
     private val isActiveConversationWorking: () -> Boolean,
@@ -59,6 +60,7 @@ internal class MainCreateActions(
         registerTaskWorkReceiver()
         restorePendingActiveWork()
         checkAndOfferGuestImport()
+        syncProjectsFromServer()
         startTaskWorkService(
             if (getWaitingForReply()) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
         )
