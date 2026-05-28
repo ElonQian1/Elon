@@ -27,9 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  - 断线按指数退避重连（5 → 10 → 20 → 40 → 120 秒封顶）
  *  - 认证可选：有 token 传给服务端以接收个人事件，匿名也能收更新推送
  *
- * 生命周期（由 MainActivity 管理）：
- *  onResume → addListener + start(ctx)
- *  onStop   → removeListener + stop()
+ * 生命周期：
+ *  Application 启动后保持连接；Activity 只增删自己的前台 UI 监听者。
  */
 class GlobalWsManager(private val serverUrl: String) {
 
@@ -146,7 +145,7 @@ class GlobalWsManager(private val serverUrl: String) {
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            if (code != 1000) {
+            if (running.get()) {
                 Log.d(TAG, "连接关闭 code=$code, 将重连")
                 scheduleReconnect()
             }

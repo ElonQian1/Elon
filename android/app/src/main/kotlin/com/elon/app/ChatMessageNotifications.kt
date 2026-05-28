@@ -15,7 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages"
+private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v2"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
 
 internal object ChatMessageNotifications {
@@ -114,6 +114,8 @@ internal object ChatMessageNotifications {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setSound(Settings.System.DEFAULT_NOTIFICATION_URI)
+            .setVibrate(longArrayOf(0L, 220L, 120L, 220L))
             .build()
         runCatching {
             NotificationManagerCompat.from(context).notify(notificationId, notification)

@@ -25,7 +25,7 @@ internal class MainLifecycleEdgeActions(
         } else if (requestCode == notificationPermissionRequest) {
             val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
             if (!granted) {
-                Toast.makeText(activity, "需要通知权限才能显示任务完成和应用更新提醒", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, "需要通知权限才能显示聊天消息、任务完成和应用更新提醒", Toast.LENGTH_SHORT).show()
             }
         }
     }
