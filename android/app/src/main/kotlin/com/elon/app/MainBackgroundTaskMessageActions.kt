@@ -21,7 +21,11 @@ internal class MainBackgroundTaskMessageActions(
             "done" -> doneMessage(parsed, isDevelopment)
             "error" -> ChatMessage(
                 "error",
-                friendlyErrorMessage(parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务失败。")
+                friendlyErrorMessage(
+                    parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务失败。",
+                    jsonStringOrNull(parsed, "code"),
+                    jsonBooleanOrNull(parsed, "retryable")
+                )
             )
             "progress" -> progressMessage(parsed) ?: return
             else -> return

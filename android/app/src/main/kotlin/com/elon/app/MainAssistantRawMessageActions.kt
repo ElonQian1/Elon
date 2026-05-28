@@ -56,7 +56,11 @@ internal class MainAssistantRawMessageActions(
                 }
                 "error" -> {
                     receivedStreamingReplyThisTurn = false
-                    assistantTerminalActions().handleError(jsonStringOrNull(json, "message") ?: "未知错误")
+                    assistantTerminalActions().handleError(
+                        jsonStringOrNull(json, "message") ?: "未知错误",
+                        jsonStringOrNull(json, "code"),
+                        jsonBooleanOrNull(json, "retryable")
+                    )
                 }
                 else -> return
             }

@@ -222,8 +222,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
         None
     };
     if let Some(ref sha) = build_sha {
-        if let Ok(Some((cached_sha, cached_url))) =
-            state.store.get_project_build_cache(&project.id)
+        if let Ok(Some((cached_sha, cached_url))) = state.store.get_project_build_cache(&project.id)
         {
             if cached_sha == *sha {
                 let _ = tx.send(
@@ -281,12 +280,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
-                let _ = tx.send(
-                    WsMessage::Error {
-                        message: format!("创建会话 worktree 失败: {}", error),
-                    }
-                    .to_json(),
-                );
+                let _ = tx
+                    .send(WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json());
                 return;
             }
         }
@@ -415,11 +410,10 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         }),
                     );
                 }
+                let error_text = format!("Codex CLI 意图确认失败: {}", error);
                 let _ = tx.send(
-                    WsMessage::Error {
-                        message: format!("Codex CLI 意图确认失败: {}", error),
-                    }
-                    .to_json(),
+                    WsMessage::classified_error(crate::ai_error::classify_ai_error(&error_text))
+                        .to_json(),
                 );
                 return;
             }

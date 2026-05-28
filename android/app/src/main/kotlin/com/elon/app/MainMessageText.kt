@@ -94,12 +94,15 @@ internal fun sanitizeFinalReplyLine(line: String): String {
         .trimEnd()
 }
 
-internal fun friendlyErrorMessage(raw: String): String {
+internal fun friendlyErrorMessage(raw: String, code: String? = null, retryable: Boolean? = null): String {
     val nestedMessage = nestedApiErrorMessage(raw)
     val source = listOf(raw, nestedMessage).joinToString(" ").lowercase(Locale.CHINA)
+    val normalizedCode = code.orEmpty().lowercase(Locale.US)
     return when {
+        isStructuredAiErrorCode(normalizedCode) && raw.isNotBlank() ->
+            raw
         isTransientAiServiceConnectionError(source) ->
-            "服务器 AI 通道刚才断开，本轮没有完成。手机连接临时断开时会自动重连并同步进度；如果看到这条红色提示，说明服务端已结束本轮，请重新发送一次。"
+            transientAiServiceConnectionMessage(retryable)
         source.contains("free_quota_exhausted") ||
             source.contains("payment required") ||
             source.contains("endpoint is inactive") ->
@@ -122,6 +125,24 @@ internal fun friendlyErrorMessage(raw: String): String {
             "AI 服务暂时不可用，请稍后重试。"
         else ->
             summarize(raw.replace(Regex("\\{.*"), "").trim().ifBlank { raw }, 90)
+    }
+}
+
+private fun isStructuredAiErrorCode(code: String): Boolean {
+    return code == "ai_service_busy" ||
+        code == "ai_provider_connection_unstable" ||
+        code == "ai_service_timeout" ||
+        code == "ai_rate_limited" ||
+        code == "ai_quota_unavailable" ||
+        code == "ai_auth_config_error" ||
+        code == "project_workspace_error"
+}
+
+private fun transientAiServiceConnectionMessage(retryable: Boolean?): String {
+    return if (retryable == false) {
+        "服务器 AI 通道刚才短暂断开，本轮没有完成。手机 WebSocket 临时断开会自动重连并同步进度；如果看到这条红色提示，说明服务端这轮已结束，请稍后重新发送。"
+    } else {
+        "服务器 AI 通道刚才拥堵或短暂断开，系统会先自动重试。手机 WebSocket 临时断开会自动重连并同步进度；如果连续重试后仍看到这条提示，说明本轮已暂停，稍后重新发送即可继续。"
     }
 }
 

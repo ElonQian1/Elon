@@ -8,11 +8,11 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent,
-    project_git::git_output,
     project_completion::ensure_done_event_has_project_apk_url,
     project_conversation_workspace::{
         merge_conversation_worktree, project_merge_execution_key, ProjectConversationWorkspace,
     },
+    project_git::git_output,
     project_ws_protocol::{is_done_project_ws_message, is_terminal_project_ws_message},
     store::ProjectAccess,
     types::{AppState, WsMessage},
@@ -91,12 +91,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     }
 
     if let Err(error) = agent_task.await {
-        let _ = tx.send(
-            WsMessage::Error {
-                message: format!("AI 任务异常结束: {}", error),
-            }
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::error(format!("AI 任务异常结束: {}", error)).to_json());
         return;
     }
 
@@ -173,12 +168,10 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                     );
                 }
                 let _ = tx.send(
-                    WsMessage::Error {
-                        message: format!(
-                            "会话代码已完成，但合并回项目主分支失败: {}。请处理冲突后重试。",
-                            error
-                        ),
-                    }
+                    WsMessage::error(format!(
+                        "会话代码已完成，但合并回项目主分支失败: {}。请处理冲突后重试。",
+                        error
+                    ))
                     .to_json(),
                 );
                 return;
@@ -213,9 +206,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
             // 导致用 base_workspace 的新 HEAD 覆盖一个旧代码构建的 APK。
             if let Some(ref url) = apk_url {
                 if let Some(ref sha) = pre_build_sha {
-                    if let Err(e) =
-                        state.store.set_project_build_cache(&project.id, sha, url)
-                    {
+                    if let Err(e) = state.store.set_project_build_cache(&project.id, sha, url) {
                         tracing::warn!("更新项目构建缓存失败: {}", e);
                     }
                 }
@@ -227,11 +218,6 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     if let Some(raw) = terminal_raw {
         let _ = tx.send(raw);
     } else {
-        let _ = tx.send(
-            WsMessage::Error {
-                message: "AI 任务结束但没有返回完成状态。".into(),
-            }
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::error("AI 任务结束但没有返回完成状态。").to_json());
     }
 }

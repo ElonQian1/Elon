@@ -154,10 +154,7 @@ pub(crate) async fn get_or_start_project_ws_job(
         ) {
             Ok(task_id) => (task_id, None),
             Err(error) => {
-                let raw = WsMessage::Error {
-                    message: format!("创建任务记录失败: {}", error),
-                }
-                .to_json();
+                let raw = WsMessage::error(format!("创建任务记录失败: {}", error)).to_json();
                 let (broadcast_tx, _) = broadcast::channel::<String>(256);
                 let (cancel_tx, _cancel_rx) = watch::channel(false);
                 let job = Arc::new(ProjectWsJob {
@@ -316,9 +313,7 @@ async fn run_project_ws_job(
                         &state,
                         &task_id,
                         &job,
-                        WsMessage::Error {
-                            message: msg.clone(),
-                        }
+                        WsMessage::error(msg.clone())
                         .to_json(),
                     )
                     .await;
@@ -360,10 +355,7 @@ async fn run_project_ws_job(
 
     if !saw_terminal {
         let msg = "任务没有返回最终结果，请稍后重试或查看服务端日志。".to_string();
-        let raw = WsMessage::Error {
-            message: msg.clone(),
-        }
-        .to_json();
+        let raw = WsMessage::error(msg.clone()).to_json();
         emit_project_job_event(&state, &task_id, &job, raw).await;
         reply = msg.clone();
         error = Some(msg);

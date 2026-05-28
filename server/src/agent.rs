@@ -13,7 +13,7 @@ use crate::{
     agent_routing::{
         api_agent_name, choose_backend, cli_option_id, has_api_agents, is_local_cli_option,
     },
-    ai_cli,
+    ai_cli, ai_error,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     source_hygiene,
     store::ProjectAccess,
@@ -81,12 +81,10 @@ pub async fn run_for_project_in_workspace(
         && (!workspace.join(".git").exists() || !has_origin_remote(&workspace))
     {
         let _ = tx.send(
-            WsMessage::Error {
-                message: format!(
-                    "当前项目被标记为 Git/local_path 项目，但 {} 不是带 origin 远端的 Git 仓库。请先把它设置成真实 git clone，并配置可用远端后再继续。",
-                    workspace.display()
-                ),
-            }
+            WsMessage::error(format!(
+                "当前项目被标记为 Git/local_path 项目，但 {} 不是带 origin 远端的 Git 仓库。请先把它设置成真实 git clone，并配置可用远端后再继续。",
+                workspace.display()
+            ))
             .to_json(),
         );
         return;
@@ -136,10 +134,7 @@ pub async fn run_for_project_in_workspace(
     {
         error!("项目级 AI 代理运行出错: {}", e);
         let _ = tx.send(
-            WsMessage::Error {
-                message: e.to_string(),
-            }
-            .to_json(),
+            WsMessage::classified_error(ai_error::classify_ai_error(&e.to_string())).to_json(),
         );
     }
 }
@@ -333,22 +328,53 @@ async fn run_backend_with_workspace(
 
     match backend {
         AiBackend::LocalCli => {
-            match ai_cli::run_with_workspace(
-                user_id,
-                workspace,
-                download_base,
-                user_message,
-                combined_preflight_note.as_deref(),
-                cli_option_id(agent_name),
-                route,
-                require_existing_git,
-                native_session_scope.clone(),
-                trace_id,
-                state,
-                tx,
-            )
-            .await
-            {
+            let max_retries = ai_error::transient_retry_attempts();
+            let mut attempt = 0usize;
+            let local_cli_result = loop {
+                let result = ai_cli::run_with_workspace(
+                    user_id,
+                    workspace,
+                    download_base,
+                    user_message,
+                    combined_preflight_note.as_deref(),
+                    cli_option_id(agent_name),
+                    route,
+                    require_existing_git,
+                    native_session_scope.clone(),
+                    trace_id,
+                    state,
+                    tx,
+                )
+                .await;
+                match result {
+                    Ok(()) => break Ok(()),
+                    Err(error) => {
+                        let classified = ai_error::classify_ai_error(&error.to_string());
+                        if classified.should_retry_local_cli() && attempt < max_retries {
+                            attempt += 1;
+                            let delay_secs = ai_error::transient_retry_delay_secs(attempt);
+                            warn!(
+                                code = classified.code,
+                                attempt,
+                                max_retries,
+                                delay_secs,
+                                "本地 AI CLI 短暂错误，准备自动重试"
+                            );
+                            let _ = tx.send(
+                                WsMessage::progress(format!(
+                                    "服务器 AI 通道刚才拥堵或短暂断开，正在自动重试（{}/{}）。手机连接会自动恢复，项目记录已保留。",
+                                    attempt, max_retries
+                                ))
+                                .to_json(),
+                            );
+                            tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+                            continue;
+                        }
+                        break Err(error);
+                    }
+                }
+            };
+            match local_cli_result {
                 Ok(()) => Ok(()),
                 Err(e)
                     if allow_api_fallback

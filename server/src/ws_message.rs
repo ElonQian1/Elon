@@ -51,10 +51,44 @@ pub enum WsMessage {
         image_url: Option<String>,
     },
     /// 发生错误
-    Error { message: String },
+    Error {
+        message: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        category: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        retryable: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        retry_after_secs: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        operator_detail: Option<String>,
+    },
 }
 
 impl WsMessage {
+    pub fn error(message: impl ToString) -> Self {
+        WsMessage::Error {
+            message: message.to_string(),
+            code: None,
+            category: None,
+            retryable: None,
+            retry_after_secs: None,
+            operator_detail: None,
+        }
+    }
+
+    pub fn classified_error(error: crate::ai_error::ClassifiedAiError) -> Self {
+        WsMessage::Error {
+            message: error.message,
+            code: Some(error.code.to_string()),
+            category: Some(error.category.as_str().to_string()),
+            retryable: Some(error.retryable),
+            retry_after_secs: error.retry_after_secs,
+            operator_detail: error.operator_detail,
+        }
+    }
+
     /// 不携带步骤信息的普通进度消息（等效于旧 Progress { message }）
     pub fn progress(message: impl ToString) -> Self {
         WsMessage::Progress {

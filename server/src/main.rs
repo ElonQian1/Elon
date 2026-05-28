@@ -23,6 +23,7 @@ mod ai_cli_prompts;
 mod ai_cli_runner;
 mod ai_cli_streaming;
 mod ai_cli_trace;
+mod ai_error;
 mod api;
 mod app_update;
 mod auth_api;

@@ -201,13 +201,11 @@ fn terminal_event_from_task(task: &TaskSnapshot) -> String {
         }
         .to_json()
     } else {
-        WsMessage::Error {
-            message: task
-                .error
-                .clone()
-                .unwrap_or_else(|| "任务已结束，但没有保存详细错误。".into()),
-        }
-        .to_json()
+        let message = task
+            .error
+            .clone()
+            .unwrap_or_else(|| "任务已结束，但没有保存详细错误。".into());
+        WsMessage::classified_error(crate::ai_error::classify_ai_error(&message)).to_json()
     }
 }
 

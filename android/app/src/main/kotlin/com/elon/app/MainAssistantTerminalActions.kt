@@ -50,9 +50,9 @@ internal class MainAssistantTerminalActions(
         }
     }
 
-    fun handleError(rawMessage: String): ChatMessage {
+    fun handleError(rawMessage: String, code: String? = null, retryable: Boolean? = null): ChatMessage {
         resetPendingRequestState()
-        val error = friendlyErrorMessage(rawMessage)
+        val error = friendlyErrorMessage(rawMessage, code, retryable)
         val wasDevelopment = getActiveRequestIsDevelopment()
         if (wasDevelopment) {
             updateStage("需要处理", error)
