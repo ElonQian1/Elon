@@ -271,6 +271,43 @@ impl Store {
         Ok(events)
     }
 
+    /// 获取项目的构建缓存：`Some((git_sha, apk_url))`。
+    /// 若 last_build_sha 或 last_build_apk_url 任一为空则返回 None。
+    pub fn get_project_build_cache(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<(String, String)>> {
+        self.conn()?
+            .query_row(
+                "SELECT last_build_sha, last_build_apk_url \
+                 FROM projects \
+                 WHERE id = ?1 \
+                   AND last_build_sha IS NOT NULL \
+                   AND last_build_apk_url IS NOT NULL",
+                params![project_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    /// 构建成功后更新项目的构建 SHA 缓存。
+    /// 下次相同 HEAD SHA 的纯构建请求可直接跳过 Gradle，返回缓存的 APK URL。
+    pub fn set_project_build_cache(
+        &self,
+        project_id: &str,
+        sha: &str,
+        apk_url: &str,
+    ) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE projects \
+             SET last_build_sha = ?1, last_build_apk_url = ?2, updated_at = ?3 \
+             WHERE id = ?4",
+            params![sha, apk_url, now(), project_id],
+        )?;
+        Ok(())
+    }
+
     /// 检查该项目是否有过成功构建并产出 APK 的历史记录。
     /// 用于跨会话 worktree 判断——不依赖当前 worktree 的文件系统。
     pub fn project_has_built_apk(&self, project_id: &str) -> Result<bool> {

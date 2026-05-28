@@ -62,6 +62,11 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         "tasks.codex_thread_id + conversation_timeline 视图",
         migration_v10,
     ),
+    (
+        11,
+        "projects 构建缓存（last_build_sha / last_build_apk_url）",
+        migration_v11,
+    ),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -565,6 +570,19 @@ fn migration_v10(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    Ok(())
+}
+
+// ── v11：项目构建缓存 ─────────────────────────────────────────────────────────
+
+fn migration_v11(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "projects", "last_build_sha", "last_build_sha     TEXT")?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "last_build_apk_url",
+        "last_build_apk_url TEXT",
+    )?;
     Ok(())
 }
 

@@ -8,6 +8,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent,
+    project_git::git_output,
     project_completion::ensure_done_event_has_project_apk_url,
     project_conversation_workspace::{
         merge_conversation_worktree, project_merge_execution_key, ProjectConversationWorkspace,
@@ -196,6 +197,18 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                             "apk_url": apk_url,
                         }),
                     );
+                }
+            }
+            // 构建成功后写入 SHA 缓存，供下次相同 HEAD 的纯构建请求直接跳过 Gradle。
+            if let Some(ref url) = apk_url {
+                if let Ok(sha) =
+                    git_output(&execution_workspace.base_workspace, &["rev-parse", "HEAD"])
+                {
+                    if let Err(e) =
+                        state.store.set_project_build_cache(&project.id, sha.trim(), url)
+                    {
+                        tracing::warn!("更新项目构建缓存失败: {}", e);
+                    }
                 }
             }
             terminal_raw = Some(raw);
