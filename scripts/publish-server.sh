@@ -44,6 +44,14 @@ REMOTE_DIR="/root/Elon"
 REMOTE_BIN="$REMOTE_DIR/server/target/release/elon-server"
 SSH_OPTS="-o ProxyCommand=none"
 
+is_local_server_deploy() {
+  case "${ELON_DEPLOY_LOCAL:-auto}" in
+    1|true|TRUE|local|LOCAL) return 0 ;;
+    0|false|FALSE|remote|REMOTE) return 1 ;;
+  esac
+  [ -d "$REMOTE_DIR" ] && [ -w "$(dirname "$REMOTE_BIN")" ] && command -v systemctl >/dev/null 2>&1
+}
+
 # ── 路径推导（兼容任意 PC、任意路径）──────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
@@ -90,6 +98,11 @@ echo -e "${CYAN}═════════════════════�
 echo -e "${GRAY}  仓库根: $REPO_ROOT${NC}"
 echo -e "${GRAY}  目标:   $TARGET${NC}"
 echo -e "${GRAY}  服务器: $SERVER${NC}"
+if is_local_server_deploy; then
+  echo -e "${GRAY}  部署模式: 本机部署（跳过 SSH/SCP）${NC}"
+else
+  echo -e "${GRAY}  部署模式: 远程 SSH/SCP${NC}"
+fi
 echo ""
 
 # ── cleanup worktree ──────────────────────────────────────────
@@ -211,21 +224,33 @@ fi
 # ── 4. 上传到服务器（staging 路径含 SHA，避免并发覆盖）────────
 echo -e "${YELLOW}4⃣  上传 binary 到服务器...${NC}"
 STAGING_PATH="/tmp/elon-server-$SHA"
-# shellcheck disable=SC2086
-scp $SSH_OPTS "$BINARY" "${SERVER}:${STAGING_PATH}"
+if is_local_server_deploy; then
+  cp "$BINARY" "$STAGING_PATH"
+else
+  # shellcheck disable=SC2086
+  scp $SSH_OPTS "$BINARY" "${SERVER}:${STAGING_PATH}"
+fi
 echo -e "${GREEN}   ✅ 上传完成${NC}"
 
 # ── 4.5 SHA 顺序检查（防止旧版编译慢覆盖新版）───────────────
 if [ "$FORCE" -eq 0 ]; then
   DEPLOYED_SHA_FILE="$REMOTE_DIR/.deployed-sha"
-  # shellcheck disable=SC2086
-  SERVER_SHA=$(ssh $SSH_OPTS "$SERVER" "cat $DEPLOYED_SHA_FILE 2>/dev/null || echo ''" | tr -d '[:space:]')
+  if is_local_server_deploy; then
+    SERVER_SHA=$(cat "$DEPLOYED_SHA_FILE" 2>/dev/null || echo '')
+  else
+    # shellcheck disable=SC2086
+    SERVER_SHA=$(ssh $SSH_OPTS "$SERVER" "cat $DEPLOYED_SHA_FILE 2>/dev/null || echo ''" | tr -d '[:space:]')
+  fi
   if [ -n "$SERVER_SHA" ] && [ "$SERVER_SHA" != "$SHA_BIG" ]; then
     # 检查服务器 SHA 是否是我们的祖先（是祖先 = 我们更新）
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SERVER_SHA" "$SHA_BIG" 2>/dev/null; then
       # 服务器已有更新版本，拒绝回退
-      # shellcheck disable=SC2086
-      ssh $SSH_OPTS "$SERVER" "rm -f $STAGING_PATH" 2>/dev/null || true
+      if is_local_server_deploy; then
+        rm -f "$STAGING_PATH" 2>/dev/null || true
+      else
+        # shellcheck disable=SC2086
+        ssh $SSH_OPTS "$SERVER" "rm -f $STAGING_PATH" 2>/dev/null || true
+      fi
       SHORT_SERVER="${SERVER_SHA:0:8}"
       echo ""
       echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
@@ -287,8 +312,12 @@ EOF
 )
 
 set +e
-# shellcheck disable=SC2086
-LOCK_OUT=$(echo "$LOCK_SCRIPT" | ssh $SSH_OPTS "$SERVER" "flock -x -w 120 /tmp/elon-deploy.lock bash -s" 2>&1)
+if is_local_server_deploy; then
+  LOCK_OUT=$(echo "$LOCK_SCRIPT" | flock -x -w 120 /tmp/elon-deploy.lock bash -s 2>&1)
+else
+  # shellcheck disable=SC2086
+  LOCK_OUT=$(echo "$LOCK_SCRIPT" | ssh $SSH_OPTS "$SERVER" "flock -x -w 120 /tmp/elon-deploy.lock bash -s" 2>&1)
+fi
 LOCK_EXIT=$?
 set -e
 if [ "$LOCK_EXIT" -eq 42 ]; then

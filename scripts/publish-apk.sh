@@ -58,6 +58,14 @@ SERVER_URL="http://43.139.149.158:8080"
 APK_SHA_FILE="$SERVER_DIR/.apk-deployed-sha"
 SSH_OPTS="-o ProxyCommand=none -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
+is_local_apk_deploy() {
+  case "${ELON_DEPLOY_LOCAL:-auto}" in
+    1|true|TRUE|local|LOCAL) return 0 ;;
+    0|false|FALSE|remote|REMOTE) return 1 ;;
+  esac
+  [[ -d "$SERVER_DIR" && -w "$SERVER_DIR" ]]
+}
+
 # ── 路径推导 ──────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
@@ -385,17 +393,31 @@ echo -e "${GREEN}📋 version.json 已生成${NC}"
 # Step 6: SCP 上传（staged 原子替换，flock+CAS）
 # ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}🚀 上传到服务器...${NC}"
+if is_local_apk_deploy; then
+  echo -e "${GRAY}   部署模式: 本机上传（跳过 SSH/SCP）${NC}"
+else
+  echo -e "${GRAY}   部署模式: 远程 SSH/SCP${NC}"
+fi
 
 APK_STAGE="$SERVER_DIR/ElonSpeed-latest.apk.${SHA_FULL}.tmp"
 JSON_STAGE="$SERVER_DIR/version.json.${SHA_FULL}.tmp"
 
-# shellcheck disable=SC2086
-ssh $SSH_OPTS "$SERVER_HOST" "mkdir -p $SERVER_DIR"
-# shellcheck disable=SC2086
-scp -o ProxyCommand=none "$APK_PATH" "${SERVER_HOST}:${APK_STAGE}"
+if is_local_apk_deploy; then
+  mkdir -p "$SERVER_DIR"
+  cp "$APK_PATH" "$APK_STAGE"
+else
+  # shellcheck disable=SC2086
+  ssh $SSH_OPTS "$SERVER_HOST" "mkdir -p $SERVER_DIR"
+  # shellcheck disable=SC2086
+  scp -o ProxyCommand=none "$APK_PATH" "${SERVER_HOST}:${APK_STAGE}"
+fi
 echo -e "${GREEN}   ✅ APK staging 上传完成${NC}"
-# shellcheck disable=SC2086
-scp -o ProxyCommand=none "$TMP_JSON" "${SERVER_HOST}:${JSON_STAGE}"
+if is_local_apk_deploy; then
+  cp "$TMP_JSON" "$JSON_STAGE"
+else
+  # shellcheck disable=SC2086
+  scp -o ProxyCommand=none "$TMP_JSON" "${SERVER_HOST}:${JSON_STAGE}"
+fi
 echo -e "${GREEN}   ✅ version.json staging 上传完成${NC}"
 
 REMOTE_SCRIPT=$(cat <<'BASH_EOF'
@@ -431,8 +453,12 @@ REMOTE_SCRIPT="${REMOTE_SCRIPT//__APK_STAGE__/$APK_STAGE}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT//__JSON_STAGE__/$JSON_STAGE}"
 
 set +e
-# shellcheck disable=SC2086
-echo "$REMOTE_SCRIPT" | ssh $SSH_OPTS "$SERVER_HOST" "bash -s"
+if is_local_apk_deploy; then
+  echo "$REMOTE_SCRIPT" | bash -s
+else
+  # shellcheck disable=SC2086
+  echo "$REMOTE_SCRIPT" | ssh $SSH_OPTS "$SERVER_HOST" "bash -s"
+fi
 DEPLOY_EXIT=$?
 set -e
 
@@ -440,14 +466,22 @@ if [[ $DEPLOY_EXIT -eq 42 ]]; then
   DEPLOYED_SHA=$(get_deployed_apk_sha || true)
   if [[ -n "$DEPLOYED_SHA" ]] && is_git_ancestor "$SHA_FULL" "$DEPLOYED_SHA" 2>/dev/null; then
     echo -e "${CYAN}⏭️  另一台机器已部署更新 APK，本次 staging 不覆盖${NC}"
-    # shellcheck disable=SC2086
-    ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
+    if is_local_apk_deploy; then
+      rm -f "$APK_STAGE" "$JSON_STAGE" 2>/dev/null || true
+    else
+      # shellcheck disable=SC2086
+      ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
+    fi
     complete_release "false" "" 0 "" "superseded by deployed apk $DEPLOYED_SHA"
     exit 0
   fi
   echo -e "${RED}❌ APK 上传 CAS 失败（并发冲突），请重新运行发布脚本${NC}" >&2
-  # shellcheck disable=SC2086
-  ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
+  if is_local_apk_deploy; then
+    rm -f "$APK_STAGE" "$JSON_STAGE" 2>/dev/null || true
+  else
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
+  fi
   exit 1
 fi
 
