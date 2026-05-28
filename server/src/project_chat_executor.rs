@@ -29,6 +29,15 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     execution_workspace: ProjectConversationWorkspace,
     tx: UnboundedSender<String>,
 ) {
+    // ── 在 Gradle 启动前就固定 SHA ──────────────────────────────────────────
+    // 必须在 agent 开始前捕获，因为编译期间其他用户可能合并新代码，
+    // 导致 base_workspace HEAD 在编译结束时已经变成另一个 SHA。
+    // 如果用完成后的 HEAD 写缓存，就会把旧代码构建的 APK 缓存到新 SHA 上，
+    // 让后续用户拿到错误的 APK。
+    let pre_build_sha = git_output(&execution_workspace.base_workspace, &["rev-parse", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string());
+
     let (agent_tx, mut agent_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let agent_state = state.clone();
     let agent_user_id = user_id.clone();
@@ -200,12 +209,12 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                 }
             }
             // 构建成功后写入 SHA 缓存，供下次相同 HEAD 的纯构建请求直接跳过 Gradle。
+            // 使用构建开始前固定的 SHA（pre_build_sha），避免编译期间其他用户合并代码
+            // 导致用 base_workspace 的新 HEAD 覆盖一个旧代码构建的 APK。
             if let Some(ref url) = apk_url {
-                if let Ok(sha) =
-                    git_output(&execution_workspace.base_workspace, &["rev-parse", "HEAD"])
-                {
+                if let Some(ref sha) = pre_build_sha {
                     if let Err(e) =
-                        state.store.set_project_build_cache(&project.id, sha.trim(), url)
+                        state.store.set_project_build_cache(&project.id, sha, url)
                     {
                         tracing::warn!("更新项目构建缓存失败: {}", e);
                     }
