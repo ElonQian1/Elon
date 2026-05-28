@@ -68,6 +68,9 @@ class StreamingASR(private val context: Context) {
      */
     var engineComponent: ComponentName? = null
 
+    /** SpeechRecognizer 是否已创建（服务绑定是否已启动）。 */
+    val isInitialized: Boolean get() = speechRecognizer != null
+
     // ==================== 公开方法 ====================
 
     /**

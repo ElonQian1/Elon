@@ -53,6 +53,14 @@ internal class MainSpeechInputActions(
     // 仿微信全屏麦克风遮罩（在端上模式下启用）
     private var voiceOverlay: VoiceRecordingOverlay? = null
 
+    init {
+        // 预热端上 ASR 引擎：提前创建 SpeechRecognizer 并连接服务，
+        // 让 mibrain 等厂商服务在用户按下麦克风之前完成绑定（约 70ms）。
+        if (VoiceInputModeSettings.get(activity) == VoiceInputMode.LOCAL_AGENT_ASR) {
+            agentBridge = AgentVoiceBridge(activity).also { it.prewarm() }
+        }
+    }
+
     fun startSpeechToText() {
         if (activeConversation().ended) return
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -178,6 +186,7 @@ internal class MainSpeechInputActions(
         bridge.onEnd = {
             if (!agentVoiceActive) {
                 voiceHoldButton().text = "按住 说话"
+                agentBridge?.prewarm()  // 立刻重新预热，准备下次按键（消除 mibrain 冷启动延迟）
             }
         }
         bridge.onError = { msg ->

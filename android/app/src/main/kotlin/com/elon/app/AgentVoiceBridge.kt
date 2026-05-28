@@ -139,6 +139,25 @@ internal class AgentVoiceBridge(context: Context) {
         main.post { asr.destroy() }
     }
 
+    /**
+     * 预热：提前创建 SpeechRecognizer 实例，让 mibrain/厂商 ASR 服务在用户按麦克风之前完成
+     * 服务绑定。Android 文档：createSpeechRecognizer 是异步绑定，第一次 startListening 前
+     * 若绑定未完成会返回 ERROR_SERVER_DISCONNECTED(11)。
+     * 幂等，可多次调用；不会打断进行中的识别。
+     */
+    fun prewarm() {
+        if (isRunning) return
+        main.post {
+            if (isRunning) return@post
+            val engines = RecognitionEngineSelector.list(appContext)
+            val first = engines.firstOrNull() ?: return@post
+            if (asr.isInitialized && asr.engineComponent == first.component) return@post
+            asr.engineComponent = first.component
+            asr.initialize()   // 创建 SpeechRecognizer，开始服务绑定，不 startListening
+            Log.i(TAG, "预热: 已为 ${first.label}(${first.packageName}) 启动服务绑定")
+        }
+    }
+
     // ─────────────────────── 内部 ───────────────────────
 
     private fun startWithCurrentCandidate() {
@@ -152,8 +171,13 @@ internal class AgentVoiceBridge(context: Context) {
             return
         }
         Log.i(TAG, "尝试引擎[$candidateIndex/${candidates.size}]: ${engine.label}(${engine.packageName})")
+        val engineChanged = asr.engineComponent != engine.component
         asr.engineComponent = engine.component
-        asr.resetEngine()
+        if (engineChanged) {
+            // 只在切换引擎时销毁重建；同一引擎保留实例（服务绑定已建立，无需重建）
+            Log.i(TAG, "引擎切换，重置 recognizer")
+            asr.resetEngine()
+        }
         listeningStartedAt = System.currentTimeMillis()
         asr.startListening()
     }
@@ -187,39 +211,37 @@ internal class AgentVoiceBridge(context: Context) {
         Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame coldRetry=$coldStartRetryOnSame")
         val current = candidates.getOrNull(candidateIndex)
 
-        // RECOGNIZER_BUSY：上一次会话的引擎还没释放完。同引擎延迟 250ms 重试，最多 2 次。
+        // RECOGNIZER_BUSY：直接重试 startListening（不销毁 recognizer），最多 2 次。
+        // 注意：以前这里调用了 resetEngine()，会导致重建的 recognizer 触发新一轮冷启动，已修复。
         if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && current != null && busyRetryOnSame < 2 && !sawAnyPartial) {
             busyRetryOnSame += 1
-            Log.i(TAG, "RECOGNIZER_BUSY，延迟 250ms 重试同引擎 ${current.label} (#$busyRetryOnSame)")
+            Log.i(TAG, "RECOGNIZER_BUSY，延迟 250ms 重试同引擎 ${current.label}（不销毁 recognizer）(#$busyRetryOnSame)")
             val mySeq = ++transitionSeq
             main.postDelayed({
                 if (isRunning && mySeq == transitionSeq) {
-                    asr.resetEngine()
                     listeningStartedAt = System.currentTimeMillis()
-                    asr.startListening()
+                    asr.startListening()   // 不 resetEngine：服务绑定已建立，直接复用
                 }
             }, 250L)
             return
         }
 
-        // 冷启动瞬时失败：startListening 后 300ms 内就报错（小米 mibrain 冷启动 ~1.5-2s
-        // 才就绪，此时连接尚未建立完成就抛 code=11 SERVER_DISCONNECTED 或 code=5）。
-        // 同引擎延迟 600ms 重试 1 次，给服务一点绑定时间。
+        // 冷启动瞬时失败：startListening 后 200ms 内就报错（mibrain 服务绑定尚未完成）。
+        // 不销毁 recognizer，直接重试 startListening，绑定通常在 50~100ms 内完成。
+        // 允许重试 2 次，每次递增延迟。
         val sinceStart = System.currentTimeMillis() - listeningStartedAt
-        val isColdStartGlitch = sinceStart in 0..300 && coldStartRetryOnSame < 1 &&
-            (code == 11 || code == SpeechRecognizer.ERROR_SERVER ||
-             code == SpeechRecognizer.ERROR_CLIENT || code == SpeechRecognizer.ERROR_NETWORK)
+        val isColdStartGlitch = sinceStart in 0..200 && coldStartRetryOnSame < 2 && code == 11
         if (isColdStartGlitch && current != null && !sawAnyPartial) {
             coldStartRetryOnSame += 1
-            Log.i(TAG, "冷启动失败(${sinceStart}ms<300ms, code=$code)，延迟 600ms 重试同引擎 ${current.label}")
+            val delay = if (coldStartRetryOnSame == 1) 100L else 300L
+            Log.i(TAG, "冷启动失败(${sinceStart}ms<200ms, code=11)，${delay}ms后重试（不销毁 recognizer）#$coldStartRetryOnSame")
             val mySeq = ++transitionSeq
             main.postDelayed({
                 if (isRunning && mySeq == transitionSeq) {
-                    asr.resetEngine()
                     listeningStartedAt = System.currentTimeMillis()
-                    asr.startListening()
+                    asr.startListening()   // 不 resetEngine：等服务绑定完成后直接复用
                 }
-            }, 600L)
+            }, delay)
             return
         }
 
