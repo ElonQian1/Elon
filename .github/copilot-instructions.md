@@ -1,6 +1,8 @@
 # 一龙云端开发平台 — AI 代理全局指令
 
-> 本文件被所有 AI 代理自动加载。请在回答任何编码问题前先理解本文件内容。
+> **所有 AI 代理（Copilot / Codex / Codex CLI / Copilot CLI）的规则权威来源。**
+> Copilot 自动加载本文件；Codex/Codex CLI 通过 `AGENTS.md` 路由后手动读取。
+> 请在回答任何编码问题前先理解本文件内容。
 
 ## 项目定位
 

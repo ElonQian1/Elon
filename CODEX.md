@@ -6,13 +6,13 @@ This is the Codex-specific overlay for the Elon repository. `AGENTS.md` is the s
 
 ## Load Order
 
-1. Read `AGENTS.md` and this file.
-2. Run and obey repository preflight before code changes.
-3. Inspect `git status --short --branch`.
-4. Read only the task-specific document routed by `AGENTS.md`.
-5. Prefer scripts, hooks, tests, and release tools over remembered process text.
-
-Do not automatically read `.github/copilot-instructions.md` for normal Codex work. It is a Copilot/VS Code customization surface; read it only for Copilot, VS Code Customizations, or agent-instruction comparison tasks.
+1. Read `.github/copilot-instructions.md` — this is the authoritative rules source for all AI agents (rules, task-start commands, deploy cheatsheet).
+2. Read `AGENTS.md` — routing table to task-specific docs.
+3. Read this file (`CODEX.md`) — Codex-specific overrides only.
+4. Run and obey repository preflight before code changes.
+5. Inspect `git status --short --branch`.
+6. Read only the task-specific document routed by `AGENTS.md`.
+7. Prefer scripts, hooks, tests, and release tools over remembered process text.
 
 ## Codex-Specific Routing
 
