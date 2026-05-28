@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde_json::{json, Value};
+
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -7,8 +7,8 @@ use tracing::{error, info, warn};
 use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{
-        has_origin_remote, is_project_delivery_request, is_project_workspace,
-        is_pure_apk_delivery_request, is_short_build_command, is_short_resume_command,
+        has_origin_remote, is_project_delivery_request, is_pure_apk_delivery_request,
+        is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
         api_agent_name, choose_backend, cli_option_id, has_api_agents, is_local_cli_option,
