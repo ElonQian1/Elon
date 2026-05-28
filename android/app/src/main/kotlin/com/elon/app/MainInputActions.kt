@@ -39,8 +39,20 @@ internal class MainInputActions(
     private var suppressInputFocusAnimation = false
     private var speechInputActions: MainSpeechInputActions? = null
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
+    private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
 
     fun setupInputComposer() {
+        fullScreenEditorOverlay = FullScreenEditorOverlay(
+            activity = activity,
+            dp = uiTools()::dp,
+            getInputText = { binding.inputEdit.text.toString() },
+            setInputText = { text ->
+                binding.inputEdit.setText(text)
+                binding.inputEdit.setSelection(text.length)
+            },
+            onSend = { sendMessageActions.sendMessage() }
+        )
+
         val views = MainInputComposerSetup(
             activity = activity,
             binding = binding,
@@ -65,7 +77,8 @@ internal class MainInputActions(
             selectRunningInputMode = { mode ->
                 runningInputMode = mode
                 updateRunningInputModeStrip()
-            }
+            },
+            showFullScreenEditor = { fullScreenEditorOverlay?.show() }
         ).setup()
 
         inputComposerViews = views
@@ -83,6 +96,14 @@ internal class MainInputActions(
     }
 
     fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews
+
+    /** 若全屏编辑器正在显示则关闭并返回 true，否则返回 false。用于返回键拦截。 */
+    fun hideFullScreenEditorForBack(): Boolean {
+        val overlay = fullScreenEditorOverlay ?: return false
+        if (!overlay.isShowing()) return false
+        overlay.hide()
+        return true
+    }
 
     fun updateRunningInputModeStrip() {
         inputComposerViewsOrNull()?.runtimeInputModeStrip?.refresh(

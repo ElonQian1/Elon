@@ -31,7 +31,8 @@ internal data class MainInputComposerViews(
     val inputRightControls: FrameLayout,
     val inputComposerMotion: InputComposerMotion,
     val attachmentPanel: LinearLayout,
-    val runtimeInputModeStrip: RuntimeInputModeStrip
+    val runtimeInputModeStrip: RuntimeInputModeStrip,
+    val expandEditorButton: ImageButton
 )
 
 internal class MainInputComposerSetup(
@@ -55,7 +56,8 @@ internal class MainInputComposerSetup(
     private val updateCollapsedInputPreview: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit,
-    private val selectRunningInputMode: (RunningInputMode) -> Unit
+    private val selectRunningInputMode: (RunningInputMode) -> Unit,
+    private val showFullScreenEditor: () -> Unit
 ) {
     @SuppressLint("ClickableViewAccessibility")
     fun setup(): MainInputComposerViews {
@@ -136,6 +138,19 @@ internal class MainInputComposerSetup(
         }
 
         lateinit var inputComposerMotion: InputComposerMotion
+        val expandEditorButton = ImageButton(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(34), dp(34), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(3)
+                marginEnd = dp(2)
+            }
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(R.drawable.ic_expand_editor)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(5), dp(5), dp(5), dp(5))
+            contentDescription = "全屏编辑"
+            setOnClickListener { showFullScreenEditor() }
+        }
+
         inputEdit.apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -151,7 +166,7 @@ internal class MainInputComposerSetup(
             isVerticalScrollBarEnabled = false
             includeFontPadding = true
             setHorizontallyScrolling(false)
-            setPadding(0, dp(8), 0, dp(6))
+            setPadding(0, dp(8), dp(36), dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#A8D0D0D0"))
             textSize = 15f
@@ -238,6 +253,7 @@ internal class MainInputComposerSetup(
         inputCenterContainer.addView(collapsedInputPreview)
         expandedInputContainer.addView(inputEdit)
         expandedInputContainer.addView(voiceHoldButton)
+        expandedInputContainer.addView(expandEditorButton)
 
         val inputRightControls = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
@@ -333,7 +349,8 @@ internal class MainInputComposerSetup(
             inputRightControls = inputRightControls,
             inputComposerMotion = inputComposerMotion,
             attachmentPanel = attachmentPanel,
-            runtimeInputModeStrip = runtimeInputModeStrip
+            runtimeInputModeStrip = runtimeInputModeStrip,
+            expandEditorButton = expandEditorButton
         )
     }
 
