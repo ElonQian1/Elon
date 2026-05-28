@@ -14,6 +14,7 @@ mod friend_messages;
 mod friends;
 mod groups;
 mod native_sessions;
+mod project_member_conversations;
 mod project_space;
 mod projects;
 mod tasks;
@@ -206,6 +207,7 @@ pub struct PublicProjectItem {
 pub struct ProjectMemberEntry {
     pub user_id: String,
     pub account: String,
+    pub avatar_data_url: Option<String>,
     pub role: String, // "owner" | "member" | "observer"
     pub joined_at: String,
 }
@@ -244,6 +246,36 @@ pub struct ProjectChannelMessage {
     pub task_id: Option<String>,
     pub created_at: String,
     pub outgoing: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberConversationEntry {
+    pub id: String,
+    pub project_id: String,
+    pub user_id: String,
+    pub user_account: String,
+    pub title: Option<String>,
+    pub status: String,
+    pub message_count: i64,
+    pub task_count: i64,
+    pub last_message: Option<String>,
+    pub last_message_role: Option<String>,
+    pub last_message_at: Option<String>,
+    pub last_task_status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberConversationMessage {
+    pub id: String,
+    pub project_id: String,
+    pub conversation_id: Option<String>,
+    pub task_id: Option<String>,
+    pub user_id: Option<String>,
+    pub role: String,
+    pub content: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

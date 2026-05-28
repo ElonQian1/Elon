@@ -137,6 +137,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_space::get_project_space),
         )
         .route(
+            "/api/projects/:project_id/members/:member_user_id/conversations",
+            get(project_space::list_member_conversations),
+        )
+        .route(
+            "/api/projects/:project_id/members/:member_user_id/conversations/:conversation_id/messages",
+            get(project_space::list_member_conversation_messages),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/messages",
             get(project_space::list_channel_messages).post(project_space::send_channel_message),
         )

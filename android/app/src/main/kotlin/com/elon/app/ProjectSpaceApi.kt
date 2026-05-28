@@ -50,6 +50,53 @@ internal fun fetchProjectChannelMessages(
     }
 }
 
+internal fun fetchProjectMemberConversations(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    memberUserId: String,
+    limit: Int = 50
+): List<ProjectMemberConversation> {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members/${projectSpaceUrlPart(memberUserId)}/conversations?limit=$limit")
+            .get()
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "加载成员会话失败"))
+        val arr = JSONObject(body).optJSONArray("conversations") ?: JSONArray()
+        return List(arr.length()) { parseProjectMemberConversation(arr.optJSONObject(it) ?: JSONObject()) }
+    }
+}
+
+internal fun fetchProjectMemberConversationMessages(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    memberUserId: String,
+    conversationId: String,
+    limit: Int = 120
+): List<ProjectMemberConversationMessage> {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members/${projectSpaceUrlPart(memberUserId)}/conversations/${projectSpaceUrlPart(conversationId)}/messages?limit=$limit")
+            .get()
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "加载会话消息失败"))
+        val arr = JSONObject(body).optJSONArray("messages") ?: JSONArray()
+        return List(arr.length()) {
+            parseProjectMemberConversationMessage(arr.optJSONObject(it) ?: JSONObject())
+        }
+    }
+}
+
 internal fun sendProjectChannelMessage(
     http: OkHttpClient,
     serverUrl: String,
@@ -164,8 +211,37 @@ private fun parseProjectChannel(json: JSONObject) = ProjectChannel(
 private fun parseProjectMember(json: JSONObject) = ProjectMember(
     userId = json.optString("user_id", ""),
     account = json.optString("account", ""),
+    avatarDataUrl = json.optString("avatar_data_url").takeIf { it.isNotBlank() },
     role = json.optString("role", "member"),
     joinedAt = json.optString("joined_at", "")
+)
+
+private fun parseProjectMemberConversation(json: JSONObject) = ProjectMemberConversation(
+    id = json.optString("id", ""),
+    projectId = json.optString("project_id", ""),
+    userId = json.optString("user_id", ""),
+    userAccount = json.optString("user_account", ""),
+    title = json.optString("title").takeIf { it.isNotBlank() },
+    status = json.optString("status", "active"),
+    messageCount = json.optInt("message_count", 0).coerceAtLeast(0),
+    taskCount = json.optInt("task_count", 0).coerceAtLeast(0),
+    lastMessage = json.optString("last_message").takeIf { it.isNotBlank() },
+    lastMessageRole = json.optString("last_message_role").takeIf { it.isNotBlank() },
+    lastMessageAt = json.optString("last_message_at").takeIf { it.isNotBlank() },
+    lastTaskStatus = json.optString("last_task_status").takeIf { it.isNotBlank() },
+    createdAt = json.optString("created_at", ""),
+    updatedAt = json.optString("updated_at", "")
+)
+
+private fun parseProjectMemberConversationMessage(json: JSONObject) = ProjectMemberConversationMessage(
+    id = json.optString("id", ""),
+    projectId = json.optString("project_id", ""),
+    conversationId = json.optString("conversation_id").takeIf { it.isNotBlank() },
+    taskId = json.optString("task_id").takeIf { it.isNotBlank() },
+    userId = json.optString("user_id").takeIf { it.isNotBlank() },
+    role = json.optString("role", "user"),
+    content = json.optString("content", ""),
+    createdAt = json.optString("created_at", "")
 )
 
 internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessage(

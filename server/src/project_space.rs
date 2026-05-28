@@ -25,6 +25,11 @@ pub struct ChannelMessagesQuery {
 }
 
 #[derive(Deserialize)]
+pub struct MemberConversationQuery {
+    pub limit: Option<i64>,
+}
+
+#[derive(Deserialize)]
 pub struct SendChannelMessageRequest {
     pub content: String,
 }
@@ -75,6 +80,57 @@ pub async fn get_project_space(
         "members": members,
     }))
     .into_response()
+}
+
+pub async fn list_member_conversations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, member_user_id)): Path<(String, String)>,
+    Query(query): Query<MemberConversationQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if let Err(e) = project_access(&state, &user.id, &project_id) {
+        return json_error(StatusCode::FORBIDDEN, e.to_string());
+    }
+    match state.store.list_project_member_conversations(
+        &user.id,
+        &project_id,
+        &member_user_id,
+        query.limit.unwrap_or(50),
+    ) {
+        Ok(conversations) => {
+            Json(serde_json::json!({ "conversations": conversations })).into_response()
+        }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn list_member_conversation_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, member_user_id, conversation_id)): Path<(String, String, String)>,
+    Query(query): Query<MemberConversationQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if let Err(e) = project_access(&state, &user.id, &project_id) {
+        return json_error(StatusCode::FORBIDDEN, e.to_string());
+    }
+    match state.store.list_project_member_conversation_messages(
+        &user.id,
+        &project_id,
+        &member_user_id,
+        &conversation_id,
+        query.limit.unwrap_or(120),
+    ) {
+        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
 }
 
 pub async fn list_channel_messages(

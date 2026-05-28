@@ -99,7 +99,16 @@ internal class ProjectSpaceController(
             Toast.makeText(activity, "成员列表加载中", Toast.LENGTH_SHORT).show()
             return
         }
-        ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp)
+        ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp) { member ->
+            ProjectMemberConversationDialog.show(
+                activity = activity,
+                http = http,
+                serverUrl = serverUrl,
+                projectId = space.project.id,
+                member = member,
+                dp = dp
+            )
+        }
     }
 
     fun isChannelActive(): Boolean = activeChannel != null

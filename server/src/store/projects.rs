@@ -190,7 +190,8 @@ impl Store {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT pm.user_id,
-                    COALESCE(u.phone, u.email, pm.user_id) AS account,
+                    COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
+                    u.avatar_data_url,
                     pm.role,
                     pm.created_at
              FROM project_members pm
@@ -203,8 +204,9 @@ impl Store {
                 Ok(ProjectMemberEntry {
                     user_id: row.get(0)?,
                     account: row.get(1)?,
-                    role: row.get(2)?,
-                    joined_at: row.get(3)?,
+                    avatar_data_url: row.get(2)?,
+                    role: row.get(3)?,
+                    joined_at: row.get(4)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

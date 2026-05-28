@@ -5,19 +5,28 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 
 internal object ProjectSpaceMemberDialog {
     fun show(
         activity: AppCompatActivity,
         projectTitle: String,
         members: List<ProjectMember>,
-        dp: (Int) -> Int
+        dp: (Int) -> Int,
+        onMemberClick: (ProjectMember) -> Unit
     ) {
+        var dialog: AlertDialog? = null
+        val openMember: (ProjectMember) -> Unit = { member ->
+            dialog?.dismiss()
+            onMemberClick(member)
+        }
         val content = ScrollView(activity).apply {
             isFillViewport = false
             addView(LinearLayout(activity).apply {
@@ -27,13 +36,13 @@ internal object ProjectSpaceMemberDialog {
                     addView(emptyRow(activity, dp))
                 } else {
                     members.forEach { member ->
-                        addView(memberRow(activity, member, dp))
+                        addView(memberRow(activity, member, dp, openMember))
                     }
                 }
             })
         }
 
-        AlertDialog.Builder(activity)
+        dialog = AlertDialog.Builder(activity)
             .setTitle("${projectTitle.ifBlank { "项目" }}成员")
             .setView(content)
             .setPositiveButton("关闭", null)
@@ -43,13 +52,19 @@ internal object ProjectSpaceMemberDialog {
     private fun memberRow(
         activity: AppCompatActivity,
         member: ProjectMember,
-        dp: (Int) -> Int
+        dp: (Int) -> Int,
+        onMemberClick: (ProjectMember) -> Unit
     ): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(10), 0, dp(10))
-            addView(avatar(activity, member.account, dp))
+            isClickable = true
+            setOnClickListener { onMemberClick(member) }
+            addView(avatar(activity, member, dp).apply {
+                contentDescription = "${member.account.ifBlank { "成员" }}的项目 AI 会话"
+                setOnClickListener { onMemberClick(member) }
+            })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), 0, 0, 0)
@@ -72,11 +87,22 @@ internal object ProjectSpaceMemberDialog {
         }
     }
 
-    private fun avatar(activity: AppCompatActivity, account: String, dp: (Int) -> Int): TextView {
+    private fun avatar(activity: AppCompatActivity, member: ProjectMember, dp: (Int) -> Int): View {
+        val size = dp(40)
+        val bitmap = UserProfileStore.decodeAvatar(member.avatarDataUrl)
+        if (bitmap != null) {
+            return ImageView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(size, size)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    isCircular = true
+                })
+            }
+        }
         return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
+            layoutParams = LinearLayout.LayoutParams(size, size)
             gravity = Gravity.CENTER
-            text = account.trim().take(1).ifBlank { "成" }.uppercase()
+            text = UserProfileStore.avatarInitial(member.account.ifBlank { "成员" }).uppercase()
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)

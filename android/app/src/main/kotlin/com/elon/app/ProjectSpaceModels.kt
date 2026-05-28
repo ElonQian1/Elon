@@ -29,8 +29,37 @@ internal data class ProjectChannel(
 internal data class ProjectMember(
     val userId: String,
     val account: String,
+    val avatarDataUrl: String?,
     val role: String,
     val joinedAt: String
+)
+
+internal data class ProjectMemberConversation(
+    val id: String,
+    val projectId: String,
+    val userId: String,
+    val userAccount: String,
+    val title: String?,
+    val status: String,
+    val messageCount: Int,
+    val taskCount: Int,
+    val lastMessage: String?,
+    val lastMessageRole: String?,
+    val lastMessageAt: String?,
+    val lastTaskStatus: String?,
+    val createdAt: String,
+    val updatedAt: String
+)
+
+internal data class ProjectMemberConversationMessage(
+    val id: String,
+    val projectId: String,
+    val conversationId: String?,
+    val taskId: String?,
+    val userId: String?,
+    val role: String,
+    val content: String,
+    val createdAt: String
 )
 
 internal data class ProjectChannelMessage(
