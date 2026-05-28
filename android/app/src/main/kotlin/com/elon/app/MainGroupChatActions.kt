@@ -306,12 +306,14 @@ internal class MainGroupChatActions(
 
     private fun groupMessageFromJson(json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
+        val senderUserId = json.optString("sender_user_id", "").trim()
+        val isElAssistant = senderUserId == SOCIAL_AI_USER_ID
         val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
         return ChatMessage(
-            role = if (outgoing) "user" else "friend",
+            role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
-            senderLabel = if (outgoing) null else senderName,
+            senderLabel = if (outgoing || isElAssistant) null else senderName,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() }
         )
     }
@@ -331,5 +333,6 @@ internal class MainGroupChatActions(
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
         const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024
+        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
     }
 }

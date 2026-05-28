@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
 
-use super::{new_id, now, FriendChatMessage, Store};
+use super::{new_id, now, FriendChatMessage, Store, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID};
 
 impl Store {
     pub fn list_friend_messages(
@@ -18,39 +18,58 @@ impl Store {
         let after = after.map(str::trim).filter(|value| !value.is_empty());
         let conn = self.conn()?;
         let sql = if after.is_some() {
-            "SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
-             FROM friend_messages
+            "SELECT m.id, m.sender_user_id, m.receiver_user_id,
+                    COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
+                    m.content, m.attachments_json, m.created_at, m.context_user_id
+             FROM friend_messages m
+             LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE (
-                 (sender_user_id = ?1 AND receiver_user_id = ?2)
-                 OR (sender_user_id = ?2 AND receiver_user_id = ?1)
-             )
-               AND created_at > ?3
-             ORDER BY created_at ASC
-             LIMIT ?4"
-        } else {
-            "SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
-             FROM (
-                 SELECT id, sender_user_id, receiver_user_id, content, attachments_json, created_at
-                 FROM friend_messages
-                 WHERE (
-                     (sender_user_id = ?1 AND receiver_user_id = ?2)
-                     OR (sender_user_id = ?2 AND receiver_user_id = ?1)
+                 (m.sender_user_id = ?1 AND m.receiver_user_id = ?2)
+                 OR (m.sender_user_id = ?2 AND m.receiver_user_id = ?1)
+                 OR (
+                     m.sender_user_id = ?3
+                     AND m.receiver_user_id = ?1
+                     AND m.context_user_id = ?2
                  )
-                 ORDER BY created_at DESC
-                 LIMIT ?4
+             )
+               AND m.created_at > ?4
+             ORDER BY m.created_at ASC
+             LIMIT ?5"
+        } else {
+            "SELECT id, sender_user_id, receiver_user_id, sender_name,
+                    content, attachments_json, created_at, context_user_id
+             FROM (
+                 SELECT m.id, m.sender_user_id, m.receiver_user_id,
+                        COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
+                        m.content, m.attachments_json, m.created_at, m.context_user_id
+                 FROM friend_messages m
+                 LEFT JOIN users u ON u.id = m.sender_user_id
+                 WHERE (
+                     (m.sender_user_id = ?1 AND m.receiver_user_id = ?2)
+                     OR (m.sender_user_id = ?2 AND m.receiver_user_id = ?1)
+                     OR (
+                         m.sender_user_id = ?3
+                         AND m.receiver_user_id = ?1
+                         AND m.context_user_id = ?2
+                     )
+                 )
+                 ORDER BY m.created_at DESC
+                 LIMIT ?5
              )
              ORDER BY created_at ASC"
         };
         let mut stmt = conn.prepare(sql)?;
         let messages = if let Some(after) = after {
-            stmt.query_map(params![user_id, friend_id, after, limit], |row| {
-                row_to_friend_message(row, user_id)
-            })?
+            stmt.query_map(
+                params![user_id, friend_id, SOCIAL_AI_USER_ID, after, limit],
+                |row| row_to_friend_message(row, user_id),
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?
         } else {
-            stmt.query_map(params![user_id, friend_id, "", limit], |row| {
-                row_to_friend_message(row, user_id)
-            })?
+            stmt.query_map(
+                params![user_id, friend_id, SOCIAL_AI_USER_ID, "", limit],
+                |row| row_to_friend_message(row, user_id),
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?
         };
         drop(stmt);
@@ -97,9 +116,11 @@ impl Store {
             id,
             sender_user_id: user_id.to_string(),
             receiver_user_id: friend_id.to_string(),
+            sender_name: None,
             content: content.to_string(),
             attachments: attachments.unwrap_or(&[]).to_vec(),
             created_at,
+            context_user_id: None,
             outgoing: true,
         })
     }
@@ -166,12 +187,19 @@ fn row_to_friend_message(
     user_id: &str,
 ) -> rusqlite::Result<FriendChatMessage> {
     let sender_user_id: String = row.get(1)?;
+    let sender_name: String = row.get(3)?;
     Ok(FriendChatMessage {
         id: row.get(0)?,
         receiver_user_id: row.get(2)?,
-        content: row.get(3)?,
-        attachments: parse_attachments(row.get::<_, Option<String>>(4)?.as_deref())?,
-        created_at: row.get(5)?,
+        sender_name: Some(if sender_user_id == SOCIAL_AI_USER_ID {
+            SOCIAL_AI_DISPLAY_NAME.to_string()
+        } else {
+            sender_name
+        }),
+        content: row.get(4)?,
+        attachments: parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?,
+        created_at: row.get(6)?,
+        context_user_id: row.get(7)?,
         outgoing: sender_user_id == user_id,
         sender_user_id,
     })

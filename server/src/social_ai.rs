@@ -1,0 +1,243 @@
+//! 好友/群聊里的 `@EL` 文本助手。
+//!
+//! 这里刻意只做普通文本问答：不接工具、不修改代码、不触发构建。
+
+use anyhow::{anyhow, Result};
+use serde_json::json;
+use std::sync::Arc;
+use tracing::warn;
+
+use crate::{
+    agent_llm_call::call_chat_llm,
+    friend_events, intent_router,
+    store::SocialAiHistoryMessage,
+    types::{AgentConfig, AppState},
+};
+
+const DEVELOPMENT_REDIRECT_REPLY: &str =
+    "这个需求已经涉及项目开发，我在好友/群聊里不能直接写代码、改项目或打包。请到「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务；在那里我可以按完整开发流程帮你实现。";
+
+pub(crate) fn contains_el_mention(content: &str) -> bool {
+    content
+        .replace('＠', "@")
+        .to_ascii_lowercase()
+        .contains("@el")
+}
+
+pub(crate) fn spawn_friend_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    friend_id: String,
+    trigger_content: String,
+) {
+    if !contains_el_mention(&trigger_content) {
+        return;
+    }
+    tokio::spawn(async move {
+        if let Err(error) = reply_to_friend(state, user_id, friend_id).await {
+            warn!("好友聊天 @EL 回复失败: {}", error);
+        }
+    });
+}
+
+pub(crate) fn spawn_group_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    group_id: String,
+    trigger_content: String,
+) {
+    if !contains_el_mention(&trigger_content) {
+        return;
+    }
+    tokio::spawn(async move {
+        if let Err(error) = reply_to_group(state, user_id, group_id).await {
+            warn!("群聊 @EL 回复失败: {}", error);
+        }
+    });
+}
+
+async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: String) -> Result<()> {
+    let history = state
+        .store
+        .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
+    let reply = social_ai_reply_or_fallback(&state, "好友聊天", &history).await;
+    let messages = state
+        .store
+        .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
+    for message in messages {
+        friend_events::publish_friend_message(&message);
+    }
+    Ok(())
+}
+
+async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String) -> Result<()> {
+    let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
+    let history = state
+        .store
+        .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
+    let reply = social_ai_reply_or_fallback(&state, "群聊", &history).await;
+    let message = state
+        .store
+        .insert_group_social_ai_reply(&group_id, &reply)?;
+    friend_events::publish_group_message(&message, recipient_user_ids);
+    Ok(())
+}
+
+async fn social_ai_reply_or_fallback(
+    state: &Arc<AppState>,
+    scene: &str,
+    history: &[SocialAiHistoryMessage],
+) -> String {
+    match build_reply(state, scene, history).await {
+        Ok(reply) => reply,
+        Err(error) => {
+            warn!("{scene} @EL 生成失败: {}", error);
+            "EL 暂时没能连上 AI。你可以稍后再 @EL 一次，或联系管理员检查 AI 代理配置。".into()
+        }
+    }
+}
+
+async fn build_reply(
+    state: &Arc<AppState>,
+    scene: &str,
+    history: &[SocialAiHistoryMessage],
+) -> Result<String> {
+    if history.is_empty() {
+        return Ok("我在。你可以把想问的问题发出来，再带上 @EL。".into());
+    }
+    if let Some(reply) = development_redirect_reply(history) {
+        return Ok(reply);
+    }
+
+    let agent = resolve_social_agent(state).await?;
+    let response = call_chat_llm(
+        state,
+        &agent,
+        &[
+            json!({
+                "role": "system",
+                "content": social_ai_prompt()
+            }),
+            json!({
+                "role": "user",
+                "content": format!(
+                    "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n请回答最后一次 @EL 触发的问题。",
+                    format_history(history)
+                )
+            }),
+        ],
+    )
+    .await?;
+    let reply = response["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。")
+        .trim();
+    Ok(if reply.is_empty() {
+        "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。".into()
+    } else {
+        reply.chars().take(1400).collect()
+    })
+}
+
+async fn resolve_social_agent(state: &Arc<AppState>) -> Result<AgentConfig> {
+    state
+        .agents_config
+        .read()
+        .await
+        .get_agent(None)
+        .cloned()
+        .ok_or_else(|| anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"))
+}
+
+fn social_ai_prompt() -> &'static str {
+    r#"你是「EL」，一龙好友聊天和群聊里的文本 AI 助手。
+
+你只做普通文本解答：可以解释、总结、建议、安慰、帮忙梳理想法，但不能写代码、不能修改项目、不能运行命令、不能构建或发布。
+
+如果用户的问题涉及开发工作（例如做 App、改代码、修 bug、打包、部署、发布、项目功能实现），不要给代码方案，也不要假装已经开始做；请明确提醒用户去「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务。
+
+根据最近聊天历史回答最后一次 @EL 触发的问题。如果最后一句只是“@EL”或召唤你，请结合它前面的最后一个真实问题来回答。回复中文，简洁自然，只输出要发到聊天框里的文本。"#
+}
+
+fn format_history(history: &[SocialAiHistoryMessage]) -> String {
+    history
+        .iter()
+        .filter_map(|message| {
+            let content = message.content.trim();
+            if content.is_empty() {
+                None
+            } else {
+                Some(format!("{}：{}", message.speaker, content))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn development_redirect_reply(history: &[SocialAiHistoryMessage]) -> Option<String> {
+    let target = latest_request_user_text(history)?;
+    if intent_router::looks_like_development_request(&target) {
+        Some(DEVELOPMENT_REDIRECT_REPLY.into())
+    } else {
+        None
+    }
+}
+
+fn latest_request_user_text(history: &[SocialAiHistoryMessage]) -> Option<String> {
+    history
+        .iter()
+        .rev()
+        .filter(|message| message.from_request_user)
+        .find_map(|message| {
+            let content = strip_el_mention(&message.content);
+            if content.is_empty() {
+                None
+            } else {
+                Some(content)
+            }
+        })
+}
+
+fn strip_el_mention(content: &str) -> String {
+    content
+        .replace('＠', "@")
+        .replace("@EL", "")
+        .replace("@El", "")
+        .replace("@eL", "")
+        .replace("@el", "")
+        .trim()
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{contains_el_mention, latest_request_user_text};
+    use crate::store::SocialAiHistoryMessage;
+
+    #[test]
+    fn detects_half_and_full_width_mentions() {
+        assert!(contains_el_mention("@EL 帮我看看"));
+        assert!(contains_el_mention("＠el 这是什么意思"));
+        assert!(!contains_el_mention("普通聊天"));
+    }
+
+    #[test]
+    fn mention_only_uses_previous_user_question() {
+        let history = vec![
+            SocialAiHistoryMessage {
+                speaker: "我".into(),
+                content: "这句话是什么意思？".into(),
+                from_request_user: true,
+            },
+            SocialAiHistoryMessage {
+                speaker: "我".into(),
+                content: "@EL".into(),
+                from_request_user: true,
+            },
+        ];
+        assert_eq!(
+            latest_request_user_text(&history).as_deref(),
+            Some("这句话是什么意思？")
+        );
+    }
+}

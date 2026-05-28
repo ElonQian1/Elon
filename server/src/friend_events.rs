@@ -69,7 +69,10 @@ pub fn subscribe_groups() -> broadcast::Receiver<GroupMessagePush> {
 pub fn publish_friend_message(message: &FriendChatMessage) {
     let event = FriendMessagePush {
         event_type: "friend_message",
-        from_user_id: message.sender_user_id.clone(),
+        from_user_id: message
+            .context_user_id
+            .clone()
+            .unwrap_or_else(|| message.sender_user_id.clone()),
         to_user_id: message.receiver_user_id.clone(),
         message_id: message.id.clone(),
         content: message.content.clone(),

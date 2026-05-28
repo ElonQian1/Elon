@@ -17,12 +17,16 @@ mod native_sessions;
 mod project_member_conversations;
 mod project_space;
 mod projects;
+mod social_ai_messages;
 mod tasks;
 mod users;
 
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
+};
+pub(crate) use social_ai_messages::{
+    SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };
 
 pub struct Store {
@@ -84,9 +88,11 @@ pub struct FriendChatMessage {
     pub id: String,
     pub sender_user_id: String,
     pub receiver_user_id: String,
+    pub sender_name: Option<String>,
     pub content: String,
     pub attachments: Vec<ProjectAttachmentRef>,
     pub created_at: String,
+    pub context_user_id: Option<String>,
     pub outgoing: bool,
 }
 

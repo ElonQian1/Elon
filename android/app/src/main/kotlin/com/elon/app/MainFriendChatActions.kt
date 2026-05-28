@@ -305,11 +305,14 @@ internal class MainFriendChatActions(
 
     private fun friendMessageFromJson(friend: AppFriend, json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
+        val senderUserId = json.optString("sender_user_id", "").trim()
+        val isElAssistant = senderUserId == SOCIAL_AI_USER_ID
+        val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
         return ChatMessage(
-            role = if (outgoing) "user" else "friend",
+            role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
-            senderLabel = if (outgoing) null else friend.name,
+            senderLabel = if (outgoing || isElAssistant) null else senderName ?: friend.name,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() }
         )
     }
@@ -329,5 +332,6 @@ internal class MainFriendChatActions(
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
         const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024
+        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
     }
 }

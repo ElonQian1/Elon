@@ -1,7 +1,10 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{normalize_account, now, AddFriendResult, FriendProfile, FriendSearchResult, Store};
+use super::{
+    normalize_account, now, AddFriendResult, FriendProfile, FriendSearchResult, Store,
+    SOCIAL_AI_USER_ID,
+};
 
 impl Store {
     pub fn search_friend(
@@ -93,8 +96,14 @@ impl Store {
                         LEFT JOIN friend_read_states read_state
                           ON read_state.user_id = ?1
                          AND read_state.friend_user_id = u.id
-                        WHERE unread.sender_user_id = u.id
-                          AND unread.receiver_user_id = ?1
+                        WHERE (
+                            (unread.sender_user_id = u.id AND unread.receiver_user_id = ?1)
+                            OR (
+                                unread.sender_user_id = ?2
+                                AND unread.receiver_user_id = ?1
+                                AND unread.context_user_id = u.id
+                            )
+                          )
                           AND (
                               read_state.last_read_at IS NULL
                               OR unread.created_at > read_state.last_read_at
@@ -105,19 +114,24 @@ impl Store {
              LEFT JOIN friend_messages lm
                ON lm.id = (
                    SELECT latest.id
-                   FROM friend_messages latest
-                   WHERE (
-                       (latest.sender_user_id = ?1 AND latest.receiver_user_id = u.id)
-                       OR (latest.sender_user_id = u.id AND latest.receiver_user_id = ?1)
-                   )
-                   ORDER BY latest.created_at DESC
-                   LIMIT 1
+                 FROM friend_messages latest
+                 WHERE (
+                     (latest.sender_user_id = ?1 AND latest.receiver_user_id = u.id)
+                     OR (latest.sender_user_id = u.id AND latest.receiver_user_id = ?1)
+                     OR (
+                         latest.sender_user_id = ?2
+                         AND latest.receiver_user_id = ?1
+                         AND latest.context_user_id = u.id
+                     )
+                 )
+                 ORDER BY latest.created_at DESC
+                 LIMIT 1
                )
              WHERE f.user_id = ?1 AND u.status = 'active'
              ORDER BY COALESCE(lm.created_at, f.created_at) DESC",
         )?;
         let friends = stmt
-            .query_map(params![user_id], |row| {
+            .query_map(params![user_id, SOCIAL_AI_USER_ID], |row| {
                 let id: String = row.get(0)?;
                 let phone: Option<String> = row.get(1)?;
                 let email: Option<String> = row.get(2)?;

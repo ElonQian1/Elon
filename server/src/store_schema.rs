@@ -67,6 +67,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         "projects 构建缓存（last_build_sha / last_build_apk_url）",
         migration_v11,
     ),
+    (12, "好友聊天 EL 助手上下文消息", migration_v12),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -582,6 +583,23 @@ fn migration_v11(conn: &Connection) -> Result<()> {
         "projects",
         "last_build_apk_url",
         "last_build_apk_url TEXT",
+    )?;
+    Ok(())
+}
+
+// ── v12：好友聊天 EL 助手上下文消息 ─────────────────────────────────────────
+
+fn migration_v12(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "friend_messages",
+        "context_user_id",
+        "context_user_id TEXT",
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_friend_messages_ai_context
+         ON friend_messages(receiver_user_id, context_user_id, created_at)",
+        [],
     )?;
     Ok(())
 }

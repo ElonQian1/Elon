@@ -205,6 +205,12 @@ pub async fn send_friend_message(
     ) {
         Ok(message) => {
             crate::friend_events::publish_friend_message(&message);
+            crate::social_ai::spawn_friend_reply(
+                state.clone(),
+                user.id.clone(),
+                friend_id.clone(),
+                req.content.clone(),
+            );
             Json(serde_json::json!({ "message": message })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -271,6 +277,12 @@ pub async fn send_friend_group_message(
             {
                 crate::friend_events::publish_group_message(&message, recipient_user_ids);
             }
+            crate::social_ai::spawn_group_reply(
+                state.clone(),
+                user.id.clone(),
+                group_id.clone(),
+                req.content.clone(),
+            );
             Json(serde_json::json!({ "message": message })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),

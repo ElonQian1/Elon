@@ -68,6 +68,7 @@ mod project_ws_protocol;
 mod release_claim;
 mod router;
 mod server_trace;
+mod social_ai;
 mod source_hygiene;
 mod store;
 mod store_schema;
