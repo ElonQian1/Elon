@@ -52,12 +52,16 @@ internal class MainSpeechInputActions(
         translationGeneration += 1
         isHoldActive = true
         isSpeechCanceled = false
-        startSpeechSession(preferLanguage = true)
+        startSpeechSession(SpeechAttempt(preferLanguage = true, preferOffline = false))
     }
 
     fun stopSpeechToText() {
         isHoldActive = false
-        if (!isListeningForSpeech) return
+        if (!isListeningForSpeech) {
+            speechSessionId += 1
+            voiceHoldButton().text = "按住 说话"
+            return
+        }
         isListeningForSpeech = false
         voiceHoldButton().text = "识别中..."
         runCatching {
@@ -90,23 +94,31 @@ internal class MainSpeechInputActions(
         isListeningForSpeech = false
     }
 
-    private fun startSpeechSession(preferLanguage: Boolean) {
+    private fun startSpeechSession(attempt: SpeechAttempt) {
         val sessionId = ++speechSessionId
         resetSpeechRecognizer()
         isListeningForSpeech = true
-        voiceHoldButton().text = if (preferLanguage) "松开 转文字" else "松开 转文字"
+        voiceHoldButton().text = if (attempt.preferOffline) "离线识别中..." else "松开 转文字"
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
-            setRecognitionListener(createSpeechRecognitionListener(sessionId, preferLanguage))
+            setRecognitionListener(createSpeechRecognitionListener(sessionId, attempt))
         }
         runCatching {
-            speechRecognizer?.startListening(recognizerIntent(preferLanguage))
+            speechRecognizer?.startListening(recognizerIntent(attempt))
         }.onFailure { error ->
             if (sessionId != speechSessionId) return
-            DebugTraceStore.record("speech_start_failed", mapOf("error" to error.message))
+            DebugTraceStore.record(
+                "speech_start_failed",
+                mapOf(
+                    "error" to error.message,
+                    "prefer_language" to attempt.preferLanguage,
+                    "prefer_offline" to attempt.preferOffline
+                )
+            )
             isListeningForSpeech = false
             resetSpeechRecognizer()
-            if (isHoldActive && preferLanguage) {
-                retryWithoutLanguage(sessionId, "start_exception")
+            val nextAttempt = nextSpeechAttempt(attempt, null)
+            if (isHoldActive && nextAttempt != null) {
+                retrySpeech(sessionId, nextAttempt, "start_exception")
             } else {
                 voiceHoldButton().text = "按住 说话"
                 showSpeechFailureToast("启动失败")
@@ -114,7 +126,7 @@ internal class MainSpeechInputActions(
         }
     }
 
-    private fun createSpeechRecognitionListener(sessionId: Int, preferLanguage: Boolean): RecognitionListener {
+    private fun createSpeechRecognitionListener(sessionId: Int, attempt: SpeechAttempt): RecognitionListener {
         return object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 if (!isCurrentSpeechSession(sessionId)) return
@@ -131,7 +143,12 @@ internal class MainSpeechInputActions(
                 if (!isCurrentSpeechSession(sessionId)) return
                 DebugTraceStore.record(
                     "speech_error",
-                    mapOf("code" to error, "message" to speechErrorMessage(error), "prefer_language" to preferLanguage)
+                    mapOf(
+                        "code" to error,
+                        "message" to speechErrorMessage(error),
+                        "prefer_language" to attempt.preferLanguage,
+                        "prefer_offline" to attempt.preferOffline
+                    )
                 )
                 isListeningForSpeech = false
                 resetSpeechRecognizer()
@@ -139,8 +156,9 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     return
                 }
-                if (isHoldActive && shouldRetryWithoutLanguage(error, preferLanguage)) {
-                    retryWithoutLanguage(sessionId, "error_$error")
+                val nextAttempt = nextSpeechAttempt(attempt, error)
+                if (isHoldActive && nextAttempt != null) {
+                    retrySpeech(sessionId, nextAttempt, "error_$error")
                     return
                 }
                 voiceHoldButton().text = "按住 说话"
@@ -166,11 +184,12 @@ internal class MainSpeechInputActions(
         }
     }
 
-    private fun recognizerIntent(preferLanguage: Boolean): Intent {
+    private fun recognizerIntent(attempt: SpeechAttempt): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.packageName)
-            if (preferLanguage) {
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, attempt.preferOffline)
+            if (attempt.preferLanguage) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, SPEECH_LANGUAGE_TAG)
             }
         }
@@ -230,23 +249,56 @@ internal class MainSpeechInputActions(
         return sessionId == speechSessionId
     }
 
-    private fun shouldRetryWithoutLanguage(error: Int, preferLanguage: Boolean): Boolean {
-        if (!preferLanguage) return false
+    private fun nextSpeechAttempt(attempt: SpeechAttempt, error: Int?): SpeechAttempt? {
+        if (error == null || isNetworkSpeechError(error)) {
+            if (!attempt.preferOffline) {
+                return attempt.copy(preferOffline = true)
+            }
+            if (attempt.preferLanguage) {
+                return SpeechAttempt(preferLanguage = false, preferOffline = true)
+            }
+            return null
+        }
+
+        if (isLanguageOrServiceSpeechError(error) && attempt.preferLanguage) {
+            return attempt.copy(preferLanguage = false)
+        }
+
+        if (isLanguageOrServiceSpeechError(error) && !attempt.preferOffline) {
+            return attempt.copy(preferOffline = true)
+        }
+
+        return null
+    }
+
+    private fun retrySpeech(previousSessionId: Int, attempt: SpeechAttempt, reason: String) {
+        DebugTraceStore.record(
+            "speech_retry",
+            mapOf(
+                "reason" to reason,
+                "prefer_language" to attempt.preferLanguage,
+                "prefer_offline" to attempt.preferOffline
+            )
+        )
+        voiceHoldButton().text = if (attempt.preferOffline) "切换离线识别..." else "正在重试..."
+        binding.root.postDelayed({
+            if (previousSessionId != speechSessionId || !isHoldActive || isSpeechCanceled) return@postDelayed
+            startSpeechSession(attempt)
+        }, SPEECH_RETRY_DELAY_MS)
+    }
+
+    private fun isNetworkSpeechError(error: Int): Boolean {
+        return error == SpeechRecognizer.ERROR_NETWORK ||
+            error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
+    }
+
+    private fun isLanguageOrServiceSpeechError(error: Int): Boolean {
         return error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
             error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
             error == SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT ||
             error == SpeechRecognizer.ERROR_SERVER ||
             error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED ||
             error == SpeechRecognizer.ERROR_CLIENT
-    }
-
-    private fun retryWithoutLanguage(previousSessionId: Int, reason: String) {
-        DebugTraceStore.record("speech_retry_without_language", mapOf("reason" to reason))
-        voiceHoldButton().text = "正在重试..."
-        binding.root.postDelayed({
-            if (previousSessionId != speechSessionId || !isHoldActive || isSpeechCanceled) return@postDelayed
-            startSpeechSession(preferLanguage = false)
-        }, SPEECH_RETRY_DELAY_MS)
     }
 
     private fun showSpeechFailureToast(message: String, error: Int? = null) {
@@ -287,4 +339,9 @@ internal class MainSpeechInputActions(
         private const val SPEECH_LANGUAGE_TAG = "zh-CN"
         private const val SPEECH_RETRY_DELAY_MS = 180L
     }
+
+    private data class SpeechAttempt(
+        val preferLanguage: Boolean,
+        val preferOffline: Boolean
+    )
 }
