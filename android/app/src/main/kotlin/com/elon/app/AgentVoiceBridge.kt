@@ -19,12 +19,13 @@ import com.elon.app.agent.infrastructure.voice.StreamingASRCallback
  *   - `onFinal`：最终文字，由调用方决定是填输入框还是直接发
  *   - `onError`：失败提示
  *
- * **引擎自动回退**：启动前从 [RecognitionEngineSelector] 拿到按优先级排序的候选
- * 引擎列表（系统默认 + 各品牌厂商 + Google），任一引擎遇到 `ERROR_NETWORK` /
- * `ERROR_CLIENT` / `ERROR_SERVER` 等明显"引擎本身不可用"的错误且尚未拿到任何
- * 部分结果，就把它加入黑名单，自动切换到下一个候选并重启识别。所有候选都失败
- * 后才把错误回调给上层。这样既兼容国行小米/华为/荣耀（系统默认那个常常是
- * 不可联网的 Google TTS 残包），又不破坏现有"系统默认能用"的设备体验。
+ * **引擎自动回退（仅本次会话内有效，不持久化）**：每次 [start] 都从
+ * [RecognitionEngineSelector] 拿到按优先级排序的候选引擎列表（系统默认 +
+ * 各品牌厂商 + Google）。任一引擎遇到 `ERROR_NETWORK` / `ERROR_CLIENT` /
+ * `ERROR_SERVER` 等"引擎本身不可用"的错误且尚未拿到任何部分结果时，
+ * 直接切换到下一个候选并重启识别。所有候选都失败后才把错误回调给上层。
+ * 下次 [start]（包括下次按麦克风）会重新从首选开始尝试 —— 用户可能切换了
+ * 网络或在系统设置里换了引擎，没必要永久封禁。
  *
  * 不依赖 Agent 的对话状态机 / TTS / 任务执行，只复用 ASR + VAD 这一层。
  */
@@ -166,10 +167,9 @@ internal class AgentVoiceBridge(context: Context) {
             return
         }
 
-        RecognitionEngineSelector.blacklist(appContext, current!!, "code=$code msg=$message")
         candidateIndex += 1
         val nextLabel = candidates.getOrNull(candidateIndex)?.label ?: "<无>"
-        Log.i(TAG, "回退到下一个引擎: $nextLabel")
+        Log.i(TAG, "回退到下一个引擎: $nextLabel (上一个: ${current!!.label}, code=$code)")
         main.post { startWithCurrentCandidate() }
     }
 }

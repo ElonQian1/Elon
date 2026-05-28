@@ -1,13 +1,12 @@
 // infrastructure/voice/RecognitionEngineSelector.kt
 // module: infrastructure/voice | layer: infrastructure | role: engine-selector
-// summary: 枚举手机所有 RecognitionService 引擎，按优先级排序并维护失败黑名单。
+// summary: 枚举手机所有 RecognitionService 引擎，按优先级排序。失败回退由调用方在内存中跟踪。
 
 package com.elon.app.agent.infrastructure.voice
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.speech.RecognitionService
 import android.util.Log
@@ -28,25 +27,17 @@ data class RecognitionEngine(
 /**
  * 引擎选择器：
  *  1. 枚举所有声明 [RecognitionService] 的包；
- *  2. 排除已知坏引擎（运行时被加入黑名单的，会写入 SharedPreferences 持久化）；
- *  3. 按优先级排序：Google > 厂商语音 > 其他；
- *  4. 始终把"系统默认"放在最前面作为兜底选项（除非默认那个已被黑名单）。
+ *  2. 按优先级排序：Google > 厂商语音 > 其他；
+ *  3. 始终把"系统默认"放在最前面作为兜底选项。
  *
- * 用法：
- * ```
- * val candidates = RecognitionEngineSelector.list(context)
- * for (engine in candidates) {
- *     // 设置 StreamingASR.engineComponent = engine.component 后启动
- *     if (success) break
- *     RecognitionEngineSelector.blacklist(context, engine, reason)
- * }
- * ```
+ * **不做持久化**。是否跳过某个引擎完全由调用方在本次会话内自己记忆
+ * （[com.elon.app.AgentVoiceBridge] 用 `candidateIndex` 顺序遍历就够了）。
+ * 这样下次 APP 启动会重新从首选引擎开始尝试 —— 用户可能在系统设置里换了
+ * 引擎、或者重启了网络，没必要永久封禁。
  */
 object RecognitionEngineSelector {
 
     private const val TAG = "AsrEngineSelector"
-    private const val PREFS = "asr_engine_prefs"
-    private const val KEY_BLACKLIST = "engine_blacklist"
 
     /** 已知优先级越大越优先；只用来做稳定排序。 */
     private val PACKAGE_PRIORITY: Map<String, Int> = mapOf(
@@ -64,8 +55,7 @@ object RecognitionEngineSelector {
      * 返回排序后的候选引擎列表。
      *
      * 列表头部总是 [RecognitionEngine] with component=null（系统默认）；
-     * 后面跟随能直接指定 ComponentName 的所有可用引擎；
-     * 全部已被黑名单的引擎会被过滤掉。
+     * 后面跟随能直接指定 ComponentName 的所有可用引擎。
      */
     fun list(context: Context): List<RecognitionEngine> {
         val pm = context.packageManager
@@ -77,7 +67,6 @@ object RecognitionEngineSelector {
             Log.w(TAG, "queryIntentServices 失败: ${t.message}")
             emptyList()
         }
-        val blacklist = loadBlacklist(context)
         val seen = HashSet<String>()
         val result = ArrayList<RecognitionEngine>()
 
@@ -105,46 +94,9 @@ object RecognitionEngineSelector {
             RecognitionEngine(component = component, packageName = pkg, label = label)
         }.sortedByDescending { PACKAGE_PRIORITY[it.packageName] ?: 0 }
 
-        for (e in engines) {
-            if (blacklist.contains(e.key())) {
-                Log.i(TAG, "跳过黑名单引擎: ${e.key()}")
-                continue
-            }
-            result += e
-        }
+        result += engines
 
         Log.i(TAG, "候选引擎: ${result.joinToString { "${it.label}(${it.packageName})" }}")
         return result
-    }
-
-    /** 把一个引擎写入黑名单（持久化）。系统默认那一项不能被加入黑名单。 */
-    fun blacklist(context: Context, engine: RecognitionEngine, reason: String) {
-        if (engine.component == null) {
-            Log.w(TAG, "拒绝把'系统默认'放入黑名单 ($reason)")
-            return
-        }
-        val key = engine.key()
-        val cur = loadBlacklist(context).toMutableSet()
-        if (cur.add(key)) {
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit()
-                .putStringSet(KEY_BLACKLIST, cur)
-                .apply()
-            Log.i(TAG, "已加入引擎黑名单: $key ($reason)")
-        }
-    }
-
-    /** 清空黑名单（用户切回手动模式或重置时调用）。 */
-    fun resetBlacklist(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_BLACKLIST)
-            .apply()
-        Log.i(TAG, "引擎黑名单已清空")
-    }
-
-    private fun loadBlacklist(context: Context): Set<String> {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getStringSet(KEY_BLACKLIST, emptySet()) ?: emptySet()
     }
 }
