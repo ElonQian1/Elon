@@ -3,6 +3,10 @@ package com.elon.app
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.speech.SpeechRecognizer
+import android.util.Log
+import com.elon.app.agent.infrastructure.voice.RecognitionEngine
+import com.elon.app.agent.infrastructure.voice.RecognitionEngineSelector
 import com.elon.app.agent.infrastructure.voice.StreamingASR
 import com.elon.app.agent.infrastructure.voice.StreamingASRCallback
 
@@ -15,12 +19,24 @@ import com.elon.app.agent.infrastructure.voice.StreamingASRCallback
  *   - `onFinal`：最终文字，由调用方决定是填输入框还是直接发
  *   - `onError`：失败提示
  *
+ * **引擎自动回退**：启动前从 [RecognitionEngineSelector] 拿到按优先级排序的候选
+ * 引擎列表（系统默认 + 各品牌厂商 + Google），任一引擎遇到 `ERROR_NETWORK` /
+ * `ERROR_CLIENT` / `ERROR_SERVER` 等明显"引擎本身不可用"的错误且尚未拿到任何
+ * 部分结果，就把它加入黑名单，自动切换到下一个候选并重启识别。所有候选都失败
+ * 后才把错误回调给上层。这样既兼容国行小米/华为/荣耀（系统默认那个常常是
+ * 不可联网的 Google TTS 残包），又不破坏现有"系统默认能用"的设备体验。
+ *
  * 不依赖 Agent 的对话状态机 / TTS / 任务执行，只复用 ASR + VAD 这一层。
  */
 internal class AgentVoiceBridge(context: Context) {
 
+    companion object {
+        private const val TAG = "AgentVoiceBridge"
+    }
+
+    private val appContext: Context = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
-    private val asr = StreamingASR(context.applicationContext).apply {
+    private val asr = StreamingASR(appContext).apply {
         useSmartVAD = true
         language = "zh-CN"
     }
@@ -35,6 +51,13 @@ internal class AgentVoiceBridge(context: Context) {
     var isRunning: Boolean = false
         private set
 
+    /** 当前会话使用的候选引擎列表（按优先级） */
+    private var candidates: List<RecognitionEngine> = emptyList()
+    /** 当前正在用第几个候选 */
+    private var candidateIndex: Int = 0
+    /** 本次会话期间收到过至少一个非空部分结果（用于判断"引擎已经在工作") */
+    private var sawAnyPartial: Boolean = false
+
     init {
         asr.callback = object : StreamingASRCallback {
             override fun onReady() = Unit
@@ -42,6 +65,7 @@ internal class AgentVoiceBridge(context: Context) {
                 main.post { onStart() }
             }
             override fun onPartialResult(text: String, confidence: Float) {
+                if (text.isNotBlank()) sawAnyPartial = true
                 main.post { onPartial(text) }
             }
             override fun onFinalResult(text: String) {
@@ -60,11 +84,10 @@ internal class AgentVoiceBridge(context: Context) {
                 main.post { onEnd() }
             }
             override fun onError(message: String) {
-                isRunning = false
-                main.post {
-                    onError(message)
-                    onEnd()
-                }
+                // 真正决定是否回退的逻辑在 onErrorCode 里
+            }
+            override fun onErrorCode(code: Int, message: String) {
+                handleEngineError(code, message)
             }
         }
     }
@@ -73,8 +96,10 @@ internal class AgentVoiceBridge(context: Context) {
     fun start() {
         if (isRunning) return
         isRunning = true
-        // ASR.startListening 必须在主线程
-        main.post { asr.startListening() }
+        sawAnyPartial = false
+        candidates = RecognitionEngineSelector.list(appContext)
+        candidateIndex = 0
+        main.post { startWithCurrentCandidate() }
     }
 
     /** 用户主动结束（松手）。 */
@@ -94,5 +119,57 @@ internal class AgentVoiceBridge(context: Context) {
     fun destroy() {
         isRunning = false
         main.post { asr.destroy() }
+    }
+
+    // ─────────────────────── 内部 ───────────────────────
+
+    private fun startWithCurrentCandidate() {
+        val engine = candidates.getOrNull(candidateIndex)
+        if (engine == null) {
+            isRunning = false
+            main.post {
+                onError("没有可用的语音识别引擎，请在设置里切换为云端识别")
+                onEnd()
+            }
+            return
+        }
+        Log.i(TAG, "尝试引擎[$candidateIndex/${candidates.size}]: ${engine.label}(${engine.packageName})")
+        asr.engineComponent = engine.component
+        asr.resetEngine()
+        asr.startListening()
+    }
+
+    /**
+     * 是否属于"引擎本身不可用，应该切换下一个"的错误码。
+     * 不包含 NO_MATCH / SPEECH_TIMEOUT：那两个是"用户没说话或没说清"，
+     * 不是引擎故障；也不包含 INSUFFICIENT_PERMISSIONS（切引擎也没用）。
+     */
+    private fun isEngineFailure(code: Int): Boolean = when (code) {
+        SpeechRecognizer.ERROR_NETWORK,
+        SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+        SpeechRecognizer.ERROR_CLIENT,
+        SpeechRecognizer.ERROR_SERVER -> true
+        else -> false
+    }
+
+    private fun handleEngineError(code: Int, message: String) {
+        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial")
+        val current = candidates.getOrNull(candidateIndex)
+
+        val retryable = isEngineFailure(code) && !sawAnyPartial && current != null
+        if (!retryable) {
+            isRunning = false
+            main.post {
+                onError(message)
+                onEnd()
+            }
+            return
+        }
+
+        RecognitionEngineSelector.blacklist(appContext, current!!, "code=$code msg=$message")
+        candidateIndex += 1
+        val nextLabel = candidates.getOrNull(candidateIndex)?.label ?: "<无>"
+        Log.i(TAG, "回退到下一个引擎: $nextLabel")
+        main.post { startWithCurrentCandidate() }
     }
 }

@@ -4,6 +4,7 @@
 
 package com.elon.app.agent.infrastructure.voice
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -58,18 +59,44 @@ class StreamingASR(private val context: Context) {
     
     /** 语言 */
     var language: String = "zh-CN"
-    
+
+    /**
+     * 指定使用的识别服务组件。
+     *  - null：调用 [SpeechRecognizer.createSpeechRecognizer]（系统默认）；
+     *  - 非 null：调用 [SpeechRecognizer.createSpeechRecognizer]（context, component）强制指定。
+     * 修改后必须调用 [destroy] 或 [resetEngine] 才会在下次 [startListening] 生效。
+     */
+    var engineComponent: ComponentName? = null
+
     // ==================== 公开方法 ====================
-    
+
     /**
      * 初始化
      */
     fun initialize() {
         if (speechRecognizer != null) return
-        
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+
+        val component = engineComponent
+        speechRecognizer = if (component != null) {
+            Log.i(TAG, "使用指定引擎: ${component.flattenToShortString()}")
+            SpeechRecognizer.createSpeechRecognizer(context, component)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(context)
+        }
         speechRecognizer?.setRecognitionListener(createListener())
-        Log.i(TAG, "✅ 流式ASR初始化完成")
+        Log.i(TAG, "✅ 流式ASR初始化完成 (engine=${component?.flattenToShortString() ?: "<system-default>"})")
+    }
+
+    /**
+     * 释放当前 recognizer 实例（保留回调与配置），下次 [startListening] 会按 [engineComponent] 重新创建。
+     * 用于在多个引擎之间切换重试。
+     */
+    fun resetEngine() {
+        stopSilenceCheck()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+        isListening = false
+        Log.i(TAG, "🔄 引擎已重置，等待重新初始化")
     }
     
     /**
@@ -198,14 +225,18 @@ class StreamingASR(private val context: Context) {
                 else -> "未知错误: $error"
             }
             
-            Log.e(TAG, "❌ 错误: $errorMsg")
-            
+            Log.e(TAG, "❌ 错误: $errorMsg (code=$error)")
+
             // NO_MATCH 不一定是错误，可能是用户还没说
             if (error != SpeechRecognizer.ERROR_NO_MATCH) {
+                callback?.onErrorCode(error, errorMsg)
                 callback?.onError(errorMsg)
             } else if (currentPartialResult.isNotEmpty()) {
                 // 有部分结果时，当作最终结果
                 callback?.onFinalResult(currentPartialResult)
+            } else {
+                // NO_MATCH 且无任何部分结果：也上报码，让上层决定是否切换引擎
+                callback?.onErrorCode(error, errorMsg)
             }
         }
         
@@ -292,22 +323,28 @@ class StreamingASR(private val context: Context) {
 interface StreamingASRCallback {
     /** 准备就绪 */
     fun onReady() {}
-    
+
     /** 检测到语音开始 */
     fun onSpeechStart()
-    
+
     /** 收到部分结果 */
     fun onPartialResult(text: String, confidence: Float)
-    
+
     /** 收到最终结果 */
     fun onFinalResult(text: String)
-    
+
     /** 检测到语音结束 */
     fun onSpeechEnd()
-    
+
     /** 音量变化 (0-1) */
     fun onVolumeChanged(volume: Float) {}
-    
-    /** 错误 */
+
+    /** 错误（文字描述） */
     fun onError(message: String)
+
+    /**
+     * 错误（携带 [android.speech.SpeechRecognizer] 的 ERROR_* 错误码）。
+     * 默认空实现，上层若需要按码切换引擎可覆写本方法。
+     */
+    fun onErrorCode(code: Int, message: String) {}
 }
