@@ -203,6 +203,30 @@ impl Store {
         Ok(())
     }
 
+    /// 把 Codex/CopilotCLI 的 native thread ID 写到对应任务上，方便后续诊断。
+    /// 取 project+user+conversation 下创建时间最近的任务（通常就是当前运行的那条）。
+    pub fn set_latest_task_thread_id(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+        thread_id: &str,
+    ) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE tasks SET codex_thread_id = ?1, updated_at = ?2
+             WHERE id = (
+               SELECT id FROM tasks
+               WHERE project_id = ?3
+                 AND user_id = ?4
+                 AND conversation_id = ?5
+               ORDER BY created_at DESC
+               LIMIT 1
+             )",
+            params![thread_id, now(), project_id, user_id, conversation_id],
+        )?;
+        Ok(())
+    }
+
     pub fn record_task_event(&self, task_id: &str, event_json: &str) -> Result<()> {
         let conn = self.conn()?;
         let tx = conn.unchecked_transaction()?;

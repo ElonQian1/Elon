@@ -440,6 +440,13 @@ pub async fn run_with_workspace(
             &workspace_key,
             &thread_id,
         );
+        // 同步写入 tasks.codex_thread_id，方便通过任务直接找到对应 Codex/CopilotCLI 线程
+        let _ = state.store.set_latest_task_thread_id(
+            &scope.project_id,
+            &scope.user_id,
+            &scope.conversation_id,
+            &thread_id,
+        );
         stored_session_id = Some(thread_id);
     }
     if output.success {

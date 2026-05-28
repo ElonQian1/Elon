@@ -57,6 +57,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (7, "项目空间频道与共享频道消息", migration_v7),
     (8, "好友与群聊消息附件引用", migration_v8),
     (9, "同一用户禁止重名活跃项目", migration_v9),
+    (10, "tasks.codex_thread_id + conversation_timeline 视图", migration_v10),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -497,6 +498,69 @@ fn migration_v9(conn: &Connection) -> Result<()> {
           WHERE status != 'deleted';
         "#,
     )?;
+    Ok(())
+}
+
+// ── v10：会话诊断列与视图 ────────────────────────────────────────────────────
+
+fn migration_v10(conn: &Connection) -> Result<()> {
+    // tasks 表：记录处理该任务的 Codex/CopilotCLI 线程 ID（方便通过 thread 找回对话原始内容）
+    add_column_if_missing(conn, "tasks", "codex_thread_id", "codex_thread_id TEXT")?;
+
+    // conversation_timeline 视图：把 messages + task_events 合并为按时间排列的统一时间线
+    // AI 代理只需 WHERE project_id=? AND conversation_id=? ORDER BY time 即可重建完整会话
+    conn.execute_batch(
+        r#"
+        DROP VIEW IF EXISTS conversation_timeline;
+        CREATE VIEW conversation_timeline AS
+        SELECT
+            m.created_at                              AS time,
+            'message'                                 AS kind,
+            COALESCE(t.project_id, m.project_id)      AS project_id,
+            p.name                                    AS project_name,
+            m.conversation_id                         AS conversation_id,
+            m.task_id                                 AS task_id,
+            t.codex_thread_id                         AS codex_thread_id,
+            m.role                                    AS role,
+            m.content                                 AS content,
+            NULL                                      AS event_type,
+            NULL                                      AS event_detail
+        FROM messages m
+        LEFT JOIN tasks t ON t.id = m.task_id
+        LEFT JOIN projects p ON p.id = COALESCE(t.project_id, m.project_id)
+
+        UNION ALL
+
+        SELECT
+            te.created_at                             AS time,
+            'task_event'                              AS kind,
+            t.project_id                              AS project_id,
+            p.name                                    AS project_name,
+            t.conversation_id                         AS conversation_id,
+            te.task_id                                AS task_id,
+            t.codex_thread_id                         AS codex_thread_id,
+            NULL                                      AS role,
+            te.event_json                             AS content,
+            json_extract(te.event_json, '$.type')     AS event_type,
+            json_extract(te.event_json, '$.text')     AS event_detail
+        FROM task_events te
+        JOIN tasks t ON t.id = te.task_id
+        LEFT JOIN projects p ON p.id = t.project_id;
+        "#,
+    )?;
+
+    // 加速 conversation_timeline 查询的索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tasks_project_conversation_created
+         ON tasks(project_id, conversation_id, created_at)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_project_conversation_created
+         ON messages(project_id, conversation_id, created_at)",
+        [],
+    )?;
+
     Ok(())
 }
 
