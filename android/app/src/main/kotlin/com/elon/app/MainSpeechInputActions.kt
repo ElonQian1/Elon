@@ -491,16 +491,11 @@ internal class MainSpeechInputActions(
             )
         )
         val text = transcription?.trim()?.takeIf { it.isNotBlank() }
-        // 总是发语音气泡（路由由 sendVoiceAttachment→trySendFriendMessage 负责）
-        sendVoiceAttachment(attachment.copy(transcription = transcription), "")
-        // 仅在项目聊天时补发一条文字供 AI 阅读；在 post 里重新检查避免时序问题
-        if (text != null) {
-            binding.root.post {
-                if (!isFriendChatActive()) {
-                    sendTextDirect?.invoke(text)
-                }
-            }
-        }
+        // 项目聊天：把转录文字作为消息 content 随语音一起发，既显示语音气泡又显示文字，
+        // 同时避免双重上传竞态（原先 sendTextDirect 会在 pendingAttachments 未清时再次触发上传）。
+        // 好友/群组聊天：保持微信风格，只发语音气泡，不附文字。
+        val messageText = if (!isFriendChatActive() && text != null) text else ""
+        sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
     }
 
     /** 语音消息模式：取消录音。 */
