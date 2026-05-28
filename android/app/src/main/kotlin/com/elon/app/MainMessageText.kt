@@ -98,6 +98,8 @@ internal fun friendlyErrorMessage(raw: String): String {
     val nestedMessage = nestedApiErrorMessage(raw)
     val source = listOf(raw, nestedMessage).joinToString(" ").lowercase(Locale.CHINA)
     return when {
+        isTransientAiServiceConnectionError(source) ->
+            "服务器 AI 通道刚才断开，本轮没有完成。手机连接临时断开时会自动重连并同步进度；如果看到这条红色提示，说明服务端已结束本轮，请重新发送一次。"
         source.contains("free_quota_exhausted") ||
             source.contains("payment required") ||
             source.contains("endpoint is inactive") ->
@@ -121,6 +123,14 @@ internal fun friendlyErrorMessage(raw: String): String {
         else ->
             summarize(raw.replace(Regex("\\{.*"), "").trim().ifBlank { raw }, 90)
     }
+}
+
+private fun isTransientAiServiceConnectionError(source: String): Boolean {
+    return source.contains("codex cli network unhealthy") ||
+        source.contains("responses websocket failed") ||
+        source.contains("required provider endpoints are unreachable") ||
+        source.contains("stream disconnected before completion") ||
+        source.contains("reachability") && source.contains("unreachable")
 }
 
 internal fun nestedApiErrorMessage(raw: String): String {
