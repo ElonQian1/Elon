@@ -180,6 +180,7 @@ setup_signing_config() {
     export ELON_RELEASE_KEYSTORE="$DEFAULT_KEYSTORE"
   # 默认别名
   [[ -z "${ELON_RELEASE_KEY_ALIAS:-}" ]] && export ELON_RELEASE_KEY_ALIAS="elon"
+  return 0
 }
 
 assert_signing_config() {
@@ -298,9 +299,14 @@ echo -e "${GREEN}   versionCode: ${OLD_CODE} → ${NEW_CODE} (临时，编译后
 if [[ "$SKIP_BUILD" == "0" ]]; then
   assert_signing_config
   echo -e "${CYAN}🔨 编译 Release APK...${NC}"
-  chmod +x "$ANDROID_DIR/gradlew"
   cd "$ANDROID_DIR"
-  ./gradlew assembleRelease
+  if [[ -f "$ANDROID_DIR/gradlew" ]]; then
+    chmod +x "$ANDROID_DIR/gradlew"
+    ./gradlew assembleRelease
+  else
+    java -classpath "$ANDROID_DIR/gradle/wrapper/gradle-wrapper.jar" \
+      org.gradle.wrapper.GradleWrapperMain assembleRelease
+  fi
   cd "$REPO_ROOT"
 else
   echo -e "${YELLOW}⏭️  跳过编译（--skip-build）${NC}"
