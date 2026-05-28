@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -12,9 +13,35 @@
     <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE" />
     <uses-permission android:name="com.hihonor.android.launcher.permission.CHANGE_BADGE" />
 
+    <!-- Agent 子系统新增权限（android-agent 一体化合并） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- Agent 子系统：常用被操作 App 包名查询 -->
+        <package android:name="com.xingin.xhs" />
+        <package android:name="com.tencent.mm" />
+        <package android:name="com.ss.android.ugc.aweme" />
+        <package android:name="com.taobao.taobao" />
+        <package android:name="com.jingdong.app.mall" />
+        <package android:name="com.alibaba.android.rimet" />
+        <package android:name="com.tencent.mobileqq" />
+        <package android:name="com.sina.weibo" />
+        <package android:name="tv.danmaku.bili" />
+        <package android:name="com.autonavi.minimap" />
+        <package android:name="com.baidu.BaiduMap" />
+        <package android:name="com.eg.android.AlipayGphone" />
+        <package android:name="com.netease.cloudmusic" />
+        <package android:name="com.kugou.android" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
 
@@ -71,6 +98,104 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- ========== Agent 子系统（android-agent 一体化合并） ========== -->
+        <!-- 入口：Agent 执行界面（从 elon 主 UI 进入，不再作为 LAUNCHER） -->
+        <activity
+            android:name="com.elon.app.agent.AgentExecuteActivity"
+            android:exported="false"
+            android:label="Agent 执行"
+            android:launchMode="singleTop" />
+
+        <!-- Agent 配置 -->
+        <activity
+            android:name="com.elon.app.agent.AgentConfigActivity"
+            android:exported="false"
+            android:label="Agent 配置" />
+
+        <!-- Agent 入口主界面（保留旧入口，不导出） -->
+        <activity
+            android:name="com.elon.app.agent.AgentActivity"
+            android:exported="false"
+            android:label="Agent" />
+
+        <!-- Agent 登录（与 elon 主 LoginActivity 不冲突，因全限定包名） -->
+        <activity
+            android:name="com.elon.app.agent.ui.LoginActivity"
+            android:exported="false"
+            android:label="Agent 登录" />
+
+        <!-- Agent 设置 -->
+        <activity
+            android:name="com.elon.app.agent.ui.SettingsActivity"
+            android:exported="false"
+            android:label="Agent 设置" />
+
+        <!-- 悬浮球语音 V1 -->
+        <activity
+            android:name="com.elon.app.agent.infrastructure.floating.FloatingVoiceActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Transparent.AppCompat"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="" />
+
+        <!-- 悬浮球语音 V2（智能对话） -->
+        <activity
+            android:name="com.elon.app.agent.infrastructure.floating.ConversationalVoiceActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Transparent.AppCompat"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="" />
+
+        <!-- 悬浮球文字输入 -->
+        <activity
+            android:name="com.elon.app.agent.infrastructure.floating.FloatingInputActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Transparent.AppCompat"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
+        <!-- Agent 无障碍服务（用户主动开启） -->
+        <service
+            android:name="com.elon.app.agent.AgentService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="accessibility_service_agent" />
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config_agent_v2" />
+        </service>
+
+        <!-- 悬浮球服务 -->
+        <service
+            android:name="com.elon.app.agent.infrastructure.floating.FloatingBallService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_ball_overlay" />
+        </service>
+
+        <!-- 通知动作接收器 -->
+        <receiver
+            android:name="com.elon.app.agent.infrastructure.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.elon.app.agent.ACTION_OPEN_APP" />
+                <action android:name="com.elon.app.agent.ACTION_QUICK_TASK" />
+                <action android:name="com.elon.app.agent.ACTION_STOP" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

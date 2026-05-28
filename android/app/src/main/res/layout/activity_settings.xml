@@ -174,6 +174,41 @@
             android:padding="12dp"
             android:textSize="14sp" />
 
+        <!-- ── 语音输入模式 ── -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
+            android:text="语音输入模式"
+            android:textColor="#333333"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:text="选择麦克风按钮使用哪种识别管线"
+            android:textColor="#777777"
+            android:textSize="11sp" />
+        <RadioGroup
+            android:id="@+id/voiceModeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:orientation="vertical">
+            <RadioButton
+                android:id="@+id/voiceModeAgent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="端上识别（推荐，低延迟）" />
+            <RadioButton
+                android:id="@+id/voiceModeCloud"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="云端直连（PCM 流→服务器→AI 直发）" />
+        </RadioGroup>
+
         <!-- ── 保存按钮 ── -->
         <Button
             android:id="@+id/saveButton"

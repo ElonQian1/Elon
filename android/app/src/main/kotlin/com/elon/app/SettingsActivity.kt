@@ -48,11 +48,36 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.userIdText).text = "用户 ID: $userId"
 
         setupModeToggle()
+        setupVoiceModeToggle()
         loadCurrentConfig()
 
         findViewById<Button>(R.id.saveButton).setOnClickListener { saveConfig() }
         findViewById<Button>(R.id.checkUpdateButton).setOnClickListener {
             AppUpdateManager(this).manualCheck()
+        }
+    }
+
+    // ── 语音输入模式切换 ──────────────────────
+    private fun setupVoiceModeToggle() {
+        val group = findViewById<RadioGroup>(R.id.voiceModeGroup)
+        val current = VoiceInputModeSettings.get(this)
+        group.check(
+            if (current == VoiceInputMode.CLOUD_REALTIME) R.id.voiceModeCloud
+            else R.id.voiceModeAgent
+        )
+        group.setOnCheckedChangeListener { _, checkedId ->
+            val mode = if (checkedId == R.id.voiceModeCloud) {
+                VoiceInputMode.CLOUD_REALTIME
+            } else {
+                VoiceInputMode.LOCAL_AGENT_ASR
+            }
+            VoiceInputModeSettings.set(this, mode)
+            Toast.makeText(
+                this,
+                if (mode == VoiceInputMode.LOCAL_AGENT_ASR) "已切换：端上识别"
+                else "已切换：云端直连",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 

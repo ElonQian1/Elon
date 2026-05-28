@@ -107,4 +107,10 @@ dependencies {
 
     // 协程
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+
+    // ===== Agent 子系统（来自 android-agent 一体化合并） =====
+    // LiveData（Agent 状态/进度）
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
+    // 注：Room 暂不接入（android-agent 原本也禁用了 kapt），若后续需要持久化记忆库再启用
 }

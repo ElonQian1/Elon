@@ -44,6 +44,9 @@ internal class MainSpeechInputActions(
     private var translationGeneration = 0
     // 方案 B：实时语音 → 转写 → AI 投递
     private var realtimeController: RealtimeVoiceController? = null
+    // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
+    private var agentBridge: AgentVoiceBridge? = null
+    private var agentVoiceActive = false
 
     fun startSpeechToText() {
         if (activeConversation().ended) return
@@ -51,7 +54,16 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
-        if (startRealtimeVoice()) return
+        when (VoiceInputModeSettings.get(activity)) {
+            VoiceInputMode.LOCAL_AGENT_ASR -> {
+                if (startAgentVoice()) return
+                // Agent 桥接启动失败时退回系统 SpeechRecognizer
+            }
+            VoiceInputMode.CLOUD_REALTIME -> {
+                if (startRealtimeVoice()) return
+                // 云端模式下无 projectId 时也退回系统 SpeechRecognizer
+            }
+        }
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
             return
@@ -63,6 +75,7 @@ internal class MainSpeechInputActions(
     }
 
     fun stopSpeechToText() {
+        if (stopAgentVoice()) return
         if (stopRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
             stopDirectVoiceRecording()
@@ -87,6 +100,7 @@ internal class MainSpeechInputActions(
     }
 
     fun cancelSpeechToText() {
+        if (cancelAgentVoice()) return
         if (cancelRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
             cancelDirectVoiceRecording()
@@ -112,6 +126,74 @@ internal class MainSpeechInputActions(
         isListeningForSpeech = false
         realtimeController?.shutdown()
         realtimeController = null
+        agentBridge?.destroy()
+        agentBridge = null
+        agentVoiceActive = false
+    }
+
+    // ─── 方案 A：端上 Agent 流式识别 → 文字 → 走 elon 正常发送链路 ─────────────
+
+    /** 启动端上流式识别。成功接管返回 true。 */
+    private fun startAgentVoice(): Boolean {
+        val bridge = agentBridge ?: AgentVoiceBridge(activity).also { agentBridge = it }
+        if (bridge.isRunning) return true
+        isHoldActive = true
+        isSpeechCanceled = false
+        agentVoiceActive = true
+        translationGeneration += 1
+        bridge.onStart = {
+            voiceHoldButton().text = "正在听..."
+        }
+        bridge.onPartial = { text ->
+            if (text.isNotBlank()) {
+                voiceHoldButton().text = text.take(24)
+            }
+        }
+        bridge.onFinal = { text ->
+            agentVoiceActive = false
+            if (!isSpeechCanceled && text.isNotBlank()) {
+                // 复用现有文字识别管线：填入输入框 + 自动转简体
+                handleRecognizedSpeech(text)
+            }
+            voiceHoldButton().text = "按住 说话"
+        }
+        bridge.onEnd = {
+            if (!agentVoiceActive) {
+                voiceHoldButton().text = "按住 说话"
+            }
+        }
+        bridge.onError = { msg ->
+            agentVoiceActive = false
+            voiceHoldButton().text = "按住 说话"
+            if (!isSpeechCanceled) {
+                Toast.makeText(activity, "语音识别失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
+            }
+        }
+        voiceHoldButton().text = "准备识别..."
+        bridge.start()
+        return true
+    }
+
+    /** 松开按钮：通知 ASR 结束（SmartVAD 通常已经判定完）。 */
+    private fun stopAgentVoice(): Boolean {
+        val bridge = agentBridge ?: return false
+        if (!agentVoiceActive && !bridge.isRunning) return false
+        isHoldActive = false
+        voiceHoldButton().text = "识别中..."
+        bridge.stop()
+        return true
+    }
+
+    /** 取消：立即关闭。 */
+    private fun cancelAgentVoice(): Boolean {
+        val bridge = agentBridge ?: return false
+        if (!agentVoiceActive && !bridge.isRunning) return false
+        isHoldActive = false
+        isSpeechCanceled = true
+        agentVoiceActive = false
+        bridge.cancel()
+        voiceHoldButton().text = "按住 说话"
+        return true
     }
 
     // ─── 方案 B：实时语音 → OpenAI 转写 → 投递 AI ────────────────────────────
