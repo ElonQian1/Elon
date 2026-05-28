@@ -7,7 +7,9 @@ package com.elon.app.agent.infrastructure.voice
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.provider.Settings
 import android.speech.RecognitionService
 import android.util.Log
 
@@ -70,15 +72,7 @@ object RecognitionEngineSelector {
         val seen = HashSet<String>()
         val result = ArrayList<RecognitionEngine>()
 
-        // 1. 系统默认入口（component=null）始终保留 — 它对应当前系统设置里选中的那个，
-        //    用户/厂商可能已经把它配成自己可用的版本。
-        result += RecognitionEngine(
-            component = null,
-            packageName = "<system-default>",
-            label = "系统默认",
-        )
-
-        // 2. 列出所有可解析的服务，按优先级排序
+        // 1. 列出所有可解析的服务，过滤掉无可用权限/已禁用的，按优先级排序
         val engines = resolves.mapNotNull { ri ->
             val si: ServiceInfo = ri.serviceInfo ?: return@mapNotNull null
             val pkg = si.packageName ?: return@mapNotNull null
@@ -86,6 +80,10 @@ object RecognitionEngineSelector {
             val component = ComponentName(pkg, cls)
             val key = component.flattenToShortString()
             if (!seen.add(key)) return@mapNotNull null
+            if (!isUsable(pm, pkg)) {
+                Log.i(TAG, "过滤无效引擎: $pkg (未启用或无 RECORD_AUDIO)")
+                return@mapNotNull null
+            }
             val label = try {
                 si.loadLabel(pm)?.toString() ?: pkg
             } catch (_: Throwable) {
@@ -94,9 +92,57 @@ object RecognitionEngineSelector {
             RecognitionEngine(component = component, packageName = pkg, label = label)
         }.sortedByDescending { PACKAGE_PRIORITY[it.packageName] ?: 0 }
 
-        result += engines
+        // 2. 解析系统默认指向的真实 component，避免走 SpeechRecognizer 的间接层（在某些
+        //    国产 ROM 上会稳定报 code=11 SERVER_DISCONNECTED）。如果解析成功且该
+        //    component 已在 engines 里，就用它作为首选（移到前面）；否则把它作为额外
+        //    候选追加。如果完全解析不到，才回退到 component=null 兜底。
+        val systemDefault = resolveSystemDefault(context, pm)
+        val enginesMut = engines.toMutableList()
+        if (systemDefault != null) {
+            val idx = enginesMut.indexOfFirst { it.component == systemDefault }
+            if (idx >= 0) {
+                val picked = enginesMut.removeAt(idx)
+                result += picked.copy(label = "${picked.label}(系统默认)")
+                result += enginesMut
+            } else {
+                val label = try { pm.getApplicationLabel(pm.getApplicationInfo(systemDefault.packageName, 0)).toString() } catch (_: Throwable) { systemDefault.packageName }
+                result += RecognitionEngine(systemDefault, systemDefault.packageName, "$label(系统默认)")
+                result += enginesMut
+            }
+        } else {
+            // 完全没解析到，把 null 兜底放最前
+            result += RecognitionEngine(null, "<system-default>", "系统默认")
+            result += enginesMut
+        }
 
-        Log.i(TAG, "候选引擎: ${result.joinToString { "${it.label}(${it.packageName})" }}")
+        Log.i(TAG, "候选引擎(${result.size}): ${result.joinToString { "${it.label}(${it.packageName})" }}")
         return result
+    }
+
+    /**
+     * 引擎是否真的可用：
+     *  - 包必须 enabled；
+     *  - 包必须已被授予 RECORD_AUDIO（很多预装但未被用过的 RecognitionService 没有授权）。
+     */
+    private fun isUsable(pm: PackageManager, pkg: String): Boolean {
+        return try {
+            val ai = pm.getApplicationInfo(pkg, 0)
+            if (!ai.enabled) return false
+            pm.checkPermission(android.Manifest.permission.RECORD_AUDIO, pkg) == PackageManager.PERMISSION_GRANTED
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /** 读 Settings.Secure 拿到当前系统默认 ASR 的 ComponentName。 */
+    private fun resolveSystemDefault(context: Context, pm: PackageManager): ComponentName? {
+        return try {
+            val raw = Settings.Secure.getString(context.contentResolver, "voice_recognition_service")
+                ?: return null
+            val cn = ComponentName.unflattenFromString(raw) ?: return null
+            if (!isUsable(pm, cn.packageName)) null else cn
+        } catch (_: Throwable) {
+            null
+        }
     }
 }

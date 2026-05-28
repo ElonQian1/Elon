@@ -58,6 +58,10 @@ internal class AgentVoiceBridge(context: Context) {
     private var candidateIndex: Int = 0
     /** 本次会话期间收到过至少一个非空部分结果（用于判断"引擎已经在工作") */
     private var sawAnyPartial: Boolean = false
+    /** 本次会话已切换/重试的总次数，防止旧 recognizer 残留事件触发死循环 */
+    private var transitionSeq: Int = 0
+    /** 同一引擎因 RECOGNIZER_BUSY 已经短延迟重试过几次（最多 2 次） */
+    private var busyRetryOnSame: Int = 0
 
     init {
         asr.callback = object : StreamingASRCallback {
@@ -100,6 +104,8 @@ internal class AgentVoiceBridge(context: Context) {
         sawAnyPartial = false
         candidates = RecognitionEngineSelector.list(appContext)
         candidateIndex = 0
+        transitionSeq += 1
+        busyRetryOnSame = 0
         main.post { startWithCurrentCandidate() }
     }
 
@@ -160,20 +166,45 @@ internal class AgentVoiceBridge(context: Context) {
     }
 
     private fun handleEngineError(code: Int, message: String) {
-        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial")
+        // 关键防护：若当前 isRunning=false（说明已经报错收尾或已切换引擎完成），
+        // 直接忽略旧 recognizer 残留事件，避免 candidateIndex 被多冲一次导致越界。
+        if (!isRunning) {
+            Log.d(TAG, "忽略残留错误 code=$code（isRunning=false）")
+            return
+        }
+        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame")
         val current = candidates.getOrNull(candidateIndex)
+
+        // RECOGNIZER_BUSY：上一次会话的引擎还没释放完。同引擎延迟 250ms 重试，最多 2 次。
+        if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && current != null && busyRetryOnSame < 2 && !sawAnyPartial) {
+            busyRetryOnSame += 1
+            Log.i(TAG, "RECOGNIZER_BUSY，延迟 250ms 重试同引擎 ${current.label} (#$busyRetryOnSame)")
+            val mySeq = ++transitionSeq
+            main.postDelayed({
+                if (isRunning && mySeq == transitionSeq) {
+                    asr.resetEngine()
+                    asr.startListening()
+                }
+            }, 250L)
+            return
+        }
 
         val retryable = isEngineFailure(code) && !sawAnyPartial && current != null
         if (!retryable) {
             isRunning = false
+            val friendly = if (candidateIndex >= candidates.size - 1)
+                "本机所有语音引擎暂时都不可用，请稍后再试或在设置切换为云端识别"
+            else message
             main.post {
-                onError(message)
+                onError(friendly)
                 onEnd()
             }
             return
         }
 
         candidateIndex += 1
+        busyRetryOnSame = 0
+        transitionSeq += 1
         val nextLabel = candidates.getOrNull(candidateIndex)?.label ?: "<无>"
         Log.i(TAG, "回退到下一个引擎: $nextLabel (上一个: ${current!!.label}, code=$code)")
         main.post { startWithCurrentCandidate() }
