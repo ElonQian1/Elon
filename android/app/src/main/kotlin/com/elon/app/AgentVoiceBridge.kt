@@ -62,6 +62,10 @@ internal class AgentVoiceBridge(context: Context) {
     private var transitionSeq: Int = 0
     /** 同一引擎因 RECOGNIZER_BUSY 已经短延迟重试过几次（最多 2 次） */
     private var busyRetryOnSame: Int = 0
+    /** 同一引擎因冷启动失败已经短延迟重试过几次（最多 1 次） */
+    private var coldStartRetryOnSame: Int = 0
+    /** 本次 startListening 的开始时间（毫秒），用于判定"冷启动瞬时失败" */
+    private var listeningStartedAt: Long = 0L
 
     init {
         asr.callback = object : StreamingASRCallback {
@@ -106,6 +110,7 @@ internal class AgentVoiceBridge(context: Context) {
         candidateIndex = 0
         transitionSeq += 1
         busyRetryOnSame = 0
+        coldStartRetryOnSame = 0
         main.post { startWithCurrentCandidate() }
     }
 
@@ -143,6 +148,7 @@ internal class AgentVoiceBridge(context: Context) {
         Log.i(TAG, "尝试引擎[$candidateIndex/${candidates.size}]: ${engine.label}(${engine.packageName})")
         asr.engineComponent = engine.component
         asr.resetEngine()
+        listeningStartedAt = System.currentTimeMillis()
         asr.startListening()
     }
 
@@ -172,7 +178,7 @@ internal class AgentVoiceBridge(context: Context) {
             Log.d(TAG, "忽略残留错误 code=$code（isRunning=false）")
             return
         }
-        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame")
+        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame coldRetry=$coldStartRetryOnSame")
         val current = candidates.getOrNull(candidateIndex)
 
         // RECOGNIZER_BUSY：上一次会话的引擎还没释放完。同引擎延迟 250ms 重试，最多 2 次。
@@ -183,9 +189,31 @@ internal class AgentVoiceBridge(context: Context) {
             main.postDelayed({
                 if (isRunning && mySeq == transitionSeq) {
                     asr.resetEngine()
+                    listeningStartedAt = System.currentTimeMillis()
                     asr.startListening()
                 }
             }, 250L)
+            return
+        }
+
+        // 冷启动瞬时失败：startListening 后 300ms 内就报错（小米 mibrain 冷启动 ~1.5-2s
+        // 才就绪，此时连接尚未建立完成就抛 code=11 SERVER_DISCONNECTED 或 code=5）。
+        // 同引擎延迟 600ms 重试 1 次，给服务一点绑定时间。
+        val sinceStart = System.currentTimeMillis() - listeningStartedAt
+        val isColdStartGlitch = sinceStart in 0..300 && coldStartRetryOnSame < 1 &&
+            (code == 11 || code == SpeechRecognizer.ERROR_SERVER ||
+             code == SpeechRecognizer.ERROR_CLIENT || code == SpeechRecognizer.ERROR_NETWORK)
+        if (isColdStartGlitch && current != null && !sawAnyPartial) {
+            coldStartRetryOnSame += 1
+            Log.i(TAG, "冷启动失败(${sinceStart}ms<300ms, code=$code)，延迟 600ms 重试同引擎 ${current.label}")
+            val mySeq = ++transitionSeq
+            main.postDelayed({
+                if (isRunning && mySeq == transitionSeq) {
+                    asr.resetEngine()
+                    listeningStartedAt = System.currentTimeMillis()
+                    asr.startListening()
+                }
+            }, 600L)
             return
         }
 
@@ -204,6 +232,7 @@ internal class AgentVoiceBridge(context: Context) {
 
         candidateIndex += 1
         busyRetryOnSame = 0
+        coldStartRetryOnSame = 0
         transitionSeq += 1
         val nextLabel = candidates.getOrNull(candidateIndex)?.label ?: "<无>"
         Log.i(TAG, "回退到下一个引擎: $nextLabel (上一个: ${current!!.label}, code=$code)")
