@@ -73,11 +73,15 @@ pub(crate) fn prepare_project_conversation_workspace(
             branch,
         ));
     }
-    if worktree_path.exists() && std::fs::read_dir(&worktree_path)?.next().is_some() {
-        anyhow::bail!(
-            "会话 worktree 路径已存在但不是 Git 工作树: {}",
-            worktree_path.display()
-        );
+    if worktree_path.exists() {
+        // 路径存在但不是有效的 git 工作树——上次 worktree remove 后可能留有空目录，直接清掉重建
+        if std::fs::read_dir(&worktree_path)?.next().is_some() {
+            anyhow::bail!(
+                "会话 worktree 路径已存在但不是 Git 工作树: {}",
+                worktree_path.display()
+            );
+        }
+        let _ = std::fs::remove_dir(&worktree_path);
     }
 
     let start_ref = conversation_start_ref(&base_workspace);
@@ -154,11 +158,27 @@ pub(crate) fn merge_conversation_worktree(
         );
     }
     let after = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
-    // 合并完成后异步清理该 worktree 对应的 Gradle home，防止磁盘持续增长。
-    // wrapper/dists 是指向共享目录的符号链接，删除 gradle-home 不会丢失发行版缓存。
-    let active_workspace_for_cleanup = workspace.active_workspace.clone();
+    // 合并完成后异步清理：
+    // 1. git worktree remove —— 释放会话工作目录（含所有临时文件）
+    // 2. git branch -d       —— 删除 ai/session/... 分支（已合并，可安全删除）
+    // 3. 删除 gradle-home    —— 防止磁盘持续增长（wrapper/dists 是共享符号链接，不会丢失发行版缓存）
+    let base_for_cleanup = workspace.base_workspace.clone();
+    let active_for_cleanup = workspace.active_workspace.clone();
+    let branch_for_cleanup = branch.to_string();
     std::thread::spawn(move || {
-        let workspace_key = active_workspace_for_cleanup
+        // 先 remove worktree（git 会取消注册并删除目录）
+        let _ = Command::new("git")
+            .args(["worktree", "remove", "--force",
+                  &active_for_cleanup.to_string_lossy()])
+            .current_dir(&base_for_cleanup)
+            .output();
+        // 删除已合并的会话分支
+        let _ = Command::new("git")
+            .args(["branch", "-d", &branch_for_cleanup])
+            .current_dir(&base_for_cleanup)
+            .output();
+        // 删除 gradle-home
+        let workspace_key = active_for_cleanup
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("");
