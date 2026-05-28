@@ -13,6 +13,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
@@ -35,6 +36,7 @@ internal class MainModelActions(
     private val serverUrl: String,
     private val userIdProvider: () -> String,
     private val modelButtonShellProvider: () -> FrameLayout?,
+    private val modelChevronProvider: () -> View?,
     private val inputBarContainerProvider: () -> LinearLayout?,
     private val getActionPopup: () -> PopupWindow?,
     private val setActionPopup: (PopupWindow?) -> Unit,
@@ -50,6 +52,10 @@ internal class MainModelActions(
         private set
     var currentModelLabel = "默认"
         private set
+
+    private var modelPopup: PopupWindow? = null
+    private var modelPopupShowsAbove = true
+    private val chevronInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     fun selectedAgentForRequest(): String? {
         return if (codexCliOnly) null else selectedAgentName
@@ -144,6 +150,10 @@ internal class MainModelActions(
     }
 
     fun showModelPopupOrLoad() {
+        if (modelPopup?.isShowing == true) {
+            dismissModelPopup(animate = true)
+            return
+        }
         if (modelOptions.isEmpty()) {
             Toast.makeText(activity, "正在加载模型列表...", Toast.LENGTH_SHORT).show()
             loadModelOptions { showModelPopupOrLoad() }
@@ -179,7 +189,9 @@ internal class MainModelActions(
     }
 
     private fun showModelPopup(anchor: View) {
-        getActionPopup()?.dismiss()
+        getActionPopup()?.takeIf { it !== modelPopup }?.dismiss()
+        modelPopup?.takeIf { it.isShowing }?.dismiss()
+        modelPopup = null
 
         val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName)) }
         val showCustomRow = !codexCliOnly
@@ -211,7 +223,7 @@ internal class MainModelActions(
 
         selectableOptions.forEachIndexed { index, option ->
             panel.addView(createModelPopupRow(option.label, isModelOptionSelected(option)) {
-                getActionPopup()?.dismiss()
+                dismissModelPopup(animate = false)
                 if (codexCliOnly) {
                     Toast.makeText(activity, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
                 } else {
@@ -225,7 +237,7 @@ internal class MainModelActions(
 
         if (showCustomRow) {
             panel.addView(createModelPopupRow("自定义模型", currentModelLabel.startsWith("自定义")) {
-                getActionPopup()?.dismiss()
+                dismissModelPopup(animate = false)
                 openSettings()
             })
         }
@@ -249,6 +261,7 @@ internal class MainModelActions(
         val anchorCenterX = anchorLocation[0] + anchor.width / 2
         val aboveY = verticalAnchorTop - totalHeight - dp(8)
         val showAbove = aboveY > dp(72)
+        modelPopupShowsAbove = showAbove
         val popupX = (anchorCenterX - popupWidth / 2)
             .coerceIn(dp(12), activity.resources.displayMetrics.widthPixels - popupWidth - dp(12))
         val popupY = if (showAbove) aboveY else verticalAnchorTop + anchor.height + dp(8)
@@ -273,7 +286,18 @@ internal class MainModelActions(
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
         }
+        modelPopup = popup
+        popup.setOnDismissListener {
+            if (modelPopup === popup) {
+                modelPopup = null
+            }
+            if (getActionPopup() === popup) {
+                setActionPopup(null)
+            }
+            animateModelChevron(expanded = false)
+        }
         setActionPopup(popup)
+        animateModelChevron(expanded = true, popupAbove = showAbove)
         root.pivotX = (anchorCenterX - popupX).toFloat()
         root.pivotY = if (showAbove) totalHeight.toFloat() else 0f
         root.animate()
@@ -282,6 +306,42 @@ internal class MainModelActions(
             .scaleY(1f)
             .setDuration(120L)
             .start()
+    }
+
+    private fun dismissModelPopup(animate: Boolean) {
+        val popup = modelPopup ?: return
+        if (!popup.isShowing || !animate) {
+            popup.dismiss()
+            return
+        }
+        val content = popup.contentView ?: run {
+            popup.dismiss()
+            return
+        }
+        content.animate().cancel()
+        content.animate()
+            .alpha(0f)
+            .scaleX(0.97f)
+            .scaleY(0.97f)
+            .setDuration(90L)
+            .withEndAction {
+                if (popup.isShowing) {
+                    popup.dismiss()
+                }
+            }
+            .start()
+    }
+
+    private fun animateModelChevron(
+        expanded: Boolean,
+        popupAbove: Boolean = modelPopupShowsAbove
+    ) {
+        val targetRotation = if (expanded && popupAbove) 180f else 0f
+        modelChevronProvider()?.animate()
+            ?.rotation(targetRotation)
+            ?.setDuration(140L)
+            ?.setInterpolator(chevronInterpolator)
+            ?.start()
     }
 
     private fun isModelOptionSelected(option: ModelOption): Boolean {

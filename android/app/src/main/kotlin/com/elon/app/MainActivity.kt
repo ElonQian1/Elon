@@ -581,6 +581,7 @@ class MainActivity : AppCompatActivity() {
             serverUrl = serverUrl,
             userIdProvider = { userId },
             modelButtonShellProvider = { inputActions.inputComposerViewsOrNull()?.modelButtonShell },
+            modelChevronProvider = { inputActions.inputComposerViewsOrNull()?.modelChevron },
             inputBarContainerProvider = { inputActions.inputComposerViewsOrNull()?.inputBarContainer },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },

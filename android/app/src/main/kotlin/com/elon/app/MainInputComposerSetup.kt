@@ -27,6 +27,7 @@ internal data class MainInputComposerViews(
     val expandedInputContainer: FrameLayout,
     val collapsedInputPreview: TextView,
     val modelButtonShell: FrameLayout,
+    val modelChevron: ImageView,
     val inputRightControls: FrameLayout,
     val inputComposerMotion: InputComposerMotion,
     val attachmentPanel: LinearLayout,
@@ -227,6 +228,7 @@ internal class MainInputComposerSetup(
             setImageResource(R.drawable.ic_input_model_chevron)
             scaleType = ImageView.ScaleType.CENTER
             alpha = 0.9f
+            rotation = 0f
             isClickable = false
             isFocusable = false
         }
@@ -327,6 +329,7 @@ internal class MainInputComposerSetup(
             expandedInputContainer = expandedInputContainer,
             collapsedInputPreview = collapsedInputPreview,
             modelButtonShell = modelButtonShell,
+            modelChevron = modelChevron,
             inputRightControls = inputRightControls,
             inputComposerMotion = inputComposerMotion,
             attachmentPanel = attachmentPanel,
