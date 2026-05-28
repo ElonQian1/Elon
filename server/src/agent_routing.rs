@@ -26,9 +26,8 @@ pub(crate) fn choose_backend(
     }
 
     if route == CapabilityRoute::ChatAgent {
-        if state.ai_cli.enabled {
-            return AiBackend::LocalCli;
-        }
+        // 普通对话路由始终走 API 后端，避免 Codex CLI 冷启动（6-20 秒）拖慢聊天体验。
+        // CLI 只负责代码任务（CodeAgent 路由）。
         return AiBackend::Api;
     }
 
