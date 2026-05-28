@@ -19,7 +19,8 @@ internal data class StoreProject(
     val memberCount: Int,
     val isPublic: Boolean,
     val joinMode: String,
-    val lastTaskStatus: String?
+    val lastTaskStatus: String?,
+    val role: String = "member"
 )
 
 internal fun StoreProject.toJointAppProject(): AppProject {
@@ -27,6 +28,20 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         id = id,
         isJointProject = true,
         collaborationProjectId = id
+    )
+}
+
+/**
+ * 将服务器项目还原为"个人独立项目"（适用于用户自己创建的 owner 项目）。
+ * id 直接用服务器项目 ID，collaborationProjectId 不设置，这样 resolveProjectId()
+ * 仍能通过 id 找到服务器项目，同时 isJointDevelopmentProject() 返回 false，
+ * 项目出现在"个人独立项目"分组。
+ */
+internal fun StoreProject.toOwnerAppProject(): AppProject {
+    return newAppProject(name, description ?: "我的项目").copy(
+        id = id,
+        isJointProject = false,
+        collaborationProjectId = null
     )
 }
 
@@ -189,7 +204,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
     joinMode = obj.optString("join_mode", "open"),
-    lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() }
+    lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
+    role = obj.optString("role", "member")
 )
 
 private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
@@ -255,4 +271,18 @@ internal fun syncAvatarToServer(
     val resp = http.newCall(req).execute()
     val respBody = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(respBody.ifBlank { "HTTP ${resp.code}" })
+}
+
+/** GET /api/me — 获取当前登录用户信息，返回 avatar_data_url（可为 null） */
+internal fun fetchMyAvatarDataUrl(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context
+): String? {
+    val req = AuthManager.applyAuth(ctx, Request.Builder().url("$serverUrl/api/me").get()).build()
+    val resp = http.newCall(req).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) return null
+    return JSONObject(body).optJSONObject("user")?.optString("avatar_data_url")
+        ?.takeIf { it.isNotBlank() }
 }

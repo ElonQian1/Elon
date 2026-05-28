@@ -25,26 +25,44 @@ internal class MainAccountActions(
 ) {
     /**
      * 登录后从服务器拉取项目列表，恢复本地丢失的项目（换机/重装场景）。
-     * 已存在（按 collaborationProjectId 匹配）的项目不会被覆盖。
+     * - 已存在（按 id 或 collaborationProjectId 匹配）的项目不会被覆盖。
+     * - role == "owner" 的项目还原为"个人独立项目"；其余为"联合开发项目"。
+     * - 同步拉取服务器头像并写入本地（仅当本地头像为空时）。
      */
     fun syncProjectsFromServer() {
         if (!AuthManager.isLoggedIn(activity)) return
         thread(name = "sync-my-projects") {
             try {
                 val serverProjects = fetchMyProjects(http, serverUrl, activity)
-                val existingIds = projects
-                    .mapNotNull { it.collaborationProjectId?.takeIf { id -> id.isNotBlank() } }
-                    .toSet()
+                // 用 id 和 collaborationProjectId 双重匹配，防止重复添加
+                val existingIds = projects.flatMap { p ->
+                    listOfNotNull(
+                        p.id.takeIf { it.isNotBlank() },
+                        p.collaborationProjectId?.takeIf { it.isNotBlank() }
+                    )
+                }.toSet()
                 val toAdd = serverProjects.filter { sp ->
                     sp.id != ELON_SELF_PROJECT_ID && sp.id !in existingIds
                 }
-                if (toAdd.isEmpty()) return@thread
-                activity.runOnUiThread {
-                    for (sp in toAdd) {
-                        projects.add(sp.toJointAppProject())
+                if (toAdd.isNotEmpty()) {
+                    activity.runOnUiThread {
+                        for (sp in toAdd) {
+                            val project = if (sp.role == "owner") sp.toOwnerAppProject()
+                            else sp.toJointAppProject()
+                            projects.add(project)
+                        }
+                        saveProjects()
+                        renderProjectList()
                     }
-                    saveProjects()
-                    renderProjectList()
+                }
+                // 头像恢复：本地无头像时从服务器拉取
+                val localAvatar = UserProfileStore.load(activity).avatarDataUrl
+                if (localAvatar.isNullOrBlank()) {
+                    val serverAvatar = fetchMyAvatarDataUrl(http, serverUrl, activity)
+                    if (!serverAvatar.isNullOrBlank()) {
+                        UserProfileStore.saveAvatar(activity, serverAvatar)
+                        activity.runOnUiThread { refreshProfileSummary() }
+                    }
                 }
             } catch (_: Throwable) {
                 // 网络不可用时静默失败，不影响正常使用

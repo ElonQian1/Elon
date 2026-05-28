@@ -55,6 +55,7 @@ pub struct PublicUser {
     pub nickname: Option<String>,
     pub role: String,
     pub status: String,
+    pub avatar_data_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -133,7 +133,7 @@ impl Store {
         let token_hash = hash_token(token);
         self.conn()?
             .query_row(
-                "SELECT u.id, u.phone, u.email, u.nickname, u.role, u.status
+                "SELECT u.id, u.phone, u.email, u.nickname, u.role, u.status, u.avatar_data_url
                  FROM sessions s
                  JOIN users u ON u.id = s.user_id
                  WHERE s.token_hash = ?1
@@ -151,6 +151,7 @@ impl Store {
                         nickname: row.get(3)?,
                         role: row.get(4)?,
                         status: row.get(5)?,
+                        avatar_data_url: row.get(6)?,
                     })
                 },
             )

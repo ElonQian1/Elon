@@ -50,6 +50,14 @@ internal object UserProfileStore {
         }.apply()
     }
 
+    /** 仅更新头像，不覆盖昵称和签名。用于登录后从服务器恢复头像。 */
+    fun saveAvatar(context: Context, avatarDataUrl: String) {
+        if (avatarDataUrl.isBlank()) return
+        AuthManager.userDataPrefs(context).edit()
+            .putString(KEY_AVATAR_DATA_URL, avatarDataUrl)
+            .apply()
+    }
+
     fun avatarInitial(name: String): String =
         name.trim().firstOrNull()?.toString()?.ifBlank { "我" } ?: "我"
 
