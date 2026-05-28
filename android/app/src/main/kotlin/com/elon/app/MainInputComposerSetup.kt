@@ -197,7 +197,8 @@ internal class MainInputComposerSetup(
             alpha = 0f
             visibility = View.GONE
             isClickable = true
-            isFocusable = true
+            isFocusable = false
+            isFocusableInTouchMode = false
             contentDescription = "选择模型：${currentModelLabel()}"
             setOnClickListener { showModelPopupOrLoad() }
         }

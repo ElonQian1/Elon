@@ -11,6 +11,8 @@ import android.view.animation.PathInterpolator
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainKeyboardInsetsAnimationActions(
@@ -214,12 +216,22 @@ internal class MainKeyboardInsetsAnimationActions(
     private fun applyChatBottomPadding(keyboardHeight: Int) {
         val targetBottom = baseChatListPaddingBottom + keyboardHeight
         if (binding.chatList.paddingBottom == targetBottom) return
+        val layoutManager = binding.chatList.layoutManager as? LinearLayoutManager
+        val anchorPosition = layoutManager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        val anchorOffset = if (anchorPosition != RecyclerView.NO_POSITION) {
+            layoutManager?.findViewByPosition(anchorPosition)?.top?.minus(binding.chatList.paddingTop)
+        } else {
+            null
+        }
         binding.chatList.setPadding(
             binding.chatList.paddingLeft,
             binding.chatList.paddingTop,
             binding.chatList.paddingRight,
             targetBottom
         )
+        if (anchorPosition != RecyclerView.NO_POSITION && anchorOffset != null) {
+            layoutManager?.scrollToPositionWithOffset(anchorPosition, anchorOffset)
+        }
     }
 
     private fun keyboardHeightFromVisibleFrame(): Int {

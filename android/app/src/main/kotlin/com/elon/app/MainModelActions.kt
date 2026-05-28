@@ -12,6 +12,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
@@ -264,8 +265,10 @@ internal class MainModelActions(
             (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
         }
 
-        val popup = PopupWindow(root, popupWidth, totalHeight, true).apply {
+        val popup = PopupWindow(root, popupWidth, totalHeight, false).apply {
             isOutsideTouchable = true
+            inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             elevation = dp(8).toFloat()
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             showAtLocation(binding.root, Gravity.NO_GRAVITY, popupX, popupY)
