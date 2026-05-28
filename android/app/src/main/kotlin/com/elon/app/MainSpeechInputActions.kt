@@ -18,7 +18,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.Locale
 
 internal class MainSpeechInputActions(
     private val activity: AppCompatActivity,
@@ -49,10 +48,10 @@ internal class MainSpeechInputActions(
             Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
             return
         }
-        resetSpeechRecognizer()
         translationGeneration += 1
         val sessionId = ++speechSessionId
         isSpeechCanceled = false
+        resetSpeechRecognizer()
         isListeningForSpeech = true
         voiceHoldButton().text = "松开 转文字"
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
@@ -148,8 +147,7 @@ internal class MainSpeechInputActions(
     private fun recognizerIntent(): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.SIMPLIFIED_CHINESE.toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, Locale.SIMPLIFIED_CHINESE.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, SPEECH_LANGUAGE_TAG)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
@@ -220,5 +218,10 @@ internal class MainSpeechInputActions(
             runCatching { recognizer.destroy() }
         }
         speechRecognizer = null
+    }
+
+    private companion object {
+        // Android speech engines are much more consistent with zh-CN than zh-Hans-CN.
+        private const val SPEECH_LANGUAGE_TAG = "zh-CN"
     }
 }
