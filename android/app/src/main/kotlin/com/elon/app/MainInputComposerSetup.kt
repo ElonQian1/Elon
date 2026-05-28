@@ -288,6 +288,9 @@ internal class MainInputComposerSetup(
             if (!inputComposerMotion.isExpanded && !isVoiceMode()) {
                 inputComposerMotion.setExpanded(true, animate = true)
             }
+            if (!isVoiceMode()) {
+                focusInputComposer()
+            }
         }
 
         inputEdit.addTextChangedListener(object : TextWatcher {

@@ -44,9 +44,12 @@ internal class MainInputFocusActions(
                 motion.setExpanded(true, animate = true)
             }
         }
-        requestKeyboardLift()
         focusAndShowKeyboard()
-        binding.inputEdit.post { focusAndShowKeyboard() }
+        requestKeyboardLift()
+        binding.inputEdit.post {
+            focusAndShowKeyboard()
+            requestKeyboardLift()
+        }
         binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 90L)
         binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 220L)
     }
@@ -80,22 +83,29 @@ internal class MainInputFocusActions(
     }
 
     private fun focusAndShowKeyboard() {
-        if (!binding.inputEdit.hasFocus()) {
+        val alreadyFocused = binding.inputEdit.hasFocus()
+        if (!alreadyFocused) {
             binding.inputEdit.requestFocusFromTouch()
             if (!binding.inputEdit.hasFocus()) {
                 binding.inputEdit.requestFocus()
             }
         }
         binding.inputEdit.isCursorVisible = true
-        binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        if (!alreadyFocused) {
+            binding.inputEdit.setSelection(binding.inputEdit.text?.length ?: 0)
+        }
         showKeyboard()
     }
 
     private fun focusAndShowKeyboardIfComposerOpen() {
         if (isVoiceMode()) return
         if (inputComposerMotion()?.isExpanded != true) return
-        if (binding.inputEdit.hasFocus() && isKeyboardVisible()) return
+        if (binding.inputEdit.hasFocus() && isKeyboardVisible()) {
+            requestKeyboardLift()
+            return
+        }
         focusAndShowKeyboard()
+        requestKeyboardLift()
     }
 
     private fun showKeyboard() {
