@@ -108,7 +108,12 @@ internal fun saveStoredProjects(
 }
 
 private fun ensureElonSelfProject(projects: MutableList<AppProject>) {
-    if (projects.any { it.id == ELON_SELF_PROJECT_ID }) return
+    val existing = projects.firstOrNull { it.id == ELON_SELF_PROJECT_ID }
+    if (existing != null) {
+        // 升级旧数据：确保一龙自项目始终是联合开发项目
+        if (!existing.isJointProject) existing.isJointProject = true
+        return
+    }
     projects.add(0, elonSelfProject())
 }
 
@@ -118,6 +123,7 @@ private fun elonSelfProject(): AppProject {
         title = "一龙项目",
         subtitle = "修改平台自身 · AI 云端迭代",
         updatedAt = 0L,
+        isJointProject = true,
         conversations = mutableListOf(
             AppConversation(
                 id = "elon-self-default",
