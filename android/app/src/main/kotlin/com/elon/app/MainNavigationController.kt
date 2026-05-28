@@ -40,6 +40,7 @@ internal class MainNavigationController(
     private val maybePrewarmCodexSession: (String) -> Unit,
     private val onFriendChatClosed: () -> Unit,
     private val onProjectChannelClosed: () -> Unit,
+    private val showProjectMembers: () -> Unit,
     private val loadMarketplace: () -> Unit
 ) {
     private enum class ChatReturnTarget {
@@ -73,6 +74,7 @@ internal class MainNavigationController(
             binding.backButton.visibility = View.GONE
             binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
+            binding.projectMembersButton.visibility = View.GONE
             binding.moreButton.visibility = View.GONE
             binding.addButton.setOnClickListener {
                 showHomeActionPopup(binding.addButton, tab)
@@ -481,6 +483,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.moreButton.contentDescription = "聊天功能"
@@ -504,6 +507,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.VISIBLE
         binding.addButton.visibility = View.VISIBLE
+        binding.projectMembersButton.visibility = View.GONE
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabChat)
@@ -524,6 +528,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setOnClickListener { showContactChatSettings() }
         binding.moreButton.contentDescription = "聊天设置"
@@ -544,6 +549,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
+        binding.projectMembersButton.visibility = View.GONE
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabProject)
@@ -565,6 +571,8 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.VISIBLE
+        binding.projectMembersButton.setOnClickListener { showProjectMembers() }
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
@@ -582,6 +590,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
         binding.moreButton.visibility = View.GONE
         binding.quickActionStrip.visibility = View.GONE
         binding.stageHintText.visibility = View.GONE

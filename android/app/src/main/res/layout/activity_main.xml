@@ -66,6 +66,19 @@
                 android:src="@drawable/ic_add_circle_simple"
                 app:tint="#B8B8B8" />
 
+            <ImageButton
+                android:id="@+id/projectMembersButton"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="成员列表"
+                android:padding="7dp"
+                android:src="@drawable/ic_project_members"
+                android:visibility="gone"
+                app:tint="#B8B8B8" />
+
             <TextView
                 android:id="@+id/moreButton"
                 android:layout_width="44dp"

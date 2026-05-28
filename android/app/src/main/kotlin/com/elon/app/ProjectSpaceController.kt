@@ -93,6 +93,15 @@ internal class ProjectSpaceController(
         container.addView(memberSummary(space.members))
     }
 
+    fun showMembers() {
+        val space = activeSpace
+        if (space == null) {
+            Toast.makeText(activity, "成员列表加载中", Toast.LENGTH_SHORT).show()
+            return
+        }
+        ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp)
+    }
+
     fun isChannelActive(): Boolean = activeChannel != null
 
     fun closeChannelChat() {

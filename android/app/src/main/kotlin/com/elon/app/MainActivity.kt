@@ -385,6 +385,7 @@ class MainActivity : AppCompatActivity() {
                 projectSpaceController.closeChannelChat()
             },
             onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
+            showProjectMembers = { projectSpaceController.showMembers() },
             loadMarketplace = { marketplaceActions.loadProjects() }
         )
     }
