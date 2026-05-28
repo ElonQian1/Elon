@@ -15,7 +15,8 @@ data class ChatAttachment(
     val sizeBytes: Long? = null,
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,
-    val durationSeconds: Int? = null
+    val durationSeconds: Int? = null,
+    val transcription: String? = null
 ) {
     fun isImage(): Boolean {
         return kind == "image" || mimeType.orEmpty().startsWith("image/")
@@ -47,7 +48,8 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
             }.getOrNull(),
             imageWidth = item.positiveIntOrNull("image_width"),
             imageHeight = item.positiveIntOrNull("image_height"),
-            durationSeconds = item.positiveIntOrNull("duration_seconds")
+            durationSeconds = item.positiveIntOrNull("duration_seconds"),
+            transcription = item.stringOrNull("transcription")
         )
     }
 }
@@ -66,7 +68,8 @@ internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachmen
                 sizeBytes = item.optLong("size_bytes", 0L).takeIf { it > 0L },
                 imageWidth = item.optInt("image_width", 0).takeIf { it > 0 },
                 imageHeight = item.optInt("image_height", 0).takeIf { it > 0 },
-                durationSeconds = item.optInt("duration_seconds", 0).takeIf { it > 0 }
+                durationSeconds = item.optInt("duration_seconds", 0).takeIf { it > 0 },
+                transcription = item.optString("transcription").takeIf { it.isNotBlank() }
             )
         }
 }
@@ -82,7 +85,8 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
             sizeBytes = attachment.file.length(),
             imageWidth = attachment.imageWidth,
             imageHeight = attachment.imageHeight,
-            durationSeconds = attachment.durationSeconds
+            durationSeconds = attachment.durationSeconds,
+            transcription = attachment.transcription
         )
     }
 }

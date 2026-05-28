@@ -94,6 +94,12 @@ internal fun uploadAttachmentRefsOrNull(
                 uploaded.optIntOrNull("image_height", attachment.imageHeight)?.let {
                     addProperty("image_height", it)
                 }
+                attachment.durationSeconds?.let {
+                    addProperty("duration_seconds", it)
+                }
+                attachment.transcription?.takeIf { it.isNotBlank() }?.let {
+                    addProperty("transcription", it)
+                }
             })
         }
     }

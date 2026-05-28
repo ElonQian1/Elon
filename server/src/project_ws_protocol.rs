@@ -40,6 +40,8 @@ pub struct ProjectAttachmentRef {
     pub size_bytes: Option<u64>,
     pub image_width: Option<u32>,
     pub image_height: Option<u32>,
+    pub duration_seconds: Option<u32>,
+    pub transcription: Option<String>,
 }
 
 pub fn enrich_project_ws_event(raw: String, task_id: &str) -> String {
