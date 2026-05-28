@@ -249,6 +249,16 @@ is_git_ancestor() {
   git -C "$REPO_ROOT" merge-base --is-ancestor "$ancestor" "$descendant" 2>/dev/null
 }
 
+live_apk_includes_build_base() {
+  local live_json live_sha
+  git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+  live_json=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
+  [[ -n "$live_json" ]] || return 1
+  live_sha=$(json_get "$live_json" "sourceSha")
+  [[ -z "$live_sha" ]] && live_sha=$(json_get "$live_json" "gitSha")
+  is_git_ancestor "$BUILD_BASE_SHA" "$live_sha"
+}
+
 # ═══════════════════════════════════════════════════════════════
 # Step 0: Git sync
 # ═══════════════════════════════════════════════════════════════
@@ -330,6 +340,16 @@ fi
 
 echo -e "${GREEN}   ✅ 已分配版本号: v${NEW_NAME} (build ${NEW_CODE})${NC}"
 
+if [[ "$FORCE" == "0" ]] && live_apk_includes_build_base; then
+  LIVE_VERSION=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
+  LIVE_NAME=$(json_get "$LIVE_VERSION" "versionName")
+  LIVE_CODE=$(json_get_int "$LIVE_VERSION" "versionCode")
+  echo -e "${GREEN}   ✅ 线上 APK 已包含本次源码，复用 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
+  echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
+  complete_release "false" "" 0 "" "live apk already includes build base"
+  exit 0
+fi
+
 # 临时写入 build.gradle（编译后自动还原，不进 git）
 sed -i "s/versionCode ${OLD_CODE}/versionCode ${NEW_CODE}/" "$GRADLE_PATH"
 sed -i "s/versionName \"${OLD_NAME}\"/versionName \"${NEW_NAME}\"/" "$GRADLE_PATH"
@@ -393,9 +413,15 @@ if [[ "$FORCE" == "0" ]]; then
   if [[ -n "$SERVER_NOW" ]]; then
     SERVER_NOW_CODE=$(json_get_int "$SERVER_NOW" "versionCode")
     if [[ "$SERVER_NOW_CODE" -ge "$NEW_CODE" ]]; then
-      echo -e "${YELLOW}⚠️  APK 发布已中止：服务器已有更新版本 (build $SERVER_NOW_CODE >= $NEW_CODE)${NC}"
-      echo -e "${YELLOW}   如确要覆盖（不推荐）：重跑加 --force${NC}"
-      complete_release "false" "" 0 "" "server already has newer apk: build $SERVER_NOW_CODE"
+      if live_apk_includes_build_base; then
+        SERVER_NOW_NAME=$(json_get "$SERVER_NOW" "versionName")
+        echo -e "${GREEN}   ✅ 服务器已有更新 APK 且包含本次源码，复用 v${SERVER_NOW_NAME} (build ${SERVER_NOW_CODE})${NC}"
+        complete_release "false" "" 0 "" "superseded by live apk that includes build base"
+      else
+        echo -e "${YELLOW}⚠️  APK 发布已中止：服务器已有更新版本 (build $SERVER_NOW_CODE >= $NEW_CODE)${NC}"
+        echo -e "${YELLOW}   如确要覆盖（不推荐）：重跑加 --force${NC}"
+        complete_release "false" "" 0 "" "server already has newer apk: build $SERVER_NOW_CODE"
+      fi
       exit 0
     fi
     echo -e "${GREEN}   ✅ 服务器版本检查通过 (服务器 $SERVER_NOW_CODE < 本次 $NEW_CODE)${NC}"
