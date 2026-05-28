@@ -99,7 +99,9 @@ internal class MainTaskActions(
         MainTaskWorkServiceActions(
             activity = activity,
             prefs = prefs,
-            appendTaskMessage = taskMessageRouterActions::appendTaskMessage,
+            appendTaskMessage = { raw, traceId, projectId, conversationId, isDevelopment ->
+                taskMessageRouterActions.appendTaskMessage(raw, traceId, projectId, conversationId, isDevelopment)
+            },
             appendRawMessage = { raw -> workflowActions().assistantRawMessageActions.appendMessage(raw) }
         )
     }
