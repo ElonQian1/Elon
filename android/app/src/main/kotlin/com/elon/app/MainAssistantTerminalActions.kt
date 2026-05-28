@@ -45,7 +45,9 @@ internal class MainAssistantTerminalActions(
         return aiMessageWithCurrentEvidence(
             finalReplyMessage(content, visibleApkUrl, imageUrl, wasDevelopment),
             chatAttachmentFromImageUrl(imageUrl)
-        )
+        ).let { msg ->
+            if (visibleApkUrl != null) msg.copy(apkUrl = visibleApkUrl) else msg
+        }
     }
 
     fun handleError(rawMessage: String): ChatMessage {

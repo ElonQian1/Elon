@@ -29,7 +29,8 @@ data class ChatMessage(
     var evidenceExpanded: Boolean = false,
     var evidenceWorking: Boolean = false,
     var senderLabel: String? = null,
-    var id: String? = null
+    var id: String? = null,
+    var apkUrl: String? = null
 )
 
 class ChatAdapter(
@@ -39,8 +40,9 @@ class ChatAdapter(
     private val onRetryFailedSend: ((ChatMessage) -> Unit)? = null,
     private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
     private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
-) :
-    RecyclerView.Adapter<ChatAdapter.VH>() {
+) : RecyclerView.Adapter<ChatAdapter.VH>() {
+    /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
+    var onApkAction: ((action: String, url: String) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
     private var selectionMode = false
     private var selectionChangedListener: ((Int) -> Unit)? = null
@@ -60,6 +62,7 @@ class ChatAdapter(
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
         val userAvatar: TextView? = view.findViewById(R.id.userAvatar)
         val friendAvatar: TextView? = view.findViewById(R.id.friendAvatar)
+        val apkActionBar: LinearLayout? = view.findViewById(R.id.apkActionBar)
         var shimmerAnimator: ValueAnimator? = null
         var evidenceShimmerAnimator: ValueAnimator? = null
 
@@ -150,6 +153,26 @@ class ChatAdapter(
         holder.pauseButton?.visibility = if (canPause) View.VISIBLE else View.GONE
         holder.pauseButton?.setOnClickListener {
             if (message.role in activeWorkflowRoles) onPauseWork?.invoke()
+        }
+        bindApkActionBar(holder, message)
+    }
+
+    private fun bindApkActionBar(holder: VH, message: ChatMessage) {
+        val bar = holder.apkActionBar ?: return
+        val url = message.apkUrl
+        if (url.isNullOrBlank()) {
+            bar.visibility = View.GONE
+            return
+        }
+        bar.visibility = View.VISIBLE
+        bar.findViewById<android.widget.Button>(R.id.apkInstallBtn)?.setOnClickListener {
+            onApkAction?.invoke("install", url)
+        }
+        bar.findViewById<android.widget.Button>(R.id.apkCopyBtn)?.setOnClickListener {
+            onApkAction?.invoke("copy", url)
+        }
+        bar.findViewById<android.widget.Button>(R.id.apkShareBtn)?.setOnClickListener {
+            onApkAction?.invoke("share", url)
         }
     }
 

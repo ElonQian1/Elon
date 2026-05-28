@@ -101,7 +101,6 @@ internal fun finalReplyMessage(content: String, apkUrl: String?, imageUrl: Strin
     }
     return buildString {
         append(main)
-        if (wasDevelopment) apkUrl?.let { append("\n\n下载新 APK：$it") }
         imageUrl?.takeIf { !main.contains(it) }?.let { append("\n\n图片链接：$it") }
     }
 }

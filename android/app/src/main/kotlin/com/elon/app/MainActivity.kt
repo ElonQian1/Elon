@@ -15,6 +15,30 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
+
+    /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
+    private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
+        adapter.onApkAction = { action, url -> handleApkChatAction(action, url) }
+        chatAdapter = adapter
+    }
+
+    private fun handleApkChatAction(action: String, url: String) {
+        when (action) {
+            "install" -> ApkChatInstaller.downloadAndInstall(this, url, s.http)
+            "copy" -> {
+                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("apk_url", url))
+                android.widget.Toast.makeText(this, "链接已复制", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            "share" -> startActivity(
+                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                }
+            )
+        }
+    }
     /** 运行时可变状态与工具实例（OkHttpClient 含超时配置）。 */
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
@@ -91,7 +115,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             projects = s.projects,
             setActiveProjectIndex = { s.activeProjectIndex = it },
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             uiTools = { uiTools },
             modelActions = { modelActions },
             projectStateActions = { projectStateActions },
@@ -133,7 +157,7 @@ class MainActivity : AppCompatActivity() {
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             setupNavigation = { navigationController.setupNavigation() },
             setupQuickActions = { profileQuickActions.setupQuickActions() },
             setupBackHandling = { navigationController.setupBackHandling() },
@@ -440,7 +464,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverUrl = serverUrl,
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             showProjectSpace = { title, animate -> navigationController.showProjectSpace(title, animate) },
             showProjectChannelChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
@@ -541,7 +565,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             setActiveProjectIndex = { s.activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
@@ -646,7 +670,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverUrl = serverUrl,
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
@@ -666,7 +690,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverUrl = serverUrl,
-            setChatAdapter = { chatAdapter = it },
+            setChatAdapter = ::setAdapterAndWireApkActions,
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,

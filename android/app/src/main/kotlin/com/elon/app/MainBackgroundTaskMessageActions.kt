@@ -33,9 +33,11 @@ internal class MainBackgroundTaskMessageActions(
         val content = parsed.optString("message").takeIf { it.isNotBlank() } ?: "任务已完成。"
         val apkUrl = parsed.optString("apk_url").takeIf { it.isNotBlank() && it != "null" }
         val imageUrl = parsed.optString("image_url").takeIf { it.isNotBlank() && it != "null" }
+        val visibleApkUrl = if (isDevelopment) apkUrl else null
         return ChatMessage(
             "ai",
-            finalReplyMessage(content, if (isDevelopment) apkUrl else null, imageUrl, isDevelopment)
+            finalReplyMessage(content, visibleApkUrl, imageUrl, isDevelopment),
+            apkUrl = visibleApkUrl
         )
     }
 
