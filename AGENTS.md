@@ -29,5 +29,5 @@
 ## 脚本优先
 
 - 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`。
-- Android 可安装端发布：业务代码 commit + push 后运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，再运行 `scripts\check-task-complete.ps1 -Kind AndroidFeature`。
+- Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；再运行 `scripts\check-task-complete.ps1 -Kind AndroidFeature`（Windows）。
 - 脚本已经负责版本 claim/finish、构建、上传、并发保护和清理。AI 不要手搓这些步骤。
