@@ -330,6 +330,20 @@ impl Store {
 
         let now = now();
         let conn = self.conn()?;
+
+        // 同一用户不允许创建同名活跃项目
+        let exists: bool = conn
+            .query_row(
+                "SELECT 1 FROM projects WHERE created_by = ?1 AND name = ?2 AND status != 'deleted' LIMIT 1",
+                params![user_id, name],
+                |_| Ok(true),
+            )
+            .optional()?
+            .unwrap_or(false);
+        if exists {
+            return Err(anyhow!("你已经有一个叫「{}」的项目了，不能重复创建。", name));
+        }
+
         let tx = conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO projects (

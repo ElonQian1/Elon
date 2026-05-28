@@ -52,6 +52,7 @@ bash scripts/ai-task-preflight.sh --create-worktree
 | Android APK 发布 | `.github/instructions/git-deploy-workflow.instructions.md` 的 APK 部署章节 |
 | Gradle 下载或 Android 首次编译环境异常 | `docs/android-setup.md` |
 | Copilot 配置或 VS Code Customizations | `.github/copilot-instructions.md`、`.github/prompts/`、`.github/agents/`、`.github/skills/` |
+| 查询聊天记录、会话时间线、APK下载地址溯源、诊断"为什么这么慢" | `docs/query-chat-records.md` |
 
 `copilot-instructions.md` 是 Copilot/VS Code 入口。Codex 只有在任务涉及 Copilot 配置、VS Code Customizations、或比较 Copilot/Codex 行为时才需要读取它。
 

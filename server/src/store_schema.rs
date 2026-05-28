@@ -56,6 +56,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (6, "好友群聊基础表与未读状态", migration_v6),
     (7, "项目空间频道与共享频道消息", migration_v7),
     (8, "好友与群聊消息附件引用", migration_v8),
+    (9, "同一用户禁止重名活跃项目", migration_v9),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -468,6 +469,19 @@ fn migration_v7(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_channel_read_states_user
           ON project_channel_read_states(user_id, project_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v9：同一用户禁止重名活跃项目 ────────────────────────────────────────────────
+
+fn migration_v9(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_owner_name_active
+          ON projects(created_by, name)
+          WHERE status != 'deleted';
         "#,
     )?;
     Ok(())
