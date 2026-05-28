@@ -5,11 +5,11 @@ use tokio::sync::mpsc::UnboundedSender;
 pub(crate) use crate::ai_cli_output::truncate_chars;
 pub(crate) use crate::ai_cli_process::{
     cap_option_timeout, configured_timeout_cap, run_cli_command_traced,
-    supports_codex_sessions, CliOutput,
+    supports_codex_sessions, supports_copilot_sessions, CliOutput,
 };
 #[cfg(test)]
 pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
-pub(crate) use crate::ai_cli_runner::codex_thread_uri;
+pub(crate) use crate::ai_cli_runner::{codex_thread_uri, copilot_session_sentinel};
 pub use crate::ai_cli_prewarm::prewarm_codex_session;
 
 use crate::{
@@ -125,7 +125,9 @@ pub async fn run_with_workspace(
     if skip_native_session {
         record_cli_session_skipped(state, trace_id, "run_workspace", "tiny_chat_fast_path");
     }
-    let use_native_sessions = supports_codex_sessions(&option) && !skip_native_session;
+    // Codex CLI：tiny chat 跳过会话以节省 token；CopilotCLI：始终启用会话续接
+    let use_native_sessions = (supports_codex_sessions(&option) && !skip_native_session)
+        || supports_copilot_sessions(&option);
     let session_state = if use_native_sessions {
         native_session_scope.as_ref().and_then(|scope| {
             state
@@ -448,6 +450,26 @@ pub async fn run_with_workspace(
             &thread_id,
         );
         stored_session_id = Some(thread_id);
+    }
+    // CopilotCLI 不在 stdout 输出 session UUID，用 sentinel key 标记"此会话已有历史上下文"，
+    // 下次请求时 cli_args_for_run 会在 args 前插入 --continue 续接同目录最近的会话。
+    if output.success
+        && stored_session_id.is_none()
+        && supports_copilot_sessions(&option)
+    {
+        if let Some(scope) = native_session_scope.as_ref().filter(|_| use_native_sessions) {
+            let sentinel = copilot_session_sentinel(&scope.conversation_id);
+            let _ = state.store.upsert_native_agent_session(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                &sentinel,
+            );
+            stored_session_id = Some(sentinel);
+        }
     }
     if output.success {
         if let (Some(scope), Some(session_id)) = (

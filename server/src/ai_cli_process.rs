@@ -33,6 +33,26 @@ pub(crate) fn supports_codex_sessions(option: &AiCliOption) -> bool {
             .unwrap_or(false)
 }
 
+/// CopilotCLI 原生会话检测。
+///
+/// 会话续接策略：已有 `native_session_id` → 在 args 前插入 `--continue`；
+/// 首次运行成功后自动写入 sentinel key，下次请求即可续接。
+pub(crate) fn supports_copilot_sessions(option: &AiCliOption) -> bool {
+    option.provider.eq_ignore_ascii_case("copilot")
+        || option.id.to_ascii_lowercase().contains("copilot")
+        || option
+            .bin
+            .rsplit(|c| c == '/' || c == '\\')
+            .next()
+            .map(|bin| bin.eq_ignore_ascii_case("copilot"))
+            .unwrap_or(false)
+}
+
+/// 任意原生会话支持（Codex 或 CopilotCLI）。
+pub(crate) fn supports_any_native_sessions(option: &AiCliOption) -> bool {
+    supports_codex_sessions(option) || supports_copilot_sessions(option)
+}
+
 pub(crate) fn configured_timeout_cap(env_name: &str, default_secs: u64) -> u64 {
     std::env::var(env_name)
         .ok()
