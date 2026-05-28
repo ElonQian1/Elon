@@ -303,6 +303,14 @@ if [[ "$SKIP_BUILD" == "0" ]]; then
   if [[ -f "$ANDROID_DIR/gradlew" ]]; then
     chmod +x "$ANDROID_DIR/gradlew"
     ./gradlew assembleRelease
+  elif [[ -n "${GRADLE_BIN:-}" && -x "$GRADLE_BIN" ]]; then
+    "$GRADLE_BIN" assembleRelease --no-daemon
+  elif command -v gradle >/dev/null 2>&1; then
+    gradle assembleRelease --no-daemon
+  elif [[ -x "$HOME/.gradle/wrapper/dists/gradle-8.6-bin/afr5mpiioh2wthjmwnkmdsd5w/gradle-8.6/bin/gradle" ]]; then
+    "$HOME/.gradle/wrapper/dists/gradle-8.6-bin/afr5mpiioh2wthjmwnkmdsd5w/gradle-8.6/bin/gradle" assembleRelease --no-daemon
+  elif [[ -x "$HOME/.gradle/wrapper/dists/gradle-8.6-bin/9kfl6m3v6ux5ki4g2exnpl853/gradle-8.6/bin/gradle" ]]; then
+    "$HOME/.gradle/wrapper/dists/gradle-8.6-bin/9kfl6m3v6ux5ki4g2exnpl853/gradle-8.6/bin/gradle" assembleRelease --no-daemon
   else
     java -classpath "$ANDROID_DIR/gradle/wrapper/gradle-wrapper.jar" \
       org.gradle.wrapper.GradleWrapperMain assembleRelease
