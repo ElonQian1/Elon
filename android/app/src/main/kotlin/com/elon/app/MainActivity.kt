@@ -102,6 +102,11 @@ class MainActivity : AppCompatActivity() {
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
             activeWorkControlActions = { activeWorkControlActions },
             sendEnabledActions = { inputActions.sendEnabledActions },
+            isProjectConversationVisible = {
+                !friendChatActions.isActive() &&
+                    !groupChatActions.isActive() &&
+                    !projectSpaceController.isChannelActive()
+            },
             drainNextQueuedMessage = { projectId, conversationId ->
                 inputActions.runningInputActions.drainNextQueuedMessage(projectId, conversationId)
             }

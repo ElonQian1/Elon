@@ -19,6 +19,7 @@ internal class MainTaskActions(
     private val conversationTaskRegistryActions: () -> MainConversationTaskRegistryActions,
     private val activeWorkControlActions: () -> MainActiveWorkControlActions,
     private val sendEnabledActions: () -> MainSendEnabledActions,
+    private val isProjectConversationVisible: () -> Boolean,
     private val drainNextQueuedMessage: (String?, String?) -> Unit
 ) {
     val taskWorkEventActions: MainTaskWorkEventActions by lazy {
@@ -73,6 +74,7 @@ internal class MainTaskActions(
             conversationTaskKey = conversationTaskRegistryActions()::conversationTaskKey,
             activeConversationTaskKey = conversationTaskRegistryActions()::activeConversationTaskKey,
             taskIsDevelopment = { key -> runningConversationTasks[key]?.isDevelopment },
+            isProjectConversationVisible = isProjectConversationVisible,
             appendActiveMessage = { raw -> workflowActions().assistantRawMessageActions.appendMessage(raw) },
             appendBackgroundTaskMessage = { raw, key, isDevelopment ->
                 backgroundTaskMessageActions.appendBackgroundTaskMessage(raw, key, isDevelopment)

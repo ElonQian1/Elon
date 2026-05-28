@@ -7,6 +7,7 @@ internal class MainTaskMessageRouterActions(
     private val conversationTaskKey: (String, String) -> String,
     private val activeConversationTaskKey: () -> String?,
     private val taskIsDevelopment: (String) -> Boolean?,
+    private val isProjectConversationVisible: () -> Boolean,
     private val appendActiveMessage: (String) -> Unit,
     private val appendBackgroundTaskMessage: (String, String?, Boolean) -> Unit,
     private val removeConversationTask: (String?, String?, String?) -> ConversationTaskState?,
@@ -24,7 +25,7 @@ internal class MainTaskMessageRouterActions(
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         val key = taskKey(traceId, projectId, conversationId)
-        if (key == activeConversationTaskKey()) {
+        if (key == activeConversationTaskKey() && isProjectConversationVisible()) {
             appendActiveMessage(raw)
         } else {
             val effectiveIsDevelopment = isDevelopment
