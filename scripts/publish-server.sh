@@ -52,6 +52,24 @@ is_local_server_deploy() {
   [ -d "$REMOTE_DIR" ] && [ -w "$(dirname "$REMOTE_BIN")" ] && command -v systemctl >/dev/null 2>&1
 }
 
+read_deployed_server_sha() {
+  local deployed_sha_file="$REMOTE_DIR/.deployed-sha"
+  if is_local_server_deploy; then
+    cat "$deployed_sha_file" 2>/dev/null || true
+  else
+    # shellcheck disable=SC2086
+    ssh $SSH_OPTS "$SERVER" "cat $deployed_sha_file 2>/dev/null || true" 2>/dev/null | tr -d '[:space:]' || true
+  fi
+}
+
+server_runtime_unchanged_since() {
+  local base_sha="$1"
+  [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  git -C "$REPO_ROOT" merge-base --is-ancestor "$base_sha" "$SHA_BIG" 2>/dev/null || return 1
+  git -C "$REPO_ROOT" diff --quiet "$base_sha" "$SHA_BIG" -- \
+    server/src server/Cargo.toml server/homecli-proto
+}
+
 # ── 路径推导（兼容任意 PC、任意路径）──────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
@@ -122,6 +140,14 @@ SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
 SERVER_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$SERVER_DIR/Cargo.toml" | head -1)
 echo -e "${GREEN}   ✅ 最新 SHA: $SHA${NC}"
+DEPLOYED_SERVER_SHA=$(read_deployed_server_sha)
+if [ "$FORCE" -eq 0 ] && [ -n "$DEPLOYED_SERVER_SHA" ] && [ "$DEPLOYED_SERVER_SHA" != "$SHA_BIG" ]; then
+  if server_runtime_unchanged_since "$DEPLOYED_SERVER_SHA"; then
+    echo -e "${GREEN}   ✅ 后端运行代码未变化，复用线上 binary（deployed ${DEPLOYED_SERVER_SHA:0:7}）${NC}"
+    echo -e "${GRAY}      如需强制重编译/重启：bash scripts/publish-server.sh --force${NC}"
+    exit 0
+  fi
+fi
 echo -e "${GREEN}   ✅ 后端版本: v$SERVER_VERSION${NC}"
 
 # ── 2. 环境检查 ───────────────────────────────────────────────
@@ -234,13 +260,7 @@ echo -e "${GREEN}   ✅ 上传完成${NC}"
 
 # ── 4.5 SHA 顺序检查（防止旧版编译慢覆盖新版）───────────────
 if [ "$FORCE" -eq 0 ]; then
-  DEPLOYED_SHA_FILE="$REMOTE_DIR/.deployed-sha"
-  if is_local_server_deploy; then
-    SERVER_SHA=$(cat "$DEPLOYED_SHA_FILE" 2>/dev/null || echo '')
-  else
-    # shellcheck disable=SC2086
-    SERVER_SHA=$(ssh $SSH_OPTS "$SERVER" "cat $DEPLOYED_SHA_FILE 2>/dev/null || echo ''" | tr -d '[:space:]')
-  fi
+  SERVER_SHA=$(read_deployed_server_sha)
   if [ -n "$SERVER_SHA" ] && [ "$SERVER_SHA" != "$SHA_BIG" ]; then
     # 检查服务器 SHA 是否是我们的祖先（是祖先 = 我们更新）
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SERVER_SHA" "$SHA_BIG" 2>/dev/null; then

@@ -235,6 +235,14 @@ get_deployed_apk_sha() {
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && echo "$sha" || echo ""
 }
 
+apk_runtime_unchanged_since() {
+  local base_sha="$1"
+  [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  git -C "$REPO_ROOT" merge-base --is-ancestor "$base_sha" "$BUILD_BASE_SHA" 2>/dev/null || return 1
+  git -C "$REPO_ROOT" diff --quiet "$base_sha" "$BUILD_BASE_SHA" -- \
+    android/app/src/main android/app/build.gradle android/build.gradle android/settings.gradle
+}
+
 is_git_ancestor() {
   local ancestor="$1" descendant="$2"
   [[ "$ancestor" =~ ^[0-9a-f]{40}$ && "$descendant" =~ ^[0-9a-f]{40}$ ]] || return 1
@@ -257,6 +265,19 @@ if [[ "$BUILD_BASE_SHA" != "$ORIGIN_MAIN_SHA" ]]; then
   fi
 fi
 echo -e "${GREEN}   基线 SHA: ${BUILD_BASE_SHA:0:7}${NC}"
+
+DEPLOYED_APK_SHA=$(get_deployed_apk_sha)
+if [[ "$FORCE" == "0" && -n "$DEPLOYED_APK_SHA" ]]; then
+  if [[ "$DEPLOYED_APK_SHA" == "$BUILD_BASE_SHA" ]] || apk_runtime_unchanged_since "$DEPLOYED_APK_SHA"; then
+    LIVE_VERSION=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
+    LIVE_NAME=$(json_get "$LIVE_VERSION" "versionName")
+    LIVE_CODE=$(json_get_int "$LIVE_VERSION" "versionCode")
+    echo -e "${GREEN}   ✅ APK 运行代码未变化，复用线上发布版 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
+    echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
+    echo -e "${GRAY}      如需强制重新打包：bash scripts/publish-apk.sh --force --changelog=\"$CHANGELOG\"${NC}"
+    exit 0
+  fi
+fi
 
 # ═══════════════════════════════════════════════════════════════
 # Step 1: Claim 版本号
