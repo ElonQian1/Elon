@@ -477,8 +477,29 @@ fn migration_v7(conn: &Connection) -> Result<()> {
 // ── v9：同一用户禁止重名活跃项目 ────────────────────────────────────────────────
 
 fn migration_v9(conn: &Connection) -> Result<()> {
+    // 先将已存在的重复项目（同一用户、同名、非 deleted）中较旧的标记为 deleted，
+    // 保留每组中 created_at 最新的一条；这样才能安全建立唯一索引。
     conn.execute_batch(
         r#"
+        UPDATE projects
+           SET status = 'deleted'
+         WHERE status != 'deleted'
+           AND id NOT IN (
+               SELECT id FROM projects p2
+                WHERE p2.created_by = projects.created_by
+                  AND p2.name       = projects.name
+                  AND p2.status    != 'deleted'
+                ORDER BY p2.created_at DESC
+                LIMIT 1
+           )
+           AND (created_by, name) IN (
+               SELECT created_by, name
+                 FROM projects
+                WHERE status != 'deleted'
+             GROUP BY created_by, name
+               HAVING COUNT(*) > 1
+           );
+
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_owner_name_active
           ON projects(created_by, name)
           WHERE status != 'deleted';
