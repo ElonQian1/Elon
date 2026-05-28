@@ -142,15 +142,21 @@ internal class AgentVoiceBridge(context: Context) {
 
     /**
      * 是否属于"引擎本身不可用，应该切换下一个"的错误码。
-     * 不包含 NO_MATCH / SPEECH_TIMEOUT：那两个是"用户没说话或没说清"，
-     * 不是引擎故障；也不包含 INSUFFICIENT_PERMISSIONS（切引擎也没用）。
+     * 反向白名单：以下错误码切引擎也没用，其它一律当引擎故障重试。
+     *   - NO_MATCH(7) / SPEECH_TIMEOUT(6)：用户没说话或没说清
+     *   - INSUFFICIENT_PERMISSIONS(9)：权限问题
+     *   - AUDIO(3)：录音硬件问题
+     * 已知会被覆盖的引擎故障码：
+     *   2=NETWORK, 4=SERVER, 5=CLIENT, 8=RECOGNIZER_BUSY,
+     *   11=SERVER_DISCONNECTED, 12=LANGUAGE_NOT_SUPPORTED,
+     *   13=LANGUAGE_UNAVAILABLE, 14=CANNOT_CHECK_SUPPORT, ...
      */
     private fun isEngineFailure(code: Int): Boolean = when (code) {
-        SpeechRecognizer.ERROR_NETWORK,
-        SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
-        SpeechRecognizer.ERROR_CLIENT,
-        SpeechRecognizer.ERROR_SERVER -> true
-        else -> false
+        SpeechRecognizer.ERROR_NO_MATCH,
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS,
+        SpeechRecognizer.ERROR_AUDIO -> false
+        else -> true
     }
 
     private fun handleEngineError(code: Int, message: String) {

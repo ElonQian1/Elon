@@ -222,6 +222,10 @@ class StreamingASR(private val context: Context) {
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别器忙"
                 SpeechRecognizer.ERROR_SERVER -> "服务器错误"
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "语音超时"
+                11 -> "服务连接被断开"           // ERROR_SERVER_DISCONNECTED (API 31+)
+                12 -> "语言不支持"               // ERROR_LANGUAGE_NOT_SUPPORTED
+                13 -> "语言未下载"               // ERROR_LANGUAGE_UNAVAILABLE
+                14 -> "无法检查语言支持"          // ERROR_CANNOT_CHECK_SUPPORT
                 else -> "未知错误: $error"
             }
             
