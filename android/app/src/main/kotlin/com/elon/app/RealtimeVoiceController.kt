@@ -34,6 +34,9 @@ internal class RealtimeVoiceController(
     private val onTranscriptFinal: (String) -> Unit = {},
     private val onVirtualMicFed: (Long) -> Unit = {},
     private val onCliDispatched: (Boolean, String) -> Unit = { _, _ -> },
+    private val onAiProgress: (String) -> Unit = {},
+    private val onAiDone: (message: String, apkUrl: String?) -> Unit = { _, _ -> },
+    private val onAiError: (String) -> Unit = {},
     private val onError: (String) -> Unit = {},
 ) {
     private val recorder = RealtimePcmRecorder(
@@ -63,6 +66,9 @@ internal class RealtimeVoiceController(
                 override fun onVirtualMicFed(bytes: Long): Unit = onVirtualMicFed(bytes)
                 override fun onCliDispatched(ok: Boolean, message: String): Unit =
                     onCliDispatched(ok, message)
+                override fun onAiProgress(text: String) = onAiProgress(text)
+                override fun onAiDone(message: String, apkUrl: String?) = onAiDone(message, apkUrl)
+                override fun onAiError(message: String) = onAiError(message)
 
                 override fun onServerError(code: String, message: String) {
                     onError("[$code] $message")

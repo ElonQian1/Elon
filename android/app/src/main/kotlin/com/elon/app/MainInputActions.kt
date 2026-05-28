@@ -326,6 +326,7 @@ internal class MainInputActions(
             userId = userId,
             selectedAgent = { modelActions().selectedAgentForRequest() },
             activeConversation = projectStateActions()::activeConversation,
+            activeProject = projectStateActions()::activeProject,
             voiceHoldButton = { requireNotNull(inputComposerViews).voiceHoldButton },
             sendVoiceAttachment = ::sendVoiceAttachment,
             setVoiceMode = { voiceMode = it },

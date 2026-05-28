@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -28,6 +29,7 @@ internal class MainSpeechInputActions(
     private val userId: () -> String,
     private val selectedAgent: () -> String?,
     private val activeConversation: () -> AppConversation,
+    private val activeProject: () -> AppProject,
     private val voiceHoldButton: () -> TextView,
     private val sendVoiceAttachment: (PendingAttachment, String) -> Unit,
     private val setVoiceMode: (Boolean) -> Unit,
@@ -40,6 +42,8 @@ internal class MainSpeechInputActions(
     private var isSpeechCanceled = false
     private var speechSessionId = 0
     private var translationGeneration = 0
+    // 方案 B：实时语音 → 转写 → AI 投递
+    private var realtimeController: RealtimeVoiceController? = null
 
     fun startSpeechToText() {
         if (activeConversation().ended) return
@@ -47,7 +51,7 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
-        if (startDirectVoiceRecording()) return
+        if (startRealtimeVoice()) return
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
             return
@@ -59,6 +63,7 @@ internal class MainSpeechInputActions(
     }
 
     fun stopSpeechToText() {
+        if (stopRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
             stopDirectVoiceRecording()
             return
@@ -82,6 +87,7 @@ internal class MainSpeechInputActions(
     }
 
     fun cancelSpeechToText() {
+        if (cancelRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
             cancelDirectVoiceRecording()
             return
@@ -104,7 +110,91 @@ internal class MainSpeechInputActions(
         voiceRecorder.cancel()
         resetSpeechRecognizer()
         isListeningForSpeech = false
+        realtimeController?.shutdown()
+        realtimeController = null
     }
+
+    // ─── 方案 B：实时语音 → OpenAI 转写 → 投递 AI ────────────────────────────
+
+    /** 按下按钮时尝试启动 Realtime 语音。有 projectId 时返回 true 并接管流程。 */
+    private fun startRealtimeVoice(): Boolean {
+        val project = activeProject()
+        val projectId = project.id.takeIf { it.isNotBlank() } ?: return false
+        val conversation = activeConversation()
+
+        isHoldActive = true
+        isSpeechCanceled = false
+        voiceHoldButton().text = "连接中..."
+
+        val ctrl = RealtimeVoiceController(
+            context = activity,
+            baseHttpUrl = serverUrl,
+            userId = userId(),
+            mode = RealtimeVoiceWsClient.Mode.Transcribe,
+            projectId = projectId,
+            conversationId = conversation.id,
+            onTranscriptDelta = { text ->
+                activity.runOnUiThread { voiceHoldButton().text = text.take(24) }
+            },
+            onTranscriptFinal = { text ->
+                activity.runOnUiThread { voiceHoldButton().text = "识别：${text.take(20)}" }
+            },
+            onCliDispatched = { ok, _ ->
+                activity.runOnUiThread {
+                    voiceHoldButton().text = if (ok) "AI 处理中…" else "按住 说话"
+                }
+            },
+            onAiProgress = { text ->
+                activity.runOnUiThread { voiceHoldButton().text = "AI: ${text.take(22)}" }
+            },
+            onAiDone = { message, _ ->
+                activity.runOnUiThread {
+                    voiceHoldButton().text = "按住 说话"
+                    Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
+                }
+                realtimeController = null
+            },
+            onAiError = { msg ->
+                activity.runOnUiThread {
+                    voiceHoldButton().text = "按住 说话"
+                    Toast.makeText(activity, "AI 出错：${msg.take(60)}", Toast.LENGTH_SHORT).show()
+                }
+                realtimeController = null
+            },
+            onError = { msg ->
+                activity.runOnUiThread {
+                    voiceHoldButton().text = "按住 说话"
+                    Toast.makeText(activity, "语音失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
+                }
+                realtimeController = null
+            },
+        )
+        realtimeController = ctrl
+        ctrl.start(activity.lifecycleScope)
+        return true
+    }
+
+    /** 松开按钮：发 commit，等待转写完成。若不在 Realtime 模式返回 false。 */
+    private fun stopRealtimeVoice(): Boolean {
+        val ctrl = realtimeController ?: return false
+        ctrl.commitUtterance()
+        isHoldActive = false
+        voiceHoldButton().text = "识别中…"
+        return true
+    }
+
+    /** 取消：立即关闭 Realtime 会话。若不在 Realtime 模式返回 false。 */
+    private fun cancelRealtimeVoice(): Boolean {
+        val ctrl = realtimeController ?: return false
+        ctrl.shutdown()
+        realtimeController = null
+        isHoldActive = false
+        isSpeechCanceled = true
+        voiceHoldButton().text = "按住 说话"
+        return true
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
 
     private fun startDirectVoiceRecording(): Boolean {
         translationGeneration += 1

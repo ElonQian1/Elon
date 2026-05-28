@@ -103,7 +103,10 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
         conversation_id,
     };
 
-    // 3. 并发：客户端循环 + 转写事件循环
+    // 3. AI 回复通道：AI 任务产生的 WsMessage JSON 通过这个 channel 流回
+    let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+    // 4. 并发：客户端循环 + 转写事件循环 + AI 回复流
     loop {
         tokio::select! {
             biased;
@@ -157,7 +160,8 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                         let _ = sender.send(Message::Text(
                             ServerEvent::TranscriptFinal { text: text.clone() }.to_json()
                         )).await;
-                        match dispatch_transcript(&state, &target, &text).await {
+                        // 每次 Final 都用同一个 ai_reply_tx（可 clone，多轮共用一个 rx）
+                        match dispatch_transcript(&state, &target, &text, ai_reply_tx.clone()).await {
                             Ok(outcome) => {
                                 let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
                                     ok: outcome.ok,
@@ -180,6 +184,10 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                     }
                     TranscriptEvent::Closed => break,
                 }
+            }
+            // AI 任务产生的进度/完成/错误消息，透传给手机
+            Some(raw_json) = ai_reply_rx.recv() => {
+                let _ = sender.send(Message::Text(raw_json)).await;
             }
         }
     }

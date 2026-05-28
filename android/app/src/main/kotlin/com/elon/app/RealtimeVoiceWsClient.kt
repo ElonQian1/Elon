@@ -40,6 +40,12 @@ internal class RealtimeVoiceWsClient(
         fun onTranscriptFinal(text: String) {}
         fun onVirtualMicFed(bytes: Long) {}
         fun onCliDispatched(ok: Boolean, message: String) {}
+        /** AI 任务执行中的进度消息（对应 WsMessage.Progress）。 */
+        fun onAiProgress(text: String) {}
+        /** AI 任务完成（对应 WsMessage.Done）。 */
+        fun onAiDone(message: String, apkUrl: String?) {}
+        /** AI 任务出错（对应 WsMessage.Error）。 */
+        fun onAiError(message: String) {}
         fun onServerError(code: String, message: String) {}
         fun onClosed() {}
     }
@@ -125,10 +131,22 @@ internal class RealtimeVoiceWsClient(
                 obj.optBoolean("ok"),
                 obj.optString("message"),
             )
-            "error" -> listener.onServerError(
-                obj.optString("code"),
+            // WsMessage JSON 透传：AI 任务进度/完成/错误
+            "progress" -> listener.onAiProgress(obj.optString("message"))
+            "done" -> listener.onAiDone(
                 obj.optString("message"),
+                obj.optString("apk_url").takeIf { it.isNotBlank() },
             )
+            "error" -> {
+                // "error" 既可能来自 ServerEvent（code+message），也可能来自 WsMessage（message）
+                val code = obj.optString("code")
+                val msg = obj.optString("message")
+                if (code.isNotBlank()) {
+                    listener.onServerError(code, msg)
+                } else {
+                    listener.onAiError(msg)
+                }
+            }
         }
     }
 }
