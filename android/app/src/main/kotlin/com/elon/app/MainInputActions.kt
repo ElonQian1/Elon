@@ -118,6 +118,23 @@ internal class MainInputActions(
         speechInputActions = null
     }
 
+    private fun sendVoiceAttachment(attachment: PendingAttachment, message: String) {
+        if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
+            attachment.file.delete()
+            Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
+            return
+        }
+        pendingAttachments.add(attachment)
+        binding.inputEdit.setText(message)
+        binding.inputEdit.setSelection(binding.inputEdit.text.length)
+        if (voiceMode) {
+            voiceMode = false
+            voiceModeActions.applyVoiceMode()
+        }
+        refreshPendingAttachmentPreview()
+        sendMessageActions.sendMessage()
+    }
+
     val adaptiveInputHeightActions: MainAdaptiveInputHeightActions by lazy {
         MainAdaptiveInputHeightActions(
             binding = binding,
@@ -310,6 +327,7 @@ internal class MainInputActions(
             selectedAgent = { modelActions().selectedAgentForRequest() },
             activeConversation = projectStateActions()::activeConversation,
             voiceHoldButton = { requireNotNull(inputComposerViews).voiceHoldButton },
+            sendVoiceAttachment = ::sendVoiceAttachment,
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() }
         ).also { speechInputActions = it }

@@ -346,6 +346,10 @@ pub async fn append_project_cli_attachment_artifacts(
                 note.push_str(&format!("\n  image_dimensions: {}", dimensions));
             }
             note.push_str("\n  Image context: inspect cli_workspace_path directly when this message asks about the image.");
+        } else if mime_type.starts_with("audio/") || kind == "audio" {
+            note.push_str(
+                "\n  Voice context: this is the user's raw uploaded voice input. Prefer cli_workspace_path over any placeholder message text when the runtime can inspect or transcribe audio.",
+            );
         }
         notes.push(note);
 

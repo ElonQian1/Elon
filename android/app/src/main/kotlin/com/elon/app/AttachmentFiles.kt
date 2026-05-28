@@ -174,6 +174,10 @@ internal fun guessMimeType(name: String): String {
         "gif" -> "image/gif"
         "pdf" -> "application/pdf"
         "txt" -> "text/plain"
+        "m4a", "mp4" -> "audio/mp4"
+        "aac" -> "audio/aac"
+        "wav" -> "audio/wav"
+        "mp3" -> "audio/mpeg"
         else -> "application/octet-stream"
     }
 }
@@ -190,6 +194,10 @@ internal fun extensionForAttachment(name: String, mimeType: String): String {
         "image/gif" -> "gif"
         "application/pdf" -> "pdf"
         "text/plain" -> "txt"
+        "audio/mp4" -> "m4a"
+        "audio/aac" -> "aac"
+        "audio/wav" -> "wav"
+        "audio/mpeg" -> "mp3"
         else -> "bin"
     }
 }

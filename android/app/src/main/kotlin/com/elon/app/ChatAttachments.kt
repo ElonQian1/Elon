@@ -141,7 +141,9 @@ internal fun pendingAttachmentSummary(attachments: List<PendingAttachment>): Str
     return when {
         attachments.size == 1 && imageCount == 1 -> "已选择 1 张图片"
         attachments.size == imageCount -> "已选择 $imageCount 张图片"
+        attachments.size == 1 && attachments[0].kind == "audio" -> "已选择 1 条语音"
         attachments.size == 1 -> "已选择 1 个附件"
+        attachments.any { it.kind == "audio" } -> "已选择 ${attachments.size} 个附件，含语音"
         imageCount > 0 -> "已选择 ${attachments.size} 个附件，含 $imageCount 张图片"
         else -> "已选择 ${attachments.size} 个附件"
     }

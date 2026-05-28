@@ -74,6 +74,10 @@ pub(crate) fn append_project_attachment_notes(
             note.push_str(
                 "\n  Image context: this is an actual uploaded chat image. Open/view the local file path above when answering image questions; do not answer from the file name alone.",
             );
+        } else if mime_type.starts_with("audio/") || attachment.kind.as_deref() == Some("audio") {
+            note.push_str(
+                "\n  Voice context: this is the user's raw uploaded voice input. Prefer the audio file over any placeholder message text when the runtime can inspect or transcribe audio.",
+            );
         }
         notes.push(note);
     }

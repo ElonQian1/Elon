@@ -29,9 +29,11 @@ internal class MainSpeechInputActions(
     private val selectedAgent: () -> String?,
     private val activeConversation: () -> AppConversation,
     private val voiceHoldButton: () -> TextView,
+    private val sendVoiceAttachment: (PendingAttachment, String) -> Unit,
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit
 ) {
+    private val voiceRecorder = VoiceAudioRecorder(activity)
     private var speechRecognizer: SpeechRecognizer? = null
     private var isListeningForSpeech = false
     private var isHoldActive = false
@@ -45,6 +47,7 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
+        if (startDirectVoiceRecording()) return
         if (!SpeechRecognizer.isRecognitionAvailable(activity)) {
             Toast.makeText(activity, "当前设备不可用语音识别", Toast.LENGTH_SHORT).show()
             return
@@ -56,6 +59,10 @@ internal class MainSpeechInputActions(
     }
 
     fun stopSpeechToText() {
+        if (voiceRecorder.isRecording) {
+            stopDirectVoiceRecording()
+            return
+        }
         isHoldActive = false
         if (!isListeningForSpeech) {
             speechSessionId += 1
@@ -75,6 +82,10 @@ internal class MainSpeechInputActions(
     }
 
     fun cancelSpeechToText() {
+        if (voiceRecorder.isRecording) {
+            cancelDirectVoiceRecording()
+            return
+        }
         if (!isListeningForSpeech && speechRecognizer == null) return
         isHoldActive = false
         speechSessionId += 1
@@ -90,8 +101,49 @@ internal class MainSpeechInputActions(
         speechSessionId += 1
         translationGeneration += 1
         isHoldActive = false
+        voiceRecorder.cancel()
         resetSpeechRecognizer()
         isListeningForSpeech = false
+    }
+
+    private fun startDirectVoiceRecording(): Boolean {
+        translationGeneration += 1
+        isHoldActive = true
+        isSpeechCanceled = false
+        val started = voiceRecorder.start()
+        if (!started) {
+            DebugTraceStore.record("voice_direct_record_start_failed", emptyMap())
+            return false
+        }
+        DebugTraceStore.record("voice_direct_record_start", emptyMap())
+        voiceHoldButton().text = "松开 发送语音"
+        return true
+    }
+
+    private fun stopDirectVoiceRecording() {
+        isHoldActive = false
+        voiceHoldButton().text = "上传语音..."
+        val attachment = voiceRecorder.stopToAttachment()
+        voiceHoldButton().text = "按住 说话"
+        if (attachment == null) {
+            DebugTraceStore.record("voice_direct_record_empty", emptyMap())
+            Toast.makeText(activity, "语音太短或录音失败，请重试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        DebugTraceStore.record(
+            "voice_direct_record_done",
+            mapOf("bytes" to attachment.file.length(), "mime_type" to attachment.mimeType)
+        )
+        sendVoiceAttachment(attachment, DIRECT_VOICE_MESSAGE)
+    }
+
+    private fun cancelDirectVoiceRecording() {
+        isHoldActive = false
+        translationGeneration += 1
+        isSpeechCanceled = true
+        voiceRecorder.cancel()
+        voiceHoldButton().text = "按住 说话"
+        DebugTraceStore.record("voice_direct_record_canceled", emptyMap())
     }
 
     private fun startSpeechSession(attempt: SpeechAttempt) {
@@ -338,6 +390,8 @@ internal class MainSpeechInputActions(
         // Android speech engines are much more consistent with zh-CN than zh-Hans-CN.
         private const val SPEECH_LANGUAGE_TAG = "zh-CN"
         private const val SPEECH_RETRY_DELAY_MS = 180L
+        private const val DIRECT_VOICE_MESSAGE =
+            "我上传了一段原始语音，请优先根据语音附件理解我的需求。"
     }
 
     private data class SpeechAttempt(
