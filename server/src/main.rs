@@ -78,6 +78,14 @@ mod tools_apk;
 mod tools_git;
 mod types;
 mod user_api;
+mod voice_audio_format;
+mod voice_config;
+mod voice_openai_realtime;
+mod voice_protocol;
+mod voice_pwcat;
+mod voice_to_cli;
+mod voice_ws_transcribe;
+mod voice_ws_virtual_mic;
 mod web;
 mod ws_message;
 

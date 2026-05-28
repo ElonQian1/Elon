@@ -12,7 +12,8 @@ use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_downloads, project_git, project_membership, project_space,
-    project_store, release_claim, speech_translate, user_api, web,
+    project_store, release_claim, speech_translate, user_api, voice_ws_transcribe,
+    voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -192,6 +193,17 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/ws/notify", get(app_update::ws_notify_handler))
         // 全局 WS 通道：统一实时推送（更新 + 未来好友消息等）
         .route("/ws/app", get(global_ws::global_ws_handler))
+        // ── 实时语音通道（两条路并行测试）─────────────────────────────────
+        // 方案 A：Android PCM → 服务器 PipeWire 虚拟麦克风（投喂 Codex CLI 本地音频采集）
+        .route(
+            "/ws/voice/virtual-mic",
+            get(voice_ws_virtual_mic::ws_virtual_mic_handler),
+        )
+        // 方案 B：Android PCM → OpenAI Realtime Transcription → 转写文本 → CLI
+        .route(
+            "/ws/voice/transcribe",
+            get(voice_ws_transcribe::ws_transcribe_handler),
+        )
         .route(
             "/api/user/:user_id/projects/:project_id",
             delete(project_deletion::delete_user_project),
