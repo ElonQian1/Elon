@@ -25,6 +25,7 @@ internal class ChatAiSideMenuView(
     private val conversations: () -> List<AppConversation>,
     private val activeConversationIndex: () -> Int,
     private val openConversation: (Int) -> Unit,
+    private val copyConversationIdentity: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
     private val openProjectManagement: () -> Unit,
     private val showCreateConversationDialog: () -> Unit,
@@ -133,7 +134,8 @@ internal class ChatAiSideMenuView(
                     onClick = {
                         requestClose(true)
                         openConversation(index)
-                    }
+                    },
+                    onLongClick = { copyConversationIdentity(index) }
                 )
             )
         }
@@ -180,7 +182,8 @@ internal class ChatAiSideMenuView(
         title: String,
         active: Boolean,
         working: Boolean,
-        onClick: () -> Unit
+        onClick: () -> Unit,
+        onLongClick: (() -> Unit)? = null
     ): TextView {
         return menuText(title).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -202,6 +205,10 @@ internal class ChatAiSideMenuView(
                 }
             }
             setOnClickListener { onClick() }
+            setOnLongClickListener {
+                onLongClick?.invoke()
+                onLongClick != null
+            }
         }
     }
 

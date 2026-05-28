@@ -10,8 +10,9 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
-    peer_relay, project_api, project_attachments, project_chat, project_downloads, project_git,
-    project_membership, project_space, project_store, release_claim, user_api, web,
+    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
+    project_downloads, project_git, project_membership, project_space, project_store,
+    release_claim, user_api, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -165,6 +166,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_chat::prewarm_project),
         )
         .route(
+            "/api/projects/:project_id/conversations/:conversation_id/identity",
+            get(project_conversation_identity::conversation_identity_project),
+        )
+        .route(
             "/api/projects/:project_id/attachments",
             post(project_attachments::upload_project_attachment).layer(DefaultBodyLimit::max(
                 project_attachments::MAX_PROJECT_ATTACHMENT_BYTES,
@@ -193,6 +198,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/prewarm",
             post(project_chat::prewarm_user_project),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/conversations/:conversation_id/identity",
+            get(project_conversation_identity::conversation_identity_user_project),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/attachments",

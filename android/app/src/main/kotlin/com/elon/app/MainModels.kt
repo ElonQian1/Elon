@@ -8,6 +8,7 @@ data class AppConversation(
     var subtitle: String,
     var updatedAt: Long,
     var ended: Boolean = false,
+    var codexThreadUri: String? = null,
     val messages: MutableList<ChatMessage>
 )
 

@@ -1,9 +1,9 @@
 use anyhow::Result;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 
 use super::{
-    clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
-    Store, TaskSnapshot, MAX_TASK_EVENTS_PER_TASK,
+    AdminConversationEntry, ConversationMessage, MAX_TASK_EVENTS_PER_TASK, Store, TaskSnapshot,
+    clean_optional, new_id, now, safe_external_id,
 };
 
 impl Store {
@@ -225,6 +225,31 @@ impl Store {
             params![thread_id, now(), project_id, user_id, conversation_id],
         )?;
         Ok(())
+    }
+
+    pub fn latest_task_codex_thread_id(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<String>> {
+        let conversation_id = safe_external_id(conversation_id, "default");
+        self.conn()?
+            .query_row(
+                "SELECT codex_thread_id
+                 FROM tasks
+                 WHERE project_id = ?1
+                   AND user_id = ?2
+                   AND conversation_id = ?3
+                   AND codex_thread_id IS NOT NULL
+                   AND codex_thread_id <> ''
+                 ORDER BY updated_at DESC, created_at DESC
+                 LIMIT 1",
+                params![project_id, user_id, conversation_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
     }
 
     pub fn record_task_event(&self, task_id: &str, event_json: &str) -> Result<()> {

@@ -492,6 +492,7 @@ class MainActivity : AppCompatActivity() {
             conversations = { projectStateActions.conversations },
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
+            copyConversationIdentity = conversationIdentityActions::copyConversationIdentity,
             isConversationWorking = homeListActions::isConversationWorking,
             showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
             projects = { s.projects },
@@ -536,6 +537,18 @@ class MainActivity : AppCompatActivity() {
             renderConversationList = homeListActions::renderConversationList,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             onConversationsChanged = { projectSpaceController.renderActiveSpace() }
+        )
+    }
+
+    private val conversationIdentityActions: MainConversationIdentityActions by lazy {
+        MainConversationIdentityActions(
+            activity = this,
+            http = s.http,
+            serverUrl = serverUrl,
+            userId = userId,
+            activeProject = projectStateActions::activeProject,
+            saveProjects = projectStateActions::saveProjects,
+            copyText = externalActions::copyText
         )
     }
 

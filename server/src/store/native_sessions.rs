@@ -1,7 +1,7 @@
 use anyhow::Result;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 
-use super::{new_id, now, safe_external_id, NativeAgentSessionState, Store};
+use super::{NativeAgentSessionState, Store, new_id, now, safe_external_id};
 
 impl Store {
     pub fn get_native_agent_session(
@@ -23,6 +23,32 @@ impl Store {
                 workspace_path,
             )?
             .map(|state| state.native_session_id))
+    }
+
+    pub fn latest_native_agent_session_for_conversation(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+        provider: &str,
+    ) -> Result<Option<String>> {
+        let conversation_id = safe_external_id(conversation_id, "default");
+        self.conn()?
+            .query_row(
+                "SELECT native_session_id
+                 FROM agent_native_sessions
+                 WHERE project_id = ?1
+                   AND user_id = ?2
+                   AND conversation_id = ?3
+                   AND provider = ?4
+                   AND status = 'active'
+                 ORDER BY updated_at DESC
+                 LIMIT 1",
+                params![project_id, user_id, conversation_id, provider],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
     }
 
     pub fn get_native_agent_session_state(
