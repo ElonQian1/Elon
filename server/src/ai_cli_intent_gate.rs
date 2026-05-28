@@ -10,7 +10,7 @@ use std::{path::Path, sync::Arc};
 
 use crate::{
     ai_cli::{IntentGateResult, NativeSessionScope},
-    ai_cli_chat::{intent_gate_fallback_chat_result},
+    ai_cli_chat::intent_gate_fallback_chat_result,
     ai_cli_native_session::should_retry_without_native_session,
     ai_cli_output::{extract_thread_id, parse_intent_gate_result},
     ai_cli_process::{

@@ -7,10 +7,10 @@
 ///   - 加入 / 退出 项目
 ///   - 列出项目成员
 ///   - 列出用户已加入（非自建）的项目
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{now, PublicProjectItem, ProjectMemberEntry, Store};
+use super::{now, ProjectMemberEntry, PublicProjectItem, Store};
 
 impl Store {
     // ─── 商店浏览 ────────────────────────────────────────────────────────────
@@ -68,7 +68,6 @@ impl Store {
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
                     owner_id: row.get(11).unwrap_or_default(),
-
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

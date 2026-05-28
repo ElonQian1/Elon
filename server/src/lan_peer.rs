@@ -21,12 +21,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{AppState, LanPeerEntry};

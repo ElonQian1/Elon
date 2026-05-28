@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     extract::{Path as AxumPath, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     response::Response,
 };
 use std::{collections::HashMap, sync::Arc};

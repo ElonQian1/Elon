@@ -1,4 +1,4 @@
-﻿//! 项目级 AI agent 在隔离执行 worktree 中的运行循环（从 project_chat.rs 抽出）。
+//! 项目级 AI agent 在隔离执行 worktree 中的运行循环（从 project_chat.rs 抽出）。
 //!
 //! 这里只负责：从 ProjectConversationWorkspace 启动 agent 任务、转发 WS 事件、
 //! 在结束时回收 worktree。project_chat.rs 调用本模块发起执行。
@@ -41,7 +41,8 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
 
     // Step 1: AI 开始理解需求
     let _ = tx.send(
-        WsMessage::progress_step("Codex 正在分析需求，准备进入开发流程…", 1, 4, "ai_thinking").to_json(),
+        WsMessage::progress_step("Codex 正在分析需求，准备进入开发流程…", 1, 4, "ai_thinking")
+            .to_json(),
     );
 
     let agent_task = tokio::spawn(async move {
@@ -101,7 +102,8 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     if terminal_is_done {
         // Step 3: 代码修改完成，准备提交合并
         let _ = tx.send(
-            WsMessage::progress_step("代码修改完成，正在提交并合并…", 3, 4, "code_committing").to_json(),
+            WsMessage::progress_step("代码修改完成，正在提交并合并…", 3, 4, "code_committing")
+                .to_json(),
         );
     }
 
@@ -122,14 +124,12 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                     );
                 }
                 let _ = merge_tx.send(
-                    WsMessage::progress("代码已在会话分支完成，正在等待项目合并锁。",).to_json(),
+                    WsMessage::progress("代码已在会话分支完成，正在等待项目合并锁。").to_json(),
                 );
             })
             .await;
         let _keep_merge_permit = merge_permit;
-        let _ = tx.send(
-            WsMessage::progress("正在把会话分支串行合并回项目主工作区。",).to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在把会话分支串行合并回项目主工作区。").to_json());
         match merge_conversation_worktree(&execution_workspace) {
             Ok(summary) => {
                 if let Some(trace_id) = trace_id.as_deref() {
@@ -145,7 +145,8 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                 }
                 // Step 4: 合并完成，任务即将交付
                 let _ = tx.send(
-                    WsMessage::progress_step("分支合并完成，任务即将交付…", 4, 4, "deploying").to_json(),
+                    WsMessage::progress_step("分支合并完成，任务即将交付…", 4, 4, "deploying")
+                        .to_json(),
                 );
                 let _ = tx.send(WsMessage::progress(summary).to_json());
             }

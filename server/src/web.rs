@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use axum::{
     extract::State,
-    http::{HeaderMap, HeaderValue, header},
+    http::{header, HeaderMap, HeaderValue},
     response::{Html, IntoResponse},
 };
 

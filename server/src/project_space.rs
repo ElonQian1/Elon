@@ -3,17 +3,17 @@
 /// 这是商城“加入项目”之后的协作空间入口。普通频道消息写入共享频道；
 /// AI 开发频道可以把一次成员发起的开发任务写回同一频道，供项目成员共同跟进。
 use axum::{
-    Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
-    project_channel_summary::{ChannelSummaryTask, spawn_channel_summary},
+    project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
     project_keys::clean_trace_id,
     types::AppState,

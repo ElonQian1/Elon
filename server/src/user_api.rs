@@ -335,12 +335,7 @@ pub async fn get_user_avatar(
         Err(_) => return json_error(StatusCode::BAD_REQUEST, "头像数据无效"),
     };
 
-    (
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, mime)],
-        bytes,
-    )
-        .into_response()
+    (StatusCode::OK, [(header::CONTENT_TYPE, mime)], bytes).into_response()
 }
 
 #[derive(Deserialize)]

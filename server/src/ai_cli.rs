@@ -3,19 +3,17 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub(crate) use crate::ai_cli_output::truncate_chars;
+pub use crate::ai_cli_prewarm::prewarm_codex_session;
 pub(crate) use crate::ai_cli_process::{
-    cap_option_timeout, configured_timeout_cap, run_cli_command_traced,
-    supports_codex_sessions, supports_copilot_sessions, CliOutput,
+    cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
+    supports_copilot_sessions, CliOutput,
 };
 #[cfg(test)]
 pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
 pub(crate) use crate::ai_cli_runner::{codex_thread_uri, copilot_session_sentinel};
-pub use crate::ai_cli_prewarm::prewarm_codex_session;
 
 use crate::{
-    ai_cli_chat::{
-        chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message,
-    },
+    ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
     ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
     ai_cli_native_session::{
         append_native_session_continuity, native_session_continuity_note,
@@ -102,22 +100,13 @@ pub async fn run_with_workspace(
 
     let android_task = development_task && looks_like_android_task(user_message);
     if development_task {
-        let _ = tx.send(
-            WsMessage::progress("正在准备项目工作区。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在准备项目工作区。").to_json());
         for note in environment_notes(user_message, &option) {
             let _ = tx.send(WsMessage::progress(note).to_json());
         }
-        let _ = tx.send(
-            WsMessage::progress("AI 助手正在处理你的请求。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("AI 助手正在处理你的请求。").to_json());
     } else {
-        let _ = tx.send(
-            WsMessage::progress("正在思考。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在思考。").to_json());
     }
 
     let workspace_key = workspace.display().to_string();
@@ -171,8 +160,7 @@ pub async fn run_with_workspace(
     }
     if native_session_id.is_some() {
         let _ = tx.send(
-            WsMessage::progress("Restoring Codex CLI context for this conversation.")
-            .to_json(),
+            WsMessage::progress("Restoring Codex CLI context for this conversation.").to_json(),
         );
     }
 
@@ -242,7 +230,7 @@ pub async fn run_with_workspace(
             );
             let _ = tx.send(
                 WsMessage::progress("旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。")
-                .to_json(),
+                    .to_json(),
             );
             native_session_id = None;
             prompt_bootstrapped = false;
@@ -326,10 +314,10 @@ pub async fn run_with_workspace(
         );
         let _ = tx.send(
             WsMessage::progress(if lightweight_chat_task {
-                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
-                } else {
-                    "Codex CLI session expired; starting a fresh session."
-                })
+                "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
+            } else {
+                "Codex CLI session expired; starting a fresh session."
+            })
             .to_json(),
         );
         native_session_id = None;
@@ -453,11 +441,11 @@ pub async fn run_with_workspace(
     }
     // CopilotCLI 不在 stdout 输出 session UUID，用 sentinel key 标记"此会话已有历史上下文"，
     // 下次请求时 cli_args_for_run 会在 args 前插入 --continue 续接同目录最近的会话。
-    if output.success
-        && stored_session_id.is_none()
-        && supports_copilot_sessions(&option)
-    {
-        if let Some(scope) = native_session_scope.as_ref().filter(|_| use_native_sessions) {
+    if output.success && stored_session_id.is_none() && supports_copilot_sessions(&option) {
+        if let Some(scope) = native_session_scope
+            .as_ref()
+            .filter(|_| use_native_sessions)
+        {
             let sentinel = copilot_session_sentinel(&scope.conversation_id);
             let _ = state.store.upsert_native_agent_session(
                 &scope.project_id,
@@ -499,16 +487,14 @@ pub async fn run_with_workspace(
     );
 
     let apk_url = if android_task && output.success {
-        let _ = tx.send(
-            WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。").to_json());
         let apk_url =
             tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
         if apk_url.is_none() {
             let _ = tx.send(
-                WsMessage::progress("未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
-                        )
+                WsMessage::progress(
+                    "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。",
+                )
                 .to_json(),
             );
         }

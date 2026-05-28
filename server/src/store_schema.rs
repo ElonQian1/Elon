@@ -57,7 +57,11 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (7, "项目空间频道与共享频道消息", migration_v7),
     (8, "好友与群聊消息附件引用", migration_v8),
     (9, "同一用户禁止重名活跃项目", migration_v9),
-    (10, "tasks.codex_thread_id + conversation_timeline 视图", migration_v10),
+    (
+        10,
+        "tasks.codex_thread_id + conversation_timeline 视图",
+        migration_v10,
+    ),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────

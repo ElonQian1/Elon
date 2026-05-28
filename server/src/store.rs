@@ -373,7 +373,10 @@ impl Store {
             .optional()?
             .unwrap_or(false);
         if exists {
-            return Err(anyhow!("你已经有一个叫「{}」的项目了，不能重复创建。", name));
+            return Err(anyhow!(
+                "你已经有一个叫「{}」的项目了，不能重复创建。",
+                name
+            ));
         }
 
         let tx = conn.unchecked_transaction()?;

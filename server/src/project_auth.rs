@@ -1,7 +1,7 @@
 use axum::{
-    Json,
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -35,9 +35,11 @@ pub fn login_inner(
     let user = state
         .store
         .authenticate_password(&req.account, &req.password)?;
-    let (token, expires_at) = state
-        .store
-        .create_session(&user.id, req.device_name.as_deref(), req.apk_version.as_deref())?;
+    let (token, expires_at) = state.store.create_session(
+        &user.id,
+        req.device_name.as_deref(),
+        req.apk_version.as_deref(),
+    )?;
     Ok((token, expires_at, user))
 }
 
@@ -51,9 +53,11 @@ pub fn register_inner(
         req.nickname.as_deref(),
         Some("user"),
     )?;
-    let (token, expires_at) = state
-        .store
-        .create_session(&user.id, req.device_name.as_deref(), req.apk_version.as_deref())?;
+    let (token, expires_at) = state.store.create_session(
+        &user.id,
+        req.device_name.as_deref(),
+        req.apk_version.as_deref(),
+    )?;
     Ok((token, expires_at, user))
 }
 

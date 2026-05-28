@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc, time::Instant};
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
         cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
     },
     ai_cli_prompts::build_prewarm_cli_prompt,
-    ai_cli_trace::{CliTraceContext, record_prewarm_session_hit},
+    ai_cli_trace::{record_prewarm_session_hit, CliTraceContext},
     types::AppState,
 };
 

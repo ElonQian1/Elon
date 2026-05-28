@@ -1,4 +1,4 @@
-﻿//! Codex CLI `--json` 流式事件解析。
+//! Codex CLI `--json` 流式事件解析。
 //!
 //! 单一职责：把 codex CLI 输出的一行 JSON 翻译成 0~N 条 WebSocket 消息
 //! （`tool_call` / `tool_result` / `usage` / `progress`）。
@@ -124,10 +124,7 @@ where
         "agent_message" => {
             if let Some(text) = item.get("text").and_then(Value::as_str) {
                 let trimmed = text.trim();
-                let display = trimmed
-                    .strip_prefix("用户可见：")
-                    .unwrap_or(trimmed)
-                    .trim();
+                let display = trimmed.strip_prefix("用户可见：").unwrap_or(trimmed).trim();
                 if !display.is_empty() {
                     out.push(
                         WsMessage::AssistantMessage {
@@ -362,7 +359,8 @@ mod tests {
 
     #[test]
     fn stream_event_skips_blank_after_prefix_strip() {
-        let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：   "}}"#;
+        let line =
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：   "}}"#;
         assert!(stream_event_to_ws_messages(line).is_empty());
     }
 

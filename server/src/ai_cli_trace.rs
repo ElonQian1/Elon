@@ -1,8 +1,8 @@
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    ai_cli::{CliOutput, NativeSessionScope, codex_thread_uri},
+    ai_cli::{codex_thread_uri, CliOutput, NativeSessionScope},
     ai_cli_output::{extract_thread_id, truncate_chars},
     intent_router,
     types::{AiCliOption, AppState},

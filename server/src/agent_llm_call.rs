@@ -17,7 +17,11 @@ use crate::{
     types::{AgentConfig, AppState},
 };
 /// 调用 LLM API（OpenAI 兼容接口）
-pub(crate) async fn call_llm(state: &Arc<AppState>, agent: &AgentConfig, messages: &[Value]) -> Result<Value> {
+pub(crate) async fn call_llm(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+) -> Result<Value> {
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({

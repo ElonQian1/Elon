@@ -1,9 +1,9 @@
 use axum::{
-    Json,
     body::{Body, Bytes},
     extract::{Path as AxumPath, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use sha2::{Digest, Sha256};
 use std::{
@@ -407,8 +407,7 @@ fn parse_positive_u32(value: &str) -> Option<u32> {
 fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<String> {
     Some(format!(
         "{}x{}",
-        attachment.image_width?,
-        attachment.image_height?
+        attachment.image_width?, attachment.image_height?
     ))
 }
 

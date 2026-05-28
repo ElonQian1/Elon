@@ -97,7 +97,6 @@ pub(crate) fn append_project_attachment_notes(
 fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<String> {
     Some(format!(
         "{}x{}",
-        attachment.image_width?,
-        attachment.image_height?
+        attachment.image_width?, attachment.image_height?
     ))
 }

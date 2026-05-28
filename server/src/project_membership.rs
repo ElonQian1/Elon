@@ -6,10 +6,10 @@
 ///   GET    /api/projects/:id/members     列出项目所有成员（公开项目无需成员身份）
 ///   PATCH  /api/projects/:id/visibility  设置公开/私有（仅 owner）
 use axum::{
-    Json,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -154,12 +154,12 @@ pub async fn update_visibility(
         return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可修改可见性");
     }
 
-    let join_mode = req
-        .join_mode
-        .as_deref()
-        .unwrap_or("open");
+    let join_mode = req.join_mode.as_deref().unwrap_or("open");
     if !["open", "approval", "invite"].contains(&join_mode) {
-        return json_error(StatusCode::BAD_REQUEST, "join_mode 必须为 open / approval / invite");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "join_mode 必须为 open / approval / invite",
+        );
     }
 
     match state

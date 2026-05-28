@@ -1,4 +1,4 @@
-﻿use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result};
 use std::sync::Arc;
 use std::{
     path::{Path, PathBuf},
@@ -57,8 +57,10 @@ pub fn create_project_workspace(
         match project_type {
             "android" => {
                 if let Some(template_dir) = template_dir("android") {
-                    copy_dir_all(&template_dir, project_root)?;                    let pkg = derive_android_package_id(project_root);
-                    patch_android_application_id(project_root, &pkg)?;                } else {
+                    copy_dir_all(&template_dir, project_root)?;
+                    let pkg = derive_android_package_id(project_root);
+                    patch_android_application_id(project_root, &pkg)?;
+                } else {
                     std::fs::write(
                         project_root.join("README.md"),
                         format!(
@@ -380,8 +382,7 @@ pub async fn exec_via_agent(
                 info!(%agent_id, %pid, "exec_via_agent: task started");
                 if let Some(tx) = progress_tx {
                     let _ = tx.send(
-                        WsMessage::progress(format!("[PC agent] 任务启动 pid={}", pid))
-                        .to_json(),
+                        WsMessage::progress(format!("[PC agent] 任务启动 pid={}", pid)).to_json(),
                     );
                 }
             }
@@ -390,10 +391,7 @@ pub async fn exec_via_agent(
                     if let Some(tx) = progress_tx {
                         let s = String::from_utf8_lossy(&bytes);
                         for line in s.lines().filter(|l| !l.trim().is_empty()) {
-                            let _ = tx.send(
-                                WsMessage::progress(line.to_string())
-                                .to_json(),
-                            );
+                            let _ = tx.send(WsMessage::progress(line.to_string()).to_json());
                         }
                     }
                     output_bytes.extend_from_slice(&bytes);
@@ -404,10 +402,8 @@ pub async fn exec_via_agent(
                     if let Some(tx) = progress_tx {
                         let s = String::from_utf8_lossy(&bytes);
                         for line in s.lines().filter(|l| !l.trim().is_empty()) {
-                            let _ = tx.send(
-                                WsMessage::progress(format!("[stderr] {}", line))
-                                .to_json(),
-                            );
+                            let _ = tx
+                                .send(WsMessage::progress(format!("[stderr] {}", line)).to_json());
                         }
                     }
                     output_bytes.extend_from_slice(&bytes);

@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::{
     path::{Path, PathBuf},
     process::Stdio,

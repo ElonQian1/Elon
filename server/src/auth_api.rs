@@ -14,7 +14,9 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
-    project_auth::{auth_from_headers, json_error, login_inner, register_inner, LoginRequest, RegisterRequest},
+    project_auth::{
+        auth_from_headers, json_error, login_inner, register_inner, LoginRequest, RegisterRequest,
+    },
     types::AppState,
 };
 

@@ -185,7 +185,10 @@ async fn run_dispatch_with_workspace(
             info!("delivery fast-path: mixed request, pre-sending apk url before ai");
             let _ = tx.send(
                 WsMessage::AssistantMessage {
-                    text: format!("APK 已就绪，你可以先下载：{}\n\n继续处理你的其他需求……", apk_url),
+                    text: format!(
+                        "APK 已就绪，你可以先下载：{}\n\n继续处理你的其他需求……",
+                        apk_url
+                    ),
                 }
                 .to_json(),
             );
@@ -198,7 +201,8 @@ async fn run_dispatch_with_workspace(
                 Some(existing) => format!("{existing}\n\n{build_note}"),
                 None => build_note.to_string(),
             };
-            let _ = tx.send(WsMessage::progress("项目还没有编译过，正在为你构建第一个 APK……").to_json());
+            let _ = tx
+                .send(WsMessage::progress("项目还没有编译过，正在为你构建第一个 APK……").to_json());
             return run_backend_with_workspace(
                 user_id,
                 workspace,

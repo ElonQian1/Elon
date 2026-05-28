@@ -1,7 +1,7 @@
-﻿use std::{
+use std::{
     sync::{
-        Arc,
         atomic::{AtomicU64, Ordering},
+        Arc,
     },
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
