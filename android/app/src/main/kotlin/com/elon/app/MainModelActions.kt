@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.os.SystemClock
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -55,6 +56,7 @@ internal class MainModelActions(
 
     private var modelPopup: PopupWindow? = null
     private var modelPopupShowsAbove = true
+    private var lastModelPopupDismissedAt = 0L
     private val chevronInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     fun selectedAgentForRequest(): String? {
@@ -152,6 +154,9 @@ internal class MainModelActions(
     fun showModelPopupOrLoad() {
         if (modelPopup?.isShowing == true) {
             dismissModelPopup(animate = true)
+            return
+        }
+        if (recentlyDismissedModelPopup()) {
             return
         }
         if (modelOptions.isEmpty()) {
@@ -288,6 +293,7 @@ internal class MainModelActions(
         }
         modelPopup = popup
         popup.setOnDismissListener {
+            lastModelPopupDismissedAt = SystemClock.uptimeMillis()
             if (modelPopup === popup) {
                 modelPopup = null
             }
@@ -306,6 +312,11 @@ internal class MainModelActions(
             .scaleY(1f)
             .setDuration(120L)
             .start()
+    }
+
+    private fun recentlyDismissedModelPopup(): Boolean {
+        val elapsed = SystemClock.uptimeMillis() - lastModelPopupDismissedAt
+        return elapsed in 0L..MODEL_POPUP_REOPEN_SUPPRESS_MS
     }
 
     private fun dismissModelPopup(animate: Boolean) {
@@ -471,5 +482,6 @@ internal class MainModelActions(
     private companion object {
         const val PREF_SELECTED_AGENT = "selected_agent_name"
         const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
+        const val MODEL_POPUP_REOPEN_SUPPRESS_MS = 260L
     }
 }
