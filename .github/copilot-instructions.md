@@ -65,6 +65,10 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 最终回复必须包含 APK 发布状态、版本号、发布 SHA、服务器 `/app/version.json` 校验结果和下载地址。
 
+**防慢构建覆盖**：如果构建期间 `origin/main` 已前进，且服务器 `.apk-deployed-sha` 已包含本次基础提交，脚本应中止本地编译/发布，直接让 AI 测试线上新版；如果 `origin/main` 已前进但线上 APK 未确认包含本次基础提交，必须停止上传，要求基于最新 `main` 重新发布。
+
+**并发保护**：两台 PC 同时部署时脚本内置 SHA 顺序检查，若另一台已部署更新版本，本机旧版编译完成后会自动中止，不会回退服务器版本。需强制覆盖时用 `-Force`。
+
 > 详细流程见：`docs/ai-agent-workflow.md`
 
 ---
@@ -107,6 +111,17 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
 
 > ⚠️ **绝对禁止**：改完代码不 commit 直接运行脚本部署——脚本基于 git HEAD，未提交内容不会进入部署。
+
+## VS Code Copilot 工作方式记忆（Copilot 专属）
+
+- VS Code Copilot 是 agent loop：先组装上下文，再用工具读取/编辑/运行命令，工具结果回到上下文后继续迭代，最后验证和交付。
+- 上下文来自系统指令、customizations、用户消息、会话历史、隐式编辑器/Git 状态、显式 `#` 引用和工具输出；没有进入上下文的内容对模型不可见。
+- 项目级稳定规则放在 `.github/copilot-instructions.md`；局部规则放在 `.github/instructions/*.instructions.md`；重复任务放在 `.github/prompts/*.prompt.md`；角色和工具受限的流程放在 `.github/agents/*.agent.md`。
+- VS Code 也会识别 `AGENTS.md`、`CLAUDE.md` 和组织级 instructions；管理入口优先使用 `Chat: Open Customizations`，避免多处复制长规则。
+- 本项目已提供 `/elon-dev-task`、`/elon-apk-release` prompt，以及 `elon-planner`、`elon-implementer`、`elon-reviewer` agents；优先用这些入口执行标准工作流。
+- 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
+
+---
 
 ## 参考文档（按需读取）
 
