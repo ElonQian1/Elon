@@ -6,7 +6,13 @@
 
 ## 项目定位
 
-**云端APK开发平台**：用户在手机APK上用自然语言和AI对话，描述自己想要的功能；AI 在真实 Git 工作区修改代码，在本地开发机/桌面版 Codex 当前机器构建产物，再把后端 binary / APK 上传到服务器部署或分发，最后把新的APK下载链接发回用户手机。用户无需任何编程知识即可定制自己的移动应用。
+**云端APK开发平台**：用户在手机APK上用自然语言和AI对话，描述自己想要的功能；AI 在真实 Git 工作区修改代码，构建产物后上传到服务器部署或分发，最后把新的APK下载链接发回用户手机。用户无需任何编程知识即可定制自己的移动应用。
+
+**elon APK 的双重身份**：
+- **elon 平台客户端**：用户通过 APK 与服务器 AI 对话、管理项目
+- **用户子项目开发入口**：用户在 APK 内描述需求，AI CLI 在服务器上修改/构建用户自己的子项目
+
+**开发 elon 自项目的 AI CLI 不限于 Windows**：Copilot（VS Code）在 Windows 开发机上运行；Codex CLI / Claude CLI / Copilot CLI 等在 **Linux 服务器**上运行，同样会修改 elon 自身代码、发布 APK。两个环境都必须能独立完成完整发布链路。
 
 ---
 
@@ -55,14 +61,14 @@
 6. **反馈用户**：将新APK下载链接通过对话界面发回用户手机
 ### ⚠️ elon 自项目 vs 用户子项目：构建方式完全不同
 
-**构建环境根本不同**：elon 自身 APK 在**本地 Windows 开发机**上构建并签名；用户子项目在**Linux/Ubuntu 服务器**上构建，服务器没有签名密钥。
+**唯一判断规则**：看改的是不是 `elon` 仓库本身（`android/`、`server/`）—— 与用哪个 CLI、在哪台机器无关。
 
-| 场景 | 运行环境 | 判断方法 | 正确构建方式 |
-|---|---|---|---|
-| **改动 elon 自身**（`android/`、`server/`、任何本仓库文件） | 本地 Windows 开发机 | 仓库根目录含 `scripts/publish-apk.ps1` | 必须用 `scripts\publish-apk.ps1`（→ `assembleRelease` + 签名） |
-| **给用户构建他们的子项目** | Linux/Ubuntu 服务器 | 通过 `build_project()` 工具调用，工作目录在 `/opt/elon/projects/<id>/` | `assembleDebug`（服务器无签名密钥，debug 正确） |
+| 场景 | 判断方法 | 正确构建方式 |
+|---|---|---|
+| **改动 elon 自身**（本仓库任何文件） | 工作目录在 elon 仓库根（含 `scripts/publish-apk.*`） | Windows：`scripts\publish-apk.ps1`；Linux：`bash scripts/publish-apk.sh` → `assembleRelease` + 签名 |
+| **给用户构建他们的子项目** | 通过 `build_project()` 工具调用，工作目录在 `/opt/elon/projects/<id>/` | `assembleDebug`（服务器无签名密钥，debug 正确） |
 
-**绝不能**在改动 elon 自身代码后用 `assembleDebug` 或手动 `./gradlew assembleRelease` 代替 `publish-apk.ps1`。
+**绝不能**在改动 elon 自身代码后用 `assembleDebug` 或跳过签名脚本直接运行 `./gradlew assembleRelease`。
 ### Android 新功能完成定义
 
 涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算完成。只要改动触及 `android/app/src/main/**`、`AndroidManifest.xml`、聊天链路、更新链路、权限、后台服务或手机端调试能力，除非用户明确要求“只改代码不发布 APK”，否则必须运行：
