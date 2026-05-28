@@ -171,6 +171,19 @@ async fn run_cli_command(
     {
         cmd.process_group(0);
     }
+    // 为每个 worktree 隔离 Gradle 守护进程和缓存，防止同一项目的多个并发
+    // 编译任务争抢 ~/.gradle/daemon 文件锁导致 CLI 卡死。
+    // 使用 /opt/elon/gradle-homes/<workspace目录名> 作为独立的 GRADLE_USER_HOME，
+    // 不同 conversation worktree 目录名不同，自然隔离；共享工作区已有串行锁不受影响。
+    {
+        let workspace_key = workspace
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("default");
+        let gradle_home =
+            std::path::PathBuf::from("/opt/elon/gradle-homes").join(workspace_key);
+        cmd.env("GRADLE_USER_HOME", &gradle_home);
+    }
 
     match option.prompt_mode {
         CliPromptMode::Arg => {
