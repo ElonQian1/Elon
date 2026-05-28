@@ -335,7 +335,13 @@ internal class MainInputActions(
             voiceHoldButton = { requireNotNull(inputComposerViews).voiceHoldButton },
             sendVoiceAttachment = ::sendVoiceAttachment,
             setVoiceMode = { voiceMode = it },
-            applyVoiceMode = { voiceModeActions.applyVoiceMode() }
+            applyVoiceMode = { voiceModeActions.applyVoiceMode() },
+            isFriendChatActive = isFriendChatActive,
+            sendTextDirect = { text ->
+                binding.inputEdit.setText(text)
+                binding.inputEdit.setSelection(text.length)
+                sendMessageActions.sendMessage()
+            }
         ).also { speechInputActions = it }
     }
 

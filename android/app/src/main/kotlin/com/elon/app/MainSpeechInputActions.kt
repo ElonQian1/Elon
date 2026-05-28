@@ -36,6 +36,7 @@ internal class MainSpeechInputActions(
     private val sendVoiceAttachment: (PendingAttachment, String) -> Unit,
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
+    private val isFriendChatActive: () -> Boolean = { false },
     private val sendTextDirect: ((String) -> Unit)? = null
 ) {
     private val voiceRecorder = VoiceAudioRecorder(activity)
@@ -483,9 +484,17 @@ internal class MainSpeechInputActions(
                 "has_transcription" to (transcription != null)
             )
         )
-        // 语音气泡携带原文（原文同时作为发送文本，让 AI 可以响应语音内容）
-        val sendText = transcription?.takeIf { it.isNotBlank() } ?: VOICE_MESSAGE_TEXT
-        sendVoiceAttachment(attachment.copy(transcription = transcription), sendText)
+        val text = transcription?.trim()?.takeIf { it.isNotBlank() }
+        if (isFriendChatActive()) {
+            // 好友聊天：只发语音气泡，原文存附件里长按可查看，不单独发文字
+            sendVoiceAttachment(attachment.copy(transcription = transcription), "")
+        } else {
+            // 项目聊天：语音气泡 + 原文独立文字气泡，两条消息让 AI 也能理解内容
+            sendVoiceAttachment(attachment.copy(transcription = transcription), "")
+            if (text != null) {
+                binding.root.post { sendTextDirect?.invoke(text) }
+            }
+        }
     }
 
     /** 语音消息模式：取消录音。 */
