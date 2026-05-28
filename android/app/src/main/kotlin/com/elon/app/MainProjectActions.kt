@@ -78,27 +78,79 @@ internal class MainProjectActions(
     fun showProjectActions(index: Int) {
         if (index !in projects.indices) return
         val project = projects[index]
-        val visLabel = "设为公开 / 私有"
-        val actions = if (projects.size <= 1) {
-            arrayOf("编辑项目名称", "Git 仓库", visLabel)
-        } else {
-            arrayOf("编辑项目名称", "Git 仓库", visLabel, "删除项目")
-        }
+        val isJoint = project.isJointDevelopmentProject()
+
+        val actions = buildList {
+            add("编辑项目名称")
+            if (!isJoint) add("升级为联合项目")
+            if (isJoint) add("打开项目空间")
+            add("Git 仓库")
+            add("设为公开 / 私有")
+            if (projects.size > 1) add("删除项目")
+        }.toTypedArray()
 
         AlertDialog.Builder(activity)
             .setTitle(project.title)
             .setItems(actions) { _, which ->
                 when (actions[which]) {
                     "编辑项目名称" -> showRenameProjectDialog(index)
+                    "升级为联合项目" -> confirmUpgradeToJoint(index)
+                    "打开项目空间" -> openProjectSpace(project.projectSpaceId(), project.title)
                     "Git 仓库" -> {
                         openProject(index)
                         showGitProjectDialog()
                     }
-                    visLabel -> showVisibilityDialog(project)
+                    "设为公开 / 私有" -> showVisibilityDialog(project)
                     "删除项目" -> confirmDeleteProject(index)
                 }
             }
             .show()
+    }
+
+    private fun confirmUpgradeToJoint(index: Int) {
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录再升级为联合项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val project = projects.getOrNull(index) ?: return
+        AlertDialog.Builder(activity)
+            .setTitle("升级为联合项目")
+            .setMessage("「${project.title}」将同步至服务端，开启频道空间（公告/讨论/需求/AI开发等），可与他人协作。\n\n升级后可通过「设为公开 / 私有」撤销公开状态。")
+            .setPositiveButton("升级") { _, _ -> doUpgradeToJoint(project) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doUpgradeToJoint(project: AppProject) {
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "正在升级为联合项目...", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                val created = createStoreProject(
+                    http = http,
+                    serverUrl = serverUrl,
+                    name = project.title,
+                    description = project.subtitle.takeIf { it.isNotBlank() },
+                    token = token,
+                    ownerAccount = AuthManager.displayName(activity)
+                )
+                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                activity.runOnUiThread {
+                    project.markJointDevelopment(created.id)
+                    saveProjects()
+                    renderProjectList()
+                    openProjectSpace(created.id, project.title)
+                    Toast.makeText(activity, "已升级为联合项目 🎉", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "升级失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun showVisibilityDialog(project: AppProject) {
