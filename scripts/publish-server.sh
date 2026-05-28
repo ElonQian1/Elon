@@ -11,7 +11,7 @@
 #
 #  用法：
 #    ./scripts/publish-server.sh                 # 正常流程
-#    ./scripts/publish-server.sh --skip-build    # 跳过编译，用上次产物重新部署
+#    ./scripts/publish-server.sh --skip-build    # 跳过编译，仅重试已有产物；产物版本必须已匹配本次 claim
 #    ./scripts/publish-server.sh --skip-upload   # 只本地编译，不部署
 #    ./scripts/publish-server.sh --force         # 强制部署，即使服务器已有更新版本
 #
@@ -19,6 +19,13 @@
 #    RUST_SERVER_MUSL_TARGET_DIR=/var/tmp/server-musl-target
 #  兼容旧名 RUST_MUSL_TARGET_DIR。
 #  旧的 ELON_BUILD_TARGET_DIR 仍兼容，脚本会在其下创建 elon-server-musl/
+#
+#  发布顺序：
+#    1. 同步并确认本地 HEAD 已经是 origin/main
+#    2. 调 /api/release/claim 原子申请版本号
+#    3. 用 ELON_BUILD_VERSION 注入版本号后编译
+#    4. 上传/本机 staging + flock/CAS 部署
+#    5. 调 /api/release/finish 登记成功或释放失败槽位
 # ================================================================
 set -euo pipefail
 
@@ -43,25 +50,117 @@ SERVER="root@43.139.149.158"
 REMOTE_DIR="/root/Elon"
 REMOTE_BIN="$REMOTE_DIR/server/target/release/elon-server"
 SSH_OPTS="-o ProxyCommand=none"
+PUBLIC_SERVER_HTTP="http://43.139.149.158:8080"
+LOCAL_SERVER_HTTP="http://127.0.0.1:8080"
+RELEASE_TOKEN=""
+RELEASE_FINISHED=0
 
 is_local_server_deploy() {
   case "${ELON_DEPLOY_LOCAL:-auto}" in
     1|true|TRUE|local|LOCAL) return 0 ;;
     0|false|FALSE|remote|REMOTE) return 1 ;;
   esac
-  [ -d "$REMOTE_DIR" ] && [ -w "$(dirname "$REMOTE_BIN")" ] && command -v systemctl >/dev/null 2>&1
+  [ -d "$REMOTE_DIR" ] && [ -d "$REMOTE_DIR/server" ] && [ -w "$REMOTE_DIR" ] && command -v systemctl >/dev/null 2>&1
+}
+
+json_field() {
+  local json="$1"
+  local field="$2"
+  JSON_INPUT="$json" python3 - "$field" <<'PY'
+import json
+import os
+import sys
+
+try:
+    data = json.loads(os.environ.get("JSON_INPUT", ""))
+except Exception:
+    print("")
+    sys.exit(0)
+
+value = data
+for part in sys.argv[1].split("."):
+    if isinstance(value, dict):
+        value = value.get(part)
+    else:
+        value = None
+        break
+if value is None:
+    print("")
+elif isinstance(value, bool):
+    print("true" if value else "false")
+else:
+    print(value)
+PY
+}
+
+release_post() {
+  local endpoint="$1"
+  local payload="$2"
+  local url="${RELEASE_API_BASE:?release api base not set}/$endpoint"
+  curl --noproxy '*' -sS --fail --max-time 30 \
+    -H 'Content-Type: application/json' \
+    -X POST \
+    -d "$payload" \
+    "$url"
+}
+
+complete_release() {
+  local success="$1"
+  local version_name="${2:-}"
+  local sha="${3:-}"
+  local error_message="${4:-}"
+
+  [ -n "$RELEASE_TOKEN" ] || return 0
+  [ "$RELEASE_FINISHED" -eq 0 ] || return 0
+
+  local payload
+  payload=$(python3 - "$RELEASE_TOKEN" "$success" "$version_name" "$sha" "$error_message" <<'PY'
+import json
+import sys
+
+token, success, version_name, sha, error_message = sys.argv[1:6]
+ok = success.lower() == "true"
+payload = {
+    "kind": "server",
+    "token": token,
+    "success": ok,
+}
+if ok:
+    if version_name:
+        payload["versionName"] = version_name
+    if sha:
+        payload["sha"] = sha
+elif error_message:
+    payload["errorMessage"] = error_message
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)
+
+  set +e
+  release_post finish "$payload" >/dev/null
+  local rc=$?
+  set -e
+  RELEASE_FINISHED=1
+  if [ "$rc" -ne 0 ]; then
+    echo -e "${YELLOW}   ⚠️  release/finish 调用失败（不影响脚本退出）：exit=$rc${NC}" >&2
+  fi
+}
+
+read_live_server_version_name() {
+  curl --noproxy '*' -s --max-time 5 "${SERVER_HTTP_BASE:-$PUBLIC_SERVER_HTTP}/api/server/version" 2>/dev/null | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('versionName',''))" 2>/dev/null || true
 }
 
 read_deployed_server_sha() {
   local deployed_sha_file="$REMOTE_DIR/.deployed-sha"
   local live_sha file_sha
-  live_sha=$(curl --noproxy '*' -s --max-time 5 "http://43.139.149.158:8080/api/server/version" 2>/dev/null | \
+  live_sha=$(curl --noproxy '*' -s --max-time 5 "${SERVER_HTTP_BASE:-$PUBLIC_SERVER_HTTP}/api/server/version" 2>/dev/null | \
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('gitSha',''))" 2>/dev/null || true)
   if [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]; then
     echo "$live_sha"
     return
   fi
-  if is_local_server_deploy; then
+  if [ "${LOCAL_DEPLOY:-0}" -eq 1 ]; then
     file_sha=$(cat "$deployed_sha_file" 2>/dev/null || true)
   else
     # shellcheck disable=SC2086
@@ -117,6 +216,15 @@ load_local_env_file() {
 
 load_local_env_file "$REPO_ROOT/.env.local"
 
+if is_local_server_deploy; then
+  LOCAL_DEPLOY=1
+  SERVER_HTTP_BASE="$LOCAL_SERVER_HTTP"
+else
+  LOCAL_DEPLOY=0
+  SERVER_HTTP_BASE="$PUBLIC_SERVER_HTTP"
+fi
+RELEASE_API_BASE="$SERVER_HTTP_BASE/api/release"
+
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
 echo -e "${CYAN}   elon cli 服务端  交叉编译 + 部署${NC}"
@@ -124,11 +232,12 @@ echo -e "${CYAN}═════════════════════�
 echo -e "${GRAY}  仓库根: $REPO_ROOT${NC}"
 echo -e "${GRAY}  目标:   $TARGET${NC}"
 echo -e "${GRAY}  服务器: $SERVER${NC}"
-if is_local_server_deploy; then
+if [ "$LOCAL_DEPLOY" -eq 1 ]; then
   echo -e "${GRAY}  部署模式: 本机部署（跳过 SSH/SCP）${NC}"
 else
   echo -e "${GRAY}  部署模式: 远程 SSH/SCP${NC}"
 fi
+echo -e "${GRAY}  发布 API: $RELEASE_API_BASE${NC}"
 echo ""
 
 # ── cleanup worktree ──────────────────────────────────────────
@@ -139,14 +248,42 @@ cleanup_worktree() {
     git -C "$REPO_ROOT" worktree remove "$TMP_WORKTREE" --force 2>/dev/null || true
   fi
 }
-trap cleanup_worktree EXIT
+
+on_exit() {
+  local code=$?
+  cleanup_worktree
+  if [ -n "$RELEASE_TOKEN" ] && [ "$RELEASE_FINISHED" -eq 0 ]; then
+    complete_release false "" "" "script exited before release finish (exit=$code)"
+  fi
+}
+trap on_exit EXIT
 
 # ── 1. git pull --rebase ──────────────────────────────────────
 echo -e "${YELLOW}1⃣  同步最新代码...${NC}"
 git -C "$REPO_ROOT" pull --rebase origin main
+DIRTY=$(git -C "$REPO_ROOT" status --porcelain)
+if [ -n "$DIRTY" ]; then
+  echo ""
+  echo -e "${RED}❌ 工作区不干净，请先 commit + push 业务改动再运行部署脚本：${NC}" >&2
+  echo "$DIRTY" >&2
+  exit 1
+fi
+
 SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
-SERVER_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$SERVER_DIR/Cargo.toml" | head -1)
+REMOTE_MAIN=$(git -C "$REPO_ROOT" rev-parse origin/main)
+if [ "$SHA_BIG" != "$REMOTE_MAIN" ]; then
+  echo ""
+  echo -e "${RED}❌ 当前 HEAD 尚未进入 origin/main，禁止基于未推送提交编译部署。${NC}" >&2
+  echo -e "${YELLOW}   当前 HEAD:  $SHA_BIG${NC}" >&2
+  echo -e "${YELLOW}   origin/main: $REMOTE_MAIN${NC}" >&2
+  echo -e "${YELLOW}   请先执行：git push origin HEAD:main${NC}" >&2
+  exit 1
+fi
+
+FALLBACK_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$SERVER_DIR/Cargo.toml" | head -1)
+LIVE_SERVER_VERSION=$(read_live_server_version_name)
+CLAIM_CURRENT_VERSION="${LIVE_SERVER_VERSION:-$FALLBACK_VERSION}"
 echo -e "${GREEN}   ✅ 最新 SHA: $SHA${NC}"
 DEPLOYED_SERVER_SHA=$(read_deployed_server_sha)
 if [ "$FORCE" -eq 0 ] && [ -n "$DEPLOYED_SERVER_SHA" ] && [ "$DEPLOYED_SERVER_SHA" != "$SHA_BIG" ]; then
@@ -156,7 +293,48 @@ if [ "$FORCE" -eq 0 ] && [ -n "$DEPLOYED_SERVER_SHA" ] && [ "$DEPLOYED_SERVER_SH
     exit 0
   fi
 fi
-echo -e "${GREEN}   ✅ 后端版本: v$SERVER_VERSION${NC}"
+echo -e "${GREEN}   ✅ Cargo.toml 兜底版本: v$FALLBACK_VERSION${NC}"
+if [ -n "$LIVE_SERVER_VERSION" ]; then
+  echo -e "${GREEN}   ✅ 当前线上后端版本: v$LIVE_SERVER_VERSION${NC}"
+fi
+
+# ── 1.5 从服务器原子分配新版本号（claim）─────────────────────
+echo -e "${YELLOW}1.5⃣  向服务器申请新版本号...${NC}"
+BUILDER_HOST="${HOSTNAME:-$(hostname 2>/dev/null || echo unknown-host)}"
+BUILDER_USER="${USER:-${LOGNAME:-unknown-user}}"
+BUILDER_ID="$BUILDER_HOST-$BUILDER_USER"
+BUILDER_LABEL="publish-server.sh @ $BUILDER_ID"
+CLAIM_PAYLOAD=$(python3 - "$SHA_BIG" "$BUILDER_ID" "$BUILDER_LABEL" "$CLAIM_CURRENT_VERSION" <<'PY'
+import json
+import sys
+
+sha, builder_id, builder_label, current_version = sys.argv[1:5]
+payload = {
+    "kind": "server",
+    "sha": sha,
+    "builderId": builder_id,
+    "builderLabel": builder_label,
+    "bump": "patch",
+}
+if current_version:
+    payload["currentVersionName"] = current_version
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)
+if ! CLAIM_JSON=$(release_post claim "$CLAIM_PAYLOAD"); then
+  echo -e "${RED}❌ /api/release/claim 失败，未开始编译。${NC}" >&2
+  exit 1
+fi
+
+CLAIM_ACTION=$(json_field "$CLAIM_JSON" action)
+RELEASE_TOKEN=$(json_field "$CLAIM_JSON" token)
+ASSIGNED_VERSION=$(json_field "$CLAIM_JSON" assignedVersionName)
+IN_FLIGHT_COUNT=$(json_field "$CLAIM_JSON" inFlightCount)
+if [ "$CLAIM_ACTION" != "build" ] || [ -z "$RELEASE_TOKEN" ] || [ -z "$ASSIGNED_VERSION" ]; then
+  echo -e "${RED}❌ release/claim 返回非预期响应：$CLAIM_JSON${NC}" >&2
+  exit 1
+fi
+echo -e "${GREEN}   ✅ 已分配版本号: v$ASSIGNED_VERSION (token=${RELEASE_TOKEN:0:8}..., in-flight=${IN_FLIGHT_COUNT:-1})${NC}"
 
 # ── 2. 环境检查 ───────────────────────────────────────────────
 if [ "$SKIP_BUILD" -eq 0 ]; then
@@ -223,13 +401,19 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   echo -e "${YELLOW}3⃣  交叉编译 → $TARGET...${NC}"
   TMP_SERVER_DIR="$TMP_WORKTREE/server"
   export CARGO_TARGET_DIR="$BUILD_TARGET_DIR"
-  (
+  if ! (
     cd "$TMP_SERVER_DIR"
-    ELON_SERVER_GIT_SHA="$SHA_BIG" cargo zigbuild --release --target "$TARGET"
-  )
+    ELON_SERVER_GIT_SHA="$SHA_BIG" ELON_BUILD_VERSION="$ASSIGNED_VERSION" cargo zigbuild --release --target "$TARGET"
+  ); then
+    unset CARGO_TARGET_DIR
+    complete_release false "" "" "cargo zigbuild failed"
+    echo -e "${RED}❌ 编译失败${NC}" >&2
+    exit 1
+  fi
   unset CARGO_TARGET_DIR
 
   if [ ! -f "$BINARY" ]; then
+    complete_release false "" "" "binary missing after build"
     echo -e "${RED}❌ 编译产物不存在: $BINARY${NC}" >&2; exit 1
   fi
 
@@ -252,13 +436,14 @@ if [ "$SKIP_UPLOAD" -eq 1 ]; then
   echo ""
   echo -e "${GREEN}✅ 本地编译完成（--skip-upload，未部署）${NC}"
   echo -e "${GRAY}   产物: $BINARY${NC}"
+  complete_release false "" "" "skip upload (local build only)"
   exit 0
 fi
 
 # ── 4. 上传到服务器（staging 路径含 SHA，避免并发覆盖）────────
 echo -e "${YELLOW}4⃣  上传 binary 到服务器...${NC}"
 STAGING_PATH="/tmp/elon-server-$SHA"
-if is_local_server_deploy; then
+if [ "$LOCAL_DEPLOY" -eq 1 ]; then
   cp "$BINARY" "$STAGING_PATH"
 else
   # shellcheck disable=SC2086
@@ -273,7 +458,7 @@ if [ "$FORCE" -eq 0 ]; then
     # 检查服务器 SHA 是否是我们的祖先（是祖先 = 我们更新）
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SERVER_SHA" "$SHA_BIG" 2>/dev/null; then
       # 服务器已有更新版本，拒绝回退
-      if is_local_server_deploy; then
+      if [ "$LOCAL_DEPLOY" -eq 1 ]; then
         rm -f "$STAGING_PATH" 2>/dev/null || true
       else
         # shellcheck disable=SC2086
@@ -286,6 +471,8 @@ if [ "$FORCE" -eq 0 ]; then
       echo -e "${YELLOW}   服务器当前: $SHORT_SERVER（比本次 $SHA 更新）${NC}"
       echo -e "${YELLOW}   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。${NC}"
       echo -e "${YELLOW}   解决：git pull --rebase 后重新编译部署，或用 --force 强制覆盖。${NC}"
+      complete_release false "" "" "superseded by server sha $SERVER_SHA"
+      echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
       echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
       echo ""
       exit 0
@@ -340,7 +527,7 @@ EOF
 )
 
 set +e
-if is_local_server_deploy; then
+if [ "$LOCAL_DEPLOY" -eq 1 ]; then
   LOCK_OUT=$(echo "$LOCK_SCRIPT" | flock -x -w 120 /tmp/elon-deploy.lock bash -s 2>&1)
 else
   # shellcheck disable=SC2086
@@ -354,9 +541,12 @@ if [ "$LOCK_EXIT" -eq 42 ]; then
   echo -e "${YELLOW}   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）${NC}"
   echo -e "${YELLOW}   $LOCK_OUT${NC}"
   echo -e "${YELLOW}   解决：git pull --rebase 后重新部署，或用 --force 强制覆盖。${NC}"
+  complete_release false "" "" "cas conflict inside flock: $LOCK_OUT"
+  echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
   echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
   exit 0
 elif [ "$LOCK_EXIT" -ne 0 ]; then
+  complete_release false "" "" "deploy script failed: exit=$LOCK_EXIT"
   echo -e "${RED}❌ 锁内部署失败（exit=$LOCK_EXIT）: $LOCK_OUT${NC}" >&2
   exit 1
 fi
@@ -368,27 +558,44 @@ echo -e "${GREEN}   ✅ SHA 记录已写入服务器 (.deployed-sha = $SHA)${NC}
 echo -e "${YELLOW}6⃣  等待服务启动（3 秒）...${NC}"
 sleep 3
 
-HEALTH=$(curl --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/health" 2>&1 || true)
+HEALTH=$(curl --noproxy '*' -s --max-time 10 "$SERVER_HTTP_BASE/health" 2>&1 || true)
 if [ -n "$HEALTH" ]; then
   echo -e "${GREEN}   ✅ 健康检查: $HEALTH${NC}"
 else
   echo -e "${YELLOW}   ⚠️  健康检查无响应（服务可能还在启动中）${NC}"
-  echo -e "${YELLOW}      手动确认：curl --noproxy '*' http://43.139.149.158:8080/health${NC}"
+  echo -e "${YELLOW}      手动确认：curl --noproxy '*' $SERVER_HTTP_BASE/health${NC}"
 fi
 
-SERVER_VERSION_JSON=$(curl --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/api/server/version" 2>&1 || true)
+SERVER_VERSION_JSON=$(curl --noproxy '*' -s --max-time 10 "$SERVER_HTTP_BASE/api/server/version" 2>&1 || true)
 if [ -n "$SERVER_VERSION_JSON" ]; then
   echo -e "${GREEN}   ✅ 后端版本接口: $SERVER_VERSION_JSON${NC}"
 else
   echo -e "${YELLOW}   ⚠️  后端版本接口无响应${NC}"
-  echo -e "${YELLOW}      手动确认：curl --noproxy '*' http://43.139.149.158:8080/api/server/version${NC}"
+  echo -e "${YELLOW}      手动确认：curl --noproxy '*' $SERVER_HTTP_BASE/api/server/version${NC}"
+  complete_release false "" "" "server version endpoint empty after deploy"
+  exit 1
+fi
+
+DEPLOYED_VERSION_NAME=$(json_field "$SERVER_VERSION_JSON" versionName)
+DEPLOYED_GIT_SHA=$(json_field "$SERVER_VERSION_JSON" gitSha)
+if [ "$DEPLOYED_VERSION_NAME" != "$ASSIGNED_VERSION" ] || [ "$DEPLOYED_GIT_SHA" != "$SHA_BIG" ]; then
+  complete_release false "" "" "server version mismatch after deploy: version=$DEPLOYED_VERSION_NAME sha=$DEPLOYED_GIT_SHA"
+  echo -e "${RED}❌ 后端版本校验失败，未登记发布成功。${NC}" >&2
+  echo -e "${YELLOW}   期望版本: v$ASSIGNED_VERSION${NC}" >&2
+  echo -e "${YELLOW}   实际版本: v${DEPLOYED_VERSION_NAME:-unknown}${NC}" >&2
+  echo -e "${YELLOW}   期望 SHA: $SHA_BIG${NC}" >&2
+  echo -e "${YELLOW}   实际 SHA: ${DEPLOYED_GIT_SHA:-unknown}${NC}" >&2
+  exit 1
 fi
 
 # ── 7. 清理工作树（由 trap EXIT 自动执行）────────────────────
+complete_release true "$ASSIGNED_VERSION" "$SHA_BIG" ""
+
 echo ""
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}   ✅ 部署完成！${NC}"
+echo -e "${GRAY}   版本:   v$ASSIGNED_VERSION（服务器分配，未写入 git）${NC}"
 echo -e "${GRAY}   SHA:    $SHA${NC}"
-echo -e "${GRAY}   服务:   http://43.139.149.158:8080/health${NC}"
+echo -e "${GRAY}   服务:   $SERVER_HTTP_BASE/health${NC}"
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
 echo ""
