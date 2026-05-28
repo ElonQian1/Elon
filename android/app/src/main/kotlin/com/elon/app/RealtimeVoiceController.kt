@@ -61,14 +61,20 @@ internal class RealtimeVoiceController(
                         onError("无法启动麦克风采集")
                     }
                 }
-                override fun onTranscriptDelta(text: String): Unit = onTranscriptDelta(text)
-                override fun onTranscriptFinal(text: String): Unit = onTranscriptFinal(text)
-                override fun onVirtualMicFed(bytes: Long): Unit = onVirtualMicFed(bytes)
+                override fun onTranscriptDelta(text: String): Unit =
+                    this@RealtimeVoiceController.onTranscriptDelta(text)
+                override fun onTranscriptFinal(text: String): Unit =
+                    this@RealtimeVoiceController.onTranscriptFinal(text)
+                override fun onVirtualMicFed(bytes: Long): Unit =
+                    this@RealtimeVoiceController.onVirtualMicFed(bytes)
                 override fun onCliDispatched(ok: Boolean, message: String): Unit =
-                    onCliDispatched(ok, message)
-                override fun onAiProgress(text: String): Unit = this@RealtimeVoiceController.onAiProgress(text)
-                override fun onAiDone(message: String, apkUrl: String?): Unit = this@RealtimeVoiceController.onAiDone(message, apkUrl)
-                override fun onAiError(message: String): Unit = this@RealtimeVoiceController.onAiError(message)
+                    this@RealtimeVoiceController.onCliDispatched(ok, message)
+                override fun onAiProgress(text: String): Unit =
+                    this@RealtimeVoiceController.onAiProgress(text)
+                override fun onAiDone(message: String, apkUrl: String?): Unit =
+                    this@RealtimeVoiceController.onAiDone(message, apkUrl)
+                override fun onAiError(message: String): Unit =
+                    this@RealtimeVoiceController.onAiError(message)
 
                 override fun onServerError(code: String, message: String) {
                     onError("[$code] $message")
