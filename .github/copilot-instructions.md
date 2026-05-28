@@ -14,51 +14,7 @@
 
 **开发 elon 自项目的 AI CLI 不限于 Windows**：Copilot（VS Code）在 Windows 开发机上运行；Codex CLI / Claude CLI / Copilot CLI 等在 **Linux 服务器**上运行，同样会修改 elon 自身代码、发布 APK。两个环境都必须能独立完成完整发布链路。
 
----
 
-## 系统组件一览
-
-```
-[用户手机 APK]
-    │ 自然语言对话
-    ▼
-[AI 对话后端]  ←─── 理解需求，规划代码修改
-    │
-    ├─► [Rust 服务端代码]   (server/)
-    ├─► [Android APK 代码]  (android/)
-    └─► [前端 Web 代码]      (frontend/)
-    │
-    ▼
-[自动化流水线]
-    git commit → 编译构建 → 部署上线 → APK 打包签名
-    │
-    ▼
-[推送下载链接] → 用户手机
-```
-
----
-
-## 技术栈
-
-| 层 | 技术 | 说明 |
-|---|---|---|
-| 移动端 | Android (Kotlin/Java) | 用户使用的 APK，含 AI 对话界面 |
-| 服务端 | Rust | 核心业务逻辑、API 接口 |
-| 前端 | (待定) | Web 管理界面或 H5 内嵌页 |
-| AI 对话 | LLM API | 理解用户需求，生成代码修改方案 |
-| CI/CD | 自动化脚本 | git → 编译 → 部署 → APK签名分发 |
-| 版本控制 | Git | 所有代码变更走 git 管理 |
-
----
-
-## 核心工作流（AI 代理必须理解）
-
-1. **需求理解**：用户在APK内用自然语言描述需求
-2. **代码定位**：AI确定需要修改哪些文件（Rust/Android/前端）
-3. **安全修改**：在当前真实 Git 工作区修改对应代码，保持代码风格一致
-4. **提交构建**：`git add → git commit → 触发构建流水线`
-5. **编译部署**：Rust 后端在本地开发机交叉编译后上传 binary；Android 在本地开发机打包签名后上传 APK；生产服务器只负责运行和分发产物
-6. **反馈用户**：将新APK下载链接通过对话界面发回用户手机
 ### ⚠️ elon 自项目 vs 用户子项目：构建方式完全不同
 
 **唯一判断规则**：看改的是不是 `elon` 仓库本身（`android/`、`server/`）—— 与用哪个 CLI、在哪台机器无关。
@@ -80,9 +36,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 最终回复必须包含 APK 发布状态、版本号、发布 SHA、服务器 `/app/version.json` 校验结果和下载地址。
 
-**防慢构建覆盖**：如果构建期间 `origin/main` 已前进，且服务器 `.apk-deployed-sha` 已包含本次基础提交，脚本应中止本地编译/发布，直接让 AI 测试线上新版；如果 `origin/main` 已前进但线上 APK 未确认包含本次基础提交，必须停止上传，要求基于最新 `main` 重新发布。
-
-**并发保护**：两台 PC 同时部署时脚本内置 SHA 顺序检查，若另一台已部署更新版本，本机旧版编译完成后会自动中止，不会回退服务器版本。需强制覆盖时用 `-Force`。
+**脚本内置防慢构建覆盖和并发保护**，无需手动干预；强制覆盖用 `-Force`。
 
 > 详细流程见：`docs/ai-agent-workflow.md`
 
@@ -100,7 +54,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
-- **长期主义模块化**：不要继续制造巨型文件；写代码前先做短文件计划。新建源文件默认目标 ≤500 行，501-800 行可容忍但必须单一职责，超过 800 行必须拆分；入口文件只做组装和路由。修改 `MainActivity.kt`、`McpDebugServer.kt`、`project_api.rs`、`ai_cli.rs` 等巨型文件时，除小修外优先顺手抽出本次触碰到的职责边界
+- **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
 - **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
@@ -130,12 +84,8 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 ## VS Code Copilot 工作方式记忆（Copilot 专属）
 
-- VS Code Copilot 是 agent loop：先组装上下文，再用工具读取/编辑/运行命令，工具结果回到上下文后继续迭代，最后验证和交付。
-- 上下文来自系统指令、customizations、用户消息、会话历史、隐式编辑器/Git 状态、显式 `#` 引用和工具输出；没有进入上下文的内容对模型不可见。
-- 项目级稳定规则放在 `.github/copilot-instructions.md`；局部规则放在 `.github/instructions/*.instructions.md`；重复任务放在 `.github/prompts/*.prompt.md`；角色和工具受限的流程放在 `.github/agents/*.agent.md`。
-- VS Code 也会识别 `AGENTS.md`、`CLAUDE.md` 和组织级 instructions；管理入口优先使用 `Chat: Open Customizations`，避免多处复制长规则。
-- 本项目已提供 `/elon-dev-task`、`/elon-apk-release` prompt，以及 `elon-planner`、`elon-implementer`、`elon-reviewer` agents；优先用这些入口执行标准工作流。
-- 修改 AI customization 时，保持规则短、自包含、可版本化；需要完整背景时引用 `docs/vscode-copilot-working-model.md`，不要在多个文件重复长规则。
+- 规则体系：全局规则 → 本文件；局部规则 → `.github/instructions/*.instructions.md`；重复任务 → `.github/prompts/*.prompt.md`；角色工作流 → `.github/agents/*.agent.md`。详见 `docs/vscode-copilot-working-model.md`。
+- 本项目已有 `/elon-dev-task`、`/elon-apk-release` prompt 和 `elon-planner`、`elon-implementer`、`elon-reviewer` agent，优先使用。
 
 ---
 
