@@ -902,6 +902,9 @@ class MainActivity : AppCompatActivity() {
                 chatProjectShareActions.restorePersonalProject(message, share)
             },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
+            canRequestAiReply = {
+                friendChatActions.isActive() || groupChatActions.isActive()
+            },
             requestAiReply = { message ->
                 when {
                     friendChatActions.isActive() -> friendChatActions.requestAiReply(message)
