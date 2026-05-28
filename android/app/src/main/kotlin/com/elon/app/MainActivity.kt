@@ -897,6 +897,13 @@ class MainActivity : AppCompatActivity() {
                 chatProjectShareActions.restorePersonalProject(message, share)
             },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
+            requestAiReply = { message ->
+                when {
+                    friendChatActions.isActive() -> friendChatActions.requestAiReply(message)
+                    groupChatActions.isActive() -> groupChatActions.requestAiReply(message)
+                    else -> uiTools.shareActions().toastMessageAction("当前聊天暂不支持 AI回复")
+                }
+            },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showStoreDialog = { storeController.showStoreDialog() }

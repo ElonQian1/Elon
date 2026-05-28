@@ -182,7 +182,14 @@ pub async fn list_friend_messages(
         query.after.as_deref(),
         query.limit.unwrap_or(80),
     ) {
-        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Ok(messages) => {
+            crate::social_ai::spawn_friend_reply_if_needed(
+                state.clone(),
+                user.id.clone(),
+                friend_id.clone(),
+            );
+            Json(serde_json::json!({ "messages": messages })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -213,6 +220,27 @@ pub async fn send_friend_message(
             );
             Json(serde_json::json!({ "message": message })).into_response()
         }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn request_friend_ai_reply(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((friend_id, message_id)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match crate::social_ai_message_reply::spawn_friend_reply_for_message(
+        state, user.id, friend_id, message_id,
+    ) {
+        Ok(()) => (
+            StatusCode::ACCEPTED,
+            Json(serde_json::json!({ "ok": true })),
+        )
+            .into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -251,7 +279,14 @@ pub async fn list_friend_group_messages(
         query.after.as_deref(),
         query.limit.unwrap_or(120),
     ) {
-        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Ok(messages) => {
+            crate::social_ai::spawn_group_reply_if_needed(
+                state.clone(),
+                user.id.clone(),
+                group_id.clone(),
+            );
+            Json(serde_json::json!({ "messages": messages })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -285,6 +320,27 @@ pub async fn send_friend_group_message(
             );
             Json(serde_json::json!({ "message": message })).into_response()
         }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn request_group_ai_reply(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((group_id, message_id)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match crate::social_ai_message_reply::spawn_group_reply_for_message(
+        state, user.id, group_id, message_id,
+    ) {
+        Ok(()) => (
+            StatusCode::ACCEPTED,
+            Json(serde_json::json!({ "ok": true })),
+        )
+            .into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }

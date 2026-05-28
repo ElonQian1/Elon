@@ -26,6 +26,7 @@ internal class MainActionPopups(
     private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
     private val restorePersonalProject: (ChatMessage, ChatProjectShare) -> Unit,
     private val quoteMessage: (String) -> Unit,
+    private val requestAiReply: (ChatMessage) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
     private val showStoreDialog: () -> Unit
@@ -75,7 +76,8 @@ internal class MainActionPopups(
             TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) },
             TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") },
             TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) },
-            TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") }
+            TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") },
+            TopAction("AI回复", R.drawable.ic_msg_ai_reply) { requestAiReply(message) }
         )
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
     }

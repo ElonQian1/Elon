@@ -18,6 +18,8 @@ mod project_member_conversations;
 mod project_space;
 mod projects;
 mod social_ai_messages;
+mod social_ai_pending;
+mod social_ai_selected;
 mod tasks;
 mod users;
 
@@ -28,6 +30,7 @@ use common::{
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };
+pub(crate) use social_ai_pending::SocialAiPendingMention;
 
 pub struct Store {
     conn: Mutex<Connection>,

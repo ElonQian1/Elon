@@ -90,6 +90,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             delete(friend_api::delete_friend_message),
         )
         .route(
+            "/api/me/friends/:friend_id/messages/:message_id/ai-reply",
+            post(friend_api::request_friend_ai_reply),
+        )
+        .route(
             "/api/me/groups",
             get(friend_api::list_friend_groups).post(friend_api::create_friend_group),
         )
@@ -100,6 +104,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/me/groups/:group_id/messages/:message_id",
             delete(friend_api::delete_friend_group_message),
+        )
+        .route(
+            "/api/me/groups/:group_id/messages/:message_id/ai-reply",
+            post(friend_api::request_group_ai_reply),
         )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))

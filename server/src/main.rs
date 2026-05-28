@@ -69,6 +69,7 @@ mod release_claim;
 mod router;
 mod server_trace;
 mod social_ai;
+mod social_ai_message_reply;
 mod source_hygiene;
 mod speech_translate;
 mod store;

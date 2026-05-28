@@ -139,6 +139,39 @@ internal class MainFriendChatActions(
         return true
     }
 
+    fun requestAiReply(message: ChatMessage) {
+        val friend = activeFriend ?: return
+        val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
+        if (messageId == null) {
+            Toast.makeText(activity, "消息尚未同步，稍后再试", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (message.content.isBlank()) {
+            Toast.makeText(activity, "这条消息没有可供 AI 回复的文本", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "EL 正在回复这条消息", Toast.LENGTH_SHORT).show()
+        thread {
+            val result = runCatching {
+                requestFriendSelectedAiReply(http, serverUrl, activity, friend.id, messageId)
+            }
+            activity.runOnUiThread {
+                if (activeFriend?.id != friend.id) return@runOnUiThread
+                result
+                    .onSuccess {
+                        pollHandler.postDelayed({
+                            if (activeFriend?.id == friend.id) {
+                                loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+                            }
+                        }, AI_REPLY_REFRESH_DELAY_MS)
+                    }
+                    .onFailure { error ->
+                        Toast.makeText(activity, error.message ?: "AI回复触发失败", Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
     fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {
         val friend = activeFriend ?: return
         val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
@@ -332,6 +365,7 @@ internal class MainFriendChatActions(
 
     private companion object {
         const val POLL_INTERVAL_MS = 3000L
+        const val AI_REPLY_REFRESH_DELAY_MS = 1200L
         const val SENDING_STATUS = "发送中..."
         const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024
         const val SOCIAL_AI_USER_ID = "usr_elon_ai"
