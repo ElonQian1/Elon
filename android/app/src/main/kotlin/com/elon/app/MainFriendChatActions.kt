@@ -196,6 +196,7 @@ internal class MainFriendChatActions(
                         currentMessages.zip(remoteMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
+                                current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
                                 current.attachments != incoming.attachments
                         }
                     currentMessages.clear()
@@ -313,7 +314,8 @@ internal class MainFriendChatActions(
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
             senderLabel = if (outgoing || isElAssistant) null else senderName ?: friend.name,
-            id = json.optString("id").trim().takeIf { it.isNotEmpty() }
+            id = json.optString("id").trim().takeIf { it.isNotEmpty() },
+            senderAvatarDataUrl = if (outgoing || isElAssistant) null else friend.avatarDataUrl
         )
     }
 

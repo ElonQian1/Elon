@@ -30,7 +30,8 @@ data class ChatMessage(
     var evidenceWorking: Boolean = false,
     var senderLabel: String? = null,
     var id: String? = null,
-    var apkUrl: String? = null
+    var apkUrl: String? = null,
+    var senderAvatarDataUrl: String? = null
 )
 
 class ChatAdapter(
@@ -144,7 +145,7 @@ class ChatAdapter(
         }
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
-        holder.friendAvatar?.text = message.senderLabel?.trim()?.take(1)?.ifBlank { "友" } ?: "友"
+        bindFriendAvatar(holder.friendAvatar, message)
         bindSelectionVisual(holder, message, projectCardBound, position)
         bindMessageActions(holder, message, projectCardBound)
         bindEvidence(holder, message, position)
@@ -402,6 +403,24 @@ class ChatAdapter(
             avatar.text = UserProfileStore.avatarInitial(profile.displayName)
         }
         avatar.contentDescription = "我的头像"
+    }
+
+    private fun bindFriendAvatar(avatar: TextView?, message: ChatMessage) {
+        avatar ?: return
+        val label = message.senderLabel?.trim().orEmpty()
+        val bitmap = UserProfileStore.decodeAvatar(message.senderAvatarDataUrl)
+        if (bitmap != null) {
+            val radius = (6 * avatar.resources.displayMetrics.density + 0.5f).toInt()
+            avatar.background = RoundedBitmapDrawableFactory.create(avatar.resources, bitmap).apply {
+                cornerRadius = radius.toFloat()
+                setAntiAlias(true)
+            }
+            avatar.text = ""
+        } else {
+            avatar.setBackgroundResource(R.drawable.bg_mock_avatar)
+            avatar.text = UserProfileStore.avatarInitial(label.ifBlank { "好友" })
+        }
+        avatar.contentDescription = label.ifBlank { "好友头像" }
     }
 
     private fun messageTextColor(role: String): Int = when (role) {

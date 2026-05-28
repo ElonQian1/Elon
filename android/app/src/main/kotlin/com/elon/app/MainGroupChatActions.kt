@@ -197,6 +197,7 @@ internal class MainGroupChatActions(
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
                                 current.senderLabel != incoming.senderLabel ||
+                                current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
                                 current.attachments != incoming.attachments
                         }
                     currentMessages.clear()
@@ -232,7 +233,7 @@ internal class MainGroupChatActions(
             val array = JSONObject(body).optJSONArray("messages") ?: JSONArray()
             return List(array.length()) { index ->
                 val json = array.optJSONObject(index) ?: JSONObject()
-                groupMessageFromJson(json)
+                groupMessageFromJson(group, json)
             }
         }
     }
@@ -287,7 +288,7 @@ internal class MainGroupChatActions(
                         fallback.put("attachments", JSONArray(attachments.toString()))
                     }
                 }
-            return groupMessageFromJson(message)
+            return groupMessageFromJson(group, message)
         }
     }
 
@@ -304,17 +305,23 @@ internal class MainGroupChatActions(
         }
     }
 
-    private fun groupMessageFromJson(json: JSONObject): ChatMessage {
+    private fun groupMessageFromJson(group: AppGroup, json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
         val senderUserId = json.optString("sender_user_id", "").trim()
         val isElAssistant = senderUserId == SOCIAL_AI_USER_ID
         val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
+        val senderAvatar = if (outgoing || isElAssistant) {
+            null
+        } else {
+            group.members.firstOrNull { it.id == senderUserId }?.avatarDataUrl
+        }
         return ChatMessage(
             role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
             content = json.optString("content", ""),
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
             senderLabel = if (outgoing || isElAssistant) null else senderName,
-            id = json.optString("id").trim().takeIf { it.isNotEmpty() }
+            id = json.optString("id").trim().takeIf { it.isNotEmpty() },
+            senderAvatarDataUrl = senderAvatar
         )
     }
 

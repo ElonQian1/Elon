@@ -65,7 +65,7 @@ internal object UserProfileStore {
         val bitmap = context.contentResolver.openInputStream(uri).use { stream ->
             BitmapFactory.decodeStream(stream)
         } ?: error("无法读取头像图片")
-        val scaled = scaleAvatar(bitmap)
+        val scaled = cropAndScaleAvatar(bitmap)
         val output = ByteArrayOutputStream()
         scaled.compress(Bitmap.CompressFormat.JPEG, 82, output)
         if (scaled !== bitmap) scaled.recycle()
@@ -74,12 +74,18 @@ internal object UserProfileStore {
         return "data:image/jpeg;base64,$encoded"
     }
 
-    private fun scaleAvatar(bitmap: Bitmap): Bitmap {
-        val maxSide = maxOf(bitmap.width, bitmap.height)
-        if (maxSide <= MAX_AVATAR_SIZE) return bitmap
-        val scale = MAX_AVATAR_SIZE.toFloat() / maxSide.toFloat()
-        val width = (bitmap.width * scale).toInt().coerceAtLeast(1)
-        val height = (bitmap.height * scale).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(bitmap, width, height, true)
+    private fun cropAndScaleAvatar(bitmap: Bitmap): Bitmap {
+        val side = minOf(bitmap.width, bitmap.height)
+        val left = ((bitmap.width - side) / 2).coerceAtLeast(0)
+        val top = ((bitmap.height - side) / 2).coerceAtLeast(0)
+        val cropped = if (left == 0 && top == 0 && bitmap.width == side && bitmap.height == side) {
+            bitmap
+        } else {
+            Bitmap.createBitmap(bitmap, left, top, side, side)
+        }
+        if (side <= MAX_AVATAR_SIZE) return cropped
+        val scaled = Bitmap.createScaledBitmap(cropped, MAX_AVATAR_SIZE, MAX_AVATAR_SIZE, true)
+        if (cropped !== bitmap) cropped.recycle()
+        return scaled
     }
 }
