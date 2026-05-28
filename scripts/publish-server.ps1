@@ -403,7 +403,13 @@ if (-not $SkipBuild) {
         $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
         $env:ELON_BUILD_VERSION  = $AssignedVersion
+        # 清除 target-cpu=native：全局 .cargo/config.toml 可能含 target-cpu=native，
+        # 交叉编译 musl 产物若带本机专有指令集（AVX-512 等），上传到服务器后会 SIGILL 崩溃。
+        # 用空字符串覆盖 RUSTFLAGS，让 cargo 对本次构建忽略全局 rustflags。
+        $savedRustflags = $env:RUSTFLAGS
+        $env:RUSTFLAGS = ""
         cargo zigbuild --release --target $Target
+        $env:RUSTFLAGS = $savedRustflags
         if ($LASTEXITCODE -ne 0) {
             Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
             Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
@@ -417,6 +423,7 @@ if (-not $SkipBuild) {
         Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     } catch {
+        $env:RUSTFLAGS = $savedRustflags
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
         Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
