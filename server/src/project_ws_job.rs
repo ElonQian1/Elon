@@ -388,7 +388,7 @@ async fn run_project_ws_job(
     schedule_project_job_cleanup(job.key.clone(), job);
 }
 
-async fn emit_project_job_event(
+pub(crate) async fn emit_project_job_event(
     state: &AppState,
     task_id: &str,
     job: &Arc<ProjectWsJob>,

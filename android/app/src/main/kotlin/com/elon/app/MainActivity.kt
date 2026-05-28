@@ -101,7 +101,10 @@ class MainActivity : AppCompatActivity() {
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
             activeWorkControlActions = { activeWorkControlActions },
-            sendEnabledActions = { inputActions.sendEnabledActions }
+            sendEnabledActions = { inputActions.sendEnabledActions },
+            drainNextQueuedMessage = { projectId, conversationId ->
+                inputActions.runningInputActions.drainNextQueuedMessage(projectId, conversationId)
+            }
         )
     }
 
@@ -133,7 +136,9 @@ class MainActivity : AppCompatActivity() {
                 projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
                     groupChatActions.trySendMessage(text, attachments) ||
                     friendChatActions.trySendMessage(text, attachments)
-            }
+            },
+            forkForRunningInput = { text -> conversationForkActions.forkForRunningInput(text) },
+            startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService
         )
     }
 
@@ -536,6 +541,19 @@ class MainActivity : AppCompatActivity() {
             renderConversationList = homeListActions::renderConversationList,
             setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             onConversationsChanged = { projectSpaceController.renderActiveSpace() }
+        )
+    }
+
+    private val conversationForkActions: MainConversationForkActions by lazy {
+        MainConversationForkActions(
+            binding = binding,
+            activeProject = projectStateActions::activeProject,
+            activeConversation = projectStateActions::activeConversation,
+            setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
+            saveProjects = projectStateActions::saveProjects,
+            renderConversationList = homeListActions::renderConversationList,
+            openConversation = conversationOpenActions::openConversation,
+            renderProjectSpace = { projectSpaceController.renderActiveSpace() }
         )
     }
 

@@ -21,7 +21,7 @@ use crate::{
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_mobile::ensure_mobile_project,
     project_trace_events::record_server_transport,
-    project_ws_job::{cancel_project_ws_job, get_or_start_project_ws_job},
+    project_ws_job::{cancel_project_ws_job, emit_project_job_event, get_or_start_project_ws_job},
     project_ws_protocol::{
         is_terminal_project_ws_message, parse_project_message, project_client_request_id,
         task_control_event,
@@ -448,11 +448,37 @@ async fn handle_project_ws(
                 incoming = receiver.next() => {
                     match incoming {
                         Some(Ok(Message::Text(text))) => {
-                            tracing::info!(
-                                task_id = %job.task_id,
-                                "received project WebSocket message while request was running; ignoring {} bytes",
-                                text.len()
-                            );
+                            let runtime_request = parse_project_message(&text);
+                            let runtime_op = runtime_request
+                                .op
+                                .as_deref()
+                                .unwrap_or("run")
+                                .to_ascii_lowercase();
+                            if runtime_op == "runtime_note" {
+                                let note_preview = summarize_runtime_note(&runtime_request.message);
+                                state.server_traces.record(
+                                    &trace_id,
+                                    "ws_project_runtime_note_received",
+                                    serde_json::json!({
+                                        "task_id": &job.task_id,
+                                        "message_chars": runtime_request.message.chars().count(),
+                                    }),
+                                );
+                                let ack = task_control_event(
+                                    "runtime_note_received",
+                                    Some(&job.task_id),
+                                    runtime_request.client_request_id.as_deref(),
+                                    Some(&conversation_id),
+                                    &format!("当前任务提醒已记录：{}", note_preview),
+                                );
+                                emit_project_job_event(&state, &job.task_id, &job, ack).await;
+                            } else {
+                                tracing::info!(
+                                    task_id = %job.task_id,
+                                    "received project WebSocket message while request was running; ignoring {} bytes",
+                                    text.len()
+                                );
+                            }
                         }
                         Some(Ok(Message::Ping(payload))) => {
                             if sender.send(Message::Pong(payload)).await.is_err() {
@@ -499,5 +525,19 @@ async fn handle_project_ws(
             );
             break;
         }
+    }
+}
+
+fn summarize_runtime_note(value: &str) -> String {
+    let preview = value
+        .replace('\n', " ")
+        .trim()
+        .chars()
+        .take(60)
+        .collect::<String>();
+    if value.chars().count() > 60 {
+        format!("{}...", preview)
+    } else {
+        preview
     }
 }

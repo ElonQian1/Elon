@@ -18,7 +18,8 @@ internal class MainTaskActions(
     private val conversationPreviewActions: () -> MainConversationPreviewActions,
     private val conversationTaskRegistryActions: () -> MainConversationTaskRegistryActions,
     private val activeWorkControlActions: () -> MainActiveWorkControlActions,
-    private val sendEnabledActions: () -> MainSendEnabledActions
+    private val sendEnabledActions: () -> MainSendEnabledActions,
+    private val drainNextQueuedMessage: (String?, String?) -> Unit
 ) {
     val taskWorkEventActions: MainTaskWorkEventActions by lazy {
         MainTaskWorkEventActions(
@@ -79,7 +80,8 @@ internal class MainTaskActions(
             removeConversationTask = conversationTaskRegistryActions()::removeConversationTask,
             persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
             updateConversationTaskFromService =
-                conversationTaskRegistryActions()::updateConversationTaskFromService
+                conversationTaskRegistryActions()::updateConversationTaskFromService,
+            drainNextQueuedMessage = drainNextQueuedMessage
         )
     }
 

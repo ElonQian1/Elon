@@ -86,6 +86,11 @@ class TaskWorkService : Service() {
                 if (hasActiveTasks()) enterForeground("connect")
                 traceId?.let { activeTasks[it] }?.let { connect(it) } ?: connectAll()
             }
+            ACTION_RUNTIME_INPUT -> {
+                if (payload != null) {
+                    sendRuntimeInput(payload, traceId)
+                }
+            }
             ACTION_PAUSE -> pauseWork(traceId)
             ACTION_SYNC_STATE -> broadcastState()
             else -> {
@@ -258,6 +263,28 @@ class TaskWorkService : Service() {
         }
         DebugTraceStore.record(
             if (sent) "task_payload_sent" else "task_payload_send_failed",
+            mapOf(
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(task),
+                "payload_bytes" to payload.toByteArray().size
+            )
+        )
+        if (!sent) scheduleReconnect(task)
+    }
+
+    private fun sendRuntimeInput(payload: String, traceId: String?) {
+        val task = traceId?.let { activeTasks[it] } ?: activeTasks.values.lastOrNull()
+        if (task == null || !task.waitingForReply) {
+            DebugTraceStore.record(
+                "task_runtime_input_dropped",
+                mapOf("trace_id" to traceId, "reason" to "no_active_task")
+            )
+            return
+        }
+        val sent = ensureClient(task).send(payload)
+        DebugTraceStore.record(
+            if (sent) "task_runtime_input_sent" else "task_runtime_input_failed",
             mapOf(
                 "trace_id" to task.traceId,
                 "kind" to task.requestKind,
@@ -497,6 +524,7 @@ class TaskWorkService : Service() {
         const val ACTION_START_WORK = "com.elon.app.task.START_WORK"
         const val ACTION_RESUME_PENDING = "com.elon.app.task.RESUME_PENDING"
         const val ACTION_CONNECT = "com.elon.app.task.CONNECT"
+        const val ACTION_RUNTIME_INPUT = "com.elon.app.task.RUNTIME_INPUT"
         const val ACTION_PAUSE = "com.elon.app.task.PAUSE"
         const val ACTION_SYNC_STATE = "com.elon.app.task.SYNC_STATE"
         const val ACTION_EVENT = "com.elon.app.task.EVENT"

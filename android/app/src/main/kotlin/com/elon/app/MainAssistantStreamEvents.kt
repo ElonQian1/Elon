@@ -21,7 +21,7 @@ internal class MainAssistantStreamEvents(
         val content = jsonStringOrNull(json, "message").orEmpty()
         handleTaskEvent(event, taskId, content)
         if (maybeAppendTaskEventNarrative(event, content)) return null
-        return if (event == "accepted" && shouldShowProgressBubble(content)) {
+        return if ((event == "accepted" || event == "runtime_note_received") && shouldShowProgressBubble(content)) {
             ChatMessage("ai-progress", workflowProgressMessage(content))
         } else {
             null

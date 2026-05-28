@@ -29,7 +29,8 @@ internal data class MainInputComposerViews(
     val modelButtonShell: FrameLayout,
     val inputRightControls: FrameLayout,
     val inputComposerMotion: InputComposerMotion,
-    val attachmentPanel: LinearLayout
+    val attachmentPanel: LinearLayout,
+    val runtimeInputModeStrip: RuntimeInputModeStrip
 )
 
 internal class MainInputComposerSetup(
@@ -52,7 +53,8 @@ internal class MainInputComposerSetup(
     private val collapseInputComposer: () -> Unit,
     private val updateCollapsedInputPreview: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
-    private val updateAdaptiveInputHeight: () -> Unit
+    private val updateAdaptiveInputHeight: () -> Unit,
+    private val selectRunningInputMode: (RunningInputMode) -> Unit
 ) {
     @SuppressLint("ClickableViewAccessibility")
     fun setup(): MainInputComposerViews {
@@ -265,7 +267,13 @@ internal class MainInputComposerSetup(
         inputBarContainer.addView(inputRightControls)
 
         val attachmentPanel = buildAttachmentPanel()
+        val runtimeInputModeStrip = RuntimeInputModeStrip(
+            activity = activity,
+            dp = dp,
+            onModeSelected = selectRunningInputMode
+        )
         root.addView(expandedInputContainer)
+        root.addView(runtimeInputModeStrip.view)
         root.addView(inputBarContainer)
         root.addView(attachmentPanel)
 
@@ -317,7 +325,8 @@ internal class MainInputComposerSetup(
             modelButtonShell = modelButtonShell,
             inputRightControls = inputRightControls,
             inputComposerMotion = inputComposerMotion,
-            attachmentPanel = attachmentPanel
+            attachmentPanel = attachmentPanel,
+            runtimeInputModeStrip = runtimeInputModeStrip
         )
     }
 

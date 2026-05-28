@@ -26,13 +26,16 @@ internal class MainInputActions(
     private val navigationController: () -> MainNavigationController,
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
-    private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean
+    private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
+    private val forkForRunningInput: (String) -> SendTarget,
+    private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean
 ) {
     private val pendingAttachments = mutableListOf<PendingAttachment>()
     private var inputComposerViews: MainInputComposerViews? = null
     private var pendingAttachmentPreviewStrip: PendingAttachmentPreviewStrip? = null
     private var voiceMode = false
     private var inputCanSend = true
+    private var runningInputMode = RunningInputMode.REMIND_CURRENT
     private var suppressInputFocusAnimation = false
     private var speechInputActions: MainSpeechInputActions? = null
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
@@ -58,7 +61,11 @@ internal class MainInputActions(
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() },
+            selectRunningInputMode = { mode ->
+                runningInputMode = mode
+                updateRunningInputModeStrip()
+            }
         ).setup()
 
         inputComposerViews = views
@@ -69,12 +76,20 @@ internal class MainInputActions(
         binding.inputLayout.addView(requireNotNull(pendingAttachmentPreviewStrip).view, 1)
         voiceModeActions.applyVoiceMode()
         collapsedInputPreviewActions.updateCollapsedInputPreview()
+        updateRunningInputModeStrip()
         updateSendButtonVisual()
         adaptiveInputHeightActions.updateAdaptiveInputHeight()
         keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(binding).also { it.install() }
     }
 
     fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews
+
+    fun updateRunningInputModeStrip() {
+        inputComposerViewsOrNull()?.runtimeInputModeStrip?.refresh(
+            visible = conversationTaskRegistryActions().isActiveConversationWorking() && !isFriendChatActive(),
+            mode = runningInputMode
+        )
+    }
 
     fun destroySpeechInput() {
         speechInputActions?.destroy()
@@ -140,6 +155,7 @@ internal class MainInputActions(
             pendingAttachments = pendingAttachments,
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
             isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
+            runningInputMode = { runningInputMode },
             activeProject = projectStateActions()::activeProject,
             activeConversation = projectStateActions()::activeConversation,
             appendMessage = workflowActions().messageAppendActions::appendMessage,
@@ -148,7 +164,23 @@ internal class MainInputActions(
                 attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
             },
             startPreparedMessage = preparedMessageActions()::startPreparedMessage,
+            handleRunningInput = runningInputActions::handleRunningInput,
             trySendFriendMessage = trySendFriendMessage
+        )
+    }
+
+    val runningInputActions: MainRunningInputActions by lazy {
+        MainRunningInputActions(
+            activity = activity,
+            projects = { projects },
+            activeConversation = projectStateActions()::activeConversation,
+            activeConversationTask = conversationTaskRegistryActions()::activeConversationTask,
+            appendMessage = workflowActions().messageAppendActions::appendMessage,
+            updateMessage = workflowActions().messageAppendActions::updateMessage,
+            startPreparedMessageAfterUserBubble = preparedMessageActions()::startPreparedMessageAfterUserBubble,
+            startTaskWorkService = startTaskWorkService,
+            forkForRunningInput = forkForRunningInput,
+            expandOutgoing = ::expandShortDevelopmentCommand
         )
     }
 
@@ -268,7 +300,9 @@ internal class MainInputActions(
             modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             updateSendButtonVisual = ::updateSendButtonVisual,
-            updateStageHintShimmer = { stageHintShimmer().update() }
+            updateStageHintShimmer = { stageHintShimmer().update() },
+            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
+            updateRunningInputModeStrip = ::updateRunningInputModeStrip
         )
     }
 

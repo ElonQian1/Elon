@@ -15,15 +15,19 @@ internal class MainSendEnabledActions(
     private val modelButtonShell: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val updateSendButtonVisual: () -> Unit,
-    private val updateStageHintShimmer: () -> Unit
+    private val updateStageHintShimmer: () -> Unit,
+    private val isActiveConversationWorking: () -> Boolean,
+    private val updateRunningInputModeStrip: () -> Unit
 ) {
     fun setSendEnabled(enabled: Boolean) {
         val conversationEnded = !isFriendChatActive() && activeConversation().ended
-        val canSend = enabled && !conversationEnded
+        val canSend = (enabled || isActiveConversationWorking()) && !conversationEnded
         setInputCanSend(canSend)
         binding.inputEdit.isEnabled = !conversationEnded
         binding.inputEdit.hint = if (conversationEnded) {
             "会话已结束，请新建会话继续"
+        } else if (isActiveConversationWorking()) {
+            "输入提醒、下一轮消息或分叉方案"
         } else {
             "文本内容在此输入。"
         }
@@ -45,6 +49,7 @@ internal class MainSendEnabledActions(
             }
         }
         updateSendButtonVisual()
+        updateRunningInputModeStrip()
         updateStageHintShimmer()
     }
 }

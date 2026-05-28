@@ -11,7 +11,8 @@ internal class MainTaskMessageRouterActions(
     private val appendBackgroundTaskMessage: (String, String?, Boolean) -> Unit,
     private val removeConversationTask: (String?, String?, String?) -> ConversationTaskState?,
     private val persistActiveWork: () -> Unit,
-    private val updateConversationTaskFromService: (String?, String?, String?, Boolean?, Boolean?) -> ConversationTaskState?
+    private val updateConversationTaskFromService: (String?, String?, String?, Boolean?, Boolean?) -> ConversationTaskState?,
+    private val drainNextQueuedMessage: (String?, String?) -> Unit
 ) {
     fun appendTaskMessage(
         raw: String,
@@ -34,6 +35,7 @@ internal class MainTaskMessageRouterActions(
         if (type == "done" || type == "error") {
             removeConversationTask(traceId, projectId, conversationId)
             persistActiveWork()
+            drainNextQueuedMessage(projectId, conversationId)
         } else {
             updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, false)
         }
