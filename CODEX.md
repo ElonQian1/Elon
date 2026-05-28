@@ -29,3 +29,4 @@ When a script prints `NEXT=`, `ERROR_CODE=`, `DOC=`, or a stop/retry message, fo
 - **Prewarm** 只做预热，不读文件、不改代码、不构建、不部署。
 - **Stale session**：`codex resume` 失败时标记 stale，带旧 `codex://threads/<thread_id>` URI 和最近后端消息重试一次（不冷启动）。
 - **APK 发布用脚本**（`publish-apk.sh`），脚本已内置并发保护和 claim/finish，不要手搓发布流程。
+- **后端发布必须用脚本**（`bash scripts/publish-server.sh`）：脚本负责 `git pull --rebase` → `POST /api/release/claim`（分配版本号）→ `cargo zigbuild`（注入 `ELON_BUILD_VERSION`）→ 上传 → `POST /api/release/finish`。**绝对禁止直接调用 `cargo build` / `cargo zigbuild` 替代脚本**，否则 binary 版本号不递增（卡在 Cargo.toml 兜底值），且服务器 release 槽位泄漏。
