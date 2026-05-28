@@ -485,14 +485,14 @@ internal class MainSpeechInputActions(
             )
         )
         val text = transcription?.trim()?.takeIf { it.isNotBlank() }
-        if (isFriendChatActive()) {
-            // 好友聊天：只发语音气泡，原文存附件里长按可查看，不单独发文字
-            sendVoiceAttachment(attachment.copy(transcription = transcription), "")
-        } else {
-            // 项目聊天：语音气泡 + 原文独立文字气泡，两条消息让 AI 也能理解内容
-            sendVoiceAttachment(attachment.copy(transcription = transcription), "")
-            if (text != null) {
-                binding.root.post { sendTextDirect?.invoke(text) }
+        // 总是发语音气泡（路由由 sendVoiceAttachment→trySendFriendMessage 负责）
+        sendVoiceAttachment(attachment.copy(transcription = transcription), "")
+        // 仅在项目聊天时补发一条文字供 AI 阅读；在 post 里重新检查避免时序问题
+        if (text != null) {
+            binding.root.post {
+                if (!isFriendChatActive()) {
+                    sendTextDirect?.invoke(text)
+                }
             }
         }
     }
