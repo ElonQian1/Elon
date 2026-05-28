@@ -229,7 +229,13 @@ internal class MainSpeechInputActions(
         val deadline = activity.window?.decorView
         deadline?.postDelayed({
             if (!agentVoiceActive) return@postDelayed
-            commitAgentVoiceFinal(targetZone)
+            // 只在已有文字时提早提交。
+            // mibrain 云端 ASR 在 stopListening 后约 600ms 才返回结果，
+            // 250ms 抢先提交会导致 finalText="" → "没听清"，真实结果被丢弃。
+            // 无文字时什么都不做，等 onFinal 回调（~600ms）或 1500ms 安全网。
+            if (agentLastFinalText.isNotBlank() || agentLastPartialText.isNotBlank()) {
+                commitAgentVoiceFinal(targetZone)
+            }
         }, 250L)
         deadline?.postDelayed({
             if (!agentVoiceActive) return@postDelayed
