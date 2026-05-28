@@ -53,7 +53,16 @@
 4. **提交构建**：`git add → git commit → 触发构建流水线`
 5. **编译部署**：Rust 后端在本地开发机交叉编译后上传 binary；Android 在本地开发机打包签名后上传 APK；生产服务器只负责运行和分发产物
 6. **反馈用户**：将新APK下载链接通过对话界面发回用户手机
+### ⚠️ elon 自项目 vs 用户子项目：构建方式完全不同
 
+**构建环境根本不同**：elon 自身 APK 在**本地 Windows 开发机**上构建并签名；用户子项目在**Linux/Ubuntu 服务器**上构建，服务器没有签名密钥。
+
+| 场景 | 运行环境 | 判断方法 | 正确构建方式 |
+|---|---|---|---|
+| **改动 elon 自身**（`android/`、`server/`、任何本仓库文件） | 本地 Windows 开发机 | 仓库根目录含 `scripts/publish-apk.ps1` | 必须用 `scripts\publish-apk.ps1`（→ `assembleRelease` + 签名） |
+| **给用户构建他们的子项目** | Linux/Ubuntu 服务器 | 通过 `build_project()` 工具调用，工作目录在 `/opt/elon/projects/<id>/` | `assembleDebug`（服务器无签名密钥，debug 正确） |
+
+**绝不能**在改动 elon 自身代码后用 `assembleDebug` 或手动 `./gradlew assembleRelease` 代替 `publish-apk.ps1`。
 ### Android 新功能完成定义
 
 涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算完成。只要改动触及 `android/app/src/main/**`、`AndroidManifest.xml`、聊天链路、更新链路、权限、后台服务或手机端调试能力，除非用户明确要求“只改代码不发布 APK”，否则必须运行：
