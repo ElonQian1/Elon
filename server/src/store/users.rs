@@ -55,6 +55,7 @@ impl Store {
             nickname: clean_optional(nickname).map(ToOwned::to_owned),
             role: role.to_string(),
             status: "active".into(),
+            avatar_data_url: None,
         })
     }
 
@@ -92,6 +93,7 @@ impl Store {
             nickname: row.4,
             role: row.5,
             status: row.6,
+            avatar_data_url: None,
         })
     }
 
@@ -189,6 +191,7 @@ impl Store {
                         nickname: row.get(3)?,
                         role: row.get(4)?,
                         status: row.get(5)?,
+                        avatar_data_url: None,
                     })
                 },
             )

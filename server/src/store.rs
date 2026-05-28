@@ -478,6 +478,7 @@ impl Store {
                     nickname: row.get(3)?,
                     role: row.get(4)?,
                     status: row.get(5)?,
+                    avatar_data_url: None,
                 })
             },
         )
