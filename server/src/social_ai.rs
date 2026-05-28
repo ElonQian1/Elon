@@ -4,15 +4,20 @@
 
 use anyhow::{anyhow, Result};
 use serde_json::json;
-use std::sync::Arc;
-use tracing::warn;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex, OnceLock},
+};
+use tracing::{info, warn};
 
 use crate::{
     agent_llm_call::call_chat_llm,
     friend_events, intent_router,
-    store::SocialAiHistoryMessage,
+    store::{SocialAiHistoryMessage, SocialAiPendingMention},
     types::{AgentConfig, AppState},
 };
+
+static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 const DEVELOPMENT_REDIRECT_REPLY: &str =
     "这个需求已经涉及项目开发，我在好友/群聊里不能直接写代码、改项目或打包。请到「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务；在那里我可以按完整开发流程帮你实现。";
@@ -33,9 +38,61 @@ pub(crate) fn spawn_friend_reply(
     if !contains_el_mention(&trigger_content) {
         return;
     }
+    spawn_friend_reply_if_needed(state, user_id, friend_id);
+}
+
+pub(crate) fn spawn_friend_reply_if_needed(
+    state: Arc<AppState>,
+    user_id: String,
+    friend_id: String,
+) {
+    let pending = match state
+        .store
+        .latest_unanswered_friend_social_ai_mention(&user_id, &friend_id)
+    {
+        Ok(pending) => pending,
+        Err(error) => {
+            warn!("friend @EL pending lookup failed: {}", error);
+            return;
+        }
+    };
+    let Some(pending) = pending else {
+        return;
+    };
+    spawn_friend_pending_reply(state, user_id, friend_id, pending);
+}
+
+fn spawn_friend_pending_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    friend_id: String,
+    pending: SocialAiPendingMention,
+) {
+    if !contains_el_mention(&pending.trigger_content) {
+        return;
+    }
+    let key = format!(
+        "friend:{user_id}:{friend_id}:{}",
+        pending.trigger_message_id
+    );
+    if !mark_in_flight(&key) {
+        return;
+    }
+    let trigger_message_id = pending.trigger_message_id;
+    info!(
+        "friend @EL reply queued: user_id={} friend_id={} trigger_message_id={}",
+        user_id, friend_id, trigger_message_id
+    );
     tokio::spawn(async move {
-        if let Err(error) = reply_to_friend(state, user_id, friend_id).await {
-            warn!("好友聊天 @EL 回复失败: {}", error);
+        let result = reply_to_friend(state, user_id, friend_id).await;
+        clear_in_flight(&key);
+        if let Err(error) = result {
+            warn!("friend @EL reply failed: {}", error);
+        } else {
+            info!(
+                "friend @EL reply stored: trigger_message_id={}",
+                trigger_message_id
+            );
         }
     });
 }
@@ -49,9 +106,54 @@ pub(crate) fn spawn_group_reply(
     if !contains_el_mention(&trigger_content) {
         return;
     }
+    spawn_group_reply_if_needed(state, user_id, group_id);
+}
+
+pub(crate) fn spawn_group_reply_if_needed(state: Arc<AppState>, user_id: String, group_id: String) {
+    let pending = match state
+        .store
+        .latest_unanswered_group_social_ai_mention(&user_id, &group_id)
+    {
+        Ok(pending) => pending,
+        Err(error) => {
+            warn!("group @EL pending lookup failed: {}", error);
+            return;
+        }
+    };
+    let Some(pending) = pending else {
+        return;
+    };
+    spawn_group_pending_reply(state, user_id, group_id, pending);
+}
+
+fn spawn_group_pending_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    group_id: String,
+    pending: SocialAiPendingMention,
+) {
+    if !contains_el_mention(&pending.trigger_content) {
+        return;
+    }
+    let key = format!("group:{group_id}:{}", pending.trigger_message_id);
+    if !mark_in_flight(&key) {
+        return;
+    }
+    let trigger_message_id = pending.trigger_message_id;
+    info!(
+        "group @EL reply queued: user_id={} group_id={} trigger_message_id={}",
+        user_id, group_id, trigger_message_id
+    );
     tokio::spawn(async move {
-        if let Err(error) = reply_to_group(state, user_id, group_id).await {
-            warn!("群聊 @EL 回复失败: {}", error);
+        let result = reply_to_group(state, user_id, group_id).await;
+        clear_in_flight(&key);
+        if let Err(error) = result {
+            warn!("group @EL reply failed: {}", error);
+        } else {
+            info!(
+                "group @EL reply stored: trigger_message_id={}",
+                trigger_message_id
+            );
         }
     });
 }
@@ -207,6 +309,24 @@ fn strip_el_mention(content: &str) -> String {
         .replace("@el", "")
         .trim()
         .to_string()
+}
+
+fn mark_in_flight(key: &str) -> bool {
+    with_in_flight(|items| items.insert(key.to_string()))
+}
+
+fn clear_in_flight(key: &str) {
+    with_in_flight(|items| {
+        items.remove(key);
+    });
+}
+
+fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
+    let mutex = SOCIAL_AI_IN_FLIGHT.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut guard = mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    operation(&mut guard)
 }
 
 #[cfg(test)]

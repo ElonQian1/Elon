@@ -182,7 +182,14 @@ pub async fn list_friend_messages(
         query.after.as_deref(),
         query.limit.unwrap_or(80),
     ) {
-        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Ok(messages) => {
+            crate::social_ai::spawn_friend_reply_if_needed(
+                state.clone(),
+                user.id.clone(),
+                friend_id.clone(),
+            );
+            Json(serde_json::json!({ "messages": messages })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -251,7 +258,14 @@ pub async fn list_friend_group_messages(
         query.after.as_deref(),
         query.limit.unwrap_or(120),
     ) {
-        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Ok(messages) => {
+            crate::social_ai::spawn_group_reply_if_needed(
+                state.clone(),
+                user.id.clone(),
+                group_id.clone(),
+            );
+            Json(serde_json::json!({ "messages": messages })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
