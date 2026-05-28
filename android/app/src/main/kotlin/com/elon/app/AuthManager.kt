@@ -87,6 +87,7 @@ object AuthManager {
             putString(KEY_AUTH_NICKNAME, nickname.orEmpty())
             putLong(KEY_AUTH_EXPIRES_AT, expiresAt ?: 0L)
         }.apply()
+        refreshGlobalWsAuth(ctx)
     }
 
     fun clear(ctx: Context) {
@@ -97,6 +98,7 @@ object AuthManager {
             remove(KEY_AUTH_NICKNAME)
             remove(KEY_AUTH_EXPIRES_AT)
         }.apply()
+        refreshGlobalWsAuth(ctx)
     }
 
     /** 给 OkHttp Request.Builder 加 Bearer token；未登录时不加。 */
@@ -117,5 +119,9 @@ object AuthManager {
         if (token.isBlank() || uid.isBlank()) throw IllegalStateException("响应缺少 token 或 user.id")
         saveSession(ctx, token, uid, account, nickname, expiresAt.takeIf { it > 0 })
         return uid
+    }
+
+    private fun refreshGlobalWsAuth(ctx: Context) {
+        (ctx.applicationContext as? ElonApplication)?.globalWs?.reconnectWithNewToken()
     }
 }

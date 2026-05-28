@@ -55,6 +55,7 @@ class GlobalWsManager(private val serverUrl: String) {
     private val reconnecting = AtomicBoolean(false)
     private var ws: WebSocket? = null
     private var retryCount = 0
+    private var connectedToken: String? = null
     private var appCtx: Context? = null // 始终持有 applicationContext，不持有 Activity
 
     // ── 公共 API ─────────────────────────────────────────────────────────────
@@ -62,7 +63,11 @@ class GlobalWsManager(private val serverUrl: String) {
     /** 开始保活连接。ctx 会提取 applicationContext，不会持有 Activity。 */
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
-        if (!running.compareAndSet(false, true)) return
+        val latestToken = AuthManager.token(ctx)
+        if (!running.compareAndSet(false, true)) {
+            if (latestToken != connectedToken) reconnectWithNewToken()
+            return
+        }
         retryCount = 0
         connect()
     }
@@ -73,6 +78,7 @@ class GlobalWsManager(private val serverUrl: String) {
         handler.removeCallbacksAndMessages(null)
         ws?.cancel()
         ws = null
+        connectedToken = null
     }
 
     /** 当用户登录/退出后调用，立即重连以刷新 token。 */
@@ -97,6 +103,7 @@ class GlobalWsManager(private val serverUrl: String) {
             .replace("https://", "wss://")
             .replace("http://", "ws://")
         val token = AuthManager.token(ctx)
+        connectedToken = token
         val versionCode = BuildConfig.VERSION_CODE
 
         val url = buildString {

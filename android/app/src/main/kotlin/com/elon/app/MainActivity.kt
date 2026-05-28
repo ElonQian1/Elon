@@ -245,7 +245,6 @@ class MainActivity : AppCompatActivity() {
         projectStateActions.saveProjects()
         val gws = (application as ElonApplication).globalWs
         gws.removeListener(globalWsListener)
-        gws.stop()
         super.onStop()
     }
 
