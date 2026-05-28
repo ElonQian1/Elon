@@ -1,0 +1,172 @@
+﻿# 清理 ai-task-preflight 留下的孤儿 worktree
+#
+# 默认（dry-run）：只列出可清理 / 不可清理的项，不做任何修改。
+# -Apply：实际执行清理。
+# -Force：跳过"分支必须合并进 origin/main"的检查（不推荐）。
+# -KeepLast N：保留最近 N 个 task worktree（按时间戳倒序）。
+#
+# 安全规则（默认所有条件都必须满足才会删除）：
+#   1. worktree 路径形如 "<repo>-task-*" 或 "<repo>-task-*-task-*"
+#   2. 工作树没有未提交 / 未跟踪文件
+#   3. 当前所在分支已经合并进 origin/main（即没有未推送或未合并的工作）
+#   4. 不是当前正在使用的 worktree
+#
+# 用法：
+#   powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1            # 预览
+#   powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply     # 执行
+
+param(
+    [switch]$Apply,
+    [switch]$Force,
+    [int]$KeepLast = 0,
+    [switch]$DeleteRemoteBranches
+)
+
+$ErrorActionPreference = "Stop"
+
+function GitOutput {
+    param([string[]]$GitArgs)
+    $output = & git @GitArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($GitArgs -join ' ') failed: $output"
+    }
+    return ($output -join "`n").Trim()
+}
+
+$repoRoot = GitOutput @("rev-parse", "--show-toplevel")
+Set-Location -LiteralPath $repoRoot
+
+$repoLeaf = Split-Path -Leaf $repoRoot
+$currentWorktree = (Resolve-Path -LiteralPath ".").Path.TrimEnd('\','/')
+
+# 同步远端，确保 origin/main 是最新的
+& git fetch origin 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "git fetch origin failed" }
+
+# 解析所有已注册 worktree
+$entries = @()
+$current = @{}
+foreach ($line in (& git worktree list --porcelain)) {
+    if ($line -eq "") {
+        if ($current.Count -gt 0) { $entries += [pscustomobject]$current; $current = @{} }
+        continue
+    }
+    $kv = $line -split " ", 2
+    switch ($kv[0]) {
+        "worktree" { $current["Path"] = $kv[1] }
+        "HEAD"     { $current["Head"] = $kv[1] }
+        "branch"   { $current["Branch"] = ($kv[1] -replace "^refs/heads/","") }
+        "bare"     { $current["Bare"] = $true }
+        "detached" { $current["Detached"] = $true }
+    }
+}
+if ($current.Count -gt 0) { $entries += [pscustomobject]$current }
+
+# 只保留任务 worktree（按命名约定）
+$pattern = "^$([regex]::Escape($repoLeaf))-task-\d{8}-\d{6}(-task-\d{8}-\d{6})?$"
+$taskWorktrees = $entries | Where-Object {
+    $_.Path -and (Split-Path -Leaf $_.Path) -match $pattern
+} | Sort-Object Path
+
+if ($KeepLast -gt 0 -and $taskWorktrees.Count -gt $KeepLast) {
+    $keep = $taskWorktrees | Sort-Object { Split-Path -Leaf $_.Path } -Descending | Select-Object -First $KeepLast
+    $keepSet = @{}; foreach ($k in $keep) { $keepSet[$k.Path] = $true }
+} else {
+    $keepSet = @{}
+}
+
+$toRemove = @()
+$kept = @()
+
+foreach ($wt in $taskWorktrees) {
+    $reasons = @()
+
+    $normalized = $wt.Path.TrimEnd('\','/')
+    if ($normalized -ieq $currentWorktree) { $reasons += "当前正在使用" }
+    if ($keepSet.ContainsKey($wt.Path))    { $reasons += "在 -KeepLast 保留范围内" }
+
+    if (-not (Test-Path -LiteralPath $wt.Path)) {
+        $reasons += "目录已不存在（可 prune）"
+    } else {
+        # 检查脏状态
+        $statusOut = (& git -C $wt.Path status --short 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            $reasons += "git status 失败: $statusOut"
+        } elseif (-not [string]::IsNullOrWhiteSpace(($statusOut -join "`n"))) {
+            $reasons += "有未提交/未跟踪改动"
+        }
+
+        # 检查分支是否合并进 origin/main
+        if (-not $Force -and $wt.Branch) {
+            & git merge-base --is-ancestor $wt.Branch origin/main 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                $reasons += "分支 $($wt.Branch) 尚未合并进 origin/main（用 -Force 跳过）"
+            }
+        }
+    }
+
+    if ($reasons.Count -eq 0) {
+        $toRemove += $wt
+    } else {
+        $kept += [pscustomobject]@{ Worktree = $wt; Reasons = $reasons }
+    }
+}
+
+Write-Host "=== 扫描结果 ===" -ForegroundColor Cyan
+Write-Host "可清理: $($toRemove.Count) 个"
+Write-Host "保留:   $($kept.Count) 个"
+Write-Host ""
+
+if ($toRemove.Count -gt 0) {
+    Write-Host "[将被删除]" -ForegroundColor Yellow
+    foreach ($wt in $toRemove) {
+        Write-Host "  $($wt.Path)  ($($wt.Branch))"
+    }
+    Write-Host ""
+}
+
+if ($kept.Count -gt 0) {
+    Write-Host "[保留]" -ForegroundColor Green
+    foreach ($k in $kept) {
+        Write-Host "  $($k.Worktree.Path)  ($($k.Worktree.Branch))"
+        foreach ($r in $k.Reasons) { Write-Host "    - $r" }
+    }
+    Write-Host ""
+}
+
+if (-not $Apply) {
+    Write-Host "预览模式。如要执行，请加 -Apply。" -ForegroundColor Cyan
+    return
+}
+
+if ($toRemove.Count -eq 0) {
+    Write-Host "无需清理。" -ForegroundColor Green
+    & git worktree prune
+    return
+}
+
+Write-Host "=== 开始清理 ===" -ForegroundColor Cyan
+$removed = 0; $failed = 0
+foreach ($wt in $toRemove) {
+    try {
+        Write-Host "removing $($wt.Path)" -ForegroundColor Yellow
+        & git worktree remove --force $wt.Path 2>&1 | ForEach-Object { Write-Host "  $_" }
+        if ($LASTEXITCODE -ne 0) { throw "worktree remove failed" }
+
+        if ($wt.Branch) {
+            & git branch -D $wt.Branch 2>&1 | ForEach-Object { Write-Host "  $_" }
+            if ($DeleteRemoteBranches) {
+                & git push origin --delete $wt.Branch 2>&1 | ForEach-Object { Write-Host "  $_" }
+            }
+        }
+        $removed++
+    } catch {
+        Write-Host "  失败: $_" -ForegroundColor Red
+        $failed++
+    }
+}
+
+& git worktree prune
+
+Write-Host ""
+Write-Host "完成：清理 $removed 个，失败 $failed 个。" -ForegroundColor Green

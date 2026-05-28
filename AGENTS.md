@@ -30,4 +30,5 @@
 
 - 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`。
 - Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；再运行 `scripts\check-task-complete.ps1 -Kind AndroidFeature`（Windows）。
+- 任务收尾清理 worktree：`scripts\cleanup-task-worktrees.ps1 -Apply`（Windows）或 `bash scripts/cleanup-task-worktrees.sh --apply`（Linux）。预览模式（不带 `-Apply`/`--apply`）只列不删；脏 worktree 和未合并分支会自动保留。
 - 脚本已经负责版本 claim/finish、构建、上传、并发保护和清理。AI 不要手搓这些步骤。
