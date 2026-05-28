@@ -230,7 +230,7 @@ class MainActivity : AppCompatActivity() {
                 taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = s.activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
         )
     }
@@ -280,7 +280,7 @@ class MainActivity : AppCompatActivity() {
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 s.runningConversationTasks.containsKey(key)
             },
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             userId = { userId },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
@@ -353,7 +353,7 @@ class MainActivity : AppCompatActivity() {
                 workflowActions.evidenceActions.stopWorkingEvidenceForActiveConversation()
             },
             clearCurrentEvidence = { workflowActions.evidenceActions.clearCurrentEvidence() },
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -405,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
             isMessageSelectionActive = { messageSelectionActions.isSelectionActive() },
             clearMessageSelection = { messageSelectionActions.cancelSelection() },
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
             onFriendChatClosed = {
                 friendChatActions.closeFriendChat()
@@ -539,7 +539,7 @@ class MainActivity : AppCompatActivity() {
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             onConversationsChanged = { projectSpaceController.renderActiveSpace() }
         )
     }
@@ -631,7 +631,7 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = it },
             resetReconnectAttempts = { s.reconnectAttempts = 0 },
             getActiveRequestIsDevelopment = { s.activeRequestIsDevelopment },
-            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
+            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             renderConversationList = homeListActions::renderConversationList,
             updateStage = projectViewActions::updateStage,
             updateProjectViews = projectViewActions::updateProjectViews

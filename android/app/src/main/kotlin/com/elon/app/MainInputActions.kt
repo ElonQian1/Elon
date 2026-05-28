@@ -154,7 +154,7 @@ internal class MainInputActions(
             binding = binding,
             pendingAttachments = pendingAttachments,
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
-            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
+            isActiveConversationWorking = { conversationTaskRegistryActions().isActiveConversationWorking() },
             runningInputMode = { runningInputMode },
             activeProject = projectStateActions()::activeProject,
             activeConversation = projectStateActions()::activeConversation,
@@ -301,7 +301,7 @@ internal class MainInputActions(
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateStageHintShimmer = { stageHintShimmer().update() },
-            isActiveConversationWorking = conversationTaskRegistryActions()::isActiveConversationWorking,
+            isActiveConversationWorking = { conversationTaskRegistryActions().isActiveConversationWorking() },
             updateRunningInputModeStrip = ::updateRunningInputModeStrip
         )
     }
