@@ -20,6 +20,9 @@
 #  兼容旧名 RUST_MUSL_TARGET_DIR。
 #  旧的 ELON_BUILD_TARGET_DIR 仍兼容，脚本会在其下创建 elon-server-musl/
 #
+#  发布构建会强制使用 CARGO_ENCODED_RUSTFLAGS="-C target-cpu=x86-64"，
+#  防止全局 Cargo config 中的 target-cpu=native 污染服务器产物。
+#
 #  发布顺序：
 #    1. 同步并确认本地 HEAD 已经是 origin/main
 #    2. 调 /api/release/claim 原子申请版本号
@@ -175,6 +178,84 @@ server_runtime_unchanged_since() {
   git -C "$REPO_ROOT" merge-base --is-ancestor "$base_sha" "$SHA_BIG" 2>/dev/null || return 1
   git -C "$REPO_ROOT" diff --quiet "$base_sha" "$SHA_BIG" -- \
     server/src server/Cargo.toml server/homecli-proto
+}
+
+cargo_config_candidates() {
+  local dir="$REPO_ROOT"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    [ -f "$dir/.cargo/config.toml" ] && printf '%s\n' "$dir/.cargo/config.toml"
+    [ -f "$dir/.cargo/config" ] && printf '%s\n' "$dir/.cargo/config"
+    dir="$(dirname "$dir")"
+  done
+
+  local cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  [ -f "$cargo_home/config.toml" ] && printf '%s\n' "$cargo_home/config.toml"
+  [ -f "$cargo_home/config" ] && printf '%s\n' "$cargo_home/config"
+}
+
+warn_native_rustflags() {
+  local found=0
+  local target_env="CARGO_TARGET_${TARGET^^}_RUSTFLAGS"
+  target_env="${target_env//-/_}"
+  local env_name env_value config_path
+
+  for env_name in RUSTFLAGS CARGO_ENCODED_RUSTFLAGS CARGO_BUILD_RUSTFLAGS "$target_env"; do
+    env_value="${!env_name-}"
+    if [[ "$env_value" =~ target-cpu[[:space:]]*=?[[:space:]]*\"?native ]]; then
+      if [ "$found" -eq 0 ]; then
+        echo -e "${YELLOW}   ⚠️  检测到 target-cpu=native，发布脚本将忽略这些机器级 rustflags：${NC}"
+      fi
+      found=1
+      echo -e "${YELLOW}      env:$env_name${NC}"
+    fi
+  done
+
+  while IFS= read -r config_path; do
+    if grep -Eq 'target-cpu[[:space:]]*=?[[:space:]]*"?native' "$config_path"; then
+      if [ "$found" -eq 0 ]; then
+        echo -e "${YELLOW}   ⚠️  检测到 target-cpu=native，发布脚本将忽略这些机器级 rustflags：${NC}"
+      fi
+      found=1
+      echo -e "${YELLOW}      $config_path${NC}"
+    fi
+  done < <(cargo_config_candidates | awk '!seen[$0]++')
+}
+
+enable_portable_release_rustflags() {
+  local target_env="CARGO_TARGET_${TARGET^^}_RUSTFLAGS"
+  target_env="${target_env//-/_}"
+
+  SAVED_RUSTFLAGS_SET="${RUSTFLAGS+x}"
+  SAVED_RUSTFLAGS="${RUSTFLAGS-}"
+  SAVED_CARGO_ENCODED_RUSTFLAGS_SET="${CARGO_ENCODED_RUSTFLAGS+x}"
+  SAVED_CARGO_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS-}"
+  SAVED_CARGO_BUILD_RUSTFLAGS_SET="${CARGO_BUILD_RUSTFLAGS+x}"
+  SAVED_CARGO_BUILD_RUSTFLAGS="${CARGO_BUILD_RUSTFLAGS-}"
+  SAVED_TARGET_RUSTFLAGS_NAME="$target_env"
+  SAVED_TARGET_RUSTFLAGS_SET="${!target_env+x}"
+  SAVED_TARGET_RUSTFLAGS="${!target_env-}"
+
+  warn_native_rustflags
+
+  # Cargo prioritizes CARGO_ENCODED_RUSTFLAGS over RUSTFLAGS and config files.
+  # Force release builds to a portable x86-64 baseline so artifacts built on a
+  # different CPU cannot SIGILL on the deployment server.
+  export CARGO_ENCODED_RUSTFLAGS=$'-C\x1ftarget-cpu=x86-64'
+  unset RUSTFLAGS CARGO_BUILD_RUSTFLAGS "$target_env"
+  echo -e "${GREEN}   ✅ Release rustflags: -C target-cpu=x86-64（屏蔽全局 target-cpu=native）${NC}"
+}
+
+restore_release_rustflags() {
+  if [ "${SAVED_RUSTFLAGS_SET:-}" = "x" ]; then export RUSTFLAGS="$SAVED_RUSTFLAGS"; else unset RUSTFLAGS; fi
+  if [ "${SAVED_CARGO_ENCODED_RUSTFLAGS_SET:-}" = "x" ]; then export CARGO_ENCODED_RUSTFLAGS="$SAVED_CARGO_ENCODED_RUSTFLAGS"; else unset CARGO_ENCODED_RUSTFLAGS; fi
+  if [ "${SAVED_CARGO_BUILD_RUSTFLAGS_SET:-}" = "x" ]; then export CARGO_BUILD_RUSTFLAGS="$SAVED_CARGO_BUILD_RUSTFLAGS"; else unset CARGO_BUILD_RUSTFLAGS; fi
+  if [ -n "${SAVED_TARGET_RUSTFLAGS_NAME:-}" ]; then
+    if [ "${SAVED_TARGET_RUSTFLAGS_SET:-}" = "x" ]; then
+      export "$SAVED_TARGET_RUSTFLAGS_NAME=$SAVED_TARGET_RUSTFLAGS"
+    else
+      unset "$SAVED_TARGET_RUSTFLAGS_NAME"
+    fi
+  fi
 }
 
 # ── 路径推导（兼容任意 PC、任意路径）──────────────────────────
@@ -357,33 +438,6 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     rustup target add "$TARGET"
   fi
 
-  # ── 安全检查：禁止 target-cpu=native 污染交叉编译产物 ──────────────────
-  # target-cpu=native 让产物依赖编译机 CPU 的高级指令集，上传到服务器后 SIGILL 崩溃。
-  _native_found=0
-  _native_sources=""
-  if echo "${RUSTFLAGS:-}" | grep -q 'target-cpu=native'; then
-    _native_found=1
-    _native_sources="$_native_sources\n  - 环境变量 RUSTFLAGS=\"${RUSTFLAGS:-}\""
-  fi
-  _global_cargo="${CARGO_HOME:-$HOME/.cargo}/config.toml"
-  if [ -f "$_global_cargo" ] && grep -q 'target-cpu=native' "$_global_cargo" 2>/dev/null; then
-    _native_found=1
-    _native_sources="$_native_sources\n  - 全局配置 $_global_cargo"
-  fi
-  _repo_cargo="$REPO_ROOT/.cargo/config.toml"
-  if [ -f "$_repo_cargo" ] && grep -q 'target-cpu=native' "$_repo_cargo" 2>/dev/null; then
-    _native_found=1
-    _native_sources="$_native_sources\n  - 项目配置 $_repo_cargo"
-  fi
-  if [ "$_native_found" -eq 1 ]; then
-    echo -e "${RED}❌ 检测到 target-cpu=native，禁止继续编译！${NC}" >&2
-    echo -e "${RED}   target-cpu=native 按本机 CPU 优化，部署到服务器后因指令集不兼容会 SIGILL 崩溃。${NC}" >&2
-    echo -e "${YELLOW}   发现位置：${NC}" >&2
-    printf "${YELLOW}%b${NC}\n" "$_native_sources" >&2
-    echo -e "${YELLOW}   修复方法：删除或注释掉上述位置中 rustflags 里的 -C target-cpu=native。${NC}" >&2
-    complete_release false "" "" "target-cpu=native detected, SIGILL risk"
-    exit 1
-  fi
 fi
 
 # ── 3. 编译（临时工作树）─────────────────────────────────────
@@ -429,26 +483,18 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   echo -e "${YELLOW}3⃣  交叉编译 → $TARGET...${NC}"
   TMP_SERVER_DIR="$TMP_WORKTREE/server"
   export CARGO_TARGET_DIR="$BUILD_TARGET_DIR"
-  # 强制中性 CPU target：无论环境变量如何，确保产物可在任何 x86-64 服务器运行。
-  _saved_rustflags="${RUSTFLAGS:-}"
-  RUSTFLAGS=$(echo "${RUSTFLAGS:-}" | sed 's/-C[[:space:]]\+target-cpu=[^[:space:]]\+//g' | xargs)
-  if [ -n "$RUSTFLAGS" ]; then
-    export RUSTFLAGS="$RUSTFLAGS -C target-cpu=x86-64"
-  else
-    export RUSTFLAGS="-C target-cpu=x86-64"
-  fi
-  echo -e "${GRAY}   RUSTFLAGS=$RUSTFLAGS${NC}"
+  enable_portable_release_rustflags
   if ! (
     cd "$TMP_SERVER_DIR"
     ELON_SERVER_GIT_SHA="$SHA_BIG" ELON_BUILD_VERSION="$ASSIGNED_VERSION" cargo zigbuild --release --target "$TARGET"
   ); then
-    RUSTFLAGS="$_saved_rustflags"
+    restore_release_rustflags
     unset CARGO_TARGET_DIR
     complete_release false "" "" "cargo zigbuild failed"
     echo -e "${RED}❌ 编译失败${NC}" >&2
     exit 1
   fi
-  RUSTFLAGS="$_saved_rustflags"
+  restore_release_rustflags
   unset CARGO_TARGET_DIR
 
   if [ ! -f "$BINARY" ]; then

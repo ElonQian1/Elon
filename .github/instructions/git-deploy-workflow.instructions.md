@@ -232,6 +232,7 @@ if ($rs) { rustfmt $rs }
 ---
 
 > 共享脚本不允许写死路径；Rust 构建缓存配置详见 `scripts/publish-server.ps1` 的 `.NOTES` 注释和 `.env.local.example`。
+> 后端发布脚本会强制使用通用 `-C target-cpu=x86-64`，并报告全局 Cargo config / 环境变量中的 `target-cpu=native`；不得让机器级 native rustflags 参与服务器发布构建。
 
 ---
 

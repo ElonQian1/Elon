@@ -55,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
-- **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交
+- **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
 

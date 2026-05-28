@@ -246,6 +246,8 @@ Windows / Linux / macOS 发布脚本都会优先读取这个变量，并直接�
 
 两者都跨 session 持久化。**同一台机器首次全量编译约 10 分钟，后续只改业务代码约 30 秒**。CI 或远程 Codex 也可以通过进程环境变量传入 `RUST_SERVER_MUSL_TARGET_DIR` 或 `ELON_BUILD_TARGET_DIR` 指向持久卷。**禁止**把 `CARGO_TARGET_DIR` 手动设为含 SHA 的路径，那样会让每次都全量重编。
 
+发布脚本会在编译服务端产物时强制覆盖 release rustflags 为 `-C target-cpu=x86-64`，并检查/提示全局 Cargo config 或环境变量中的 `target-cpu=native`。原因是 Windows/Linux 开发机可能有 AVX-512 等本机专有指令，不能把 `native` 优化带进要上传到服务器的二进制。
+
 ```powershell
 cd scripts
 .\publish-server.ps1 -SkipUpload
