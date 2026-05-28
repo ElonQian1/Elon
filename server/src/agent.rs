@@ -190,6 +190,32 @@ async fn run_dispatch_with_workspace(
                 .to_json(),
             );
             // fall through：继续走 AI 完成开发需求
+        } else if is_pure_apk_delivery_request(user_message, workspace) {
+            // 纯交付请求但项目尚无 APK：注入 preflight 指令让 AI 直接编译，不要等用户再说一遍
+            info!("delivery fast-path: pure apk delivery but no apk yet, injecting build note");
+            let build_note = "【系统提示】用户请求下载 APK，但该项目尚未编译过。请直接调用 build_project(\"android\") 为用户构建第一个 APK，无需询问或修改代码。编译成功后系统会自动把下载链接发给用户。";
+            let combined_note = match preflight_note {
+                Some(existing) => format!("{existing}\n\n{build_note}"),
+                None => build_note.to_string(),
+            };
+            let _ = tx.send(WsMessage::progress("项目还没有编译过，正在为你构建第一个 APK……").to_json());
+            return run_backend_with_workspace(
+                user_id,
+                workspace,
+                user_config_workspace,
+                download_base,
+                native_session_scope,
+                user_message,
+                Some(&combined_note),
+                agent_name,
+                trace_id,
+                CapabilityRoute::CodeAgent,
+                true,
+                require_existing_git,
+                state,
+                tx,
+            )
+            .await;
         }
     }
 
