@@ -2,8 +2,11 @@ package com.elon.app
 
 import android.content.Context
 import android.graphics.Rect
+import android.os.SystemClock
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainInputFocusActions(
@@ -24,10 +27,13 @@ internal class MainInputFocusActions(
     private var keyboardWatcherInstalled = false
     private var lastKeyboardVisible = false
     private var keyboardVisibleSinceFocus = false
+    private var keyboardDismissCheckPending = false
+    private var keyboardVisibleAt = 0L
 
     fun focusInputComposer() {
         if (!isFriendChatActive() && activeConversation().ended) return
         keyboardVisibleSinceFocus = false
+        keyboardVisibleAt = 0L
         installKeyboardCollapseWatcher()
         if (isVoiceMode()) {
             setVoiceMode(false)
@@ -105,6 +111,9 @@ internal class MainInputFocusActions(
             val keyboardVisible = isKeyboardVisible()
             if (keyboardVisible) {
                 keyboardVisibleSinceFocus = true
+                if (keyboardVisibleAt == 0L) {
+                    keyboardVisibleAt = SystemClock.uptimeMillis()
+                }
             }
             if (
                 lastKeyboardVisible &&
@@ -113,8 +122,7 @@ internal class MainInputFocusActions(
                 inputComposerMotion()?.isExpanded == true &&
                 keyboardVisibleSinceFocus
             ) {
-                keyboardVisibleSinceFocus = false
-                collapseInputComposer(animate = true)
+                scheduleKeyboardDismissCheck()
             }
             lastKeyboardVisible = keyboardVisible
         }
@@ -127,5 +135,32 @@ internal class MainInputFocusActions(
         val hiddenHeight = rootHeight - visibleFrame.bottom
         val threshold = (binding.root.resources.displayMetrics.density * 120f).toInt()
         return hiddenHeight > threshold
+    }
+
+    private fun scheduleKeyboardDismissCheck() {
+        if (keyboardDismissCheckPending) return
+        keyboardDismissCheckPending = true
+        val visibleForMs = (SystemClock.uptimeMillis() - keyboardVisibleAt).coerceAtLeast(0L)
+        val delayMs = maxOf(KEYBOARD_DISMISS_CONFIRM_MS, KEYBOARD_STABLE_VISIBLE_MS - visibleForMs)
+        binding.root.postDelayed({
+            keyboardDismissCheckPending = false
+            if (!keyboardVisibleSinceFocus) return@postDelayed
+            if (isKeyboardVisible() || isImeVisible()) return@postDelayed
+            if (!binding.inputEdit.hasFocus()) return@postDelayed
+            if (inputComposerMotion()?.isExpanded != true) return@postDelayed
+            keyboardVisibleSinceFocus = false
+            keyboardVisibleAt = 0L
+            collapseInputComposer(animate = true)
+        }, delayMs)
+    }
+
+    private fun isImeVisible(): Boolean {
+        return ViewCompat.getRootWindowInsets(binding.root)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+    }
+
+    private companion object {
+        private const val KEYBOARD_DISMISS_CONFIRM_MS = 80L
+        private const val KEYBOARD_STABLE_VISIBLE_MS = 160L
     }
 }

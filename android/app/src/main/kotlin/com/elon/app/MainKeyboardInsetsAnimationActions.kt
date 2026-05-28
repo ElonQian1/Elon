@@ -14,8 +14,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainKeyboardInsetsAnimationActions(
-    private val binding: ActivityMainBinding,
-    private val onKeyboardDismissed: () -> Unit = {}
+    private val binding: ActivityMainBinding
 ) {
     private val fallbackInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var bottomOffsetAnimator: ValueAnimator? = null
@@ -26,8 +25,6 @@ internal class MainKeyboardInsetsAnimationActions(
     private var usingEstimatedKeyboardHeight = false
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
-    private var dispatchingKeyboardDismissal = false
-    private var suppressKeyboardDismissal = false
     private val visibleFrame = Rect()
 
     fun install() {
@@ -106,14 +103,9 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     fun releaseKeyboardLift() {
-        suppressKeyboardDismissal = true
-        try {
-            usingEstimatedKeyboardHeight = false
-            keyboardWasVisibleSinceLift = false
-            applyKeyboardHeight(0, animate = true)
-        } finally {
-            suppressKeyboardDismissal = false
-        }
+        usingEstimatedKeyboardHeight = false
+        keyboardWasVisibleSinceLift = false
+        applyKeyboardHeight(0, animate = true)
     }
 
     private fun installVisibleFrameFallback() {
@@ -181,9 +173,6 @@ internal class MainKeyboardInsetsAnimationActions(
             usingEstimatedKeyboardHeight = false
         }
         if (target == 0) {
-            if (lastKeyboardHeight > 0 && keyboardWasVisibleSinceLift && binding.inputEdit.hasFocus()) {
-                dispatchKeyboardDismissed()
-            }
             usingEstimatedKeyboardHeight = false
             keyboardWasVisibleSinceLift = false
         }
@@ -259,13 +248,10 @@ internal class MainKeyboardInsetsAnimationActions(
         if (keyboardHeight != 0 || !binding.inputEdit.hasFocus()) {
             return false
         }
-        if (keyboardWasVisibleSinceLift) {
-            return false
-        }
-        if (imeVisible || recentlyRequestedKeyboardLift()) {
+        if (imeVisible) {
             return true
         }
-        if (usingEstimatedKeyboardHeight) {
+        if (!keyboardWasVisibleSinceLift && recentlyRequestedKeyboardLift()) {
             return true
         }
         return false
@@ -298,18 +284,6 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private fun WindowInsetsAnimationCompat.includesIme(): Boolean {
         return typeMask and WindowInsetsCompat.Type.ime() != 0
-    }
-
-    private fun dispatchKeyboardDismissed() {
-        if (suppressKeyboardDismissal || dispatchingKeyboardDismissal) return
-        dispatchingKeyboardDismissal = true
-        binding.root.post {
-            try {
-                onKeyboardDismissed()
-            } finally {
-                dispatchingKeyboardDismissal = false
-            }
-        }
     }
 
     private companion object {
