@@ -308,6 +308,15 @@ pub struct ProjectAccess {
 }
 
 #[derive(Debug, Clone)]
+pub struct ProjectDeletionTarget {
+    pub id: String,
+    pub name: String,
+    pub workspace_key: String,
+    pub source_type: String,
+    pub workspace_path: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct TaskSnapshot {
     pub id: String,
     pub project_id: String,

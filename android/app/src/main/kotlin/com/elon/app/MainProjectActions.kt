@@ -86,7 +86,7 @@ internal class MainProjectActions(
             if (isJoint) add("打开项目空间")
             add("Git 仓库")
             add("设为公开 / 私有")
-            if (projects.size > 1) add("删除项目")
+            if (projects.size > 1 && project.id != ELON_SELF_PROJECT_ID) add("删除项目")
         }.toTypedArray()
 
         AlertDialog.Builder(activity)
@@ -305,9 +305,14 @@ internal class MainProjectActions(
 
     private fun confirmDeleteProject(index: Int) {
         if (index !in projects.indices || projects.size <= 1) return
+        val project = projects[index]
+        if (project.id == ELON_SELF_PROJECT_ID) {
+            Toast.makeText(activity, "一龙项目是平台自身项目，不能删除", Toast.LENGTH_SHORT).show()
+            return
+        }
         AlertDialog.Builder(activity)
             .setTitle("删除项目")
-            .setMessage("删除后这个项目下的会话和进度记录会从本机移除。")
+            .setMessage("会先从服务器删除「${project.title}」的项目记录、工作区文件、附件、构建产物和会话 worktree；成功后才从本机移除。正在运行的开发任务需先结束。")
             .setNegativeButton("取消", null)
             .setPositiveButton("删除") { _, _ -> deleteProject(index) }
             .show()
@@ -315,10 +320,58 @@ internal class MainProjectActions(
 
     private fun deleteProject(index: Int) {
         if (index !in projects.indices || projects.size <= 1) return
-        projects.removeAt(index)
-        val activeProjectIndex = activeProjectIndexProvider().coerceAtMost(projects.lastIndex)
+        val project = projects[index]
+        val targetProjectId = project.projectSpaceId()
+        val token = tokenProvider()
+        val userId = AuthManager.effectiveUserId(activity)
+        Toast.makeText(activity, "正在删除服务器项目...", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                val remoteDeleted = deleteServerProject(
+                    http = http,
+                    serverUrl = serverUrl,
+                    projectId = targetProjectId,
+                    token = token,
+                    userId = userId
+                )
+                activity.runOnUiThread {
+                    removeLocalProject(project.id, targetProjectId)
+                    val message = if (remoteDeleted) {
+                        "项目已从服务器和本机移除"
+                    } else {
+                        "服务器没有找到对应项目，已移除本机记录"
+                    }
+                    Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(
+                        activity,
+                        "删除失败：${e.message}。本机未移除，避免服务器残留。",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun removeLocalProject(localProjectId: String, remoteProjectId: String) {
+        val deleteIndex = projects.indexOfFirst {
+            it.id == localProjectId || it.projectSpaceId() == remoteProjectId
+        }
+        if (deleteIndex !in projects.indices || projects.size <= 1) return
+        projects.removeAt(deleteIndex)
+        val currentActive = activeProjectIndexProvider()
+        val activeProjectIndex = when {
+            currentActive > deleteIndex -> currentActive - 1
+            currentActive >= projects.size -> projects.lastIndex
+            else -> currentActive
+        }.coerceIn(0, projects.lastIndex)
         setActiveProjectIndex(activeProjectIndex)
         val activeProject = projects[activeProjectIndex]
+        if (activeProject.conversations.isEmpty()) {
+            activeProject.conversations.add(defaultAppConversation())
+        }
         setActiveConversationIndex(activeProject.activeConversationIndex.coerceIn(0, activeProject.conversations.lastIndex))
         saveProjects()
         renderProjectList()

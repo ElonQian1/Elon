@@ -143,4 +143,4 @@ private fun elonSelfProject(): AppProject {
 
 private const val PROJECTS_JSON_KEY = "projects_json"
 private const val ACTIVE_PROJECT_INDEX_KEY = "active_project_index"
-private const val ELON_SELF_PROJECT_ID = "elon-self"
+internal const val ELON_SELF_PROJECT_ID = "elon-self"

@@ -10,7 +10,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{now, ProjectMemberEntry, PublicProjectItem, Store};
+use super::{now, ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store};
 
 impl Store {
     // ─── 商店浏览 ────────────────────────────────────────────────────────────
@@ -252,5 +252,207 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    /// 返回一个用户拥有的项目删除目标。只允许 owner 删除；运行中的任务会阻止删除。
+    pub fn project_deletion_target(
+        &self,
+        user_id: &str,
+        project_id: &str,
+    ) -> Result<ProjectDeletionTarget> {
+        if project_id == "elon-self" {
+            anyhow::bail!("一龙项目是平台自身项目，不能从手机端删除");
+        }
+
+        let conn = self.conn()?;
+        let (target, role) = conn
+            .query_row(
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, pm.role
+                 FROM projects p
+                 JOIN project_members pm ON pm.project_id = p.id
+                 WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
+                params![project_id, user_id],
+                |row| {
+                    Ok((
+                        ProjectDeletionTarget {
+                            id: row.get(0)?,
+                            name: row.get(1)?,
+                            workspace_key: row.get(2)?,
+                            source_type: row.get(3)?,
+                            workspace_path: row.get(4)?,
+                        },
+                        row.get::<_, String>(5)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
+
+        if role != "owner" {
+            anyhow::bail!("只有项目 owner 才能删除项目");
+        }
+
+        let running_tasks: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM tasks WHERE project_id = ?1 AND status = 'running'",
+            params![project_id],
+            |row| row.get(0),
+        )?;
+        if running_tasks > 0 {
+            anyhow::bail!("项目还有正在运行的开发任务，请等待结束后再删除");
+        }
+
+        Ok(target)
+    }
+
+    /// 彻底删除项目在数据库中的产品记录。调用前应已经完成文件清理。
+    pub fn purge_project_records(&self, user_id: &str, project_id: &str) -> Result<()> {
+        if project_id == "elon-self" {
+            anyhow::bail!("一龙项目是平台自身项目，不能从手机端删除");
+        }
+
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        let role: Option<String> = tx
+            .query_row(
+                "SELECT pm.role
+                 FROM projects p
+                 JOIN project_members pm ON pm.project_id = p.id
+                 WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
+                params![project_id, user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match role.as_deref() {
+            Some("owner") => {}
+            Some(_) => anyhow::bail!("只有项目 owner 才能删除项目"),
+            None => anyhow::bail!("项目不存在，或当前用户无权访问"),
+        }
+
+        let running_tasks: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM tasks WHERE project_id = ?1 AND status = 'running'",
+            params![project_id],
+            |row| row.get(0),
+        )?;
+        if running_tasks > 0 {
+            anyhow::bail!("项目还有正在运行的开发任务，请等待结束后再删除");
+        }
+
+        tx.execute(
+            "DELETE FROM task_events WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?1)",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_channel_read_states WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_channel_messages WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_channels WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM agent_native_sessions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM messages WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM artifacts WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_events WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM conversations WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM tasks WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_members WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
+        tx.commit()?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn temp_store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon_project_delete_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn deletion_target_rejects_running_tasks() {
+        let store = temp_store();
+        let user = store
+            .create_user("delete-running@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Running Delete", None, None)
+            .expect("project should be created");
+        store
+            .create_task(&project.id, &user.id, Some("conv"), "run")
+            .expect("task should be created");
+
+        let err = store
+            .project_deletion_target(&user.id, &project.id)
+            .expect_err("running task should block deletion")
+            .to_string();
+
+        assert!(err.contains("正在运行"));
+    }
+
+    #[test]
+    fn purge_project_records_removes_project_children() {
+        let store = temp_store();
+        let user = store
+            .create_user("delete-purge@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Purge Delete", None, None)
+            .expect("project should be created");
+        let task = store
+            .create_task(&project.id, &user.id, Some("conv"), "run")
+            .expect("task should be created");
+        store
+            .record_task_event(&task, r#"{"type":"progress","message":"step"}"#)
+            .expect("event should be recorded");
+        store
+            .finish_task(&task, "done", Some("done"), None, None)
+            .expect("task should finish");
+
+        let target = store
+            .project_deletion_target(&user.id, &project.id)
+            .expect("target should be available");
+        assert_eq!(target.id, project.id);
+
+        store
+            .purge_project_records(&user.id, &project.id)
+            .expect("project records should purge");
+
+        assert!(store.get_project_access(&user.id, &project.id).is_err());
+        assert!(store
+            .list_task_events(&task, 10)
+            .expect("task events query should work")
+            .is_empty());
     }
 }

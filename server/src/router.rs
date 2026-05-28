@@ -11,8 +11,8 @@ use crate::types::AppState;
 use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
-    project_downloads, project_git, project_membership, project_space, project_store,
-    release_claim, user_api, web,
+    project_deletion, project_downloads, project_git, project_membership, project_space,
+    project_store, release_claim, user_api, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -102,6 +102,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
+        .route("/api/projects/:id", delete(project_deletion::delete_project))
         // ── 项目商店 ─────────────────────────────────────────────────────
         .route(
             "/api/store/projects",
@@ -191,6 +192,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/ws/notify", get(app_update::ws_notify_handler))
         // 全局 WS 通道：统一实时推送（更新 + 未来好友消息等）
         .route("/ws/app", get(global_ws::global_ws_handler))
+        .route(
+            "/api/user/:user_id/projects/:project_id",
+            delete(project_deletion::delete_user_project),
+        )
         .route(
             "/api/user/:user_id/projects/:project_id/git/status",
             get(project_git::user_project_git_status),

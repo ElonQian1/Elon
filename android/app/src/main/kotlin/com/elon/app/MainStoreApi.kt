@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.net.URLEncoder
 
 // ─── 数据模型 ─────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,32 @@ internal fun leaveStoreProject(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
+/** DELETE /api/projects/:id 或旧匿名 /api/user/:user_id/projects/:id — 删除服务器项目和托管文件 */
+internal fun deleteServerProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String?,
+    userId: String
+): Boolean {
+    val encodedProjectId = storeUrlPart(projectId)
+    val builder = if (!token.isNullOrBlank()) {
+        Request.Builder()
+            .url("$serverUrl/api/projects/$encodedProjectId")
+            .delete()
+            .header("Authorization", "Bearer $token")
+    } else {
+        Request.Builder()
+            .url("$serverUrl/api/user/${storeUrlPart(userId)}/projects/$encodedProjectId")
+            .delete()
+    }
+    val resp = http.newCall(builder.build()).execute()
+    val body = resp.body?.string().orEmpty()
+    if (resp.code == 404) return false
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return true
+}
+
 /** PATCH /api/projects/:id/visibility — 仅 owner；需要 Bearer token */
 internal fun setProjectVisibility(
     http: OkHttpClient,
@@ -148,6 +175,9 @@ private fun parseStoreProjectList(json: JSONObject): List<StoreProject> {
     val arr = json.optJSONArray("projects") ?: return emptyList()
     return (0 until arr.length()).map { i -> parseStoreProject(arr.getJSONObject(i)) }
 }
+
+private fun storeUrlPart(value: String): String =
+    URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
 internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     id = obj.getString("id"),
