@@ -43,7 +43,9 @@ internal class MainWorkflowStageActions(
             else ->
                 updateStage("开发实现", facing)
         }
-        if (recordProgressEvidence && !content.startsWith("CLI 仍在运行")) {
+        // "AI 执行命令：..." 和 "命令执行完毕" 已由 tool_call/tool_result 记录，跳过避免重复
+        val isRedundantCommandProgress = content.startsWith("AI 执行命令：") || content == "命令执行完毕"
+        if (recordProgressEvidence && !content.startsWith("CLI 仍在运行") && !isRedundantCommandProgress) {
             recordEvidence("progress", userFacingProgress(content))
         }
         addProjectEvent("进度更新：${summarize(content, 30)}")
@@ -77,7 +79,10 @@ internal class MainWorkflowStageActions(
     }
 
     fun handleToolCall(tool: String) {
-        recordEvidence(toolEvidenceKind(tool), "开始：${toolLabel(tool)}")
+        // shell 命令的实际内容由后续 progress "AI 执行命令：..." 记录，这里跳过避免重复
+        if (tool != "shell" && tool != "run_shell") {
+            recordEvidence(toolEvidenceKind(tool), "开始：${toolLabel(tool)}")
+        }
         when (tool) {
             "build_project" -> updateStage("编译打包", "正在编译项目并准备 APK。")
             "git_commit" -> updateStage("交付完成", "正在保存当前开发版本。")
