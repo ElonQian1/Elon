@@ -782,3 +782,17 @@ if (Test-Path $distClient) {
 } else {
     Write-Warning "   ⚠️  未找到 $distClient，跳过局域网分发服务"
 }
+
+# ── 自动清理已合并、工作树干净的孤儿 task worktree ─────────────
+$cleanupScript = Join-Path $RepoRoot "scripts\cleanup-task-worktrees.ps1"
+if (Test-Path -LiteralPath $cleanupScript) {
+    try {
+        $cleanupOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cleanupScript -Apply 2>&1
+        $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
+        if ($removedLine) {
+            Write-Host "   $($removedLine.Line.Trim())（自动）" -ForegroundColor DarkGray
+        }
+    } catch {
+        Write-Host "   ⚠️  自动清理 worktree 失败：$_" -ForegroundColor Yellow
+    }
+}

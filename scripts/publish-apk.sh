@@ -585,3 +585,10 @@ echo -e "   版本: v${NEW_NAME} (build ${NEW_CODE}) — 服务器分配，未�
 echo -e "   SHA:  ${SHA_SHORT} (源代码 commit，无新增 release commit)"
 echo -e "   下载: $SERVER_URL/app/ElonSpeed-latest.apk"
 echo -e "${CYAN}${SEP}${NC}"
+
+# 自动清理已合并、工作树干净的孤儿 task worktree
+if [[ -x "$REPO_ROOT/scripts/cleanup-task-worktrees.sh" ]]; then
+  cleanup_out="$(bash "$REPO_ROOT/scripts/cleanup-task-worktrees.sh" --apply 2>&1 || true)"
+  removed_line="$(printf '%s\n' "$cleanup_out" | grep -E '^完成：清理' | tail -n 1 || true)"
+  [[ -n "$removed_line" ]] && echo "   $removed_line（自动）"
+fi

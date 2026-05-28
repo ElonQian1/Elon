@@ -727,3 +727,19 @@ Write-Host "   服务:   http://43.139.149.158:8080/health" -ForegroundColor Gra
 Write-Host "   版本接口: http://43.139.149.158:8080/api/server/version" -ForegroundColor Gray
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
+
+# ─────────────────────────────────────────────────────────────
+# 8. 自动清理已合并的孤儿 task worktree（防累积）
+# ─────────────────────────────────────────────────────────────
+$cleanupScript = Join-Path $RepoRoot "scripts\cleanup-task-worktrees.ps1"
+if (Test-Path -LiteralPath $cleanupScript) {
+    try {
+        $cleanupOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cleanupScript -Apply 2>&1
+        $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
+        if ($removedLine) {
+            Write-Host "   $($removedLine.Line.Trim())（自动）" -ForegroundColor DarkGray
+        }
+    } catch {
+        Write-Host "   ⚠️  自动清理 worktree 失败：$_" -ForegroundColor Yellow
+    }
+}

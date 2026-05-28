@@ -684,3 +684,10 @@ echo -e "${GRAY}   SHA:    $SHA${NC}"
 echo -e "${GRAY}   服务:   $SERVER_HTTP_BASE/health${NC}"
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
 echo ""
+
+# 自动清理已合并、工作树干净的孤儿 task worktree
+if [[ -x "$REPO_ROOT/scripts/cleanup-task-worktrees.sh" ]]; then
+  cleanup_out="$(bash "$REPO_ROOT/scripts/cleanup-task-worktrees.sh" --apply 2>&1 || true)"
+  removed_line="$(printf '%s\n' "$cleanup_out" | grep -E '^完成：清理' | tail -n 1 || true)"
+  [[ -n "$removed_line" ]] && echo -e "${GRAY}   $removed_line（自动）${NC}"
+fi

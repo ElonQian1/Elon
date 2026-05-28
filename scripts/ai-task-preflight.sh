@@ -5,6 +5,7 @@ create_worktree=0
 always_create_worktree=0
 branch_prefix="codex/task"
 worktree_parent=""
+skip_auto_cleanup=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -24,6 +25,10 @@ while [[ $# -gt 0 ]]; do
     --worktree-parent)
       worktree_parent="${2:?missing value for --worktree-parent}"
       shift 2
+      ;;
+    --skip-auto-cleanup)
+      skip_auto_cleanup=1
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -96,4 +101,15 @@ elif [[ "$needs_worktree" -eq 1 ]]; then
 else
   echo "WORKTREE_CREATED=false"
   echo "NEXT=Workspace is clean and current enough for direct edits."
+fi
+
+# 自动清理已合并、工作树干净的孤儿 task worktree。要禁用：--skip-auto-cleanup
+if [[ "$skip_auto_cleanup" -ne 1 && -x "$repo_root/scripts/cleanup-task-worktrees.sh" ]]; then
+  cleanup_out="$(bash "$repo_root/scripts/cleanup-task-worktrees.sh" --apply 2>&1 || true)"
+  removed_line="$(printf '%s\n' "$cleanup_out" | grep -E '^完成：清理' | tail -n 1 || true)"
+  if [[ -n "$removed_line" ]]; then
+    echo "AUTO_CLEANUP=$removed_line"
+  else
+    echo "AUTO_CLEANUP=skipped"
+  fi
 fi

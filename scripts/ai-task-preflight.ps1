@@ -1,8 +1,9 @@
-param(
+﻿param(
     [switch]$CreateWorktree,
     [switch]$AlwaysCreateWorktree,
     [string]$BranchPrefix = "codex/task",
-    [string]$WorktreeParent = ""
+    [string]$WorktreeParent = "",
+    [switch]$SkipAutoCleanup
 )
 
 $ErrorActionPreference = "Stop"
@@ -89,4 +90,26 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
 } else {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Workspace is clean and current enough for direct edits."
+}
+
+# ─────────────────────────────────────────────────────────────
+# 自动清理已合并、工作树干净的孤儿 task worktree（防止累积）
+# 仅删除满足"已合并到 origin/main + 无未提交内容 + 不是当前 worktree"的，
+# 有未提交改动的会被自动保留。要禁用：-SkipAutoCleanup
+# ─────────────────────────────────────────────────────────────
+if (-not $SkipAutoCleanup) {
+    $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
+    if (Test-Path -LiteralPath $cleanupScript) {
+        try {
+            $cleanupOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cleanupScript -Apply 2>&1
+            $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
+            if ($removedLine) {
+                Write-Host "AUTO_CLEANUP=$($removedLine.Line.Trim())"
+            } else {
+                Write-Host "AUTO_CLEANUP=skipped"
+            }
+        } catch {
+            Write-Host "AUTO_CLEANUP=failed: $_"
+        }
+    }
 }
