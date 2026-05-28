@@ -504,6 +504,40 @@ impl Store {
         tx.commit()?;
         drop(conn);
 
+        // 如果项目被标记为 deleted（例如被迁移脚本误删），尝试透明重定向到同名 active 项目，
+        // 或将其恢复为 active，避免 APK 收到"项目不存在"错误。
+        {
+            let conn2 = self.conn()?;
+            let is_deleted: bool = conn2
+                .query_row(
+                    "SELECT status = 'deleted' FROM projects WHERE id = ?1",
+                    params![id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+            if is_deleted {
+                let active_id: Option<String> = conn2
+                    .query_row(
+                        "SELECT id FROM projects \
+                         WHERE created_by = ?1 AND name = ?2 AND status != 'deleted' LIMIT 1",
+                        params![user.id, name],
+                        |row| row.get(0),
+                    )
+                    .optional()?;
+                drop(conn2);
+                if let Some(redirect_id) = active_id {
+                    // 同名 active 项目已存在，直接返回它（透明重定向）
+                    return self.get_project_access(&user.id, &redirect_id);
+                } else {
+                    // 无同名 active 项目，将本项目恢复为 active
+                    self.conn()?.execute(
+                        "UPDATE projects SET status = 'active' WHERE id = ?1",
+                        params![id],
+                    )?;
+                }
+            }
+        }
+
         self.get_project_access(&user.id, &id)
     }
 
