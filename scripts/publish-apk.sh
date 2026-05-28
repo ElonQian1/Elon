@@ -290,6 +290,19 @@ OLD_NAME=$(grep 'versionName' "$GRADLE_PATH" | grep -oP '"[^"]+"' | tr -d '"' | 
 
 echo -e "${GRAY}   build.gradle 兜底: v${OLD_NAME} (build ${OLD_CODE}) — 不会被本次脚本提交${NC}"
 
+CLAIM_BASE_CODE="$OLD_CODE"
+CLAIM_BASE_NAME="$OLD_NAME"
+LIVE_BEFORE_CLAIM=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
+if [[ -n "$LIVE_BEFORE_CLAIM" ]]; then
+  LIVE_BEFORE_CODE=$(json_get_int "$LIVE_BEFORE_CLAIM" "versionCode")
+  LIVE_BEFORE_NAME=$(json_get "$LIVE_BEFORE_CLAIM" "versionName")
+  if [[ "$LIVE_BEFORE_CODE" -gt "$CLAIM_BASE_CODE" ]]; then
+    CLAIM_BASE_CODE="$LIVE_BEFORE_CODE"
+    [[ -n "$LIVE_BEFORE_NAME" ]] && CLAIM_BASE_NAME="$LIVE_BEFORE_NAME"
+    echo -e "${GRAY}   线上版本基线: v${CLAIM_BASE_NAME} (build ${CLAIM_BASE_CODE})${NC}"
+  fi
+fi
+
 BUILDER_ID="${HOSTNAME:-unknown}-${USER:-unknown}"
 BUILDER_LABEL="publish-apk.sh @ $BUILDER_ID"
 
@@ -299,8 +312,8 @@ CLAIM_BODY=$(python3 -c "import json; print(json.dumps({
   'builderId': '$BUILDER_ID',
   'builderLabel': '$BUILDER_LABEL',
   'bump': 'patch',
-  'currentVersionName': '$OLD_NAME',
-  'currentVersionCode': $OLD_CODE
+  'currentVersionName': '$CLAIM_BASE_NAME',
+  'currentVersionCode': $CLAIM_BASE_CODE
 }))")
 
 CLAIM_RESP=$(call_release_api "claim" "$CLAIM_BODY") || {
