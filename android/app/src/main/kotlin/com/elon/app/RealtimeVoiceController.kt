@@ -58,10 +58,10 @@ internal class RealtimeVoiceController(
                         onError("无法启动麦克风采集")
                     }
                 }
-                override fun onTranscriptDelta(text: String) = onTranscriptDelta(text)
-                override fun onTranscriptFinal(text: String) = onTranscriptFinal(text)
-                override fun onVirtualMicFed(bytes: Long) = onVirtualMicFed(bytes)
-                override fun onCliDispatched(ok: Boolean, message: String) =
+                override fun onTranscriptDelta(text: String): Unit = onTranscriptDelta(text)
+                override fun onTranscriptFinal(text: String): Unit = onTranscriptFinal(text)
+                override fun onVirtualMicFed(bytes: Long): Unit = onVirtualMicFed(bytes)
+                override fun onCliDispatched(ok: Boolean, message: String): Unit =
                     onCliDispatched(ok, message)
 
                 override fun onServerError(code: String, message: String) {
