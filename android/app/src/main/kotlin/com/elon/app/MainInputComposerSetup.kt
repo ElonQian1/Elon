@@ -47,6 +47,7 @@ internal class MainInputComposerSetup(
     private val focusInputComposer: () -> Unit,
     private val startSpeechToText: () -> Unit,
     private val stopSpeechToText: () -> Unit,
+    private val cancelSpeechToText: () -> Unit,
     private val showModelPopupOrLoad: () -> Unit,
     private val sendMessage: () -> Unit,
     private val toggleAttachmentPanel: () -> Unit,
@@ -197,7 +198,7 @@ internal class MainInputComposerSetup(
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        stopSpeechToText()
+                        if (event.action == MotionEvent.ACTION_UP) stopSpeechToText() else cancelSpeechToText()
                         true
                     }
                     else -> true

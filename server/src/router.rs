@@ -12,7 +12,7 @@ use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_downloads, project_git, project_membership, project_space,
-    project_store, release_claim, user_api, web,
+    project_store, release_claim, speech_translate, user_api, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -288,6 +288,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
+        )
+        .route(
+            "/api/user/:user_id/speech/translate",
+            post(speech_translate::translate_user_speech),
         )
         // ── 用户头像（公开查看 / 登录后上传）─────────────────────────────────
         .route("/api/users/:user_id/avatar", get(user_api::get_user_avatar))

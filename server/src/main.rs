@@ -70,6 +70,7 @@ mod router;
 mod server_trace;
 mod social_ai;
 mod source_hygiene;
+mod speech_translate;
 mod store;
 mod store_schema;
 mod tools;
