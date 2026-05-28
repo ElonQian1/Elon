@@ -54,12 +54,20 @@ is_local_server_deploy() {
 
 read_deployed_server_sha() {
   local deployed_sha_file="$REMOTE_DIR/.deployed-sha"
+  local live_sha file_sha
+  live_sha=$(curl --noproxy '*' -s --max-time 5 "http://43.139.149.158:8080/api/server/version" 2>/dev/null | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('gitSha',''))" 2>/dev/null || true)
+  if [[ "$live_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "$live_sha"
+    return
+  fi
   if is_local_server_deploy; then
-    cat "$deployed_sha_file" 2>/dev/null || true
+    file_sha=$(cat "$deployed_sha_file" 2>/dev/null || true)
   else
     # shellcheck disable=SC2086
-    ssh $SSH_OPTS "$SERVER" "cat $deployed_sha_file 2>/dev/null || true" 2>/dev/null | tr -d '[:space:]' || true
+    file_sha=$(ssh $SSH_OPTS "$SERVER" "cat $deployed_sha_file 2>/dev/null || true" 2>/dev/null | tr -d '[:space:]' || true)
   fi
+  [[ "$file_sha" =~ ^[0-9a-f]{40}$ ]] && echo "$file_sha" || true
 }
 
 server_runtime_unchanged_since() {
