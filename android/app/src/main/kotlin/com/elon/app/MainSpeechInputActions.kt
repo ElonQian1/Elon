@@ -73,6 +73,11 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
+        // 好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送
+        if (isFriendChatActive()) {
+            if (startVoiceMessageRecording()) return
+            return
+        }
         when (VoiceInputModeSettings.get(activity)) {
             VoiceInputMode.LOCAL_AGENT_ASR -> {
                 if (startAgentVoice()) return
@@ -103,8 +108,8 @@ internal class MainSpeechInputActions(
         if (stopAgentVoice()) return
         if (stopRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
-            // VOICE_MESSAGE 模式：发送语音气泡；其他情况（直接录音模式）也走此分支
-            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
+            // 好友/群聊/频道 或 VOICE_MESSAGE 模式：发送语音气泡
+            if (isFriendChatActive() || VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
                 stopVoiceMessageRecording()
             } else {
                 stopDirectVoiceRecording()
@@ -133,7 +138,8 @@ internal class MainSpeechInputActions(
         if (cancelAgentVoice()) return
         if (cancelRealtimeVoice()) return
         if (voiceRecorder.isRecording) {
-            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
+            // 好友/群聊/频道 或 VOICE_MESSAGE 模式：取消语音气泡录制
+            if (isFriendChatActive() || VoiceInputModeSettings.get(activity) == VoiceInputMode.VOICE_MESSAGE) {
                 cancelVoiceMessageRecording()
             } else {
                 cancelDirectVoiceRecording()
