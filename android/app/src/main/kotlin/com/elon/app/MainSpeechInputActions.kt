@@ -251,6 +251,9 @@ internal class MainSpeechInputActions(
         val finalText = agentLastFinalText.ifBlank { agentLastPartialText }.trim()
         voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
+        // 会话结束时立即预热，确保下次按键准备就绪。
+        // bridge.onEnd 在网络超时被忽略时不会触发，此处兜底保证预热不被遗漏。
+        agentBridge?.prewarm()
         if (finalText.isBlank()) {
             Toast.makeText(activity, "没听清，请重试", Toast.LENGTH_SHORT).show()
             return

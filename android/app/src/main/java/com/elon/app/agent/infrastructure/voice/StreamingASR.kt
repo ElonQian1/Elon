@@ -118,7 +118,10 @@ class StreamingASR(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)  // 关键：启用部分结果
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            
+            // 偏好离线识别：防止小米 mibrain 走 XiaoAI 云端（useLocal=false）
+            // 导致用户松手后云端 ~1.5s 超时 code=1、无最终结果只有截断 partial。
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+
             // 如果使用智能VAD，延长系统默认静音时间
             if (useSmartVAD) {
                 putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)

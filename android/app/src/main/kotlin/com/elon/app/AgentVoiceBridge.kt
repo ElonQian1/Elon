@@ -148,8 +148,11 @@ internal class AgentVoiceBridge(context: Context) {
     fun prewarm() {
         if (isRunning) return
         main.post {
-            if (isRunning) return@post
-            val engines = RecognitionEngineSelector.list(appContext)
+            // 注意：不在此检查 isRunning。
+            // init{} 同步调用 prewarm() 后，start() 会立即设置 isRunning=true；
+            // 若此处拦截则 main.post 队列里的预热 lambda 永远被跳过，
+            // 导致 asr.engineComponent 仍为 null，startWithCurrentCandidate 误判为"引擎切换"。
+            val engines = RecognitionEngineSelector.listForUse(appContext)
             val first = engines.firstOrNull() ?: return@post
             if (asr.isInitialized && asr.engineComponent == first.component) return@post
             asr.engineComponent = first.component
