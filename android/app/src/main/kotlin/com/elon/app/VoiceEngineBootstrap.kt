@@ -9,6 +9,7 @@ package com.elon.app
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.speech.SpeechRecognizer
 import android.util.Log
 import com.elon.app.agent.infrastructure.voice.EngineHealth
 import com.elon.app.agent.infrastructure.voice.EnginePreference
@@ -51,6 +52,22 @@ object VoiceEngineBootstrap {
                 Log.i(TAG, "  ${result.key} → ${result.health} (${result.errorMessage ?: "-"})")
             },
             onDone = {
+                // 自动排除"系统常驻语音助手"引擎（ERROR_RECOGNIZER_BUSY=8）
+                // 条件：至少还剩一个非 BUSY 引擎可用，且用户未手动配置过
+                val busyKeys = engines.filter { engine ->
+                    val err = EnginePreference.getLastError(context, engine.key())
+                    err?.first == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                }.map { it.key() }
+                val nonBusyCount = engines.count { it.key() !in busyKeys }
+                if (busyKeys.isNotEmpty() && nonBusyCount > 0) {
+                    busyKeys.forEach { busyKey ->
+                        if (!AsrFallbackSettings.isEngineDisabled(context, busyKey)) {
+                            AsrFallbackSettings.setEngineDisabled(context, busyKey, true)
+                            Log.i(TAG, "自动排除系统常驻引擎（RECOGNIZER_BUSY）: $busyKey")
+                        }
+                    }
+                }
+
                 // 若用户未设偏好，且至少有一个 OK 引擎，自动把第一个 OK 引擎设为偏好
                 if (EnginePreference.getPreferredKey(context) == null) {
                     val firstOk = engines.firstOrNull { EnginePreference.getHealth(context, it.key()) == EngineHealth.OK }

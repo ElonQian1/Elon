@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import android.speech.SpeechRecognizer
 import com.elon.app.agent.infrastructure.voice.EngineHealth
 import com.elon.app.agent.infrastructure.voice.EnginePreference
 import com.elon.app.agent.infrastructure.voice.EngineProbe
@@ -155,6 +156,23 @@ class VoiceEngineActivity : AppCompatActivity() {
                 setTextColor(0xFFD32F2F.toInt())
             }
             card.addView(errView)
+
+            // 系统常驻语音助手提示：仅在引擎未被排除时显示（排除后卡片已标灰，不再重复提醒）
+            val isAlwaysOnBusy = err.first == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ||
+                (err.first == SpeechRecognizer.ERROR_CLIENT &&
+                    (engine.packageName.contains("magicvoice", ignoreCase = true) ||
+                     engine.packageName.contains("bixby", ignoreCase = true)))
+            if (isAlwaysOnBusy && !isDisabled) {
+                val tipView = TextView(this).apply {
+                    text = "⚠️ 被系统语音助手常驻占用，建议「排除」或到手机「设置 → 智慧语音 → 语音唤醒」关闭。"
+                    textSize = 11f
+                    setTextColor(0xFFFF8F00.toInt())
+                    val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    lp.topMargin = (4 * dp).toInt()
+                    layoutParams = lp
+                }
+                card.addView(tipView)
+            }
         }
 
         // ── 操作行 ──
