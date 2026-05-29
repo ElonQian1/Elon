@@ -89,7 +89,7 @@ impl WsMessage {
         }
     }
 
-    pub fn classified_error(error: crate::ai_error::ClassifiedAiError) -> Self {
+    pub fn classified_error(error: crate::errors::ClassifiedAiError) -> Self {
         WsMessage::Error {
             message: error.message,
             code: Some(error.code.to_string()),
