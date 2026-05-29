@@ -47,6 +47,8 @@ class StreamingASR(private val context: Context) {
     private var lastResultTime: Long = 0
     private var currentPartialResult: String = ""
     private var silenceCheckRunnable: Runnable? = null
+    /** onFinalResult 已经触发过一次，防止安全网和 onResults 双重回调 */
+    private var finalDelivered: Boolean = false
     
     // ==================== 回调 ====================
     
@@ -132,6 +134,7 @@ class StreamingASR(private val context: Context) {
             isListening = true
             lastResultTime = System.currentTimeMillis()
             currentPartialResult = ""
+            finalDelivered = false
             
             // 启动静音检测
             if (useSmartVAD) {
@@ -250,11 +253,12 @@ class StreamingASR(private val context: Context) {
         override fun onResults(results: Bundle?) {
             isListening = false
             stopSilenceCheck()
-            
+
             val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
             val finalResult = matches?.firstOrNull() ?: currentPartialResult
-            
-            if (finalResult.isNotEmpty()) {
+
+            if (finalResult.isNotEmpty() && !finalDelivered) {
+                finalDelivered = true
                 Log.i(TAG, "✅ 最终结果: $finalResult")
                 callback?.onFinalResult(finalResult)
             }
@@ -294,17 +298,25 @@ class StreamingASR(private val context: Context) {
                 
                 if (decision.shouldEnd && currentPartialResult.isNotEmpty()) {
                     Log.i(TAG, "🎯 智能VAD决定结束: ${decision.completeness.reason}")
-                    
-                    // 手动触发结束
+
+                    // 通知上层语音结束（UI 状态变化），但不立即停止识别器
                     callback?.onSpeechEnd()
-                    
-                    // 如果系统还没返回最终结果，用部分结果
+
+                    // 让引擎把缓冲区内的语音全部识别完再返回 onResults。
+                    // 不能在这里直接 onFinalResult(partial)——MiBrain 等引擎的 final
+                    // 比 partial 晚 600ms+ 才到，200ms 强制提交会截断句子。
+                    stopListening()
+
+                    // 安全网：2000ms 后若 onResults 仍未到来（引擎超时/失败），
+                    // 才降级用 partial 兜底。
+                    val savedPartial = currentPartialResult
                     handler.postDelayed({
-                        if (isListening && currentPartialResult.isNotEmpty()) {
-                            stopListening()
-                            callback?.onFinalResult(currentPartialResult)
+                        if (!finalDelivered && savedPartial.isNotEmpty()) {
+                            finalDelivered = true
+                            Log.w(TAG, "⚠️ onResults 超时，降级使用 partial: $savedPartial")
+                            callback?.onFinalResult(savedPartial)
                         }
-                    }, 200)
+                    }, 2000)
                 } else {
                     // 继续检测
                     handler.postDelayed(this, SILENCE_CHECK_INTERVAL_MS)
