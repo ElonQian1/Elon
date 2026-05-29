@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_cli_output::parse_intent_gate_result;
+use super::ai_cli_output::parse_intent_gate_result;
 use crate::types::{AiCliOption, CliPromptMode};
 
 #[test]

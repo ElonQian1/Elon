@@ -14,16 +14,16 @@ use std::{
 };
 
 use crate::{
-    ai_cli::{
-        cap_option_timeout, codex_thread_uri, configured_timeout_cap, run_cli_command_traced,
-        supports_codex_sessions, CliOutput, NativeSessionScope,
-    },
-    ai_cli_output::{extract_thread_id, truncate_chars},
-    ai_cli_prompts::build_native_session_repair_prompt,
-    ai_cli_trace::{clean_trace_id_opt, record_native_session_repair_event, CliTraceContext},
     intent_router,
     store::ConversationMessage,
     types::{AiCliOption, AppState},
+};
+use super::{
+    cap_option_timeout, codex_thread_uri, configured_timeout_cap, run_cli_command_traced,
+    supports_codex_sessions, CliOutput, NativeSessionScope,
+    ai_cli_output::{extract_thread_id, truncate_chars},
+    ai_cli_prompts::build_native_session_repair_prompt,
+    ai_cli_trace::{clean_trace_id_opt, record_native_session_repair_event, CliTraceContext},
 };
 
 pub(crate) const DEFAULT_SESSION_REPAIR_TIMEOUT_CAP_SECS: u64 = 25;

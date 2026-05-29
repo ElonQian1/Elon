@@ -2,14 +2,16 @@ use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc, time::Instant};
 
 use crate::{
-    ai_cli::NativeSessionScope,
+    types::AppState,
+};
+use super::{
+    NativeSessionScope,
     ai_cli_output::extract_thread_id,
     ai_cli_process::{
         cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
     },
     ai_cli_prompts::build_prewarm_cli_prompt,
     ai_cli_trace::{record_prewarm_session_hit, CliTraceContext},
-    types::AppState,
 };
 
 const DEFAULT_PREWARM_TIMEOUT_CAP_SECS: u64 = 8;

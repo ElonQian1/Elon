@@ -1,3 +1,8 @@
+/// 当前服务器 WS 协议版本号（单调递增）
+pub const SERVER_PROTOCOL_VERSION: u32 = 1;
+/// 服务器要求客户端支持的最低协议版本
+pub const MIN_CLIENT_PROTOCOL_VERSION: u32 = 1;
+
 /// WebSocket 消息格式（发给 APK）
 #[derive(serde::Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -63,6 +68,12 @@ pub enum WsMessage {
         retry_after_secs: Option<u64>,
         #[serde(skip_serializing_if = "Option::is_none")]
         operator_detail: Option<String>,
+    },
+    /// WS 连接建立后第一帧握手：告知客户端服务器协议版本
+    /// 容错方案：客户端若不认识此类型，忽略即可，不影响功能
+    ProtocolHello {
+        server_version: u32,
+        min_client_version: u32,
     },
 }
 

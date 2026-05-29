@@ -53,6 +53,7 @@ async fn handle(
     let mut update_rx = crate::app_update::subscribe();
     let mut friend_rx = crate::friend_events::subscribe();
     let mut group_rx = crate::friend_events::subscribe_groups();
+    let mut project_task_rx = crate::project_events::subscribe();
 
     // 连接时若服务器已有更新版本，立即推送一次，无需等待下次广播
     if let Some(event) =
@@ -93,6 +94,19 @@ async fn handle(
                         if tx.send(Message::Text(payload)).await.is_err() { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次群列表刷新会补齐未读状态 */ }
+                    _ => {}
+                }
+            }
+            // 方案5: 项目任务完成——推给其他项目成员
+            msg = project_task_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id
+                        .as_ref()
+                        .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => { /* 项目列表刷新时可服主务器查最新状态 */ }
                     _ => {}
                 }
             }

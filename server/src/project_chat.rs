@@ -1,24 +1,23 @@
 use axum::{
+    Json,
     extract::{Path as AxumPath, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    agent, agent_intent, ai_cli, intent_router,
+    agent, ai_cli, intent_router,
     project_attachment_notes::append_project_attachment_notes,
     project_attachments::append_project_cli_attachment_artifacts,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
     project_chat_reply::chat_reply_after_intent_gate,
     project_conversation_workspace::{
-        prepare_project_conversation_workspace, project_conversation_execution_key,
-        project_shared_execution_key, ProjectConversationWorkspace,
+        ProjectConversationWorkspace, prepare_project_conversation_workspace,
+        project_conversation_execution_key, project_shared_execution_key,
     },
-    project_git::git_output,
     project_keys::clean_trace_id,
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
@@ -209,79 +208,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
     }
     let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-
-    // ── 构建去重 Layer 1（SHA 缓存预检）────────────────────────────────────────
-    // 仅对精确纯构建命令（"打包"/"编译" 等）启用，代码未变时直接返回上次 APK。
-    let is_pure_build_cmd =
-        agent_intent::is_short_build_command(&message, base_workspace.as_path());
-    let build_sha = if is_pure_build_cmd {
-        git_output(&base_workspace, &["rev-parse", "HEAD"])
-            .ok()
-            .map(|s| s.trim().to_string())
-    } else {
-        None
-    };
-    if let Some(ref sha) = build_sha {
-        if let Ok(Some((cached_sha, cached_url))) = state.store.get_project_build_cache(&project.id)
-        {
-            if cached_sha == *sha {
-                let _ = tx.send(
-                    WsMessage::Done {
-                        message: "代码无变化，直接使用上次构建的 APK，无需重新编译。".into(),
-                        apk_url: Some(cached_url),
-                        image_url: None,
-                    }
-                    .to_json(),
-                );
-                return;
-            }
-        }
-    }
-    // ── 构建去重 Layer 2（飞行中并发串行化）────────────────────────────────────
-    // 若同项目同时有多个纯构建请求，让后来者等待第一个完成后再次检查缓存。
-    let _keep_build_permit = if is_pure_build_cmd {
-        let build_key = format!("build:{}", project.id);
-        let queued_tx_build = tx.clone();
-        let permit = state
-            .project_task_scheduler
-            .acquire(&build_key, move || {
-                let _ = queued_tx_build.send(
-                    WsMessage::progress(
-                        "同项目已有编译任务在运行，等待其完成后再检查结果，请稍候…",
-                    )
-                    .to_json(),
-                );
-            })
-            .await;
-        // 获锁后再次检查：另一个并发构建可能已完成并更新了缓存
-        if let Some(ref sha) = build_sha {
-            if let Ok(Some((cached_sha, cached_url))) =
-                state.store.get_project_build_cache(&project.id)
-            {
-                if cached_sha == *sha {
-                    let _ = tx.send(
-                        WsMessage::Done {
-                            message: "并发编译已完成，直接使用最新 APK，无需再次编译。".into(),
-                            apk_url: Some(cached_url),
-                            image_url: None,
-                        }
-                        .to_json(),
-                    );
-                    return; // permit 自动 drop → 下一个等待者解锁
-                }
-            }
-        }
-        Some(permit)
-    } else {
-        None
-    };
-
     let prepared_execution_workspace = if needs_project_workflow {
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
-                let _ = tx
-                    .send(WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json());
+                let _ = tx.send(
+                    WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json(),
+                );
                 return;
             }
         }
@@ -410,10 +343,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         }),
                     );
                 }
-                let error_text = format!("Codex CLI 意图确认失败: {}", error);
                 let _ = tx.send(
-                    WsMessage::classified_error(crate::ai_error::classify_ai_error(&error_text))
-                        .to_json(),
+                    WsMessage::error(format!("Codex CLI 意图确认失败: {}", error)).to_json(),
                 );
                 return;
             }

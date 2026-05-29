@@ -17,6 +17,8 @@ pub struct ProjectChatRequest {
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
+    /// 方案8: 客户端声明的 WS 协议版本，旧客户端为 None（服务器按 v1 处理）
+    pub protocol_version: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -191,6 +193,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         conversation_id: None,
         conversation_title: None,
         attachments: None,
+        protocol_version: None,
     })
 }
 
@@ -203,11 +206,12 @@ fn terminal_event_from_task(task: &TaskSnapshot) -> String {
         }
         .to_json()
     } else {
-        let message = task
-            .error
-            .clone()
-            .unwrap_or_else(|| "任务已结束，但没有保存详细错误。".into());
-        WsMessage::classified_error(crate::ai_error::classify_ai_error(&message)).to_json()
+        WsMessage::error(
+            task.error
+                .clone()
+                .unwrap_or_else(|| "任务已结束，但没有保存详细错误。".into()),
+        )
+        .to_json()
     }
 }
 

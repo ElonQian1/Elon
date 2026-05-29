@@ -162,6 +162,16 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
     let history = state
         .store
         .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
+    // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接卡片
+    if let Some(summary) = is_development_intent(&history) {
+        let messages = state
+            .store
+            .insert_friend_social_ai_reply(&user_id, &friend_id, DEVELOPMENT_REDIRECT_REPLY)?;
+        for message in messages {
+            friend_events::publish_friend_bridge_message(&message, &summary);
+        }
+        return Ok(());
+    }
     let reply = social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history).await;
     let messages = state
         .store
@@ -177,7 +187,12 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
-    let reply = social_ai_reply_or_fallback(&state, &user_id, "群聊", &history).await;
+    // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接（群聊暂只发文字，无桥接卡片）
+    let reply = if is_development_intent(&history).is_some() {
+        DEVELOPMENT_REDIRECT_REPLY.to_string()
+    } else {
+        social_ai_reply_or_fallback(&state, &user_id, "群聊", &history).await
+    };
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
@@ -209,9 +224,7 @@ async fn build_reply(
     if history.is_empty() {
         return Ok("我在。你可以把想问的问题发出来，再带上 @EL。".into());
     }
-    if let Some(reply) = development_redirect_reply(history) {
-        return Ok(reply);
-    }
+    // 注意：开发意图已在 reply_to_friend/group 层拦截；此处不需重复判断。
 
     let agent = resolve_social_agent(state).await?;
     let response = call_chat_llm(
@@ -280,10 +293,13 @@ pub(crate) fn format_history(history: &[SocialAiHistoryMessage]) -> String {
         .join("\n")
 }
 
-fn development_redirect_reply(history: &[SocialAiHistoryMessage]) -> Option<String> {
+/// 若检测到开发意图（confidence ≥ 70 且 needs_code_change），返回触发文本摘要；否则 None。
+/// 使用 intent_router::classify 而非旧的独立关键词函数，确保两路分类逻辑一致。
+fn is_development_intent(history: &[SocialAiHistoryMessage]) -> Option<String> {
     let target = latest_request_user_text(history)?;
-    if intent_router::looks_like_development_request(&target) {
-        Some(DEVELOPMENT_REDIRECT_REPLY.into())
+    let decision = intent_router::classify(&target);
+    if decision.needs_code_change && decision.confidence >= 70 {
+        Some(target.chars().take(80).collect())
     } else {
         None
     }

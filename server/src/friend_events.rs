@@ -27,6 +27,12 @@ pub struct FriendMessagePush {
     pub content: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    /// 消息类型："text"（普通文本）| "project_bridge"（开发需求跳转卡片）
+    #[serde(rename = "messageKind")]
+    pub message_kind: String,
+    /// 开发需求摘要，仅 project_bridge 类型携带
+    #[serde(rename = "devSummary", skip_serializing_if = "Option::is_none")]
+    pub dev_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -77,6 +83,28 @@ pub fn publish_friend_message(message: &FriendChatMessage) {
         message_id: message.id.clone(),
         content: message.content.clone(),
         created_at: message.created_at.clone(),
+        message_kind: "text".into(),
+        dev_summary: None,
+    };
+    let _ = FRIEND_EVENT_TX.send(event);
+}
+
+/// 发布「开发需求跳转」消息推送。
+/// 存储的消息文本是引导用户前往项目页面的普通文字（向后兼容旧客户端），
+/// 推送事件额外携带 `message_kind: "project_bridge"` 和 `dev_summary` 供新客户端渲染操作卡片。
+pub fn publish_friend_bridge_message(message: &FriendChatMessage, dev_summary: &str) {
+    let event = FriendMessagePush {
+        event_type: "friend_message",
+        from_user_id: message
+            .context_user_id
+            .clone()
+            .unwrap_or_else(|| message.sender_user_id.clone()),
+        to_user_id: message.receiver_user_id.clone(),
+        message_id: message.id.clone(),
+        content: message.content.clone(),
+        created_at: message.created_at.clone(),
+        message_kind: "project_bridge".into(),
+        dev_summary: Some(dev_summary.chars().take(80).collect()),
     };
     let _ = FRIEND_EVENT_TX.send(event);
 }

@@ -1,5 +1,5 @@
 use anyhow::Result;
-
+use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -7,13 +7,13 @@ use tracing::{error, info, warn};
 use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{
-        has_origin_remote, is_project_delivery_request, is_pure_apk_delivery_request,
+        has_origin_remote, is_project_delivery_request, is_project_workspace,
         is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
         api_agent_name, choose_backend, cli_option_id, has_api_agents, is_local_cli_option,
     },
-    ai_cli, ai_error,
+    ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     source_hygiene,
     store::ProjectAccess,
@@ -134,7 +134,7 @@ pub async fn run_for_project_in_workspace(
     {
         error!("项目级 AI 代理运行出错: {}", e);
         let _ = tx.send(
-            WsMessage::classified_error(ai_error::classify_ai_error(&e.to_string())).to_json(),
+            WsMessage::error(e.to_string()).to_json(),
         );
     }
 }
@@ -156,65 +156,17 @@ async fn run_dispatch_with_workspace(
     let resume_command = is_short_resume_command(user_message, workspace);
     let delivery_request = is_project_delivery_request(user_message, workspace);
     if delivery_request && !resume_command {
-        // 优先用数据库判断项目是否有成功构建的 APK，避免跨会话 worktree 时误判为无 APK
-        let project_has_apk = native_session_scope
-            .as_ref()
-            .and_then(|s| state.store.project_has_built_apk(&s.project_id).ok())
-            .unwrap_or_else(|| tools::find_latest_apk(workspace).is_some());
-        if project_has_apk {
+        if tools::find_latest_apk(workspace).is_some() {
             let apk_url = tools::stable_apk_url(download_base);
-            if is_pure_apk_delivery_request(user_message, workspace) {
-                // 纯交付请求：立即返回下载链接，无需启动 AI
-                info!("delivery fast-path: pure apk delivery, returning url immediately");
-                let _ = tx.send(
-                    WsMessage::Done {
-                        message: "APK 已就绪，下载安装后即可体验最新版本。".into(),
-                        apk_url: Some(apk_url),
-                        image_url: None,
-                    }
-                    .to_json(),
-                );
-                return Ok(());
-            }
-            // 混合请求（交付意图 + 其他开发需求）：先立即把链接发出去，再让 AI 处理其余部分
-            info!("delivery fast-path: mixed request, pre-sending apk url before ai");
             let _ = tx.send(
-                WsMessage::AssistantMessage {
-                    text: format!(
-                        "APK 已就绪，你可以先下载：{}\n\n继续处理你的其他需求……",
-                        apk_url
-                    ),
+                WsMessage::Done {
+                    message: "我看了当前项目状态，APK 已经生成了。你现在最需要的是下载安装测试，所以我先把下载链接给你。".into(),
+                    apk_url: Some(apk_url),
+                    image_url: None,
                 }
                 .to_json(),
             );
-            // fall through：继续走 AI 完成开发需求
-        } else if is_pure_apk_delivery_request(user_message, workspace) {
-            // 纯交付请求但项目尚无 APK：注入 preflight 指令让 AI 直接编译，不要等用户再说一遍
-            info!("delivery fast-path: pure apk delivery but no apk yet, injecting build note");
-            let build_note = "【系统提示】用户请求下载 APK，但该项目尚未编译过。请直接调用 build_project(\"android\") 为用户构建第一个 APK，无需询问或修改代码。编译成功后系统会自动把下载链接发给用户。";
-            let combined_note = match preflight_note {
-                Some(existing) => format!("{existing}\n\n{build_note}"),
-                None => build_note.to_string(),
-            };
-            let _ = tx
-                .send(WsMessage::progress("项目还没有编译过，正在为你构建第一个 APK……").to_json());
-            return run_backend_with_workspace(
-                user_id,
-                workspace,
-                user_config_workspace,
-                download_base,
-                native_session_scope,
-                user_message,
-                Some(&combined_note),
-                agent_name,
-                trace_id,
-                CapabilityRoute::CodeAgent,
-                true,
-                require_existing_git,
-                state,
-                tx,
-            )
-            .await;
+            return Ok(());
         }
     }
 
@@ -328,53 +280,22 @@ async fn run_backend_with_workspace(
 
     match backend {
         AiBackend::LocalCli => {
-            let max_retries = ai_error::transient_retry_attempts();
-            let mut attempt = 0usize;
-            let local_cli_result = loop {
-                let result = ai_cli::run_with_workspace(
-                    user_id,
-                    workspace,
-                    download_base,
-                    user_message,
-                    combined_preflight_note.as_deref(),
-                    cli_option_id(agent_name),
-                    route,
-                    require_existing_git,
-                    native_session_scope.clone(),
-                    trace_id,
-                    state,
-                    tx,
-                )
-                .await;
-                match result {
-                    Ok(()) => break Ok(()),
-                    Err(error) => {
-                        let classified = ai_error::classify_ai_error(&error.to_string());
-                        if classified.should_retry_local_cli() && attempt < max_retries {
-                            attempt += 1;
-                            let delay_secs = ai_error::transient_retry_delay_secs(attempt);
-                            warn!(
-                                code = classified.code,
-                                attempt,
-                                max_retries,
-                                delay_secs,
-                                "本地 AI CLI 短暂错误，准备自动重试"
-                            );
-                            let _ = tx.send(
-                                WsMessage::progress(format!(
-                                    "服务器 AI 通道刚才拥堵或短暂断开，正在自动重试（{}/{}）。手机连接会自动恢复，项目记录已保留。",
-                                    attempt, max_retries
-                                ))
-                                .to_json(),
-                            );
-                            tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
-                            continue;
-                        }
-                        break Err(error);
-                    }
-                }
-            };
-            match local_cli_result {
+            match ai_cli::run_with_workspace(
+                user_id,
+                workspace,
+                download_base,
+                user_message,
+                combined_preflight_note.as_deref(),
+                cli_option_id(agent_name),
+                route,
+                require_existing_git,
+                native_session_scope.clone(),
+                trace_id,
+                state,
+                tx,
+            )
+            .await
+            {
                 Ok(()) => Ok(()),
                 Err(e)
                     if allow_api_fallback

@@ -8,12 +8,14 @@ use std::{
 use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::UnboundedSender};
 
 use crate::{
+    types::{AiCliOption, CliPromptMode},
+};
+use super::{
     ai_cli_streaming::{current_unix_millis, read_cli_stream, send_cli_heartbeat},
     ai_cli_trace::{
         record_cli_done, record_cli_error, record_cli_start, record_codex_network_gate,
         CliTraceContext,
     },
-    types::{AiCliOption, CliPromptMode},
 };
 
 pub(crate) struct CliOutput {
@@ -161,7 +163,7 @@ async fn run_cli_command(
     tx: &UnboundedSender<String>,
 ) -> Result<CliOutput> {
     let mut cmd = Command::new(&option.bin);
-    let args = crate::ai_cli_runner::cli_args_for_run(option, native_session_id);
+    let args = super::ai_cli_runner::cli_args_for_run(option, native_session_id);
     cmd.args(&args)
         .current_dir(workspace)
         .stdout(Stdio::piped())
@@ -257,7 +259,7 @@ async fn run_cli_command(
                 heartbeat_task.abort();
                 stdout_task.abort();
                 stderr_task.abort();
-                crate::ai_cli_runner::kill_timed_out_child(&mut child).await;
+                super::ai_cli_runner::kill_timed_out_child(&mut child).await;
                 return Err(anyhow!(
                     "本地 AI CLI 执行超时，请稍后重试或调大对应 TIMEOUT_SECS"
                 ));

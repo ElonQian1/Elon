@@ -251,6 +251,16 @@ async fn handle_project_ws(
         }
     }
 
+    // 方案8: 告知客户端当前服务器协议版本；旧客户端忽略未知 type 即可
+    let hello = crate::ws_message::WsMessage::ProtocolHello {
+        server_version: crate::ws_message::SERVER_PROTOCOL_VERSION,
+        min_client_version: crate::ws_message::MIN_CLIENT_PROTOCOL_VERSION,
+    }
+    .to_json();
+    if sender.send(Message::Text(hello)).await.is_err() {
+        return;
+    }
+
     loop {
         let text = tokio::select! {
             update = update_rx.recv() => {

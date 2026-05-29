@@ -1,19 +1,39 @@
+mod ai_cli_chat;
+mod ai_cli_environment;
+mod ai_cli_intent_gate;
+mod ai_cli_native_session;
+mod ai_cli_output;
+mod ai_cli_prewarm;
+mod ai_cli_process;
+mod ai_cli_prompts;
+mod ai_cli_runner;
+mod ai_cli_streaming;
+mod ai_cli_trace;
+#[cfg(test)]
+mod ai_cli_tests;
+
 use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
-pub(crate) use crate::ai_cli_output::truncate_chars;
-pub use crate::ai_cli_prewarm::prewarm_codex_session;
-pub(crate) use crate::ai_cli_process::{
-    cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
-    supports_copilot_sessions, CliOutput,
+pub(crate) use self::ai_cli_output::truncate_chars;
+pub(crate) use self::ai_cli_process::{
+    cap_option_timeout, configured_timeout_cap, run_cli_command_traced,
+    supports_codex_sessions, CliOutput,
 };
 #[cfg(test)]
-pub(crate) use crate::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
-pub(crate) use crate::ai_cli_runner::{codex_thread_uri, copilot_session_sentinel};
+pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
+pub(crate) use self::ai_cli_runner::codex_thread_uri;
+pub use self::ai_cli_prewarm::prewarm_codex_session;
 
 use crate::{
-    ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
+    intent_router, tools,
+    types::{AppState, WsMessage},
+};
+use self::{
+    ai_cli_chat::{
+        chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message,
+    },
     ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
     ai_cli_native_session::{
         append_native_session_continuity, native_session_continuity_note,
@@ -22,16 +42,14 @@ use crate::{
     ai_cli_output::{extract_json_agent_message, extract_thread_id, format_cli_reply},
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
-    intent_router, tools,
-    types::{AppState, WsMessage},
 };
 
 #[cfg(test)]
-use crate::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
+use self::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
 #[cfg(test)]
-use crate::ai_cli_native_session::build_native_session_continuity_note;
+use self::ai_cli_native_session::build_native_session_continuity_note;
 #[cfg(test)]
-use crate::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
+use self::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
 #[cfg(test)]
 use crate::store::ConversationMessage;
 #[cfg(test)]
@@ -61,7 +79,7 @@ impl IntentGateResult {
     }
 }
 
-pub use crate::ai_cli_intent_gate::confirm_project_intent;
+pub use self::ai_cli_intent_gate::confirm_project_intent;
 
 pub async fn run_with_workspace(
     user_id: &str,
@@ -100,13 +118,22 @@ pub async fn run_with_workspace(
 
     let android_task = development_task && looks_like_android_task(user_message);
     if development_task {
-        let _ = tx.send(WsMessage::progress("正在准备项目工作区。").to_json());
+        let _ = tx.send(
+            WsMessage::progress("正在准备项目工作区。")
+            .to_json(),
+        );
         for note in environment_notes(user_message, &option) {
             let _ = tx.send(WsMessage::progress(note).to_json());
         }
-        let _ = tx.send(WsMessage::progress("AI 助手正在处理你的请求。").to_json());
+        let _ = tx.send(
+            WsMessage::progress("AI 助手正在处理你的请求。")
+            .to_json(),
+        );
     } else {
-        let _ = tx.send(WsMessage::progress("正在思考。").to_json());
+        let _ = tx.send(
+            WsMessage::progress("正在思考。")
+            .to_json(),
+        );
     }
 
     let workspace_key = workspace.display().to_string();
@@ -114,9 +141,7 @@ pub async fn run_with_workspace(
     if skip_native_session {
         record_cli_session_skipped(state, trace_id, "run_workspace", "tiny_chat_fast_path");
     }
-    // Codex CLI：tiny chat 跳过会话以节省 token；CopilotCLI：始终启用会话续接
-    let use_native_sessions = (supports_codex_sessions(&option) && !skip_native_session)
-        || supports_copilot_sessions(&option);
+    let use_native_sessions = supports_codex_sessions(&option) && !skip_native_session;
     let session_state = if use_native_sessions {
         native_session_scope.as_ref().and_then(|scope| {
             state
@@ -160,7 +185,8 @@ pub async fn run_with_workspace(
     }
     if native_session_id.is_some() {
         let _ = tx.send(
-            WsMessage::progress("Restoring Codex CLI context for this conversation.").to_json(),
+            WsMessage::progress("Restoring Codex CLI context for this conversation.")
+            .to_json(),
         );
     }
 
@@ -230,7 +256,7 @@ pub async fn run_with_workspace(
             );
             let _ = tx.send(
                 WsMessage::progress("旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。")
-                    .to_json(),
+                .to_json(),
             );
             native_session_id = None;
             prompt_bootstrapped = false;
@@ -314,10 +340,10 @@ pub async fn run_with_workspace(
         );
         let _ = tx.send(
             WsMessage::progress(if lightweight_chat_task {
-                "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
-            } else {
-                "Codex CLI session expired; starting a fresh session."
-            })
+                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
+                } else {
+                    "Codex CLI session expired; starting a fresh session."
+                })
             .to_json(),
         );
         native_session_id = None;
@@ -430,34 +456,7 @@ pub async fn run_with_workspace(
             &workspace_key,
             &thread_id,
         );
-        // 同步写入 tasks.codex_thread_id，方便通过任务直接找到对应 Codex/CopilotCLI 线程
-        let _ = state.store.set_latest_task_thread_id(
-            &scope.project_id,
-            &scope.user_id,
-            &scope.conversation_id,
-            &thread_id,
-        );
         stored_session_id = Some(thread_id);
-    }
-    // CopilotCLI 不在 stdout 输出 session UUID，用 sentinel key 标记"此会话已有历史上下文"，
-    // 下次请求时 cli_args_for_run 会在 args 前插入 --continue 续接同目录最近的会话。
-    if output.success && stored_session_id.is_none() && supports_copilot_sessions(&option) {
-        if let Some(scope) = native_session_scope
-            .as_ref()
-            .filter(|_| use_native_sessions)
-        {
-            let sentinel = copilot_session_sentinel(&scope.conversation_id);
-            let _ = state.store.upsert_native_agent_session(
-                &scope.project_id,
-                &scope.user_id,
-                Some(&scope.conversation_id),
-                &option.provider,
-                &option.id,
-                &workspace_key,
-                &sentinel,
-            );
-            stored_session_id = Some(sentinel);
-        }
     }
     if output.success {
         if let (Some(scope), Some(session_id)) = (
@@ -501,7 +500,20 @@ pub async fn run_with_workspace(
     );
 
     let apk_url = if android_task && output.success {
-        tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base))
+        let _ = tx.send(
+            WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。")
+            .to_json(),
+        );
+        let apk_url =
+            tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
+        if apk_url.is_none() {
+            let _ = tx.send(
+                WsMessage::progress("未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
+                        )
+                .to_json(),
+            );
+        }
+        apk_url
     } else {
         None
     };
@@ -517,7 +529,3 @@ pub async fn run_with_workspace(
 
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "ai_cli_tests.rs"]
-mod tests;
