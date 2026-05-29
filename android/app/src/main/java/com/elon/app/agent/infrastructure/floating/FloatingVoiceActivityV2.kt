@@ -27,8 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.application.IntentAnalyzer
 import com.elon.app.agent.domain.conversation.ConversationState
-import com.elon.app.agent.infrastructure.voice.*
-import kotlinx.coroutines.*
+import com.elon.app.agent.infrastructure.voice.*import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 
 /**
@@ -111,38 +110,76 @@ class ConversationalVoiceActivity : AppCompatActivity() {
      * 初始化对话系统
      */
     private fun initializeConversation() {
-        // 获取 API Key
-        val apiKey = AgentConfigActivity.getApiKey(this)
-        Log.i(TAG, "📱 API Key ${if (apiKey.isNotEmpty()) "已配置" else "未配置"}")
-        
+        val config = AgentConfigActivity.getAgentConfig(this)
+        Log.i(TAG, "📱 语音模式：${config.voiceMode}")
+
         // 初始化 TTS
         ttsService = AndroidTTSService(this)
-        
+
         // 初始化对话适配器
         voiceAdapter = ConversationalVoiceAdapter(this).apply {
             setTTSService(ttsService)
-            
-            // 🧠 设置智能意图分析器（关键！）
-            if (apiKey.isNotEmpty()) {
-                val intentAnalyzer = IntentAnalyzer(apiKey)
-                setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
-                
-                // 设置智能响应生成器
-                setResponseGenerator(SmartResponseGenerator(apiKey))
-                
-                Log.i(TAG, "✅ 智能模式已启用")
-            } else {
-                Log.w(TAG, "⚠️ 未配置 API Key，使用简单模式（只有关键词匹配）")
-                Toast.makeText(
-                    this@ConversationalVoiceActivity,
-                    "未配置 API Key，当前为简单模式：仅支持打开应用、基础问候等关键词指令",
-                    Toast.LENGTH_LONG
-                ).show()
+
+            when (config.voiceMode) {
+
+                AgentConfigActivity.VOICE_MODE_APIKEY -> {
+                    if (config.hunyuanApiKey.isNotEmpty()) {
+                        val intentAnalyzer = IntentAnalyzer(config.hunyuanApiKey)
+                        setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
+                        setResponseGenerator(SmartResponseGenerator(config.hunyuanApiKey))
+                        Log.i(TAG, "✅ API Key 智能模式已启用")
+                        Toast.makeText(
+                            this@ConversationalVoiceActivity,
+                            "智能模式（混元 AI）",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Log.w(TAG, "⚠️ 已选 API Key 模式但未填写 Key，降级为简单模式")
+                        Toast.makeText(
+                            this@ConversationalVoiceActivity,
+                            "未配置 API Key，当前为简单模式：仅支持关键词指令",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+                AgentConfigActivity.VOICE_MODE_CLI -> {
+                    if (config.cliProjectId.isNotEmpty()) {
+                        setIntentAnalyzer(PassthroughIntentAnalyzer())
+                        setResponseGenerator(CliResponseGenerator(
+                            context    = this@ConversationalVoiceActivity,
+                            projectId  = config.cliProjectId,
+                            serverUrl  = config.cliServerUrl
+                        ))
+                        Log.i(TAG, "✅ 服务器 CLI 模式已启用 project=${config.cliProjectId}")
+                        Toast.makeText(
+                            this@ConversationalVoiceActivity,
+                            "服务器 CLI 模式",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Log.w(TAG, "⚠️ 已选 CLI 模式但未填写 Project ID，降级为简单模式")
+                        Toast.makeText(
+                            this@ConversationalVoiceActivity,
+                            "未配置 Project ID，当前为简单模式；请在 Agent 设置中配置",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+                else -> { // VOICE_MODE_SIMPLE
+                    Log.i(TAG, "ℹ️ 简单模式（关键词匹配）")
+                    Toast.makeText(
+                        this@ConversationalVoiceActivity,
+                        "简单模式（关键词匹配，无需网络）",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
-            
+
             // 设置 UI 监听器
             listener = createConversationListener()
-            
+
             // 设置任务执行回调
             onTaskExecute = { goal ->
                 executeTask(goal)
