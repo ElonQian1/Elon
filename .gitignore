@@ -30,3 +30,7 @@ Thumbs.db
 # Temporary AI deploy helpers
 scripts/_wsl_deploy.sh
 scripts/_deploy_temp*.sh
+
+# 本地运行目录（start-local.ps1 自动生成）
+data-local/
+workspaces-local/
