@@ -25,15 +25,21 @@ class AgentConfigActivity : Activity() {
         const val VOICE_MODE_APIKEY = "apikey"
         const val VOICE_MODE_CLI    = "cli"
 
+        val DEFAULT_MODE_ORDER: List<String> = listOf(VOICE_MODE_APIKEY, VOICE_MODE_CLI, VOICE_MODE_SIMPLE)
+        private const val DEFAULT_ORDER_STR = "apikey,cli,simple"
+
         fun getAgentConfig(context: Context): AgentConfig {
             val prefs = context.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+            val orderStr = prefs.getString("voice_mode_order", DEFAULT_ORDER_STR) ?: DEFAULT_ORDER_STR
+            val order = orderStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                .let { if (it.containsAll(listOf(VOICE_MODE_APIKEY, VOICE_MODE_CLI, VOICE_MODE_SIMPLE))) it else DEFAULT_MODE_ORDER }
             return AgentConfig(
                 hunyuanApiKey   = prefs.getString("hunyuan_api_key", "") ?: "",
                 qwenVLApiKey    = prefs.getString("qwen_vl_api_key", "") ?: "",
                 openaiApiKey    = prefs.getString("openai_api_key", "") ?: "",
                 visionProvider  = prefs.getString("vision_provider", "none") ?: "none",
                 websocketPort   = prefs.getInt("websocket_port", 11452),
-                voiceMode       = prefs.getString("voice_mode", VOICE_MODE_SIMPLE) ?: VOICE_MODE_SIMPLE,
+                voiceModeOrder  = order,
                 cliProjectId    = prefs.getString("cli_project_id", "") ?: "",
                 cliServerUrl    = prefs.getString("cli_server_url", "http://43.139.149.158:8080") ?: "http://43.139.149.158:8080"
             )
@@ -50,18 +56,18 @@ class AgentConfigActivity : Activity() {
     private lateinit var visionProviderSpinner: Spinner
     private lateinit var websocketPortInput: EditText
 
-    // 语音模式选择
-    private lateinit var voiceModeGroup: RadioGroup
-    private lateinit var rbSimple: RadioButton
-    private lateinit var rbApiKey: RadioButton
-    private lateinit var rbCli: RadioButton
+    // 语音模式回退排序
+    private val modeOrderList: MutableList<String> = mutableListOf(
+        VOICE_MODE_APIKEY, VOICE_MODE_CLI, VOICE_MODE_SIMPLE
+    )
+    private lateinit var modeOrderLayout: LinearLayout
 
     // CLI 模式配置
     private lateinit var cliSection: LinearLayout
     private lateinit var cliProjectIdInput: EditText
     private lateinit var cliServerUrlInput: EditText
 
-    // API Key 区域（仅 apikey 模式显示）
+// API Key 区域
     private lateinit var apiKeySection: LinearLayout
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,32 +92,16 @@ class AgentConfigActivity : Activity() {
         layout.addView(statusText)
 
         // ================================================================
-        // === 🎙️ 语音助手模式选择 ===
+        // === 🎙️ 语音助手模式回退顺序 ===
         // ================================================================
-        layout.addView(createSectionTitle("🎙️ 语音助手模式"))
+        layout.addView(createSectionTitle("🎙️ 语音助手模式（回退顺序）"))
+        layout.addView(createHint("按顺序尝试，未填写配置的模式自动跳过；简单模式无需配置，始终作为最终兜底"))
 
-        voiceModeGroup = RadioGroup(this).apply {
-            orientation = RadioGroup.VERTICAL
+        modeOrderLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(0, 8, 0, 8)
         }
-        rbSimple = RadioButton(this).apply {
-            text = "简单模式（本地关键词匹配，无需网络）"
-            id = View.generateViewId()
-        }
-        rbApiKey = RadioButton(this).apply {
-            text = "混元 API Key 模式（直连腾讯混元 AI）"
-            id = View.generateViewId()
-        }
-        rbCli = RadioButton(this).apply {
-            text = "服务器 CLI 模式（由 elon 服务器 AI 回答）"
-            id = View.generateViewId()
-        }
-        voiceModeGroup.addView(rbSimple)
-        voiceModeGroup.addView(rbApiKey)
-        voiceModeGroup.addView(rbCli)
-        layout.addView(voiceModeGroup)
-
-        voiceModeGroup.setOnCheckedChangeListener { _, _ -> updateSectionVisibility() }
+        layout.addView(modeOrderLayout)
 
         layout.addView(createDivider())
 
@@ -285,14 +275,66 @@ class AgentConfigActivity : Activity() {
         setBackgroundColor(Color.LTGRAY)
     }
 
-    // === 模式切换 ===
+    // === 模式排序 UI ===
 
-    private fun updateSectionVisibility() {
-        val isApiKey = rbApiKey.isChecked
-        val isCli    = rbCli.isChecked
-        apiKeySection.visibility = if (isApiKey) View.VISIBLE else View.GONE
-        cliSection.visibility    = if (isCli)    View.VISIBLE else View.GONE
+    private fun refreshModeOrderUI() {
+        modeOrderLayout.removeAllViews()
+        modeOrderList.forEachIndexed { index, mode ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, 6, 0, 6)
+            }
+            val label = TextView(this).apply {
+                text = "#${index + 1}  ${modeName(mode)}"
+                textSize = 15f
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                if (mode == VOICE_MODE_SIMPLE) setTextColor(Color.GRAY)
+            }
+            row.addView(label)
+
+            // 上移按钮（第一个不显示）
+            if (index > 0) {
+                val upBtn = Button(this).apply {
+                    text = "↑"
+                    textSize = 14f
+                    setPadding(dp2px(12), dp2px(2), dp2px(12), dp2px(2))
+                    setOnClickListener {
+                        val tmp = modeOrderList[index - 1]
+                        modeOrderList[index - 1] = modeOrderList[index]
+                        modeOrderList[index] = tmp
+                        refreshModeOrderUI()
+                    }
+                }
+                row.addView(upBtn)
+            } else {
+                row.addView(View(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp2px(60), 1)
+                })
+            }
+
+            // 下移按钮（最后一个不显示）
+            if (index < modeOrderList.size - 1) {
+                val downBtn = Button(this).apply {
+                    text = "↓"
+                    textSize = 14f
+                    setPadding(dp2px(12), dp2px(2), dp2px(12), dp2px(2))
+                    setOnClickListener {
+                        val tmp = modeOrderList[index + 1]
+                        modeOrderList[index + 1] = modeOrderList[index]
+                        modeOrderList[index] = tmp
+                        refreshModeOrderUI()
+                    }
+                }
+                row.addView(downBtn)
+            }
+
+            modeOrderLayout.addView(row)
+        }
     }
+
+    private fun dp2px(dp: Int): Int =
+        (dp * resources.displayMetrics.density + 0.5f).toInt()
 
     // === 配置管理 ===
 
@@ -313,30 +355,15 @@ class AgentConfigActivity : Activity() {
             }
         )
 
-        when (config.voiceMode) {
-            VOICE_MODE_APIKEY -> rbApiKey.isChecked = true
-            VOICE_MODE_CLI    -> rbCli.isChecked    = true
-            else              -> rbSimple.isChecked = true
-        }
-        updateSectionVisibility()
+        modeOrderList.clear()
+        modeOrderList.addAll(config.voiceModeOrder)
+        refreshModeOrderUI()
     }
 
     private fun saveConfig() {
-        val mode = when {
-            rbApiKey.isChecked -> VOICE_MODE_APIKEY
-            rbCli.isChecked    -> VOICE_MODE_CLI
-            else               -> VOICE_MODE_SIMPLE
-        }
-
-        // 模式特定校验
-        if (mode == VOICE_MODE_APIKEY && hunyuanKeyInput.text.isBlank()) {
-            Toast.makeText(this, "❌ 混元 API Key 模式需要填写 API Key", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (mode == VOICE_MODE_CLI && cliProjectIdInput.text.isBlank()) {
-            Toast.makeText(this, "❌ 服务器 CLI 模式需要填写 Project ID", Toast.LENGTH_SHORT).show()
-            return
-        }
+        val order = modeOrderList.toMutableList()
+        // 简单模式必须在列表里（如果用户手动删除就补入末尾）
+        if (!order.contains(VOICE_MODE_SIMPLE)) order.add(VOICE_MODE_SIMPLE)
 
         val visionProvider = when (visionProviderSpinner.selectedItemPosition) {
             1 -> "qwen"; 2 -> "openai"; else -> "none"
@@ -350,13 +377,14 @@ class AgentConfigActivity : Activity() {
             openaiApiKey   = openaiKeyInput.text.toString().trim(),
             visionProvider = visionProvider,
             websocketPort  = websocketPortInput.text.toString().toIntOrNull() ?: 11452,
-            voiceMode      = mode,
+            voiceModeOrder = order,
             cliProjectId   = cliProjectIdInput.text.toString().trim(),
             cliServerUrl   = serverUrl
         )
 
         saveConfig(config)
-        Toast.makeText(this, "✅ 配置已保存（模式：${modeName(mode)}）", Toast.LENGTH_SHORT).show()
+        val orderDesc = order.joinToString(" → ") { modeName(it) }
+        Toast.makeText(this, "✅ 已保存！回退顺序：$orderDesc", Toast.LENGTH_LONG).show()
     }
 
     private fun modeName(mode: String) = when (mode) {
@@ -366,29 +394,14 @@ class AgentConfigActivity : Activity() {
     }
 
     private fun testConnection() {
-        when {
-            rbApiKey.isChecked -> {
-                if (hunyuanKeyInput.text.isBlank()) {
-                    Toast.makeText(this, "❌ 请先填写混元 API Key", Toast.LENGTH_SHORT).show()
-                    return
-                }
-                Toast.makeText(this, "🔄 测试 API Key 连接中...", Toast.LENGTH_SHORT).show()
-                android.os.Handler(mainLooper).postDelayed({
-                    Toast.makeText(this, "✅ 格式正确（完整验证需实际调用）", Toast.LENGTH_LONG).show()
-                }, 800)
-            }
-            rbCli.isChecked -> {
-                if (cliProjectIdInput.text.isBlank()) {
-                    Toast.makeText(this, "❌ 请先填写 Project ID", Toast.LENGTH_SHORT).show()
-                    return
-                }
-                Toast.makeText(this, "🔄 测试服务器连接中...", Toast.LENGTH_SHORT).show()
-                android.os.Handler(mainLooper).postDelayed({
-                    Toast.makeText(this, "✅ 配置已填写（需在语音界面实际发送才能验证）", Toast.LENGTH_LONG).show()
-                }, 800)
-            }
-            else -> Toast.makeText(this, "ℹ️ 简单模式无需连接测试", Toast.LENGTH_SHORT).show()
-        }
+        val hasApiKey = hunyuanKeyInput.text.isNotBlank()
+        val hasCli    = cliProjectIdInput.text.isNotBlank()
+        val sb = StringBuilder("🔍 配置状态检查：\n")
+        sb.append(if (hasApiKey) "✅ 混元 API Key：已填写\n" else "⚪ 混元 API Key：未填写（该顺序将被跳过）\n")
+        sb.append(if (hasCli)    "✅ Project ID：已填写\n"   else "⚪ Project ID：未填写（该顺序将被跳过）\n")
+        sb.append("✅ 简单模式：始终可用（最终兜底）\n")
+        sb.append("\n回退顺序：${modeOrderList.joinToString(" → ") { modeName(it) }}")
+        Toast.makeText(this, sb.toString(), Toast.LENGTH_LONG).show()
     }
 
     private fun getConfig(): AgentConfig {
@@ -398,14 +411,14 @@ class AgentConfigActivity : Activity() {
     private fun saveConfig(config: AgentConfig) {
         getSharedPreferences("agent_config", Context.MODE_PRIVATE)
             .edit()
-            .putString("hunyuan_api_key",  config.hunyuanApiKey)
-            .putString("qwen_vl_api_key",  config.qwenVLApiKey)
-            .putString("openai_api_key",   config.openaiApiKey)
-            .putString("vision_provider",  config.visionProvider)
-            .putInt("websocket_port",      config.websocketPort)
-            .putString("voice_mode",       config.voiceMode)
-            .putString("cli_project_id",   config.cliProjectId)
-            .putString("cli_server_url",   config.cliServerUrl)
+            .putString("hunyuan_api_key",   config.hunyuanApiKey)
+            .putString("qwen_vl_api_key",   config.qwenVLApiKey)
+            .putString("openai_api_key",    config.openaiApiKey)
+            .putString("vision_provider",   config.visionProvider)
+            .putInt("websocket_port",        config.websocketPort)
+            .putString("voice_mode_order",   config.voiceModeOrder.joinToString(","))
+            .putString("cli_project_id",     config.cliProjectId)
+            .putString("cli_server_url",     config.cliServerUrl)
             .apply()
     }
 
@@ -443,7 +456,7 @@ data class AgentConfig(
     val openaiApiKey:   String = "",
     val visionProvider: String = "none",        // none | qwen | openai
     val websocketPort:  Int    = 11452,
-    val voiceMode:      String = AgentConfigActivity.VOICE_MODE_SIMPLE, // simple | apikey | cli
+    val voiceModeOrder: List<String> = AgentConfigActivity.DEFAULT_MODE_ORDER, // 回退顺序列表
     val cliProjectId:   String = "",
     val cliServerUrl:   String = "http://43.139.149.158:8080"
 ) {

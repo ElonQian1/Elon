@@ -120,62 +120,62 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         voiceAdapter = ConversationalVoiceAdapter(this).apply {
             setTTSService(ttsService)
 
-            when (config.voiceMode) {
+            // 按回退顺序依次尝试，使用第一个有配置的模式
+            var activatedMode = AgentConfigActivity.VOICE_MODE_SIMPLE
+            val skipped = mutableListOf<String>()
 
-                AgentConfigActivity.VOICE_MODE_APIKEY -> {
-                    if (config.hunyuanApiKey.isNotEmpty()) {
-                        val intentAnalyzer = IntentAnalyzer(config.hunyuanApiKey)
-                        setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
-                        setResponseGenerator(SmartResponseGenerator(config.hunyuanApiKey))
-                        Log.i(TAG, "✅ API Key 智能模式已启用")
-                        Toast.makeText(
-                            this@ConversationalVoiceActivity,
-                            "智能模式（混元 AI）",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Log.w(TAG, "⚠️ 已选 API Key 模式但未填写 Key，降级为简单模式")
-                        Toast.makeText(
-                            this@ConversationalVoiceActivity,
-                            "未配置 API Key，当前为简单模式：仅支持关键词指令",
-                            Toast.LENGTH_LONG
-                        ).show()
+            run cascade@{
+                for (mode in config.voiceModeOrder) {
+                    when (mode) {
+                        AgentConfigActivity.VOICE_MODE_APIKEY -> {
+                            if (config.hunyuanApiKey.isNotEmpty()) {
+                                val intentAnalyzer = IntentAnalyzer(config.hunyuanApiKey)
+                                setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
+                                setResponseGenerator(SmartResponseGenerator(config.hunyuanApiKey))
+                                activatedMode = mode
+                                Log.i(TAG, "✅ API Key 模式已激活（优先级 #${config.voiceModeOrder.indexOf(mode) + 1}）")
+                                return@cascade
+                            } else {
+                                skipped.add("混元 API Key（未填写）")
+                                Log.i(TAG, "⏭️ API Key 未配置，跳过")
+                            }
+                        }
+                        AgentConfigActivity.VOICE_MODE_CLI -> {
+                            if (config.cliProjectId.isNotEmpty()) {
+                                setIntentAnalyzer(PassthroughIntentAnalyzer())
+                                setResponseGenerator(CliResponseGenerator(
+                                    context   = this@ConversationalVoiceActivity,
+                                    projectId = config.cliProjectId,
+                                    serverUrl = config.cliServerUrl
+                                ))
+                                activatedMode = mode
+                                Log.i(TAG, "✅ CLI 模式已激活 project=${config.cliProjectId}")
+                                return@cascade
+                            } else {
+                                skipped.add("服务器 CLI（未填写 Project ID）")
+                                Log.i(TAG, "⏭️ CLI Project ID 未配置，跳过")
+                            }
+                        }
+                        AgentConfigActivity.VOICE_MODE_SIMPLE -> {
+                            activatedMode = mode
+                            Log.i(TAG, "ℹ️ 简单模式（关键词匹配）")
+                            return@cascade
+                        }
                     }
                 }
-
-                AgentConfigActivity.VOICE_MODE_CLI -> {
-                    if (config.cliProjectId.isNotEmpty()) {
-                        setIntentAnalyzer(PassthroughIntentAnalyzer())
-                        setResponseGenerator(CliResponseGenerator(
-                            context    = this@ConversationalVoiceActivity,
-                            projectId  = config.cliProjectId,
-                            serverUrl  = config.cliServerUrl
-                        ))
-                        Log.i(TAG, "✅ 服务器 CLI 模式已启用 project=${config.cliProjectId}")
-                        Toast.makeText(
-                            this@ConversationalVoiceActivity,
-                            "服务器 CLI 模式",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        Log.w(TAG, "⚠️ 已选 CLI 模式但未填写 Project ID，降级为简单模式")
-                        Toast.makeText(
-                            this@ConversationalVoiceActivity,
-                            "未配置 Project ID，当前为简单模式；请在 Agent 设置中配置",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-
-                else -> { // VOICE_MODE_SIMPLE
-                    Log.i(TAG, "ℹ️ 简单模式（关键词匹配）")
-                    Toast.makeText(
-                        this@ConversationalVoiceActivity,
-                        "简单模式（关键词匹配，无需网络）",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                // voiceModeOrder 里没有 simple 时的兜底
+                Log.i(TAG, "ℹ️ 兜底：简单模式")
             }
+
+            // Toast 汇报激活的模式（+ 跳过了哪些）
+            val modeLabel = when (activatedMode) {
+                AgentConfigActivity.VOICE_MODE_APIKEY -> "混元 AI 模式"
+                AgentConfigActivity.VOICE_MODE_CLI    -> "服务器 CLI 模式"
+                else                                  -> "简单模式（关键词匹配）"
+            }
+            val msg = if (skipped.isEmpty()) modeLabel
+                      else "$modeLabel\n（已跳过：${skipped.joinToString("、")}）"
+            Toast.makeText(this@ConversationalVoiceActivity, msg, Toast.LENGTH_SHORT).show()
 
             // 设置 UI 监听器
             listener = createConversationListener()
