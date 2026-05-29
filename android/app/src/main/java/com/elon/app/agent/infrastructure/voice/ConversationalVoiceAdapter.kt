@@ -191,6 +191,10 @@ class ConversationalVoiceAdapter(private val context: Context) {
                 Log.e(TAG, "🎤 ASR 错误: $error")
                 conversationManager.onError(error)
             }
+
+            override fun onErrorCode(code: Int, message: String) {
+                Log.w(TAG, "🎤 ASR 错误码: code=$code, msg=$message")
+            }
         }
     }
     
