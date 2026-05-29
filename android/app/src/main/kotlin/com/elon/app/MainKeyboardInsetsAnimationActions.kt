@@ -28,12 +28,14 @@ internal class MainKeyboardInsetsAnimationActions(
     private var usingEstimatedKeyboardHeight = false
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
+    private var followChatBottomDuringLift = false
     private val visibleFrame = Rect()
 
     fun install() {
         baseChatListPaddingBottom = binding.chatList.paddingBottom
         installVisibleFrameFallback()
         installFocusFallback()
+        installBottomBarLayoutSync()
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             if (!runningImeAnimation) {
@@ -96,6 +98,7 @@ internal class MainKeyboardInsetsAnimationActions(
     fun requestKeyboardLift() {
         liftRequestedAt = SystemClock.uptimeMillis()
         keyboardWasVisibleSinceLift = false
+        followChatBottomDuringLift = shouldFollowLatestMessage()
         binding.bottomBarContainer.bringToFront()
         applyKnownOrEstimatedKeyboardHeight()
         binding.root.post {
@@ -159,6 +162,24 @@ internal class MainKeyboardInsetsAnimationActions(
             } else if (!binding.inputEdit.hasFocus() && usingEstimatedKeyboardHeight) {
                 usingEstimatedKeyboardHeight = false
                 applyKeyboardHeight(0, animate = true)
+            }
+        }
+    }
+
+    private fun installBottomBarLayoutSync() {
+        binding.bottomBarContainer.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (binding.chatPage.visibility != View.VISIBLE) return@addOnLayoutChangeListener
+            val oldHeight = oldBottom - oldTop
+            val newHeight = bottom - top
+            val heightDelta = newHeight - oldHeight
+            if (oldHeight <= 0 || heightDelta == 0) return@addOnLayoutChangeListener
+            if (!followChatBottomDuringLift && !shouldFollowLatestMessage()) return@addOnLayoutChangeListener
+            followChatBottomDuringLift = binding.inputEdit.hasFocus() || followChatBottomDuringLift
+            binding.chatList.post {
+                if (heightDelta != 0) {
+                    binding.chatList.scrollBy(0, heightDelta)
+                }
+                keepLatestMessageAboveInput(binding.chatList.layoutManager as? LinearLayoutManager)
             }
         }
     }
@@ -247,23 +268,66 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private fun applyChatBottomPadding(keyboardHeight: Int) {
         val targetBottom = baseChatListPaddingBottom + keyboardHeight
-        if (binding.chatList.paddingBottom == targetBottom) return
+        val currentBottom = binding.chatList.paddingBottom
+        if (currentBottom == targetBottom) return
         val layoutManager = binding.chatList.layoutManager as? LinearLayoutManager
-        val anchorPosition = layoutManager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
-        val anchorOffset = if (anchorPosition != RecyclerView.NO_POSITION) {
-            layoutManager?.findViewByPosition(anchorPosition)?.top?.minus(binding.chatList.paddingTop)
-        } else {
-            null
-        }
+        val shouldFollowLatest = followChatBottomDuringLift || shouldFollowLatestMessage(layoutManager)
+        val anchor = if (shouldFollowLatest) null else chatListAnchor(layoutManager)
         binding.chatList.setPadding(
             binding.chatList.paddingLeft,
             binding.chatList.paddingTop,
             binding.chatList.paddingRight,
             targetBottom
         )
-        if (anchorPosition != RecyclerView.NO_POSITION && anchorOffset != null) {
-            layoutManager?.scrollToPositionWithOffset(anchorPosition, anchorOffset)
+        if (shouldFollowLatest) {
+            followChatBottomDuringLift = keyboardHeight > 0
+            val delta = targetBottom - currentBottom
+            if (delta != 0) {
+                binding.chatList.scrollBy(0, delta)
+            }
+            keepLatestMessageAboveInput(layoutManager)
+        } else if (anchor != null) {
+            layoutManager?.scrollToPositionWithOffset(anchor.position, anchor.offset)
         }
+        if (keyboardHeight == 0) {
+            followChatBottomDuringLift = false
+        }
+    }
+
+    private fun shouldFollowLatestMessage(
+        layoutManager: LinearLayoutManager? = binding.chatList.layoutManager as? LinearLayoutManager
+    ): Boolean {
+        if (binding.chatPage.visibility != View.VISIBLE) return false
+        val itemCount = binding.chatList.adapter?.itemCount ?: return false
+        if (itemCount <= 0) return false
+        val lastVisible = layoutManager?.findLastVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        return lastVisible >= itemCount - 1
+    }
+
+    private fun keepLatestMessageAboveInput(layoutManager: LinearLayoutManager?) {
+        val itemCount = binding.chatList.adapter?.itemCount ?: return
+        if (itemCount <= 0) return
+        val latestPosition = itemCount - 1
+        val viewportBottom = binding.chatList.height - binding.chatList.paddingBottom
+        val latestView = layoutManager?.findViewByPosition(latestPosition)
+        if (latestView == null) {
+            binding.chatList.scrollToPosition(latestPosition)
+            return
+        }
+        val coveredDistance = latestView.bottom - viewportBottom
+        if (coveredDistance > 0) {
+            binding.chatList.scrollBy(0, coveredDistance)
+        }
+    }
+
+    private fun chatListAnchor(layoutManager: LinearLayoutManager?): ChatListAnchor? {
+        val anchorPosition = layoutManager?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        if (anchorPosition == RecyclerView.NO_POSITION) return null
+        val anchorView = layoutManager?.findViewByPosition(anchorPosition) ?: return null
+        return ChatListAnchor(
+            position = anchorPosition,
+            offset = anchorView.top - binding.chatList.paddingTop
+        )
     }
 
     private fun keyboardHeightFromVisibleFrame(): Int {
@@ -329,6 +393,11 @@ internal class MainKeyboardInsetsAnimationActions(
     private fun WindowInsetsAnimationCompat.includesIme(): Boolean {
         return typeMask and WindowInsetsCompat.Type.ime() != 0
     }
+
+    private data class ChatListAnchor(
+        val position: Int,
+        val offset: Int
+    )
 
     private companion object {
         private const val ZERO_HEIGHT_GRACE_MS = 900L
