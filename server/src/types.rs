@@ -91,6 +91,10 @@ pub struct AppState {
     pub codex_network: Arc<crate::codex_health::CodexNetworkHealth>,
     /// Short-lived in-memory debug events keyed by client trace_id.
     pub server_traces: Arc<crate::server_trace::ServerTraceStore>,
+    /// 本地模式 owner token（ENV: OWNER_TOKEN）。
+    /// 设置后，携带该 token 的请求将以固定的 owner 身份通过认证，
+    /// 无需在 SQLite 中注册账号。用于 Windows 本机单用户模式。
+    pub owner_token: Option<String>,
 }
 
 pub use crate::project_task_scheduler::{CodexPrewarmRegistry, ProjectTaskScheduler};
@@ -258,6 +262,11 @@ impl AppState {
             tracing::info!("已加载文生图模型: {} -> {}", cfg.model, cfg.api_base);
         } else {
             tracing::warn!("未配置 IMAGE_API_KEY，文生图能力暂不可用");
+        }
+
+        let owner_token = std::env::var("OWNER_TOKEN").ok().filter(|v| !v.trim().is_empty());
+        if let Some(ref tok) = owner_token {
+            tracing::info!("已启用本地 owner token（前8位: {}…），本机单用户模式", &tok[..tok.len().min(8)]);
         }
 
         Ok(Self {

@@ -563,11 +563,8 @@ $originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()
 if ($BuildBaseSha -ne $originMainSha) {
     git -C $RepoRoot merge-base --is-ancestor $originMainSha $BuildBaseSha | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "   ℹ️  检测到本地存在待发布业务提交，推送到 origin/main..." -ForegroundColor Yellow
-        Push-HeadToMain
-        $originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()
+        Write-Host "   ℹ️  检测到本地存在待发布业务提交，APK freshness 基线改为 origin/main：$((Format-ShortSha $originMainSha))" -ForegroundColor Yellow
         $BuildBaseSha = $originMainSha
-        Write-Host "   ✅ 推送完成，origin/main → $((Format-ShortSha $originMainSha))" -ForegroundColor Green
     }
 }
 
