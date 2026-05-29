@@ -46,7 +46,8 @@ impl Store {
               p.created_by AS owner_id
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
-            WHERE p.is_public = 1
+             WHERE p.is_public = 1
+              AND p.join_mode != 'invite'
               AND p.status != 'deleted'
               AND (?1 IS NULL OR LOWER(p.name) LIKE ?1 OR LOWER(COALESCE(p.description,'')) LIKE ?1)
             ORDER BY p.updated_at DESC
@@ -91,7 +92,7 @@ impl Store {
                p.created_by AS owner_id
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
-             WHERE p.id = ?1 AND p.is_public = 1 AND p.status != 'deleted'",
+             WHERE p.id = ?1 AND p.is_public = 1 AND p.join_mode != 'invite' AND p.status != 'deleted'",
             params![project_id],
             |row| {
                 Ok(PublicProjectItem {
@@ -149,8 +150,11 @@ impl Store {
         if is_public == 0 {
             anyhow::bail!("该项目不对外公开");
         }
-        if join_mode != "open" {
+        if join_mode == "approval" {
             anyhow::bail!("该项目需要审批才能加入，请联系项目 owner");
+        }
+        if join_mode != "open" && join_mode != "invite" {
+            anyhow::bail!("该项目只能通过邀请加入");
         }
         // 已经是成员则幂等成功
         conn.execute(
@@ -424,6 +428,39 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn invite_projects_are_hidden_from_store_but_joinable_by_card() {
+        let store = temp_store();
+        let owner = store
+            .create_user("invite-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let invited = store
+            .create_user("invite-member@example.com", "secret1", None, None)
+            .expect("invited user should be created");
+        let project = store
+            .create_project(&owner.id, "Invite Only", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&project.id, true, "invite")
+            .expect("project should become invite-only");
+
+        assert!(store
+            .list_public_projects(None, 10, 0)
+            .expect("store projects should list")
+            .is_empty());
+        assert!(store.get_public_project(&project.id).is_err());
+
+        store
+            .join_project(&invited.id, &project.id)
+            .expect("invited card recipient should join");
+        let access = store
+            .get_project_access(&invited.id, &project.id)
+            .expect("joined user should have project access");
+        assert_eq!(access.role, "member");
     }
 
     #[test]

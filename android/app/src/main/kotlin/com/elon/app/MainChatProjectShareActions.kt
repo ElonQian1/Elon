@@ -112,7 +112,7 @@ internal class MainChatProjectShareActions(
         Toast.makeText(activity, "正在恢复个人项目...", Toast.LENGTH_SHORT).show()
         thread {
             val result = runCatching {
-                setProjectVisibility(http, serverUrl, remoteProjectId, false, "request", token)
+                setProjectVisibility(http, serverUrl, remoteProjectId, false, "invite", token)
             }
             activity.runOnUiThread {
                 result
@@ -145,7 +145,7 @@ internal class MainChatProjectShareActions(
             return
         }
         if (!isLoggedIn()) {
-            Toast.makeText(activity, "请先登录后发布联合项目", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "请先登录后邀请协作", Toast.LENGTH_SHORT).show()
             return
         }
         val token = tokenProvider() ?: run {
@@ -158,7 +158,7 @@ internal class MainChatProjectShareActions(
             return
         }
 
-        Toast.makeText(activity, "正在发布为联合项目...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "正在创建协作邀请...", Toast.LENGTH_SHORT).show()
         val ownerAccount = AuthManager.displayName(activity)
         thread {
             val result = runCatching {
@@ -170,7 +170,7 @@ internal class MainChatProjectShareActions(
                     token = token,
                     ownerAccount = ownerAccount
                 )
-                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 created
             }
             activity.runOnUiThread {
@@ -178,7 +178,7 @@ internal class MainChatProjectShareActions(
                     .onSuccess { created ->
                         val currentIndex = findProjectIndex(share.id)
                         if (currentIndex >= 0) {
-                            projects[currentIndex].markJointDevelopment(created.id)
+                            projects[currentIndex].markJointDevelopment(created.id, "invite")
                             saveProjects()
                             renderProjectList()
                         }
@@ -188,12 +188,12 @@ internal class MainChatProjectShareActions(
                                 latestLog = share.latestLog
                             )
                         )
-                        Toast.makeText(activity, "已发布为联合项目", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "已发送协作邀请", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure { error ->
                         Toast.makeText(
                             activity,
-                            error.message ?: "发布联合项目失败",
+                            error.message ?: "发送协作邀请失败",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -207,7 +207,8 @@ internal class MainChatProjectShareActions(
         val project = newAppProject(share.name, share.description ?: "联合项目").copy(
             id = share.id,
             isJointProject = share.source != "local",
-            collaborationProjectId = share.id.takeIf { share.source != "local" }
+            collaborationProjectId = share.id.takeIf { share.source != "local" },
+            collaborationJoinMode = share.joinMode.takeIf { it.isNotBlank() }
         )
         projects.add(project)
         saveProjects()

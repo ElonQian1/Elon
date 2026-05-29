@@ -82,10 +82,11 @@ internal class MainProjectActions(
 
         val actions = buildList {
             add("编辑项目名称")
-            if (!isJoint) add("升级为联合项目")
+            if (!isJoint) add("邀请好友协作")
             if (isJoint) add("打开项目空间")
+            if (isJoint) add("发布到项目商城")
             add("Git 仓库")
-            add("设为公开 / 私有")
+            add("协作权限 / 商城公开")
             if (projects.size > 1 && project.id != ELON_SELF_PROJECT_ID) add("删除项目")
         }.toTypedArray()
 
@@ -94,13 +95,14 @@ internal class MainProjectActions(
             .setItems(actions) { _, which ->
                 when (actions[which]) {
                     "编辑项目名称" -> showRenameProjectDialog(index)
-                    "升级为联合项目" -> confirmUpgradeToJoint(index)
+                    "邀请好友协作" -> confirmUpgradeToJoint(index)
                     "打开项目空间" -> openProjectSpace(project.projectSpaceId(), project.title)
+                    "发布到项目商城" -> confirmPublishToMarketplace(project)
                     "Git 仓库" -> {
                         openProject(index)
                         showGitProjectDialog()
                     }
-                    "设为公开 / 私有" -> showVisibilityDialog(project)
+                    "协作权限 / 商城公开" -> showVisibilityDialog(project)
                     "删除项目" -> confirmDeleteProject(index)
                 }
             }
@@ -114,9 +116,9 @@ internal class MainProjectActions(
         }
         val project = projects.getOrNull(index) ?: return
         AlertDialog.Builder(activity)
-            .setTitle("升级为联合项目")
-            .setMessage("「${project.title}」将同步至服务端，开启频道空间（公告/讨论/需求/AI开发等），可与他人协作。\n\n升级后可通过「设为公开 / 私有」撤销公开状态。")
-            .setPositiveButton("升级") { _, _ -> doUpgradeToJoint(project) }
+            .setTitle("邀请好友协作")
+            .setMessage("「${project.title}」将同步至服务端并开启联合项目空间。\n\n这不会发布到项目商城；只有你把项目卡片发给好友或群聊后，收到卡片的人才能接受邀请共同开发。")
+            .setPositiveButton("创建邀请") { _, _ -> doUpgradeToJoint(project) }
             .setNegativeButton("取消", null)
             .show()
     }
@@ -126,7 +128,7 @@ internal class MainProjectActions(
             Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(activity, "正在升级为联合项目...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "正在创建协作邀请...", Toast.LENGTH_SHORT).show()
         Thread {
             try {
                 val created = createStoreProject(
@@ -137,20 +139,29 @@ internal class MainProjectActions(
                     token = token,
                     ownerAccount = AuthManager.displayName(activity)
                 )
-                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 activity.runOnUiThread {
-                    project.markJointDevelopment(created.id)
+                    project.markJointDevelopment(created.id, "invite")
                     saveProjects()
                     renderProjectList()
                     openProjectSpace(created.id, project.title)
-                    Toast.makeText(activity, "已升级为联合项目 🎉", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "已创建邀请协作项目", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
-                    Toast.makeText(activity, "升级失败：${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(activity, "创建协作邀请失败：${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
+    }
+
+    private fun confirmPublishToMarketplace(project: AppProject) {
+        AlertDialog.Builder(activity)
+            .setTitle("发布到项目商城")
+            .setMessage("「${project.title}」会出现在项目商城，所有用户都能看到并直接加入。\n\n如果只是邀请指定好友共同开发，请继续使用聊天里的项目卡片。")
+            .setPositiveButton("发布商城") { _, _ -> doSetVisibility(project, true, "open") }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun showVisibilityDialog(project: AppProject) {
@@ -158,13 +169,19 @@ internal class MainProjectActions(
             Toast.makeText(activity, "请先登录再修改项目可见性", Toast.LENGTH_SHORT).show()
             return
         }
-        val options = arrayOf("公开（任何人可加入）", "需审批加入", "私有（仅自己可见）")
+        val options = arrayOf(
+            "邀请协作（仅收到项目卡片的人可加入）",
+            "发布到商城（所有人可见并可加入）",
+            "商城展示但需审批",
+            "私有（仅成员可见）"
+        )
         AlertDialog.Builder(activity)
-            .setTitle("${project.title} · 可见性")
+            .setTitle("${project.title} · 协作权限")
             .setItems(options) { _, which ->
                 val (isPublic, joinMode) = when (which) {
-                    0 -> true to "open"
-                    1 -> true to "approval"
+                    0 -> true to "invite"
+                    1 -> true to "open"
+                    2 -> true to "approval"
                     else -> false to "invite"
                 }
                 doSetVisibility(project, isPublic, joinMode)
@@ -205,12 +222,17 @@ internal class MainProjectActions(
                 }
                 val label = when {
                     !isPublic -> "已设为私有"
-                    joinMode == "open" -> "已设为公开（直接加入）"
-                    else -> "已设为公开（需审批）"
+                    joinMode == "invite" -> "已设为邀请协作"
+                    joinMode == "open" -> "已发布到项目商城"
+                    else -> "已发布到项目商城（需审批）"
                 }
                 activity.runOnUiThread {
                     if (isPublic) {
-                        project.markJointDevelopment(remoteProjectId)
+                        project.markJointDevelopment(remoteProjectId, joinMode)
+                        saveProjects()
+                        renderProjectList()
+                    } else if (project.isJointDevelopmentProject()) {
+                        project.markJointDevelopment(remoteProjectId, "invite")
                         saveProjects()
                         renderProjectList()
                     }
@@ -249,7 +271,7 @@ internal class MainProjectActions(
                     token = token,
                     ownerAccount = ownerAccount
                 )
-                setProjectVisibility(http, serverUrl, created.id, true, "open", token)
+                setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 activity.runOnUiThread {
                     val existingIndex = projects.indexOfFirst { it.projectSpaceId() == created.id }
                     val index = if (existingIndex >= 0) {
@@ -258,7 +280,7 @@ internal class MainProjectActions(
                         projects.add(created.toJointAppProject())
                         projects.lastIndex
                     }
-                    projects[index].markJointDevelopment(created.id)
+                    projects[index].markJointDevelopment(created.id, "invite")
                     setActiveProjectIndex(index)
                     setActiveConversationIndex(0)
                     saveProjects()

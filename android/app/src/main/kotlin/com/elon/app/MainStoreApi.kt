@@ -27,7 +27,8 @@ internal fun StoreProject.toJointAppProject(): AppProject {
     return newAppProject(name, description ?: "联合项目").copy(
         id = id,
         isJointProject = true,
-        collaborationProjectId = id
+        collaborationProjectId = id,
+        collaborationJoinMode = joinMode.takeIf { it.isNotBlank() } ?: "invite"
     )
 }
 
@@ -217,7 +218,7 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     ownerUserId = "",
     memberCount = 1,
     isPublic = false,
-    joinMode = "open",
+    joinMode = obj.optString("join_mode", "invite").takeIf { it.isNotBlank() } ?: "invite",
     lastTaskStatus = null
 )
 

@@ -20,6 +20,7 @@ data class AppProject(
     var stage: String = "待提交需求",
     var isJointProject: Boolean = false,
     var collaborationProjectId: String? = null,
+    var collaborationJoinMode: String? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()
@@ -27,16 +28,28 @@ data class AppProject(
 
 internal fun AppProject.isJointDevelopmentProject(): Boolean {
     val remoteId = collaborationProjectId?.trim().orEmpty()
-    return isJointProject || remoteId.isNotBlank() || id.startsWith("prj_")
+    return isJointProject || remoteId.isNotBlank()
 }
 
 internal fun AppProject.projectSpaceId(): String {
     return collaborationProjectId?.trim()?.takeIf { it.isNotBlank() } ?: id
 }
 
-internal fun AppProject.markJointDevelopment(remoteProjectId: String? = null) {
+internal fun AppProject.projectJoinMode(): String {
+    val mode = collaborationJoinMode?.trim()
+    return when (mode) {
+        "open", "approval", "invite" -> mode
+        else -> "invite"
+    }
+}
+
+internal fun AppProject.markJointDevelopment(remoteProjectId: String? = null, joinMode: String = "invite") {
     remoteProjectId?.trim()?.takeIf { it.isNotBlank() }?.let {
         collaborationProjectId = it
+    }
+    collaborationJoinMode = when (joinMode.trim()) {
+        "open", "approval", "invite" -> joinMode.trim()
+        else -> "invite"
     }
     isJointProject = true
     updatedAt = System.currentTimeMillis()
@@ -45,6 +58,7 @@ internal fun AppProject.markJointDevelopment(remoteProjectId: String? = null) {
 internal fun AppProject.markPersonalDevelopment() {
     isJointProject = false
     collaborationProjectId = null
+    collaborationJoinMode = null
     updatedAt = System.currentTimeMillis()
 }
 

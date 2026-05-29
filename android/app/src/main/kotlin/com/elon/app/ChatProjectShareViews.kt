@@ -31,7 +31,7 @@ internal fun AppProject.toChatProjectShare(): ChatProjectShare {
         description = subtitle.takeIf { it.isNotBlank() },
         ownerAccount = null,
         memberCount = conversations.size.coerceAtLeast(1),
-        joinMode = "open",
+        joinMode = if (isJoint) projectJoinMode() else "invite",
         latestLog = events.firstOrNull()?.trim()?.takeIf { it.isNotBlank() },
         source = if (isJoint) "store" else "local"
     )
@@ -260,7 +260,10 @@ private fun projectShareMetaText(share: ChatProjectShare): String {
 
 private fun projectShareActionLabel(share: ChatProjectShare, role: String): String {
     return when {
-        share.joinMode == "open" || role == "user" || share.source == "local" -> "加入项目"
+        role == "user" -> "打开项目"
+        share.source == "local" -> "加入项目"
+        share.joinMode == "invite" -> "接受邀请"
+        share.joinMode == "open" -> "加入项目"
         else -> "申请加入"
     }
 }
