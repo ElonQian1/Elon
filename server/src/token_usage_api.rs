@@ -168,9 +168,9 @@ pub(crate) fn record_api_usage(
 
 /// Codex CLI 运行完成后，扫描 stdout 中的 JSON 事件行，汇总 token 用量并写入数据库。
 ///
-/// Codex 输出两类事件：
-/// - `{"type":"token_count", "inputTokens":N, "outputTokens":N, ...}`
-/// - `{"type":"turn.completed", "usage": {...}}`
+/// Codex 输出两类事件（字段名可能是 camelCase 或 snake_case，两者都尝试）：
+/// - `{"type":"token_count", "inputTokens":N, ...}` 或 `{"type":"token_count","input_tokens":N,...}`
+/// - `{"type":"turn.completed", "usage": {"input_tokens":N, ...}}`
 pub(crate) fn record_codex_usage_from_stdout(
     store: &Store,
     user_id: &str,
@@ -178,6 +178,18 @@ pub(crate) fn record_codex_usage_from_stdout(
     model: Option<&str>,
     stdout: &str,
 ) {
+    /// 从对象中按多个备选 key 取 i64，取第一个非零值。
+    fn pick(obj: &Value, keys: &[&str]) -> i64 {
+        for k in keys {
+            if let Some(n) = obj.get(*k).and_then(Value::as_i64) {
+                if n > 0 {
+                    return n;
+                }
+            }
+        }
+        0
+    }
+
     let mut input: i64 = 0;
     let mut cached: i64 = 0;
     let mut output: i64 = 0;
@@ -186,7 +198,8 @@ pub(crate) fn record_codex_usage_from_stdout(
 
     for line in stdout.lines() {
         let line = line.trim();
-        if !line.contains("token") {
+        // 快速过滤：只解析含 "token" 的行
+        if !line.contains("token") && !line.contains("turn.completed") {
             continue;
         }
         let Ok(v): Result<Value, _> = serde_json::from_str(line) else {
@@ -196,19 +209,23 @@ pub(crate) fn record_codex_usage_from_stdout(
 
         match ty {
             "token_count" => {
-                input += v["inputTokens"].as_i64().unwrap_or(0);
-                cached += v["cachedInputTokens"].as_i64().unwrap_or(0);
-                output += v["outputTokens"].as_i64().unwrap_or(0);
-                reasoning += v["reasoningTokens"].as_i64().unwrap_or(0);
+                // camelCase (旧 Codex) 或 snake_case (新 Codex) 都兼容
+                input += pick(&v, &["inputTokens", "input_tokens", "prompt_tokens", "input"]);
+                cached += pick(&v, &["cachedInputTokens", "cached_input_tokens", "cache_read_input_tokens"]);
+                output += pick(&v, &["outputTokens", "output_tokens", "completion_tokens", "output"]);
+                reasoning += pick(&v, &["reasoningTokens", "reasoning_tokens", "reasoning_output_tokens"]);
                 found = true;
             }
             "turn.completed" => {
-                let u = &v["usage"];
-                if !u.is_null() {
-                    input += u["input_tokens"].as_i64().unwrap_or(0);
-                    cached += u["cached_input_tokens"].as_i64().unwrap_or(0);
-                    output += u["output_tokens"].as_i64().unwrap_or(0);
-                    reasoning += u["reasoning_output_tokens"].as_i64().unwrap_or(0);
+                // usage 可能在 v["usage"] 或直接在 v 里
+                let u = if !v["usage"].is_null() { &v["usage"] } else { &v };
+                let i = pick(u, &["input_tokens", "inputTokens", "prompt_tokens"]);
+                let o = pick(u, &["output_tokens", "outputTokens", "completion_tokens"]);
+                if i > 0 || o > 0 {
+                    input += i;
+                    cached += pick(u, &["cached_input_tokens", "cachedInputTokens", "cache_read_input_tokens"]);
+                    output += o;
+                    reasoning += pick(u, &["reasoning_output_tokens", "reasoningTokens", "reasoning_tokens"]);
                     found = true;
                 }
             }
@@ -217,10 +234,24 @@ pub(crate) fn record_codex_usage_from_stdout(
     }
 
     if !found || (input + output) == 0 {
+        tracing::debug!(
+            user_id,
+            feature,
+            "record_codex_usage_from_stdout: 未找到 token 用量事件（stdout {} 字节）",
+            stdout.len()
+        );
         return;
     }
 
     let total = input + output;
+    tracing::info!(
+        user_id,
+        feature,
+        input,
+        output,
+        total,
+        "记录 Codex CLI token 用量"
+    );
     let record = TokenUsageRecord {
         user_id,
         feature,
@@ -233,7 +264,7 @@ pub(crate) fn record_codex_usage_from_stdout(
         total_tokens: total,
     };
     if let Err(e) = store.record_token_usage(&record) {
-        tracing::debug!("record_codex_usage_from_stdout: {}", e);
+        tracing::warn!("record_codex_usage_from_stdout 写入失败: {}", e);
     }
 }
 
