@@ -227,6 +227,16 @@ pub fn classify(message: &str) -> RoutingDecision {
     let has_model_config = contains_any(&normalized, MODEL_CONFIG_TERMS)
         && contains_any(&normalized, MODEL_CONFIG_ACTION_TERMS);
 
+    // 明确要生成新图片并集成到应用（两步：文生图 + 代码集成）
+    if has_image_object && has_image_action && has_app_context && has_asset_integration {
+        return RoutingDecision::new(
+            UserIntent::ImageAssetForApp,
+            CapabilityRoute::ImageThenCode,
+            88,
+            "image_generate_then_integrate_into_app",
+        );
+    }
+
     if has_image_object
         && has_app_context
         && (has_image_action || has_asset_integration || is_strong_app_asset(&normalized))

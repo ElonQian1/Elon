@@ -8,7 +8,8 @@ use crate::{
     agent_llm_call::{call_chat_llm, call_llm, execute_tool},
     agent_prompts::system_prompt,
     agent_routing::{casual_chat_prompt, is_local_cli_option, quick_casual_reply},
-    intent_router, tools,
+    intent_router,
+    tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
 };
 
@@ -99,10 +100,7 @@ pub(crate) async fn run_api_inner_with_workspace(
 
         let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
         let _ = tx.send(
-            WsMessage::progress(format!(
-                "正在使用 AI 代理聊天: {} ({})",
-                agent.name, agent.model
-            ))
+            WsMessage::progress(format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model))
             .to_json(),
         );
 
@@ -139,10 +137,7 @@ pub(crate) async fn run_api_inner_with_workspace(
     let workspace_str = workspace.to_string_lossy().to_string();
 
     let _ = tx.send(
-        WsMessage::progress(format!(
-            "正在使用 AI 代理: {} ({})",
-            agent.name, agent.model
-        ))
+        WsMessage::progress(format!("正在使用 AI 代理: {} ({})", agent.name, agent.model))
         .to_json(),
     );
 
@@ -166,7 +161,10 @@ pub(crate) async fn run_api_inner_with_workspace(
         }),
     ];
 
-    let _ = tx.send(WsMessage::progress("AI 正在理解需求...").to_json());
+    let _ = tx.send(
+        WsMessage::progress("AI 正在理解需求...")
+        .to_json(),
+    );
 
     // 追踪 APK 下载链接（build_project 成功后填入）
     let mut apk_url: Option<String> = None;
@@ -244,18 +242,15 @@ pub(crate) async fn run_api_inner_with_workspace(
                     if let Err(ref e) = r {
                         warn!("PC agent 构建失败，回退到服务器本地构建: {}", e);
                         let _ = tx.send(
-                            WsMessage::progress(format!(
-                                "PC agent 不可用（{}），尝试服务器本地构建...",
-                                e
-                            ))
+                            WsMessage::progress(format!("PC agent 不可用（{}），尝试服务器本地构建...", e))
                             .to_json(),
                         );
-                        execute_tool(state, &workspace, &tool_name, &args)
+                        execute_tool(state, &workspace, &tool_name, &args, user_id)
                     } else {
                         r
                     }
                 } else {
-                    execute_tool(state, &workspace, &tool_name, &args)
+                    execute_tool(state, &workspace, &tool_name, &args, user_id)
                 };
 
                 let result_str = match result {
@@ -266,9 +261,7 @@ pub(crate) async fn run_api_inner_with_workspace(
                                 let _apk_name = line.trim_start_matches("##APK_FILE:").trim();
                                 apk_url = Some(tools::stable_apk_url(download_base));
                                 let _ = tx.send(
-                                    WsMessage::progress(format!(
-                                        "APK 编译成功，正在生成下载链接..."
-                                    ))
+                                    WsMessage::progress(format!("APK 编译成功，正在生成下载链接..."))
                                     .to_json(),
                                 );
                             }

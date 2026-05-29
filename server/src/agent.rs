@@ -185,13 +185,17 @@ async fn run_dispatch_with_workspace(
     info!("intent routing decision: {:?}", decision);
 
     let codex_cli_only = state.ai_cli.codex_cli_only;
-    let image_cli_only = matches!(
-        decision.intent,
-        intent_router::UserIntent::TextToImage | intent_router::UserIntent::ImageAssetForApp
-    ) || matches!(
-        decision.route,
-        CapabilityRoute::TextToImage | CapabilityRoute::ImageThenCode
-    );
+    // ImageThenCode: 有文生图模型时走两步管道（先生图，再集成到代码）；否则降级为 CodeAgent
+    let is_image_then_code = matches!(decision.route, CapabilityRoute::ImageThenCode)
+        && state.image_model.is_some();
+    let image_cli_only = !is_image_then_code
+        && (matches!(
+            decision.intent,
+            intent_router::UserIntent::TextToImage | intent_router::UserIntent::ImageAssetForApp
+        ) || matches!(
+            decision.route,
+            CapabilityRoute::TextToImage | CapabilityRoute::ImageThenCode
+        ));
     let backend_route = if codex_cli_only {
         if !state.ai_cli.enabled {
             return Err(anyhow::anyhow!(
@@ -232,6 +236,44 @@ async fn run_dispatch_with_workspace(
     } else {
         agent_name
     };
+
+    // ImageThenCode 两步管道：先文生图，把 URL 注入消息，再走代码 Agent 集成
+    if is_image_then_code {
+        let _ = tx.send(WsMessage::progress("正在生成图片资源...").to_json());
+        match crate::image_generation::generate_text_to_image(state, user_message).await {
+            Ok(img) => {
+                let injected_message = format!(
+                    "{}\n\n[已生成图片: {}]\n请将上方图片 URL 下载后集成到项目中作为所需的图片资源。",
+                    user_message, img.url
+                );
+                let _ = tx.send(WsMessage::progress("图片生成完成，正在集成到代码...").to_json());
+                return run_backend_with_workspace(
+                    user_id,
+                    workspace,
+                    user_config_workspace,
+                    download_base,
+                    native_session_scope,
+                    &injected_message,
+                    preflight_note,
+                    backend_agent_name,
+                    trace_id,
+                    CapabilityRoute::CodeAgent,
+                    true,
+                    require_existing_git,
+                    state,
+                    tx,
+                )
+                .await;
+            }
+            Err(e) => {
+                warn!("文生图失败，降级到纯代码路径: {}", e);
+                let _ = tx.send(
+                    WsMessage::progress(format!("图片生成失败（{}），将尝试用代码实现。", e))
+                        .to_json(),
+                );
+            }
+        }
+    }
 
     run_backend_with_workspace(
         user_id,

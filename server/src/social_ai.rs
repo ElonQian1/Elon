@@ -226,36 +226,88 @@ async fn build_reply(
     }
     // 注意：开发意图已在 reply_to_friend/group 层拦截；此处不需重复判断。
 
-    let agent = resolve_social_agent(state).await?;
-    let response = call_chat_llm(
-        state,
-        &agent,
-        &[
-            json!({
-                "role": "system",
-                "content": social_ai_prompt()
-            }),
-            json!({
-                "role": "user",
-                "content": format!(
-                    "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n请回答最后一次 @EL 触发的问题。",
-                    format_history(history)
-                )
-            }),
-        ],
+    let prompt_text = format!(
+        "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n请回答最后一次 @EL 触发的问题。",
+        format_history(history)
+    );
+
+    match resolve_social_agent(state).await {
+        Ok(agent) => {
+            let response = call_chat_llm(
+                state,
+                &agent,
+                &[
+                    json!({ "role": "system", "content": social_ai_prompt() }),
+                    json!({ "role": "user", "content": prompt_text }),
+                ],
+                user_id,
+                "social_ai",
+            )
+            .await?;
+            let reply = response["choices"][0]["message"]["content"]
+                .as_str()
+                .unwrap_or("我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。")
+                .trim();
+            Ok(if reply.is_empty() {
+                "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。".into()
+            } else {
+                reply.chars().take(1400).collect()
+            })
+        }
+        Err(api_err) if state.ai_cli.enabled => {
+            info!("social AI 无 API 代理，回退到本地 CLI: {}", api_err);
+            build_reply_with_cli(state, user_id, &prompt_text).await
+        }
+        Err(api_err) => Err(api_err),
+    }
+}
+
+/// 使用本地 AI CLI（无工具、无项目工作区）生成社交聊天回复
+async fn build_reply_with_cli(
+    state: &Arc<AppState>,
+    user_id: &str,
+    prompt: &str,
+) -> Result<String> {
+    use crate::intent_router::CapabilityRoute;
+    use tokio::sync::mpsc;
+
+    let temp_dir = std::env::temp_dir().join(format!("elon_social_{}", user_id));
+    std::fs::create_dir_all(&temp_dir)?;
+
+    let full_prompt = format!("{}\n\n{}", social_ai_prompt(), prompt);
+    let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+
+    let run_result = crate::ai_cli::run_with_workspace(
         user_id,
-        "social_ai",
+        &temp_dir,
+        "",
+        &full_prompt,
+        None,
+        None,
+        CapabilityRoute::ChatAgent,
+        false,
+        None,
+        None,
+        state,
+        &tx,
     )
-    .await?;
-    let reply = response["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。")
-        .trim();
-    Ok(if reply.is_empty() {
-        "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。".into()
-    } else {
-        reply.chars().take(1400).collect()
-    })
+    .await;
+
+    drop(tx); // 关闭 sender，让 rx 可以正常耗尽
+
+    let mut final_reply: Option<String> = None;
+    while let Some(msg_json) = rx.recv().await {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&msg_json) {
+            if val["type"].as_str() == Some("done") {
+                final_reply = val["message"].as_str().map(|s| s.to_string());
+            }
+        }
+    }
+
+    run_result?; // CLI 报错则传播
+    final_reply
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow!("本地 AI 未返回完整回复"))
 }
 
 pub(crate) async fn resolve_social_agent(state: &Arc<AppState>) -> Result<AgentConfig> {

@@ -1,12 +1,31 @@
 use anyhow::{anyhow, Result};
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::{
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 use tracing::{info, warn};
 
 pub use crate::tools_git::{git_commit, git_pull_rebase};
+
+/// 每用户并发构建槽（同一用户同时只允许一个本地构建）
+static BUILD_SLOTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn build_slots() -> &'static Mutex<HashSet<String>> {
+    BUILD_SLOTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// RAII 守卫：Drop 时自动释放构建槽
+struct BuildSlotGuard(String);
+
+impl Drop for BuildSlotGuard {
+    fn drop(&mut self) {
+        if let Ok(mut slots) = build_slots().lock() {
+            slots.remove(&self.0);
+        }
+    }
+}
 
 /// AI 代理可以调用的所有工具
 
@@ -84,9 +103,20 @@ pub fn create_project_workspace(
 
 /// 构建项目（自动检测项目类型，从工作区根目录开始）
 /// target: "android" | "rust" | "frontend"
+/// user_id: 调用用户 ID，用于并发构建保护
 /// 成功时返回值中若包含 ##APK_FILE:<name>，表示有 APK 可供下载
-pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
+pub fn build_project(project_root: &Path, target: &str, user_id: &str) -> Result<String> {
     info!("[工具] 构建项目: {}", target);
+
+    // 每用户并发构建保护：同一用户同时只允许一个本地构建
+    {
+        let mut slots = build_slots().lock().unwrap_or_else(|e| e.into_inner());
+        if slots.contains(user_id) {
+            return Err(anyhow!("您已有一个构建任务正在进行，请等待完成后再试"));
+        }
+        slots.insert(user_id.to_string());
+    }
+    let _slot_guard = BuildSlotGuard(user_id.to_string());
 
     let (work_dir, cmd) = match target {
         "android" => {
@@ -141,10 +171,26 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
         info!("[工具] {}", version_note);
     }
 
-    let output = Command::new("bash")
+    // 启动子进程并设置 10 分钟超时防护
+    let mut child = Command::new("bash")
         .args(["-c", cmd])
         .current_dir(&work_dir)
-        .output()?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    const BUILD_TIMEOUT_SECS: u64 = 600;
+    let start = std::time::Instant::now();
+    let output = loop {
+        if start.elapsed().as_secs() > BUILD_TIMEOUT_SECS {
+            let _ = child.kill();
+            return Err(anyhow!("构建超时（超过 {} 秒），已终止进程", BUILD_TIMEOUT_SECS));
+        }
+        match child.try_wait()? {
+            Some(_) => break child.wait_with_output()?,
+            None => std::thread::sleep(std::time::Duration::from_millis(500)),
+        }
+    };
 
     let combined = format!(
         "{}{}",
@@ -153,11 +199,22 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
     );
 
     if !output.status.success() {
+        let elapsed = start.elapsed().as_secs();
+        tracing::info!(
+            target: "build_metrics",
+            user_id = user_id,
+            target = target,
+            duration_secs = elapsed,
+            success = false,
+            "build_failed"
+        );
         return Err(anyhow!(
             "构建失败:\n{}",
             &combined[..combined.len().min(2000)]
         ));
     }
+
+    let elapsed = start.elapsed().as_secs();
 
     // Android 构建成功后找到 APK 文件，嵌入特殊标记
     if target == "android" {
@@ -167,6 +224,14 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
+            tracing::info!(
+                target: "build_metrics",
+                user_id = user_id,
+                target = target,
+                duration_secs = elapsed,
+                success = true,
+                "build_complete"
+            );
             return Ok(format!(
                 "android 构建成功\n{}\n##APK_FILE:{}\n\n构建日志:\n{}",
                 version_note,
@@ -175,6 +240,15 @@ pub fn build_project(project_root: &Path, target: &str) -> Result<String> {
             ));
         }
     }
+
+    tracing::info!(
+        target: "build_metrics",
+        user_id = user_id,
+        target = target,
+        duration_secs = elapsed,
+        success = true,
+        "build_complete"
+    );
 
     Ok(format!(
         "{} 构建成功\n{}",
@@ -343,21 +417,63 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
 
 
 /// 安全路径：确保路径不会逃出 project_root
-fn safe_path(project_root: &Path, relative_path: &str) -> Result<std::path::PathBuf> {
-    // 拒绝包含 .. 的路径
+///
+/// 修复以下攻击向量：
+/// 1. 路径前缀混淆：字符串前缀检查会让 /proj1 错误匹配 /proj10
+/// 2. 绝对路径注入：Path::join 对绝对路径会替换整个 base
+/// 3. 符号链接逃逸：通过 symlink 跳出工作区
+fn safe_path(project_root: &Path, relative_path: &str) -> Result<PathBuf> {
+    // 1. 拒绝包含 .. 的路径（防相对遍历）
     if relative_path.contains("..") {
         return Err(anyhow!("路径不允许包含 '..': {}", relative_path));
     }
-    let full = project_root.join(relative_path);
-    // 规范化后再检查是否仍在 project_root 内
+    // 2. 拒绝绝对路径注入（Unix: 以 / 开头；Windows: drive letter）
+    if Path::new(relative_path).is_absolute() {
+        return Err(anyhow!("路径不允许为绝对路径: {}", relative_path));
+    }
+
     let canonical_root = project_root
         .canonicalize()
-        .unwrap_or(project_root.to_path_buf());
-    // 注意：文件可能还不存在，无法 canonicalize，用前缀检查
-    let full_str = full.to_string_lossy();
-    let root_str = canonical_root.to_string_lossy();
-    if !full_str.starts_with(root_str.as_ref()) {
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    let full = canonical_root.join(relative_path);
+
+    // 3. 解析符号链接：对已存在的路径直接 canonicalize；
+    //    对尚未存在的路径（写入新文件），沿祖先链找到最近存在的目录 canonicalize，
+    //    再拼接剩余路径段，避免符号链接逃逸。
+    let effective = if full.exists() {
+        full.canonicalize()
+            .map_err(|e| anyhow!("路径规范化失败: {}", e))?
+    } else {
+        resolve_nonexistent_path(&full)?
+    };
+
+    // 4. 使用 Path::starts_with 逐组件比较（不是字符串比较，避免前缀混淆）
+    if !effective.starts_with(&canonical_root) {
         return Err(anyhow!("路径越界: {}", relative_path));
     }
     Ok(full)
+}
+
+/// 对尚不存在的路径，沿祖先链找到最近存在的目录 canonicalize，再拼接剩余路径段
+fn resolve_nonexistent_path(path: &Path) -> Result<PathBuf> {
+    let mut ancestor: &Path = path;
+    let mut tail: Vec<std::ffi::OsString> = vec![];
+    loop {
+        let parent = ancestor
+            .parent()
+            .ok_or_else(|| anyhow!("路径无效，无法找到存在的祖先目录"))?;
+        if let Some(name) = ancestor.file_name() {
+            tail.push(name.to_owned());
+        }
+        if parent.exists() {
+            let mut resolved = parent
+                .canonicalize()
+                .map_err(|e| anyhow!("路径规范化失败: {}", e))?;
+            for component in tail.iter().rev() {
+                resolved.push(component);
+            }
+            return Ok(resolved);
+        }
+        ancestor = parent;
+    }
 }

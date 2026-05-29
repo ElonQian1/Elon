@@ -7,6 +7,7 @@ use std::{
 
 use crate::store_schema::apply_migrations;
 
+mod build_quota;
 mod common;
 mod conversations;
 mod friend_messages;
@@ -440,6 +441,8 @@ impl Store {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }
+
+// ── 私有帮助函数 ──────────────────────────────────────────────────────────────
 
 fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectSummary> {
     Ok(ProjectSummary {

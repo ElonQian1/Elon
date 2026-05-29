@@ -28,6 +28,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         migration_v11,
     ),
     (12, "好友聊天 EL 助手上下文消息", migration_v12),
+    (13, "每日编译配额表（build_quota）", migration_v13),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -567,6 +568,22 @@ fn migration_v12(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_friend_messages_ai_context
          ON friend_messages(receiver_user_id, context_user_id, created_at)",
         [],
+    )?;
+    Ok(())
+}
+
+fn migration_v13(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS build_quota (
+          user_id  TEXT NOT NULL,
+          date     TEXT NOT NULL,
+          count    INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (user_id, date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_build_quota_user_date
+          ON build_quota(user_id, date);
+        "#,
     )?;
     Ok(())
 }

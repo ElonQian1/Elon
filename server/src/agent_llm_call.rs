@@ -159,10 +159,11 @@ pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> 
 
 /// 根据工具名和参数，调用对应的工具函数
 pub(crate) fn execute_tool(
-    _state: &Arc<AppState>,
+    state: &Arc<AppState>,
     workspace: &std::path::Path,
     tool_name: &str,
     args: &Value,
+    user_id: &str,
 ) -> Result<String> {
     match tool_name {
         "init_project" => {
@@ -206,7 +207,14 @@ pub(crate) fn execute_tool(
             let target = args["target"]
                 .as_str()
                 .ok_or_else(|| anyhow::anyhow!("缺少 target 参数"))?;
-            tools::build_project(workspace, target)
+            let quota: i64 = std::env::var("DAILY_BUILD_QUOTA")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10);
+            if quota > 0 {
+                state.store.check_and_increment_build_quota(user_id, quota)?;
+            }
+            tools::build_project(workspace, target, user_id)
         }
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
     }

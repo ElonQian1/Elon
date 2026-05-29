@@ -296,6 +296,12 @@ pub struct ProjectSummary {
 }
 
 #[derive(Debug, Clone)]
+pub struct CreateProjectResult {
+    pub project: ProjectSummary,
+    pub reused_existing: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct ProjectAccess {
     pub id: String,
     pub name: String,

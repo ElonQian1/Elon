@@ -337,7 +337,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/users/:user_id/avatar", get(user_api::get_user_avatar))
         .route(
             "/api/me/avatar",
-            axum::routing::put(user_api::put_my_avatar),
+            axum::routing::put(user_api::put_my_avatar)
+                .layer(DefaultBodyLimit::max(800_000)),
         )
         .layer(cors)
         .with_state(state)
