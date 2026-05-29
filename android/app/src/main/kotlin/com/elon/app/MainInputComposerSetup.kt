@@ -48,7 +48,7 @@ internal class MainInputComposerSetup(
     private val startSpeechToText: () -> Unit,
     private val stopSpeechToText: () -> Unit,
     private val cancelSpeechToText: () -> Unit,
-    private val onVoiceTouchMoveDx: (Float) -> Unit = {},
+    private val onVoiceTouchMove: (Float, Float) -> Unit = { _, _ -> },
     private val showModelPopupOrLoad: () -> Unit,
     private val sendMessage: () -> Unit,
     private val toggleAttachmentPanel: () -> Unit,
@@ -192,17 +192,15 @@ internal class MainInputComposerSetup(
             setTextColor(Color.parseColor("#D0D0D0"))
             textSize = 15f
             visibility = View.GONE
-            var touchDownX = 0f
             setOnTouchListener { _, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        touchDownX = event.rawX
                         startSpeechToText()
+                        onVoiceTouchMove(event.rawX, event.rawY)
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        val dx = event.rawX - touchDownX  // 向右为正，向左为负
-                        onVoiceTouchMoveDx(dx)
+                        onVoiceTouchMove(event.rawX, event.rawY)
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

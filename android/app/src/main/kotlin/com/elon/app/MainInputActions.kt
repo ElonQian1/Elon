@@ -66,7 +66,7 @@ internal class MainInputActions(
             startSpeechToText = { speechInputActions().startSpeechToText() },
             stopSpeechToText = { speechInputActions().stopSpeechToText() },
             cancelSpeechToText = { speechInputActions().cancelSpeechToText() },
-            onVoiceTouchMoveDx = { dx -> speechInputActions().onVoiceTouchMoveDx(dx) },
+            onVoiceTouchMove = { rawX, rawY -> speechInputActions().onVoiceTouchMove(rawX, rawY) },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             sendMessage = { sendMessageActions.sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },

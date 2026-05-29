@@ -1,284 +1,351 @@
 package com.elon.app
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
-import android.graphics.drawable.GradientDrawable
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.TextView
-import kotlin.math.sin
 
 /**
- * 仿微信"按住说话"的全屏录音遮罩。
+ * WeChat-style full-screen overlay for "hold to talk".
  *
- * 三个区域，由手指水平位移决定（DOWN 时设零点）：
- *   - SEND：手指未明显偏移，松开 → 直接把转写文字作为消息发送
- *   - TRANSLATE：向右滑 >= [DRAG_THRESHOLD_DP] dp，松开 → 回填输入框供用户查看/编辑
- *   - CANCEL：向左滑 >= [DRAG_THRESHOLD_DP] dp，松开 → 取消并丢弃
- *
- * 仅渲染 UI，不持有 ASR 状态；由 [MainSpeechInputActions] 通过 [updatePartial] / [updateZone] 推送。
+ * It only renders UI and touch-choice feedback. Speech/ASR state is still owned by
+ * [MainSpeechInputActions].
  */
 internal class VoiceRecordingOverlay(private val activity: Activity) {
 
-    enum class Zone { SEND, TRANSLATE, CANCEL }
+    enum class Zone { AI_REPLY, TRANSCRIBE, CANCEL }
 
-    private val main = Handler(Looper.getMainLooper())
     private var root: FrameLayout? = null
+    private var bubbleView: VoiceWaveBubbleView? = null
     private var partialView: TextView? = null
-    private var durationView: TextView? = null
-    private var waveformView: WaveformView? = null
-    private var leftZoneView: TextView? = null
-    private var rightZoneView: TextView? = null
-    private var centerActionText: TextView? = null
-    private var startedAt = 0L
-    private var zone: Zone = Zone.SEND
-
-    private val durationTick = object : Runnable {
-        override fun run() {
-            val ms = SystemClock.elapsedRealtime() - startedAt
-            durationView?.text = formatDuration(ms)
-            waveformView?.advance()
-            main.postDelayed(this, 80L)
-        }
-    }
+    private var trayView: VoiceActionTrayView? = null
+    private var partialText: String = ""
+    private var zone: Zone = Zone.AI_REPLY
 
     val isShowing: Boolean get() = root != null
+    val currentZone: Zone get() = zone
 
     fun show() {
         if (root != null) return
         val parent = activity.window.decorView as? ViewGroup ?: return
 
         val overlay = FrameLayout(activity).apply {
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            setBackgroundColor(Color.parseColor("#99000000"))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setBackgroundColor(Color.parseColor("#CC000000"))
+            // Touch events continue to be handled by the underlying hold button.
             isClickable = false
             isFocusable = false
         }
 
-        // ─── 录音卡片（居中，底部留出操作栏空间）───────────────────────────────
-        val waveform = WaveformView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(64)
-            ).apply { bottomMargin = dp(14) }
+        val bubble = VoiceWaveBubbleView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(BUBBLE_WIDTH_DP), dp(BUBBLE_HEIGHT_DP)).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(240)
+            }
         }
+
         val partial = TextView(activity).apply {
-            textSize = 15f
-            setTextColor(Color.WHITE)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                leftMargin = dp(36)
+                rightMargin = dp(36)
+                bottomMargin = dp(206)
+            }
             gravity = Gravity.CENTER
-            maxLines = 3
-            text = "正在听…"
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(6) }
+            includeFontPadding = false
+            maxLines = 2
+            textSize = 14f
+            setTextColor(Color.parseColor("#DDEDEDED"))
         }
-        val duration = TextView(activity).apply {
-            textSize = 12f
-            setTextColor(Color.parseColor("#CCFFFFFF"))
-            gravity = Gravity.CENTER
-            text = "0.0\""
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+
+        val tray = VoiceActionTrayView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(ACTION_TRAY_HEIGHT_DP),
+                Gravity.BOTTOM
             )
         }
-        val card = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#3DC561"))
-                cornerRadius = dp(20).toFloat()
-            }
-            setPadding(dp(24), dp(28), dp(24), dp(20))
-            elevation = dp(4).toFloat()
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER
-                marginStart = dp(32)
-                marginEnd = dp(32)
-                bottomMargin = dp(130)  // 向上偏移，为底部操作栏让出空间
-            }
-        }
-        card.addView(waveform)
-        card.addView(partial)
-        card.addView(duration)
 
-        // ─── 底部操作栏（仿微信：取消 ← | 松开发送 | → 转文字）──────────────────
-        val leftZone = makeActionZone(activity, "取消", marginEndDp = 8)
-        val rightZone = makeActionZone(activity, "转文字", marginStartDp = 8)
-        val centerText = TextView(activity).apply {
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            text = "松开 发送"
-            layoutParams = LinearLayout.LayoutParams(dp(108), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.CENTER_VERTICAL
-            }
-        }
-        val actionBar = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(48))
-            layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.BOTTOM }
-        }
-        actionBar.addView(leftZone)
-        actionBar.addView(centerText)
-        actionBar.addView(rightZone)
-
-        overlay.addView(card)
-        overlay.addView(actionBar)
+        overlay.addView(bubble)
+        overlay.addView(partial)
+        overlay.addView(tray)
         parent.addView(overlay)
 
         root = overlay
+        bubbleView = bubble
         partialView = partial
-        durationView = duration
-        waveformView = waveform
-        leftZoneView = leftZone
-        rightZoneView = rightZone
-        centerActionText = centerText
-        startedAt = SystemClock.elapsedRealtime()
-        zone = Zone.SEND
+        trayView = tray
+        partialText = ""
+        zone = Zone.AI_REPLY
         applyZone()
-        main.post(durationTick)
     }
 
-    private fun makeActionZone(
-        ctx: android.content.Context,
-        label: String,
-        marginStartDp: Int = 0,
-        marginEndDp: Int = 0
-    ): TextView = TextView(ctx).apply {
-        text = label
-        textSize = 15f
-        setTextColor(Color.parseColor("#AAAAAA"))
-        gravity = Gravity.CENTER
-        background = GradientDrawable().apply {
-            setColor(Color.parseColor("#2E2E2E"))
-            cornerRadius = dp(28).toFloat()
-        }
-        layoutParams = LinearLayout.LayoutParams(0, dp(58)).apply {
-            weight = 1f
-            if (marginStartDp > 0) this.marginStart = dp(marginStartDp)
-            if (marginEndDp > 0) this.marginEnd = dp(marginEndDp)
-        }
-    }
-
-    /** 实时识别文字（部分结果） */
     fun updatePartial(text: String) {
-        partialView?.text = if (text.isBlank()) "正在听…" else text
+        partialText = text.trim()
+        renderPartial()
     }
 
-    /**
-     * 根据手指水平位移更新区域。
-     * @param dx 向右为正，向左为负（像素）
-     */
+    fun updateTouch(rawX: Float, rawY: Float) {
+        val overlay = root ?: return
+        val location = IntArray(2)
+        overlay.getLocationOnScreen(location)
+        val x = rawX - location[0]
+        val y = rawY - location[1]
+        val width = overlay.width.takeIf { it > 0 } ?: return
+        val height = overlay.height.takeIf { it > 0 } ?: return
+        val chooseTop = height - dp(TOUCH_CHOICE_HEIGHT_DP)
+        val newZone = if (y < chooseTop) {
+            when {
+                x < width * 0.34f -> Zone.CANCEL
+                x > width * 0.66f -> Zone.TRANSCRIBE
+                else -> Zone.AI_REPLY
+            }
+        } else {
+            Zone.AI_REPLY
+        }
+        setZone(newZone)
+    }
+
+    /** Backward-compatible horizontal-delta feedback for older call sites/tests. */
     fun updateZone(dx: Float) {
-        val threshold = dp(DRAG_THRESHOLD_DP).toFloat()
+        val threshold = dp(DRAG_CHOICE_DX_DP).toFloat()
         val newZone = when {
             dx < -threshold -> Zone.CANCEL
-            dx > threshold -> Zone.TRANSLATE
-            else -> Zone.SEND
+            dx > threshold -> Zone.TRANSCRIBE
+            else -> Zone.AI_REPLY
         }
-        if (newZone != zone) {
-            zone = newZone
-            applyZone()
-        }
+        setZone(newZone)
     }
 
-    val currentZone: Zone get() = zone
-
     fun hide() {
-        main.removeCallbacks(durationTick)
         root?.let { (it.parent as? ViewGroup)?.removeView(it) }
         root = null
+        bubbleView = null
         partialView = null
-        durationView = null
-        waveformView = null
-        leftZoneView = null
-        rightZoneView = null
-        centerActionText = null
+        trayView = null
+        partialText = ""
+        zone = Zone.AI_REPLY
+    }
+
+    private fun setZone(newZone: Zone) {
+        if (newZone == zone) return
+        zone = newZone
+        applyZone()
     }
 
     private fun applyZone() {
-        when (zone) {
-            Zone.SEND -> {
-                applyZoneStyle(leftZoneView, active = false, isCancelStyle = true)
-                applyZoneStyle(rightZoneView, active = false, isCancelStyle = false)
-                centerActionText?.text = "松开 发送"
-                centerActionText?.setTextColor(Color.WHITE)
-            }
-            Zone.CANCEL -> {
-                applyZoneStyle(leftZoneView, active = true, isCancelStyle = true)
-                applyZoneStyle(rightZoneView, active = false, isCancelStyle = false)
-                centerActionText?.text = "松开 取消"
-                centerActionText?.setTextColor(Color.parseColor("#FF6B6B"))
-            }
-            Zone.TRANSLATE -> {
-                applyZoneStyle(leftZoneView, active = false, isCancelStyle = true)
-                applyZoneStyle(rightZoneView, active = true, isCancelStyle = false)
-                centerActionText?.text = "松开 转文字"
-                centerActionText?.setTextColor(Color.parseColor("#4FC3F7"))
-            }
-        }
+        trayView?.zone = zone
+        bubbleView?.isCanceling = zone == Zone.CANCEL
+        renderPartial()
     }
 
-    private fun applyZoneStyle(tv: TextView?, active: Boolean, isCancelStyle: Boolean) {
-        tv ?: return
-        val bg = tv.background as? GradientDrawable ?: return
-        val bgColor = when {
-            active && isCancelStyle -> Color.parseColor("#AA2222")
-            active && !isCancelStyle -> Color.parseColor("#1A6DAA")
-            else -> Color.parseColor("#2E2E2E")
+    private fun renderPartial() {
+        val fallback = when (zone) {
+            Zone.AI_REPLY -> "松开 AI回复"
+            Zone.TRANSCRIBE -> "松开 转文字"
+            Zone.CANCEL -> "松开 取消"
         }
-        bg.setColor(bgColor)
-        tv.setTextColor(if (active) Color.WHITE else Color.parseColor("#AAAAAA"))
+        partialView?.text = partialText.ifBlank { fallback }
+        partialView?.setTextColor(
+            Color.parseColor(
+                when (zone) {
+                    Zone.AI_REPLY -> "#DDEDEDED"
+                    Zone.TRANSCRIBE -> "#EAF7F0"
+                    Zone.CANCEL -> "#FFE3E3"
+                }
+            )
+        )
     }
 
-    private fun formatDuration(ms: Long) = String.format("%.1f\"", ms / 1000.0)
-    private fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
+    private fun dp(v: Int): Int =
+        (v * activity.resources.displayMetrics.density).toInt()
 
     private companion object {
-        const val DRAG_THRESHOLD_DP = 60
+        const val ACTION_TRAY_HEIGHT_DP = 194
+        const val TOUCH_CHOICE_HEIGHT_DP = 118
+        const val BUBBLE_WIDTH_DP = 192
+        const val BUBBLE_HEIGHT_DP = 88
+        const val DRAG_CHOICE_DX_DP = 80
     }
+}
 
-    // ─── 波形动画 View ──────────────────────────────────────────────────────────
-    private inner class WaveformView(ctx: android.content.Context) : View(ctx) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-        private val barCount = 28
-        private var tick = 0f
+private class VoiceWaveBubbleView(context: Context) : View(context) {
+    private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#3FBE7A")
+        style = Paint.Style.FILL
+    }
+    private val cancelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#E65A5A")
+        style = Paint.Style.FILL
+    }
+    private val wavePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#2C6C52")
+        style = Paint.Style.FILL
+    }
+    private val bubbleRect = RectF()
+    private val bubblePath = Path()
 
-        fun advance() {
-            tick += 1f
+    var isCanceling: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
             invalidate()
         }
 
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            if (w <= 0f || h <= 0f) return
-            // gap = barW * 0.6  →  barW = w / (barCount + (barCount-1)*0.6)
-            val barW = w / (barCount + (barCount - 1) * 0.6f)
-            val step = barW * 1.6f
-            for (i in 0 until barCount) {
-                val x = i * step
-                // 双频叠加，模拟自然声波起伏
-                val wave = (sin((tick * 0.18f + i * 0.65f).toDouble()) * 0.45 +
-                            sin((tick * 0.11f + i * 1.25f).toDouble()) * 0.2 + 0.55)
-                    .toFloat().coerceIn(0.08f, 1f)
-                val barH = wave * h
-                val top = (h - barH) / 2f
-                canvas.drawRoundRect(RectF(x, top, x + barW, top + barH), barW / 2, barW / 2, paint)
-            }
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val density = resources.displayMetrics.density
+        val notch = 11f * density
+        val radius = 12f * density
+        bubbleRect.set(0f, 0f, width.toFloat(), height - notch)
+        bubblePath.reset()
+        bubblePath.addRoundRect(bubbleRect, radius, radius, Path.Direction.CW)
+        bubblePath.moveTo(width / 2f - notch, height - notch)
+        bubblePath.lineTo(width / 2f, height.toFloat())
+        bubblePath.lineTo(width / 2f + notch, height - notch)
+        bubblePath.close()
+        canvas.drawPath(bubblePath, if (isCanceling) cancelPaint else bubblePaint)
+
+        val centerX = width / 2f
+        val centerY = (height - notch) / 2f
+        val barWidth = 2.2f * density
+        val gap = 3.2f * density
+        val heights = floatArrayOf(7f, 12f, 18f, 26f, 19f, 30f, 22f, 14f, 20f, 12f, 7f)
+        val totalWidth = heights.size * barWidth + (heights.size - 1) * gap
+        var x = centerX - totalWidth / 2f
+        heights.forEach { hDp ->
+            val half = hDp * density / 2f
+            canvas.drawRoundRect(
+                x,
+                centerY - half,
+                x + barWidth,
+                centerY + half,
+                barWidth,
+                barWidth,
+                wavePaint
+            )
+            x += barWidth + gap
         }
     }
+}
+
+private class VoiceActionTrayView(context: Context) : View(context) {
+    private val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#70575757")
+        style = Paint.Style.FILL
+    }
+    private val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#8A707070")
+        style = Paint.Style.FILL
+    }
+    private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#48FFFFFF")
+        style = Paint.Style.FILL
+    }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#EDEDED")
+        textAlign = Paint.Align.CENTER
+        textSize = sp(15f)
+    }
+    private val subTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#C8C8C8")
+        textAlign = Paint.Align.CENTER
+        textSize = sp(12f)
+    }
+    private val path = Path()
+
+    var zone: VoiceRecordingOverlay.Zone = VoiceRecordingOverlay.Zone.AI_REPLY
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val d = resources.displayMetrics.density
+
+        path.reset()
+        path.moveTo(0f, h)
+        path.lineTo(0f, 72f * d)
+        path.cubicTo(w * 0.22f, 16f * d, w * 0.78f, 16f * d, w, 72f * d)
+        path.lineTo(w, h)
+        path.close()
+        canvas.drawPath(path, outerPaint)
+
+        path.reset()
+        path.moveTo(0f, h)
+        path.lineTo(0f, 122f * d)
+        path.cubicTo(w * 0.24f, 74f * d, w * 0.76f, 74f * d, w, 122f * d)
+        path.lineTo(w, h)
+        path.close()
+        canvas.drawPath(path, innerPaint)
+
+        drawHighlight(canvas, w, d)
+        drawLabels(canvas, w, h, d)
+    }
+
+    private fun drawHighlight(canvas: Canvas, width: Float, density: Float) {
+        val cx = when (zone) {
+            VoiceRecordingOverlay.Zone.CANCEL -> width * 0.19f
+            VoiceRecordingOverlay.Zone.AI_REPLY -> width * 0.50f
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> width * 0.81f
+        }
+        val cy = when (zone) {
+            VoiceRecordingOverlay.Zone.AI_REPLY -> 118f * density
+            else -> 72f * density
+        }
+        canvas.drawCircle(cx, cy, 38f * density, highlightPaint)
+    }
+
+    private fun drawLabels(canvas: Canvas, width: Float, height: Float, density: Float) {
+        textPaint.color = Color.parseColor("#EFEFEF")
+        subTextPaint.color = Color.parseColor("#D0D0D0")
+        canvas.save()
+        canvas.rotate(-16f, width * 0.19f, 78f * density)
+        drawOption(canvas, "取消", width * 0.19f, 82f * density, zone == VoiceRecordingOverlay.Zone.CANCEL)
+        canvas.restore()
+
+        drawOption(canvas, "AI回复", width * 0.50f, 120f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+
+        canvas.save()
+        canvas.rotate(14f, width * 0.81f, 78f * density)
+        drawOption(canvas, "转文字", width * 0.81f, 82f * density, zone == VoiceRecordingOverlay.Zone.TRANSCRIBE)
+        canvas.restore()
+
+        val releaseLabel = when (zone) {
+            VoiceRecordingOverlay.Zone.AI_REPLY -> "松开 AI回复"
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> "松开 转文字"
+            VoiceRecordingOverlay.Zone.CANCEL -> "松开 取消"
+        }
+        subTextPaint.color = Color.parseColor("#2B2B2B")
+        canvas.drawText(releaseLabel, width * 0.50f, height - 50f * density, subTextPaint)
+    }
+
+    private fun drawOption(canvas: Canvas, label: String, x: Float, y: Float, selected: Boolean) {
+        textPaint.color = Color.parseColor(if (selected) "#FFFFFF" else "#E4E4E4")
+        textPaint.isFakeBoldText = selected
+        canvas.drawText(label, x, y, textPaint)
+        textPaint.isFakeBoldText = false
+    }
+
+    private fun sp(value: Float): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, resources.displayMetrics)
 }

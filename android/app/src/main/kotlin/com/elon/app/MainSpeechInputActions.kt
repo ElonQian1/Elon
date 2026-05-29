@@ -178,9 +178,9 @@ internal class MainSpeechInputActions(
 
     // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
 
-    /** 手指以 ACTION_DOWN 点为零点、水平位移（向右为正，向左为负，像素）。仅在 agent 语音中生效。 */
-    fun onVoiceTouchMoveDx(dx: Float) {
-        voiceOverlay?.updateZone(dx)
+    /** 手指屏幕坐标。仅在 agent 语音中生效，用于选择 AI回复 / 转文字 / 取消。 */
+    fun onVoiceTouchMove(rawX: Float, rawY: Float) {
+        voiceOverlay?.updateTouch(rawX, rawY)
     }
 
     // ─── 方案 A：端上 Agent 流式识别 → 文字 → 走 elon 正常发送链路 ─────────────
@@ -210,8 +210,8 @@ internal class MainSpeechInputActions(
         bridge.onFinal = { text ->
             agentLastFinalText = text
             voiceOverlay?.updatePartial(text)
-            // 不在这里自动处理发送/预览，等 ACTION_UP 手势决定跳转。
-            // 但如果用户已经松开且在 SEND 区送出（常规路径），stopAgentVoice 会取走它。
+            // 不在这里自动处理 AI回复/转文字，等 ACTION_UP 手势决定跳转。
+            // 如果用户已经松开，stopAgentVoice 会取走最终结果。
         }
         bridge.onEnd = {
             if (!agentVoiceActive) {
@@ -234,14 +234,14 @@ internal class MainSpeechInputActions(
 
     /**
      * 松开按钮：根据遵照 [voiceOverlay] 当前区域决定动作。
-     *  - SEND: 直接发送转写文字
-     *  - TRANSLATE: 回填输入框供用户查看/编辑
+     *  - AI_REPLY: 直接把转写文字交给 AI 回复
+     *  - TRANSCRIBE: 回填输入框供用户查看/编辑
      *  - CANCEL: 丢弃
      */
     private fun stopAgentVoice(): Boolean {
         val bridge = agentBridge ?: return false
         if (!agentVoiceActive && !bridge.isRunning) return false
-        val zone = voiceOverlay?.currentZone ?: VoiceRecordingOverlay.Zone.SEND
+        val zone = voiceOverlay?.currentZone ?: VoiceRecordingOverlay.Zone.AI_REPLY
         isHoldActive = false
         if (zone == VoiceRecordingOverlay.Zone.CANCEL) {
             isSpeechCanceled = true
@@ -295,8 +295,8 @@ internal class MainSpeechInputActions(
             return
         }
         when (zone) {
-            VoiceRecordingOverlay.Zone.SEND -> {
-                // 直发：走现有文字发送链路（后台只看到文字）
+            VoiceRecordingOverlay.Zone.AI_REPLY -> {
+                // AI回复：走现有文字发送链路（后台只看到文字）
                 val sender = sendTextDirect
                 if (sender != null) {
                     setVoiceMode(false)
@@ -306,9 +306,11 @@ internal class MainSpeechInputActions(
                     handleRecognizedSpeech(finalText)
                 }
             }
-            VoiceRecordingOverlay.Zone.TRANSLATE -> {
-                // 回填输入框（用户阅读/翻译/修改）
-                handleRecognizedSpeech(finalText)
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> {
+                // 转文字：只回填输入框，交给用户继续编辑或手动发送。
+                setVoiceMode(false)
+                applyVoiceMode()
+                setInputText(finalText)
             }
             VoiceRecordingOverlay.Zone.CANCEL -> Unit
         }
