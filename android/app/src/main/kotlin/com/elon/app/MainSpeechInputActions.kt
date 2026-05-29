@@ -569,7 +569,7 @@ internal class MainSpeechInputActions(
             }
             VoiceRecordingOverlay.Zone.SEND -> {
                 // 直接发送语音气泡给对方，不经 AI
-                val messageText = if (transcription != null) transcription else ""
+                val messageText = if (!isFriendChatActive() && transcription != null) transcription else ""
                 sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
             }
             VoiceRecordingOverlay.Zone.CANCEL -> discardVoiceAttachment(attachment)

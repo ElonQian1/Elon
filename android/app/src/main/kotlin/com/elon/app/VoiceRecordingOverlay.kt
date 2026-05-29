@@ -33,6 +33,7 @@ internal class VoiceRecordingOverlay(
     private var trayView: VoiceActionTrayView? = null
     private var partialText: String = ""
     private var zone: Zone = Zone.AI_REPLY
+    private var initialTouchRawY: Float? = null
 
     val isShowing: Boolean get() = root != null
     val currentZone: Zone get() = zone
@@ -94,6 +95,7 @@ internal class VoiceRecordingOverlay(
         partialView = partial
         trayView = tray
         partialText = ""
+        initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
         applyZone()
     }
@@ -105,6 +107,14 @@ internal class VoiceRecordingOverlay(
 
     fun updateTouch(rawX: Float, rawY: Float) {
         val overlay = root ?: return
+        val startY = initialTouchRawY
+        if (startY == null) {
+            initialTouchRawY = rawY
+            if (mode == Mode.FRIEND_CHAT) {
+                setZone(Zone.SEND)
+                return
+            }
+        }
         val location = IntArray(2)
         overlay.getLocationOnScreen(location)
         val x = rawX - location[0]
@@ -112,6 +122,13 @@ internal class VoiceRecordingOverlay(
         val width = overlay.width.takeIf { it > 0 } ?: return
         val height = overlay.height.takeIf { it > 0 } ?: return
         val chooseTop = height - dp(TOUCH_CHOICE_HEIGHT_DP)
+        if (mode == Mode.FRIEND_CHAT) {
+            val movedUpEnough = rawY < (initialTouchRawY ?: rawY) - dp(CHOICE_DRAG_UP_DP)
+            if (!movedUpEnough) {
+                setZone(Zone.SEND)
+                return
+            }
+        }
         val newZone = if (y < chooseTop) {
             when {
                 x < width * 0.34f -> Zone.CANCEL
@@ -130,6 +147,7 @@ internal class VoiceRecordingOverlay(
         val newZone = when {
             dx < -threshold -> Zone.CANCEL
             dx > threshold -> Zone.TRANSCRIBE
+            mode == Mode.FRIEND_CHAT -> Zone.SEND
             else -> Zone.AI_REPLY
         }
         setZone(newZone)
@@ -142,6 +160,7 @@ internal class VoiceRecordingOverlay(
         partialView = null
         trayView = null
         partialText = ""
+        initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
     }
 
@@ -159,7 +178,7 @@ internal class VoiceRecordingOverlay(
 
     private fun renderPartial() {
         val fallback = when (zone) {
-            Zone.AI_REPLY -> if (mode == Mode.FRIEND_CHAT) "滑到这 @AI回复" else "松开 AI回复"
+            Zone.AI_REPLY -> if (mode == Mode.FRIEND_CHAT) "滑到这 AI回复" else "松开 AI回复"
             Zone.TRANSCRIBE -> "松开 转文字"
             Zone.CANCEL -> "松开 取消"
             Zone.SEND -> "松开 发送"
@@ -185,6 +204,7 @@ internal class VoiceRecordingOverlay(
         const val TOUCH_CHOICE_HEIGHT_DP = 118
         const val BUBBLE_WIDTH_DP = 192
         const val BUBBLE_HEIGHT_DP = 88
+        const val CHOICE_DRAG_UP_DP = 56
         const val DRAG_CHOICE_DX_DP = 80
     }
 }
@@ -336,8 +356,8 @@ private class VoiceActionTrayView(
         if (mode == VoiceRecordingOverlay.Mode.AGENT) {
             drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
         } else {
-            // FRIEND_CHAT: @AI 在上方中央，"发 送" 在下方默认区域
-            drawOption(canvas, "@AI", width * 0.50f, 78f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            // FRIEND_CHAT: AI回复 在上方中央，"发 送" 在下方默认区域
+            drawOption(canvas, "AI回复", width * 0.50f, 78f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
             drawOption(canvas, "发 送", width * 0.50f, 154f * density, zone == VoiceRecordingOverlay.Zone.SEND)
         }
 
@@ -347,7 +367,7 @@ private class VoiceActionTrayView(
         canvas.restore()
 
         val releaseLabel = when (zone) {
-            VoiceRecordingOverlay.Zone.AI_REPLY -> if (mode == VoiceRecordingOverlay.Mode.FRIEND_CHAT) "松开 @AI 回复" else "松开 AI回复"
+            VoiceRecordingOverlay.Zone.AI_REPLY -> "松开 AI回复"
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> "松开 转文字"
             VoiceRecordingOverlay.Zone.CANCEL -> "松开 取消"
             VoiceRecordingOverlay.Zone.SEND -> "松开 发送"
