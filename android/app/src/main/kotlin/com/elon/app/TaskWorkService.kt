@@ -83,6 +83,7 @@ class TaskWorkService : Service() {
                 if (hasActiveTasks()) enterForeground()
                 traceId?.let { activeTasks[it] }?.let { connect(it) } ?: connectAll()
             }
+            ACTION_RUNTIME_INPUT -> sendRuntimeInput(payload, traceId)
             ACTION_PAUSE -> pauseWork(traceId)
             ACTION_SYNC_STATE -> broadcastState()
             else -> {
@@ -263,6 +264,34 @@ class TaskWorkService : Service() {
             )
         )
         if (!sent) scheduleReconnect(task)
+    }
+
+    private fun sendRuntimeInput(payload: String?, traceId: String?) {
+        if (payload.isNullOrBlank()) {
+            DebugTraceStore.record("task_runtime_input_missing_payload", mapOf("trace_id" to traceId))
+            return
+        }
+        restorePersistedTaskWork(prefs, activeTasks)
+        val task = traceId?.let { activeTasks[it] }
+            ?: activeTasks.values.firstOrNull { it.waitingForReply }
+        if (task == null) {
+            DebugTraceStore.record("task_runtime_input_no_active_task", mapOf("trace_id" to traceId))
+            broadcastState()
+            return
+        }
+
+        enterForeground()
+        val client = ensureClient(task)
+        val sent = if (client.isConnected()) client.send(payload) else false
+        DebugTraceStore.record(
+            if (sent) "task_runtime_input_sent" else "task_runtime_input_send_failed",
+            mapOf(
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "payload_bytes" to payload.toByteArray().size
+            )
+        )
+        if (!sent) connect(task)
     }
 
     private fun scheduleReconnect(task: RunningTask) {
@@ -491,6 +520,7 @@ class TaskWorkService : Service() {
         const val ACTION_RESUME_PENDING = "com.elon.app.task.RESUME_PENDING"
         const val ACTION_CONNECT = "com.elon.app.task.CONNECT"
         const val ACTION_PAUSE = "com.elon.app.task.PAUSE"
+        const val ACTION_RUNTIME_INPUT = "com.elon.app.task.RUNTIME_INPUT"
         const val ACTION_SYNC_STATE = "com.elon.app.task.SYNC_STATE"
         const val ACTION_EVENT = "com.elon.app.task.EVENT"
         const val ACTION_STATE = "com.elon.app.task.STATE"
