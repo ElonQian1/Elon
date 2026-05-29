@@ -5,6 +5,8 @@ import android.graphics.drawable.Drawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.animation.PathInterpolator
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -17,7 +19,8 @@ internal class SideMenuUsageDropdown(
 ) {
     val rowView: LinearLayout = buildRow()
     val detailsView: LinearLayout = buildDetailsContainer()
-    private lateinit var arrow: TextView
+    private val chevronInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+    private lateinit var chevron: ImageView
     private var expanded = false
     private var loadSerial = 0
 
@@ -44,15 +47,16 @@ internal class SideMenuUsageDropdown(
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 17f
             })
-            arrow = TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(22), LinearLayout.LayoutParams.WRAP_CONTENT)
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = "▾"
-                setTextColor(Color.parseColor("#4E4E4E"))
-                textSize = 15f
+            chevron = ImageView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                setImageResource(R.drawable.ic_input_model_chevron)
+                scaleType = ImageView.ScaleType.CENTER
+                alpha = 0.9f
+                rotation = 0f
+                isClickable = false
+                isFocusable = false
             }
-            addView(arrow)
+            addView(chevron)
         }
     }
 
@@ -64,6 +68,9 @@ internal class SideMenuUsageDropdown(
             )
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
+            alpha = 0f
+            scaleY = 0.97f
+            pivotY = 0f
             setPadding(dp(22), 0, dp(22), dp(8))
         }
     }
@@ -91,9 +98,54 @@ internal class SideMenuUsageDropdown(
 
     private fun setExpanded(value: Boolean) {
         expanded = value
-        arrow.text = if (value) "▴" else "▾"
-        detailsView.visibility = if (value) View.VISIBLE else View.GONE
-        if (!value) loadSerial += 1
+        animateChevron(value)
+        if (value) {
+            showDetails()
+        } else {
+            loadSerial += 1
+            hideDetails()
+        }
+    }
+
+    private fun showDetails() {
+        detailsView.animate().cancel()
+        detailsView.visibility = View.VISIBLE
+        detailsView.alpha = 0f
+        detailsView.scaleY = 0.97f
+        detailsView.pivotY = 0f
+        detailsView.animate()
+            .alpha(1f)
+            .scaleY(1f)
+            .setDuration(120L)
+            .setInterpolator(chevronInterpolator)
+            .start()
+    }
+
+    private fun hideDetails() {
+        detailsView.animate().cancel()
+        if (detailsView.visibility != View.VISIBLE) {
+            detailsView.alpha = 0f
+            detailsView.scaleY = 0.97f
+            return
+        }
+        detailsView.animate()
+            .alpha(0f)
+            .scaleY(0.97f)
+            .setDuration(90L)
+            .setInterpolator(chevronInterpolator)
+            .withEndAction {
+                if (!expanded) detailsView.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun animateChevron(value: Boolean) {
+        chevron.animate().cancel()
+        chevron.animate()
+            .rotation(if (value) 180f else 0f)
+            .setDuration(140L)
+            .setInterpolator(chevronInterpolator)
+            .start()
     }
 
     private fun load() {

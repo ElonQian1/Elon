@@ -58,7 +58,8 @@ internal class ChatSideMenuController(
     private lateinit var overlay: FrameLayout
     private lateinit var panel: FrameLayout
     private lateinit var settingsBubble: FrameLayout
-    private lateinit var accountNameRow: TextView
+    private lateinit var accountNameText: TextView
+    private lateinit var accountAccountText: TextView
     private lateinit var usageDropdown: SideMenuUsageDropdown
     private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
@@ -386,8 +387,7 @@ internal class ChatSideMenuController(
             }
         )
 
-        accountNameRow = settingsRow(accountMenuTitle()) { showAccountInfo() }
-        panelBody.addView(accountNameRow)
+        panelBody.addView(accountSummaryRow())
         panelBody.addView(settingsRow("个人账户") { openAccountEntry() })
         usageDropdown = SideMenuUsageDropdown(activity, dp, selectableForeground)
         panelBody.addView(usageDropdown.rowView)
@@ -426,9 +426,7 @@ internal class ChatSideMenuController(
 
     private fun showSettingsBubble() {
         updateSettingsBubbleBounds()
-        if (::accountNameRow.isInitialized) {
-            accountNameRow.text = accountMenuTitle()
-        }
+        updateAccountSummary()
         settingsBubble.visibility = View.VISIBLE
         settingsBubble.animate().cancel()
         settingsBubble.alpha = 0f
@@ -468,6 +466,48 @@ internal class ChatSideMenuController(
                 }
             })
             .start()
+    }
+
+    private fun accountSummaryRow(): LinearLayout {
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(54)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), 0, dp(22), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener {
+                hideSettingsBubble()
+                showAccountInfo()
+            }
+            accountNameText = TextView(activity).apply {
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+                textSize = 17f
+            }
+            accountAccountText = TextView(activity).apply {
+                includeFontPadding = false
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor("#555555"))
+                textSize = 12.5f
+                setPadding(0, dp(6), 0, 0)
+            }
+            addView(accountNameText)
+            addView(accountAccountText)
+            updateAccountSummary()
+        }
+    }
+
+    private fun updateAccountSummary() {
+        if (!::accountNameText.isInitialized || !::accountAccountText.isInitialized) return
+        accountNameText.text = accountMenuTitle()
+        accountAccountText.text = "账号：${accountMenuAccount()}"
     }
 
     private fun settingsRow(title: String, action: () -> Unit): TextView {
@@ -514,6 +554,11 @@ internal class ChatSideMenuController(
 
     private fun accountMenuTitle(): String =
         if (AuthManager.isLoggedIn(activity)) AuthManager.displayName(activity) else "未登录"
+
+    private fun accountMenuAccount(): String {
+        if (!AuthManager.isLoggedIn(activity)) return "未登录"
+        return AuthManager.account(activity) ?: UserProfileStore.load(activity).wechatId
+    }
 
     private fun openAccountEntry() {
         if (AuthManager.isLoggedIn(activity)) {
