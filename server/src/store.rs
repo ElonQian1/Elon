@@ -440,3 +440,56 @@ impl Store {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }
+
+fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectSummary> {
+    Ok(ProjectSummary {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        workspace_key: row.get(3)?,
+        template: row.get(4)?,
+        source_type: row.get(5)?,
+        repo_url: row.get(6)?,
+        branch: row.get(7)?,
+        workspace_path: row.get(8)?,
+        status: row.get(9)?,
+        role: row.get(10)?,
+        last_task_status: row.get(11)?,
+        last_apk_url: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn find_owner_project_by_name(
+    conn: &Connection,
+    user_id: &str,
+    name: &str,
+) -> Result<Option<ProjectSummary>> {
+    Ok(conn
+        .query_row(
+            "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.status,
+                    COALESCE(pm.role, 'owner') AS role,
+                    (
+                        SELECT t.status FROM tasks t
+                        WHERE t.project_id = p.id
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_task_status,
+                    (
+                        SELECT t.apk_url FROM tasks t
+                        WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_apk_url,
+                    p.updated_at
+             FROM projects p
+             LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
+             WHERE p.created_by = ?1 AND p.name = ?2 AND p.status != 'deleted'
+             ORDER BY p.updated_at DESC
+             LIMIT 1",
+            params![user_id, name],
+            project_summary_from_row,
+        )
+        .optional()?)
+}

@@ -272,6 +272,12 @@ pub struct ProjectMemberConversationMessage {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct CreateProjectResult {
+    pub project: ProjectSummary,
+    pub reused_existing: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ProjectSummary {
     pub id: String,
     pub name: String,
