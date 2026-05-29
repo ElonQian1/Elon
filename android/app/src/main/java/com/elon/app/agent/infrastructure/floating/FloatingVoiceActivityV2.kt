@@ -132,7 +132,15 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                 
                 Log.i(TAG, "✅ 智能模式已启用")
             } else {
-                Log.w(TAG, "⚠️ 未配置 API Key，使用简单模式（只有关键词匹配）")
+                Log.w(TAG, "⚠️ 未配置 API Key")
+                Toast.makeText(
+                    this@ConversationalVoiceActivity,
+                    "请先在 Agent 设置中配置 API Key，否则语音助手无法理解您的意图",
+                    Toast.LENGTH_LONG
+                ).show()
+                // 延迟关闭，让 Toast 显示完
+                Handler(Looper.getMainLooper()).postDelayed({ finish() }, 2000)
+                return@apply
             }
             
             // 设置 UI 监听器

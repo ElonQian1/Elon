@@ -24,6 +24,7 @@ import com.elon.app.agent.domain.execution.ExecutionInfo
 import com.elon.app.agent.domain.execution.ExecutionLogEntry
 import com.elon.app.agent.domain.execution.ExecutionState
 import com.elon.app.agent.domain.execution.ExecutionStateManager
+import com.elon.app.agent.AgentConfigActivity
 
 /**
  * 🎈 悬浮球服务
@@ -357,6 +358,11 @@ class FloatingBallService : Service() {
     // ==================== 语音输入 ====================
     
     private fun showVoiceInputDialog() {
+        // 提前检查 API Key，给出友好提示
+        if (AgentConfigActivity.getApiKey(this).isEmpty()) {
+            Toast.makeText(this, "请先在 Agent 设置中配置 API Key", Toast.LENGTH_LONG).show()
+            return
+        }
         // 使用新的智能对话系统 V2
         val intent = Intent(this, ConversationalVoiceActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
