@@ -14,6 +14,7 @@ internal class MainVoiceModeActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val inputModeButton: () -> ImageButton?,
+    private val emojiButton: () -> ImageButton?,
     private val voiceHoldButton: () -> TextView?,
     private val inputCenterContainer: () -> FrameLayout?,
     private val expandedInputContainer: () -> FrameLayout?,
@@ -43,6 +44,7 @@ internal class MainVoiceModeActions(
         if (isVoiceMode()) {
             hideKeyboard()
             modeButton.setImageResource(R.drawable.ic_input_keyboard_circle)
+            emojiButton()?.visibility = View.GONE
             inputComposerMotion()?.setExpanded(false, animate = true)
             voiceButton.detachFromParent()
             centerContainer.removeAllViews()
@@ -52,6 +54,7 @@ internal class MainVoiceModeActions(
             voiceButton.visibility = View.VISIBLE
         } else {
             modeButton.setImageResource(R.drawable.ic_input_voice_circle)
+            emojiButton()?.visibility = View.VISIBLE
             collapsedPreview.detachFromParent()
             voiceButton.detachFromParent()
             centerContainer.removeAllViews()

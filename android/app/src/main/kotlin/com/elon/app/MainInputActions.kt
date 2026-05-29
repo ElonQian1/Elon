@@ -343,6 +343,7 @@ internal class MainInputActions(
             activity = activity,
             binding = binding,
             inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            emojiButton = { inputComposerViewsOrNull()?.emojiButton },
             voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
             inputCenterContainer = { inputComposerViewsOrNull()?.inputCenterContainer },
             expandedInputContainer = { inputComposerViewsOrNull()?.expandedInputContainer },
