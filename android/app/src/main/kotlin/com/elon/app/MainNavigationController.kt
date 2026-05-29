@@ -119,23 +119,32 @@ internal class MainNavigationController(
         clearMessageSelection()
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
-        updateBottomTabSelection(binding.tabProject)
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.GONE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.VISIBLE
-        binding.agentPage.root.visibility = View.GONE
-        binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        binding.moreButton.visibility = View.GONE
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = "项目广场"
+        val shouldAnimate = binding.projectPage.visibility == View.VISIBLE &&
+            binding.marketplacePage.visibility != View.VISIBLE
         loadMarketplace()
+        applyMarketplaceChrome()
+        if (shouldAnimate) {
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromRight(
+                container = binding.contentContainer,
+                incoming = listOf(binding.marketplacePage),
+                outgoing = listOf(binding.projectPage),
+                onEnd = {
+                    binding.conversationPage.visibility = View.GONE
+                    binding.chatPage.visibility = View.GONE
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.VISIBLE
+                    binding.agentPage.root.visibility = View.GONE
+                    binding.inputLayout.visibility = View.GONE
+                    binding.pageTabs.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else {
+            clearPageTranslations()
+        }
     }
 
     fun showAgentCenter() {
@@ -488,7 +497,30 @@ internal class MainNavigationController(
     }
 
     private fun showProjectHome(animate: Boolean = false) {
-        if (animate && binding.chatPage.visibility == View.VISIBLE) {
+        if (animate && binding.marketplacePage.visibility == View.VISIBLE) {
+            actionPopupProvider()?.dismiss()
+            closeChatSideMenu(false)
+            renderProjectList()
+            applyProjectHomeChrome()
+            pageTransitionRunning = true
+            WechatPageTransition.exitToRight(
+                container = binding.contentContainer,
+                outgoing = listOf(binding.marketplacePage),
+                incoming = listOf(binding.projectPage),
+                onEnd = {
+                    binding.chatPage.visibility = View.GONE
+                    binding.inputLayout.visibility = View.GONE
+                    binding.conversationPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
+                    binding.projectPage.visibility = View.VISIBLE
+                    binding.pageTabs.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                    renderProjectList()
+                }
+            )
+        } else if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
             closeChatSideMenu(false)
             renderProjectList()
@@ -611,6 +643,25 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "项目管理"
         renderProjectList()
+    }
+
+    private fun applyMarketplaceChrome() {
+        updateBottomTabSelection(binding.tabProject)
+        binding.conversationPage.visibility = View.GONE
+        binding.chatPage.visibility = View.GONE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.VISIBLE
+        binding.agentPage.root.visibility = View.GONE
+        binding.inputLayout.visibility = View.GONE
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.backButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
+        binding.moreButton.visibility = View.GONE
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = "项目广场"
     }
 
     private fun applyProjectSpaceChrome(title: String) {
