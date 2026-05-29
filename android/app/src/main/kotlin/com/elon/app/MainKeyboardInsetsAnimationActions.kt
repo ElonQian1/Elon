@@ -20,6 +20,7 @@ internal class MainKeyboardInsetsAnimationActions(
 ) {
     private val fallbackInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var bottomOffsetAnimator: ValueAnimator? = null
+    private var chatLiftAnimator: ValueAnimator? = null
     private var runningImeAnimation = false
     private var baseChatListPaddingBottom = 0
     private var baselineHiddenHeight = -1
@@ -57,6 +58,7 @@ internal class MainKeyboardInsetsAnimationActions(
                     if (!animation.includesIme()) return
                     runningImeAnimation = true
                     bottomOffsetAnimator?.cancel()
+                    chatLiftAnimator?.cancel()
                     binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
                 }
 
@@ -65,7 +67,7 @@ internal class MainKeyboardInsetsAnimationActions(
                     runningAnimations: MutableList<WindowInsetsAnimationCompat>
                 ): WindowInsetsCompat {
                     if (runningAnimations.any { it.includesIme() }) {
-                        val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
+                        val keyboardHeight = keyboardHeightFromAnimationProgress(insets)
                         val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
                         markKeyboardVisibleIfNeeded(keyboardHeight)
                         if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) {
@@ -254,10 +256,12 @@ internal class MainKeyboardInsetsAnimationActions(
         }
         if (animate) {
             animateBottomBarOffset(target)
+            animateChatBottomPadding(target)
         } else {
             applyBottomBarOffset(target)
+            chatLiftAnimator?.cancel()
+            applyChatBottomPadding(target)
         }
-        applyChatBottomPadding(target)
     }
 
     private fun applyBottomBarOffset(keyboardHeight: Int) {
@@ -286,10 +290,48 @@ internal class MainKeyboardInsetsAnimationActions(
         }
     }
 
+    private fun animateChatBottomPadding(keyboardHeight: Int) {
+        val target = keyboardHeight.coerceAtLeast(0)
+        val start = (binding.chatList.paddingBottom - baseChatListPaddingBottom).coerceAtLeast(0)
+        if (start == target) {
+            applyChatBottomPadding(target)
+            return
+        }
+        var cancelled = false
+        chatLiftAnimator?.cancel()
+        binding.chatList.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        chatLiftAnimator = ValueAnimator.ofInt(start, target).apply {
+            duration = 220L
+            interpolator = fallbackInterpolator
+            addUpdateListener { animator ->
+                applyChatBottomPadding(animator.animatedValue as Int)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    binding.chatList.setLayerType(View.LAYER_TYPE_NONE, null)
+                    if (!cancelled) {
+                        applyChatBottomPadding(target)
+                    }
+                    chatLiftAnimator = null
+                }
+            })
+            start()
+        }
+    }
+
     private fun applyChatBottomPadding(keyboardHeight: Int) {
         val targetBottom = baseChatListPaddingBottom + keyboardHeight
         val currentBottom = binding.chatList.paddingBottom
-        if (currentBottom == targetBottom) return
+        if (currentBottom == targetBottom) {
+            if (keyboardHeight == 0) {
+                followChatBottomDuringLift = false
+            }
+            return
+        }
         val layoutManager = binding.chatList.layoutManager as? LinearLayoutManager
         val shouldFollowLatest = followChatBottomDuringLift || shouldFollowLatestMessage(layoutManager)
         val anchor = if (shouldFollowLatest) null else chatListAnchor(layoutManager)
@@ -364,6 +406,14 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private fun keyboardHeightFromInsetsOrFrame(insets: WindowInsetsCompat): Int {
         return maxOf(keyboardHeight(insets), keyboardHeightFromVisibleFrame())
+    }
+
+    private fun keyboardHeightFromAnimationProgress(insets: WindowInsetsCompat): Int {
+        val insetHeight = keyboardHeight(insets)
+        if (insetHeight > 0 || insets.isVisible(WindowInsetsCompat.Type.ime())) {
+            return insetHeight
+        }
+        return keyboardHeightFromVisibleFrame()
     }
 
     private fun estimatedKeyboardHeight(): Int {
