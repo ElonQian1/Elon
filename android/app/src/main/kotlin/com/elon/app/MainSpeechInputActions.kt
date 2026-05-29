@@ -438,17 +438,44 @@ internal class MainSpeechInputActions(
             DebugTraceStore.record("voice_message_record_start_failed", emptyMap())
             return false
         }
-        // MediaRecorder 独占麦克风；SpeechRecognizer 与 MediaRecorder 无法同时录音
-        // （ERROR_CLIENT code=5 / RECOGNIZER_BUSY code=8），因此不再并行启动本地 ASR。
-        // 需要转写时由 finishVoiceMessageRecording 上传到服务器 Whisper 处理。
+        // 乐观并行：同时启动 MediaRecorder 录音文件 + AgentVoiceBridge 实时 ASR。
+        // 小米等设备两者可共存，录音期间有实时转写文字显示。
+        // Honor/华为 HAL 独占麦克风导致 ASR 立即 code=5 失败，onFinal 不会被调用，
+        // finishVoiceMessageRecording 检测到 transcription==null 后自动上传服务器 Whisper。
         voiceMessageTranscription = null
         voiceMessagePartialText = null
-        voiceMessageAsrAllFailed = true   // 标记需要服务器转写（无本地 ASR）
+        voiceMessageAsrAllFailed = false
         // 好友/群聊使用 4 区域模式：发送/取消/转文字/@AI回复
         val overlayMode = if (isFriendChatActive()) VoiceRecordingOverlay.Mode.FRIEND_CHAT else VoiceRecordingOverlay.Mode.AGENT
         val overlay = voiceOverlay?.takeIf { it.mode == overlayMode }
             ?: VoiceRecordingOverlay(activity, overlayMode).also { voiceOverlay = it }
         overlay.show()
+        // 启动 AgentVoiceBridge 多引擎并行 ASR（支持自动引擎切换）
+        runCatching {
+            voiceMessageBridge?.destroy()
+            voiceMessageBridge = AgentVoiceBridge(activity).also { bridge ->
+                bridge.onPartial = { text ->
+                    voiceMessagePartialText = text
+                    voiceOverlay?.updatePartial(text)
+                }
+                bridge.onFinal = { text ->
+                    if (text.isNotBlank()) voiceMessageTranscription = text
+                    voiceOverlay?.updatePartial(text)
+                    DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
+                }
+                bridge.onError = { msg ->
+                    // 所有本地引擎失败（Honor 抢麦冲突等）；finishVoiceMessageRecording
+                    // 通过 transcription==null 判断需要服务器兜底，此标志仅供调试日志
+                    voiceMessageAsrAllFailed = true
+                    DebugTraceStore.record("voice_message_asr_all_failed", mapOf("msg" to msg))
+                }
+                bridge.start()
+            }
+        }.onFailure {
+            DebugTraceStore.record("voice_message_asr_start_failed", mapOf("error" to it.message))
+            voiceMessageBridge?.destroy()
+            voiceMessageBridge = null
+        }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
         // 好友/群聊/频道模式已有浮层提示；清空底层按钮文字，避免透过半透明托盘重复显示。
         voiceHoldButton().text = if (isFriendChatActive()) "" else "松开 AI回复"
@@ -494,8 +521,9 @@ internal class MainSpeechInputActions(
         attachment: PendingAttachment
     ) {
         val transcription = currentVoiceMessageText()
-        // 在 cleanup 重置 asrAllFailed 前先读取
-        val serverFallbackNeeded = transcription == null && voiceMessageAsrAllFailed
+        // 不依赖 asrAllFailed（Honor 等设备上 onError 在松手后才异步到达，届时已为 false）。
+        // 改为：只要没拿到文字就走服务器兜底——小米/华为通吃。
+        val serverFallbackNeeded = transcription == null
         cleanupVoiceMessageRecognition()
         voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
