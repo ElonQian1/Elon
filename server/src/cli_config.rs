@@ -54,6 +54,9 @@ pub struct AiCliConfig {
     pub fallback_to_api: bool,
     /// 临时单通道模式：用户侧聊天、意图分析后的执行、代码协作都只走 Codex CLI。
     pub codex_cli_only: bool,
+    /// 主 CLI 失败时自动切换的备用 CLI option_id（如 "codex_cli"）。
+    /// 由环境变量 AI_CLI_FALLBACK 设置。
+    pub fallback_cli_option: Option<String>,
 }
 
 impl AiCliConfig {
@@ -75,7 +78,7 @@ impl AiCliConfig {
             "Copilot CLI",
             "copilot",
             "",
-            false,
+            true,
             "--model",
         ));
         if codex_cli_only {
@@ -90,12 +93,20 @@ impl AiCliConfig {
 
         let allow_api_fallback = env_bool("AI_ALLOW_API_FALLBACK", false);
 
+        let fallback_cli_option = std::env::var("AI_CLI_FALLBACK")
+            .ok()
+            .filter(|id| {
+                let id = id.trim().to_ascii_lowercase();
+                !id.is_empty() && options.iter().any(|opt| opt.id.eq_ignore_ascii_case(&id))
+            });
+
         Self {
             enabled,
             options,
             default_option,
             fallback_to_api: !codex_cli_only && allow_api_fallback,
             codex_cli_only,
+            fallback_cli_option,
         }
     }
 

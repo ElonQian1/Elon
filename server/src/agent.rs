@@ -322,13 +322,14 @@ async fn run_backend_with_workspace(
 
     match backend {
         AiBackend::LocalCli => {
-            match ai_cli::run_with_workspace(
+            let primary_option = cli_option_id(agent_name);
+            let cli_result = ai_cli::run_with_workspace(
                 user_id,
                 workspace,
                 download_base,
                 user_message,
                 combined_preflight_note.as_deref(),
-                cli_option_id(agent_name),
+                primary_option,
                 route,
                 require_existing_git,
                 native_session_scope.clone(),
@@ -336,9 +337,77 @@ async fn run_backend_with_workspace(
                 state,
                 tx,
             )
-            .await
-            {
+            .await;
+
+            match cli_result {
                 Ok(()) => Ok(()),
+                Err(e) if state.ai_cli.fallback_cli_option.is_some() => {
+                    let fallback_id = state.ai_cli.fallback_cli_option.clone().unwrap();
+                    // 主 CLI 与备用 CLI 不同时才回退，避免无效重试
+                    let primary_resolved = state
+                        .ai_cli
+                        .find_option(primary_option)
+                        .map(|opt| opt.id.as_str())
+                        .unwrap_or("");
+                    if primary_resolved.eq_ignore_ascii_case(&fallback_id) {
+                        return Err(e);
+                    }
+                    warn!(
+                        "主 CLI 执行失败（{}），正在切换备用 CLI {}: {}",
+                        primary_resolved, fallback_id, e
+                    );
+                    let _ = tx.send(
+                        WsMessage::progress(format!(
+                            "主 AI CLI 暂不可用，正在切换备用 CLI ({fallback_id})…"
+                        ))
+                        .to_json(),
+                    );
+                    let fallback_result = ai_cli::run_with_workspace(
+                        user_id,
+                        workspace,
+                        download_base,
+                        user_message,
+                        combined_preflight_note.as_deref(),
+                        Some(fallback_id.as_str()),
+                        route,
+                        require_existing_git,
+                        native_session_scope.clone(),
+                        trace_id,
+                        state,
+                        tx,
+                    )
+                    .await;
+                    match fallback_result {
+                        Ok(()) => Ok(()),
+                        Err(fallback_e)
+                            if allow_api_fallback
+                                && state.ai_cli.fallback_to_api
+                                && has_api_agents(state).await =>
+                        {
+                            warn!("备用 CLI 也失败，回退到 API 代理: {}", fallback_e);
+                            let _ = tx.send(
+                                WsMessage::progress(format!(
+                                    "本地 AI CLI 均不可用，正在切换 API 代理: {}",
+                                    fallback_e
+                                ))
+                                .to_json(),
+                            );
+                            run_api_inner_with_workspace(
+                                user_id,
+                                workspace,
+                                user_config_workspace,
+                                download_base,
+                                user_message,
+                                combined_preflight_note.as_deref(),
+                                api_agent_name(state, agent_name),
+                                state,
+                                tx,
+                            )
+                            .await
+                        }
+                        Err(fallback_e) => Err(fallback_e),
+                    }
+                }
                 Err(e)
                     if allow_api_fallback
                         && state.ai_cli.fallback_to_api

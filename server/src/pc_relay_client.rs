@@ -18,6 +18,11 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
+/// WS ping 间隔：每 30s 向云端发一次 WS-level Ping，检测 zombie 连接
+const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
+/// 读超时：90s 内如果未收到任何 WS frame（包括 Pong），视为 zombie，强制断开重连
+const WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
+
 /// 从环境变量读取 relay 配置，启动后台连接循环（自动重连）
 pub fn spawn_if_configured() {
     let cloud_url = match std::env::var("RELAY_CLOUD_URL") {
@@ -56,6 +61,8 @@ async fn run_relay_loop(
         match run_relay_session(&cloud_url, &agent_id, &agent_secret, local_port).await {
             Ok(()) => {
                 info!("[relay-client] 连接正常断开，{:.1}s 后重连", backoff.as_secs_f32());
+                // 正常断开后重置退避，快速重连
+                backoff = Duration::from_secs(2);
             }
             Err(e) => {
                 warn!("[relay-client] 连接错误: {e:#}，{:.1}s 后重连", backoff.as_secs_f32());
@@ -114,9 +121,32 @@ async fn run_relay_session(
         .build()?;
     let local_base = format!("http://127.0.0.1:{}", local_port);
 
-    // 读循环：每条消息都可能并发处理
-    while let Some(frame) = ws_read.next().await {
-        let frame = frame?;
+    // 周期 WS Ping：防止 NAT 保活 / 检测 zombie 连接
+    let ping_tx = out_tx.clone();
+    let _ping_task = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(WS_PING_INTERVAL);
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            if ping_tx.send(Message::Ping(b"keepalive".to_vec())).is_err() {
+                break; // 写任务已退出，结束 ping 循环
+            }
+        }
+    });
+
+    // 读循环：带超时，防止 zombie TCP 连接永久阻塞
+    loop {
+        let frame = match tokio::time::timeout(WS_READ_TIMEOUT, ws_read.next()).await {
+            Ok(Some(Ok(f))) => f,
+            Ok(Some(Err(e))) => return Err(e.into()),
+            Ok(None) => break, // WS 正常关闭
+            Err(_) => {
+                return Err(anyhow!(
+                    "read timeout ({:.0}s) - 云端连接可能已失效，强制重连",
+                    WS_READ_TIMEOUT.as_secs_f32()
+                ));
+            }
+        };
         let text = match frame {
             Message::Text(t) => t,
             Message::Close(_) => break,
@@ -124,6 +154,7 @@ async fn run_relay_session(
                 let _ = out_tx.send(Message::Pong(d));
                 continue;
             }
+            Message::Pong(_) => continue, // 收到 Pong，超时计时器自然重置
             _ => continue,
         };
 

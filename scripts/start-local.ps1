@@ -63,6 +63,13 @@ $env:AI_BACKEND      = "local_cli"
 $env:RUST_LOG        = "info,elon_server=debug"
 $env:LOCAL_SERVER_PORT = $Port
 
+# ── AI CLI 优先级：Copilot CLI → 回退 Codex CLI ──────────────────────────────
+$env:AI_CODEX_CLI_ONLY     = "false"         # 同时加载 copilot + codex 两个选项
+$env:COPILOT_CLI_ENABLED   = "true"
+$env:COPILOT_CLI_ARGS      = "--allow-all-tools --allow-all-paths -p"  # 非交互模式
+$env:AI_CLI_DEFAULT        = "copilot_cli"   # 优先使用 Copilot CLI
+$env:AI_CLI_FALLBACK       = "codex_cli"     # Copilot 失败时回退到 Codex CLI
+
 # PC → 云端 agent 反向代理配置（让 APK 通过 /api/pc-relay/{agent_id}/... 访问本机）
 $cloudWs = "ws://43.139.149.158:8080/agent/ws"
 $agentId = "elon-pc-1"
