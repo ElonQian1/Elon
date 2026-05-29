@@ -178,9 +178,9 @@ internal class MainSpeechInputActions(
 
     // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
 
-    /** 手指以 ACTION_DOWN 点为零点、向上的位移（像素）。仅在 agent 语音中生效。 */
-    fun onVoiceTouchMoveDyUp(dyUp: Float) {
-        voiceOverlay?.updateZone(dyUp)
+    /** 手指以 ACTION_DOWN 点为零点、水平位移（向右为正，向左为负，像素）。仅在 agent 语音中生效。 */
+    fun onVoiceTouchMoveDx(dx: Float) {
+        voiceOverlay?.updateZone(dx)
     }
 
     // ─── 方案 A：端上 Agent 流式识别 → 文字 → 走 elon 正常发送链路 ─────────────
