@@ -9,8 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent, ai_cli, intent_router,
-    project_attachment_notes::append_project_attachment_notes,
-    project_attachments::append_project_cli_attachment_artifacts,
+    project_attachment_notes::{append_project_attachment_notes, append_project_cli_attachment_artifacts},
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
     project_chat_reply::chat_reply_after_intent_gate,
