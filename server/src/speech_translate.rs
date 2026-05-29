@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -9,7 +9,9 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    agent_api_loop::resolve_agent, agent_llm_call::call_chat_llm, project_auth::json_error,
+    agent_api_loop::resolve_agent,
+    agent_llm_call::call_chat_llm,
+    project_auth::{auth_from_headers, json_error},
     types::AppState,
 };
 
@@ -28,9 +30,18 @@ struct SpeechTranslateResponse {
 
 pub async fn translate_user_speech(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(user_id): Path<String>,
     Json(req): Json<SpeechTranslateRequest>,
 ) -> Response {
+    let caller = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    if caller.id != user_id {
+        return json_error(StatusCode::FORBIDDEN, "无权为此用户执行语音翻译");
+    }
+
     let source_text = req.text.trim().to_string();
     if source_text.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "语音文本不能为空");
