@@ -69,6 +69,7 @@ mod token_usage_api;
 mod tools;
 mod tools_apk;
 mod tools_git;
+mod agent_config;
 mod types;
 mod user_api;
 mod voice_audio_format;
