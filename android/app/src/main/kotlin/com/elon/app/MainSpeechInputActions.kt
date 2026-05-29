@@ -14,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -47,10 +49,12 @@ internal class MainSpeechInputActions(
     private var isSpeechCanceled = false
     private var speechSessionId = 0
     private var translationGeneration = 0
-    // 语音消息模式：并行 ASR 采集原文
-    private var voiceMessageAsrRecognizer: SpeechRecognizer? = null
+    // 语音消息模式：并行 ASR 采集原文（使用 AgentVoiceBridge 多引擎轮换）
+    private var voiceMessageBridge: AgentVoiceBridge? = null
     private var voiceMessageTranscription: String? = null
     private var voiceMessagePartialText: String? = null
+    /** 所有本地 ASR 引擎都失败时为 true，触发服务器 Whisper fallback */
+    private var voiceMessageAsrAllFailed = false
     // 方案 B：实时语音 → 转写 → AI 投递
     private var realtimeController: RealtimeVoiceController? = null
     // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
@@ -173,10 +177,11 @@ internal class MainSpeechInputActions(
         agentVoiceActive = false
         voiceOverlay?.hide()
         voiceOverlay = null
-        voiceMessageAsrRecognizer?.destroy()
-        voiceMessageAsrRecognizer = null
+        voiceMessageBridge?.destroy()
+        voiceMessageBridge = null
         voiceMessageTranscription = null
         voiceMessagePartialText = null
+        voiceMessageAsrAllFailed = false
     }
 
     // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
@@ -436,61 +441,41 @@ internal class MainSpeechInputActions(
         // 并行启动 ASR：MediaRecorder 录音文件 + SpeechRecognizer 识别原文
         voiceMessageTranscription = null
         voiceMessagePartialText = null
+        voiceMessageAsrAllFailed = false
         // 好友/群聊使用 4 区域模式：发送/取消/转文字/@AI回复
         val overlayMode = if (isFriendChatActive()) VoiceRecordingOverlay.Mode.FRIEND_CHAT else VoiceRecordingOverlay.Mode.AGENT
         val overlay = voiceOverlay?.takeIf { it.mode == overlayMode }
             ?: VoiceRecordingOverlay(activity, overlayMode).also { voiceOverlay = it }
         overlay.show()
+        // 启动 AgentVoiceBridge 多引擎并行 ASR（支持自动引擎切换）
         runCatching {
-            voiceMessageAsrRecognizer?.destroy()
-            voiceMessageAsrRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
-                setRecognitionListener(createVoiceMessageAsrListener())
+            voiceMessageBridge?.destroy()
+            voiceMessageBridge = AgentVoiceBridge(activity).also { bridge ->
+                bridge.onPartial = { text ->
+                    voiceMessagePartialText = text
+                    voiceOverlay?.updatePartial(text)
+                }
+                bridge.onFinal = { text ->
+                    if (text.isNotBlank()) voiceMessageTranscription = text
+                    voiceOverlay?.updatePartial(text)
+                    DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
+                }
+                bridge.onError = { msg ->
+                    // 所有本地引擎失败：后续由 finishVoiceMessageRecording 上传到服务器
+                    voiceMessageAsrAllFailed = true
+                    DebugTraceStore.record("voice_message_asr_all_failed", mapOf("msg" to msg))
+                }
+                bridge.start()
             }
-            voiceMessageAsrRecognizer?.startListening(
-                recognizerIntent(SpeechAttempt(preferLanguage = true, preferOffline = true))
-            )
         }.onFailure {
             DebugTraceStore.record("voice_message_asr_start_failed", mapOf("error" to it.message))
-            voiceMessageAsrRecognizer?.destroy()
-            voiceMessageAsrRecognizer = null
+            voiceMessageBridge?.destroy()
+            voiceMessageBridge = null
         }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
         // 好友/群聊/频道模式已有浮层提示；清空底层按钮文字，避免透过半透明托盘重复显示。
         voiceHoldButton().text = if (isFriendChatActive()) "" else "松开 AI回复"
         return true
-    }
-
-    private fun createVoiceMessageAsrListener(): RecognitionListener = object : RecognitionListener {
-        override fun onReadyForSpeech(params: Bundle?) = Unit
-        override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = Unit
-        override fun onBufferReceived(buffer: ByteArray?) = Unit
-        override fun onEndOfSpeech() = Unit
-        override fun onError(error: Int) {
-            DebugTraceStore.record("voice_message_asr_error", mapOf("code" to error))
-            voiceMessageAsrRecognizer?.destroy()
-            voiceMessageAsrRecognizer = null
-        }
-        override fun onResults(results: Bundle?) {
-            val text = results
-                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()?.trim()
-                ?.takeIf { it.isNotBlank() }
-            voiceMessageTranscription = text
-            text?.let { voiceOverlay?.updatePartial(it) }
-            DebugTraceStore.record("voice_message_asr_result", mapOf("text" to (text ?: "")))
-            voiceMessageAsrRecognizer?.destroy()
-            voiceMessageAsrRecognizer = null
-        }
-        override fun onPartialResults(partialResults: Bundle?) {
-            val text = partialResults
-                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()?.trim()
-                ?.takeIf { it.isNotBlank() }
-            voiceMessagePartialText = text
-            text?.let { voiceOverlay?.updatePartial(it) }
-        }
-        override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 
     /** 语音消息模式：录音结束，将音频以语音气泡发送（携带 ASR 原文）。 */
@@ -502,8 +487,8 @@ internal class MainSpeechInputActions(
             return
         }
         isHoldActive = false
-        // 停止 ASR 采集，等候最终结果已由 onResults/onError 回调写入 voiceMessageTranscription
-        runCatching { voiceMessageAsrRecognizer?.stopListening() }
+        // 停止 ASR 采集，最终结果已由 bridge 回调写入 voiceMessageTranscription
+        runCatching { voiceMessageBridge?.stop() }
         voiceHoldButton().text = when (zone) {
             VoiceRecordingOverlay.Zone.AI_REPLY -> "AI回复中..."
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> "转文字中..."
@@ -532,6 +517,8 @@ internal class MainSpeechInputActions(
         attachment: PendingAttachment
     ) {
         val transcription = currentVoiceMessageText()
+        // 在 cleanup 重置 asrAllFailed 前先读取
+        val serverFallbackNeeded = transcription == null && voiceMessageAsrAllFailed
         cleanupVoiceMessageRecognition()
         voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
@@ -541,9 +528,39 @@ internal class MainSpeechInputActions(
                 "bytes" to attachment.file.length(),
                 "duration_sec" to (attachment.durationSeconds ?: 0),
                 "has_transcription" to (transcription != null),
+                "server_fallback" to serverFallbackNeeded,
                 "zone" to zone.name
             )
         )
+        // SEND / CANCEL 不需要转写文字，直接处理
+        if (zone == VoiceRecordingOverlay.Zone.SEND) {
+            sendVoiceAttachment(attachment.copy(transcription = transcription), "")
+            return
+        }
+        if (zone == VoiceRecordingOverlay.Zone.CANCEL) {
+            discardVoiceAttachment(attachment)
+            return
+        }
+        // AI_REPLY / TRANSCRIBE：本地 ASR 全失败时尝试服务器 Whisper
+        if (serverFallbackNeeded) {
+            voiceHoldButton().text = "识别中..."
+            uploadAudioForTranscription(attachment.file) { text ->
+                activity.runOnUiThread {
+                    voiceHoldButton().text = "按住 说话"
+                    applyVoiceZoneAction(zone, attachment, text)
+                }
+            }
+            return
+        }
+        applyVoiceZoneAction(zone, attachment, transcription)
+    }
+
+    /** 根据区域决定最终行为（在获得转写文字后调用）。 */
+    private fun applyVoiceZoneAction(
+        zone: VoiceRecordingOverlay.Zone,
+        attachment: PendingAttachment,
+        transcription: String?
+    ) {
         when (zone) {
             VoiceRecordingOverlay.Zone.AI_REPLY -> {
                 val sender = sendTextDirect
@@ -554,7 +571,7 @@ internal class MainSpeechInputActions(
                     sender(voiceAiReplyText(transcription))
                     return
                 }
-                // ASR 没拿到文字时，保留老逻辑：仍然把语音气泡发出去。
+                // 还是没拿到文字：把语音气泡发出去
                 val messageText = if (!isFriendChatActive() && transcription != null) transcription else ""
                 sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
             }
@@ -569,11 +586,56 @@ internal class MainSpeechInputActions(
                 setInputText(transcription)
             }
             VoiceRecordingOverlay.Zone.SEND -> {
-                // 直接发送语音气泡给对方，不经 AI
-                val messageText = if (!isFriendChatActive() && transcription != null) transcription else ""
-                sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
+                sendVoiceAttachment(attachment.copy(transcription = transcription), "")
             }
             VoiceRecordingOverlay.Zone.CANCEL -> discardVoiceAttachment(attachment)
+        }
+    }
+
+    /**
+     * 将录音文件上传到服务器 `/api/voice/asr`，回调返回识别文字（失败时为 null）。
+     * 在后台线程执行 HTTP，结果通过 callback 传回（调用方负责切换到主线程）。
+     */
+    private fun uploadAudioForTranscription(file: File, callback: (String?) -> Unit) {
+        activity.lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                val bytes = file.readBytes()
+                val ext = file.extension.lowercase().let { if (it.isEmpty()) "m4a" else it }
+                val mime = when (ext) {
+                    "wav" -> "audio/wav"
+                    "mp3" -> "audio/mpeg"
+                    "ogg", "oga" -> "audio/ogg"
+                    "webm" -> "audio/webm"
+                    "aac" -> "audio/aac"
+                    else -> "audio/m4a"
+                }
+                val requestBody = okhttp3.MultipartBody.Builder()
+                    .setType(okhttp3.MultipartBody.FORM)
+                    .addFormDataPart("audio", file.name,
+                        bytes.toRequestBody(mime.toMediaType()))
+                    .addFormDataPart("format", mime)
+                    .build()
+                val authToken = AuthManager.token(activity) ?: ""
+                val request = Request.Builder()
+                    .url("$serverUrl/api/voice/asr")
+                    .addHeader("Authorization", "Bearer $authToken")
+                    .post(requestBody)
+                    .build()
+                http.newCall(request).execute().use { resp ->
+                    val body = resp.body?.string() ?: ""
+                    if (resp.isSuccessful) {
+                        val text = JSONObject(body).optString("text", "").trim()
+                        DebugTraceStore.record("voice_asr_server_result", mapOf("text" to text))
+                        callback(text.ifBlank { null })
+                    } else {
+                        DebugTraceStore.record("voice_asr_server_error", mapOf("code" to resp.code, "body" to body))
+                        callback(null)
+                    }
+                }
+            }.onFailure { e ->
+                DebugTraceStore.record("voice_asr_server_exception", mapOf("error" to e.message))
+                callback(null)
+            }
         }
     }
 
@@ -582,7 +644,7 @@ internal class MainSpeechInputActions(
         isHoldActive = false
         translationGeneration += 1
         isSpeechCanceled = true
-        runCatching { voiceMessageAsrRecognizer?.cancel() }
+        runCatching { voiceMessageBridge?.cancel() }
         cleanupVoiceMessageRecognition()
         voiceRecorder.cancel()
         voiceOverlay?.hide()
@@ -595,10 +657,11 @@ internal class MainSpeechInputActions(
             ?: voiceMessagePartialText?.trim()?.takeIf { it.isNotBlank() }
 
     private fun cleanupVoiceMessageRecognition() {
-        voiceMessageAsrRecognizer?.destroy()
-        voiceMessageAsrRecognizer = null
+        voiceMessageBridge?.destroy()
+        voiceMessageBridge = null
         voiceMessageTranscription = null
         voiceMessagePartialText = null
+        voiceMessageAsrAllFailed = false
     }
 
     private fun discardVoiceAttachment(attachment: PendingAttachment) {

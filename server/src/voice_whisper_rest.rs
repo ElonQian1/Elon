@@ -154,6 +154,70 @@ impl WhisperRestCandidate {
             .to_string();
         Ok(text)
     }
+
+    /// 把已编码音频字节（AAC/M4A/MP4/WAV 等）直接 POST 到 OpenAI `/v1/audio/transcriptions`。
+    ///
+    /// 与 `transcribe` 不同，这里不做 PCM→WAV 转换，直接发原始文件，适用于
+    /// 客户端 MediaRecorder 输出的压缩格式。
+    pub async fn transcribe_raw(&self, audio: &[u8], mime: &str) -> Result<String> {
+        if audio.is_empty() {
+            return Ok(String::new());
+        }
+
+        // 从 MIME 推断文件名（OpenAI 通过文件名判断格式）
+        let ext = match mime {
+            "audio/wav" | "audio/x-wav" => "wav",
+            "audio/mp3" | "audio/mpeg" => "mp3",
+            "audio/ogg" | "audio/oga" => "ogg",
+            "audio/webm" => "webm",
+            "audio/aac" => "aac",
+            _ => "m4a",
+        };
+        let filename = format!("audio.{ext}");
+
+        let url = format!("{}/audio/transcriptions", self.base_url);
+
+        let audio_part = reqwest::multipart::Part::bytes(audio.to_vec())
+            .file_name(filename)
+            .mime_str(mime)
+            .context("设置 MIME 失败")?;
+        let form = reqwest::multipart::Form::new()
+            .part("file", audio_part)
+            .text("model", self.model.clone())
+            .text("language", self.language.clone())
+            .text("response_format", "json");
+
+        let resp = reqwest::Client::new()
+            .post(&url)
+            .bearer_auth(&self.api_key)
+            .multipart(form)
+            .timeout(std::time::Duration::from_secs(90))
+            .send()
+            .await
+            .with_context(|| format!("[{}] HTTP 请求失败 {url}", self.label))?;
+
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+
+        if !status.is_success() {
+            anyhow::bail!("[{}] 转写失败 {status}: {body}", self.label);
+        }
+
+        #[derive(Deserialize)]
+        struct Resp {
+            text: Option<String>,
+            transcript: Option<String>,
+        }
+        let parsed: Resp = serde_json::from_str(&body)
+            .with_context(|| format!("[{}] 解析响应失败: {body}", self.label))?;
+        let text = parsed
+            .text
+            .or(parsed.transcript)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        Ok(text)
+    }
 }
 
 /// 依次尝试所有候选，返回第一个成功的转写结果。
