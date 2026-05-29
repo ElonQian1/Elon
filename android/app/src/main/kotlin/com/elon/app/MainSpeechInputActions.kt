@@ -226,9 +226,15 @@ internal class MainSpeechInputActions(
         bridge.onError = { msg ->
             agentVoiceActive = false
             voiceOverlay?.hide()
-            voiceHoldButton().text = "按住 说话"
-            if (!isSpeechCanceled) {
-                Toast.makeText(activity, "语音识别失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
+            // SpeechRecognizer 所有引擎失败时（如 Honor MagicVoice 常驻占用 session），
+            // 静默 fallback 到云端语音（AudioRecord PCM，不调 RecognitionService）。
+            // 用户仍在按住按钮时无感知切换，松手后走 stopRealtimeVoice 正常提交。
+            val cloudFallback = !isSpeechCanceled && isHoldActive && startRealtimeVoice()
+            if (!cloudFallback) {
+                voiceHoldButton().text = "按住 说话"
+                if (!isSpeechCanceled) {
+                    Toast.makeText(activity, "语音识别失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
         voiceHoldButton().text = "准备识别..."
