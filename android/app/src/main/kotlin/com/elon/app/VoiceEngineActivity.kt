@@ -44,7 +44,7 @@ class VoiceEngineActivity : AppCompatActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         languageSpinner.adapter = adapter
         val savedCode = AsrFallbackSettings.getWhisperLanguage(this)
-        languageSpinner.setSelection(langCodes.indexOf(savedCode).coerceAtLeast(0))
+        languageSpinner.setSelection(langCodes.indexOf(savedCode).let { if (it < 0) langCodes.indexOf("auto") else it })
         languageSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
                 AsrFallbackSettings.setWhisperLanguage(this@VoiceEngineActivity, langCodes[position])

@@ -43,7 +43,7 @@ object AsrFallbackSettings {
      *   "auto"  = 自动检测
      */
     fun getWhisperLanguage(context: Context): String =
-        prefs(context).getString(KEY_WHISPER_LANGUAGE, "zh") ?: "zh"
+        prefs(context).getString(KEY_WHISPER_LANGUAGE, "auto") ?: "auto"
 
     fun setWhisperLanguage(context: Context, lang: String) {
         prefs(context).edit().putString(KEY_WHISPER_LANGUAGE, lang).apply()
