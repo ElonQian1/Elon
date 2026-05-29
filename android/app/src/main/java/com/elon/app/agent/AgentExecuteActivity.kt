@@ -224,7 +224,7 @@ class AgentExecuteActivity : Activity() {
                 textSize = 18f
                 setBackgroundColor(Color.TRANSPARENT)
                 setOnClickListener {
-                    startActivity(Intent(this@AgentExecuteActivity, com.elon.app.agent.ui.SettingsActivity::class.java))
+                    startActivity(Intent(this@AgentExecuteActivity, AgentConfigActivity::class.java))
                 }
             })
         }

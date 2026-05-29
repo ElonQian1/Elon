@@ -2,20 +2,36 @@
 package com.elon.app.agent
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import com.elon.app.agent.infrastructure.auth.AuthService
+
+// 暗黑主题色常量
+private const val BG          = "#0D0D0D"
+private const val SURFACE     = "#1A1A1A"
+private const val SURFACE2    = "#242424"
+private const val ACCENT      = "#4FC3F7"   // 主强调色（浅蓝）
+private const val ACCENT2     = "#81D4FA"   // 次强调色
+private const val TEXT_PRIM   = "#EFEFEF"
+private const val TEXT_SEC    = "#AAAAAA"
+private const val TEXT_DIM    = "#666666"
+private const val DIVIDER     = "#2C2C2C"
+private const val BTN_PRIMARY = "#1565C0"
+private const val BTN_DANGER  = "#B71C1C"
 
 /**
- * Agent 配置界面 V2.0
- * 支持多种 AI API Key 配置 + 语音助手模式选择
+ * Agent 配置界面 V2.0 — 暗黑主题
+ * 支持多种 AI API Key 配置 + 语音助手模式选择 + 账号状态
  */
 class AgentConfigActivity : Activity() {
 
@@ -50,11 +66,13 @@ class AgentConfigActivity : Activity() {
     }
 
     private lateinit var statusText: TextView
+    private lateinit var accountStatusText: TextView
     private lateinit var hunyuanKeyInput: EditText
     private lateinit var qwenVLKeyInput: EditText
     private lateinit var openaiKeyInput: EditText
     private lateinit var visionProviderSpinner: Spinner
     private lateinit var websocketPortInput: EditText
+    private lateinit var authService: AuthService
 
     // 语音模式回退排序
     private val modeOrderList: MutableList<String> = mutableListOf(
@@ -67,27 +85,36 @@ class AgentConfigActivity : Activity() {
     private lateinit var cliProjectIdInput: EditText
     private lateinit var cliServerUrlInput: EditText
 
-// API Key 区域
+    // API Key 区域
     private lateinit var apiKeySection: LinearLayout
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        authService = AuthService(this)
 
-        val scrollView = ScrollView(this)
+        val scrollView = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor(BG))
+        }
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
+            setPadding(dp(20), dp(16), dp(20), dp(32))
+            setBackgroundColor(Color.parseColor(BG))
         }
 
-        // === 标题区 ===
-        layout.addView(createTitle())
+        // === 顶部标题栏 ===
+        layout.addView(createTopBar())
+
+        // === 账号状态卡片 ===
+        layout.addView(createAccountCard())
+
         layout.addView(createDivider())
 
-        // === 服务状态区 ===
+        // === 无障碍服务状态 ===
         statusText = TextView(this).apply {
             text = "检查中..."
-            textSize = 16f
-            setPadding(0, 16, 0, 24)
+            textSize = 13f
+            setTextColor(Color.parseColor(TEXT_SEC))
+            setPadding(0, 0, 0, dp(8))
         }
         layout.addView(statusText)
 
@@ -95,25 +122,23 @@ class AgentConfigActivity : Activity() {
         // === 🎙️ 语音助手模式回退顺序 ===
         // ================================================================
         layout.addView(createSectionTitle("🎙️ 语音助手模式（回退顺序）"))
-        layout.addView(createHint("按顺序尝试，未填写配置的模式自动跳过；简单模式无需配置，始终作为最终兜底"))
+        layout.addView(createHint("按顺序尝试，未填写配置的模式自动跳过；简单模式无需配置，始终兜底"))
 
         modeOrderLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 8, 0, 8)
+            setPadding(0, dp(4), 0, dp(4))
         }
         layout.addView(modeOrderLayout)
 
         layout.addView(createDivider())
 
         // ================================================================
-        // === 🧠 API Key 配置区（仅 apikey 模式） ===
+        // === 🧠 API Key 配置区 ===
         // ================================================================
         apiKeySection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-
         apiKeySection.addView(createSectionTitle("🧠 混元 AI 配置"))
-
         apiKeySection.addView(createLabel("混元 API Key", true))
-        hunyuanKeyInput = createPasswordInput("输入混元 API Key")
+        hunyuanKeyInput = createTextInput("输入混元 API Key", password = true)
         apiKeySection.addView(hunyuanKeyInput)
         apiKeySection.addView(createHint("从腾讯云控制台获取，用于语音意图分析和对话回复"))
 
@@ -124,47 +149,36 @@ class AgentConfigActivity : Activity() {
                 android.R.layout.simple_spinner_dropdown_item,
                 listOf("不使用视觉服务", "通义千问 VL", "OpenAI GPT-4V")
             )
+            setBackgroundColor(Color.parseColor(SURFACE2))
         }
         apiKeySection.addView(visionProviderSpinner)
 
         apiKeySection.addView(createLabel("通义千问 VL API Key", false))
-        qwenVLKeyInput = createPasswordInput("输入通义千问 API Key")
+        qwenVLKeyInput = createTextInput("输入通义千问 API Key", password = true)
         apiKeySection.addView(qwenVLKeyInput)
         apiKeySection.addView(createHint("用于图片理解，从阿里云控制台获取"))
 
         apiKeySection.addView(createLabel("OpenAI API Key", false))
-        openaiKeyInput = createPasswordInput("输入 OpenAI API Key")
+        openaiKeyInput = createTextInput("输入 OpenAI API Key", password = true)
         apiKeySection.addView(openaiKeyInput)
         apiKeySection.addView(createHint("用于 GPT-4V 视觉分析"))
-
         layout.addView(apiKeySection)
 
         // ================================================================
-        // === 🖥️ 服务器 CLI 配置区（仅 cli 模式） ===
+        // === 🖥️ 服务器 CLI 配置区 ===
         // ================================================================
         cliSection = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-
         cliSection.addView(createSectionTitle("🖥️ 服务器 CLI 配置"))
-        cliSection.addView(createHint("语音输入将发送给 elon 服务器，由服务器上的 AI CLI 回答。\n需要已登录 elon APP 并拥有一个项目。"))
-
+        cliSection.addView(createHint("语音输入将发送给 elon 服务器由 AI CLI 回答\n需要已登录 elon APP 并拥有一个项目"))
         cliSection.addView(createLabel("Project ID", true))
-        cliProjectIdInput = EditText(this).apply {
-            hint = "例如：abc123def456"
-            inputType = InputType.TYPE_CLASS_TEXT
-            isSingleLine = true
-        }
+        cliProjectIdInput = createTextInput("例如：abc123def456")
         cliSection.addView(cliProjectIdInput)
         cliSection.addView(createHint("在 elon APP 项目设置中可查看项目 ID"))
-
         cliSection.addView(createLabel("服务器地址 (可选)", false))
-        cliServerUrlInput = EditText(this).apply {
-            hint = "http://43.139.149.158:8080"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            isSingleLine = true
-        }
+        cliServerUrlInput = createTextInput("http://43.139.149.158:8080",
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         cliSection.addView(cliServerUrlInput)
         cliSection.addView(createHint("留空则使用默认服务器"))
-
         layout.addView(cliSection)
 
         layout.addView(createDivider())
@@ -174,106 +188,234 @@ class AgentConfigActivity : Activity() {
         // ================================================================
         layout.addView(createSectionTitle("🌐 网络配置"))
         layout.addView(createLabel("WebSocket 端口", false))
-        websocketPortInput = EditText(this).apply {
-            hint = "11452"
-            inputType = InputType.TYPE_CLASS_NUMBER
-        }
+        websocketPortInput = createTextInput("11452", inputType = InputType.TYPE_CLASS_NUMBER)
         layout.addView(websocketPortInput)
         layout.addView(createHint("PC 端连接使用的端口"))
 
         layout.addView(createDivider())
 
-        // === 按钮区 ===
-        val buttonLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, 24, 0, 16)
-        }
-        val saveButton = Button(this).apply {
-            text = "💾 保存配置"
-            setOnClickListener { saveConfig() }
-        }
-        buttonLayout.addView(saveButton)
-        val testButton = Button(this).apply {
-            text = "🧪 测试连接"
-            setOnClickListener { testConnection() }
-        }
-        buttonLayout.addView(testButton)
-        
-        layout.addView(buttonLayout)
-        
-        // 无障碍设置按钮
-        val accessibilityButton = Button(this).apply {
-            text = "⚙️ 打开无障碍设置"
-            setOnClickListener { openAccessibilitySettings() }
-        }
-        layout.addView(accessibilityButton)
-        
+        // === 操作按钮区 ===
+        layout.addView(createActionButtons())
+
+        // 无障碍设置
+        layout.addView(createDarkButton("⚙️ 打开无障碍设置", color = "#37474F") {
+            openAccessibilitySettings()
+        })
+
         // 版本信息
         layout.addView(TextView(this).apply {
             text = "Android AI Agent V2.0"
-            textSize = 12f
-            setTextColor(Color.GRAY)
+            textSize = 11f
+            setTextColor(Color.parseColor(TEXT_DIM))
             gravity = Gravity.CENTER
-            setPadding(0, 32, 0, 0)
+            setPadding(0, dp(24), 0, 0)
         })
-        
+
         scrollView.addView(layout)
         setContentView(scrollView)
-        
-        // 加载配置
+
         loadConfig()
         updateServiceStatus()
     }
-    
+
     override fun onResume() {
         super.onResume()
         updateServiceStatus()
+        refreshAccountCard()
     }
-    
-    // === UI 辅助方法 ===
+
+    // ================================================================
+    // === UI 构建方法 ===
+    // ================================================================
+
+    private fun createTopBar(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(0, dp(8), 0, dp(16))
+
+        addView(Button(this@AgentConfigActivity).apply {
+            text = "← 返回"
+            textSize = 14f
+            setTextColor(Color.parseColor(ACCENT))
+            setBackgroundColor(Color.TRANSPARENT)
+            setPadding(0, 0, dp(8), 0)
+            setOnClickListener { finish() }
+        })
+
+        addView(TextView(this@AgentConfigActivity).apply {
+            text = "🤖 AI Agent 配置"
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor(TEXT_PRIM))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+    }
+
+    private lateinit var accountCard: LinearLayout
+
+    private fun createAccountCard(): LinearLayout {
+        val user = authService.getCurrentUser()
+        val isLoggedIn = authService.isLoggedIn()
+        accountCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor(SURFACE))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+
+            // 头像
+            addView(TextView(this@AgentConfigActivity).apply {
+                text = if (isLoggedIn) "👤" else "🔓"
+                textSize = 22f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { rightMargin = dp(12) }
+            })
+
+            // 账号信息
+            addView(LinearLayout(this@AgentConfigActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+
+                addView(TextView(this@AgentConfigActivity).apply {
+                    text = if (isLoggedIn) (user?.nickname ?: user?.username ?: "已登录") else "未登录"
+                    textSize = 15f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.parseColor(TEXT_PRIM))
+                })
+                addView(TextView(this@AgentConfigActivity).apply {
+                    text = if (isLoggedIn) "@${user?.username ?: ""}  ☁️ 已同步" else "登录后可同步配置、使用服务器 CLI"
+                    textSize = 12f
+                    setTextColor(Color.parseColor(if (isLoggedIn) "#4CAF50" else TEXT_SEC))
+                })
+            })
+
+            // 登录/登出按钮
+            addView(Button(this@AgentConfigActivity).apply {
+                accountStatusText = this
+                text = if (isLoggedIn) "登出" else "登录"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(if (isLoggedIn) BTN_DANGER else BTN_PRIMARY))
+                setPadding(dp(16), dp(4), dp(16), dp(4))
+                setOnClickListener {
+                    if (authService.isLoggedIn()) {
+                        AlertDialog.Builder(this@AgentConfigActivity)
+                            .setTitle("退出登录")
+                            .setMessage("确定要退出吗？")
+                            .setPositiveButton("确定") { _, _ ->
+                                authService.logout()
+                                refreshAccountCard()
+                            }
+                            .setNegativeButton("取消", null)
+                            .show()
+                    } else {
+                        startActivity(Intent(this@AgentConfigActivity,
+                            com.elon.app.agent.ui.LoginActivity::class.java))
+                    }
+                }
+            })
+        }
+        return accountCard
+    }
+
+    private fun refreshAccountCard() {
+        // 重新渲染账号卡片内容
+        val parent = accountCard.parent as? LinearLayout ?: return
+        val idx = (0 until parent.childCount).firstOrNull { parent.getChildAt(it) == accountCard } ?: return
+        parent.removeViewAt(idx)
+        parent.addView(createAccountCard(), idx)
+    }
+
+    private fun createActionButtons(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER
+        setPadding(0, dp(16), 0, dp(8))
+
+        val lp = LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, dp(4), 0) }
+
+        addView(createDarkButton("💾 保存", color = BTN_PRIMARY, lp = lp) { saveConfig() })
+        addView(createDarkButton("🔍 检查", color = "#1B5E20", lp = lp) { testConnection() })
+    }
+
+    private fun createDarkButton(
+        label: String,
+        color: String = BTN_PRIMARY,
+        lp: LinearLayout.LayoutParams? = null,
+        onClick: () -> Unit
+    ): Button = Button(this).apply {
+        text = label
+        textSize = 14f
+        setTextColor(Color.WHITE)
+        setBackgroundColor(Color.parseColor(color))
+        layoutParams = lp ?: LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
+        ).apply { setMargins(0, dp(4), 0, dp(4)) }
+        setOnClickListener { onClick() }
+    }
 
     private fun createTitle(): TextView = TextView(this).apply {
         text = "🤖 AI Agent 配置中心"
-        textSize = 24f
+        textSize = 22f
         setTypeface(null, Typeface.BOLD)
+        setTextColor(Color.parseColor(TEXT_PRIM))
         gravity = Gravity.CENTER
-        setPadding(0, 0, 0, 16)
+        setPadding(0, 0, 0, dp(12))
     }
 
     private fun createSectionTitle(title: String): TextView = TextView(this).apply {
         text = title
-        textSize = 18f
+        textSize = 16f
         setTypeface(null, Typeface.BOLD)
-        setPadding(0, 16, 0, 8)
+        setTextColor(Color.parseColor(ACCENT))
+        setPadding(0, dp(16), 0, dp(6))
     }
 
     private fun createLabel(text: String, required: Boolean): TextView = TextView(this).apply {
         this.text = if (required) "$text *" else text
-        textSize = 14f
-        setPadding(0, 16, 0, 4)
-        if (required) setTextColor(Color.parseColor("#1976D2"))
+        textSize = 13f
+        setTextColor(Color.parseColor(if (required) ACCENT2 else TEXT_SEC))
+        setPadding(0, dp(12), 0, dp(2))
     }
 
     private fun createHint(hint: String): TextView = TextView(this).apply {
         text = hint
-        textSize = 12f
-        setTextColor(Color.GRAY)
-        setPadding(0, 0, 0, 8)
+        textSize = 11f
+        setTextColor(Color.parseColor(TEXT_DIM))
+        setPadding(0, 0, 0, dp(4))
     }
 
-    private fun createPasswordInput(hint: String): EditText = EditText(this).apply {
+    private fun createTextInput(
+        hint: String,
+        password: Boolean = false,
+        inputType: Int = InputType.TYPE_CLASS_TEXT
+    ): EditText = EditText(this).apply {
         this.hint = hint
-        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        this.inputType = if (password) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                        else inputType
         isSingleLine = true
+        setTextColor(Color.parseColor(TEXT_PRIM))
+        setHintTextColor(Color.parseColor(TEXT_DIM))
+        setBackgroundColor(Color.parseColor(SURFACE2))
+        setPadding(dp(12), dp(10), dp(12), dp(10))
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(2); bottomMargin = dp(2) }
     }
 
     private fun createDivider(): View = View(this).apply {
         layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 2
-        ).apply { setMargins(0, 24, 0, 24) }
-        setBackgroundColor(Color.LTGRAY)
+            LinearLayout.LayoutParams.MATCH_PARENT, 1
+        ).apply { setMargins(0, dp(16), 0, dp(16)) }
+        setBackgroundColor(Color.parseColor(DIVIDER))
     }
+
+    private fun dp(dp: Int): Int = (dp * resources.displayMetrics.density + 0.5f).toInt()
 
     // === 模式排序 UI ===
 
@@ -283,58 +425,52 @@ class AgentConfigActivity : Activity() {
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 6, 0, 6)
+                setBackgroundColor(Color.parseColor(SURFACE))
+                setPadding(dp(12), dp(8), dp(8), dp(8))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, dp(3), 0, dp(3)) }
             }
             val label = TextView(this).apply {
                 text = "#${index + 1}  ${modeName(mode)}"
-                textSize = 15f
+                textSize = 14f
+                setTextColor(Color.parseColor(if (mode == VOICE_MODE_SIMPLE) TEXT_SEC else TEXT_PRIM))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                if (mode == VOICE_MODE_SIMPLE) setTextColor(Color.GRAY)
             }
             row.addView(label)
 
-            // 上移按钮（第一个不显示）
             if (index > 0) {
-                val upBtn = Button(this).apply {
-                    text = "↑"
-                    textSize = 14f
-                    setPadding(dp2px(12), dp2px(2), dp2px(12), dp2px(2))
-                    setOnClickListener {
-                        val tmp = modeOrderList[index - 1]
-                        modeOrderList[index - 1] = modeOrderList[index]
-                        modeOrderList[index] = tmp
-                        refreshModeOrderUI()
-                    }
-                }
-                row.addView(upBtn)
-            } else {
-                row.addView(View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp2px(60), 1)
+                row.addView(createOrderBtn("↑") {
+                    val tmp = modeOrderList[index - 1]; modeOrderList[index - 1] = modeOrderList[index]; modeOrderList[index] = tmp
+                    refreshModeOrderUI()
                 })
+            } else {
+                row.addView(View(this).apply { layoutParams = LinearLayout.LayoutParams(dp(52), 1) })
             }
 
-            // 下移按钮（最后一个不显示）
             if (index < modeOrderList.size - 1) {
-                val downBtn = Button(this).apply {
-                    text = "↓"
-                    textSize = 14f
-                    setPadding(dp2px(12), dp2px(2), dp2px(12), dp2px(2))
-                    setOnClickListener {
-                        val tmp = modeOrderList[index + 1]
-                        modeOrderList[index + 1] = modeOrderList[index]
-                        modeOrderList[index] = tmp
-                        refreshModeOrderUI()
-                    }
-                }
-                row.addView(downBtn)
+                row.addView(createOrderBtn("↓") {
+                    val tmp = modeOrderList[index + 1]; modeOrderList[index + 1] = modeOrderList[index]; modeOrderList[index] = tmp
+                    refreshModeOrderUI()
+                })
             }
 
             modeOrderLayout.addView(row)
         }
     }
 
-    private fun dp2px(dp: Int): Int =
-        (dp * resources.displayMetrics.density + 0.5f).toInt()
+    private fun createOrderBtn(label: String, onClick: () -> Unit): Button = Button(this).apply {
+        text = label
+        textSize = 14f
+        setTextColor(Color.parseColor(ACCENT))
+        setBackgroundColor(Color.parseColor(SURFACE2))
+        setPadding(dp(12), dp(2), dp(12), dp(2))
+        layoutParams = LinearLayout.LayoutParams(dp(52), dp(36)).apply { setMargins(dp(4), 0, 0, 0) }
+        setOnClickListener { onClick() }
+    }
+
+    private fun dp2px(dp: Int): Int = dp(dp)
 
     // === 配置管理 ===
 
@@ -427,15 +563,14 @@ class AgentConfigActivity : Activity() {
     }
 
     private fun updateServiceStatus() {
-        val v1Enabled = isServiceEnabled("AgentService")
         val v2Enabled = isServiceEnabled("AgentServiceV2")
-
-        statusText.text = buildString {
-            append("📱 服务状态:\n")
-            append(if (v1Enabled) "  ✅ V1 服务：已启用\n" else "  ⚪ V1 服务：未启用\n")
-            append(if (v2Enabled) "  ✅ V2 服务：已启用 (推荐)" else "  ⚪ V2 服务：未启用")
-            if (!v1Enabled && !v2Enabled) append("\n\n⚠️ 请点击下方按钮启用无障碍服务")
+        val v1Enabled = isServiceEnabled("AgentService")
+        statusText.text = when {
+            v2Enabled -> "✅ V2 无障碍服务运行中"
+            v1Enabled -> "✅ V1 无障碍服务运行中"
+            else      -> "⚠️ 无障碍服务未启用 — 点击下方按钮前往开启"
         }
+        statusText.setTextColor(Color.parseColor(if (v1Enabled || v2Enabled) "#4CAF50" else "#FF7043"))
     }
 
     private fun isServiceEnabled(serviceName: String): Boolean {
