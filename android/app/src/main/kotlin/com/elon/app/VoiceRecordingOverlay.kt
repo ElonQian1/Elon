@@ -357,7 +357,7 @@ private class VoiceActionTrayView(
             drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
         } else {
             // FRIEND_CHAT: AI回复 在上方中央，"发 送" 在下方默认区域
-            drawOption(canvas, "AI回复", width * 0.50f, 78f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
             drawOption(canvas, "发 送", width * 0.50f, 154f * density, zone == VoiceRecordingOverlay.Zone.SEND)
         }
 
@@ -373,7 +373,9 @@ private class VoiceActionTrayView(
             VoiceRecordingOverlay.Zone.SEND -> "松开 发送"
         }
         subTextPaint.color = Color.parseColor("#2B2B2B")
-        canvas.drawText(releaseLabel, width * 0.50f, height - 50f * density, subTextPaint)
+        if (zone != VoiceRecordingOverlay.Zone.SEND) {
+            canvas.drawText(releaseLabel, width * 0.50f, height - 50f * density, subTextPaint)
+        }
     }
 
     private fun drawOption(canvas: Canvas, label: String, x: Float, y: Float, selected: Boolean) {
