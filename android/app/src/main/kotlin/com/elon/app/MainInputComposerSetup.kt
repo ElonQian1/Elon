@@ -21,6 +21,7 @@ import com.elon.app.databinding.ActivityMainBinding
 internal data class MainInputComposerViews(
     val inputModeButton: ImageButton,
     val attachmentButton: ImageButton,
+    val emojiButton: ImageButton,
     val voiceHoldButton: TextView,
     val inputBarContainer: LinearLayout,
     val inputCenterContainer: FrameLayout,
@@ -31,6 +32,7 @@ internal data class MainInputComposerViews(
     val inputRightControls: FrameLayout,
     val inputComposerMotion: InputComposerMotion,
     val attachmentPanel: LinearLayout,
+    val emojiPanel: LinearLayout,
     val runtimeInputModeStrip: RuntimeInputModeStrip,
     val expandEditorButton: ImageButton
 )
@@ -43,6 +45,7 @@ internal class MainInputComposerSetup(
     private val isVoiceMode: () -> Boolean,
     private val shouldAnimateInputFocus: () -> Boolean,
     private val isAttachmentPanelOpen: () -> Boolean,
+    private val isEmojiPanelOpen: () -> Boolean,
     private val toggleVoiceMode: () -> Unit,
     private val focusInputComposer: () -> Unit,
     private val startSpeechToText: () -> Unit,
@@ -52,8 +55,11 @@ internal class MainInputComposerSetup(
     private val showModelPopupOrLoad: () -> Unit,
     private val sendMessage: () -> Unit,
     private val toggleAttachmentPanel: () -> Unit,
+    private val toggleEmojiPanel: () -> Unit,
     private val buildAttachmentPanel: () -> LinearLayout,
+    private val buildEmojiPanel: () -> LinearLayout,
     private val collapseAttachmentPanel: () -> Unit,
+    private val collapseEmojiPanel: () -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val updateCollapsedInputPreview: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
@@ -257,6 +263,18 @@ internal class MainInputComposerSetup(
         modelButtonShell.addView(modelButton)
         modelButtonShell.addView(modelChevron)
 
+        val emojiButton = ImageButton(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                marginEnd = dp(8)
+            }
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(R.drawable.ic_input_emoji_circle)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            contentDescription = "打开表情"
+            setOnClickListener { toggleEmojiPanel() }
+        }
+
         inputCenterContainer.addView(collapsedInputPreview)
         expandedInputContainer.addView(inputEdit)
         expandedInputContainer.addView(voiceHoldButton)
@@ -287,12 +305,14 @@ internal class MainInputComposerSetup(
 
         inputBarContainer.addView(inputModeButton)
         inputBarContainer.addView(modelButtonShell)
+        inputBarContainer.addView(emojiButton)
         inputBarContainer.addView(inputCenterContainer)
         inputRightControls.addView(attachmentButton)
         inputRightControls.addView(sendButton)
         inputBarContainer.addView(inputRightControls)
 
         val attachmentPanel = buildAttachmentPanel()
+        val emojiPanel = buildEmojiPanel()
         val runtimeInputModeStrip = RuntimeInputModeStrip(
             activity = activity,
             dp = dp,
@@ -302,6 +322,7 @@ internal class MainInputComposerSetup(
         root.addView(runtimeInputModeStrip.view)
         root.addView(inputBarContainer)
         root.addView(attachmentPanel)
+        root.addView(emojiPanel)
 
         inputComposerMotion = InputComposerMotion(
             expandedInputContainer = expandedInputContainer,
@@ -334,18 +355,23 @@ internal class MainInputComposerSetup(
                 if (isAttachmentPanelOpen()) {
                     collapseAttachmentPanel()
                 }
+                if (isEmojiPanelOpen()) {
+                    collapseEmojiPanel()
+                }
                 collapseInputComposer()
             }
             false
         }
         binding.stageHintText.setOnClickListener {
             collapseAttachmentPanel()
+            collapseEmojiPanel()
             collapseInputComposer()
         }
 
         return MainInputComposerViews(
             inputModeButton = inputModeButton,
             attachmentButton = attachmentButton,
+            emojiButton = emojiButton,
             voiceHoldButton = voiceHoldButton,
             inputBarContainer = inputBarContainer,
             inputCenterContainer = inputCenterContainer,
@@ -356,6 +382,7 @@ internal class MainInputComposerSetup(
             inputRightControls = inputRightControls,
             inputComposerMotion = inputComposerMotion,
             attachmentPanel = attachmentPanel,
+            emojiPanel = emojiPanel,
             runtimeInputModeStrip = runtimeInputModeStrip,
             expandEditorButton = expandEditorButton
         )

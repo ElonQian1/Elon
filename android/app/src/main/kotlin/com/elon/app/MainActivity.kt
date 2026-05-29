@@ -418,10 +418,7 @@ class MainActivity : AppCompatActivity() {
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
             collapseInputComposer = { animate -> inputActions.inputFocusActions.collapseInputComposer(animate) },
-            collapseInputComposerForBack = {
-                inputActions.hideFullScreenEditorForBack() ||
-                    inputActions.inputFocusActions.collapseInputComposerForBack()
-            },
+            collapseInputComposerForBack = { inputActions.hideInputOverlaysForBack() },
             isChatSideMenuOpen = { chatSideMenuController.isOpen },
             closeChatSideMenu = { animate -> chatSideMenuController.close(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,

@@ -23,12 +23,14 @@ internal class MainVoiceModeActions(
     private val isVoiceMode: () -> Boolean,
     private val setVoiceMode: (Boolean) -> Unit,
     private val collapseAttachmentPanel: () -> Unit,
+    private val collapseEmojiPanel: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
 ) {
     fun toggleVoiceMode() {
         setVoiceMode(!isVoiceMode())
         collapseAttachmentPanel()
+        collapseEmojiPanel()
         applyVoiceMode()
     }
 

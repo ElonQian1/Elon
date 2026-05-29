@@ -54,6 +54,7 @@ internal class MainInputActions(
             onSend = { sendMessageActions.sendMessage() }
         )
 
+        emojiActions.setupEmojiLaunchers()
         val views = MainInputComposerSetup(
             activity = activity,
             binding = binding,
@@ -62,6 +63,7 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             shouldAnimateInputFocus = { !suppressInputFocusAnimation },
             isAttachmentPanelOpen = { attachmentPanelActions.isOpen },
+            isEmojiPanelOpen = { emojiActions.isOpen },
             toggleVoiceMode = { voiceModeActions.toggleVoiceMode() },
             focusInputComposer = { inputFocusActions.focusInputComposer() },
             startSpeechToText = { speechInputActions().startSpeechToText() },
@@ -71,8 +73,11 @@ internal class MainInputActions(
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
             sendMessage = { sendMessageActions.sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
+            toggleEmojiPanel = { emojiActions.toggleEmojiPanel() },
             buildAttachmentPanel = { attachmentPanelActions.buildAttachmentPanel() },
+            buildEmojiPanel = { emojiActions.buildEmojiPanel() },
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             updateCollapsedInputPreview = { collapsedInputPreviewActions.updateCollapsedInputPreview() },
             updateSendButtonVisual = ::updateSendButtonVisual,
@@ -108,6 +113,16 @@ internal class MainInputActions(
         return true
     }
 
+    fun hideInputOverlaysForBack(): Boolean {
+        if (hideFullScreenEditorForBack()) return true
+        if (emojiActions.collapseEmojiPanelForBack()) return true
+        if (attachmentPanelActions.isOpen) {
+            attachmentPanelActions.collapseAttachmentPanel()
+            return true
+        }
+        return inputFocusActions.collapseInputComposerForBack()
+    }
+
     fun updateRunningInputModeStrip() {
         inputComposerViewsOrNull()?.runtimeInputModeStrip?.refresh(
             visible = conversationTaskRegistryActions().isActiveConversationWorking() && !isFriendChatActive(),
@@ -141,6 +156,25 @@ internal class MainInputActions(
         sendMessageActions.sendMessage()
     }
 
+    private fun addCustomEmojiAttachment(item: CustomEmojiItem): Boolean {
+        if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
+            Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        val attachment = CustomEmojiStore.toPendingAttachment(activity, item, pendingAttachments.size + 1)
+        if (attachment == null) {
+            Toast.makeText(activity, "这个表情文件已不存在", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        pendingAttachments.add(attachment)
+        if (voiceMode) {
+            voiceMode = false
+            voiceModeActions.applyVoiceMode()
+        }
+        refreshPendingAttachmentPreview()
+        return true
+    }
+
     val adaptiveInputHeightActions: MainAdaptiveInputHeightActions by lazy {
         MainAdaptiveInputHeightActions(
             binding = binding,
@@ -165,6 +199,7 @@ internal class MainInputActions(
             requestKeyboardLift = { keyboardInsetsAnimationActions?.requestKeyboardLift() },
             releaseKeyboardLift = { keyboardInsetsAnimationActions?.releaseKeyboardLift() },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },
+            collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
         )
@@ -198,7 +233,10 @@ internal class MainInputActions(
         MainSendMessageActions(
             binding = binding,
             pendingAttachments = pendingAttachments,
-            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            collapseAttachmentPanel = {
+                attachmentPanelActions.collapseAttachmentPanel()
+                emojiActions.collapseEmojiPanel()
+            },
             isActiveConversationWorking = { conversationTaskRegistryActions().isActiveConversationWorking() },
             runningInputMode = { runningInputMode },
             activeProject = projectStateActions()::activeProject,
@@ -277,9 +315,26 @@ internal class MainInputActions(
             attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
             openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() }
+        )
+    }
+
+    val emojiActions: MainEmojiActions by lazy {
+        MainEmojiActions(
+            activity = activity,
+            binding = binding,
+            dp = uiTools()::dp,
+            selectableForeground = uiTools()::selectableForeground,
+            activeConversation = projectStateActions()::activeConversation,
+            emojiPanel = { inputComposerViewsOrNull()?.emojiPanel },
+            emojiButton = { inputComposerViewsOrNull()?.emojiButton },
+            collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            addPendingEmojiAttachment = ::addCustomEmojiAttachment,
+            updateSendButtonVisual = ::updateSendButtonVisual,
+            updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
         )
     }
 
@@ -297,6 +352,7 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }
         )
@@ -354,6 +410,7 @@ internal class MainInputActions(
             isFriendChatActive = isFriendChatActive,
             setInputCanSend = { inputCanSend = it },
             inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
+            emojiButton = { inputComposerViewsOrNull()?.emojiButton },
             voiceHoldButton = { inputComposerViewsOrNull()?.voiceHoldButton },
             modelButtonShell = { inputComposerViewsOrNull()?.modelButtonShell },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },

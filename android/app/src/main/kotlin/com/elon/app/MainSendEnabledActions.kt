@@ -11,6 +11,7 @@ internal class MainSendEnabledActions(
     private val isFriendChatActive: () -> Boolean,
     private val setInputCanSend: (Boolean) -> Unit,
     private val inputModeButton: () -> ImageButton?,
+    private val emojiButton: () -> ImageButton?,
     private val voiceHoldButton: () -> TextView?,
     private val modelButtonShell: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
@@ -34,6 +35,10 @@ internal class MainSendEnabledActions(
         inputModeButton()?.let { button ->
             button.isEnabled = !conversationEnded
             button.alpha = if (conversationEnded) 0.55f else 1f
+        }
+        emojiButton()?.let { button ->
+            button.isEnabled = !conversationEnded
+            button.alpha = if (conversationEnded) 0.55f else 0.92f
         }
         voiceHoldButton()?.let { button ->
             button.isEnabled = !conversationEnded

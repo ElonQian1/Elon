@@ -20,6 +20,7 @@ internal class MainAttachmentPanelActions(
     private val attachmentPanel: () -> LinearLayout?,
     private val attachmentButton: () -> ImageButton?,
     private val collapseInputComposer: () -> Unit,
+    private val collapseEmojiPanel: () -> Unit,
     private val openCameraAttachment: () -> Unit,
     private val openPhotoAttachment: () -> Unit,
     private val openDocumentAttachment: () -> Unit
@@ -59,6 +60,7 @@ internal class MainAttachmentPanelActions(
 
     fun expandAttachmentPanel() {
         if (activeConversation().ended) return
+        collapseEmojiPanel()
         collapseInputComposer()
         if (isOpen) return
         val panel = attachmentPanel() ?: return

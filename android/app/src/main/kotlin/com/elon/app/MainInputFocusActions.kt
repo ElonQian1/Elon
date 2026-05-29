@@ -21,6 +21,7 @@ internal class MainInputFocusActions(
     private val requestKeyboardLift: () -> Unit,
     private val releaseKeyboardLift: () -> Unit,
     private val setSuppressInputFocusAnimation: (Boolean) -> Unit,
+    private val collapseEmojiPanel: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
 ) {
@@ -32,6 +33,7 @@ internal class MainInputFocusActions(
 
     fun focusInputComposer() {
         if (!isFriendChatActive() && activeConversation().ended) return
+        collapseEmojiPanel()
         keyboardVisibleSinceFocus = false
         keyboardVisibleAt = 0L
         installKeyboardCollapseWatcher()
