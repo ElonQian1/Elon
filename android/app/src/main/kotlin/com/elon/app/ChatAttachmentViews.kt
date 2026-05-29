@@ -23,6 +23,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.math.max
+import kotlin.math.min
 
 internal fun bindChatAttachmentViews(
     container: LinearLayout?,
@@ -150,7 +151,7 @@ private fun createVoiceAttachmentView(
         gravity = Gravity.CENTER_VERTICAL
         layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), context.dp(VOICE_BUBBLE_HEIGHT_DP))
         minimumWidth = context.dp(VOICE_BUBBLE_MIN_WIDTH_DP)
-        setPadding(context.dp(12), 0, context.dp(12), 0)
+        setPadding(context.dp(14), 0, context.dp(14), 0)
         background = voiceBubbleBackground(context, isSent, bgColor)
         isClickable = true
         isFocusable = true
@@ -158,7 +159,7 @@ private fun createVoiceAttachmentView(
 
     // 波形图标（仿微信 3 道弧线，播放时动画）
     val waveIcon = VoiceWaveIconView(context, waveColor, faceRight = !isSent).apply {
-        layoutParams = LinearLayout.LayoutParams(context.dp(18), context.dp(18))
+        layoutParams = LinearLayout.LayoutParams(context.dp(30), context.dp(24))
         isPlaying = VoiceMessagePlayer.isCurrentlyPlaying(source)
     }
 
@@ -291,10 +292,17 @@ private class VoiceWaveIconView(
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        paint.strokeWidth = (w * 0.11f).coerceAtLeast(1.5f)
+        if (w <= 0f || h <= 0f) return
+
+        val density = resources.displayMetrics.density
+        val stroke = (min(w, h) * 0.12f).coerceIn(1.8f * density, 2.6f * density)
+        val inset = stroke / 2f + density
+        val centerY = h / 2f
+        val maxRadius = (h / 2f - inset).coerceAtLeast(1f)
+        paint.strokeWidth = stroke
 
         for (i in 0..2) {
-            val r = (i + 1) * w / 4.5f
+            val r = maxRadius * (0.42f + i * 0.29f)
             val alpha: Float = if (isPlaying) {
                 // 三道弧依次循环点亮
                 val t = ((animPhase - i * 0.25f + 1f) % 1f)
@@ -306,8 +314,8 @@ private class VoiceWaveIconView(
             }
             paint.alpha = (alpha * 255).toInt()
 
-            val cx = if (faceRight) r * 0.5f else w - r * 0.5f
-            val oval = RectF(cx - r, h / 2f - r, cx + r, h / 2f + r)
+            val cx = if (faceRight) inset + r else w - inset - r
+            val oval = RectF(cx - r, centerY - r, cx + r, centerY + r)
             val startAngle = if (faceRight) -50f else 130f
             canvas.drawArc(oval, startAngle, 100f, false, paint)
         }
@@ -452,7 +460,7 @@ private fun List<ChatAttachment>.attachmentRenderSignature(): String {
 }
 
 private const val MAX_CHAT_ATTACHMENTS = 6
-private const val VOICE_BUBBLE_HEIGHT_DP = 40
-private const val VOICE_BUBBLE_MIN_WIDTH_DP = 92
+private const val VOICE_BUBBLE_HEIGHT_DP = 42
+private const val VOICE_BUBBLE_MIN_WIDTH_DP = 104
 private const val VOICE_BUBBLE_MAX_WIDTH_DP = 216
 private const val VOICE_BUBBLE_WIDTH_PER_SECOND_DP = 2
