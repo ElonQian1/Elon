@@ -52,6 +52,9 @@ class SettingsActivity : AppCompatActivity() {
         loadCurrentConfig()
 
         findViewById<Button>(R.id.saveButton).setOnClickListener { saveConfig() }
+        findViewById<Button>(R.id.tokenUsageButton).setOnClickListener {
+            startActivity(android.content.Intent(this, TokenUsageActivity::class.java))
+        }
         findViewById<Button>(R.id.checkUpdateButton).setOnClickListener {
             AppUpdateManager(this).manualCheck()
         }

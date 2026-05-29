@@ -235,6 +235,17 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
+        <!-- ── Token 用量统计 ── -->
+        <Button
+            android:id="@+id/tokenUsageButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#7B1FA2"
+            android:text="📊 Token 用量统计"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
+
         <!-- ── 检查更新 ── -->
         <Button
             android:id="@+id/checkUpdateButton"
