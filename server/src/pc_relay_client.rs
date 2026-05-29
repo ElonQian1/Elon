@@ -1,11 +1,11 @@
 //! PC 本地 relay 客户端：在本地模式下连接到云端 /agent/ws，
-//! 接收 HttpRequest 消息并转发给本机 HTTP server，再把响应回传给云端。
+//! 接收 HttpRequest / CliPrompt 消息并在本机处理，把结果回传给云端。
 //!
-//! 通过 `RELAY_CLOUD_URL` 和 `ELON_AGENT_ID` / `ELON_AGENT_SECRET` 环境变量配置。
+//! 支持并发：多个请求同时处理，不互相阻塞。
 //!
-//! 典型配置（start-local.ps1 会设置）：
-//!   RELAY_CLOUD_URL  = wss://43.139.149.158:8080/agent/ws
-//!   ELON_AGENT_ID    = elon-pc-1
+//! 通过环境变量配置（start-local.ps1 会设置）：
+//!   RELAY_CLOUD_URL   = ws://43.139.149.158:8080/agent/ws
+//!   ELON_AGENT_ID     = elon-pc-1
 //!   ELON_AGENT_SECRET = <64字符随机hex>
 //!   LOCAL_SERVER_PORT = 7800
 
@@ -14,6 +14,7 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, ServerToAgent, PROTO_VERSION};
 use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
@@ -41,12 +42,7 @@ pub fn spawn_if_configured() {
         agent_id, cloud_url
     );
 
-    tokio::spawn(run_relay_loop(
-        cloud_url,
-        agent_id,
-        agent_secret,
-        local_port,
-    ));
+    tokio::spawn(run_relay_loop(cloud_url, agent_id, agent_secret, local_port));
 }
 
 async fn run_relay_loop(
@@ -77,42 +73,55 @@ async fn run_relay_session(
     local_port: u16,
 ) -> Result<()> {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-    // into_client_request 会自动生成 Sec-WebSocket-Key 等握手头
     let mut request = cloud_url.into_client_request()?;
     request.headers_mut().insert(
         "Authorization",
         format!("Bearer {}", agent_secret).parse()?,
     );
 
-    let (mut ws, _) = connect_async(request).await?;
+    let (ws_stream, _) = connect_async(request).await?;
     info!("[relay-client] 已连接到云端 {}", cloud_url);
+
+    // 拆分读写，用 channel 让并发任务向 WS 写消息
+    let (ws_write, mut ws_read) = ws_stream.split();
+    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+
+    // 写任务：drain out_rx → ws_write
+    let writer = tokio::spawn(async move {
+        let mut sink = ws_write;
+        while let Some(msg) = out_rx.recv().await {
+            if sink.send(msg).await.is_err() {
+                break;
+            }
+        }
+        let _ = sink.close().await;
+    });
 
     // 发送 Register 帧
     let register = AgentToServer::Register {
         agent_id: agent_id.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: PROTO_VERSION,
-        allowed_clis: vec![],
+        allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
     };
-    ws.send(Message::Text(serde_json::to_string(&register)?))
-        .await?;
+    out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");
 
     let http_client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(55))
         .build()?;
-
     let local_base = format!("http://127.0.0.1:{}", local_port);
 
-    while let Some(frame) = ws.next().await {
+    // 读循环：每条消息都可能并发处理
+    while let Some(frame) = ws_read.next().await {
         let frame = frame?;
         let text = match frame {
             Message::Text(t) => t,
             Message::Close(_) => break,
             Message::Ping(d) => {
-                ws.send(Message::Pong(d)).await?;
+                let _ = out_tx.send(Message::Pong(d));
                 continue;
             }
             _ => continue,
@@ -135,38 +144,127 @@ async fn run_relay_session(
                 body_b64,
             } => {
                 let url = format!("{}{}", local_base, path);
-                let response = handle_http_request(
-                    &http_client,
-                    &req_id,
-                    &method,
-                    &url,
-                    headers,
-                    body_b64,
-                )
-                .await;
-                let resp_text = serde_json::to_string(&response)?;
-                ws.send(Message::Text(resp_text)).await?;
+                let client = http_client.clone();
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let resp =
+                        handle_http_request(&client, &req_id, &method, &url, headers, body_b64)
+                            .await;
+                    let _ = tx.send(Message::Text(serde_json::to_string(&resp).unwrap()));
+                });
             }
+
+            ServerToAgent::CliPrompt {
+                req_id,
+                cli,
+                extra_args,
+                prompt,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(handle_cli_prompt(req_id, cli, extra_args, prompt, tx));
+            }
+
             ServerToAgent::Ping { nonce } => {
                 let pong = AgentToServer::Pong { nonce };
-                ws.send(Message::Text(serde_json::to_string(&pong)?))
-                    .await?;
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&pong)?));
             }
-            // exec 命令在本地模式下暂不支持
+
+            // Exec 在本地 relay 模式下不支持（使用 CliPrompt 替代）
             ServerToAgent::Exec { task_id, .. } => {
                 let err = AgentToServer::TaskError {
                     task_id,
-                    message: "本地 relay 模式不支持 exec 命令".into(),
+                    message: "本地 relay 模式请使用 CliPrompt 代替 Exec".into(),
                 };
-                ws.send(Message::Text(serde_json::to_string(&err)?))
-                    .await?;
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
-            _ => {}
+
+            ServerToAgent::Cancel { .. } => {
+                // TODO: 取消正在运行的 CLI 任务（当前忽略）
+            }
         }
     }
 
+    drop(out_tx);
+    let _ = writer.await;
     Ok(())
 }
+
+// ── CliPrompt 处理 ────────────────────────────────────────────────────────────
+
+async fn handle_cli_prompt(
+    req_id: String,
+    cli: String,
+    extra_args: Vec<String>,
+    prompt: String,
+    out: mpsc::UnboundedSender<Message>,
+) {
+    info!("[relay-client] CliPrompt: cli={cli} req_id={req_id}");
+    let (exit_ok, error) =
+        match run_cli_and_stream(&req_id, &cli, &extra_args, &prompt, &out).await {
+            Ok(ok) => (ok, None),
+            Err(e) => {
+                warn!("[relay-client] CLI 执行失败: {e:#}");
+                (false, Some(e.to_string()))
+            }
+        };
+    let done = AgentToServer::CliDone {
+        req_id,
+        exit_ok,
+        error,
+    };
+    let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
+}
+
+async fn run_cli_and_stream(
+    req_id: &str,
+    cli: &str,
+    extra_args: &[String],
+    prompt: &str,
+    out: &mpsc::UnboundedSender<Message>,
+) -> Result<bool> {
+    use tokio::io::AsyncBufReadExt;
+    use tokio::process::Command;
+
+    let mut cmd = Command::new(cli);
+    for arg in extra_args {
+        cmd.arg(arg);
+    }
+    cmd.arg("-p").arg(prompt);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::null()); // 不转发 stderr（包含 stats/warning）
+    cmd.kill_on_drop(true);
+
+    let mut child = cmd.spawn().map_err(|e| anyhow!("启动 {cli} 失败: {e}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow!("无法获取 stdout"))?;
+
+    // 流式转发 stdout
+    let req_id_s = req_id.to_string();
+    let out_clone = out.clone();
+    let stream_task = tokio::spawn(async move {
+        let mut reader = tokio::io::BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let chunk = AgentToServer::CliChunk {
+                req_id: req_id_s.clone(),
+                text: format!("{}\n", line),
+            };
+            if out_clone
+                .send(Message::Text(serde_json::to_string(&chunk).unwrap()))
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+
+    let status = child.wait().await?;
+    let _ = stream_task.await;
+    Ok(status.success())
+}
+
+// ── HTTP 请求转发 ─────────────────────────────────────────────────────────────
 
 async fn handle_http_request(
     client: &reqwest::Client,

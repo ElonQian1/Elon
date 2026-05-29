@@ -31,6 +31,18 @@ pub enum ServerToAgent {
         /// base64 编码的 body（GET 等无 body 时为 None）
         body_b64: Option<String>,
     },
+    /// 云端把 AI 提示发给 PC，让 PC 用本地 CLI（copilot/codex）执行，流式返回结果
+    CliPrompt {
+        /// 唯一请求 ID，用于匹配 CliChunk/CliDone
+        req_id: String,
+        /// CLI 可执行文件名，如 "copilot" 或 "codex"
+        cli: String,
+        /// 额外参数（在 -p/prompt 之前），可为空
+        #[serde(default)]
+        extra_args: Vec<String>,
+        /// 完整的提示内容
+        prompt: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +94,18 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC CLI 执行的流式输出片段
+    CliChunk {
+        req_id: String,
+        text: String,
+    },
+    /// PC CLI 执行完毕（最后一帧）
+    CliDone {
+        req_id: String,
+        exit_ok: bool,
+        #[serde(default)]
+        error: Option<String>,
+    },
 }
 
 impl AgentToServer {
@@ -92,14 +116,27 @@ impl AgentToServer {
             | Self::TaskStderr { task_id, .. }
             | Self::TaskExit { task_id, .. }
             | Self::TaskError { task_id, .. } => Some(task_id.as_str()),
-            Self::Register { .. } | Self::Pong { .. } | Self::HttpResponse { .. } | Self::HttpError { .. } => None,
+            Self::Register { .. }
+            | Self::Pong { .. }
+            | Self::HttpResponse { .. }
+            | Self::HttpError { .. }
+            | Self::CliChunk { .. }
+            | Self::CliDone { .. } => None,
         }
     }
 
     pub fn req_id(&self) -> Option<&str> {
         match self {
-            Self::HttpResponse { req_id, .. } | Self::HttpError { req_id, .. } => Some(req_id.as_str()),
+            Self::HttpResponse { req_id, .. }
+            | Self::HttpError { req_id, .. }
+            | Self::CliChunk { req_id, .. }
+            | Self::CliDone { req_id, .. } => Some(req_id.as_str()),
             _ => None,
         }
+    }
+
+    /// CliChunk 需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
+    pub fn is_final_req_msg(&self) -> bool {
+        !matches!(self, Self::CliChunk { .. })
     }
 }

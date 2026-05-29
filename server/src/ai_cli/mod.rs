@@ -16,6 +16,7 @@ mod ai_cli_tests;
 pub use self::ai_cli_types::{IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
+use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -67,6 +68,31 @@ pub async fn run_with_workspace(
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     let started = std::time::Instant::now();
+
+    // ── PC agent 委托（优先）──────────────────────────────────────────────────
+    // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
+    // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
+    // 通过 PC_CLI_RELAY_ENABLED=false 可禁用此功能，回退到云端本地 CLI。
+    let pc_relay_enabled = std::env::var("PC_CLI_RELAY_ENABLED")
+        .map(|v| v != "false")
+        .unwrap_or(true);
+    if pc_relay_enabled {
+        if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
+            let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
+            match run_via_pc_agent(&agent_id, user_message, preflight_note, state, tx).await {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
+                    let _ = tx.send(
+                        WsMessage::progress(format!("PC CLI 暂不可用，切换本地 CLI: {e}"))
+                            .to_json(),
+                    );
+                }
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     let mut option = state
         .ai_cli
         .find_option(option_id)
@@ -499,4 +525,65 @@ pub async fn run_with_workspace(
     );
 
     Ok(())
+}
+
+// ── PC agent 委托辅助函数 ─────────────────────────────────────────────────────
+
+/// 把 AI 请求委托给通过 WS 连接的 PC agent（elon-pc-1），在 PC 上执行 Copilot CLI。
+/// 结果以流式 CliChunk 形式返回并转发给 APK。
+async fn run_via_pc_agent(
+    agent_id: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    let prompt = match preflight_note {
+        Some(note) => format!(
+            "你是一龙开发助手，帮助用户开发移动端 App。\n\n注意：{}\n\n用户请求：{}",
+            note, user_message
+        ),
+        None => format!(
+            "你是一龙开发助手，帮助用户开发移动端 App。\n\n用户请求：{}",
+            user_message
+        ),
+    };
+
+    let (_, mut rx) = state
+        .agent_manager
+        .dispatch_cli_prompt(agent_id, "copilot".into(), vec![], prompt)
+        .await?;
+
+    let mut full_text = String::new();
+    while let Some(event) = rx.recv().await {
+        match event {
+            AgentToServer::CliChunk { text, .. } => {
+                full_text.push_str(&text);
+                // 流式进度发给 APK，让用户实时看到输出
+                let _ = tx.send(WsMessage::AssistantMessage { text }.to_json());
+            }
+            AgentToServer::CliDone { exit_ok, error, .. } => {
+                if exit_ok {
+                    // 发送最终完成消息
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(), // AssistantMessage 已流式发过了
+                            apk_url: None,
+                            image_url: None,
+                        }
+                        .to_json(),
+                    );
+                    return Ok(());
+                } else {
+                    return Err(anyhow!(
+                        "PC CLI 执行失败: {}",
+                        error.unwrap_or_default()
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }

@@ -58,6 +58,38 @@ impl AgentManager {
         Self::default()
     }
 
+    /// 返回第一个当前在线的 PC agent ID（优先用于 CLI 委托）
+    pub async fn any_connected_agent_id(&self) -> Option<String> {
+        self.agents.read().await.keys().next().cloned()
+    }
+
+    /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
+    pub async fn dispatch_cli_prompt(
+        &self,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        prompt: String,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(ServerToAgent::CliPrompt {
+                req_id: req_id.clone(),
+                cli,
+                extra_args,
+                prompt,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        Ok((req_id, rx))
+    }
+
     pub async fn list(&self) -> Vec<AgentSummary> {
         self.agents
             .read()
@@ -305,10 +337,15 @@ async fn run_agent_session(
                                 p.remove(&task_id);
                             }
                         } else if let Some(req_id) = msg.req_id() {
-                            // HTTP relay response — one-shot, always remove
+                            // HTTP relay / CLI streaming — CliChunk 保留，其余删除
                             let req_id = req_id.to_string();
+                            let is_final = msg.is_final_req_msg();
                             let mut p = pending_r.lock().await;
-                            if let Some(tx) = p.remove(&req_id) {
+                            if is_final {
+                                if let Some(tx) = p.remove(&req_id) {
+                                    let _ = tx.send(msg);
+                                }
+                            } else if let Some(tx) = p.get(&req_id) {
                                 let _ = tx.send(msg);
                             }
                         } else {
