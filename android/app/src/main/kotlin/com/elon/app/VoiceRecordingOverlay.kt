@@ -26,12 +26,15 @@ internal class VoiceRecordingOverlay(
 ) {
     enum class Mode { AGENT, FRIEND_CHAT }
     enum class Zone { AI_REPLY, TRANSCRIBE, CANCEL, SEND }
+    /** 识别生命周期各阶段，用于在 partial 文字为空时给用户状态反馈 */
+    enum class ListeningState { PREPARING, LISTENING, HEARD, PROCESSING, SILENCE }
 
     private var root: FrameLayout? = null
     private var bubbleView: VoiceWaveBubbleView? = null
     private var partialView: TextView? = null
     private var trayView: VoiceActionTrayView? = null
     private var partialText: String = ""
+    private var stateHint: String = ""
     private var zone: Zone = Zone.AI_REPLY
     private var initialTouchRawY: Float? = null
 
@@ -95,6 +98,7 @@ internal class VoiceRecordingOverlay(
         partialView = partial
         trayView = tray
         partialText = ""
+        stateHint = "准备中..."
         initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
         applyZone()
@@ -160,8 +164,26 @@ internal class VoiceRecordingOverlay(
         partialView = null
         trayView = null
         partialText = ""
+        stateHint = ""
         initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
+    }
+
+    /** 更新麦克风实时音量（0-1），驱动波形条高度动态变化 */
+    fun setVolume(v: Float) {
+        bubbleView?.setVolume(v)
+    }
+
+    /** 在 partial 文字为空时展示识别阶段状态文字 */
+    fun setListeningState(state: ListeningState) {
+        stateHint = when (state) {
+            ListeningState.PREPARING -> "准备中..."
+            ListeningState.LISTENING -> "正在听..."
+            ListeningState.HEARD -> "听到了，松手发送"
+            ListeningState.PROCESSING -> "识别中..."
+            ListeningState.SILENCE -> "没有检测到声音"
+        }
+        renderPartial()
     }
 
     private fun setZone(newZone: Zone) {
@@ -177,13 +199,20 @@ internal class VoiceRecordingOverlay(
     }
 
     private fun renderPartial() {
-        val fallback = when (zone) {
+        val zoneFallback = when (zone) {
             Zone.AI_REPLY -> if (mode == Mode.FRIEND_CHAT) "滑到这 AI回复" else "松开 AI回复"
             Zone.TRANSCRIBE -> "松开 转文字"
             Zone.CANCEL -> "松开 取消"
             Zone.SEND -> "松开 发送"
         }
-        partialView?.text = partialText.ifBlank { fallback }
+        // 在默认区域（未滑动选择）且无 partial 文字时，优先展示阶段状态提示
+        val isDefaultZone = (zone == Zone.AI_REPLY && mode == Mode.AGENT) ||
+                            (zone == Zone.SEND && mode == Mode.FRIEND_CHAT)
+        partialView?.text = when {
+            partialText.isNotBlank() -> partialText
+            stateHint.isNotBlank() && isDefaultZone -> stateHint
+            else -> zoneFallback
+        }
         partialView?.setTextColor(
             Color.parseColor(
                 when (zone) {
@@ -232,6 +261,23 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
             invalidate()
         }
 
+    /** 当前平滑后的音量值（0-1） */
+    private var currentVolume: Float = 0f
+
+    /**
+     * 接收 onRmsChanged 归一化后的音量（0-1）。
+     * 上升快（× 0.7 权重新值），下降慢（× 0.3 权重新值），让视觉感更自然。
+     */
+    fun setVolume(v: Float) {
+        val target = v.coerceIn(0f, 1f)
+        currentVolume = if (target > currentVolume) {
+            currentVolume * 0.3f + target * 0.7f
+        } else {
+            currentVolume * 0.7f + target * 0.3f
+        }
+        invalidate()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
@@ -250,11 +296,13 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
         val centerY = (height - notch) / 2f
         val barWidth = 2.2f * density
         val gap = 3.2f * density
-        val heights = floatArrayOf(7f, 12f, 18f, 26f, 19f, 30f, 22f, 14f, 20f, 12f, 7f)
-        val totalWidth = heights.size * barWidth + (heights.size - 1) * gap
+        val baseHeights = floatArrayOf(7f, 12f, 18f, 26f, 19f, 30f, 22f, 14f, 20f, 12f, 7f)
+        // 无声音时保留 25% 高度（有形但安静），满音量时 100%
+        val scale = 0.25f + currentVolume * 0.75f
+        val totalWidth = baseHeights.size * barWidth + (baseHeights.size - 1) * gap
         var x = centerX - totalWidth / 2f
-        heights.forEach { hDp ->
-            val half = hDp * density / 2f
+        baseHeights.forEach { hDp ->
+            val half = hDp * scale * density / 2f
             canvas.drawRoundRect(
                 x,
                 centerY - half,

@@ -49,6 +49,10 @@ internal class AgentVoiceBridge(context: Context) {
     var onError: (String) -> Unit = {}
     var onStart: () -> Unit = {}
     var onEnd: () -> Unit = {}
+    /** 实时麦克风音量（0-1），用于驱动波形动画 */
+    var onVolume: (Float) -> Unit = {}
+    /** 引擎绑定完成、可以开始说话 */
+    var onReady: () -> Unit = {}
 
     @Volatile
     var isRunning: Boolean = false
@@ -73,9 +77,14 @@ internal class AgentVoiceBridge(context: Context) {
 
     init {
         asr.callback = object : StreamingASRCallback {
-            override fun onReady() = Unit
+            override fun onReady() {
+                main.post { onReady() }
+            }
             override fun onSpeechStart() {
                 main.post { onStart() }
+            }
+            override fun onVolumeChanged(volume: Float) {
+                main.post { onVolume(volume) }
             }
             override fun onPartialResult(text: String, confidence: Float) {
                 if (text.isNotBlank()) sawAnyPartial = true

@@ -208,8 +208,18 @@ internal class MainSpeechInputActions(
         val overlay = voiceOverlay?.takeIf { it.mode == VoiceRecordingOverlay.Mode.AGENT }
             ?: VoiceRecordingOverlay(activity, VoiceRecordingOverlay.Mode.AGENT).also { voiceOverlay = it }
         overlay.show()
-        bridge.onStart = {
+        bridge.onReady = {
+            // 引擎绑定完成，开始收音
             voiceHoldButton().text = "正在听..."
+            voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.LISTENING)
+        }
+        bridge.onStart = {
+            // VAD 检测到声音开始
+            voiceHoldButton().text = "正在听..."
+            voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.LISTENING)
+        }
+        bridge.onVolume = { v ->
+            voiceOverlay?.setVolume(v)
         }
         bridge.onPartial = { text ->
             if (text.isNotBlank()) {
@@ -228,6 +238,12 @@ internal class MainSpeechInputActions(
             if (!agentVoiceActive) {
                 voiceHoldButton().text = "按住 说话"
                 agentBridge?.prewarm()  // 立刻重新预热，准备下次按键（消除 mibrain 冷启动延迟）
+            } else if (agentLastFinalText.isNotBlank() || agentLastPartialText.isNotBlank()) {
+                // SmartVAD 判断说完，已有识别内容，等用户松手
+                voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.HEARD)
+            } else {
+                // VAD 静音超时但无任何内容，提示用户没听到
+                voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.SILENCE)
             }
         }
         bridge.onError = { msg ->
@@ -244,7 +260,7 @@ internal class MainSpeechInputActions(
                 }
             }
         }
-        voiceHoldButton().text = "准备识别..."
+        voiceHoldButton().text = "准备中..."
         bridge.start()
         return true
     }
@@ -271,22 +287,21 @@ internal class MainSpeechInputActions(
         // 让 ASR 赶紧出最终结果。bridge.onFinal 可能同步或异步回调。
         bridge.stop()
         val targetZone = zone
-        // 如果 onFinal 已提前到达（agentLastFinalText 非空）则立即处理，
-        // 否则等待一个上限 1500ms 的窗口后用 partial 兑现。
+        // 松手后立即切到"识别中..."状态，让用户知道在等待引擎返回结果
+        voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.PROCESSING)
         val deadline = activity.window?.decorView
         deadline?.postDelayed({
             if (!agentVoiceActive) return@postDelayed
-            // 只在已有文字时提早提交。
-            // mibrain 云端 ASR 在 stopListening 后约 600ms 才返回结果，
-            // 250ms 抢先提交会导致 finalText="" → "没听清"，真实结果被丢弃。
-            // 无文字时什么都不做，等 onFinal 回调（~600ms）或 1500ms 安全网。
-            if (agentLastFinalText.isNotBlank() || agentLastPartialText.isNotBlank()) {
+            // 只在 final 已到达时才提早提交。
+            // partial 代表识别中间片段（可能只有一个字），用它提交会丢弃引擎
+            // 随后返回的完整 final 结果（mibrain 等引擎约 600ms 后才返回 final）。
+            if (agentLastFinalText.isNotBlank()) {
                 commitAgentVoiceFinal(targetZone)
             }
         }, 250L)
         deadline?.postDelayed({
             if (!agentVoiceActive) return@postDelayed
-            // 安全网：其他路径仍未完成时兑现 partial
+            // 安全网（1500ms）：final 仍未到时用 partial 兜底
             commitAgentVoiceFinal(targetZone)
         }, 1500L)
         // 同步绑定 onFinal，立即拿到结果就立即提交，跳过安全网调度
