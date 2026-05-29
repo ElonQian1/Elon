@@ -63,6 +63,11 @@ pub fn register_inner(
 
 pub fn auth_from_headers(state: &AppState, headers: &HeaderMap) -> anyhow::Result<PublicUser> {
     let token = bearer_token(headers).ok_or_else(|| anyhow::anyhow!("缺少 Authorization token"))?;
+    if let Some(owner) = &state.owner_token {
+        if token == owner {
+            return Ok(make_local_owner());
+        }
+    }
     state.store.authenticate_token(token)
 }
 
@@ -72,6 +77,11 @@ pub fn auth_from_headers_or_query(
     query: &HashMap<String, String>,
 ) -> anyhow::Result<PublicUser> {
     if let Some(token) = bearer_token(headers) {
+        if let Some(owner) = &state.owner_token {
+            if token == owner {
+                return Ok(make_local_owner());
+            }
+        }
         return state.store.authenticate_token(token);
     }
     let token = query
@@ -81,11 +91,35 @@ pub fn auth_from_headers_or_query(
     state.store.authenticate_token(token)
 }
 
+/// 本地 owner 虚拟用户（仅在 OWNER_TOKEN 匹配时使用）
+fn make_local_owner() -> PublicUser {
+    PublicUser {
+        id: "local-owner".to_string(),
+        account: "owner@local".to_string(),
+        nickname: Some("Elon".to_string()),
+        role: "owner".to_string(),
+        status: "active".to_string(),
+        avatar_data_url: None,
+    }
+}
+
 pub fn project_access(
     state: &AppState,
     user_id: &str,
     project_id: &str,
 ) -> anyhow::Result<ProjectAccess> {
+    // 本地 owner 对所有项目默认拥有 owner 权限
+    if state.owner_token.is_some() && user_id == "local-owner" {
+        return Ok(ProjectAccess {
+            id: project_id.to_string(),
+            name: project_id.to_string(),
+            workspace_key: project_id.to_string(),
+            source_type: "local".to_string(),
+            workspace_path: None,
+            role: "owner".to_string(),
+            status: "active".to_string(),
+        });
+    }
     state.store.get_project_access(user_id, project_id)
 }
 
