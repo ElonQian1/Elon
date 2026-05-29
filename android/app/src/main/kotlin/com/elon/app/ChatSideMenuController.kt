@@ -24,7 +24,6 @@ import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.abs
@@ -59,6 +58,8 @@ internal class ChatSideMenuController(
     private lateinit var overlay: FrameLayout
     private lateinit var panel: FrameLayout
     private lateinit var settingsBubble: FrameLayout
+    private lateinit var accountNameRow: TextView
+    private lateinit var usageDropdown: SideMenuUsageDropdown
     private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
     private var isSetup = false
@@ -385,9 +386,12 @@ internal class ChatSideMenuController(
             }
         )
 
-        panelBody.addView(settingsRow("账号信息") { showAccountInfo() })
+        accountNameRow = settingsRow(accountMenuTitle()) { showAccountInfo() }
+        panelBody.addView(accountNameRow)
         panelBody.addView(settingsRow("个人账户") { openAccountEntry() })
-        panelBody.addView(settingsRow("剩余用量") { showUsageHint() })
+        usageDropdown = SideMenuUsageDropdown(activity, dp, selectableForeground)
+        panelBody.addView(usageDropdown.rowView)
+        panelBody.addView(usageDropdown.detailsView)
         panelBody.addView(settingsRow("退出登录") { confirmLogout() })
         return bubble
     }
@@ -422,6 +426,9 @@ internal class ChatSideMenuController(
 
     private fun showSettingsBubble() {
         updateSettingsBubbleBounds()
+        if (::accountNameRow.isInitialized) {
+            accountNameRow.text = accountMenuTitle()
+        }
         settingsBubble.visibility = View.VISIBLE
         settingsBubble.animate().cancel()
         settingsBubble.alpha = 0f
@@ -440,6 +447,7 @@ internal class ChatSideMenuController(
 
     private fun hideSettingsBubble(animate: Boolean = true) {
         if (!isSetup || settingsBubble.visibility != View.VISIBLE) return
+        if (::usageDropdown.isInitialized) usageDropdown.collapse()
         settingsBubble.animate().cancel()
         if (!animate) {
             settingsBubble.visibility = View.GONE
@@ -504,20 +512,15 @@ internal class ChatSideMenuController(
             .show()
     }
 
+    private fun accountMenuTitle(): String =
+        if (AuthManager.isLoggedIn(activity)) AuthManager.displayName(activity) else "未登录"
+
     private fun openAccountEntry() {
         if (AuthManager.isLoggedIn(activity)) {
-            showAccountInfo()
+            activity.startActivity(Intent(activity, PersonalProfileActivity::class.java))
         } else {
             activity.startActivity(Intent(activity, LoginActivity::class.java))
         }
-    }
-
-    private fun showUsageHint() {
-        if (!AuthManager.isLoggedIn(activity)) {
-            Toast.makeText(activity, "请先登录账号才能查看用量统计", Toast.LENGTH_SHORT).show()
-            return
-        }
-        activity.startActivity(Intent(activity, TokenUsageActivity::class.java))
     }
 
     private fun applyPanelWidth() {
