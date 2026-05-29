@@ -58,7 +58,8 @@ class AgentConfigActivity : Activity() {
                 voiceModeOrder  = order,
                 cliProjectId    = prefs.getString("cli_project_id", "") ?: "",
                 cliServerUrl       = prefs.getString("cli_server_url", "http://43.139.149.158:8080") ?: "http://43.139.149.158:8080",
-                fallbackServerUrl  = prefs.getString("fallback_server_url", "") ?: ""
+                fallbackServerUrl   = prefs.getString("fallback_server_url", "") ?: "",
+                fallbackServerToken = prefs.getString("fallback_server_token", "") ?: ""
             )
         }
 
@@ -86,6 +87,7 @@ class AgentConfigActivity : Activity() {
     private lateinit var cliProjectIdInput: EditText
     private lateinit var cliServerUrlInput: EditText
     private lateinit var fallbackServerUrlInput: EditText
+    private lateinit var fallbackServerTokenInput: EditText
 
     // API Key 区域
     private lateinit var apiKeySection: LinearLayout
@@ -185,7 +187,12 @@ class AgentConfigActivity : Activity() {
         fallbackServerUrlInput = createTextInput("例如: http://192.168.31.100:8081 或 Tailscale IP",
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI)
         cliSection.addView(fallbackServerUrlInput)
-        cliSection.addView(createHint("主服务器断开连续 3 次后自动切振到备用\n备用需运行本地 elon-server，推荐用 Tailscale IP"))
+        cliSection.addView(createHint("主服务器断开连续 3 次后自动切换到备用\n备用需运行本地 homecli，推荐用 Tailscale IP"))
+        cliSection.addView(createLabel("备用服务器 Token (可选)", false))
+        fallbackServerTokenInput = createTextInput("homecli config.toml [owner].access_token 的值",
+            password = false)
+        cliSection.addView(fallbackServerTokenInput)
+        cliSection.addView(createHint("切换到备用服务器时使用此 Token（留空则复用云端登录 Token）"))
         layout.addView(cliSection)
 
         layout.addView(createDivider())
@@ -490,6 +497,7 @@ class AgentConfigActivity : Activity() {
         cliProjectIdInput.setText(config.cliProjectId)
         cliServerUrlInput.setText(config.cliServerUrl)
         fallbackServerUrlInput.setText(config.fallbackServerUrl)
+        fallbackServerTokenInput.setText(config.fallbackServerToken)
 
         visionProviderSpinner.setSelection(
             when (config.visionProvider) {
@@ -524,7 +532,8 @@ class AgentConfigActivity : Activity() {
             voiceModeOrder = order,
             cliProjectId      = cliProjectIdInput.text.toString().trim(),
             cliServerUrl      = serverUrl,
-            fallbackServerUrl = fallbackServerUrlInput.text.toString().trim()
+            fallbackServerUrl  = fallbackServerUrlInput.text.toString().trim(),
+            fallbackServerToken = fallbackServerTokenInput.text.toString().trim()
         )
 
         saveConfig(config)
@@ -564,7 +573,8 @@ class AgentConfigActivity : Activity() {
             .putString("voice_mode_order",   config.voiceModeOrder.joinToString(","))
             .putString("cli_project_id",       config.cliProjectId)
             .putString("cli_server_url",        config.cliServerUrl)
-            .putString("fallback_server_url",   config.fallbackServerUrl)
+            .putString("fallback_server_url",    config.fallbackServerUrl)
+            .putString("fallback_server_token",   config.fallbackServerToken)
             .apply()
     }
 
@@ -603,8 +613,9 @@ data class AgentConfig(
     val websocketPort:  Int    = 11452,
     val voiceModeOrder: List<String> = AgentConfigActivity.DEFAULT_MODE_ORDER, // 回退顺序列表
     val cliProjectId:   String = "",
-    val cliServerUrl:      String = "http://43.139.149.158:8080",
-    val fallbackServerUrl: String = ""
+    val cliServerUrl:       String = "http://43.139.149.158:8080",
+    val fallbackServerUrl:  String = "",
+    val fallbackServerToken: String = ""
 ) {
     val hasVision: Boolean
         get() = visionProvider != "none" && getVisionApiKey().isNotEmpty()

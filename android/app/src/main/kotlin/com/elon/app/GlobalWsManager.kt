@@ -62,7 +62,16 @@ class GlobalWsManager(private val serverUrl: String) {
     /** 开始保活连接。ctx 会提取 applicationContext，不会持有 Activity。 */
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
-        val latestToken = AuthManager.token(ctx)
+        val activeUrl = ServerUrlManager.getActive(ctx)
+        val isPrimary = (activeUrl == BuildConfig.SERVER_URL)
+        val latestToken = if (isPrimary) {
+            AuthManager.token(ctx)
+        } else {
+            ctx.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+                .getString("fallback_server_token", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: AuthManager.token(ctx)
+        }
         if (!running.compareAndSet(false, true)) {
             if (latestToken != connectedToken) reconnectWithNewToken()
             return
@@ -102,7 +111,16 @@ class GlobalWsManager(private val serverUrl: String) {
         val wsBase = activeUrl
             .replace("https://", "wss://")
             .replace("http://", "ws://")
-        val token = AuthManager.token(ctx)
+        // 备用服务器：优先使用 fallbackServerToken；云端：使用 session token
+        val isPrimary = (activeUrl == BuildConfig.SERVER_URL)
+        val token = if (isPrimary) {
+            AuthManager.token(ctx)
+        } else {
+            val fallbackToken = ctx.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+                .getString("fallback_server_token", null)
+                ?.takeIf { it.isNotBlank() }
+            fallbackToken ?: AuthManager.token(ctx)
+        }
         connectedToken = token
         val versionCode = BuildConfig.VERSION_CODE
 

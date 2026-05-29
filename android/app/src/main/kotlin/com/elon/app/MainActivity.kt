@@ -47,6 +47,18 @@ class MainActivity : AppCompatActivity() {
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
     private val serverUrl get() = ServerUrlManager.getActive(this)
+    /** 返回当前活跃服务器对应的 token：备用服务器使用本地静态 token，云端使用 session token。 */
+    private fun activeToken(): String? {
+        val activeUrl = ServerUrlManager.getActive(this)
+        return if (activeUrl == BuildConfig.SERVER_URL) {
+            AuthManager.token(this)
+        } else {
+            getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+                .getString("fallback_server_token", null)
+                ?.takeIf { it.isNotBlank() }
+                ?: AuthManager.token(this)
+        }
+    }
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
@@ -797,7 +809,7 @@ class MainActivity : AppCompatActivity() {
             showGitProjectDialog = ::showGitProjectDialog,
             http = s.http,
             serverUrl = serverUrl,
-            tokenProvider = { AuthManager.token(this) },
+            tokenProvider = { activeToken() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             removeSentProjectShareCards = { projectIds ->
                 friendChatActions.removeProjectShareCards(projectIds) +
@@ -855,7 +867,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             http = s.http,
             serverUrl = serverUrl,
-            tokenProvider = { AuthManager.token(this) },
+            tokenProvider = { activeToken() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             addJoinedProject = { storeProject ->
                 val newProject = storeProject.toJointAppProject()
@@ -892,7 +904,7 @@ class MainActivity : AppCompatActivity() {
             },
             sendMessage = { inputActions.sendMessageActions.sendMessage() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
-            tokenProvider = { AuthManager.token(this) }
+            tokenProvider = { activeToken() }
         )
     }
 
