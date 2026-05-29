@@ -326,6 +326,8 @@ private class VoiceActionTrayView(
     }
 
     private fun drawHighlight(canvas: Canvas, width: Float, density: Float) {
+        val actionCenterY = ACTION_OPTION_CENTER_Y_DP * density
+        val sendCenterY = SEND_OPTION_CENTER_Y_DP * density
         val cx = when (zone) {
             VoiceRecordingOverlay.Zone.CANCEL -> width * 0.19f
             VoiceRecordingOverlay.Zone.AI_REPLY -> width * 0.50f
@@ -333,41 +335,71 @@ private class VoiceActionTrayView(
             VoiceRecordingOverlay.Zone.SEND -> width * 0.50f
         }
         val cy = when {
-            zone == VoiceRecordingOverlay.Zone.SEND -> 150f * density
-            else -> 72f * density
+            zone == VoiceRecordingOverlay.Zone.SEND -> sendCenterY
+            else -> actionCenterY
         }
         val radius = if (zone == VoiceRecordingOverlay.Zone.SEND) 48f * density else 38f * density
         canvas.drawCircle(cx, cy, radius, highlightPaint)
     }
 
     private fun drawLabels(canvas: Canvas, width: Float, density: Float) {
-        textPaint.color = Color.parseColor("#EFEFEF")
-        canvas.save()
-        canvas.rotate(-16f, width * 0.19f, 78f * density)
-        drawOption(canvas, "取消", width * 0.19f, 82f * density, zone == VoiceRecordingOverlay.Zone.CANCEL)
-        canvas.restore()
+        val actionCenterY = ACTION_OPTION_CENTER_Y_DP * density
+        val sendCenterY = SEND_OPTION_CENTER_Y_DP * density
+        drawRotatedOption(
+            canvas,
+            "取消",
+            width * 0.19f,
+            actionCenterY,
+            -16f,
+            zone == VoiceRecordingOverlay.Zone.CANCEL
+        )
 
         if (mode == VoiceRecordingOverlay.Mode.AGENT) {
-            drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "AI回复", width * 0.50f, actionCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
         } else {
             // FRIEND_CHAT: AI回复 在上方中央，"发 送" 在下方默认区域
-            drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
-            drawOption(canvas, "发 送", width * 0.50f, 154f * density, zone == VoiceRecordingOverlay.Zone.SEND)
+            drawOption(canvas, "AI回复", width * 0.50f, actionCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "发 送", width * 0.50f, sendCenterY, zone == VoiceRecordingOverlay.Zone.SEND)
         }
 
+        drawRotatedOption(
+            canvas,
+            "转文字",
+            width * 0.81f,
+            actionCenterY,
+            14f,
+            zone == VoiceRecordingOverlay.Zone.TRANSCRIBE
+        )
+    }
+
+    private fun drawRotatedOption(
+        canvas: Canvas,
+        label: String,
+        x: Float,
+        centerY: Float,
+        degrees: Float,
+        selected: Boolean
+    ) {
         canvas.save()
-        canvas.rotate(14f, width * 0.81f, 78f * density)
-        drawOption(canvas, "转文字", width * 0.81f, 82f * density, zone == VoiceRecordingOverlay.Zone.TRANSCRIBE)
+        canvas.rotate(degrees, x, centerY)
+        drawOption(canvas, label, x, centerY, selected)
         canvas.restore()
     }
 
-    private fun drawOption(canvas: Canvas, label: String, x: Float, y: Float, selected: Boolean) {
+    private fun drawOption(canvas: Canvas, label: String, x: Float, centerY: Float, selected: Boolean) {
         textPaint.color = Color.parseColor(if (selected) "#FFFFFF" else "#E4E4E4")
         textPaint.isFakeBoldText = selected
-        canvas.drawText(label, x, y, textPaint)
+        val fontMetrics = textPaint.fontMetrics
+        val baseline = centerY - (fontMetrics.ascent + fontMetrics.descent) / 2f
+        canvas.drawText(label, x, baseline, textPaint)
         textPaint.isFakeBoldText = false
     }
 
     private fun sp(value: Float): Float =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, resources.displayMetrics)
+
+    private companion object {
+        const val ACTION_OPTION_CENTER_Y_DP = 78f
+        const val SEND_OPTION_CENTER_Y_DP = 154f
+    }
 }
