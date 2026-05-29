@@ -291,6 +291,7 @@ impl AppState {
             codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),
             codex_network: Arc::new(crate::codex_health::CodexNetworkHealth::from_env()),
             server_traces: Arc::new(crate::server_trace::ServerTraceStore::new()),
+            owner_token,
         })
     }
 
