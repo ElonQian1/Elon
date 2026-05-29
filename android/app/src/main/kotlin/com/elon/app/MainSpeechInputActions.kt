@@ -37,6 +37,7 @@ internal class MainSpeechInputActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val isFriendChatActive: () -> Boolean = { false },
+    private val isSocialAiChatActive: () -> Boolean = { false },
     private val sendTextDirect: ((String) -> Unit)? = null
 ) {
     private val voiceRecorder = VoiceAudioRecorder(activity)
@@ -49,6 +50,7 @@ internal class MainSpeechInputActions(
     // 语音消息模式：并行 ASR 采集原文
     private var voiceMessageAsrRecognizer: SpeechRecognizer? = null
     private var voiceMessageTranscription: String? = null
+    private var voiceMessagePartialText: String? = null
     // 方案 B：实时语音 → 转写 → AI 投递
     private var realtimeController: RealtimeVoiceController? = null
     // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
@@ -174,6 +176,7 @@ internal class MainSpeechInputActions(
         voiceMessageAsrRecognizer?.destroy()
         voiceMessageAsrRecognizer = null
         voiceMessageTranscription = null
+        voiceMessagePartialText = null
     }
 
     // ─── 手指拖动的 zone 反馈（仅端上模式生效） ─────────────────────
@@ -424,6 +427,9 @@ internal class MainSpeechInputActions(
         }
         // 并行启动 ASR：MediaRecorder 录音文件 + SpeechRecognizer 识别原文
         voiceMessageTranscription = null
+        voiceMessagePartialText = null
+        val overlay = voiceOverlay ?: VoiceRecordingOverlay(activity).also { voiceOverlay = it }
+        overlay.show()
         runCatching {
             voiceMessageAsrRecognizer?.destroy()
             voiceMessageAsrRecognizer = SpeechRecognizer.createSpeechRecognizer(activity).apply {
@@ -438,7 +444,7 @@ internal class MainSpeechInputActions(
             voiceMessageAsrRecognizer = null
         }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
-        voiceHoldButton().text = "松开 发送语音"
+        voiceHoldButton().text = "松开 AI回复"
         return true
     }
 
@@ -459,45 +465,97 @@ internal class MainSpeechInputActions(
                 ?.firstOrNull()?.trim()
                 ?.takeIf { it.isNotBlank() }
             voiceMessageTranscription = text
+            text?.let { voiceOverlay?.updatePartial(it) }
             DebugTraceStore.record("voice_message_asr_result", mapOf("text" to (text ?: "")))
             voiceMessageAsrRecognizer?.destroy()
             voiceMessageAsrRecognizer = null
         }
-        override fun onPartialResults(partialResults: Bundle?) = Unit
+        override fun onPartialResults(partialResults: Bundle?) {
+            val text = partialResults
+                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                ?.firstOrNull()?.trim()
+                ?.takeIf { it.isNotBlank() }
+            voiceMessagePartialText = text
+            text?.let { voiceOverlay?.updatePartial(it) }
+        }
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 
     /** 语音消息模式：录音结束，将音频以语音气泡发送（携带 ASR 原文）。 */
     private fun stopVoiceMessageRecording() {
+        val zone = voiceOverlay?.currentZone ?: VoiceRecordingOverlay.Zone.AI_REPLY
+        if (zone == VoiceRecordingOverlay.Zone.CANCEL) {
+            cancelVoiceMessageRecording()
+            return
+        }
         isHoldActive = false
         // 停止 ASR 采集，等候最终结果已由 onResults/onError 回调写入 voiceMessageTranscription
         runCatching { voiceMessageAsrRecognizer?.stopListening() }
-        voiceHoldButton().text = "上传中..."
+        voiceHoldButton().text = when (zone) {
+            VoiceRecordingOverlay.Zone.AI_REPLY -> "AI回复中..."
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> "转文字中..."
+            VoiceRecordingOverlay.Zone.CANCEL -> "按住 说话"
+        }
         val attachment = voiceRecorder.stopToAttachment()
-        voiceHoldButton().text = "按住 说话"
         if (attachment == null) {
+            cleanupVoiceMessageRecognition()
+            voiceOverlay?.hide()
+            voiceHoldButton().text = "按住 说话"
             DebugTraceStore.record("voice_message_record_empty", emptyMap())
-            Toast.makeText(activity, "语音太短，请轻追再试", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "语音太短，请轻触再试", Toast.LENGTH_SHORT).show()
             return
         }
-        val transcription = voiceMessageTranscription
-        voiceMessageTranscription = null
-        voiceMessageAsrRecognizer?.destroy()
-        voiceMessageAsrRecognizer = null
+        val finishGeneration = ++translationGeneration
+        val posted = activity.window?.decorView?.postDelayed({
+            if (finishGeneration != translationGeneration) return@postDelayed
+            finishVoiceMessageRecording(zone, attachment)
+        }, VOICE_MESSAGE_ASR_SETTLE_MS) ?: false
+        if (!posted) finishVoiceMessageRecording(zone, attachment)
+    }
+
+    private fun finishVoiceMessageRecording(
+        zone: VoiceRecordingOverlay.Zone,
+        attachment: PendingAttachment
+    ) {
+        val transcription = currentVoiceMessageText()
+        cleanupVoiceMessageRecognition()
+        voiceOverlay?.hide()
+        voiceHoldButton().text = "按住 说话"
         DebugTraceStore.record(
             "voice_message_record_done",
             mapOf(
                 "bytes" to attachment.file.length(),
                 "duration_sec" to (attachment.durationSeconds ?: 0),
-                "has_transcription" to (transcription != null)
+                "has_transcription" to (transcription != null),
+                "zone" to zone.name
             )
         )
-        val text = transcription?.trim()?.takeIf { it.isNotBlank() }
-        // 项目聊天：把转录文字作为消息 content 随语音一起发，既显示语音气泡又显示文字，
-        // 同时避免双重上传竞态（原先 sendTextDirect 会在 pendingAttachments 未清时再次触发上传）。
-        // 好友/群组聊天：保持微信风格，只发语音气泡，不附文字。
-        val messageText = if (!isFriendChatActive() && text != null) text else ""
-        sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
+        when (zone) {
+            VoiceRecordingOverlay.Zone.AI_REPLY -> {
+                val sender = sendTextDirect
+                if (sender != null && transcription != null) {
+                    discardVoiceAttachment(attachment)
+                    setVoiceMode(false)
+                    applyVoiceMode()
+                    sender(voiceAiReplyText(transcription))
+                    return
+                }
+                // ASR 没拿到文字时，保留老逻辑：仍然把语音气泡发出去。
+                val messageText = if (!isFriendChatActive() && transcription != null) transcription else ""
+                sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
+            }
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> {
+                discardVoiceAttachment(attachment)
+                if (transcription == null) {
+                    Toast.makeText(activity, "没听清，请重试", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                setVoiceMode(false)
+                applyVoiceMode()
+                setInputText(transcription)
+            }
+            VoiceRecordingOverlay.Zone.CANCEL -> discardVoiceAttachment(attachment)
+        }
     }
 
     /** 语音消息模式：取消录音。 */
@@ -506,13 +564,35 @@ internal class MainSpeechInputActions(
         translationGeneration += 1
         isSpeechCanceled = true
         runCatching { voiceMessageAsrRecognizer?.cancel() }
-        voiceMessageAsrRecognizer?.destroy()
-        voiceMessageAsrRecognizer = null
-        voiceMessageTranscription = null
+        cleanupVoiceMessageRecognition()
         voiceRecorder.cancel()
+        voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
         DebugTraceStore.record("voice_message_record_canceled", emptyMap())
     }
+
+    private fun currentVoiceMessageText(): String? =
+        voiceMessageTranscription?.trim()?.takeIf { it.isNotBlank() }
+            ?: voiceMessagePartialText?.trim()?.takeIf { it.isNotBlank() }
+
+    private fun cleanupVoiceMessageRecognition() {
+        voiceMessageAsrRecognizer?.destroy()
+        voiceMessageAsrRecognizer = null
+        voiceMessageTranscription = null
+        voiceMessagePartialText = null
+    }
+
+    private fun discardVoiceAttachment(attachment: PendingAttachment) {
+        runCatching { attachment.file.delete() }
+    }
+
+    private fun voiceAiReplyText(text: String): String {
+        val trimmed = text.trim()
+        return if (isSocialAiChatActive() && !containsElMention(trimmed)) "@EL $trimmed" else trimmed
+    }
+
+    private fun containsElMention(text: String): Boolean =
+        text.replace('＠', '@').contains("@EL", ignoreCase = true)
 
     /**
      * 长按语音气泡时展示原文（录音时 ASR 采集的识别结果）和翻译选项。
@@ -822,6 +902,7 @@ internal class MainSpeechInputActions(
         // Android speech engines are much more consistent with zh-CN than zh-Hans-CN.
         private const val SPEECH_LANGUAGE_TAG = "zh-CN"
         private const val SPEECH_RETRY_DELAY_MS = 180L
+        private const val VOICE_MESSAGE_ASR_SETTLE_MS = 900L
         private const val DIRECT_VOICE_MESSAGE =
             "我上传了一段原始语音，请优先根据语音附件理解我的需求。"
 

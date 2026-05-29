@@ -26,6 +26,7 @@ internal class MainInputActions(
     private val navigationController: () -> MainNavigationController,
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
+    private val isSocialAiChatActive: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean
@@ -337,6 +338,7 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             isFriendChatActive = isFriendChatActive,
+            isSocialAiChatActive = isSocialAiChatActive,
             sendTextDirect = { text ->
                 binding.inputEdit.setText(text)
                 binding.inputEdit.setSelection(text.length)

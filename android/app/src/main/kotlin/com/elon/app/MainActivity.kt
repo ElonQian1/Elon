@@ -141,6 +141,9 @@ class MainActivity : AppCompatActivity() {
             isFriendChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
             },
+            isSocialAiChatActive = {
+                friendChatActions.isActive() || groupChatActions.isActive()
+            },
             trySendFriendMessage = { text, attachments ->
                 projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
                     groupChatActions.trySendMessage(text, attachments) ||
