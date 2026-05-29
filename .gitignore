@@ -26,3 +26,7 @@ Thumbs.db
 
 # VS Code workspace file
 *.code-workspace
+
+# Temporary AI deploy helpers
+scripts/_wsl_deploy.sh
+scripts/_deploy_temp*.sh
