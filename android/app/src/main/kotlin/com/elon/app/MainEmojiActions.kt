@@ -29,6 +29,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainEmojiActions(
@@ -40,7 +42,7 @@ internal class MainEmojiActions(
     private val emojiPanel: () -> LinearLayout?,
     private val emojiButton: () -> ImageButton?,
     private val collapseAttachmentPanel: () -> Unit,
-    private val requestKeyboardLift: () -> Unit,
+    private val setKeyboardOverlayMode: (Boolean) -> Unit,
     private val replacementPanelHeight: (Int) -> Int,
     private val addPendingEmojiAttachment: (CustomEmojiItem) -> Boolean,
     private val updateSendButtonVisual: () -> Unit,
@@ -56,6 +58,7 @@ internal class MainEmojiActions(
     private var builtInTab: TextView? = null
     private var customTab: TextView? = null
     private var panelAnimator: ValueAnimator? = null
+    private var keyboardVisibleOverEmojiPanel = false
     private val panelInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     fun setupEmojiLaunchers() {
@@ -100,7 +103,7 @@ internal class MainEmojiActions(
     }
 
     fun toggleEmojiPanel() {
-        if (isOpen) collapseEmojiPanel(showKeyboard = true) else expandEmojiPanel()
+        if (isOpen) toggleKeyboardOverEmojiPanel() else expandEmojiPanel()
     }
 
     fun expandEmojiPanel() {
@@ -109,6 +112,7 @@ internal class MainEmojiActions(
         val panel = emojiPanel() ?: return
         panelAnimator?.cancel()
         isOpen = true
+        keyboardVisibleOverEmojiPanel = false
         panel.visibility = View.VISIBLE
         setPanelHeight(panel, 0)
         panel.alpha = 0f
@@ -125,12 +129,14 @@ internal class MainEmojiActions(
     private fun collapseEmojiPanel(showKeyboard: Boolean) {
         val panel = emojiPanel() ?: return
         val wasOpen = isOpen || panel.visibility == View.VISIBLE
+        if (keyboardVisibleOverEmojiPanel) hideKeyboard()
+        keyboardVisibleOverEmojiPanel = false
+        setKeyboardOverlayMode(false)
         isOpen = false
         if (wasOpen) {
             animateEmojiPanel(panel, expand = false, matchKeyboardTransition = showKeyboard)
             updateEmojiButton(selected = false)
         }
-        if (showKeyboard) showKeyboard()
     }
 
     fun collapseEmojiPanelForBack(): Boolean {
@@ -558,18 +564,42 @@ internal class MainEmojiActions(
             .show()
     }
 
-    private fun hideKeyboard() {
-        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
-    }
+    private fun toggleKeyboardOverEmojiPanel() {
+        if (keyboardVisibleOverEmojiPanel && !isKeyboardVisible()) {
+            keyboardVisibleOverEmojiPanel = false
+        }
+        if (keyboardVisibleOverEmojiPanel) {
+            hideKeyboard()
+            keyboardVisibleOverEmojiPanel = false
+            updateEmojiButton(selected = true)
+            return
+        }
 
-    private fun showKeyboard() {
+        val panel = emojiPanel() ?: return
+        panelAnimator?.cancel()
+        isOpen = true
+        setKeyboardOverlayMode(true)
+        panel.visibility = View.VISIBLE
+        setPanelHeight(panel, targetEmojiPanelHeight())
+        panel.alpha = 1f
+        panel.translationY = 0f
         binding.inputEdit.requestFocus()
-        requestKeyboardLift()
         binding.inputEdit.post {
             val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
         }
+        keyboardVisibleOverEmojiPanel = true
+        updateEmojiButton(selected = true)
+    }
+
+    private fun isKeyboardVisible(): Boolean {
+        return ViewCompat.getRootWindowInsets(binding.root)
+            ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+    }
+
+    private fun hideKeyboard() {
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
     }
 
     private fun updateEmojiButton(selected: Boolean) {

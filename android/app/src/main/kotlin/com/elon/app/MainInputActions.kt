@@ -332,7 +332,9 @@ internal class MainInputActions(
             emojiPanel = { inputComposerViewsOrNull()?.emojiPanel },
             emojiButton = { inputComposerViewsOrNull()?.emojiButton },
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
-            requestKeyboardLift = { keyboardInsetsAnimationActions?.requestKeyboardLift() },
+            setKeyboardOverlayMode = { enabled ->
+                keyboardInsetsAnimationActions?.setKeyboardOverlayMode(enabled)
+            },
             replacementPanelHeight = { fallback ->
                 keyboardInsetsAnimationActions?.replacementPanelHeight(fallback) ?: fallback
             },

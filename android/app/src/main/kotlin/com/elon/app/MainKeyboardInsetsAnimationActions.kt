@@ -26,6 +26,7 @@ internal class MainKeyboardInsetsAnimationActions(
     private var lastKeyboardHeight = -1
     private var lastKnownKeyboardHeight = -1
     private var usingEstimatedKeyboardHeight = false
+    private var keyboardOverlayMode = false
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
     private var followChatBottomDuringLift = false
@@ -112,6 +113,20 @@ internal class MainKeyboardInsetsAnimationActions(
         usingEstimatedKeyboardHeight = false
         keyboardWasVisibleSinceLift = false
         applyKeyboardHeight(0, animate = true)
+    }
+
+    fun setKeyboardOverlayMode(enabled: Boolean) {
+        if (keyboardOverlayMode == enabled) return
+        keyboardOverlayMode = enabled
+        if (enabled) {
+            bottomOffsetAnimator?.cancel()
+            binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_NONE, null)
+            applyBottomBarOffset(0)
+            applyChatBottomPadding(0)
+            return
+        }
+        val target = lastKeyboardHeight.coerceAtLeast(0)
+        applyKeyboardHeight(target, animate = true)
     }
 
     fun replacementPanelHeight(fallbackHeight: Int): Int {
@@ -232,6 +247,11 @@ internal class MainKeyboardInsetsAnimationActions(
             keyboardWasVisibleSinceLift = false
         }
         lastKeyboardHeight = target
+        if (keyboardOverlayMode) {
+            applyBottomBarOffset(0)
+            applyChatBottomPadding(0)
+            return
+        }
         if (animate) {
             animateBottomBarOffset(target)
         } else {
