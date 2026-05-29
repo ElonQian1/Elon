@@ -66,6 +66,8 @@ internal class AgentVoiceBridge(context: Context) {
     private var busyRetryOnSame: Int = 0
     /** 同一引擎因冷启动失败已经短延迟重试过几次（最多 1 次） */
     private var coldStartRetryOnSame: Int = 0
+    /** 同一引擎因系统 session 被占用（ERROR_CLIENT 瞬时失败）已重试次数（最多 2 次）*/
+    private var sessionConflictRetry: Int = 0
     /** 本次 startListening 的开始时间（毫秒），用于判定"冷启动瞬时失败" */
     private var listeningStartedAt: Long = 0L
 
@@ -117,6 +119,7 @@ internal class AgentVoiceBridge(context: Context) {
         transitionSeq += 1
         busyRetryOnSame = 0
         coldStartRetryOnSame = 0
+        sessionConflictRetry = 0
         main.post { startWithCurrentCandidate() }
     }
 
@@ -148,14 +151,19 @@ internal class AgentVoiceBridge(context: Context) {
     fun prewarm() {
         if (isRunning) return
         main.post {
-            // 注意：不在此检查 isRunning。
-            // init{} 同步调用 prewarm() 后，start() 会立即设置 isRunning=true；
-            // 若此处拦截则 main.post 队列里的预热 lambda 永远被跳过，
-            // 导致 asr.engineComponent 仍为 null，startWithCurrentCandidate 误判为"引擎切换"。
+            // 若 start() 已在队列里（init{} 后立即按键），跳过预热不影响正确性：
+            // startWithCurrentCandidate 会自己检测 engineChanged 并 resetEngine+initialize。
+            if (isRunning) return@post
             val engines = RecognitionEngineSelector.listForUse(appContext)
             val first = engines.firstOrNull() ?: return@post
             if (asr.isInitialized && asr.engineComponent == first.component) return@post
             asr.engineComponent = first.component
+            // Bug fix：engineComponent 切换时必须销毁旧 recognizer。
+            // 否则 initialize() 因 speechRecognizer != null 直接 return，
+            // 导致 engineComponent=Google 但 recognizer 仍是上次失败的引擎（如 MagicVoice），
+            // 下次 startWithCurrentCandidate 看到 engineChanged=false 不 reset，
+            // 调旧 recognizer 的 startListening → ERROR_CLIENT "already in session"。
+            asr.resetEngine()  // 销毁旧引擎 recognizer（noop 若未初始化），确保 initialize() 创建正确引擎
             asr.initialize()   // 创建 SpeechRecognizer，开始服务绑定，不 startListening
             Log.i(TAG, "预热: 已为 ${first.label}(${first.packageName}) 启动服务绑定")
         }
@@ -211,8 +219,9 @@ internal class AgentVoiceBridge(context: Context) {
             Log.d(TAG, "忽略残留错误 code=$code（isRunning=false）")
             return
         }
-        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame coldRetry=$coldStartRetryOnSame")
+        Log.w(TAG, "引擎错误 code=$code msg=$message engineIdx=$candidateIndex sawPartial=$sawAnyPartial busyRetry=$busyRetryOnSame coldRetry=$coldStartRetryOnSame conflictRetry=$sessionConflictRetry")
         val current = candidates.getOrNull(candidateIndex)
+        val sinceStart = System.currentTimeMillis() - listeningStartedAt
 
         // RECOGNIZER_BUSY：直接重试 startListening（不销毁 recognizer），最多 2 次。
         // 注意：以前这里调用了 resetEngine()，会导致重建的 recognizer 触发新一轮冷启动，已修复。
@@ -229,10 +238,29 @@ internal class AgentVoiceBridge(context: Context) {
             return
         }
 
+        // 系统 session 冲突：ERROR_CLIENT(5) 且极快失败（< 50ms）。
+        // 通常是 Honor MagicVoice / 其他厂商助手短暂占用了 RecognitionService。
+        // 等待 600ms 让系统 session 释放后用同一引擎重试（不切引擎，切了也一样会冲突）。
+        val isSessionConflict = code == SpeechRecognizer.ERROR_CLIENT && sinceStart < 50L && sessionConflictRetry < 2 && !sawAnyPartial
+        if (isSessionConflict && current != null) {
+            sessionConflictRetry += 1
+            val delay = if (sessionConflictRetry == 1) 600L else 1200L
+            Log.i(TAG, "系统session占用(${sinceStart}ms, code=5)，${delay}ms后重试同引擎 ${current.label}（等待系统ASR释放）#$sessionConflictRetry")
+            val mySeq = ++transitionSeq
+            main.postDelayed({
+                if (isRunning && mySeq == transitionSeq) {
+                    // 重建 recognizer，彻底刷新 listener binder，避免 "already in session" 残留
+                    asr.resetEngine()
+                    listeningStartedAt = System.currentTimeMillis()
+                    asr.startListening()
+                }
+            }, delay)
+            return
+        }
+
         // 冷启动瞬时失败：startListening 后 200ms 内就报错（mibrain 服务绑定尚未完成）。
         // 不销毁 recognizer，直接重试 startListening，绑定通常在 50~100ms 内完成。
         // 允许重试 2 次，每次递增延迟。
-        val sinceStart = System.currentTimeMillis() - listeningStartedAt
         val isColdStartGlitch = sinceStart in 0..200 && coldStartRetryOnSame < 2 && code == 11
         if (isColdStartGlitch && current != null && !sawAnyPartial) {
             coldStartRetryOnSame += 1
