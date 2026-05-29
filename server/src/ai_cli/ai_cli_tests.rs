@@ -1,5 +1,9 @@
 use super::*;
+use super::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
+use super::ai_cli_native_session::build_native_session_continuity_note;
 use super::ai_cli_output::parse_intent_gate_result;
+use super::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
+use crate::store::ConversationMessage;
 use crate::types::{AiCliOption, CliPromptMode};
 
 #[test]

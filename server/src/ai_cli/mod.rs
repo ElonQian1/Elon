@@ -9,8 +9,11 @@ mod ai_cli_prompts;
 mod ai_cli_runner;
 mod ai_cli_streaming;
 mod ai_cli_trace;
+mod ai_cli_types;
 #[cfg(test)]
 mod ai_cli_tests;
+
+pub use self::ai_cli_types::{IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc};
@@ -44,40 +47,8 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
 };
 
-#[cfg(test)]
-use self::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
-#[cfg(test)]
-use self::ai_cli_native_session::build_native_session_continuity_note;
-#[cfg(test)]
-use self::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
-#[cfg(test)]
-use crate::store::ConversationMessage;
-#[cfg(test)]
-use crate::types::{AiCliOption, CliPromptMode};
-
-#[derive(Debug, Clone)]
-pub struct NativeSessionScope {
-    pub project_id: String,
-    pub user_id: String,
-    pub conversation_id: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct IntentGateResult {
-    pub route: intent_router::CapabilityRoute,
-    pub confidence: f64,
-    pub reason: String,
-    pub chat_reply: Option<String>,
-}
-
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
-
-impl IntentGateResult {
-    pub fn should_enter_development(&self) -> bool {
-        self.route == intent_router::CapabilityRoute::CodeAgent && self.confidence >= 0.75
-    }
-}
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
