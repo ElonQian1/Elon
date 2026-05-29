@@ -2,11 +2,16 @@ package com.elon.app
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -66,6 +71,9 @@ internal class MainSpeechInputActions(
     private var agentLastPartialText: String = ""
     // 仿微信全屏麦克风遮罩（在端上模式下启用）
     private var voiceOverlay: VoiceRecordingOverlay? = null
+    // 噪音检测——连续高音量且无识别结果时提示
+    private var highVolumeStartMs: Long = 0L
+    private var noiseWarningShown: Boolean = false
 
     init {
         // 预热端上 ASR 引擎：提前创建 SpeechRecognizer 并连接服务，
@@ -212,14 +220,29 @@ internal class MainSpeechInputActions(
             // 引擎绑定完成，开始收音
             voiceHoldButton().text = "正在听..."
             voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.LISTENING)
+            voiceOverlay?.startCountdown(MAX_RECOGNITION_MS)
         }
         bridge.onStart = {
-            // VAD 检测到声音开始
+            // VAD 检测到声音开始：震动反馈确认
+            vibrateOnce(30L)
             voiceHoldButton().text = "正在听..."
             voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.LISTENING)
         }
         bridge.onVolume = { v ->
             voiceOverlay?.setVolume(v)
+            // 噪音检测：连续高音量(>0.70)且 2.5s 内无任何识别内容
+            if (v > 0.70f) {
+                if (highVolumeStartMs == 0L) highVolumeStartMs = System.currentTimeMillis()
+                else if (!noiseWarningShown
+                    && agentLastPartialText.isBlank()
+                    && System.currentTimeMillis() - highVolumeStartMs > 2500L
+                ) {
+                    noiseWarningShown = true
+                    voiceOverlay?.setListeningState(VoiceRecordingOverlay.ListeningState.NOISE)
+                }
+            } else {
+                highVolumeStartMs = 0L
+            }
         }
         bridge.onPartial = { text ->
             if (text.isNotBlank()) {
@@ -248,6 +271,7 @@ internal class MainSpeechInputActions(
         }
         bridge.onError = { msg ->
             agentVoiceActive = false
+            voiceOverlay?.stopCountdown()
             voiceOverlay?.hide()
             // SpeechRecognizer 所有引擎失败时（如 Honor MagicVoice 常驻占用 session），
             // 静默 fallback 到云端语音（AudioRecord PCM，不调 RecognitionService）。
@@ -261,6 +285,8 @@ internal class MainSpeechInputActions(
             }
         }
         voiceHoldButton().text = "准备中..."
+        highVolumeStartMs = 0L
+        noiseWarningShown = false
         bridge.start()
         return true
     }
@@ -357,9 +383,29 @@ internal class MainSpeechInputActions(
         isSpeechCanceled = true
         agentVoiceActive = false
         bridge.cancel()
+        voiceOverlay?.stopCountdown()
         voiceOverlay?.hide()
         voiceHoldButton().text = "按住 说话"
         return true
+    }
+
+    /** 短震动反馈（VAD 说话开始确认）。屏蔽异常，不影响主流程。 */
+    private fun vibrateOnce(ms: Long) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                val v = activity.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v?.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    v?.vibrate(ms)
+                }
+            }
+        }
     }
 
     // ─── 方案 B：实时语音 → OpenAI 转写 → 投递 AI ────────────────────────────
@@ -1055,6 +1101,8 @@ internal class MainSpeechInputActions(
             "我发送了一条语音消息，请根据语音内容做出回应。"
 
         private const val VOICE_AI_PREVIEW_DELAY_MS = 2000L
+        // 识别时长上限提示（20s——大多数引擎不超过此时间）
+        private const val MAX_RECOGNITION_MS = 20_000L
     }
 
     private data class SpeechAttempt(

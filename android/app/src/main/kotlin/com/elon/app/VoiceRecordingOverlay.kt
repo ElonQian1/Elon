@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.graphics.Canvas
@@ -7,11 +8,14 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ScrollView
 import android.widget.TextView
 
 /**
@@ -27,13 +31,15 @@ internal class VoiceRecordingOverlay(
     enum class Mode { AGENT, FRIEND_CHAT }
     enum class Zone { AI_REPLY, TRANSCRIBE, CANCEL, SEND }
     /** 识别生命周期各阶段，用于在 partial 文字为空时给用户状态反馈 */
-    enum class ListeningState { PREPARING, LISTENING, HEARD, PROCESSING, SILENCE }
+    enum class ListeningState { PREPARING, LISTENING, HEARD, PROCESSING, SILENCE, NOISE }
 
     private var root: FrameLayout? = null
     private var bubbleView: VoiceWaveBubbleView? = null
+    private var partialScroll: ScrollView? = null
     private var partialView: TextView? = null
     private var trayView: VoiceActionTrayView? = null
     private var partialText: String = ""
+    private var historyText: String = ""  // 已确认的历史句段（Final 结果）
     private var stateHint: String = ""
     private var zone: Zone = Zone.AI_REPLY
     private var initialTouchRawY: Float? = null
@@ -63,21 +69,27 @@ internal class VoiceRecordingOverlay(
             }
         }
 
-        val partial = TextView(activity).apply {
+        val partialTv = TextView(activity).apply {
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            textSize = 15f
+            lineSpacingMultiplier = 1.25f
+            setTextColor(Color.parseColor("#DDEDEDED"))
+            setPadding(0, 0, 0, 0)
+        }
+        val partial = ScrollView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                dp(PARTIAL_MAX_HEIGHT_DP)
             ).apply {
                 gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                 leftMargin = dp(36)
                 rightMargin = dp(36)
                 bottomMargin = dp(206)
             }
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            maxLines = 2
-            textSize = 14f
-            setTextColor(Color.parseColor("#DDEDEDED"))
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(partialTv)
         }
 
         val tray = VoiceActionTrayView(activity, mode).apply {
@@ -95,9 +107,11 @@ internal class VoiceRecordingOverlay(
 
         root = overlay
         bubbleView = bubble
-        partialView = partial
+        partialScroll = partial
+        partialView = partialTv
         trayView = tray
         partialText = ""
+        historyText = ""
         stateHint = "准备中..."
         initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
@@ -158,12 +172,15 @@ internal class VoiceRecordingOverlay(
     }
 
     fun hide() {
+        bubbleView?.stopCountdown()
         root?.let { (it.parent as? ViewGroup)?.removeView(it) }
         root = null
         bubbleView = null
+        partialScroll = null
         partialView = null
         trayView = null
         partialText = ""
+        historyText = ""
         stateHint = ""
         initialTouchRawY = null
         zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
@@ -174,6 +191,29 @@ internal class VoiceRecordingOverlay(
         bubbleView?.setVolume(v)
     }
 
+    /**
+     * 将已确认的最终识别结果追加到历史区（浅色）。
+     * 用于多段连续说话时的滚动实时转写：每段 Final 到达时调用，
+     * partialText 同步清空等待下段 Partial。
+     */
+    fun appendHistory(text: String) {
+        val t = text.trim()
+        if (t.isBlank()) return
+        historyText = if (historyText.isBlank()) t else "$historyText\n$t"
+        partialText = ""
+        renderPartial()
+    }
+
+    /** 启动气泡倒计时弧（maxMs 毫秒内识别时长上限）。 */
+    fun startCountdown(maxMs: Long) {
+        bubbleView?.startCountdown(maxMs)
+    }
+
+    /** 停止倒计时弧。 */
+    fun stopCountdown() {
+        bubbleView?.stopCountdown()
+    }
+
     /** 在 partial 文字为空时展示识别阶段状态文字 */
     fun setListeningState(state: ListeningState) {
         stateHint = when (state) {
@@ -182,6 +222,10 @@ internal class VoiceRecordingOverlay(
             ListeningState.HEARD -> "听到了，松手发送"
             ListeningState.PROCESSING -> "识别中..."
             ListeningState.SILENCE -> "没有检测到声音"
+            ListeningState.NOISE -> "环境较嘈杂，请靠近手机说话"
+        }
+        if (state == ListeningState.HEARD) {
+            bubbleView?.playHeardAnimation()
         }
         renderPartial()
     }
@@ -205,24 +249,42 @@ internal class VoiceRecordingOverlay(
             Zone.CANCEL -> "松开 取消"
             Zone.SEND -> "松开 发送"
         }
-        // 在默认区域（未滑动选择）且无 partial 文字时，优先展示阶段状态提示
         val isDefaultZone = (zone == Zone.AI_REPLY && mode == Mode.AGENT) ||
                             (zone == Zone.SEND && mode == Mode.FRIEND_CHAT)
-        partialView?.text = when {
-            partialText.isNotBlank() -> partialText
-            stateHint.isNotBlank() && isDefaultZone -> stateHint
-            else -> zoneFallback
-        }
-        partialView?.setTextColor(
-            Color.parseColor(
-                when (zone) {
-                    Zone.AI_REPLY -> "#DDEDEDED"
-                    Zone.TRANSCRIBE -> "#EAF7F0"
-                    Zone.CANCEL -> "#FFE3E3"
-                    Zone.SEND -> "#DDEDEDED"
-                }
-            )
+        val mainColor = Color.parseColor(
+            when (zone) {
+                Zone.AI_REPLY -> "#DDEDEDED"
+                Zone.TRANSCRIBE -> "#EAF7F0"
+                Zone.CANCEL -> "#FFE3E3"
+                Zone.SEND -> "#DDEDEDED"
+            }
         )
+        // 有历史转写时：历史（半透明）+ 当前 partial 或状态提示
+        if (historyText.isNotBlank()) {
+            val sb = SpannableStringBuilder()
+            sb.append(historyText)
+            val currentLine = when {
+                partialText.isNotBlank() -> "\n$partialText"
+                else -> ""
+            }
+            if (currentLine.isNotBlank()) {
+                sb.append(currentLine)
+                sb.setSpan(
+                    ForegroundColorSpan(Color.parseColor("#99EDEDED")),
+                    0, historyText.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            partialView?.text = sb
+        } else {
+            partialView?.text = when {
+                partialText.isNotBlank() -> partialText
+                stateHint.isNotBlank() && isDefaultZone -> stateHint
+                else -> zoneFallback
+            }
+        }
+        partialView?.setTextColor(mainColor)
+        // 自动滚到底部，让用户看到最新内容
+        partialScroll?.post { partialScroll?.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun dp(v: Int): Int =
@@ -235,6 +297,7 @@ internal class VoiceRecordingOverlay(
         const val BUBBLE_HEIGHT_DP = 88
         const val CHOICE_DRAG_UP_DP = 56
         const val DRAG_CHOICE_DX_DP = 80
+        const val PARTIAL_MAX_HEIGHT_DP = 112  // ≈ 5 行转写历史可见区域
     }
 }
 
@@ -251,6 +314,13 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
         color = Color.parseColor("#2C6C52")
         style = Paint.Style.FILL
     }
+    /** 倒计时弧线画笔（STROKE 模式，宽度在 onSizeChanged 确定） */
+    private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        color = Color.parseColor("#60FFFFFF")
+    }
+    private val arcRect = RectF()
     private val bubbleRect = RectF()
     private val bubblePath = Path()
 
@@ -264,6 +334,52 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
     /** 当前平滑后的音量值（0-1） */
     private var currentVolume: Float = 0f
 
+    // ── 倒计时弧 ─────────────────────────────────────────────────────────
+    private var countdownStartMs: Long = 0L
+    private var countdownMaxMs: Long = 0L
+    private var countdownProgress: Float = 0f  // 0=刚开始, 1=到时
+    private val countdownRunnable = object : Runnable {
+        override fun run() {
+            if (countdownMaxMs <= 0L) return
+            val elapsed = System.currentTimeMillis() - countdownStartMs
+            countdownProgress = (elapsed.toFloat() / countdownMaxMs).coerceIn(0f, 1f)
+            // 超过 75% 变黄色警告
+            arcPaint.color = if (countdownProgress < 0.75f)
+                Color.parseColor("#60FFFFFF")
+            else
+                Color.parseColor("#FFCC44")
+            invalidate()
+            if (countdownProgress < 1f) postDelayed(this, 80L)
+        }
+    }
+
+    fun startCountdown(maxMs: Long) {
+        removeCallbacks(countdownRunnable)
+        countdownMaxMs = maxMs
+        countdownStartMs = System.currentTimeMillis()
+        countdownProgress = 0f
+        post(countdownRunnable)
+    }
+
+    fun stopCountdown() {
+        removeCallbacks(countdownRunnable)
+        countdownMaxMs = 0L
+        countdownProgress = 0f
+        invalidate()
+    }
+
+    /** 说话被识别到（HEARD）时的短脉冲缩放动画，给用户确认感 */
+    fun playHeardAnimation() {
+        val anim = ValueAnimator.ofFloat(1f, 1.10f, 1f)
+        anim.duration = 220L
+        anim.addUpdateListener { va ->
+            val s = va.animatedValue as Float
+            scaleX = s
+            scaleY = s
+        }
+        anim.start()
+    }
+
     /**
      * 接收 onRmsChanged 归一化后的音量（0-1）。
      * 上升快（× 0.7 权重新值），下降慢（× 0.3 权重新值），让视觉感更自然。
@@ -276,6 +392,15 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
             currentVolume * 0.7f + target * 0.3f
         }
         invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val density = resources.displayMetrics.density
+        val notch = 11f * density
+        val margin = 6f * density
+        arcRect.set(margin, margin, w - margin, h - notch - margin)
+        arcPaint.strokeWidth = 3f * density
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -313,6 +438,12 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
                 wavePaint
             )
             x += barWidth + gap
+        }
+
+        // 倒计时弧：从顶部顺时针缩短，快到时间变黄
+        if (countdownMaxMs > 0L && countdownProgress < 1f) {
+            val sweepAngle = 360f * (1f - countdownProgress)
+            canvas.drawArc(arcRect, -90f, sweepAngle, false, arcPaint)
         }
     }
 }
