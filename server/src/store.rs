@@ -8,6 +8,7 @@ use std::{
 use crate::store_schema::apply_migrations;
 
 mod common;
+mod conversations;
 mod friend_messages;
 mod friends;
 mod groups;

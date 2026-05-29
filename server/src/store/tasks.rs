@@ -1,39 +1,9 @@
 use anyhow::Result;
 use rusqlite::{OptionalExtension, params};
 
-use super::{
-    AdminConversationEntry, ConversationMessage, MAX_TASK_EVENTS_PER_TASK, Store, TaskSnapshot,
-    clean_optional, new_id, now, safe_external_id,
-};
+use super::{MAX_TASK_EVENTS_PER_TASK, Store, TaskSnapshot, clean_optional, new_id, now, safe_external_id};
 
 impl Store {
-    pub fn ensure_conversation(
-        &self,
-        project_id: &str,
-        user_id: &str,
-        conversation_id: Option<&str>,
-        title: Option<&str>,
-    ) -> Result<String> {
-        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
-        let now = now();
-        self.conn()?.execute(
-            "INSERT INTO conversations (
-                project_id, user_id, id, title, status, created_at, updated_at
-             )
-             VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?5)
-             ON CONFLICT(project_id, user_id, id) DO UPDATE SET
-                title = COALESCE(excluded.title, conversations.title),
-                updated_at = excluded.updated_at",
-            params![
-                project_id,
-                user_id,
-                conversation_id,
-                clean_optional(title),
-                now
-            ],
-        )?;
-        Ok(conversation_id)
-    }
 
     pub fn create_task(
         &self,
@@ -344,117 +314,6 @@ impl Store {
         Ok(count > 0)
     }
 
-    pub fn add_message(
-        &self,
-        project_id: &str,
-        conversation_id: Option<&str>,
-        task_id: Option<&str>,
-        user_id: Option<&str>,
-        role: &str,
-        content: &str,
-    ) -> Result<()> {
-        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
-        self.conn()?.execute(
-            "INSERT INTO messages (
-                id, project_id, conversation_id, task_id, user_id, role, content, created_at
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                new_id("msg"),
-                project_id,
-                conversation_id,
-                clean_optional(task_id),
-                clean_optional(user_id),
-                role,
-                content,
-                now()
-            ],
-        )?;
-        Ok(())
-    }
-
-    pub fn list_recent_conversation_messages(
-        &self,
-        project_id: &str,
-        conversation_id: Option<&str>,
-        limit: usize,
-    ) -> Result<Vec<ConversationMessage>> {
-        let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
-        let limit = limit.clamp(1, 30) as i64;
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare(
-            "SELECT role, content
-             FROM (
-                SELECT role, content, created_at, id
-                FROM messages
-                WHERE project_id = ?1
-                  AND conversation_id = ?2
-                ORDER BY created_at DESC, id DESC
-                LIMIT ?3
-             )
-             ORDER BY created_at ASC, id ASC",
-        )?;
-        let messages = stmt
-            .query_map(params![project_id, conversation_id, limit], |row| {
-                Ok(ConversationMessage {
-                    role: row.get(0)?,
-                    content: row.get(1)?,
-                })
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(messages)
-    }
-
-    /// 管理员总览：列出某项目下所有会话，附带消息数、任务数和最后任务状态
-    pub fn list_conversations_for_project_admin(
-        &self,
-        project_id: &str,
-    ) -> Result<Vec<AdminConversationEntry>> {
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare(
-            "SELECT
-               c.id,
-               c.project_id,
-               c.user_id,
-               COALESCE(u.phone, u.email, c.user_id) AS user_account,
-               c.title,
-               c.status,
-               (SELECT COUNT(*) FROM messages m
-                WHERE m.project_id = c.project_id
-                  AND m.conversation_id = c.id) AS message_count,
-               (SELECT COUNT(*) FROM tasks t
-                WHERE t.project_id = c.project_id
-                  AND t.conversation_id = c.id) AS task_count,
-               (SELECT t2.status FROM tasks t2
-                WHERE t2.project_id = c.project_id
-                  AND t2.conversation_id = c.id
-                ORDER BY t2.created_at DESC LIMIT 1) AS last_task_status,
-               c.created_at,
-               c.updated_at
-             FROM conversations c
-             LEFT JOIN users u ON u.id = c.user_id
-             WHERE c.project_id = ?1
-             ORDER BY c.updated_at DESC",
-        )?;
-        let rows = stmt
-            .query_map(params![project_id], |row| {
-                Ok(AdminConversationEntry {
-                    id: row.get(0)?,
-                    project_id: row.get(1)?,
-                    user_id: row.get(2)?,
-                    user_account: row.get(3)?,
-                    title: row.get(4)?,
-                    status: row.get(5)?,
-                    message_count: row.get(6)?,
-                    task_count: row.get(7)?,
-                    last_task_status: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                })
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        Ok(rows)
-    }
 }
 
 #[cfg(test)]
