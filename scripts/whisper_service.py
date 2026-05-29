@@ -37,11 +37,15 @@ app = FastAPI(title="Elon Whisper ASR", version="1.0")
 @app.post("/transcribe")
 async def transcribe(
     audio: UploadFile = File(..., description="WAV 文件（PCM16 LE，任意采样率）"),
-    language: str = Form("zh", description="目标语言代码，如 zh / en / ja"),
+    language: str = Form("zh", description="目标语言代码，如 zh / zh-TW / en / auto"),
 ):
     """
     接收 WAV 音频，返回转写文本。
-    Rust 端传入的是用 PCM16 手工封装的 WAV，采样率从 hello 帧取得。
+    语言代码规则：
+      zh    → 简体中文（传 language=zh + initial_prompt 引导输出简体字）
+      zh-TW → 繁体中文（传 language=zh，不加简体 prompt）
+      en    → 英文
+      auto  → 自动检测（不指定语言）
     """
     data = await audio.read()
     if not data:
@@ -49,17 +53,34 @@ async def transcribe(
 
     logger.info(f"收到转写请求：{len(data)} 字节，语言={language}")
 
+    # 映射客户端语言代码到 Whisper 参数
+    if language == "auto" or language == "":
+        whisper_lang = None          # faster-whisper 自动检测
+        initial_prompt = None
+    elif language == "zh-TW":
+        whisper_lang = "zh"          # Whisper 只有 zh，不加简体 prompt → 倾向繁体
+        initial_prompt = None
+    elif language == "zh":
+        whisper_lang = "zh"
+        initial_prompt = "以下是普通话的句子，请用简体中文书写。"  # 引导输出简体字
+    else:
+        whisper_lang = language      # en / ja / ko 等直接传入
+        initial_prompt = None
+
     try:
         buf = io.BytesIO(data)
-        # beam_size=1 最快；对话场景不需要高 beam
-        segments, info = _model.transcribe(
-            buf,
-            language=language,
+        transcribe_kwargs = dict(
             beam_size=1,
             best_of=1,
-            vad_filter=True,          # 过滤空白段，减少幻觉
+            vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 300},
         )
+        if whisper_lang is not None:
+            transcribe_kwargs["language"] = whisper_lang
+        if initial_prompt is not None:
+            transcribe_kwargs["initial_prompt"] = initial_prompt
+
+        segments, info = _model.transcribe(buf, **transcribe_kwargs)
         text = "".join(s.text for s in segments).strip()
         logger.info(f"转写完成：'{text[:60]}' (检测语言={info.language})")
         return {"transcript": text, "language": info.language}

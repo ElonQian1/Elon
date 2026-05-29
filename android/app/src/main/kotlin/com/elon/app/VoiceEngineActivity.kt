@@ -19,6 +19,7 @@ class VoiceEngineActivity : AppCompatActivity() {
     private lateinit var summary: TextView
     private lateinit var probeAllBtn: Button
     private lateinit var clearBtn: Button
+    private lateinit var languageSpinner: Spinner
     private var engines: List<RecognitionEngine> = emptyList()
     private val probingKeys = HashSet<String>()
 
@@ -34,6 +35,22 @@ class VoiceEngineActivity : AppCompatActivity() {
         summary = findViewById(R.id.engineSummary)
         probeAllBtn = findViewById(R.id.probeAllButton)
         clearBtn = findViewById(R.id.clearHealthButton)
+        languageSpinner = findViewById(R.id.whisperLanguageSpinner)
+
+        // 语言选择器
+        val langLabels = listOf("简体中文", "繁体中文", "英文 (English)", "自动检测")
+        val langCodes  = listOf("zh", "zh-TW", "en", "auto")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, langLabels)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        languageSpinner.adapter = adapter
+        val savedCode = AsrFallbackSettings.getWhisperLanguage(this)
+        languageSpinner.setSelection(langCodes.indexOf(savedCode).coerceAtLeast(0))
+        languageSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                AsrFallbackSettings.setWhisperLanguage(this@VoiceEngineActivity, langCodes[position])
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
 
         probeAllBtn.setOnClickListener { probeAll() }
         clearBtn.setOnClickListener {

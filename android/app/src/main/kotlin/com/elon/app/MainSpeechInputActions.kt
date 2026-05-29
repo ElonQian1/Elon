@@ -624,6 +624,7 @@ internal class MainSpeechInputActions(
                     .addFormDataPart("audio", file.name,
                         bytes.toRequestBody(mime.toMediaType()))
                     .addFormDataPart("format", mime)
+                    .addFormDataPart("language", AsrFallbackSettings.getWhisperLanguage(activity))
                     .build()
                 val authToken = AuthManager.token(activity) ?: ""
                 val request = Request.Builder()

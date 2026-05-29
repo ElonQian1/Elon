@@ -21,6 +21,7 @@ object AsrFallbackSettings {
     private const val PREFS = "elon_asr_fallback"
     private const val KEY_SERVER_ENABLED = "server_fallback_enabled"
     private const val KEY_DISABLED_ENGINES = "disabled_engine_keys"
+    private const val KEY_WHISPER_LANGUAGE = "whisper_language"
 
     // ──────────────── 服务器 Whisper 兜底 ────────────────
 
@@ -30,6 +31,22 @@ object AsrFallbackSettings {
 
     fun setServerFallbackEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_SERVER_ENABLED, enabled).apply()
+    }
+
+    // ──────────────── 云端 Whisper 转写语言 ────────────────
+
+    /**
+     * 云端 Whisper 转写时使用的语言代码：
+     *   "zh"    = 简体中文（默认，输出简体字）
+     *   "zh-TW" = 繁体中文
+     *   "en"    = 英文
+     *   "auto"  = 自动检测
+     */
+    fun getWhisperLanguage(context: Context): String =
+        prefs(context).getString(KEY_WHISPER_LANGUAGE, "zh") ?: "zh"
+
+    fun setWhisperLanguage(context: Context, lang: String) {
+        prefs(context).edit().putString(KEY_WHISPER_LANGUAGE, lang).apply()
     }
 
     // ──────────────── 本地引擎禁用列表 ────────────────

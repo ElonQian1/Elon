@@ -50,6 +50,7 @@ pub async fn asr_upload_handler(
     // 解析 multipart
     let mut audio_bytes: Option<Vec<u8>> = None;
     let mut mime_hint = "audio/m4a".to_string();
+    let mut language_override: Option<String> = None;
 
     while let Ok(Some(field)) = multipart.next_field().await {
         let name = field.name().unwrap_or("").to_string();
@@ -89,6 +90,14 @@ pub async fn asr_upload_handler(
                     }
                 }
             }
+            "language" => {
+                if let Ok(s) = field.text().await {
+                    let s = s.trim().to_string();
+                    if !s.is_empty() {
+                        language_override = Some(s);
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -98,10 +107,11 @@ pub async fn asr_upload_handler(
         _ => return json_error(StatusCode::BAD_REQUEST, "请求中缺少 audio 字段"),
     };
 
-    info!(target: "voice_asr", "收到 ASR 上传请求，音频 {} 字节，格式提示 {}", audio.len(), mime_hint);
+    info!(target: "voice_asr", "收到 ASR 上传请求，音频 {} 字节，格式 {}，语言 {:?}",
+          audio.len(), mime_hint, language_override);
 
     // 优先级：本地 Whisper → OpenAI Whisper REST
-    let text = transcribe_audio(&state, &audio, &mime_hint).await;
+    let text = transcribe_audio(&state, &audio, &mime_hint, language_override.as_deref()).await;
 
     match text {
         Ok(t) if t.trim().is_empty() => {
@@ -125,9 +135,13 @@ pub async fn asr_upload_handler(
 /// 本地 Whisper 服务（python-whisper/faster-whisper）通常支持多格式，
 /// 但接口期望 WAV 头，因此我们对本地 Whisper 直接发原始字节（filename=audio.m4a）；
 /// 如果本地 Whisper 服务不支持 M4A，会返回错误，此时自动降级到 Whisper REST。
-async fn transcribe_audio(state: &Arc<AppState>, audio: &[u8], mime: &str) -> anyhow::Result<String> {
+async fn transcribe_audio(state: &Arc<AppState>, audio: &[u8], mime: &str, language: Option<&str>) -> anyhow::Result<String> {
     // --- Tier 1: 本地 Whisper（直接发文件字节） ---
-    if let Some(cfg) = voice_whisper_local::WhisperLocalConfig::from_env() {
+    if let Some(mut cfg) = voice_whisper_local::WhisperLocalConfig::from_env() {
+        // 用户指定的语言覆盖服务器环境变量默认值
+        if let Some(lang) = language {
+            cfg.language = lang.to_string();
+        }
         match transcribe_raw_via_local_whisper(&cfg, audio, mime).await {
             Ok(t) => return Ok(t),
             Err(e) => {
