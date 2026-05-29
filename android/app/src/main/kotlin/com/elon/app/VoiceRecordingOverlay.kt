@@ -73,7 +73,7 @@ internal class VoiceRecordingOverlay(
             gravity = Gravity.CENTER
             includeFontPadding = false
             textSize = 15f
-            lineSpacingMultiplier = 1.25f
+            setLineSpacing(0f, 1.25f)
             setTextColor(Color.parseColor("#DDEDEDED"))
             setPadding(0, 0, 0, 0)
         }
