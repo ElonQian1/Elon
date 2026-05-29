@@ -141,6 +141,7 @@ class ChatAdapter(
         )
         applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
+        applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
             holder.text.text = message.content
             holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
@@ -192,6 +193,16 @@ class ChatAdapter(
         projectCardBound: Boolean
     ) {
         if (bubble == null || projectCardBound || !message.isImageOnlyMessage()) return
+        bubble.background = ColorDrawable(Color.TRANSPARENT)
+        bubble.setPadding(0, 0, 0, 0)
+    }
+
+    private fun applyVoiceOnlyBubbleStyle(
+        bubble: LinearLayout?,
+        message: ChatMessage,
+        projectCardBound: Boolean
+    ) {
+        if (bubble == null || projectCardBound || !message.isVoiceOnlyMessage()) return
         bubble.background = ColorDrawable(Color.TRANSPARENT)
         bubble.setPadding(0, 0, 0, 0)
     }
@@ -656,4 +667,9 @@ private fun ChatMessage.canRetryFailedAttachmentSend(): Boolean {
 private fun ChatMessage.isImageOnlyMessage(): Boolean {
     val items = attachments.orEmpty()
     return content.isBlank() && items.isNotEmpty() && items.all { it.isImage() }
+}
+
+private fun ChatMessage.isVoiceOnlyMessage(): Boolean {
+    val items = attachments.orEmpty()
+    return content.isBlank() && items.isNotEmpty() && items.all { it.isVoice() }
 }

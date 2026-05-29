@@ -131,12 +131,14 @@ private fun createVoiceAttachmentView(
     onLongPress: ((ChatAttachment) -> Unit)?
 ): View {
     val source = attachment.playbackSource() ?: ""
-    val durationSec = attachment.durationSeconds ?: 0
+    val durationSec = (attachment.durationSeconds ?: 1).coerceAtLeast(1)
     // 微信风格时长：N"
-    val durationText = "${durationSec.coerceAtLeast(1)}\""
+    val durationText = "$durationSec\""
 
-    // 宽度按时长动态计算：1 秒 = +4dp，最小 68dp，最大 190dp
-    val widthDp = (68 + durationSec.coerceIn(0, 60) * 4).coerceIn(68, 190)
+    // 宽度按时长动态计算：短语音约 92dp，最长约 216dp。
+    val widthDp = (VOICE_BUBBLE_MIN_WIDTH_DP +
+        (durationSec.coerceIn(1, 60) - 1) * VOICE_BUBBLE_WIDTH_PER_SECOND_DP)
+        .coerceAtMost(VOICE_BUBBLE_MAX_WIDTH_DP)
 
     // 颜色匹配气泡：发送方绿色，接收方深色半透明
     val bgColor = if (isSent) Color.parseColor("#95EC69") else Color.parseColor("#3D3D3D")
@@ -146,19 +148,17 @@ private fun createVoiceAttachmentView(
     val container = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), context.dp(42))
-        setPadding(context.dp(11), context.dp(8), context.dp(11), context.dp(8))
-        background = GradientDrawable().apply {
-            cornerRadius = context.dp(20).toFloat()
-            setColor(bgColor)
-        }
+        layoutParams = LinearLayout.LayoutParams(context.dp(widthDp), context.dp(VOICE_BUBBLE_HEIGHT_DP))
+        minimumWidth = context.dp(VOICE_BUBBLE_MIN_WIDTH_DP)
+        setPadding(context.dp(12), 0, context.dp(12), 0)
+        background = voiceBubbleBackground(context, isSent, bgColor)
         isClickable = true
         isFocusable = true
     }
 
     // 波形图标（仿微信 3 道弧线，播放时动画）
     val waveIcon = VoiceWaveIconView(context, waveColor, faceRight = !isSent).apply {
-        layoutParams = LinearLayout.LayoutParams(context.dp(20), context.dp(20))
+        layoutParams = LinearLayout.LayoutParams(context.dp(18), context.dp(18))
         isPlaying = VoiceMessagePlayer.isCurrentlyPlaying(source)
     }
 
@@ -172,17 +172,21 @@ private fun createVoiceAttachmentView(
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            if (isSent) marginEnd = context.dp(6) else marginStart = context.dp(6)
-        }
+        )
+    }
+
+    val spacer = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
     }
 
     // 发送方：[时长] [波形]；接收方：[波形] [时长]
     if (isSent) {
         container.addView(durationView)
+        container.addView(spacer)
         container.addView(waveIcon)
     } else {
         container.addView(waveIcon)
+        container.addView(spacer)
         container.addView(durationView)
     }
 
@@ -221,6 +225,29 @@ private fun createVoiceAttachmentView(
     }
 
     return container
+}
+
+private fun voiceBubbleBackground(context: Context, isSent: Boolean, color: Int): GradientDrawable {
+    val radius = context.dp(8).toFloat()
+    val tightRadius = context.dp(2).toFloat()
+    return GradientDrawable().apply {
+        setColor(color)
+        cornerRadii = if (isSent) {
+            floatArrayOf(
+                radius, radius,
+                tightRadius, tightRadius,
+                radius, radius,
+                radius, radius
+            )
+        } else {
+            floatArrayOf(
+                tightRadius, tightRadius,
+                radius, radius,
+                radius, radius,
+                radius, radius
+            )
+        }
+    }
 }
 
 /**
@@ -418,9 +445,14 @@ private fun List<ChatAttachment>.attachmentRenderSignature(): String {
             attachment.fileName.orEmpty(),
             attachment.sizeBytes?.toString().orEmpty(),
             attachment.imageWidth?.toString().orEmpty(),
-            attachment.imageHeight?.toString().orEmpty()
+            attachment.imageHeight?.toString().orEmpty(),
+            attachment.durationSeconds?.toString().orEmpty()
         ).joinToString(separator = "\u001E")
     }
 }
 
 private const val MAX_CHAT_ATTACHMENTS = 6
+private const val VOICE_BUBBLE_HEIGHT_DP = 40
+private const val VOICE_BUBBLE_MIN_WIDTH_DP = 92
+private const val VOICE_BUBBLE_MAX_WIDTH_DP = 216
+private const val VOICE_BUBBLE_WIDTH_PER_SECOND_DP = 2
