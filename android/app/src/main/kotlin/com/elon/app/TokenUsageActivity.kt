@@ -52,8 +52,14 @@ class TokenUsageActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
         }
 
-        userId = getSharedPreferences("elon", MODE_PRIVATE).getString("user_id", "") ?: ""
+        userId = AuthManager.effectiveUserId(this)
         authToken = AuthManager.token(this) ?: ""
+
+        if (authToken.isBlank()) {
+            Toast.makeText(this, "请先登录账号才能查看用量统计", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
 
         loadingBar = findViewById(R.id.usageLoadingBar)
         errorText = findViewById(R.id.usageErrorText)
