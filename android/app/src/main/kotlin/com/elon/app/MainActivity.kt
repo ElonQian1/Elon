@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
     /** 运行时可变状态与工具实例（OkHttpClient 含超时配置）。 */
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
-    private val serverUrl = BuildConfig.SERVER_URL
+    private val serverUrl get() = ServerUrlManager.getActive(this)
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"

@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.app.Application
+import android.content.Context
 import com.elon.app.mcp.*
 
 class ElonApplication : Application() {
@@ -48,6 +49,11 @@ class ElonApplication : Application() {
     }
 
     companion object {
-        const val SERVER_URL = "http://43.139.149.158:8080"
+        /** 主服务器 URL（与 BuildConfig.SERVER_URL 保持一致，供静态引用）。动态 URL 请用 [activeServerUrl]。 */
+        val SERVER_URL: String = BuildConfig.SERVER_URL
+
+        /** 返回当前活跃服务器 URL（主服务器或备用服务器）。 */
+        @JvmStatic
+        fun activeServerUrl(context: Context): String = ServerUrlManager.getActive(context)
     }
 }

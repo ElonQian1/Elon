@@ -63,6 +63,9 @@ android {
         // 服务器地址：可通过环境变量 ELON_SERVER_URL 覆盖，默认指向生产服务器
         def serverUrl = signingValue("ELON_SERVER_URL", "http://43.139.149.158:8080")
         buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
+        // 备用服务器地址（本地开发机）：通过环境变量 ELON_FALLBACK_SERVER_URL 配置，留空则运行时从设置读取
+        def fallbackUrl = signingValue("ELON_FALLBACK_SERVER_URL", "")
+        buildConfigField "String", "FALLBACK_SERVER_URL", "\"${fallbackUrl}\""
     }
 
     buildTypes {

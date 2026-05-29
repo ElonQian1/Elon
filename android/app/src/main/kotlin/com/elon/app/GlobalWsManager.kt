@@ -98,7 +98,8 @@ class GlobalWsManager(private val serverUrl: String) {
         val ctx = appCtx ?: return
         if (!running.get()) return
 
-        val wsBase = serverUrl
+        val activeUrl = ServerUrlManager.getActive(ctx)
+        val wsBase = activeUrl
             .replace("https://", "wss://")
             .replace("http://", "ws://")
         val token = AuthManager.token(ctx)
@@ -133,6 +134,7 @@ class GlobalWsManager(private val serverUrl: String) {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             Log.d(TAG, "已连接")
             retryCount = 0
+            appCtx?.let { ServerUrlManager.reportSuccess(it) }
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -141,6 +143,7 @@ class GlobalWsManager(private val serverUrl: String) {
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             Log.w(TAG, "连接失败: ${t.message}")
+            appCtx?.let { ServerUrlManager.reportFailure(it) }
             scheduleReconnect()
         }
 
