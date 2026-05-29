@@ -332,6 +332,7 @@ internal class MainInputActions(
             emojiPanel = { inputComposerViewsOrNull()?.emojiPanel },
             emojiButton = { inputComposerViewsOrNull()?.emojiButton },
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
+            requestKeyboardLift = { keyboardInsetsAnimationActions?.requestKeyboardLift() },
             addPendingEmojiAttachment = ::addCustomEmojiAttachment,
             updateSendButtonVisual = ::updateSendButtonVisual,
             updateAdaptiveInputHeight = { adaptiveInputHeightActions.updateAdaptiveInputHeight() }

@@ -1,14 +1,20 @@
 package com.elon.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.icu.text.BreakIterator
 import android.net.Uri
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.PathInterpolator
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -34,6 +40,7 @@ internal class MainEmojiActions(
     private val emojiPanel: () -> LinearLayout?,
     private val emojiButton: () -> ImageButton?,
     private val collapseAttachmentPanel: () -> Unit,
+    private val requestKeyboardLift: () -> Unit,
     private val addPendingEmojiAttachment: (CustomEmojiItem) -> Boolean,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
@@ -47,6 +54,8 @@ internal class MainEmojiActions(
     private var contentFrame: FrameLayout? = null
     private var builtInTab: TextView? = null
     private var customTab: TextView? = null
+    private var panelAnimator: ValueAnimator? = null
+    private val panelInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     fun setupEmojiLaunchers() {
         packImportLauncher = activity.registerForActivityResult(
@@ -71,7 +80,7 @@ internal class MainEmojiActions(
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(268)
+                0
             )
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1E1E1E"))
@@ -90,25 +99,37 @@ internal class MainEmojiActions(
     }
 
     fun toggleEmojiPanel() {
-        if (isOpen) collapseEmojiPanel() else expandEmojiPanel()
+        if (isOpen) collapseEmojiPanel(showKeyboard = true) else expandEmojiPanel()
     }
 
     fun expandEmojiPanel() {
         if (activeConversation().ended) return
         collapseAttachmentPanel()
-        hideKeyboard()
         val panel = emojiPanel() ?: return
+        panelAnimator?.cancel()
         isOpen = true
         panel.visibility = View.VISIBLE
+        setPanelHeight(panel, 0)
+        panel.alpha = 0f
+        panel.translationY = dp(10).toFloat()
+        hideKeyboard()
+        animateEmojiPanel(panel, expand = true)
         updateEmojiButton(selected = true)
     }
 
     fun collapseEmojiPanel() {
+        collapseEmojiPanel(showKeyboard = false)
+    }
+
+    private fun collapseEmojiPanel(showKeyboard: Boolean) {
         val panel = emojiPanel() ?: return
         val wasOpen = isOpen || panel.visibility == View.VISIBLE
         isOpen = false
-        panel.visibility = View.GONE
-        if (wasOpen) updateEmojiButton(selected = false)
+        if (wasOpen) {
+            animateEmojiPanel(panel, expand = false)
+            updateEmojiButton(selected = false)
+        }
+        if (showKeyboard) showKeyboard()
     }
 
     fun collapseEmojiPanelForBack(): Boolean {
@@ -117,7 +138,61 @@ internal class MainEmojiActions(
         return true
     }
 
-    private fun createTabRow(): HorizontalScrollView {
+    private fun animateEmojiPanel(panel: LinearLayout, expand: Boolean) {
+        val targetHeight = if (expand) dp(EMOJI_PANEL_HEIGHT_DP) else 0
+        val startHeight = maxOf(
+            (panel.layoutParams?.height ?: 0).coerceAtLeast(0),
+            panel.height.coerceAtLeast(0)
+        )
+        if (startHeight == targetHeight) {
+            if (!expand) panel.visibility = View.GONE
+            panel.alpha = 1f
+            panel.translationY = 0f
+            return
+        }
+        var cancelled = false
+        panel.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        panelAnimator?.cancel()
+        panelAnimator = ValueAnimator.ofInt(startHeight, targetHeight).apply {
+            duration = if (expand) 220L else 170L
+            interpolator = panelInterpolator
+            addUpdateListener { animator ->
+                val fraction = animator.animatedFraction
+                setPanelHeight(panel, animator.animatedValue as Int)
+                panel.alpha = if (expand) fraction else 1f - fraction
+                panel.translationY = if (expand) {
+                    dp(10) * (1f - fraction)
+                } else {
+                    dp(8) * fraction
+                }
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    panel.setLayerType(View.LAYER_TYPE_NONE, null)
+                    if (cancelled) return
+                    setPanelHeight(panel, targetHeight)
+                    panel.alpha = 1f
+                    panel.translationY = 0f
+                    if (!expand) panel.visibility = View.GONE
+                    panelAnimator = null
+                }
+            })
+            start()
+        }
+    }
+
+    private fun setPanelHeight(panel: View, height: Int) {
+        val params = panel.layoutParams ?: return
+        if (params.height == height) return
+        params.height = height
+        panel.layoutParams = params
+    }
+
+    private fun createTabRow(): LinearLayout {
         val row = LinearLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -125,20 +200,48 @@ internal class MainEmojiActions(
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), dp(8), dp(14), dp(6))
+            setPadding(dp(14), dp(8), dp(6), dp(6))
         }
         builtInTab = createTab("表情") { selectTab(EmojiTab.BUILT_IN) }
         customTab = createTab("自定义") { selectTab(EmojiTab.CUSTOM) }
         row.addView(requireNotNull(builtInTab))
         row.addView(requireNotNull(customTab))
-        return HorizontalScrollView(activity).apply {
+        val tabsScroll = HorizontalScrollView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
+                0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(48)
+                1f
             )
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
             addView(row)
+        }
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            addView(tabsScroll)
+            addView(createPanelDeleteButton())
+        }
+    }
+
+    private fun createPanelDeleteButton(): ImageButton {
+        return ImageButton(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(52), dp(42)).apply {
+                marginEnd = dp(14)
+            }
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(R.drawable.ic_emoji_backspace)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(9), dp(9), dp(9), dp(9))
+            alpha = 0.94f
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = "Delete emoji"
+            setOnClickListener { deleteBeforeCursor() }
         }
     }
 
@@ -381,11 +484,21 @@ internal class MainEmojiActions(
         if (start != end) {
             editable.delete(minOf(start, end), maxOf(start, end))
         } else if (start > 0) {
-            val deleteFrom = Character.offsetByCodePoints(editable, start, -1)
-            editable.delete(deleteFrom, start)
+            editable.delete(graphemeStartBeforeCursor(editable, start), start)
         }
         updateSendButtonVisual()
         updateAdaptiveInputHeight()
+    }
+
+    private fun graphemeStartBeforeCursor(text: CharSequence, cursor: Int): Int {
+        val iterator = BreakIterator.getCharacterInstance()
+        iterator.setText(text.toString())
+        val boundary = iterator.preceding(cursor)
+        return if (boundary != BreakIterator.DONE) {
+            boundary.coerceIn(0, cursor)
+        } else {
+            Character.offsetByCodePoints(text, cursor, -1)
+        }
     }
 
     private fun openPackImport() {
@@ -438,8 +551,28 @@ internal class MainEmojiActions(
         imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
     }
 
+    private fun showKeyboard() {
+        binding.inputEdit.requestFocus()
+        requestKeyboardLift()
+        binding.inputEdit.post {
+            val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
     private fun updateEmojiButton(selected: Boolean) {
-        emojiButton()?.alpha = if (selected) 1f else 0.92f
+        emojiButton()?.let { button ->
+            button.animate().cancel()
+            button.setImageResource(if (selected) R.drawable.ic_input_keyboard_circle else R.drawable.ic_input_emoji_circle)
+            button.contentDescription = if (selected) "Show keyboard" else "Open emoji"
+            button.animate()
+                .alpha(if (selected) 1f else 0.92f)
+                .scaleX(if (selected) 1.06f else 1f)
+                .scaleY(if (selected) 1.06f else 1f)
+                .setDuration(160L)
+                .setInterpolator(panelInterpolator)
+                .start()
+        }
     }
 
     private fun rounded(color: String, stroke: String): GradientDrawable {
@@ -453,6 +586,7 @@ internal class MainEmojiActions(
     private enum class EmojiTab { BUILT_IN, CUSTOM }
 
     private companion object {
+        private const val EMOJI_PANEL_HEIGHT_DP = 268
         private const val BUILT_IN_COLUMNS = 8
         private const val CUSTOM_COLUMNS = 4
         private const val MAX_CUSTOM_EMOJI_IMPORT = 20
