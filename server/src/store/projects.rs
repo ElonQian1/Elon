@@ -401,6 +401,32 @@ mod tests {
     }
 
     #[test]
+    fn create_project_reuses_existing_owner_project_name() {
+        let store = temp_store();
+        let user = store
+            .create_user("reuse-project-name@example.com", "secret1", None, None)
+            .expect("user should be created");
+
+        let first = store
+            .create_project(&user.id, "Reusable Project", None, None)
+            .expect("project should be created");
+        let second = store
+            .create_project(&user.id, "Reusable Project", None, None)
+            .expect("existing project should be reused");
+
+        assert!(!first.reused_existing);
+        assert!(second.reused_existing);
+        assert_eq!(second.project.id, first.project.id);
+        assert_eq!(
+            store
+                .list_projects_for_user(&user.id)
+                .expect("projects should list")
+                .len(),
+            1
+        );
+    }
+
+    #[test]
     fn deletion_target_rejects_running_tasks() {
         let store = temp_store();
         let user = store
@@ -408,7 +434,8 @@ mod tests {
             .expect("user should be created");
         let project = store
             .create_project(&user.id, "Running Delete", None, None)
-            .expect("project should be created");
+            .expect("project should be created")
+            .project;
         store
             .create_task(&project.id, &user.id, Some("conv"), "run")
             .expect("task should be created");
@@ -429,7 +456,8 @@ mod tests {
             .expect("user should be created");
         let project = store
             .create_project(&user.id, "Purge Delete", None, None)
-            .expect("project should be created");
+            .expect("project should be created")
+            .project;
         let task = store
             .create_task(&project.id, &user.id, Some("conv"), "run")
             .expect("task should be created");

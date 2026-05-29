@@ -93,24 +93,29 @@ pub async fn create_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    let project = match state.store.create_project(
+    let create_result = match state.store.create_project(
         &user.id,
         &req.name,
         req.description.as_deref(),
         req.template.as_deref(),
     ) {
-        Ok(project) => project,
+        Ok(result) => result,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
 
-    let workspace = state.get_project_workspace(&project.workspace_key);
-    if let Err(e) =
-        tools::create_project_workspace(&workspace, &project.template, &project.name, &user.id)
-    {
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+    let reused_existing = create_result.reused_existing;
+    let project = create_result.project;
+    if !reused_existing {
+        let workspace = state.get_project_workspace(&project.workspace_key);
+        if let Err(e) =
+            tools::create_project_workspace(&workspace, &project.template, &project.name, &user.id)
+        {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+        }
     }
 
-    Json(serde_json::json!({ "project": project })).into_response()
+    Json(serde_json::json!({ "project": project, "reused_existing": reused_existing }))
+        .into_response()
 }
 
 pub async fn ws_project_handler(

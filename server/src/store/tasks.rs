@@ -474,7 +474,8 @@ mod tests {
             .expect("user should be created");
         let project = store
             .create_project(&user.id, "Task Events", None, None)
-            .expect("project should be created");
+            .expect("project should be created")
+            .project;
         store
             .create_task(&project.id, &user.id, Some("conv"), "run task")
             .expect("task should be created")

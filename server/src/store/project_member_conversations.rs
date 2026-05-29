@@ -211,7 +211,8 @@ mod tests {
             .expect("outsider should be created");
         let project = store
             .create_project(&owner.id, "Member Conversation Scope", None, None)
-            .expect("project should be created");
+            .expect("project should be created")
+            .project;
         store
             .set_project_visibility(&project.id, true, "open")
             .expect("project should be public");

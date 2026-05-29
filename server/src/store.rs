@@ -309,6 +309,12 @@ pub struct ProjectSummary {
 }
 
 #[derive(Debug, Clone)]
+pub struct CreateProjectResult {
+    pub project: ProjectSummary,
+    pub reused_existing: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct ProjectAccess {
     pub id: String,
     pub name: String,
@@ -340,6 +346,59 @@ pub struct TaskSnapshot {
     pub error: Option<String>,
 }
 
+fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectSummary> {
+    Ok(ProjectSummary {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        description: row.get(2)?,
+        workspace_key: row.get(3)?,
+        template: row.get(4)?,
+        source_type: row.get(5)?,
+        repo_url: row.get(6)?,
+        branch: row.get(7)?,
+        workspace_path: row.get(8)?,
+        status: row.get(9)?,
+        role: row.get(10)?,
+        last_task_status: row.get(11)?,
+        last_apk_url: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn find_owner_project_by_name(
+    conn: &Connection,
+    user_id: &str,
+    name: &str,
+) -> Result<Option<ProjectSummary>> {
+    Ok(conn
+        .query_row(
+            "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.status,
+                    COALESCE(pm.role, 'owner') AS role,
+                    (
+                        SELECT t.status FROM tasks t
+                        WHERE t.project_id = p.id
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_task_status,
+                    (
+                        SELECT t.apk_url FROM tasks t
+                        WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_apk_url,
+                    p.updated_at
+             FROM projects p
+             LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
+             WHERE p.created_by = ?1 AND p.name = ?2 AND p.status != 'deleted'
+             ORDER BY p.updated_at DESC
+             LIMIT 1",
+            params![user_id, name],
+            project_summary_from_row,
+        )
+        .optional()?)
+}
+
 impl Store {
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(parent) = path.parent() {
@@ -363,14 +422,12 @@ impl Store {
         name: &str,
         description: Option<&str>,
         template: Option<&str>,
-    ) -> Result<ProjectSummary> {
+    ) -> Result<CreateProjectResult> {
         let name = name.trim();
         if name.is_empty() {
             return Err(anyhow!("项目名称不能为空"));
         }
 
-        let id = new_id("prj");
-        let workspace_key = id.clone();
         let template = template
             .map(str::trim)
             .filter(|v| !v.is_empty())
@@ -384,22 +441,16 @@ impl Store {
         let now = now();
         let conn = self.conn()?;
 
-        // 同一用户不允许创建同名活跃项目
-        let exists: bool = conn
-            .query_row(
-                "SELECT 1 FROM projects WHERE created_by = ?1 AND name = ?2 AND status != 'deleted' LIMIT 1",
-                params![user_id, name],
-                |_| Ok(true),
-            )
-            .optional()?
-            .unwrap_or(false);
-        if exists {
-            return Err(anyhow!(
-                "你已经有一个叫「{}」的项目了，不能重复创建。",
-                name
-            ));
+        if let Some(project) = find_owner_project_by_name(&conn, user_id, name)? {
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
         }
 
+        let id = new_id("prj");
+        let workspace_key = id.clone();
+        let description = clean_optional(description);
         let tx = conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO projects (
@@ -407,15 +458,7 @@ impl Store {
                 status, created_by, created_at, updated_at
              )
              VALUES (?1, ?2, ?3, ?4, ?5, 'template', 'active', ?6, ?7, ?7)",
-            params![
-                id,
-                name,
-                clean_optional(description),
-                workspace_key,
-                template,
-                user_id,
-                now
-            ],
+            params![id, name, description, workspace_key, template, user_id, now],
         )?;
         tx.execute(
             "INSERT INTO project_members (project_id, user_id, role, created_at)
@@ -435,21 +478,24 @@ impl Store {
         )?;
         tx.commit()?;
 
-        Ok(ProjectSummary {
-            id,
-            name: name.to_string(),
-            description: clean_optional(description).map(ToOwned::to_owned),
-            workspace_key,
-            template: template.to_string(),
-            source_type: "template".into(),
-            repo_url: None,
-            branch: None,
-            workspace_path: None,
-            status: "active".into(),
-            role: "owner".into(),
-            last_task_status: None,
-            last_apk_url: None,
-            updated_at: now,
+        Ok(CreateProjectResult {
+            project: ProjectSummary {
+                id,
+                name: name.to_string(),
+                description: description.map(ToOwned::to_owned),
+                workspace_key,
+                template: template.to_string(),
+                source_type: "template".into(),
+                repo_url: None,
+                branch: None,
+                workspace_path: None,
+                status: "active".into(),
+                role: "owner".into(),
+                last_task_status: None,
+                last_apk_url: None,
+                updated_at: now,
+            },
+            reused_existing: false,
         })
     }
 
@@ -624,24 +670,7 @@ impl Store {
         )?;
 
         let projects = stmt
-            .query_map(params![user_id], |row| {
-                Ok(ProjectSummary {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    workspace_key: row.get(3)?,
-                    template: row.get(4)?,
-                    source_type: row.get(5)?,
-                    repo_url: row.get(6)?,
-                    branch: row.get(7)?,
-                    workspace_path: row.get(8)?,
-                    status: row.get(9)?,
-                    role: row.get(10)?,
-                    last_task_status: row.get(11)?,
-                    last_apk_url: row.get(12)?,
-                    updated_at: row.get(13)?,
-                })
-            })?
+            .query_map(params![user_id], project_summary_from_row)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         Ok(projects)
