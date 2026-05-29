@@ -18,6 +18,12 @@ pub struct WhisperLocalConfig {
     pub base_url: String,
     /// 转写目标语言，默认 `zh`。
     pub language: String,
+    /// beam_size：解码宽度，1=最快(贪心) 5=平衡 10=最准，默认 5。
+    pub beam_size: u8,
+    /// vad_filter：是否启用静音过滤，默认 true。
+    pub vad_filter: bool,
+    /// condition_on_previous_text：是否参考上一句识别结果，默认 false。
+    pub condition_on_previous_text: bool,
 }
 
 impl WhisperLocalConfig {
@@ -28,6 +34,9 @@ impl WhisperLocalConfig {
             base_url: url.trim_end_matches('/').to_string(),
             language: std::env::var("ELON_VOICE_TRANSCRIBE_LANGUAGE")
                 .unwrap_or_else(|_| "zh".to_string()),
+            beam_size: 5,
+            vad_filter: true,
+            condition_on_previous_text: false,
         })
     }
 }
@@ -59,9 +68,15 @@ pub async fn transcribe_pcm(
         .mime_str("audio/wav")
         .context("设置 MIME 类型失败")?;
     let lang_part = reqwest::multipart::Part::text(cfg.language.clone());
+    let beam_part = reqwest::multipart::Part::text(cfg.beam_size.to_string());
+    let vad_part = reqwest::multipart::Part::text(cfg.vad_filter.to_string());
+    let cond_part = reqwest::multipart::Part::text(cfg.condition_on_previous_text.to_string());
     let form = reqwest::multipart::Form::new()
         .part("audio", audio_part)
-        .part("language", lang_part);
+        .part("language", lang_part)
+        .part("beam_size", beam_part)
+        .part("vad_filter", vad_part)
+        .part("condition_on_previous_text", cond_part);
 
     let url = format!("{}/transcribe", cfg.base_url);
     let resp = reqwest::Client::new()

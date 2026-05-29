@@ -38,6 +38,9 @@ app = FastAPI(title="Elon Whisper ASR", version="1.0")
 async def transcribe(
     audio: UploadFile = File(..., description="WAV 文件（PCM16 LE，任意采样率）"),
     language: str = Form("zh", description="目标语言代码，如 zh / zh-TW / en / auto"),
+    beam_size: int = Form(5, description="解码宽度，1=最快(贪心) 5=平衡 10=最准"),
+    vad_filter: bool = Form(True, description="是否启用静音过滤"),
+    condition_on_previous_text: bool = Form(False, description="是否参考上一句识别结果"),
 ):
     """
     接收 WAV 音频，返回转写文本。
@@ -51,7 +54,7 @@ async def transcribe(
     if not data:
         raise HTTPException(status_code=400, detail="音频数据为空")
 
-    logger.info(f"收到转写请求：{len(data)} 字节，语言={language}")
+    logger.info(f"收到转写请求：{len(data)} 字节，语言={language}，beam_size={beam_size}，vad_filter={vad_filter}，condition_on_previous_text={condition_on_previous_text}")
 
     # 映射客户端语言代码到 Whisper 参数
     if language == "auto" or language == "":
@@ -69,10 +72,13 @@ async def transcribe(
 
     try:
         buf = io.BytesIO(data)
+        # beam_size 合法范围 1-10，防止客户端传异常值
+        safe_beam_size = max(1, min(10, beam_size))
         transcribe_kwargs = dict(
-            beam_size=1,
-            best_of=1,
-            vad_filter=True,
+            beam_size=safe_beam_size,
+            best_of=safe_beam_size,
+            vad_filter=vad_filter,
+            condition_on_previous_text=condition_on_previous_text,
             vad_parameters={"min_silence_duration_ms": 300},
         )
         if whisper_lang is not None:

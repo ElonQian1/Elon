@@ -21,6 +21,9 @@ class VoiceEngineActivity : AppCompatActivity() {
     private lateinit var probeAllBtn: Button
     private lateinit var clearBtn: Button
     private lateinit var languageSpinner: Spinner
+    private lateinit var beamSizeSpinner: Spinner
+    private lateinit var vadFilterSwitch: Switch
+    private lateinit var conditionSwitch: Switch
     private var engines: List<RecognitionEngine> = emptyList()
     private val probingKeys = HashSet<String>()
 
@@ -37,8 +40,11 @@ class VoiceEngineActivity : AppCompatActivity() {
         probeAllBtn = findViewById(R.id.probeAllButton)
         clearBtn = findViewById(R.id.clearHealthButton)
         languageSpinner = findViewById(R.id.whisperLanguageSpinner)
+        beamSizeSpinner = findViewById(R.id.whisperBeamSizeSpinner)
+        vadFilterSwitch = findViewById(R.id.whisperVadFilterSwitch)
+        conditionSwitch = findViewById(R.id.whisperConditionSwitch)
 
-        // 语言选择器
+        // ── 语言选择器 ──
         val langLabels = listOf("简体中文", "繁体中文", "英文 (English)", "自动检测")
         val langCodes  = listOf("zh", "zh-TW", "en", "auto")
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, langLabels)
@@ -51,6 +57,33 @@ class VoiceEngineActivity : AppCompatActivity() {
                 AsrFallbackSettings.setWhisperLanguage(this@VoiceEngineActivity, langCodes[position])
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        // ── beam_size 选择器 ──
+        val beamLabels = listOf("1 — 最快（贪心）", "3 — 较快", "5 — 平衡（推荐）", "7 — 较准", "10 — 最准")
+        val beamValues = listOf(1, 3, 5, 7, 10)
+        val beamAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, beamLabels)
+        beamAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        beamSizeSpinner.adapter = beamAdapter
+        val savedBeam = AsrFallbackSettings.getWhisperBeamSize(this)
+        beamSizeSpinner.setSelection(beamValues.indexOf(savedBeam).let { if (it < 0) beamValues.indexOf(5) else it })
+        beamSizeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                AsrFallbackSettings.setWhisperBeamSize(this@VoiceEngineActivity, beamValues[position])
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        // ── vad_filter 开关 ──
+        vadFilterSwitch.isChecked = AsrFallbackSettings.getWhisperVadFilter(this)
+        vadFilterSwitch.setOnCheckedChangeListener { _, checked ->
+            AsrFallbackSettings.setWhisperVadFilter(this, checked)
+        }
+
+        // ── condition_on_previous_text 开关 ──
+        conditionSwitch.isChecked = AsrFallbackSettings.getWhisperConditionOnPrevious(this)
+        conditionSwitch.setOnCheckedChangeListener { _, checked ->
+            AsrFallbackSettings.setWhisperConditionOnPrevious(this, checked)
         }
 
         probeAllBtn.setOnClickListener { probeAll() }

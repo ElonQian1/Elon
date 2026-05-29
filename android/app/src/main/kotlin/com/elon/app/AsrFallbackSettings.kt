@@ -22,6 +22,9 @@ object AsrFallbackSettings {
     private const val KEY_SERVER_ENABLED = "server_fallback_enabled"
     private const val KEY_DISABLED_ENGINES = "disabled_engine_keys"
     private const val KEY_WHISPER_LANGUAGE = "whisper_language"
+    private const val KEY_WHISPER_BEAM_SIZE = "whisper_beam_size"
+    private const val KEY_WHISPER_VAD_FILTER = "whisper_vad_filter"
+    private const val KEY_WHISPER_CONDITION_PREV = "whisper_condition_on_previous"
 
     // ──────────────── 服务器 Whisper 兜底 ────────────────
 
@@ -47,6 +50,38 @@ object AsrFallbackSettings {
 
     fun setWhisperLanguage(context: Context, lang: String) {
         prefs(context).edit().putString(KEY_WHISPER_LANGUAGE, lang).apply()
+    }
+
+    // ──────────────── 云端 Whisper 转写高级参数 ────────────────
+
+    /**
+     * beam_size：解码宽度，越大越准但越慢。
+     *   1 = 最快（贪心解码）  5 = 平衡（默认）  10 = 最准
+     */
+    fun getWhisperBeamSize(context: Context): Int =
+        prefs(context).getInt(KEY_WHISPER_BEAM_SIZE, 5)
+
+    fun setWhisperBeamSize(context: Context, size: Int) {
+        prefs(context).edit().putInt(KEY_WHISPER_BEAM_SIZE, size).apply()
+    }
+
+    /** vad_filter：是否启用静音过滤，开启后自动跳过无声片段（默认开启）。 */
+    fun getWhisperVadFilter(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WHISPER_VAD_FILTER, true)
+
+    fun setWhisperVadFilter(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WHISPER_VAD_FILTER, enabled).apply()
+    }
+
+    /**
+     * condition_on_previous_text：是否让模型参考上一句识别结果（默认关闭）。
+     * 关闭可避免一句识别错误"传染"到下一句。
+     */
+    fun getWhisperConditionOnPrevious(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_WHISPER_CONDITION_PREV, false)
+
+    fun setWhisperConditionOnPrevious(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_WHISPER_CONDITION_PREV, enabled).apply()
     }
 
     // ──────────────── 本地引擎禁用列表 ────────────────

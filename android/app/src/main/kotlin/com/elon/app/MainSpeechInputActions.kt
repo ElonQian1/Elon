@@ -627,6 +627,9 @@ internal class MainSpeechInputActions(
                         bytes.toRequestBody(mime.toMediaType()))
                     .addFormDataPart("format", mime)
                     .addFormDataPart("language", AsrFallbackSettings.getWhisperLanguage(activity))
+                    .addFormDataPart("beam_size", AsrFallbackSettings.getWhisperBeamSize(activity).toString())
+                    .addFormDataPart("vad_filter", AsrFallbackSettings.getWhisperVadFilter(activity).toString())
+                    .addFormDataPart("condition_on_previous_text", AsrFallbackSettings.getWhisperConditionOnPrevious(activity).toString())
                     .build()
                 val authToken = AuthManager.token(activity) ?: ""
                 val request = Request.Builder()
