@@ -76,18 +76,15 @@ async fn run_relay_session(
     agent_secret: &str,
     local_port: u16,
 ) -> Result<()> {
-    let request = tokio_tungstenite::tungstenite::client::IntoClientRequest::into_client_request(
-        cloud_url,
-    )?;
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    // into_client_request 会自动生成 Sec-WebSocket-Key 等握手头
+    let mut request = cloud_url.into_client_request()?;
+    request.headers_mut().insert(
+        "Authorization",
+        format!("Bearer {}", agent_secret).parse()?,
+    );
 
-    // 手动加 Authorization header
-    use tokio_tungstenite::tungstenite::handshake::client::Request;
-    let mut req = Request::builder()
-        .uri(cloud_url)
-        .header("Authorization", format!("Bearer {}", agent_secret))
-        .body(())?;
-
-    let (mut ws, _) = connect_async(req).await?;
+    let (mut ws, _) = connect_async(request).await?;
     info!("[relay-client] 已连接到云端 {}", cloud_url);
 
     // 发送 Register 帧

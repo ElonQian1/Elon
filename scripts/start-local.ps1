@@ -98,4 +98,4 @@ New-Item -ItemType Directory -Force -Path $env:WORKSPACE_ROOT | Out-Null
 
 # ── 启动服务 ────────────────────────────────────────────────────────────────
 Write-Host "[start-local] 启动中... (Ctrl+C 停止)"
-cargo run -p elon-server
+cargo run --manifest-path "$PSScriptRoot\..\server\Cargo.toml"
