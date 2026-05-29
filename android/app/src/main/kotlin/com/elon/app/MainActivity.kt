@@ -15,6 +15,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
+    private lateinit var agentPageController: AgentPageController
 
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
@@ -158,6 +159,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         createActions.onCreate(intent)
         messageSelectionActions.setup()
+        agentPageController = AgentPageController(this, binding)
+        agentPageController.setup()
         com.elon.app.VoiceEngineBootstrap.scheduleSilentProbeIfNeeded(this)
     }
 
@@ -217,6 +220,7 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.resumeIfActive()
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
+        if (::agentPageController.isInitialized) agentPageController.refresh()
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -429,7 +433,8 @@ class MainActivity : AppCompatActivity() {
             },
             onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
             showProjectMembers = { projectSpaceController.showMembers() },
-            loadMarketplace = { marketplaceActions.loadProjects() }
+            loadMarketplace = { marketplaceActions.loadProjects() },
+            onAgentTabSelected = { agentPageController.refresh() }
         )
     }
 

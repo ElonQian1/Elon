@@ -523,6 +523,13 @@
                 android:orientation="vertical"
                 android:paddingBottom="16dp" />
         </ScrollView>
+
+        <include
+            android:id="@+id/agentPage"
+            layout="@layout/page_agent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
     </FrameLayout>
 
     <FrameLayout
@@ -684,6 +691,12 @@
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_store"
                 android:text="商城" />
+
+            <TextView
+                android:id="@+id/tabAgent"
+                style="@style/MainTabText"
+                android:drawableTop="@drawable/ic_tab_agent"
+                android:text="Agent" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

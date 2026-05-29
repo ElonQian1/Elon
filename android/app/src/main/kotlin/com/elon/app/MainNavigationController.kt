@@ -41,7 +41,8 @@ internal class MainNavigationController(
     private val onFriendChatClosed: () -> Unit,
     private val onProjectChannelClosed: () -> Unit,
     private val showProjectMembers: () -> Unit,
-    private val loadMarketplace: () -> Unit
+    private val loadMarketplace: () -> Unit,
+    private val onAgentTabSelected: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -55,7 +56,7 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket)
+        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket, binding.tabAgent)
 
         fun select(tab: TextView) {
             WechatPageTransition.cancelActive()
@@ -69,6 +70,7 @@ internal class MainNavigationController(
             binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
             binding.marketplacePage.visibility = if (tab == binding.tabMarket) View.VISIBLE else View.GONE
+            binding.agentPage.root.visibility = if (tab == binding.tabAgent) View.VISIBLE else View.GONE
             binding.inputLayout.visibility = View.GONE
             binding.pageTabs.visibility = View.VISIBLE
             binding.backButton.visibility = View.GONE
@@ -84,6 +86,7 @@ internal class MainNavigationController(
                 binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
                 binding.tabMarket -> "商城"
+                binding.tabAgent -> "Agent 自动化"
                 else -> "好友"
             }
             if (tab != binding.tabChat) {
@@ -98,6 +101,8 @@ internal class MainNavigationController(
                 refreshServerVersion()
             } else if (tab == binding.tabMarket) {
                 loadMarketplace()
+            } else if (tab == binding.tabAgent) {
+                onAgentTabSelected()
             }
         }
 
@@ -105,6 +110,7 @@ internal class MainNavigationController(
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
         binding.tabMarket.setOnClickListener { select(binding.tabMarket) }
+        binding.tabAgent.setOnClickListener { select(binding.tabAgent) }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
@@ -599,7 +605,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket).forEach { tab ->
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket, binding.tabAgent).forEach { tab ->
             updateBottomTabVisual(tab, tab == selectedTab)
         }
     }
@@ -618,6 +624,7 @@ internal class MainNavigationController(
         binding.projectPage.translationX = 0f
         binding.profilePage.translationX = 0f
         binding.marketplacePage.translationX = 0f
+        binding.agentPage.root.translationX = 0f
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
     }
