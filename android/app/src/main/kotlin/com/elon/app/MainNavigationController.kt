@@ -662,7 +662,7 @@ internal class MainNavigationController(
         val color = Color.parseColor(if (selected) "#E1E1E1" else "#A8A8A8")
         tab.isSelected = selected
         tab.setTextColor(color)
-        tab.textSize = 11f
+        tab.textSize = 12f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
     }
 
