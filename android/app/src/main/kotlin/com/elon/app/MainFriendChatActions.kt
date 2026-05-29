@@ -205,6 +205,28 @@ internal class MainFriendChatActions(
         }
     }
 
+    fun removeProjectShareCards(projectIds: Set<String>): Int {
+        val ids = projectIds.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (ids.isEmpty()) return 0
+        var removed = 0
+        var activeChanged = false
+        val activeId = activeFriend?.id
+        messagesByFriend.forEach { (friendId, messages) ->
+            val before = messages.size
+            messages.removeAll { message ->
+                message.role == "user" && parseChatProjectShareMessage(message.content)?.id in ids
+            }
+            val removedHere = before - messages.size
+            if (removedHere > 0) {
+                removed += removedHere
+                if (friendId == activeId) activeChanged = true
+            }
+        }
+        if (activeChanged) activeAdapter?.notifyDataSetChanged()
+        if (removed > 0) onFriendSummariesChanged()
+        return removed
+    }
+
     private fun startPolling() {
         if (polling) return
         polling = true

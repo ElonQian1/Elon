@@ -800,7 +800,11 @@ class MainActivity : AppCompatActivity() {
             http = s.http,
             serverUrl = serverUrl,
             tokenProvider = { AuthManager.token(this) },
-            isLoggedIn = { AuthManager.isLoggedIn(this) }
+            isLoggedIn = { AuthManager.isLoggedIn(this) },
+            removeSentProjectShareCards = { projectIds ->
+                friendChatActions.removeProjectShareCards(projectIds) +
+                    groupChatActions.removeProjectShareCards(projectIds)
+            }
         )
     }
 

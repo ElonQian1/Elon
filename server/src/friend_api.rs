@@ -6,6 +6,7 @@
 //!   GET  /api/me/friends/search                  → 按手机号搜索用户
 //!   GET  /api/me/friends/:friend_id/messages     → 获取与好友的消息记录
 //!   POST /api/me/friends/:friend_id/messages     → 发送消息给好友
+//!   DELETE /api/me/project-share-messages/:project_id → 撤回自己发出的项目卡片
 
 use axum::{
     extract::{Path, Query, State},
@@ -386,6 +387,40 @@ pub async fn delete_friend_group_message(
         .delete_friend_group_message(&user.id, &group_id, &message_id)
     {
         Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn delete_project_share_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project_id = project_id.trim();
+    if project_id.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "项目 ID 不能为空");
+    }
+    let result = (|| -> anyhow::Result<(usize, usize)> {
+        let friend_count = state
+            .store
+            .delete_friend_project_share_messages(&user.id, project_id)?;
+        let group_count = state
+            .store
+            .delete_group_project_share_messages(&user.id, project_id)?;
+        Ok((friend_count, group_count))
+    })();
+    match result {
+        Ok((friend_count, group_count)) => Json(serde_json::json!({
+            "ok": true,
+            "deleted": friend_count + group_count,
+            "friend_deleted": friend_count,
+            "group_deleted": group_count
+        }))
+        .into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }

@@ -146,6 +146,26 @@ impl Store {
         Ok(())
     }
 
+    pub fn delete_friend_project_share_messages(
+        &self,
+        user_id: &str,
+        project_id: &str,
+    ) -> Result<usize> {
+        let project_id = project_id.trim();
+        if project_id.is_empty() {
+            return Ok(0);
+        }
+        let id_marker = format!(r#""id":"{}""#, project_id);
+        let changed = self.conn()?.execute(
+            "DELETE FROM friend_messages
+             WHERE sender_user_id = ?1
+               AND content LIKE '【一龙项目卡片】%'
+               AND instr(content, ?2) > 0",
+            params![user_id, id_marker],
+        )?;
+        Ok(changed)
+    }
+
     fn ensure_friend_pair(&self, user_id: &str, friend_id: &str) -> Result<()> {
         if user_id == friend_id {
             return Err(anyhow!("不能和自己聊天"));

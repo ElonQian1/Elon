@@ -185,6 +185,26 @@ internal fun setProjectVisibility(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
+/** DELETE /api/me/project-share-messages/:project_id — 撤回自己发出的好友/群聊项目卡片 */
+internal fun revokeProjectShareMessages(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String
+): Int {
+    val encodedProjectId = storeUrlPart(projectId)
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/me/project-share-messages/$encodedProjectId")
+            .delete()
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return runCatching { JSONObject(body).optInt("deleted", 0) }.getOrDefault(0)
+}
+
 // ─── 解析 ─────────────────────────────────────────────────────────────────────
 
 private fun parseStoreProjectList(json: JSONObject): List<StoreProject> {

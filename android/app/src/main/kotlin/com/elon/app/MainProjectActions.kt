@@ -21,7 +21,8 @@ internal class MainProjectActions(
     private val http: OkHttpClient,
     private val serverUrl: String,
     private val tokenProvider: () -> String?,
-    private val isLoggedIn: () -> Boolean
+    private val isLoggedIn: () -> Boolean,
+    private val removeSentProjectShareCards: (Set<String>) -> Int
 ) {
     fun showCreateProjectDialog() {
         val input = titleEditText("新项目 ${projects.size + 1}")
@@ -183,11 +184,13 @@ internal class MainProjectActions(
         val collaborationId = project.collaborationProjectId?.trim().orEmpty()
         val hasRemoteProject = collaborationId.isNotBlank() || project.id.startsWith("prj_")
         val remoteProjectId = collaborationId.ifBlank { project.id }
+        val cardProjectIds = setOf(project.id, remoteProjectId).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         if (!hasRemoteProject) {
             project.markPersonalDevelopment()
             saveProjects()
             renderProjectList()
-            Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+            val localRemoved = removeSentProjectShareCards(cardProjectIds)
+            Toast.makeText(activity, restorePersonalProjectToast(localRemoved), Toast.LENGTH_SHORT).show()
             return
         }
         if (!isLoggedIn()) {
@@ -202,11 +205,19 @@ internal class MainProjectActions(
         Thread {
             try {
                 setProjectVisibility(http, serverUrl, remoteProjectId, false, "invite", token)
+                val serverRemoved = cardProjectIds.sumOf { projectId ->
+                    revokeProjectShareMessages(http, serverUrl, projectId, token)
+                }
                 activity.runOnUiThread {
                     project.markPersonalDevelopment()
                     saveProjects()
                     renderProjectList()
-                    Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+                    val localRemoved = removeSentProjectShareCards(cardProjectIds)
+                    Toast.makeText(
+                        activity,
+                        restorePersonalProjectToast(maxOf(serverRemoved, localRemoved)),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {
@@ -214,6 +225,14 @@ internal class MainProjectActions(
                 }
             }
         }.start()
+    }
+
+    private fun restorePersonalProjectToast(removedCards: Int): String {
+        return if (removedCards > 0) {
+            "已恢复为个人项目，并撤回 $removedCards 张项目卡片"
+        } else {
+            "已恢复为个人项目"
+        }
     }
 
     private fun showVisibilityDialog(project: AppProject) {

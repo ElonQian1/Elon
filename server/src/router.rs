@@ -82,6 +82,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(friend_api::search_friend_by_phone),
         )
         .route(
+            "/api/me/project-share-messages/:project_id",
+            delete(friend_api::delete_project_share_messages),
+        )
+        .route(
             "/api/me/friends/:friend_id/messages",
             get(friend_api::list_friend_messages).post(friend_api::send_friend_message),
         )

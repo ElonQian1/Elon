@@ -252,6 +252,49 @@ impl Store {
         Ok(())
     }
 
+    pub fn delete_group_project_share_messages(
+        &self,
+        user_id: &str,
+        project_id: &str,
+    ) -> Result<usize> {
+        let project_id = project_id.trim();
+        if project_id.is_empty() {
+            return Ok(0);
+        }
+        let id_marker = format!(r#""id":"{}""#, project_id);
+        let conn = self.conn()?;
+        let group_ids = {
+            let mut stmt = conn.prepare(
+                "SELECT DISTINCT group_id
+                 FROM friend_group_messages
+                 WHERE sender_user_id = ?1
+                   AND content LIKE '【一龙项目卡片】%'
+                   AND instr(content, ?2) > 0",
+            )?;
+            let rows = stmt.query_map(params![user_id, id_marker.clone()], |row| {
+                row.get::<_, String>(0)
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let changed = conn.execute(
+            "DELETE FROM friend_group_messages
+             WHERE sender_user_id = ?1
+               AND content LIKE '【一龙项目卡片】%'
+               AND instr(content, ?2) > 0",
+            params![user_id, id_marker],
+        )?;
+        if changed > 0 {
+            let updated_at = now();
+            for group_id in group_ids {
+                conn.execute(
+                    "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
+                    params![updated_at, group_id],
+                )?;
+            }
+        }
+        Ok(changed)
+    }
+
     pub fn add_group_members(
         &self,
         caller_user_id: &str,
