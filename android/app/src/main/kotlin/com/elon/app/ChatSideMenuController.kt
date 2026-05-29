@@ -513,7 +513,11 @@ internal class ChatSideMenuController(
     }
 
     private fun showUsageHint() {
-        Toast.makeText(activity, "剩余用量统计准备中", Toast.LENGTH_SHORT).show()
+        if (!AuthManager.isLoggedIn(activity)) {
+            Toast.makeText(activity, "请先登录账号才能查看用量统计", Toast.LENGTH_SHORT).show()
+            return
+        }
+        activity.startActivity(Intent(activity, TokenUsageActivity::class.java))
     }
 
     private fun applyPanelWidth() {
