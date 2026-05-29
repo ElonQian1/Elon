@@ -198,7 +198,8 @@ internal class MainSpeechInputActions(
         agentLastFinalText = ""
         agentLastPartialText = ""
         translationGeneration += 1
-        val overlay = voiceOverlay ?: VoiceRecordingOverlay(activity).also { voiceOverlay = it }
+        val overlay = voiceOverlay?.takeIf { it.mode == VoiceRecordingOverlay.Mode.AGENT }
+            ?: VoiceRecordingOverlay(activity, VoiceRecordingOverlay.Mode.AGENT).also { voiceOverlay = it }
         overlay.show()
         bridge.onStart = {
             voiceHoldButton().text = "正在听..."
@@ -316,6 +317,7 @@ internal class MainSpeechInputActions(
                 setInputText(finalText)
             }
             VoiceRecordingOverlay.Zone.CANCEL -> Unit
+            VoiceRecordingOverlay.Zone.SEND -> Unit  // Agent 模式不会出现，忽略
         }
     }
 
@@ -428,7 +430,10 @@ internal class MainSpeechInputActions(
         // 并行启动 ASR：MediaRecorder 录音文件 + SpeechRecognizer 识别原文
         voiceMessageTranscription = null
         voiceMessagePartialText = null
-        val overlay = voiceOverlay ?: VoiceRecordingOverlay(activity).also { voiceOverlay = it }
+        // 好友/群聊使用 4 区域模式：发送/取消/转文字/@AI回复
+        val overlayMode = if (isFriendChatActive()) VoiceRecordingOverlay.Mode.FRIEND_CHAT else VoiceRecordingOverlay.Mode.AGENT
+        val overlay = voiceOverlay?.takeIf { it.mode == overlayMode }
+            ?: VoiceRecordingOverlay(activity, overlayMode).also { voiceOverlay = it }
         overlay.show()
         runCatching {
             voiceMessageAsrRecognizer?.destroy()
@@ -444,7 +449,7 @@ internal class MainSpeechInputActions(
             voiceMessageAsrRecognizer = null
         }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
-        voiceHoldButton().text = "松开 AI回复"
+        voiceHoldButton().text = if (isFriendChatActive()) "松开 发送" else "松开 AI回复"
         return true
     }
 
@@ -483,7 +488,8 @@ internal class MainSpeechInputActions(
 
     /** 语音消息模式：录音结束，将音频以语音气泡发送（携带 ASR 原文）。 */
     private fun stopVoiceMessageRecording() {
-        val zone = voiceOverlay?.currentZone ?: VoiceRecordingOverlay.Zone.AI_REPLY
+        val zone = voiceOverlay?.currentZone
+            ?: if (isFriendChatActive()) VoiceRecordingOverlay.Zone.SEND else VoiceRecordingOverlay.Zone.AI_REPLY
         if (zone == VoiceRecordingOverlay.Zone.CANCEL) {
             cancelVoiceMessageRecording()
             return
@@ -495,6 +501,7 @@ internal class MainSpeechInputActions(
             VoiceRecordingOverlay.Zone.AI_REPLY -> "AI回复中..."
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> "转文字中..."
             VoiceRecordingOverlay.Zone.CANCEL -> "按住 说话"
+            VoiceRecordingOverlay.Zone.SEND -> "发送中..."
         }
         val attachment = voiceRecorder.stopToAttachment()
         if (attachment == null) {
@@ -553,6 +560,11 @@ internal class MainSpeechInputActions(
                 setVoiceMode(false)
                 applyVoiceMode()
                 setInputText(transcription)
+            }
+            VoiceRecordingOverlay.Zone.SEND -> {
+                // 直接发送语音气泡给对方，不经 AI
+                val messageText = if (transcription != null) transcription else ""
+                sendVoiceAttachment(attachment.copy(transcription = transcription), messageText)
             }
             VoiceRecordingOverlay.Zone.CANCEL -> discardVoiceAttachment(attachment)
         }

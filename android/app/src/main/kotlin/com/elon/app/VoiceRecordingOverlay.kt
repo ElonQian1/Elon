@@ -20,9 +20,12 @@ import android.widget.TextView
  * It only renders UI and touch-choice feedback. Speech/ASR state is still owned by
  * [MainSpeechInputActions].
  */
-internal class VoiceRecordingOverlay(private val activity: Activity) {
-
-    enum class Zone { AI_REPLY, TRANSCRIBE, CANCEL }
+internal class VoiceRecordingOverlay(
+    private val activity: Activity,
+    val mode: Mode = Mode.AGENT
+) {
+    enum class Mode { AGENT, FRIEND_CHAT }
+    enum class Zone { AI_REPLY, TRANSCRIBE, CANCEL, SEND }
 
     private var root: FrameLayout? = null
     private var bubbleView: VoiceWaveBubbleView? = null
@@ -73,7 +76,7 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
             setTextColor(Color.parseColor("#DDEDEDED"))
         }
 
-        val tray = VoiceActionTrayView(activity).apply {
+        val tray = VoiceActionTrayView(activity, mode).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(ACTION_TRAY_HEIGHT_DP),
@@ -91,7 +94,7 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
         partialView = partial
         trayView = tray
         partialText = ""
-        zone = Zone.AI_REPLY
+        zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
         applyZone()
     }
 
@@ -116,7 +119,7 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
                 else -> Zone.AI_REPLY
             }
         } else {
-            Zone.AI_REPLY
+            if (mode == Mode.FRIEND_CHAT) Zone.SEND else Zone.AI_REPLY
         }
         setZone(newZone)
     }
@@ -139,7 +142,7 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
         partialView = null
         trayView = null
         partialText = ""
-        zone = Zone.AI_REPLY
+        zone = if (mode == Mode.AGENT) Zone.AI_REPLY else Zone.SEND
     }
 
     private fun setZone(newZone: Zone) {
@@ -156,9 +159,10 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
 
     private fun renderPartial() {
         val fallback = when (zone) {
-            Zone.AI_REPLY -> "松开 AI回复"
+            Zone.AI_REPLY -> if (mode == Mode.FRIEND_CHAT) "滑到这 @AI回复" else "松开 AI回复"
             Zone.TRANSCRIBE -> "松开 转文字"
             Zone.CANCEL -> "松开 取消"
+            Zone.SEND -> "松开 发送"
         }
         partialView?.text = partialText.ifBlank { fallback }
         partialView?.setTextColor(
@@ -167,6 +171,7 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
                     Zone.AI_REPLY -> "#DDEDEDED"
                     Zone.TRANSCRIBE -> "#EAF7F0"
                     Zone.CANCEL -> "#FFE3E3"
+                    Zone.SEND -> "#DDEDEDED"
                 }
             )
         )
@@ -244,7 +249,10 @@ private class VoiceWaveBubbleView(context: Context) : View(context) {
     }
 }
 
-private class VoiceActionTrayView(context: Context) : View(context) {
+private class VoiceActionTrayView(
+    context: Context,
+    private val mode: VoiceRecordingOverlay.Mode = VoiceRecordingOverlay.Mode.AGENT
+) : View(context) {
     private val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#70575757")
         style = Paint.Style.FILL
@@ -307,13 +315,14 @@ private class VoiceActionTrayView(context: Context) : View(context) {
             VoiceRecordingOverlay.Zone.CANCEL -> width * 0.19f
             VoiceRecordingOverlay.Zone.AI_REPLY -> width * 0.50f
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> width * 0.81f
+            VoiceRecordingOverlay.Zone.SEND -> width * 0.50f
         }
-        val cy = when (zone) {
-            VoiceRecordingOverlay.Zone.AI_REPLY,
-            VoiceRecordingOverlay.Zone.CANCEL,
-            VoiceRecordingOverlay.Zone.TRANSCRIBE -> 72f * density
+        val cy = when {
+            zone == VoiceRecordingOverlay.Zone.SEND -> 150f * density
+            else -> 72f * density
         }
-        canvas.drawCircle(cx, cy, 38f * density, highlightPaint)
+        val radius = if (zone == VoiceRecordingOverlay.Zone.SEND) 48f * density else 38f * density
+        canvas.drawCircle(cx, cy, radius, highlightPaint)
     }
 
     private fun drawLabels(canvas: Canvas, width: Float, height: Float, density: Float) {
@@ -324,7 +333,13 @@ private class VoiceActionTrayView(context: Context) : View(context) {
         drawOption(canvas, "取消", width * 0.19f, 82f * density, zone == VoiceRecordingOverlay.Zone.CANCEL)
         canvas.restore()
 
-        drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+        if (mode == VoiceRecordingOverlay.Mode.AGENT) {
+            drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+        } else {
+            // FRIEND_CHAT: @AI 在上方中央，"发 送" 在下方默认区域
+            drawOption(canvas, "@AI", width * 0.50f, 78f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "发 送", width * 0.50f, 154f * density, zone == VoiceRecordingOverlay.Zone.SEND)
+        }
 
         canvas.save()
         canvas.rotate(14f, width * 0.81f, 78f * density)
@@ -332,9 +347,10 @@ private class VoiceActionTrayView(context: Context) : View(context) {
         canvas.restore()
 
         val releaseLabel = when (zone) {
-            VoiceRecordingOverlay.Zone.AI_REPLY -> "松开 AI回复"
+            VoiceRecordingOverlay.Zone.AI_REPLY -> if (mode == VoiceRecordingOverlay.Mode.FRIEND_CHAT) "松开 @AI 回复" else "松开 AI回复"
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> "松开 转文字"
             VoiceRecordingOverlay.Zone.CANCEL -> "松开 取消"
+            VoiceRecordingOverlay.Zone.SEND -> "松开 发送"
         }
         subTextPaint.color = Color.parseColor("#2B2B2B")
         canvas.drawText(releaseLabel, width * 0.50f, height - 50f * density, subTextPaint)
