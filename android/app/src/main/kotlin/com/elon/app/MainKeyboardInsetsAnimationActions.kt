@@ -24,6 +24,7 @@ internal class MainKeyboardInsetsAnimationActions(
     private var baseChatListPaddingBottom = 0
     private var baselineHiddenHeight = -1
     private var lastKeyboardHeight = -1
+    private var lastKnownKeyboardHeight = -1
     private var usingEstimatedKeyboardHeight = false
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
@@ -110,6 +111,34 @@ internal class MainKeyboardInsetsAnimationActions(
         applyKeyboardHeight(0, animate = true)
     }
 
+    fun replacementPanelHeight(fallbackHeight: Int): Int {
+        val rememberedHeight = when {
+            lastKeyboardHeight > 0 -> lastKeyboardHeight
+            lastKnownKeyboardHeight > 0 -> lastKnownKeyboardHeight
+            else -> 0
+        }
+        if (rememberedHeight > 0) return rememberedHeight
+
+        val rootHeight = binding.root.rootView.height
+        val maxHeight = if (rootHeight > 0) {
+            (rootHeight * MAX_REPLACEMENT_PANEL_RATIO).toInt()
+        } else {
+            Int.MAX_VALUE
+        }
+        val minHeight = if (rootHeight > 0) {
+            (rootHeight * MIN_REPLACEMENT_PANEL_RATIO).toInt()
+        } else {
+            0
+        }
+        val estimatedHeight = estimatedKeyboardHeight()
+        val candidate = if (estimatedHeight > 0) estimatedHeight else fallbackHeight
+        return candidate
+            .coerceAtLeast(minHeight.coerceAtMost(maxHeight))
+            .coerceAtMost(maxHeight)
+            .takeIf { it > 0 }
+            ?: fallbackHeight
+    }
+
     private fun installVisibleFrameFallback() {
         binding.root.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
@@ -173,6 +202,9 @@ internal class MainKeyboardInsetsAnimationActions(
         val target = keyboardHeight.coerceAtLeast(0)
         if (target > 0 && target != estimatedKeyboardHeight()) {
             usingEstimatedKeyboardHeight = false
+        }
+        if (target > 0) {
+            lastKnownKeyboardHeight = target
         }
         if (target == 0) {
             usingEstimatedKeyboardHeight = false
@@ -300,5 +332,7 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private companion object {
         private const val ZERO_HEIGHT_GRACE_MS = 900L
+        private const val MIN_REPLACEMENT_PANEL_RATIO = 0.24f
+        private const val MAX_REPLACEMENT_PANEL_RATIO = 0.48f
     }
 }

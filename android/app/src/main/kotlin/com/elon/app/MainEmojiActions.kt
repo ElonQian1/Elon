@@ -41,6 +41,7 @@ internal class MainEmojiActions(
     private val emojiButton: () -> ImageButton?,
     private val collapseAttachmentPanel: () -> Unit,
     private val requestKeyboardLift: () -> Unit,
+    private val replacementPanelHeight: (Int) -> Int,
     private val addPendingEmojiAttachment: (CustomEmojiItem) -> Boolean,
     private val updateSendButtonVisual: () -> Unit,
     private val updateAdaptiveInputHeight: () -> Unit
@@ -126,7 +127,7 @@ internal class MainEmojiActions(
         val wasOpen = isOpen || panel.visibility == View.VISIBLE
         isOpen = false
         if (wasOpen) {
-            animateEmojiPanel(panel, expand = false)
+            animateEmojiPanel(panel, expand = false, matchKeyboardTransition = showKeyboard)
             updateEmojiButton(selected = false)
         }
         if (showKeyboard) showKeyboard()
@@ -138,8 +139,12 @@ internal class MainEmojiActions(
         return true
     }
 
-    private fun animateEmojiPanel(panel: LinearLayout, expand: Boolean) {
-        val targetHeight = if (expand) dp(EMOJI_PANEL_HEIGHT_DP) else 0
+    private fun animateEmojiPanel(
+        panel: LinearLayout,
+        expand: Boolean,
+        matchKeyboardTransition: Boolean = false
+    ) {
+        val targetHeight = if (expand) targetEmojiPanelHeight() else 0
         val startHeight = maxOf(
             (panel.layoutParams?.height ?: 0).coerceAtLeast(0),
             panel.height.coerceAtLeast(0)
@@ -154,7 +159,7 @@ internal class MainEmojiActions(
         panel.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         panelAnimator?.cancel()
         panelAnimator = ValueAnimator.ofInt(startHeight, targetHeight).apply {
-            duration = if (expand) 220L else 170L
+            duration = if (expand || matchKeyboardTransition) 220L else 170L
             interpolator = panelInterpolator
             addUpdateListener { animator ->
                 val fraction = animator.animatedFraction
@@ -183,6 +188,13 @@ internal class MainEmojiActions(
             })
             start()
         }
+    }
+
+    private fun targetEmojiPanelHeight(): Int {
+        val fallbackHeight = dp(EMOJI_PANEL_HEIGHT_DP)
+        return replacementPanelHeight(fallbackHeight)
+            .takeIf { it > 0 }
+            ?: fallbackHeight
     }
 
     private fun setPanelHeight(panel: View, height: Int) {
