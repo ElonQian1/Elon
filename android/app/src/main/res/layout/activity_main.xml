@@ -443,6 +443,19 @@
                     android:textSize="16sp" />
 
                 <TextView
+                    android:id="@+id/profileAgentButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="1dp"
+                    android:background="#1E1E1E"
+                    android:gravity="center_vertical"
+                    android:paddingStart="22dp"
+                    android:paddingEnd="22dp"
+                    android:text="Agent 自动化"
+                    android:textColor="#D0D0D0"
+                    android:textSize="16sp" />
+
+                <TextView
                     android:id="@+id/profileCheckUpdateButton"
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
@@ -690,13 +703,15 @@
                 android:id="@+id/tabMarket"
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_store"
-                android:text="商城" />
+                android:text="商城"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/tabAgent"
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_agent"
-                android:text="Agent" />
+                android:text="Agent"
+                android:visibility="gone" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

@@ -17,6 +17,7 @@ internal class MainProfileQuickActions(
     private val showGitProjectDialog: () -> Unit,
     private val openSettings: () -> Unit,
     private val openProfileDetails: () -> Unit,
+    private val openAgentCenter: () -> Unit,
     private val showPromotionDialog: () -> Unit,
     private val showGuestImportDialog: () -> Unit,
     private val confirmLogout: () -> Unit
@@ -30,6 +31,7 @@ internal class MainProfileQuickActions(
             showProjectRecordDialog = showProjectRecordDialog,
             showGitProjectDialog = showGitProjectDialog,
             openSettings = openSettings,
+            openAgentCenter = openAgentCenter,
             showPromotionDialog = showPromotionDialog,
             showGuestImportDialog = showGuestImportDialog,
             confirmLogout = confirmLogout

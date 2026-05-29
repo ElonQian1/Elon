@@ -13,6 +13,7 @@ internal class MainQuickActionBindings(
     private val showProjectRecordDialog: () -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val openSettings: () -> Unit,
+    private val openAgentCenter: () -> Unit,
     private val showPromotionDialog: () -> Unit,
     private val showGuestImportDialog: () -> Unit,
     private val confirmLogout: () -> Unit
@@ -40,6 +41,7 @@ internal class MainQuickActionBindings(
         binding.projectGitButton.setOnClickListener { showGitProjectDialog() }
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
+        binding.profileAgentButton.setOnClickListener { openAgentCenter() }
         binding.profileCheckUpdateButton.setOnClickListener {
             AppUpdateManager(activity).manualCheck()
         }

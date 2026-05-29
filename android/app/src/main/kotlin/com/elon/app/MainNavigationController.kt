@@ -56,7 +56,7 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket, binding.tabAgent)
+        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
 
         fun select(tab: TextView) {
             WechatPageTransition.cancelActive()
@@ -69,8 +69,8 @@ internal class MainNavigationController(
             binding.chatPage.visibility = View.GONE
             binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
-            binding.marketplacePage.visibility = if (tab == binding.tabMarket) View.VISIBLE else View.GONE
-            binding.agentPage.root.visibility = if (tab == binding.tabAgent) View.VISIBLE else View.GONE
+            binding.marketplacePage.visibility = View.GONE
+            binding.agentPage.root.visibility = View.GONE
             binding.inputLayout.visibility = View.GONE
             binding.pageTabs.visibility = View.VISIBLE
             binding.backButton.visibility = View.GONE
@@ -85,8 +85,6 @@ internal class MainNavigationController(
             binding.topTitleText.text = when (tab) {
                 binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
-                binding.tabMarket -> "商城"
-                binding.tabAgent -> "Agent 自动化"
                 else -> "好友"
             }
             if (tab != binding.tabChat) {
@@ -99,18 +97,12 @@ internal class MainNavigationController(
                 renderConversationList()
             } else if (tab == binding.tabProfile) {
                 refreshServerVersion()
-            } else if (tab == binding.tabMarket) {
-                loadMarketplace()
-            } else if (tab == binding.tabAgent) {
-                onAgentTabSelected()
             }
         }
 
         binding.tabChat.setOnClickListener { select(binding.tabChat) }
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
-        binding.tabMarket.setOnClickListener { select(binding.tabMarket) }
-        binding.tabAgent.setOnClickListener { select(binding.tabAgent) }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
@@ -120,6 +112,54 @@ internal class MainNavigationController(
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
+    }
+
+    fun showProjectPlaza() {
+        if (pageTransitionRunning) return
+        clearMessageSelection()
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        updateBottomTabSelection(binding.tabProject)
+        binding.conversationPage.visibility = View.GONE
+        binding.chatPage.visibility = View.GONE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.VISIBLE
+        binding.agentPage.root.visibility = View.GONE
+        binding.inputLayout.visibility = View.GONE
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.backButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
+        binding.moreButton.visibility = View.GONE
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = "项目广场"
+        loadMarketplace()
+    }
+
+    fun showAgentCenter() {
+        if (pageTransitionRunning) return
+        clearMessageSelection()
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        updateBottomTabSelection(binding.tabProfile)
+        binding.conversationPage.visibility = View.GONE
+        binding.chatPage.visibility = View.GONE
+        binding.projectPage.visibility = View.GONE
+        binding.profilePage.visibility = View.GONE
+        binding.marketplacePage.visibility = View.GONE
+        binding.agentPage.root.visibility = View.VISIBLE
+        binding.inputLayout.visibility = View.GONE
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.backButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
+        binding.addButton.visibility = View.GONE
+        binding.projectMembersButton.visibility = View.GONE
+        binding.moreButton.visibility = View.GONE
+        binding.topTitleText.setOnLongClickListener(null)
+        binding.topTitleText.text = "Agent 自动化"
+        onAgentTabSelected()
     }
 
     fun setupBackHandling() {
@@ -155,6 +195,14 @@ internal class MainNavigationController(
         }
         if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
             showProjectHome(animate = true)
+            return
+        }
+        if (binding.marketplacePage.visibility == View.VISIBLE) {
+            showProjectHome(animate = true)
+            return
+        }
+        if (binding.agentPage.root.visibility == View.VISIBLE) {
+            binding.tabProfile.performClick()
             return
         }
         showExitConfirmation()
@@ -605,7 +653,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket, binding.tabAgent).forEach { tab ->
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach { tab ->
             updateBottomTabVisual(tab, tab == selectedTab)
         }
     }

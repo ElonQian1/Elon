@@ -23,6 +23,7 @@ internal class MainHomeListActions(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
+    private val showProjectPlaza: () -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
     private val openGroup: (AppGroup) -> Unit
@@ -94,7 +95,7 @@ internal class MainHomeListActions(
     fun renderProjectList() {
         val container = binding.projectContentLayout
         container.removeAllViews()
-        container.addView(createNewProjectRow())
+        container.addView(createProjectHeaderRow())
         val indexedProjects = projects().mapIndexed { index, project -> index to project }
         val personalProjects = indexedProjects.filter { (_, project) -> !project.isJointDevelopmentProject() }
         val jointProjects = indexedProjects.filter { (_, project) -> project.isJointDevelopmentProject() }
@@ -122,23 +123,51 @@ internal class MainHomeListActions(
         return isTaskRunning(activeProject().id, conversations[index].id)
     }
 
-    private fun createNewProjectRow(): TextView {
-        return TextView(activity).apply {
+    private fun createProjectHeaderRow(): LinearLayout {
+        return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52)
+                dp(64)
             ).apply {
                 bottomMargin = dp(8)
             }
+            orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#202020"))
-            gravity = Gravity.CENTER_VERTICAL
-            text = "＋ 新建项目"
+            addView(
+                createProjectHeaderButton("＋ 新建项目") {
+                    showCreateProjectDialog()
+                }
+            )
+            addView(View(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(1), LinearLayout.LayoutParams.MATCH_PARENT).apply {
+                    topMargin = dp(12)
+                    bottomMargin = dp(12)
+                }
+                setBackgroundColor(Color.parseColor("#4A4A4A"))
+            })
+            addView(
+                createProjectHeaderButton("项目广场") {
+                    showProjectPlaza()
+                }
+            )
+        }
+    }
+
+    private fun createProjectHeaderButton(label: String, onClick: () -> Unit): TextView {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1f
+            )
+            gravity = Gravity.CENTER
+            text = label
             setTextColor(Color.parseColor("#D0D0D0"))
-            textSize = 15f
+            textSize = 16f
             setPadding(dp(20), 0, dp(20), 0)
             isClickable = true
             foreground = selectableForeground()
-            setOnClickListener { showCreateProjectDialog() }
+            setOnClickListener { onClick() }
         }
     }
 

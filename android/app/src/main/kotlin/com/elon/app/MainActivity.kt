@@ -706,6 +706,7 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
+            showProjectPlaza = { navigationController.showProjectPlaza() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
                 groupChatActions.closeGroupChat()
@@ -845,6 +846,7 @@ class MainActivity : AppCompatActivity() {
             openProfileDetails = {
                 startActivity(Intent(this, PersonalProfileActivity::class.java))
             },
+            openAgentCenter = { navigationController.showAgentCenter() },
             showPromotionDialog = { messageActions.showPromotionDialog() },
             showGuestImportDialog = { accountActions().showGuestImportDialog() },
             confirmLogout = { accountActions().confirmLogout() }
