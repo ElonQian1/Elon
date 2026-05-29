@@ -290,11 +290,6 @@ private class VoiceActionTrayView(
         textAlign = Paint.Align.CENTER
         textSize = sp(15f)
     }
-    private val subTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#C8C8C8")
-        textAlign = Paint.Align.CENTER
-        textSize = sp(12f)
-    }
     private val path = Path()
 
     var zone: VoiceRecordingOverlay.Zone = VoiceRecordingOverlay.Zone.AI_REPLY
@@ -327,7 +322,7 @@ private class VoiceActionTrayView(
         canvas.drawPath(path, innerPaint)
 
         drawHighlight(canvas, w, d)
-        drawLabels(canvas, w, h, d)
+        drawLabels(canvas, w, d)
     }
 
     private fun drawHighlight(canvas: Canvas, width: Float, density: Float) {
@@ -345,9 +340,8 @@ private class VoiceActionTrayView(
         canvas.drawCircle(cx, cy, radius, highlightPaint)
     }
 
-    private fun drawLabels(canvas: Canvas, width: Float, height: Float, density: Float) {
+    private fun drawLabels(canvas: Canvas, width: Float, density: Float) {
         textPaint.color = Color.parseColor("#EFEFEF")
-        subTextPaint.color = Color.parseColor("#D0D0D0")
         canvas.save()
         canvas.rotate(-16f, width * 0.19f, 78f * density)
         drawOption(canvas, "取消", width * 0.19f, 82f * density, zone == VoiceRecordingOverlay.Zone.CANCEL)
@@ -365,17 +359,6 @@ private class VoiceActionTrayView(
         canvas.rotate(14f, width * 0.81f, 78f * density)
         drawOption(canvas, "转文字", width * 0.81f, 82f * density, zone == VoiceRecordingOverlay.Zone.TRANSCRIBE)
         canvas.restore()
-
-        val releaseLabel = when (zone) {
-            VoiceRecordingOverlay.Zone.AI_REPLY -> "松开 AI回复"
-            VoiceRecordingOverlay.Zone.TRANSCRIBE -> "松开 转文字"
-            VoiceRecordingOverlay.Zone.CANCEL -> "松开 取消"
-            VoiceRecordingOverlay.Zone.SEND -> "松开 发送"
-        }
-        subTextPaint.color = Color.parseColor("#2B2B2B")
-        if (zone != VoiceRecordingOverlay.Zone.SEND) {
-            canvas.drawText(releaseLabel, width * 0.50f, height - 50f * density, subTextPaint)
-        }
     }
 
     private fun drawOption(canvas: Canvas, label: String, x: Float, y: Float, selected: Boolean) {
