@@ -156,6 +156,109 @@ internal class MainGroupActions(
         dialog.show()
     }
 
+    fun showAddMemberDialog(group: AppGroup, onDone: () -> Unit) {
+        if (!ensureLoggedIn()) return
+        val alreadyInGroup = group.members.map { it.id }.toSet()
+        val candidates = friends().filter { it.id !in alreadyInGroup }
+        if (candidates.isEmpty()) {
+            Toast.makeText(activity, "好友都已在群中，无法继续邀请", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val selectedIds = linkedSetOf<String>()
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(8), dp(22), dp(2))
+        }
+        val hint = TextView(activity).apply {
+            text = "选择要邀请进「${group.name}」的好友"
+            textSize = 14f
+            alpha = 0.72f
+        }
+        val listContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        candidates.forEach { friend ->
+            listContainer.addView(CheckBox(activity).apply {
+                text = "${friend.name}  ${friend.phone ?: friend.account}"
+                textSize = 16f
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(8), 0, dp(8))
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) selectedIds.add(friend.id) else selectedIds.remove(friend.id)
+                }
+            })
+        }
+        val scroll = ScrollView(activity).apply {
+            addView(listContainer)
+        }
+        container.addView(hint)
+        container.addView(scroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(260)
+        ))
+
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("邀请成员")
+            .setView(container)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("邀请", null)
+            .create()
+
+        dialog.setOnShowListener {
+            val inviteButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            inviteButton.setOnClickListener {
+                if (selectedIds.isEmpty()) {
+                    Toast.makeText(activity, "请选择至少 1 位好友", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                inviteButton.isEnabled = false
+                inviteMembers(group, selectedIds.toList()) { error ->
+                    inviteButton.isEnabled = true
+                    if (error != null) {
+                        Toast.makeText(activity, error, Toast.LENGTH_SHORT).show()
+                        return@inviteMembers
+                    }
+                    dialog.dismiss()
+                    loadGroups()
+                    onDone()
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun inviteMembers(
+        group: AppGroup,
+        memberIds: List<String>,
+        onDone: (String?) -> Unit
+    ) {
+        thread {
+            val result = runCatching {
+                val payload = JSONObject()
+                    .put("member_ids", JSONArray(memberIds))
+                    .toString()
+                    .toRequestBody("application/json".toMediaType())
+                val request = AuthManager.applyAuth(
+                    activity,
+                    Request.Builder()
+                        .url("$serverUrl/api/me/groups/${group.id}/members")
+                        .post(payload)
+                ).build()
+                http.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) error(readErrorMessage(body, "邀请成员失败"))
+                }
+            }
+            activity.runOnUiThread {
+                result.fold(
+                    onSuccess = { onDone(null) },
+                    onFailure = { onDone(it.message ?: "邀请成员失败") }
+                )
+            }
+        }
+    }
+
     private fun ensureLoggedIn(): Boolean {
         if (AuthManager.isLoggedIn(activity)) return true
         AlertDialog.Builder(activity)

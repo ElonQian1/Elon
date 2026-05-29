@@ -29,7 +29,8 @@ internal class MainChatSettingsActions(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val clearFriendMessages: () -> Unit,
-    private val clearGroupMessages: () -> Unit
+    private val clearGroupMessages: () -> Unit,
+    private val onAddGroupMember: ((AppGroup, () -> Unit) -> Unit)? = null
 ) {
     private val prefs by lazy { AuthManager.userDataPrefs(activity) }
     private var pageAnimator: AnimatorSet? = null
@@ -66,7 +67,10 @@ internal class MainChatSettingsActions(
 
     fun showGroupSettings(group: AppGroup) {
         showSettingsPage("聊天信息") { dialog ->
-            addView(groupMemberStrip(group))
+            addView(groupMemberStrip(group) {
+                onAddGroupMember?.invoke(group) { dismissWithAnimation(dialog) }
+                    ?: toast("添加群成员准备中")
+            })
             addView(sectionSpacer())
             addView(actionRow("群聊名称", group.name) {
                 toast("群聊名称编辑准备中")
@@ -253,7 +257,7 @@ internal class MainChatSettingsActions(
         }
     }
 
-    private fun groupMemberStrip(group: AppGroup): View {
+    private fun groupMemberStrip(group: AppGroup, onAddMember: () -> Unit): View {
         return HorizontalScrollView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -269,7 +273,7 @@ internal class MainChatSettingsActions(
                 group.members.take(12).forEach { member ->
                     addView(personTile(member.displayName, member.avatarDataUrl))
                 }
-                addView(addTile { toast("添加群成员准备中") })
+                addView(addTile { onAddMember() })
             })
         }
     }

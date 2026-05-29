@@ -55,6 +55,11 @@ pub struct SendFriendMessageRequest {
 }
 
 #[derive(Deserialize)]
+pub struct AddGroupMembersRequest {
+    pub member_ids: Vec<String>,
+}
+
+#[derive(Deserialize)]
 pub struct FriendGroupMessagesQuery {
     pub after: Option<String>,
     pub limit: Option<i64>,
@@ -103,6 +108,28 @@ pub async fn create_friend_group(
     match state
         .store
         .create_friend_group(&user.id, req.name.as_deref(), &req.member_ids)
+    {
+        Ok(group) => Json(serde_json::json!({ "group": group })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn add_group_members(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(group_id): Path<String>,
+    Json(req): Json<AddGroupMembersRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if req.member_ids.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "请至少选择一位好友".to_string());
+    }
+    match state
+        .store
+        .add_group_members(&user.id, &group_id, &req.member_ids)
     {
         Ok(group) => Json(serde_json::json!({ "group": group })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),

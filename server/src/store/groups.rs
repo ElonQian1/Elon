@@ -252,6 +252,74 @@ impl Store {
         Ok(())
     }
 
+    pub fn add_group_members(
+        &self,
+        caller_user_id: &str,
+        group_id: &str,
+        new_member_ids: &[String],
+    ) -> Result<FriendGroupProfile> {
+        self.ensure_group_member(caller_user_id, group_id)?;
+
+        // 验证所有新成员都是调用者的好友
+        for id in new_member_ids {
+            let id = id.trim();
+            if !id.is_empty() && id != caller_user_id {
+                self.ensure_group_candidate_friend(caller_user_id, id)?;
+            }
+        }
+
+        let conn = self.conn()?;
+        let joined_at = now();
+
+        // 过滤已经在群里的成员，只插入新成员
+        for id in new_member_ids {
+            let id = id.trim();
+            if id.is_empty() || id == caller_user_id {
+                continue;
+            }
+            let already_in: bool = conn
+                .query_row(
+                    "SELECT 1 FROM friend_group_members WHERE group_id = ?1 AND user_id = ?2 LIMIT 1",
+                    params![group_id, id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            if !already_in {
+                conn.execute(
+                    "INSERT INTO friend_group_members (group_id, user_id, created_at, last_read_at)
+                     VALUES (?1, ?2, ?3, NULL)",
+                    params![group_id, id, joined_at],
+                )?;
+            }
+        }
+        conn.execute(
+            "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
+            params![joined_at, group_id],
+        )?;
+
+        let group = conn.query_row(
+            "SELECT g.id, g.name, g.created_at,
+                    (SELECT COUNT(*) FROM friend_group_members m WHERE m.group_id = g.id)
+             FROM friend_groups g WHERE g.id = ?1",
+            params![group_id],
+            |row| {
+                Ok(FriendGroupProfile {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    created_at: row.get(2)?,
+                    member_count: row.get(3)?,
+                    members: Vec::new(),
+                    last_message: None,
+                    last_message_at: None,
+                    unread_count: 0,
+                })
+            },
+        )?;
+        let members = list_group_member_previews(&conn, group_id)?;
+        Ok(FriendGroupProfile { members, ..group })
+    }
+
     pub fn friend_group_member_ids(&self, user_id: &str, group_id: &str) -> Result<Vec<String>> {
         self.ensure_group_member(user_id, group_id)?;
         let conn = self.conn()?;

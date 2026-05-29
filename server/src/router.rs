@@ -98,6 +98,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(friend_api::list_friend_groups).post(friend_api::create_friend_group),
         )
         .route(
+            "/api/me/groups/:group_id/members",
+            post(friend_api::add_group_members),
+        )
+        .route(
             "/api/me/groups/:group_id/messages",
             get(friend_api::list_friend_group_messages).post(friend_api::send_friend_group_message),
         )
