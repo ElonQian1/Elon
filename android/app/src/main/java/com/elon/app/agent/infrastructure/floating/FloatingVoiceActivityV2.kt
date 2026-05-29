@@ -111,7 +111,8 @@ class ConversationalVoiceActivity : AppCompatActivity() {
      */
     private fun initializeConversation() {
         val config = AgentConfigActivity.getAgentConfig(this)
-        Log.i(TAG, "📱 语音回退顺序：${config.voiceModeOrder.joinToString(\" → \")}")
+        val orderLog = config.voiceModeOrder.joinToString(" -> ")
+        Log.i(TAG, "📱 语音回退顺序：$orderLog")
 
         // 初始化 TTS
         ttsService = AndroidTTSService(this)
@@ -173,8 +174,8 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                 AgentConfigActivity.VOICE_MODE_CLI    -> "服务器 CLI 模式"
                 else                                  -> "简单模式（关键词匹配）"
             }
-            val msg = if (skipped.isEmpty()) modeLabel
-                      else "$modeLabel\n（已跳过：${skipped.joinToString("、")}）"
+            val skippedDesc = skipped.joinToString("、")
+            val msg = if (skipped.isEmpty()) modeLabel else "$modeLabel\n（已跳过：$skippedDesc）"
             Toast.makeText(this@ConversationalVoiceActivity, msg, Toast.LENGTH_SHORT).show()
 
             // 设置 UI 监听器
