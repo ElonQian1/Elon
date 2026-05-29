@@ -518,14 +518,19 @@ internal class MainSpeechInputActions(
             discardVoiceAttachment(attachment)
             return
         }
-        // AI_REPLY / TRANSCRIBE：本地 ASR 全失败时尝试服务器 Whisper
+        // AI_REPLY / TRANSCRIBE：本地 ASR 全失败时尝试服务器 Whisper（若用户未关闭云端兜底）
         if (serverFallbackNeeded) {
-            voiceHoldButton().text = "识别中..."
-            uploadAudioForTranscription(attachment.file) { text ->
-                activity.runOnUiThread {
-                    voiceHoldButton().text = "按住 说话"
-                    applyVoiceZoneAction(zone, attachment, text)
+            if (AsrFallbackSettings.isServerFallbackEnabled(activity)) {
+                voiceHoldButton().text = "识别中..."
+                uploadAudioForTranscription(attachment.file) { text ->
+                    activity.runOnUiThread {
+                        voiceHoldButton().text = "按住 说话"
+                        applyVoiceZoneAction(zone, attachment, text)
+                    }
                 }
+            } else {
+                // 用户关闭了云端兜底：直接用空转写走后续逻辑（语音消息仍可发送，只是没文字）
+                applyVoiceZoneAction(zone, attachment, null)
             }
             return
         }

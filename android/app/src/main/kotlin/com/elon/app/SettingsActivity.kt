@@ -12,6 +12,8 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import com.elon.app.agent.infrastructure.voice.EnginePreference
+import com.elon.app.agent.infrastructure.voice.RecognitionEngineSelector
 import com.elon.app.update.AppUpdateManager
 import java.util.Locale
 
@@ -49,6 +51,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupModeToggle()
         setupVoiceModeToggle()
+        setupAsrChainSection()
         loadCurrentConfig()
 
         findViewById<Button>(R.id.saveButton).setOnClickListener { saveConfig() }
@@ -60,7 +63,42 @@ class SettingsActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.manageEngineButton).setOnClickListener {
             startActivity(android.content.Intent(this, VoiceEngineActivity::class.java))
+            // 返回时刷新链路摘要
         }
+    }
+
+    // ── ASR 回退链摘要 + 服务器兜底开关 ──────────────────────
+    private fun setupAsrChainSection() {
+        // 初始化服务器兜底 Switch
+        val sw = findViewById<Switch>(R.id.switchServerFallback)
+        sw.isChecked = AsrFallbackSettings.isServerFallbackEnabled(this)
+        sw.setOnCheckedChangeListener { _, checked ->
+            AsrFallbackSettings.setServerFallbackEnabled(this, checked)
+            refreshAsrChainSummary()
+            val msg = if (checked) "云端 Whisper 兜底已开启" else "云端 Whisper 兜底已关闭"
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+        }
+        refreshAsrChainSummary()
+    }
+
+    /** 构建并刷新回退链摘要文字（onResume 时也应调用）。 */
+    private fun refreshAsrChainSummary() {
+        val summaryView = findViewById<TextView>(R.id.asrChainSummary) ?: return
+        val disabled = AsrFallbackSettings.getDisabledEngineKeys(this)
+        val serverOn = AsrFallbackSettings.isServerFallbackEnabled(this)
+        val ordered = RecognitionEngineSelector.listForUse(this).filter { it.key() !in disabled }
+        val chainParts = ordered.mapIndexed { i, e -> "#${i + 1} ${e.label.take(16)}" }.toMutableList()
+        if (serverOn) chainParts.add("☁️ 服务器 Whisper")
+        summaryView.text = if (chainParts.isEmpty()) {
+            "⚠️ 所有本地引擎已排除且云端兜底关闭，语音识别将不可用"
+        } else {
+            "识别链路: " + chainParts.joinToString(" → ")
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshAsrChainSummary()
     }
 
     // ── 语音输入模式切换 ──────────────────────

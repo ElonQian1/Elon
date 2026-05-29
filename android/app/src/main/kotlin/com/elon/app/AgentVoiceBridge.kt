@@ -114,7 +114,11 @@ internal class AgentVoiceBridge(context: Context) {
         if (isRunning) return
         isRunning = true
         sawAnyPartial = false
-        candidates = RecognitionEngineSelector.listForUse(appContext)
+        val disabledKeys = AsrFallbackSettings.getDisabledEngineKeys(appContext)
+        val allCandidates = RecognitionEngineSelector.listForUse(appContext)
+        // 过滤用户手动排除的引擎；若全部排除则回退使用全部（避免无引擎可用）
+        candidates = allCandidates.filter { it.key() !in disabledKeys }
+            .ifEmpty { allCandidates }
         candidateIndex = 0
         transitionSeq += 1
         busyRetryOnSame = 0

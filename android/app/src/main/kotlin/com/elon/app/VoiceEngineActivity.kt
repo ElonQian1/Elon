@@ -1,5 +1,5 @@
 // VoiceEngineActivity.kt — 语音识别引擎管理界面
-// 功能：列出所有候选引擎、显示健康度、用户可单测某引擎、可选为偏好、可清空记录
+// 功能：列出所有候选引擎、显示健康度、用户可单测某引擎、可选为偏好、可排除/清空记录
 
 package com.elon.app
 
@@ -50,11 +50,13 @@ class VoiceEngineActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
+        // 所有引擎（用于展示）
         engines = RecognitionEngineSelector.list(this)
+        // 实际使用顺序（含偏好/健康度排序）
+        val orderedForUse = RecognitionEngineSelector.listForUse(this)
         val preferredKey = EnginePreference.getPreferredKey(this)
-        var ok = 0
-        var failed = 0
-        var unknown = 0
+        val disabledKeys = AsrFallbackSettings.getDisabledEngineKeys(this)
+        var ok = 0; var failed = 0; var unknown = 0
         engines.forEach {
             when (EnginePreference.getHealth(this, it.key())) {
                 EngineHealth.OK -> ok++
@@ -62,47 +64,69 @@ class VoiceEngineActivity : AppCompatActivity() {
                 else -> unknown++
             }
         }
-        val preferredLabel = engines.firstOrNull { it.key() == preferredKey }?.label
+        // 构建回退链摘要（只显示未被排除的引擎）
+        val chainLabels = orderedForUse
+            .filter { it.key() !in disabledKeys }
+            .mapIndexed { i, e -> "#${i + 1} ${e.label.take(18)}" }
         summary.text = buildString {
-            append("共 ${engines.size} 个候选引擎 — ✅ $ok 正常 / ❌ $failed 失败 / ❓ $unknown 未测试")
-            if (preferredLabel != null) append("\n当前偏好: $preferredLabel")
+            append("共 ${engines.size} 个引擎 — ✅ $ok / ❌ $failed / ❓ $unknown")
+            if (disabledKeys.isNotEmpty()) append("  (${disabledKeys.size} 已排除)")
+            append("\n\n回退链: ")
+            if (chainLabels.isEmpty()) {
+                append("⚠️ 全部引擎已排除，将只走云端兜底")
+            } else {
+                append(chainLabels.joinToString(" → "))
+            }
         }
         container.removeAllViews()
-        engines.forEach { addEngineCard(it, preferredKey) }
+        // 按实际使用顺序展示（排除的放最后）
+        val active = orderedForUse.filter { it.key() !in disabledKeys }
+        val excluded = orderedForUse.filter { it.key() in disabledKeys }
+        (active + excluded).forEach { addEngineCard(it, preferredKey, disabledKeys, active.indexOf(it) + 1) }
     }
 
-    private fun addEngineCard(engine: RecognitionEngine, preferredKey: String?) {
+    private fun addEngineCard(engine: RecognitionEngine, preferredKey: String?, disabledKeys: Set<String>, orderIndex: Int) {
         val key = engine.key()
+        val isDisabled = key in disabledKeys
         val health = if (probingKeys.contains(key)) EngineHealth.PROBING
         else EnginePreference.getHealth(this, key)
         val isPreferred = preferredKey == key
 
-        val pad = (12 * resources.displayMetrics.density).toInt()
+        val dp = resources.displayMetrics.density
+        val pad = (12 * dp).toInt()
+        val bgColor = when {
+            isDisabled  -> 0xFF1A1A1A.toInt()
+            isPreferred -> 0xFF1C2B1C.toInt()
+            else        -> 0xFF1E1E1E.toInt()
+        }
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
-            setBackgroundColor(if (isPreferred) 0xFFFFF8E1.toInt() else 0xFFFFFFFF.toInt())
+            setBackgroundColor(bgColor)
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.topMargin = (8 * resources.displayMetrics.density).toInt()
+            lp.topMargin = (8 * dp).toInt()
             layoutParams = lp
         }
 
+        // ── 标题行：序号 + 名称 + 偏好徽标 ──
+        val orderBadge = if (isDisabled) "  [排除]" else "  #$orderIndex"
         val title = TextView(this).apply {
             text = buildString {
                 append(badge(health))
                 append(" ")
                 append(engine.label)
-                if (isPreferred) append("  ⭐ 偏好")
+                append(orderBadge)
+                if (isPreferred) append("  ⭐")
             }
             textSize = 15f
-            setTextColor(0xFF222222.toInt())
+            setTextColor(if (isDisabled) 0xFF555555.toInt() else 0xFFEFEFEF.toInt())
         }
         card.addView(title)
 
         val pkg = TextView(this).apply {
             text = engine.packageName + "  ·  " + healthText(health)
             textSize = 11f
-            setTextColor(0xFF777777.toInt())
+            setTextColor(if (isDisabled) 0xFF444444.toInt() else 0xFF888888.toInt())
         }
         card.addView(pkg)
 
@@ -116,28 +140,33 @@ class VoiceEngineActivity : AppCompatActivity() {
             card.addView(errView)
         }
 
+        // ── 操作行 ──
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.topMargin = (8 * resources.displayMetrics.density).toInt()
+            lp.topMargin = (8 * dp).toInt()
             layoutParams = lp
         }
 
+        // 测试按钮（禁用状态下置灰）
         val probeBtn = Button(this).apply {
             text = if (health == EngineHealth.PROBING) "测试中…" else "测试"
-            isEnabled = health != EngineHealth.PROBING
+            isEnabled = health != EngineHealth.PROBING && !isDisabled
             textSize = 12f
-            val lp = LinearLayout.LayoutParams(0, (40 * resources.displayMetrics.density).toInt(), 1f)
-            lp.marginEnd = (6 * resources.displayMetrics.density).toInt()
+            val lp = LinearLayout.LayoutParams(0, (40 * dp).toInt(), 1f)
+            lp.marginEnd = (4 * dp).toInt()
             layoutParams = lp
             setOnClickListener { probeOne(engine) }
         }
         btnRow.addView(probeBtn)
 
+        // 偏好按钮
         val preferBtn = Button(this).apply {
             text = if (isPreferred) "取消偏好" else "设为偏好"
+            isEnabled = !isDisabled
             textSize = 12f
-            val lp = LinearLayout.LayoutParams(0, (40 * resources.displayMetrics.density).toInt(), 1f)
+            val lp = LinearLayout.LayoutParams(0, (40 * dp).toInt(), 1f)
+            lp.marginEnd = (4 * dp).toInt()
             layoutParams = lp
             setOnClickListener {
                 if (isPreferred) {
@@ -151,8 +180,35 @@ class VoiceEngineActivity : AppCompatActivity() {
             }
         }
         btnRow.addView(preferBtn)
-        card.addView(btnRow)
 
+        // 排除/恢复按钮
+        val excludeBtn = Button(this).apply {
+            text = if (isDisabled) "恢复" else "排除"
+            textSize = 12f
+            setBackgroundColor(if (isDisabled) 0xFF37474F.toInt() else 0xFF6D1010.toInt())
+            setTextColor(0xFFFFFFFF.toInt())
+            val lp = LinearLayout.LayoutParams(0, (40 * dp).toInt(), 0.8f)
+            layoutParams = lp
+            setOnClickListener {
+                val nowDisabled = !isDisabled
+                // 阻止用户排除所有引擎
+                if (nowDisabled) {
+                    val disabledCount = AsrFallbackSettings.getDisabledEngineKeys(this@VoiceEngineActivity).size
+                    val totalActive = engines.size
+                    if (disabledCount + 1 >= totalActive) {
+                        Toast.makeText(this@VoiceEngineActivity, "至少保留一个引擎", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                }
+                AsrFallbackSettings.setEngineDisabled(this@VoiceEngineActivity, key, nowDisabled)
+                val msg = if (nowDisabled) "已排除「${engine.label}」" else "已恢复「${engine.label}」"
+                Toast.makeText(this@VoiceEngineActivity, msg, Toast.LENGTH_SHORT).show()
+                refresh()
+            }
+        }
+        btnRow.addView(excludeBtn)
+
+        card.addView(btnRow)
         container.addView(card)
     }
 
