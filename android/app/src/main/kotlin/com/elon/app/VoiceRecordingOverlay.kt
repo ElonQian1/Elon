@@ -1,7 +1,10 @@
 package com.elon.app
 
 import android.app.Activity
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
@@ -10,17 +13,17 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import kotlin.math.sin
 
 /**
  * 仿微信"按住说话"的全屏录音遮罩。
  *
- * 三个区域，由触摸的 Y 位移决定（DOWN 时设零点）：
- *   - SEND：正常按住区域，松开 → 直接把转写文字作为消息发送
- *   - TRANSLATE：手指上滑 >= [DRAG_TRANSLATE_DY] 像素，松开 → 把转写文字回填到输入框给用户查看/编辑
- *   - CANCEL：手指继续上滑 >= [DRAG_CANCEL_DY] 像素，松开 → 取消并丢弃
+ * 三个区域，由手指水平位移决定（DOWN 时设零点）：
+ *   - SEND：手指未明显偏移，松开 → 直接把转写文字作为消息发送
+ *   - TRANSLATE：向右滑 >= [DRAG_THRESHOLD_DP] dp，松开 → 回填输入框供用户查看/编辑
+ *   - CANCEL：向左滑 >= [DRAG_THRESHOLD_DP] dp，松开 → 取消并丢弃
  *
  * 仅渲染 UI，不持有 ASR 状态；由 [MainSpeechInputActions] 通过 [updatePartial] / [updateZone] 推送。
  */
@@ -30,18 +33,21 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
 
     private val main = Handler(Looper.getMainLooper())
     private var root: FrameLayout? = null
-    private var card: LinearLayout? = null
-    private var iconView: ImageView? = null
-    private var durationView: TextView? = null
     private var partialView: TextView? = null
-    private var hintView: TextView? = null
-    private var startedAt: Long = 0L
+    private var durationView: TextView? = null
+    private var waveformView: WaveformView? = null
+    private var leftZoneView: TextView? = null
+    private var rightZoneView: TextView? = null
+    private var centerActionText: TextView? = null
+    private var startedAt = 0L
     private var zone: Zone = Zone.SEND
+
     private val durationTick = object : Runnable {
         override fun run() {
             val ms = SystemClock.elapsedRealtime() - startedAt
             durationView?.text = formatDuration(ms)
-            main.postDelayed(this, 200L)
+            waveformView?.advance()
+            main.postDelayed(this, 80L)
         }
     }
 
@@ -52,83 +58,119 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
         val parent = activity.window.decorView as? ViewGroup ?: return
 
         val overlay = FrameLayout(activity).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            setBackgroundColor(Color.parseColor("#88000000"))
-            // 透明传递触摸：触摸事件仍由底下的"按住说话"按钮处理
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            setBackgroundColor(Color.parseColor("#99000000"))
             isClickable = false
             isFocusable = false
         }
-        val container = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            val pad = dp(20)
-            setPadding(pad, pad, pad, pad)
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#262626"))
-                cornerRadius = dp(16).toFloat()
-            }
-            val lp = FrameLayout.LayoutParams(
-                dp(280),
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { gravity = Gravity.CENTER }
-            layoutParams = lp
-        }
-        val icon = ImageView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(56), dp(56)).apply {
-                bottomMargin = dp(12)
-            }
-            setImageResource(android.R.drawable.ic_btn_speak_now)
-            setColorFilter(Color.WHITE)
-        }
-        val duration = TextView(activity).apply {
-            textSize = 14f
-            setTextColor(Color.parseColor("#E0E0E0"))
-            text = "0.0\""
-            gravity = Gravity.CENTER
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(10) }
-            layoutParams = lp
+
+        // ─── 录音卡片（居中，底部留出操作栏空间）───────────────────────────────
+        val waveform = WaveformView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(64)
+            ).apply { bottomMargin = dp(14) }
         }
         val partial = TextView(activity).apply {
-            textSize = 14f
+            textSize = 15f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            maxLines = 4
+            maxLines = 3
             text = "正在听…"
-            val lp = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(14) }
-            layoutParams = lp
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(6) }
         }
-        val hint = TextView(activity).apply {
+        val duration = TextView(activity).apply {
             textSize = 12f
-            setTextColor(Color.parseColor("#C0C0C0"))
+            setTextColor(Color.parseColor("#CCFFFFFF"))
             gravity = Gravity.CENTER
-            text = "松开发送 · 上滑查看文字 · 继续上滑取消"
+            text = "0.0\""
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         }
-        container.addView(icon)
-        container.addView(duration)
-        container.addView(partial)
-        container.addView(hint)
-        overlay.addView(container)
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#3DC561"))
+                cornerRadius = dp(20).toFloat()
+            }
+            setPadding(dp(24), dp(28), dp(24), dp(20))
+            elevation = dp(4).toFloat()
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+                marginStart = dp(32)
+                marginEnd = dp(32)
+                bottomMargin = dp(130)  // 向上偏移，为底部操作栏让出空间
+            }
+        }
+        card.addView(waveform)
+        card.addView(partial)
+        card.addView(duration)
+
+        // ─── 底部操作栏（仿微信：取消 ← | 松开发送 | → 转文字）──────────────────
+        val leftZone = makeActionZone(activity, "取消", marginEndDp = 8)
+        val rightZone = makeActionZone(activity, "转文字", marginStartDp = 8)
+        val centerText = TextView(activity).apply {
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            text = "松开 发送"
+            layoutParams = LinearLayout.LayoutParams(dp(108), ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
+        }
+        val actionBar = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(48))
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.BOTTOM }
+        }
+        actionBar.addView(leftZone)
+        actionBar.addView(centerText)
+        actionBar.addView(rightZone)
+
+        overlay.addView(card)
+        overlay.addView(actionBar)
         parent.addView(overlay)
 
         root = overlay
-        card = container
-        iconView = icon
-        durationView = duration
         partialView = partial
-        hintView = hint
+        durationView = duration
+        waveformView = waveform
+        leftZoneView = leftZone
+        rightZoneView = rightZone
+        centerActionText = centerText
         startedAt = SystemClock.elapsedRealtime()
         zone = Zone.SEND
         applyZone()
         main.post(durationTick)
+    }
+
+    private fun makeActionZone(
+        ctx: android.content.Context,
+        label: String,
+        marginStartDp: Int = 0,
+        marginEndDp: Int = 0
+    ): TextView = TextView(ctx).apply {
+        text = label
+        textSize = 15f
+        setTextColor(Color.parseColor("#AAAAAA"))
+        gravity = Gravity.CENTER
+        background = GradientDrawable().apply {
+            setColor(Color.parseColor("#2E2E2E"))
+            cornerRadius = dp(28).toFloat()
+        }
+        layoutParams = LinearLayout.LayoutParams(0, dp(58)).apply {
+            weight = 1f
+            if (marginStartDp > 0) this.marginStart = dp(marginStartDp)
+            if (marginEndDp > 0) this.marginEnd = dp(marginEndDp)
+        }
     }
 
     /** 实时识别文字（部分结果） */
@@ -136,11 +178,15 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
         partialView?.text = if (text.isBlank()) "正在听…" else text
     }
 
-    /** 根据手指 Y 位移更新区域 */
-    fun updateZone(dyUp: Float) {
+    /**
+     * 根据手指水平位移更新区域。
+     * @param dx 向右为正，向左为负（像素）
+     */
+    fun updateZone(dx: Float) {
+        val threshold = dp(DRAG_THRESHOLD_DP).toFloat()
         val newZone = when {
-            dyUp >= DRAG_CANCEL_DY -> Zone.CANCEL
-            dyUp >= DRAG_TRANSLATE_DY -> Zone.TRANSLATE
+            dx < -threshold -> Zone.CANCEL
+            dx > threshold -> Zone.TRANSLATE
             else -> Zone.SEND
         }
         if (newZone != zone) {
@@ -155,44 +201,84 @@ internal class VoiceRecordingOverlay(private val activity: Activity) {
         main.removeCallbacks(durationTick)
         root?.let { (it.parent as? ViewGroup)?.removeView(it) }
         root = null
-        card = null
-        iconView = null
-        durationView = null
         partialView = null
-        hintView = null
+        durationView = null
+        waveformView = null
+        leftZoneView = null
+        rightZoneView = null
+        centerActionText = null
     }
 
     private fun applyZone() {
         when (zone) {
             Zone.SEND -> {
-                iconView?.setColorFilter(Color.WHITE)
-                hintView?.text = "松开发送 · 上滑查看文字 · 继续上滑取消"
-                hintView?.setTextColor(Color.parseColor("#C0C0C0"))
-            }
-            Zone.TRANSLATE -> {
-                iconView?.setColorFilter(Color.parseColor("#4FC3F7"))
-                hintView?.text = "松开 → 查看转写文字（不直接发送）"
-                hintView?.setTextColor(Color.parseColor("#4FC3F7"))
+                applyZoneStyle(leftZoneView, active = false, isCancelStyle = true)
+                applyZoneStyle(rightZoneView, active = false, isCancelStyle = false)
+                centerActionText?.text = "松开 发送"
+                centerActionText?.setTextColor(Color.WHITE)
             }
             Zone.CANCEL -> {
-                iconView?.setColorFilter(Color.parseColor("#FF6B6B"))
-                hintView?.text = "松开 → 取消本次录音"
-                hintView?.setTextColor(Color.parseColor("#FF6B6B"))
+                applyZoneStyle(leftZoneView, active = true, isCancelStyle = true)
+                applyZoneStyle(rightZoneView, active = false, isCancelStyle = false)
+                centerActionText?.text = "松开 取消"
+                centerActionText?.setTextColor(Color.parseColor("#FF6B6B"))
+            }
+            Zone.TRANSLATE -> {
+                applyZoneStyle(leftZoneView, active = false, isCancelStyle = true)
+                applyZoneStyle(rightZoneView, active = true, isCancelStyle = false)
+                centerActionText?.text = "松开 转文字"
+                centerActionText?.setTextColor(Color.parseColor("#4FC3F7"))
             }
         }
     }
 
-    private fun formatDuration(ms: Long): String {
-        val sec = ms / 1000.0
-        return String.format("%.1f\"", sec)
+    private fun applyZoneStyle(tv: TextView?, active: Boolean, isCancelStyle: Boolean) {
+        tv ?: return
+        val bg = tv.background as? GradientDrawable ?: return
+        val bgColor = when {
+            active && isCancelStyle -> Color.parseColor("#AA2222")
+            active && !isCancelStyle -> Color.parseColor("#1A6DAA")
+            else -> Color.parseColor("#2E2E2E")
+        }
+        bg.setColor(bgColor)
+        tv.setTextColor(if (active) Color.WHITE else Color.parseColor("#AAAAAA"))
     }
 
-    private fun dp(v: Int): Int =
-        (v * activity.resources.displayMetrics.density).toInt()
+    private fun formatDuration(ms: Long) = String.format("%.1f\"", ms / 1000.0)
+    private fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
 
     private companion object {
-        // Y 像素阈值，DOWN 时为零点，向上为正
-        const val DRAG_TRANSLATE_DY = 120f
-        const val DRAG_CANCEL_DY = 260f
+        const val DRAG_THRESHOLD_DP = 60
+    }
+
+    // ─── 波形动画 View ──────────────────────────────────────────────────────────
+    private inner class WaveformView(ctx: android.content.Context) : View(ctx) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        private val barCount = 28
+        private var tick = 0f
+
+        fun advance() {
+            tick += 1f
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            if (w <= 0f || h <= 0f) return
+            // gap = barW * 0.6  →  barW = w / (barCount + (barCount-1)*0.6)
+            val barW = w / (barCount + (barCount - 1) * 0.6f)
+            val step = barW * 1.6f
+            for (i in 0 until barCount) {
+                val x = i * step
+                // 双频叠加，模拟自然声波起伏
+                val wave = (sin((tick * 0.18f + i * 0.65f).toDouble()) * 0.45 +
+                            sin((tick * 0.11f + i * 1.25f).toDouble()) * 0.2 + 0.55)
+                    .toFloat().coerceIn(0.08f, 1f)
+                val barH = wave * h
+                val top = (h - barH) / 2f
+                canvas.drawRoundRect(RectF(x, top, x + barW, top + barH), barW / 2, barW / 2, paint)
+            }
+        }
     }
 }
