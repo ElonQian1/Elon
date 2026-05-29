@@ -84,6 +84,7 @@ internal class MainProjectActions(
             add("编辑项目名称")
             if (!isJoint) add("邀请好友协作")
             if (isJoint) add("打开项目空间")
+            if (isJoint) add("恢复为个人项目")
             if (isJoint) add("发布到项目商城")
             add("Git 仓库")
             add("协作权限 / 商城公开")
@@ -97,6 +98,7 @@ internal class MainProjectActions(
                     "编辑项目名称" -> showRenameProjectDialog(index)
                     "邀请好友协作" -> confirmUpgradeToJoint(index)
                     "打开项目空间" -> openProjectSpace(project.projectSpaceId(), project.title)
+                    "恢复为个人项目" -> confirmRestorePersonalProject(project)
                     "发布到项目商城" -> confirmPublishToMarketplace(project)
                     "Git 仓库" -> {
                         openProject(index)
@@ -162,6 +164,56 @@ internal class MainProjectActions(
             .setPositiveButton("发布商城") { _, _ -> doSetVisibility(project, true, "open") }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    private fun confirmRestorePersonalProject(project: AppProject) {
+        if (!project.isJointDevelopmentProject()) {
+            Toast.makeText(activity, "已经是个人项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("恢复为个人项目")
+            .setMessage("「${project.title}」会从联合项目移回个人项目。\n\n如果它已经同步到服务端，会先设为私有，之后不会再作为联合项目空间打开。")
+            .setPositiveButton("恢复") { _, _ -> doRestorePersonalProject(project) }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doRestorePersonalProject(project: AppProject) {
+        val collaborationId = project.collaborationProjectId?.trim().orEmpty()
+        val hasRemoteProject = collaborationId.isNotBlank() || project.id.startsWith("prj_")
+        val remoteProjectId = collaborationId.ifBlank { project.id }
+        if (!hasRemoteProject) {
+            project.markPersonalDevelopment()
+            saveProjects()
+            renderProjectList()
+            Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!isLoggedIn()) {
+            Toast.makeText(activity, "请先登录后恢复个人项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "正在恢复个人项目...", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                setProjectVisibility(http, serverUrl, remoteProjectId, false, "invite", token)
+                activity.runOnUiThread {
+                    project.markPersonalDevelopment()
+                    saveProjects()
+                    renderProjectList()
+                    Toast.makeText(activity, "已恢复为个人项目", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "恢复个人项目失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun showVisibilityDialog(project: AppProject) {

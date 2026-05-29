@@ -911,9 +911,6 @@ class MainActivity : AppCompatActivity() {
             deleteMessage = { message -> messageActions.deleteMessage(message) },
             startMultiSelect = { message -> messageSelectionActions.startSelection(message) },
             revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
-            restorePersonalProject = { message, share ->
-                chatProjectShareActions.restorePersonalProject(message, share)
-            },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
             canRequestAiReply = {
                 friendChatActions.isActive() || groupChatActions.isActive()

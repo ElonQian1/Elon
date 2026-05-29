@@ -24,7 +24,6 @@ internal class MainActionPopups(
     private val deleteMessage: (ChatMessage) -> Unit,
     private val startMultiSelect: (ChatMessage) -> Unit,
     private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
-    private val restorePersonalProject: (ChatMessage, ChatProjectShare) -> Unit,
     private val quoteMessage: (String) -> Unit,
     private val canRequestAiReply: () -> Boolean,
     private val requestAiReply: (ChatMessage) -> Unit,
@@ -89,9 +88,6 @@ internal class MainActionPopups(
         val actions = listOf(
             TopAction("撤销", R.drawable.ic_msg_delete) {
                 revokeProjectShare(message, share)
-            },
-            TopAction("恢复", R.drawable.ic_popup_project) {
-                restorePersonalProject(message, share)
             }
         )
         setActionPopup(renderer().showProjectCardActionPopup(anchor, getActionPopup(), actions))
