@@ -309,8 +309,9 @@ private class VoiceActionTrayView(context: Context) : View(context) {
             VoiceRecordingOverlay.Zone.TRANSCRIBE -> width * 0.81f
         }
         val cy = when (zone) {
-            VoiceRecordingOverlay.Zone.AI_REPLY -> 118f * density
-            else -> 72f * density
+            VoiceRecordingOverlay.Zone.AI_REPLY,
+            VoiceRecordingOverlay.Zone.CANCEL,
+            VoiceRecordingOverlay.Zone.TRANSCRIBE -> 72f * density
         }
         canvas.drawCircle(cx, cy, 38f * density, highlightPaint)
     }
@@ -323,7 +324,7 @@ private class VoiceActionTrayView(context: Context) : View(context) {
         drawOption(canvas, "取消", width * 0.19f, 82f * density, zone == VoiceRecordingOverlay.Zone.CANCEL)
         canvas.restore()
 
-        drawOption(canvas, "AI回复", width * 0.50f, 120f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+        drawOption(canvas, "AI回复", width * 0.50f, 82f * density, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
 
         canvas.save()
         canvas.rotate(14f, width * 0.81f, 78f * density)
