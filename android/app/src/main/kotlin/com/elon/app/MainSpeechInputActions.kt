@@ -5,6 +5,8 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -578,7 +580,7 @@ internal class MainSpeechInputActions(
                     discardVoiceAttachment(attachment)
                     setVoiceMode(false)
                     applyVoiceMode()
-                    sender(voiceAiReplyText(transcription))
+                    showVoiceAiPreviewAndSend(transcription, sender)
                     return
                 }
                 // 还是没拿到文字：把语音气泡发出去
@@ -677,6 +679,37 @@ internal class MainSpeechInputActions(
 
     private fun discardVoiceAttachment(attachment: PendingAttachment) {
         runCatching { attachment.file.delete() }
+    }
+
+    /**
+     * 语音 @AI 回复预览气泡：底部展示识别结果 2 秒后自动发送。
+     * 用户点「取消」可将文字回填到输入框自行修改，不发送。
+     */
+    private fun showVoiceAiPreviewAndSend(transcription: String, sender: (String) -> Unit) {
+        val handler = Handler(Looper.getMainLooper())
+        val textToSend = voiceAiReplyText(transcription)
+
+        // 用 Snackbar 做底部气泡
+        val rootView = activity.window.decorView.findViewById<android.view.View>(android.R.id.content)
+        val snackbar = com.google.android.material.snackbar.Snackbar.make(
+            rootView,
+            textToSend,
+            com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
+        )
+        snackbar.setAction("取消") {
+            handler.removeCallbacksAndMessages(null)
+            // 取消：把识别文字填到输入框，不发送
+            setInputText(transcription.trim())
+        }
+        snackbar.show()
+
+        // 2 秒后自动发送
+        handler.postDelayed({
+            if (snackbar.isShown) {
+                snackbar.dismiss()
+                sender(textToSend)
+            }
+        }, VOICE_AI_PREVIEW_DELAY_MS)
     }
 
     private fun voiceAiReplyText(text: String): String {
@@ -1002,6 +1035,8 @@ internal class MainSpeechInputActions(
         // 语音消息模式：AI 可以对语音内容做出回应，但不强制执行命令
         private const val VOICE_MESSAGE_TEXT =
             "我发送了一条语音消息，请根据语音内容做出回应。"
+
+        private const val VOICE_AI_PREVIEW_DELAY_MS = 2000L
     }
 
     private data class SpeechAttempt(
