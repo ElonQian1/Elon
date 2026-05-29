@@ -455,7 +455,8 @@ internal class MainSpeechInputActions(
             voiceMessageAsrRecognizer = null
         }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
-        voiceHoldButton().text = if (isFriendChatActive()) "松开 发送" else "松开 AI回复"
+        // 好友/群聊/频道模式已有浮层提示；清空底层按钮文字，避免透过半透明托盘重复显示。
+        voiceHoldButton().text = if (isFriendChatActive()) "" else "松开 AI回复"
         return true
     }
 
