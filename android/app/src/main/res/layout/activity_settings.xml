@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="#0D0D0D">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,10 +15,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="#E3F2FD"
+            android:background="#0D2137"
             android:padding="12dp"
             android:text="当前测试阶段已锁定 Codex CLI。\n• 聊天、意图分析和代码协作统一走 Codex CLI\n• 暂不切换到其他 AI 代理或自定义 API 模型\n• 恢复多模型前会同步更新服务端和 APK 设置"
-            android:textColor="#1565C0"
+            android:textColor="#4FC3F7"
             android:textSize="13sp" />
 
         <!-- ── 选择模式 ── -->
@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="AI 模型模式"
-            android:textColor="#333333"
+            android:textColor="#EFEFEF"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -36,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="#FFFFFF"
+            android:background="#1A1A1A"
             android:orientation="vertical"
             android:padding="4dp">
 
@@ -46,6 +46,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="🌐  使用服务器默认模型（推荐）"
+                android:textColor="#EFEFEF"
                 android:textSize="14sp" />
 
             <RadioButton
@@ -54,6 +55,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="📋  选择预设模型"
+                android:textColor="#EFEFEF"
                 android:textSize="14sp" />
 
             <RadioButton
@@ -62,6 +64,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="🔧  自定义 API Key 和模型"
+                android:textColor="#EFEFEF"
                 android:textSize="14sp" />
         </RadioGroup>
 
@@ -79,7 +82,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="6dp"
                 android:text="选择模型"
-                android:textColor="#333333"
+                android:textColor="#EFEFEF"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
@@ -87,7 +90,7 @@
                 android:id="@+id/agentSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="#FFFFFF"
+                android:background="#242424"
                 android:padding="8dp" />
         </LinearLayout>
 
@@ -105,17 +108,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="API 地址（Base URL）"
-                android:textColor="#555555"
+                android:textColor="#AAAAAA"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customBase"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#FFFFFF"
+                android:background="#1A1A1A"
                 android:hint="https://api.deepseek.com/v1"
                 android:inputType="textUri"
                 android:padding="12dp"
+                android:textColor="#EFEFEF"
+                android:textColorHint="#666666"
                 android:textSize="14sp" />
 
             <TextView
@@ -123,17 +128,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="API 密钥"
-                android:textColor="#555555"
+                android:textColor="#AAAAAA"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#FFFFFF"
+                android:background="#1A1A1A"
                 android:hint="sk-..."
                 android:inputType="textPassword"
                 android:padding="12dp"
+                android:textColor="#EFEFEF"
+                android:textColorHint="#666666"
                 android:textSize="14sp" />
 
             <TextView
@@ -141,17 +148,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="模型名称"
-                android:textColor="#555555"
+                android:textColor="#AAAAAA"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customModel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#FFFFFF"
+                android:background="#1A1A1A"
                 android:hint="deepseek-chat"
                 android:inputType="text"
                 android:padding="12dp"
+                android:textColor="#EFEFEF"
+                android:textColorHint="#666666"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -161,17 +170,19 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
             android:text="我的昵称（可选，仅管理员可见）"
-            android:textColor="#555555"
+            android:textColor="#AAAAAA"
             android:textSize="12sp" />
         <EditText
             android:id="@+id/nicknameEdit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            android:background="#FFFFFF"
+            android:background="#1A1A1A"
             android:hint="输入昵称..."
             android:inputType="text"
             android:padding="12dp"
+            android:textColor="#EFEFEF"
+            android:textColorHint="#666666"
             android:textSize="14sp" />
 
         <!-- ── 语音输入模式 ── -->
@@ -181,7 +192,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginBottom="4dp"
             android:text="语音输入模式"
-            android:textColor="#333333"
+            android:textColor="#EFEFEF"
             android:textSize="13sp"
             android:textStyle="bold" />
         <TextView
@@ -189,7 +200,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
             android:text="选择麦克风按钮使用哪种识别管线"
-            android:textColor="#777777"
+            android:textColor="#AAAAAA"
             android:textSize="11sp" />
         <RadioGroup
             android:id="@+id/voiceModeGroup"
@@ -201,17 +212,20 @@
                 android:id="@+id/voiceModeAgent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="端上识别（推荐，低延迟）" />
+                android:text="端上识别（推荐，低延迟）"
+                android:textColor="#EFEFEF" />
             <RadioButton
                 android:id="@+id/voiceModeCloud"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="云端直连（PCM 流→服务器→AI 直发）" />
+                android:text="云端直连（PCM 流→服务器→AI 直发）"
+                android:textColor="#EFEFEF" />
             <RadioButton
                 android:id="@+id/voiceModeVoiceMsg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="🎤 语音消息（录音发送气泡，可播放）" />
+                android:text="🎤 语音消息（录音发送气泡，可播放）"
+                android:textColor="#EFEFEF" />
         </RadioGroup>
 
         <Button
