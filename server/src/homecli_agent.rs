@@ -73,6 +73,42 @@ impl AgentManager {
             .collect()
     }
 
+    /// Send an HTTP request through the WS tunnel to the PC's local server.
+    /// Returns a single AgentToServer::HttpResponse or HttpError.
+    pub async fn dispatch_http(
+        &self,
+        agent_id: &str,
+        method: String,
+        path: String,
+        headers: Vec<(String, String)>,
+        body_b64: Option<String>,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(ServerToAgent::HttpRequest {
+                req_id: req_id.clone(),
+                method,
+                path,
+                headers,
+                body_b64,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+        // Wait for the single response frame (no streaming for HTTP relay)
+        match tokio::time::timeout(Duration::from_secs(60), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!("agent disconnected before http response")),
+            Err(_) => Err(anyhow!("http relay timeout (60s)")),
+        }
+    }
+
     /// Dispatch a new exec task to the given agent. Returns a receiver that
     /// streams the agent's events for this task until `TaskExit` or `TaskError`.
     pub async fn dispatch(
@@ -267,6 +303,13 @@ async fn run_agent_session(
                             }
                             if drop_after {
                                 p.remove(&task_id);
+                            }
+                        } else if let Some(req_id) = msg.req_id() {
+                            // HTTP relay response — one-shot, always remove
+                            let req_id = req_id.to_string();
+                            let mut p = pending_r.lock().await;
+                            if let Some(tx) = p.remove(&req_id) {
+                                let _ = tx.send(msg);
                             }
                         } else {
                             // Register/Pong without task_id — ignore (Register already consumed).

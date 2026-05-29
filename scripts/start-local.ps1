@@ -44,8 +44,9 @@ Write-Host "  elon server 本地模式" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  本机 IP   : $localIp"
 Write-Host "  监听地址  : 0.0.0.0:$Port"
-Write-Host "  备用服务器: http://${localIp}:$Port   ← APK 里填这个"
-Write-Host "  Owner Token: $OwnerToken   ← APK 里填这个"
+Write-Host "  局域网URL : http://${localIp}:$Port         ← 同WiFi时 APK 填这个"
+Write-Host "  互联网URL : http://43.139.149.158:8080/api/pc-relay/elon-pc-1  ← 跨网时 APK 填这个"
+Write-Host "  Owner Token: $OwnerToken"
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -60,6 +61,28 @@ $env:ADMIN_TOKEN     = "local-admin-$(($OwnerToken).Substring(0,8))"
 $env:REQUIRE_LOGIN   = "false"
 $env:AI_BACKEND      = "local_cli"
 $env:RUST_LOG        = "info,elon_server=debug"
+$env:LOCAL_SERVER_PORT = $Port
+
+# PC → 云端 agent 反向代理配置（让 APK 通过 /api/pc-relay/{agent_id}/... 访问本机）
+$cloudWs = "ws://43.139.149.158:8080/agent/ws"
+$agentId = "elon-pc-1"
+$agentSecretFile = "$PSScriptRoot\..\data-local\.agent_secret"
+if (Test-Path $agentSecretFile) {
+    $agentSecret = (Get-Content $agentSecretFile -Raw).Trim()
+} else {
+    $b = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+    $agentSecret = ([System.BitConverter]::ToString($b) -replace '-','').ToLower()
+    $agentSecret | Set-Content $agentSecretFile
+    Write-Host "[start-local] 已生成新 agent secret，保存到 $agentSecretFile"
+    Write-Host ""
+    Write-Host "⚠️  首次启动：需要在服务器注册 agent secret！" -ForegroundColor Yellow
+    Write-Host "   运行以下命令（需要 ADMIN_TOKEN）：" -ForegroundColor Yellow
+    Write-Host "   ssh root@43.139.149.158 'echo ""ELON_AGENT_SECRETS=elon-pc-1:$agentSecret"" >> /etc/elon-server.env && systemctl restart elon-server'" -ForegroundColor Cyan
+    Write-Host ""
+}
+$env:RELAY_CLOUD_URL  = $cloudWs
+$env:ELON_AGENT_ID    = $agentId
+$env:ELON_AGENT_SECRET = $agentSecret
 
 # 如果有 GitHub Token，自动启用 Copilot API 代理
 if ($env:GITHUB_TOKEN) {

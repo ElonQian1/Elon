@@ -74,6 +74,8 @@ mod tools_git;
 mod agent_config;
 mod types;
 mod user_api;
+mod pc_relay;
+mod pc_relay_client;
 mod voice_audio_format;
 mod voice_config;
 mod voice_openai_realtime;
@@ -102,6 +104,8 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(AppState::new()?);
     codex_health::spawn_codex_network_monitor(state.clone());
+    // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
+    pc_relay_client::spawn_if_configured();
 
     // 服务启动时：将上次运行中的任务标记为已中断
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
