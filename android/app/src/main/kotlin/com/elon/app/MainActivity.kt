@@ -53,7 +53,7 @@ class MainActivity : AppCompatActivity() {
         return if (activeUrl == BuildConfig.SERVER_URL) {
             AuthManager.token(this)
         } else {
-            getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+            getSharedPreferences("agent_config", android.content.Context.MODE_PRIVATE)
                 .getString("fallback_server_token", null)
                 ?.takeIf { it.isNotBlank() }
                 ?: AuthManager.token(this)
