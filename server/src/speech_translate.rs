@@ -64,7 +64,7 @@ pub async fn translate_user_speech(
         }),
     ];
 
-    let response = match call_chat_llm(&state, &agent, &messages).await {
+    let response = match call_chat_llm(&state, &agent, &messages, &user_id, "speech_translate").await {
         Ok(response) => response,
         Err(err) => {
             tracing::warn!("语音翻译调用失败: {}", err);

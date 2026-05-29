@@ -478,6 +478,20 @@ pub async fn run_with_workspace(
             );
         }
     }
+    // 从 Codex CLI stdout 解析 token 用量并写入数据库
+    let cli_feature = if development_task {
+        "codex_cli_dev"
+    } else {
+        "codex_cli_chat"
+    };
+    crate::token_usage_api::record_codex_usage_from_stdout(
+        &state.store,
+        user_id,
+        cli_feature,
+        Some(option.id.as_str()),
+        &output.stdout,
+    );
+
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
     tracing::info!(
         route = ?route,

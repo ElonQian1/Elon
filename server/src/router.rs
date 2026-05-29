@@ -12,7 +12,7 @@ use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_downloads, project_git, project_membership, project_space,
-    project_store, release_claim, speech_translate, user_api, voice_ws_transcribe,
+    project_store, release_claim, speech_translate, token_usage_api, user_api, voice_ws_transcribe,
     voice_ws_virtual_mic, web,
 };
 
@@ -308,6 +308,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
+        )
+        .route(
+            "/api/user/:user_id/usage/stats",
+            get(token_usage_api::get_usage_stats),
+        )
+        .route(
+            "/api/user/:user_id/usage/report",
+            post(token_usage_api::report_client_usage),
         )
         .route(
             "/api/user/:user_id/speech/translate",

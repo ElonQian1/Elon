@@ -40,6 +40,7 @@ pub(crate) async fn resolve_agent(
 async fn run_casual_chat(
     state: &Arc<AppState>,
     agent: &AgentConfig,
+    user_id: &str,
     user_message: &str,
 ) -> Result<String> {
     let messages = vec![
@@ -53,7 +54,8 @@ async fn run_casual_chat(
         }),
     ];
 
-    let response = call_chat_llm(state, agent, &messages).await?;
+    let response = call_chat_llm(state, agent, &messages, user_id, "chat").await?;
+
     let reply = response["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("我在，你可以继续说。")
@@ -104,7 +106,7 @@ pub(crate) async fn run_api_inner_with_workspace(
             .to_json(),
         );
 
-        let reply = run_casual_chat(state, &agent, user_message).await?;
+        let reply = run_casual_chat(state, &agent, user_id, user_message).await?;
         let _ = tx.send(
             WsMessage::Done {
                 message: reply,
@@ -171,7 +173,7 @@ pub(crate) async fn run_api_inner_with_workspace(
 
     // 工具调用循环（最多 20 轮，防止死循环）
     for _round in 0..20 {
-        let response = call_llm(state, &agent, &messages).await?;
+        let response = call_llm(state, &agent, &messages, user_id, "agent_tool").await?;
 
         let choice = &response["choices"][0];
         let finish_reason = choice["finish_reason"].as_str().unwrap_or("");

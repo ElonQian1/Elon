@@ -16,11 +16,16 @@ use crate::{
     tools,
     types::{AgentConfig, AppState},
 };
-/// 调用 LLM API（OpenAI 兼容接口）
+/// 调用 LLM API（OpenAI 兼容接口，带工具定义）
+///
+/// `user_id`  触发本次调用的用户 ID，用于 token 用量统计。
+/// `feature`  功能标签，例如 "agent_tool" / "chat"，用于用量分类。
 pub(crate) async fn call_llm(
     state: &Arc<AppState>,
     agent: &AgentConfig,
     messages: &[Value],
+    user_id: &str,
+    feature: &str,
 ) -> Result<Value> {
     let url = format!("{}/chat/completions", agent.api_base);
 
@@ -61,13 +66,21 @@ pub(crate) async fn call_llm(
         return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
     }
 
-    Ok(resp.json::<Value>().await?)
+    let response: Value = resp.json().await?;
+    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);
+    Ok(response)
 }
 
+/// 调用 LLM API（普通对话，不带工具）
+///
+/// `user_id`  触发本次调用的用户 ID，用于 token 用量统计。
+/// `feature`  功能标签，例如 "chat" / "social_ai" / "speech_translate"。
 pub(crate) async fn call_chat_llm(
     state: &Arc<AppState>,
     agent: &AgentConfig,
     messages: &[Value],
+    user_id: &str,
+    feature: &str,
 ) -> Result<Value> {
     let url = format!("{}/chat/completions", agent.api_base);
 
@@ -108,7 +121,9 @@ pub(crate) async fn call_chat_llm(
         return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
     }
 
-    Ok(resp.json::<Value>().await?)
+    let response: Value = resp.json().await?;
+    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);
+    Ok(response)
 }
 
 pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {

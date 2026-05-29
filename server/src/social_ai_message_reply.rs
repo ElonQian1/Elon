@@ -101,7 +101,7 @@ async fn reply_to_selected_friend_message(
     let history = state
         .store
         .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
-    let reply = selected_reply_or_fallback(&state, "好友聊天", &history, &selected).await;
+    let reply = selected_reply_or_fallback(&state, &user_id, "好友聊天", &history, &selected).await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -121,7 +121,7 @@ async fn reply_to_selected_group_message(
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
-    let reply = selected_reply_or_fallback(&state, "群聊", &history, &selected).await;
+    let reply = selected_reply_or_fallback(&state, &user_id, "群聊", &history, &selected).await;
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
@@ -131,11 +131,12 @@ async fn reply_to_selected_group_message(
 
 async fn selected_reply_or_fallback(
     state: &Arc<AppState>,
+    user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
 ) -> String {
-    match build_selected_reply(state, scene, history, selected).await {
+    match build_selected_reply(state, user_id, scene, history, selected).await {
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} selected-message AI generation failed: {}", error);
@@ -147,6 +148,7 @@ async fn selected_reply_or_fallback(
 
 async fn build_selected_reply(
     state: &Arc<AppState>,
+    user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
@@ -182,6 +184,8 @@ async fn build_selected_reply(
                 )
             }),
         ],
+        user_id,
+        "social_ai_selected",
     )
     .await?;
     let reply = response["choices"][0]["message"]["content"]

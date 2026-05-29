@@ -74,6 +74,7 @@ mod source_hygiene;
 mod speech_translate;
 mod store;
 mod store_schema;
+mod token_usage_api;
 mod tools;
 mod tools_apk;
 mod tools_git;

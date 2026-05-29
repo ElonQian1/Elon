@@ -21,12 +21,14 @@ mod social_ai_messages;
 mod social_ai_pending;
 mod social_ai_selected;
 mod tasks;
+mod token_usage;
 mod users;
 
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
+pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };

@@ -162,7 +162,7 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
     let history = state
         .store
         .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
-    let reply = social_ai_reply_or_fallback(&state, "好友聊天", &history).await;
+    let reply = social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history).await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -177,7 +177,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
-    let reply = social_ai_reply_or_fallback(&state, "群聊", &history).await;
+    let reply = social_ai_reply_or_fallback(&state, &user_id, "群聊", &history).await;
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
@@ -187,10 +187,11 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
 
 async fn social_ai_reply_or_fallback(
     state: &Arc<AppState>,
+    user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
 ) -> String {
-    match build_reply(state, scene, history).await {
+    match build_reply(state, user_id, scene, history).await {
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} @EL 生成失败: {}", error);
@@ -201,6 +202,7 @@ async fn social_ai_reply_or_fallback(
 
 async fn build_reply(
     state: &Arc<AppState>,
+    user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
 ) -> Result<String> {
@@ -228,6 +230,8 @@ async fn build_reply(
                 )
             }),
         ],
+        user_id,
+        "social_ai",
     )
     .await?;
     let reply = response["choices"][0]["message"]["content"]

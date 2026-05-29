@@ -68,6 +68,7 @@ static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         migration_v11,
     ),
     (12, "好友聊天 EL 助手上下文消息", migration_v12),
+    (13, "Token 用量统计事件流水表", migration_v13),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -600,6 +601,31 @@ fn migration_v12(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_friend_messages_ai_context
          ON friend_messages(receiver_user_id, context_user_id, created_at)",
         [],
+    )?;
+    Ok(())
+}
+
+// ── v13：Token 用量统计事件流水表 ───────────────────────────────────────────
+
+fn migration_v13(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS token_usage_events (
+          id                  TEXT PRIMARY KEY,
+          user_id             TEXT NOT NULL,
+          feature             TEXT NOT NULL DEFAULT 'chat',
+          usage_mode          TEXT NOT NULL,
+          model               TEXT,
+          input_tokens        INTEGER NOT NULL DEFAULT 0,
+          cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens       INTEGER NOT NULL DEFAULT 0,
+          reasoning_tokens    INTEGER NOT NULL DEFAULT 0,
+          total_tokens        INTEGER NOT NULL DEFAULT 0,
+          created_at          TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_token_usage_user_date
+          ON token_usage_events(user_id, created_at);
+        "#,
     )?;
     Ok(())
 }
