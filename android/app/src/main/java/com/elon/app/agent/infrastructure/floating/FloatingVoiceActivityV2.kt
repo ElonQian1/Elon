@@ -111,7 +111,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
      */
     private fun initializeConversation() {
         val config = AgentConfigActivity.getAgentConfig(this)
-        Log.i(TAG, "📱 语音模式：${config.voiceMode}")
+        Log.i(TAG, "📱 语音回退顺序：${config.voiceModeOrder.joinToString(\" → \")}")
 
         // 初始化 TTS
         ttsService = AndroidTTSService(this)
