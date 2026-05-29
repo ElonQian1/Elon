@@ -438,40 +438,17 @@ internal class MainSpeechInputActions(
             DebugTraceStore.record("voice_message_record_start_failed", emptyMap())
             return false
         }
-        // 并行启动 ASR：MediaRecorder 录音文件 + SpeechRecognizer 识别原文
+        // MediaRecorder 独占麦克风；SpeechRecognizer 与 MediaRecorder 无法同时录音
+        // （ERROR_CLIENT code=5 / RECOGNIZER_BUSY code=8），因此不再并行启动本地 ASR。
+        // 需要转写时由 finishVoiceMessageRecording 上传到服务器 Whisper 处理。
         voiceMessageTranscription = null
         voiceMessagePartialText = null
-        voiceMessageAsrAllFailed = false
+        voiceMessageAsrAllFailed = true   // 标记需要服务器转写（无本地 ASR）
         // 好友/群聊使用 4 区域模式：发送/取消/转文字/@AI回复
         val overlayMode = if (isFriendChatActive()) VoiceRecordingOverlay.Mode.FRIEND_CHAT else VoiceRecordingOverlay.Mode.AGENT
         val overlay = voiceOverlay?.takeIf { it.mode == overlayMode }
             ?: VoiceRecordingOverlay(activity, overlayMode).also { voiceOverlay = it }
         overlay.show()
-        // 启动 AgentVoiceBridge 多引擎并行 ASR（支持自动引擎切换）
-        runCatching {
-            voiceMessageBridge?.destroy()
-            voiceMessageBridge = AgentVoiceBridge(activity).also { bridge ->
-                bridge.onPartial = { text ->
-                    voiceMessagePartialText = text
-                    voiceOverlay?.updatePartial(text)
-                }
-                bridge.onFinal = { text ->
-                    if (text.isNotBlank()) voiceMessageTranscription = text
-                    voiceOverlay?.updatePartial(text)
-                    DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
-                }
-                bridge.onError = { msg ->
-                    // 所有本地引擎失败：后续由 finishVoiceMessageRecording 上传到服务器
-                    voiceMessageAsrAllFailed = true
-                    DebugTraceStore.record("voice_message_asr_all_failed", mapOf("msg" to msg))
-                }
-                bridge.start()
-            }
-        }.onFailure {
-            DebugTraceStore.record("voice_message_asr_start_failed", mapOf("error" to it.message))
-            voiceMessageBridge?.destroy()
-            voiceMessageBridge = null
-        }
         DebugTraceStore.record("voice_message_record_start", emptyMap())
         // 好友/群聊/频道模式已有浮层提示；清空底层按钮文字，避免透过半透明托盘重复显示。
         voiceHoldButton().text = if (isFriendChatActive()) "" else "松开 AI回复"
