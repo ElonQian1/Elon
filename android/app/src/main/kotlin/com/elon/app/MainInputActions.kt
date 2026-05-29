@@ -196,6 +196,7 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
+            isEmojiKeyboardOverlayActive = { emojiActions.isKeyboardVisibleOverEmojiPanel() },
             requestKeyboardLift = { keyboardInsetsAnimationActions?.requestKeyboardLift() },
             releaseKeyboardLift = { keyboardInsetsAnimationActions?.releaseKeyboardLift() },
             setSuppressInputFocusAnimation = { suppressInputFocusAnimation = it },

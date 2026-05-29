@@ -11,6 +11,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.icu.text.BreakIterator
 import android.net.Uri
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -59,7 +60,14 @@ internal class MainEmojiActions(
     private var customTab: TextView? = null
     private var panelAnimator: ValueAnimator? = null
     private var keyboardVisibleOverEmojiPanel = false
+    private var keyboardOverlayRequestedAt = 0L
     private val panelInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+
+    private enum class EmojiButtonState {
+        CLOSED,
+        PANEL,
+        KEYBOARD_OVER_PANEL
+    }
 
     fun setupEmojiLaunchers() {
         packImportLauncher = activity.registerForActivityResult(
@@ -106,6 +114,18 @@ internal class MainEmojiActions(
         if (isOpen) toggleKeyboardOverEmojiPanel() else expandEmojiPanel()
     }
 
+    fun isKeyboardVisibleOverEmojiPanel(): Boolean {
+        val waitingForKeyboard = SystemClock.uptimeMillis() - keyboardOverlayRequestedAt < KEYBOARD_OVERLAY_GRACE_MS
+        if (keyboardVisibleOverEmojiPanel && !waitingForKeyboard && !isKeyboardVisible()) {
+            keyboardVisibleOverEmojiPanel = false
+            keyboardOverlayRequestedAt = 0L
+            if (isOpen) {
+                updateEmojiButton(EmojiButtonState.PANEL)
+            }
+        }
+        return isOpen && keyboardVisibleOverEmojiPanel
+    }
+
     fun expandEmojiPanel() {
         if (activeConversation().ended) return
         collapseAttachmentPanel()
@@ -113,13 +133,14 @@ internal class MainEmojiActions(
         panelAnimator?.cancel()
         isOpen = true
         keyboardVisibleOverEmojiPanel = false
+        keyboardOverlayRequestedAt = 0L
         panel.visibility = View.VISIBLE
         setPanelHeight(panel, 0)
         panel.alpha = 0f
         panel.translationY = dp(10).toFloat()
         hideKeyboard()
         animateEmojiPanel(panel, expand = true)
-        updateEmojiButton(selected = true)
+        updateEmojiButton(EmojiButtonState.PANEL)
     }
 
     fun collapseEmojiPanel() {
@@ -131,11 +152,12 @@ internal class MainEmojiActions(
         val wasOpen = isOpen || panel.visibility == View.VISIBLE
         if (keyboardVisibleOverEmojiPanel) hideKeyboard()
         keyboardVisibleOverEmojiPanel = false
+        keyboardOverlayRequestedAt = 0L
         setKeyboardOverlayMode(false)
         isOpen = false
         if (wasOpen) {
             animateEmojiPanel(panel, expand = false, matchKeyboardTransition = showKeyboard)
-            updateEmojiButton(selected = false)
+            updateEmojiButton(EmojiButtonState.CLOSED)
         }
     }
 
@@ -567,11 +589,13 @@ internal class MainEmojiActions(
     private fun toggleKeyboardOverEmojiPanel() {
         if (keyboardVisibleOverEmojiPanel && !isKeyboardVisible()) {
             keyboardVisibleOverEmojiPanel = false
+            keyboardOverlayRequestedAt = 0L
         }
         if (keyboardVisibleOverEmojiPanel) {
             hideKeyboard()
             keyboardVisibleOverEmojiPanel = false
-            updateEmojiButton(selected = true)
+            keyboardOverlayRequestedAt = 0L
+            updateEmojiButton(EmojiButtonState.PANEL)
             return
         }
 
@@ -584,12 +608,13 @@ internal class MainEmojiActions(
         panel.alpha = 1f
         panel.translationY = 0f
         binding.inputEdit.requestFocus()
+        keyboardOverlayRequestedAt = SystemClock.uptimeMillis()
         binding.inputEdit.post {
             val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
         }
         keyboardVisibleOverEmojiPanel = true
-        updateEmojiButton(selected = true)
+        updateEmojiButton(EmojiButtonState.KEYBOARD_OVER_PANEL)
     }
 
     private fun isKeyboardVisible(): Boolean {
@@ -602,15 +627,23 @@ internal class MainEmojiActions(
         imm?.hideSoftInputFromWindow(binding.inputEdit.windowToken, 0)
     }
 
-    private fun updateEmojiButton(selected: Boolean) {
+    private fun updateEmojiButton(state: EmojiButtonState) {
         emojiButton()?.let { button ->
             button.animate().cancel()
-            button.setImageResource(if (selected) R.drawable.ic_input_keyboard_circle else R.drawable.ic_input_emoji_circle)
-            button.contentDescription = if (selected) "Show keyboard" else "Open emoji"
+            val active = state != EmojiButtonState.CLOSED
+            val showKeyboardIcon = state == EmojiButtonState.PANEL
+            button.setImageResource(
+                if (showKeyboardIcon) R.drawable.ic_input_keyboard_circle else R.drawable.ic_input_emoji_circle
+            )
+            button.contentDescription = when (state) {
+                EmojiButtonState.CLOSED -> "Open emoji"
+                EmojiButtonState.PANEL -> "Show keyboard"
+                EmojiButtonState.KEYBOARD_OVER_PANEL -> "Hide keyboard"
+            }
             button.animate()
-                .alpha(if (selected) 1f else 0.92f)
-                .scaleX(if (selected) 1.06f else 1f)
-                .scaleY(if (selected) 1.06f else 1f)
+                .alpha(if (active) 1f else 0.92f)
+                .scaleX(if (active) 1.06f else 1f)
+                .scaleY(if (active) 1.06f else 1f)
                 .setDuration(160L)
                 .setInterpolator(panelInterpolator)
                 .start()
@@ -631,6 +664,7 @@ internal class MainEmojiActions(
         private const val EMOJI_PANEL_HEIGHT_DP = 268
         private const val BUILT_IN_COLUMNS = 8
         private const val CUSTOM_COLUMNS = 4
+        private const val KEYBOARD_OVERLAY_GRACE_MS = 700L
         private const val MAX_CUSTOM_EMOJI_IMPORT = 20
         private val BUILT_IN_EMOJIS = listOf(
             "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣",
