@@ -327,6 +327,7 @@ private class VoiceActionTrayView(
 
     private fun drawHighlight(canvas: Canvas, width: Float, density: Float) {
         val actionCenterY = ACTION_OPTION_CENTER_Y_DP * density
+        val aiReplyCenterY = AI_REPLY_OPTION_CENTER_Y_DP * density
         val sendCenterY = SEND_OPTION_CENTER_Y_DP * density
         val cx = when (zone) {
             VoiceRecordingOverlay.Zone.CANCEL -> width * 0.19f
@@ -336,6 +337,7 @@ private class VoiceActionTrayView(
         }
         val cy = when {
             zone == VoiceRecordingOverlay.Zone.SEND -> sendCenterY
+            zone == VoiceRecordingOverlay.Zone.AI_REPLY -> aiReplyCenterY
             else -> actionCenterY
         }
         val radius = if (zone == VoiceRecordingOverlay.Zone.SEND) 48f * density else 38f * density
@@ -344,6 +346,7 @@ private class VoiceActionTrayView(
 
     private fun drawLabels(canvas: Canvas, width: Float, density: Float) {
         val actionCenterY = ACTION_OPTION_CENTER_Y_DP * density
+        val aiReplyCenterY = AI_REPLY_OPTION_CENTER_Y_DP * density
         val sendCenterY = SEND_OPTION_CENTER_Y_DP * density
         drawRotatedOption(
             canvas,
@@ -355,10 +358,10 @@ private class VoiceActionTrayView(
         )
 
         if (mode == VoiceRecordingOverlay.Mode.AGENT) {
-            drawOption(canvas, "AI回复", width * 0.50f, actionCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "AI回复", width * 0.50f, aiReplyCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
         } else {
             // FRIEND_CHAT: AI回复 在上方中央，"发 送" 在下方默认区域
-            drawOption(canvas, "AI回复", width * 0.50f, actionCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
+            drawOption(canvas, "AI回复", width * 0.50f, aiReplyCenterY, zone == VoiceRecordingOverlay.Zone.AI_REPLY)
             drawOption(canvas, "发 送", width * 0.50f, sendCenterY, zone == VoiceRecordingOverlay.Zone.SEND)
         }
 
@@ -400,6 +403,7 @@ private class VoiceActionTrayView(
 
     private companion object {
         const val ACTION_OPTION_CENTER_Y_DP = 78f
+        const val AI_REPLY_OPTION_CENTER_Y_DP = 58f
         const val SEND_OPTION_CENTER_Y_DP = 154f
     }
 }
