@@ -77,8 +77,44 @@ pub(crate) fn api_agent_name<'a>(
     agent_name.filter(|name| !is_local_cli_option(state, name) && !is_api_backend_alias(name))
 }
 
-pub(crate) fn cli_option_id(agent_name: Option<&str>) -> Option<&str> {
-    agent_name.filter(|name| !is_cli_alias(name))
+pub(crate) fn resolve_cli_option_id(state: &Arc<AppState>, agent_name: Option<&str>) -> Option<String> {
+    let name = agent_name.map(str::trim).filter(|name| !name.is_empty())?;
+
+    if is_local_default_alias(name) {
+        return None;
+    }
+
+    if let Some(opt) = state
+        .ai_cli
+        .options
+        .iter()
+        .find(|opt| opt.id.eq_ignore_ascii_case(name))
+    {
+        return Some(opt.id.clone());
+    }
+
+    if is_codex_alias(name) {
+        return state
+            .ai_cli
+            .options
+            .iter()
+            .find(|opt| opt.provider.eq_ignore_ascii_case("codex") || opt.id.to_ascii_lowercase().contains("codex"))
+            .map(|opt| opt.id.clone());
+    }
+
+    if is_copilot_alias(name) {
+        return state
+            .ai_cli
+            .options
+            .iter()
+            .find(|opt| {
+                opt.provider.eq_ignore_ascii_case("copilot")
+                    || opt.id.to_ascii_lowercase().contains("copilot")
+            })
+            .map(|opt| opt.id.clone());
+    }
+
+    None
 }
 
 pub(crate) fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
@@ -86,9 +122,27 @@ pub(crate) fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
 }
 
 fn is_cli_alias(name: &str) -> bool {
+    is_local_default_alias(name) || is_codex_alias(name) || is_copilot_alias(name)
+}
+
+fn is_local_default_alias(name: &str) -> bool {
     matches!(
         name.trim().to_ascii_lowercase().as_str(),
-        "codex" | "codex_cli" | "cli" | "local" | "local_cli"
+        "cli" | "local" | "local_cli"
+    )
+}
+
+fn is_codex_alias(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "codex" | "codex_cli"
+    )
+}
+
+fn is_copilot_alias(name: &str) -> bool {
+    matches!(
+        name.trim().to_ascii_lowercase().as_str(),
+        "copilot" | "copilot_cli"
     )
 }
 

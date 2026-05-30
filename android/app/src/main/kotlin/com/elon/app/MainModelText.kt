@@ -7,22 +7,42 @@ internal fun modelLabel(name: String, model: String): String {
 }
 
 internal fun displayModelLabel(provider: String, model: String, rawLabel: String): String {
-    val modelName = model.trim()
-    if (modelName.isNotBlank() && !modelName.equals("default", ignoreCase = true)) {
-        return friendlyModelName(modelName)
+    val raw = rawLabel.trim()
+    if (raw.isNotBlank()) {
+        return cleanModelLabel(raw)
     }
-    return cleanModelLabel(rawLabel.ifBlank { modelLabel(provider, model) })
+
+    val modelName = model.trim()
+    val providerLabel = providerDisplayName(provider)
+    if (modelName.isNotBlank() && !modelName.equals("default", ignoreCase = true)) {
+        return "$providerLabel / ${friendlyModelName(modelName)}"
+    }
+    return providerLabel
 }
 
 internal fun cleanModelLabel(label: String): String {
-    val withoutCopilot = label.trim().replace(Regex("^copilot\\s*/\\s*", RegexOption.IGNORE_CASE), "")
-    val bracket = Regex("\\[([^\\]]+)\\]\\s*$").find(withoutCopilot)
-    if (bracket != null) return friendlyModelName(bracket.groupValues[1].trim())
-    if (withoutCopilot.contains("/")) {
-        val tail = withoutCopilot.substringAfterLast("/").trim()
-        if (tail.isNotBlank()) return friendlyModelName(tail)
+    val raw = label.trim()
+    if (raw.isBlank()) return raw
+    val normalized = raw
+        .replace(Regex("^copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
+        .replace(Regex("^github\\s*copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
+        .replace(Regex("^codex\\b", RegexOption.IGNORE_CASE), "Codex版")
+    if (normalized.contains("/")) {
+        val provider = normalized.substringBefore("/").trim()
+        val model = normalized.substringAfter("/").trim()
+        if (provider.isNotBlank() && model.isNotBlank()) {
+            return "$provider / ${friendlyModelName(model)}"
+        }
     }
-    return friendlyModelName(withoutCopilot)
+    return normalized
+}
+
+private fun providerDisplayName(provider: String): String {
+    return when (provider.trim().lowercase(Locale.US)) {
+        "copilot" -> "GitHub版"
+        "codex" -> "Codex版"
+        else -> provider.trim().ifBlank { "本地模型" }
+    }
 }
 
 internal fun friendlyModelName(model: String): String {
@@ -46,7 +66,8 @@ internal fun friendlyModelName(model: String): String {
 internal fun shortModelLabel(label: String): String {
     val m = cleanModelLabel(label)
     return when {
-        m.startsWith("Codex", ignoreCase = true) -> "Codex"
+        m.startsWith("Codex版", ignoreCase = true) -> "Codex"
+        m.startsWith("GitHub版", ignoreCase = true) -> "GitHub"
         m.startsWith("服务器默认") -> "默认"
         m.startsWith("自定义") -> "自定"
         m.startsWith("GPT") -> m.replace(" ", "").take(6)

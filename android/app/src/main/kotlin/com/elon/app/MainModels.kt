@@ -64,7 +64,8 @@ internal fun AppProject.markPersonalDevelopment() {
 
 data class ModelOption(
     val label: String,
-    val agentName: String?
+    val agentName: String?,
+    val provider: String = ""
 )
 
 data class ConversationTaskState(

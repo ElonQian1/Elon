@@ -99,16 +99,16 @@ internal class MainModelActions(
 
                 val config = json.optJSONObject("config") ?: JSONObject()
                 val agents = json.optJSONArray("available_agents") ?: JSONArray()
-                val options = mutableListOf(ModelOption("服务器默认", null))
+                val options = mutableListOf(ModelOption("服务器默认", null, ""))
 
                 for (i in 0 until agents.length()) {
                     val item = agents.getJSONObject(i)
                     val name = item.optString("name", "")
                     val model = item.optString("model", "")
-                    val provider = item.optString("provider", name)
+                    val provider = item.optString("provider", "")
                     val label = displayModelLabel(provider, model, item.optString("label", ""))
                     if (name.isNotBlank()) {
-                        options.add(ModelOption(label, name))
+                        options.add(ModelOption(label, name, provider))
                     }
                 }
 
@@ -198,15 +198,51 @@ internal class MainModelActions(
         modelPopup?.takeIf { it.isShowing }?.dismiss()
         modelPopup = null
 
-        val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName)) }
+        val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName, "")) }
         val showCustomRow = !codexCliOnly
-        val rowCount = selectableOptions.size + if (showCustomRow) 1 else 0
+
+        // ── 构建带分组信息的行项目（section header + option rows）──────────────────
+        val items = mutableListOf<PopupRowItem>()
+        // "服务器默认" 不分组，直接排最前
+        selectableOptions.filter { it.agentName == null }.forEach { items.add(PopupRowItem.Option(it)) }
+        // 其余按 provider 分组
+        val grouped = selectableOptions
+            .filter { it.agentName != null }
+            .groupByTo(linkedMapOf()) { opt ->
+                when (opt.provider.trim().lowercase()) {
+                    "codex" -> "Codex版"
+                    "copilot" -> "GitHub版"
+                    else -> opt.provider.ifBlank { "其他" }
+                }
+            }
+        grouped.forEach { (header, opts) ->
+            if (opts.isNotEmpty()) {
+                items.add(PopupRowItem.Header(header))
+                opts.forEach { items.add(PopupRowItem.Option(it)) }
+            }
+        }
+
+        val headerHeight = dp(28)
+        val rowHeight = dp(44)
         val popupWidth = dp(176)
         val arrowHeight = dp(8)
-        val rowHeight = dp(40)
-        val dividerCount = (rowCount - 1).coerceAtLeast(0)
-        val panelHeight = (rowHeight * rowCount.coerceAtLeast(1) + dividerCount).coerceAtMost(dp(264))
+
+        // 计算总高度（header 行更矮）
+        var contentHeight = 0
+        var dividerCount = 0
+        items.forEachIndexed { idx, item ->
+            contentHeight += if (item is PopupRowItem.Header) headerHeight else rowHeight
+            // header 上方不加 divider；option 与下一个 option 之间加 divider
+            val next = items.getOrNull(idx + 1)
+            if (item is PopupRowItem.Option && next is PopupRowItem.Option) dividerCount++
+        }
+        if (showCustomRow) {
+            if (items.isNotEmpty()) dividerCount++
+            contentHeight += rowHeight
+        }
+        val panelHeight = (contentHeight + dividerCount).coerceAtMost(dp(380))
         val totalHeight = panelHeight + arrowHeight
+
         val root = FrameLayout(activity).apply {
             layoutParams = ViewGroup.LayoutParams(popupWidth, totalHeight)
             alpha = 0f
@@ -216,31 +252,45 @@ internal class MainModelActions(
 
         val panel = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
+        }
+        val scroll = android.widget.ScrollView(activity).apply {
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
             background = GradientDrawable().apply {
                 cornerRadius = dp(10).toFloat()
                 setColor(Color.parseColor(WECHAT_POPUP_PANEL_COLOR))
             }
         }
-        root.addView(panel, FrameLayout.LayoutParams(
+        scroll.addView(panel)
+        root.addView(scroll, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             panelHeight
         ))
 
-        selectableOptions.forEachIndexed { index, option ->
-            panel.addView(createModelPopupRow(option.label, isModelOptionSelected(option)) {
-                dismissModelPopup(animate = false)
-                if (codexCliOnly) {
-                    Toast.makeText(activity, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
-                } else {
-                    saveModelSelection(option)
+        items.forEachIndexed { idx, item ->
+            when (item) {
+                is PopupRowItem.Header -> {
+                    panel.addView(createSectionHeaderView(item.title))
                 }
-            })
-            if (index < selectableOptions.lastIndex || showCustomRow) {
-                panel.addView(createPopupDivider(marginStart = dp(16)))
+                is PopupRowItem.Option -> {
+                    panel.addView(createModelPopupRow(item.option.label, isModelOptionSelected(item.option)) {
+                        dismissModelPopup(animate = false)
+                        if (codexCliOnly) {
+                            Toast.makeText(activity, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+                        } else {
+                            saveModelSelection(item.option)
+                        }
+                    })
+                    val next = items.getOrNull(idx + 1)
+                    if (next is PopupRowItem.Option) {
+                        panel.addView(createPopupDivider(marginStart = dp(16)))
+                    }
+                }
             }
         }
 
         if (showCustomRow) {
+            if (items.isNotEmpty()) panel.addView(createPopupDivider(marginStart = dp(16)))
             panel.addView(createModelPopupRow("自定义模型", currentModelLabel.startsWith("自定义")) {
                 dismissModelPopup(animate = false)
                 openSettings()
@@ -358,6 +408,21 @@ internal class MainModelActions(
     private fun isModelOptionSelected(option: ModelOption): Boolean {
         if (currentModelLabel == option.label) return true
         return selectedAgentName == option.agentName && !currentModelLabel.startsWith("自定义")
+    }
+
+    private fun createSectionHeaderView(title: String): View {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(28)
+            )
+            setPadding(dp(18), 0, dp(14), 0)
+            gravity = Gravity.CENTER_VERTICAL
+            text = title
+            setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+            alpha = 0.5f
+            textSize = 11f
+        }
     }
 
     private fun createModelPopupRow(title: String, selected: Boolean, action: () -> Unit): View {
@@ -484,4 +549,9 @@ internal class MainModelActions(
         const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
         const val MODEL_POPUP_REOPEN_SUPPRESS_MS = 260L
     }
+}
+
+private sealed class PopupRowItem {
+    data class Header(val title: String) : PopupRowItem()
+    data class Option(val option: ModelOption) : PopupRowItem()
 }

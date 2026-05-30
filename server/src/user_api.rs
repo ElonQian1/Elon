@@ -229,7 +229,7 @@ fn is_cli_selection(state: &AppState, name: &str) -> bool {
 fn is_cli_alias(name: &str) -> bool {
     matches!(
         name.trim().to_ascii_lowercase().as_str(),
-        "codex" | "codex_cli" | "cli" | "local" | "local_cli"
+        "codex" | "codex_cli" | "copilot" | "copilot_cli" | "cli" | "local" | "local_cli"
     )
 }
 
@@ -240,7 +240,11 @@ fn agent_display_meta(name: &str, model: &str) -> (String, String) {
     if let Some(model_id) = name.strip_prefix("copilot:") {
         (
             "copilot".to_string(),
-            copilot_model_friendly_name(model_id).to_string(),
+            format!(
+                "{} / {}",
+                cli_provider_display_name("copilot"),
+                copilot_model_friendly_name(model_id)
+            ),
         )
     } else {
         (name.to_string(), direct_model_label(model, name))
@@ -251,8 +255,18 @@ fn cli_option_display_label(option: &AiCliOption) -> String {
     option
         .model
         .as_deref()
-        .map(|model| direct_model_label(model, &option.label))
-        .unwrap_or_else(|| strip_provider_prefix(&option.label))
+        .map(|model| model.trim())
+        .filter(|model| !model.is_empty() && !model.eq_ignore_ascii_case("default"))
+        .map(|model| copilot_model_friendly_name(model).to_string())
+        .unwrap_or_else(|| cli_provider_display_name(&option.provider).to_string())
+}
+
+fn cli_provider_display_name(provider: &str) -> &str {
+    match provider.trim().to_ascii_lowercase().as_str() {
+        "copilot" => "GitHub版",
+        "codex" => "Codex版",
+        _ => provider,
+    }
 }
 
 fn direct_model_label(model: &str, fallback: &str) -> String {
@@ -373,10 +387,10 @@ mod tests {
     use crate::types::CliPromptMode;
 
     #[test]
-    fn copilot_agent_label_shows_model_only() {
+    fn copilot_agent_label_shows_provider_and_model() {
         let (provider, label) = agent_display_meta("copilot:gpt-4o", "gpt-4o");
         assert_eq!(provider, "copilot");
-        assert_eq!(label, "GPT-4o");
+        assert_eq!(label, "GitHub版 / GPT-4o");
     }
 
     #[test]
@@ -387,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn cli_label_strips_legacy_provider_prefix() {
+    fn cli_label_keeps_provider_identity() {
         let option = AiCliOption {
             id: "codex:gpt-5".into(),
             label: "Codex CLI / gpt-5".into(),

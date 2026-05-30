@@ -63,12 +63,16 @@ $env:AI_BACKEND      = "local_cli"
 $env:RUST_LOG        = "info,elon_server=debug"
 $env:LOCAL_SERVER_PORT = $Port
 
-# ── AI CLI 优先级：Copilot CLI → 回退 Codex CLI ──────────────────────────────
+# ── AI CLI 优先级：Codex CLI → 回退 Copilot CLI ──────────────────────────────
 $env:AI_CODEX_CLI_ONLY     = "false"         # 同时加载 copilot + codex 两个选项
 $env:COPILOT_CLI_ENABLED   = "true"
 $env:COPILOT_CLI_ARGS      = "--allow-all-tools --allow-all-paths -p"  # 非交互模式
-$env:AI_CLI_DEFAULT        = "copilot_cli"   # 优先使用 Copilot CLI
-$env:AI_CLI_FALLBACK       = "codex_cli"     # Copilot 失败时回退到 Codex CLI
+# Copilot CLI 可选模型列表（逗号分隔）
+$env:COPILOT_CLI_MODELS    = "gpt-4.5-preview,gpt-4o,gpt-4.1,claude-sonnet-4-5"
+# Codex CLI 可选模型列表（逗号分隔）
+$env:CODEX_CLI_MODELS      = "gpt-4.5-preview,o4-mini,o3-mini"
+$env:AI_CLI_DEFAULT        = "codex:gpt-4.5-preview"   # 默认 Codex CLI + GPT-4.5
+$env:AI_CLI_FALLBACK       = "copilot:gpt-4o"           # Codex 失败时回退 Copilot GPT-4o
 
 # PC → 云端 agent 反向代理配置（让 APK 通过 /api/pc-relay/{agent_id}/... 访问本机）
 $cloudWs = "ws://43.139.149.158:8080/agent/ws"

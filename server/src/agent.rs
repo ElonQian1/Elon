@@ -11,7 +11,8 @@ use crate::{
         is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
-        api_agent_name, choose_backend, cli_option_id, has_api_agents, is_local_cli_option,
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option,
+        resolve_cli_option_id,
     },
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
@@ -322,7 +323,14 @@ async fn run_backend_with_workspace(
 
     match backend {
         AiBackend::LocalCli => {
-            let primary_option = cli_option_id(agent_name);
+            let preferred_local_agent = agent_name.or_else(|| {
+                user_config
+                    .as_ref()
+                    .and_then(|cfg| cfg.use_agent.as_deref())
+                    .filter(|name| is_local_cli_option(state, name))
+            });
+            let primary_option_owned = resolve_cli_option_id(state, preferred_local_agent);
+            let primary_option = primary_option_owned.as_deref();
             let cli_result = ai_cli::run_with_workspace(
                 user_id,
                 workspace,
