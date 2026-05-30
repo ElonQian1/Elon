@@ -260,8 +260,6 @@ fn resolve_cli_program(cli: &str) -> String {
         {
             let mut candidates = Vec::new();
             if let Ok(appdata) = std::env::var("APPDATA") {
-                candidates.push(format!(r"{}\npm\copilot.cmd", appdata));
-                candidates.push(format!(r"{}\npm\copilot", appdata));
                 candidates.push(format!(
                     r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot.bat",
                     appdata
@@ -270,6 +268,8 @@ fn resolve_cli_program(cli: &str) -> String {
                     r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot",
                     appdata
                 ));
+                candidates.push(format!(r"{}\npm\copilot.cmd", appdata));
+                candidates.push(format!(r"{}\npm\copilot", appdata));
             }
             for p in candidates {
                 if Path::new(&p).exists() {
@@ -295,7 +295,23 @@ async fn run_cli_and_stream(
     if program != cli {
         info!("[relay-client] cli={} 使用可执行路径: {}", cli, program);
     }
-    let mut cmd = Command::new(&program);
+    #[cfg(windows)]
+    let is_batch = {
+        let p = program.to_ascii_lowercase();
+        p.ends_with(".cmd") || p.ends_with(".bat")
+    };
+
+    #[cfg(not(windows))]
+    let is_batch = false;
+
+    let mut cmd = if is_batch {
+        // .cmd/.bat 通过 cmd /C 执行，避免 CreateProcess 直接调用批处理导致参数异常。
+        let mut c = Command::new("cmd");
+        c.arg("/C").arg(&program);
+        c
+    } else {
+        Command::new(&program)
+    };
     for arg in extra_args {
         cmd.arg(arg);
     }
