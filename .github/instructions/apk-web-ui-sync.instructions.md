@@ -95,6 +95,25 @@ APK 新增了 AlertDialog 或 BottomSheetDialog：
 APK 修改 `colors.xml` 或 `themes.xml`：
 - 同步修改 `web_page.html` `<style>` 头部的 `:root { }` CSS 变量
 
+### 7. 新增底部 UI 元素（底部栏、输入栏、按钮行等）
+
+**所有位于底部的 UI 元素**（Tab 栏、输入栏、浮动按钮行等），网页端必须加 iOS 安全区域 padding：
+
+```css
+/* Tab 栏 / 底部导航 */
+.tabs-bar {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 输入栏（兼顾原有内边距和安全区域，取较大值）*/
+.input-bar {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+```
+
+原因：iOS 全面屏手机在 PWA / Safari 全屏模式下，Home 条会遮挡页面底部。
+不加此规则会导致底部按钮在 iPhone 上被系统 Home 条遮住。
+
 ---
 
 ## ❌ 以下 APK 功能无需在网页实现
@@ -120,6 +139,7 @@ AI 代理不要尝试在网页端"模拟"以下原生能力，标注说明即可
 - [ ] 颜色/主题改动 → 网页 `:root` CSS 变量已同步
 - [ ] 新增设置项 → 网页"我的"页已同步
 - [ ] 新增对话框 → 网页 `.modal-mask` 已同步
+- [ ] **新增底部 UI 元素 → 已加 `padding-bottom: env(safe-area-inset-bottom)`（iOS 安全区域）**
 - [ ] 同一 commit 包含 APK 和网页两侧的修改
 
 ---
