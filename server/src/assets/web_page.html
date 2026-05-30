@@ -291,14 +291,41 @@
     }
 
     /* ===== 我的页 ===== */
-    .profile-header {
+    /* 用户卡片（头像 + 昵称 + 账号，对齐 APK activity_settings.xml 顶部） */
+    .profile-user-card {
       background: var(--panel-2);
-      padding: 22px;
-      color: var(--ink);
-      font-size: 15px;
-      line-height: 1.75;
-      min-height: 112px;
-      white-space: pre-wrap;
+      padding: 22px 22px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .profile-avatar {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1a3a2a, #47c484);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      color: #fff;
+      flex-shrink: 0;
+      font-weight: 500;
+      user-select: none;
+    }
+    .profile-user-info { flex: 1; min-width: 0; }
+    .profile-nickname {
+      font-size: 18px;
+      color: var(--ink-strong);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .profile-account {
+      font-size: 13px;
+      color: var(--ink-faint);
+      margin-top: 5px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .profile-workspace-hint {
+      font-size: 12px;
+      color: var(--ink-dim);
+      margin-top: 3px;
     }
     .profile-row {
       min-height: 64px;
@@ -651,7 +678,14 @@
 
     <!-- 我的页 -->
     <div id="profilePage" class="page">
-      <div class="profile-header" id="userInfoText">我的开发工作台</div>
+      <div class="profile-user-card">
+        <div class="profile-avatar" id="profileAvatar">龙</div>
+        <div class="profile-user-info">
+          <div class="profile-nickname" id="profileNickname">加载中…</div>
+          <div class="profile-account" id="profileAccount"></div>
+          <div class="profile-workspace-hint">云端工作区已就绪</div>
+        </div>
+      </div>
 
       <!-- APK 推广下载块 -->
       <div class="apk-promo">
@@ -740,6 +774,17 @@
   </form>
 </div>
 
+<!-- ============ 进度记录对话框 ============ -->
+<div class="modal-mask" id="progressLogMask">
+  <div class="modal" style="max-height:72vh;display:flex;flex-direction:column;gap:12px">
+    <h2>进度记录</h2>
+    <div id="progressLogContent" style="flex:1;overflow-y:auto;font-size:13px;color:var(--ink-soft);line-height:1.75;white-space:pre-wrap;min-height:80px;max-height:50vh">暂无记录</div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="closeProgressLogBtn">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ AI 代理设置对话框 ============ -->
 <div class="modal-mask" id="agentMask">
   <form class="modal" id="agentForm">
@@ -794,7 +839,9 @@
   const projectRecordBtn = $('projectRecordBtn');
   const projectSettingsBtn = $('projectSettingsBtn');
 
-  const userInfoText = $('userInfoText');
+  const profileAvatar = $('profileAvatar');
+  const profileNickname = $('profileNickname');
+  const profileAccount = $('profileAccount');
   const versionText = $('versionText');
   const aiSettingsRow = $('aiSettingsRow');
   const checkUpdateRow = $('checkUpdateRow');
@@ -823,6 +870,10 @@
   const agentError = $('agentError');
   const cancelAgentBtn = $('cancelAgentBtn');
 
+  const progressLogMask = $('progressLogMask');
+  const progressLogContent = $('progressLogContent');
+  const closeProgressLogBtn = $('closeProgressLogBtn');
+
   const downloadApkBtn = $('downloadApkBtn');
   const copyLinkBtn = $('copyLinkBtn');
   const downloadLinkBox = $('downloadLinkBox');
@@ -838,6 +889,7 @@
   let currentTab = 'chatPage';
   let socket = null;
   let busy = false;
+  let progressLog = [];
   let selectedAgent = '';
   let agentOptions = [];
   let agentSelectionInitialized = false;
@@ -982,6 +1034,7 @@
     // 退出当前项目，回到会话列表
     if (socket) { try { socket.close(); } catch {} socket = null; }
     currentProject = null;
+    progressLog = [];
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
@@ -1023,6 +1076,7 @@
 
   function selectProject(project) {
     currentProject = project;
+    progressLog = [];
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
     chatList.innerHTML = '';
@@ -1101,8 +1155,11 @@
     socket.addEventListener('message', (ev) => {
       try {
         const data = JSON.parse(ev.data);
-        if (data.type === 'progress') appendBubble('progress', data.message || '');
-        else if (data.type === 'tool_call') appendBubble('progress', '工具：' + (data.tool || ''));
+        if (data.type === 'progress') {
+          const msg = data.message || '';
+          progressLog.push(msg);
+          appendBubble('progress', msg);
+        } else if (data.type === 'tool_call') appendBubble('progress', '工具：' + (data.tool || ''));
         else if (data.type === 'tool_result') appendBubble('progress', (data.tool || 'tool') + '\n' + (data.result || ''));
         else if (data.type === 'done') {
           setBusy(false);
@@ -1162,15 +1219,11 @@
     if (!res.ok) throw new Error('加载用户信息失败：HTTP ' + res.status);
     const data = await res.json();
     currentUser = data.user;
-    const name = currentUser.nickname || currentUser.account || '';
+    const name = currentUser.nickname || currentUser.account || '用户';
     const account = currentUser.account || '';
-    const tail = (account && account !== name) ? ' · ' + account : '';
-    const lines = [
-      '我的开发工作台',
-      '登录账号：' + name + tail,
-      '云端工作区已就绪，可在网页版和其它手机间同步。'
-    ];
-    userInfoText.textContent = lines.join('\n');
+    profileNickname.textContent = name;
+    profileAccount.textContent = (account && account !== name) ? '账号：' + account : '';
+    profileAvatar.textContent = name.charAt(0).toUpperCase();
   }
   async function loadProjects() {
     const res = await api('/api/me/projects');
@@ -1483,7 +1536,18 @@
     switchTab('chatPage');
     setBusy(true);
   });
-  projectRecordBtn.addEventListener('click', () => switchTab('chatPage'));
+  projectRecordBtn.addEventListener('click', () => {
+    if (!progressLog.length) {
+      progressLogContent.textContent = '暂无进度记录。\n开始开发后，AI 每一步执行状态都会记录在这里。';
+    } else {
+      progressLogContent.textContent = progressLog
+        .map((m, i) => '【步骤 ' + (i + 1) + '】\n' + m)
+        .join('\n\n');
+    }
+    progressLogMask.classList.add('active');
+  });
+  closeProgressLogBtn.addEventListener('click', () => progressLogMask.classList.remove('active'));
+  progressLogMask.addEventListener('click', (e) => { if (e.target === progressLogMask) progressLogMask.classList.remove('active'); });
   projectSettingsBtn.addEventListener('click', openAgentDialog);
 
   // ====== 启动 ======
