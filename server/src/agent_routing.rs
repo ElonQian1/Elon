@@ -19,36 +19,23 @@ pub(crate) fn choose_backend(
     state: &Arc<AppState>,
     user_config: Option<&UserAgentConfig>,
     agent_name: Option<&str>,
-    route: CapabilityRoute,
+    _route: CapabilityRoute,
 ) -> AiBackend {
+    // 锁定 Codex CLI → 所有请求全走 CLI
     if state.ai_cli.codex_cli_only {
         return AiBackend::LocalCli;
     }
 
-    if route == CapabilityRoute::ChatAgent {
-        // 普通对话路由始终走 API 后端，避免 Codex CLI 冷启动（6-20 秒）拖慢聊天体验。
-        // CLI 只负责代码任务（CodeAgent 路由）。
-        return AiBackend::Api;
-    }
-
-    if state.ai_cli.enabled {
-        return AiBackend::LocalCli;
-    }
-
+    // ── 调用方或用户显式指定了 agent → 优先遵从，无视路由 ──
     if let Some(name) = agent_name {
         if is_local_cli_option(state, name) {
             return AiBackend::LocalCli;
         }
-        if is_api_backend_alias(name) {
-            return AiBackend::Api;
-        }
+        // 其他名字（API agent name 或 "api"/"remote" 别名）→ Api
         return AiBackend::Api;
     }
 
-    if route == CapabilityRoute::CodeAgent && state.ai_cli.enabled {
-        return AiBackend::LocalCli;
-    }
-
+    // ── 用户有保存的偏好 → 遵从 ──
     if let Some(cfg) = user_config {
         if cfg.has_config() {
             if cfg
@@ -63,11 +50,14 @@ pub(crate) fn choose_backend(
         }
     }
 
-    if state.default_backend == AiBackend::LocalCli && state.ai_cli.enabled {
-        AiBackend::LocalCli
-    } else {
-        AiBackend::Api
+    // ── 无显式偏好：CLI 可用时项目会话全部走 CLI ──
+    // 本机 PC agent 连线优先（run_with_workspace 内部处理），其次服务器 Copilot CLI。
+    // CLI 不可用时才退回 API。
+    if state.ai_cli.enabled {
+        return AiBackend::LocalCli;
     }
+
+    AiBackend::Api
 }
 
 pub(crate) fn api_agent_name<'a>(
