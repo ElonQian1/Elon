@@ -97,6 +97,12 @@ class ElonWsClient(
         connected.set(false)
         ws?.close(1000, "用户关闭")
         ws = null
+        shutdownOkHttp()
+    }
+
+    private fun shutdownOkHttp() {
+        runCatching { client.dispatcher.executorService.shutdown() }
+        runCatching { client.connectionPool.evictAll() }
     }
 
     private fun traceIdFromPayload(message: String): String? {

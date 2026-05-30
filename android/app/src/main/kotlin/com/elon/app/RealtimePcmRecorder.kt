@@ -80,7 +80,14 @@ internal class RealtimePcmRecorder(
             try {
                 while (isRecording) {
                     val read = recorder.read(frame, 0, frame.size)
-                    if (read <= 0) continue
+                    if (read <= 0) {
+                        // 防止 CPU 紧循环：硬件瞬时错误或音频资源竞争时 read() 立即返回
+                        // 负数：AudioRecord.ERROR / ERROR_INVALID_OPERATION / ERROR_BAD_VALUE
+                        // 0：极少情况下的空返回
+                        if (read < 0) Log.w(TAG, "recorder.read 错误码: $read（可能是音频资源被抢占）")
+                        kotlinx.coroutines.delay(5L)
+                        continue
+                    }
                     if (read == frame.size) {
                         onChunk(frame.copyOf())
                     } else {
