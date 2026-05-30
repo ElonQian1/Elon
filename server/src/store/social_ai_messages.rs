@@ -72,13 +72,13 @@ impl Store {
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
                     m.content
              FROM friend_group_messages m
-             JOIN users u ON u.id = m.sender_user_id
+             LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
              ORDER BY m.created_at DESC
              LIMIT ?2",
         )?;
         let mut messages = stmt
-            .query_map(params![group_id, limit.clamp(1, 30)], |row| {
+            .query_map(params![group_id, limit.clamp(1, 60)], |row| {
                 let sender_user_id: String = row.get(0)?;
                 let sender_name: String = row.get(1)?;
                 Ok(history_message_from_row(

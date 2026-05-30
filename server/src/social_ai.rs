@@ -186,7 +186,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
     let history = state
         .store
-        .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
+        .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
     // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接（群聊暂只发文字，无桥接卡片）
     let reply = if is_development_intent(&history).is_some() {
         DEVELOPMENT_REDIRECT_REPLY.to_string()

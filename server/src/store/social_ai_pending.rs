@@ -60,19 +60,18 @@ impl Store {
             "SELECT candidate.id, candidate.content
              FROM friend_group_messages candidate
              WHERE candidate.group_id = ?1
-               AND candidate.sender_user_id = ?2
                AND LOWER(REPLACE(candidate.content, '＠', '@')) LIKE '%@el%'
                AND NOT EXISTS (
                    SELECT 1
                    FROM friend_group_messages ai
                    WHERE ai.group_id = ?1
-                     AND ai.sender_user_id = ?3
+                     AND ai.sender_user_id = ?2
                      AND ai.created_at > candidate.created_at
                    LIMIT 1
                )
              ORDER BY candidate.created_at DESC
              LIMIT 1",
-            params![group_id, user_id, SOCIAL_AI_USER_ID],
+            params![group_id, SOCIAL_AI_USER_ID],
             |row| {
                 Ok(SocialAiPendingMention {
                     trigger_message_id: row.get(0)?,

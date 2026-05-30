@@ -120,7 +120,7 @@ async fn reply_to_selected_group_message(
     let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
     let history = state
         .store
-        .list_recent_group_messages_for_social_ai(&user_id, &group_id, 18)?;
+        .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
     let reply = selected_reply_or_fallback(&state, &user_id, "群聊", &history, &selected).await;
     let message = state
         .store
