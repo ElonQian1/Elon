@@ -56,6 +56,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **任务完成后清理 worktree**：push 并同步主工作区后，运行 `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply`（Linux：`bash scripts/cleanup-task-worktrees.sh --apply`）回收已合并的 task worktree。脚本只删"已合并到 origin/main + 工作树干净"的，绝对安全；带未提交改动的会被自动保留
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
+- **APK UI ↔ 网页 UI 同步**：改动 APK 任何 layout XML、Toolbar、Tab、气泡、颜色主题时，必须在同一 commit 同步更新 `server/src/assets/web_page.html`。对照规则见 `.github/instructions/apk-web-ui-sync.instructions.md`
 - **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
 - **Android 新功能必须发布 APK**，不能只停在 PR、Debug 包或本地验证
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
@@ -95,6 +96,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 | 文档 | 内容 |
 |---|---|
 | `.github/instructions/modular-architecture.instructions.md` | 模块化、巨型文件治理、多 AI 并行拆分边界 |
+| `.github/instructions/apk-web-ui-sync.instructions.md` | APK UI 改动时必须同步更新网页端的对照规则和检查清单 |
 | `docs/system-architecture.md` | 系统架构详细设计、组件交互、数据流 |
 | `docs/ai-agent-workflow.md` | AI代理如何执行代码修改→编译→部署的完整流程 |
 | `docs/android-setup.md` | Android 新机器首次配置：Gradle 测速、缓存修复、全局镜像 |
