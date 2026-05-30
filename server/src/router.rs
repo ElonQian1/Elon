@@ -295,6 +295,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/_test_dispatch",
             post(crate::homecli_agent::test_dispatch),
         )
+        .route(
+            "/api/_test_cli_prompt",
+            post(crate::homecli_agent::test_cli_prompt),
+        )
         // ── PC 本地 server 反向代理中继（Symmetric NAT 穿透）────────
         // APK 通过 /api/pc-relay/{agent_id}/... 访问 PC 本机 HTTP 服务
         .route(
