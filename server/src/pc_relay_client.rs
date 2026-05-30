@@ -13,6 +13,7 @@ use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, ServerToAgent, PROTO_VERSION};
+use std::path::Path;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -246,6 +247,40 @@ async fn handle_cli_prompt(
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
 }
 
+fn resolve_cli_program(cli: &str) -> String {
+    if cli.eq_ignore_ascii_case("copilot") {
+        if let Ok(v) = std::env::var("COPILOT_CLI_BIN") {
+            let v = v.trim();
+            if !v.is_empty() {
+                return v.to_string();
+            }
+        }
+
+        #[cfg(windows)]
+        {
+            let mut candidates = Vec::new();
+            if let Ok(appdata) = std::env::var("APPDATA") {
+                candidates.push(format!(r"{}\npm\copilot.cmd", appdata));
+                candidates.push(format!(r"{}\npm\copilot", appdata));
+                candidates.push(format!(
+                    r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot.bat",
+                    appdata
+                ));
+                candidates.push(format!(
+                    r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot",
+                    appdata
+                ));
+            }
+            for p in candidates {
+                if Path::new(&p).exists() {
+                    return p;
+                }
+            }
+        }
+    }
+    cli.to_string()
+}
+
 async fn run_cli_and_stream(
     req_id: &str,
     cli: &str,
@@ -256,7 +291,11 @@ async fn run_cli_and_stream(
     use tokio::io::AsyncBufReadExt;
     use tokio::process::Command;
 
-    let mut cmd = Command::new(cli);
+    let program = resolve_cli_program(cli);
+    if program != cli {
+        info!("[relay-client] cli={} 使用可执行路径: {}", cli, program);
+    }
+    let mut cmd = Command::new(&program);
     for arg in extra_args {
         cmd.arg(arg);
     }
@@ -265,7 +304,9 @@ async fn run_cli_and_stream(
     cmd.stderr(std::process::Stdio::null()); // 不转发 stderr（包含 stats/warning）
     cmd.kill_on_drop(true);
 
-    let mut child = cmd.spawn().map_err(|e| anyhow!("启动 {cli} 失败: {e}"))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| anyhow!("启动 {} 失败: {e}", program))?;
     let stdout = child
         .stdout
         .take()
