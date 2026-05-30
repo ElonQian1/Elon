@@ -446,6 +446,7 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
                 }
+                realtimeController?.shutdown()
                 realtimeController = null
             },
             onAiError = { msg ->
@@ -453,6 +454,7 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, "AI 出错：${msg.take(60)}", Toast.LENGTH_SHORT).show()
                 }
+                realtimeController?.shutdown()
                 realtimeController = null
             },
             onError = { msg ->
@@ -460,6 +462,7 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, "语音失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
                 }
+                realtimeController?.shutdown()
                 realtimeController = null
             },
         )

@@ -92,11 +92,13 @@ internal class RealtimeVoiceWsClient(
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 isOpen = false
+                shutdownOkHttp()
                 listener.onClosed()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 isOpen = false
+                shutdownOkHttp()
                 Log.w("RealtimeVoiceWs", "ws failure", t)
                 listener.onServerError("ws_failure", t.message ?: "unknown")
                 listener.onClosed()
@@ -118,6 +120,12 @@ internal class RealtimeVoiceWsClient(
         isOpen = false
         runCatching { current?.send("""{"type":"close"}""") }
         runCatching { current?.close(1000, "client close") }
+        shutdownOkHttp()
+    }
+
+    private fun shutdownOkHttp() {
+        runCatching { client.dispatcher.executorService.shutdown() }
+        runCatching { client.connectionPool.evictAll() }
     }
 
     private fun handleServerText(text: String) {
