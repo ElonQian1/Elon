@@ -30,6 +30,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
+import java.util.Locale
 
 internal class MainSpeechInputActions(
     private val activity: AppCompatActivity,
@@ -446,7 +447,6 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
                 }
-                realtimeController?.shutdown()
                 realtimeController = null
             },
             onAiError = { msg ->
@@ -454,7 +454,6 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, "AI 出错：${msg.take(60)}", Toast.LENGTH_SHORT).show()
                 }
-                realtimeController?.shutdown()
                 realtimeController = null
             },
             onError = { msg ->
@@ -462,7 +461,6 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, "语音失败：${msg.take(60)}", Toast.LENGTH_SHORT).show()
                 }
-                realtimeController?.shutdown()
                 realtimeController = null
             },
         )
@@ -506,8 +504,8 @@ internal class MainSpeechInputActions(
         }
         // 乐观并行：同时启动 MediaRecorder 录音文件 + AgentVoiceBridge 实时 ASR。
         // 小米等设备两者可共存，录音期间有实时转写文字显示。
-        // Honor/华为 HAL 独占麦克风导致 ASR 立即 code=5 失败，onFinal 不会被调用，
-        // finishVoiceMessageRecording 检测到 transcription==null 后自动上传服务器 Whisper。
+        // Honor/华为部分机型 HAL 更容易出现麦克风独占，双录音会额外放大发热。
+        // 这些机型直接跳过并行本地 ASR，统一走录音完成后的服务器 Whisper 兜底。
         voiceMessageTranscription = null
         voiceMessagePartialText = null
         voiceMessageAsrAllFailed = false
@@ -516,29 +514,38 @@ internal class MainSpeechInputActions(
         val overlay = voiceOverlay?.takeIf { it.mode == overlayMode }
             ?: VoiceRecordingOverlay(activity, overlayMode).also { voiceOverlay = it }
         overlay.show()
-        // 启动 AgentVoiceBridge 多引擎并行 ASR（支持自动引擎切换）
-        runCatching {
-            voiceMessageBridge?.destroy()
-            voiceMessageBridge = AgentVoiceBridge(activity).also { bridge ->
-                bridge.onPartial = { text ->
-                    voiceMessagePartialText = text
-                    voiceOverlay?.updatePartial(text)
+        if (shouldRunParallelVoiceMessageAsr()) {
+            // 启动 AgentVoiceBridge 多引擎并行 ASR（支持自动引擎切换）
+            runCatching {
+                voiceMessageBridge?.destroy()
+                voiceMessageBridge = AgentVoiceBridge(activity).also { bridge ->
+                    bridge.onPartial = { text ->
+                        voiceMessagePartialText = text
+                        voiceOverlay?.updatePartial(text)
+                    }
+                    bridge.onFinal = { text ->
+                        if (text.isNotBlank()) voiceMessageTranscription = text
+                        voiceOverlay?.updatePartial(text)
+                        DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
+                    }
+                    bridge.onError = { msg ->
+                        // 所有本地引擎失败（Honor 抢麦冲突等）；finishVoiceMessageRecording
+                        // 通过 transcription==null 判断需要服务器兜底，此标志仅供调试日志
+                        voiceMessageAsrAllFailed = true
+                        DebugTraceStore.record("voice_message_asr_all_failed", mapOf("msg" to msg))
+                    }
+                    bridge.start()
                 }
-                bridge.onFinal = { text ->
-                    if (text.isNotBlank()) voiceMessageTranscription = text
-                    voiceOverlay?.updatePartial(text)
-                    DebugTraceStore.record("voice_message_asr_result", mapOf("text" to text))
-                }
-                bridge.onError = { msg ->
-                    // 所有本地引擎失败（Honor 抢麦冲突等）；finishVoiceMessageRecording
-                    // 通过 transcription==null 判断需要服务器兜底，此标志仅供调试日志
-                    voiceMessageAsrAllFailed = true
-                    DebugTraceStore.record("voice_message_asr_all_failed", mapOf("msg" to msg))
-                }
-                bridge.start()
+            }.onFailure {
+                DebugTraceStore.record("voice_message_asr_start_failed", mapOf("error" to it.message))
+                voiceMessageBridge?.destroy()
+                voiceMessageBridge = null
             }
-        }.onFailure {
-            DebugTraceStore.record("voice_message_asr_start_failed", mapOf("error" to it.message))
+        } else {
+            DebugTraceStore.record(
+                "voice_message_asr_skipped_for_device",
+                mapOf("manufacturer" to Build.MANUFACTURER, "brand" to Build.BRAND)
+            )
             voiceMessageBridge?.destroy()
             voiceMessageBridge = null
         }
@@ -629,6 +636,17 @@ internal class MainSpeechInputActions(
             return
         }
         applyVoiceZoneAction(zone, attachment, transcription)
+    }
+
+    private fun shouldRunParallelVoiceMessageAsr(): Boolean {
+        val manufacturer = Build.MANUFACTURER.orEmpty().lowercase(Locale.ROOT)
+        val brand = Build.BRAND.orEmpty().lowercase(Locale.ROOT)
+        val model = Build.MODEL.orEmpty().lowercase(Locale.ROOT)
+        val isHonorOrHuawei =
+            manufacturer.contains("honor") || manufacturer.contains("huawei") ||
+                brand.contains("honor") || brand.contains("huawei") ||
+                model.contains("honor") || model.contains("huawei")
+        return !isHonorOrHuawei
     }
 
     /** 根据区域决定最终行为（在获得转写文字后调用）。 */

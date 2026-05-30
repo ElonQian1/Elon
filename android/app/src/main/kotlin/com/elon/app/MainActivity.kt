@@ -176,7 +176,6 @@ class MainActivity : AppCompatActivity() {
         messageSelectionActions.setup()
         agentPageController = AgentPageController(this, binding)
         agentPageController.setup()
-        com.elon.app.VoiceEngineBootstrap.scheduleSilentProbeIfNeeded(this)
     }
 
     private val createActions: MainCreateActions by lazy {
