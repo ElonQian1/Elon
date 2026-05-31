@@ -1232,8 +1232,8 @@
     // 返回按钮：仅"会话"页进入项目后显示
     backBtn.style.display = inChat ? '' : 'none';
     // 新建按钮：仅会话页显示
-    addBtn.style.display = tabId === 'chatPage' ? '' : 'none';
-    searchBtn.style.display = tabId === 'chatPage' ? '' : 'none';
+    addBtn.style.display = (tabId === 'chatPage' && !currentProject) ? '' : 'none';
+    searchBtn.style.display = (tabId === 'chatPage' && !currentProject) ? '' : 'none';
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
       refreshDownloadPage();
@@ -1251,6 +1251,8 @@
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
     backBtn.style.display = 'none';
+    addBtn.style.display = '';
+    searchBtn.style.display = '';
     resetProjectPage();
     renderConversationList();
   });
@@ -1405,7 +1407,12 @@
       return;
     }
     socket.addEventListener('open', () => appendBubble('progress', '项目通道已连接。'));
-    socket.addEventListener('close', () => setBusy(false));
+    socket.addEventListener('close', () => {
+      if (busy) {
+        setBusy(false);
+        appendBubble('error', '项目通道已断开。任务可能仍在后台执行，可稍后刷新项目查看结果。');
+      }
+    });
     socket.addEventListener('error', () => appendBubble('error', '项目通道连接异常。'));
     socket.addEventListener('message', (ev) => {
       try {
@@ -1432,6 +1439,7 @@
           if (data.image_url) links.push({ href: data.image_url, label: '查看图片' });
           appendBubble('ai', data.message || '已完成。', links);
           loadProjects();
+          if (data.apk_url) refreshDownloadPage().catch(() => {});
         } else if (data.type === 'error') {
           setBusy(false);
           appendBubble('error', data.message || 'unknown error');
@@ -1951,7 +1959,6 @@
     showLogin();
   });
 
-  // ====== 搜索 ======
   // ====== 删除项目 ======
   let pendingDeleteProject = null;
   function openDeleteConfirm(p) {
