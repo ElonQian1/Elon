@@ -262,7 +262,11 @@
       margin-top: 10px !important;
     }
     .project-block h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); font-weight: normal; }
-    .stage-line { padding: 8px 0; font-size: 14px; color: var(--ink-soft); }
+    .stage-line { padding: 8px 0; font-size: 14px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
+    .stage-line.active { color: var(--brand); font-weight: 500; }
+    .stage-line.done { color: #47c484; }
+    .stage-line.active::after { content: '⋯'; animation: dots 1.2s infinite; }
+    @keyframes dots { 0%,100%{opacity:1} 50%{opacity:.3} }
     .project-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -327,6 +331,34 @@
       color: var(--ink-dim);
       margin-top: 3px;
     }
+    /* Token 消耗统计 */
+    .usage-section {
+      background: var(--panel);
+      padding: 18px 22px;
+      margin-top: 10px !important;
+    }
+    .usage-section h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: normal;
+      color: var(--ink);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .usage-section h3 small { font-size: 12px; color: var(--ink-dim); font-weight: normal; }
+    .usage-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .usage-row:last-child { border-bottom: none; }
+    .usage-label { color: var(--ink-soft); }
+    .usage-value { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 14px; }
+    .usage-hint { font-size: 12px; color: var(--ink-dim); margin-top: 8px; }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -716,6 +748,10 @@
         <span>退出登录</span><span class="arrow">›</span>
       </button>
       <div class="profile-version" id="versionText">一龙网页版</div>
+      <div class="usage-section">
+        <h3>消耗统计 <small>近 30 天</small></h3>
+        <div id="usageContent"><div class="usage-hint">加载中…</div></div>
+      </div>
     </div>
 
   </section>
@@ -844,6 +880,7 @@
   const profileAccount = $('profileAccount');
   const versionText = $('versionText');
   const aiSettingsRow = $('aiSettingsRow');
+  const usageContent = $('usageContent');
   const checkUpdateRow = $('checkUpdateRow');
   const updateArrow = $('updateArrow');
   const logoutRow = $('logoutRow');
@@ -1026,7 +1063,10 @@
     addBtn.style.display = tabId === 'chatPage' ? '' : 'none';
     searchBtn.style.display = tabId === 'chatPage' ? '' : 'none';
     // 下载页：切入"我的"时刷新版本信息
-    if (tabId === 'profilePage') refreshDownloadPage();
+    if (tabId === 'profilePage') {
+      refreshDownloadPage();
+      loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+    }
   }
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -1087,6 +1127,26 @@
     renderProjectPage(project);
     connectSocket();
     setBusy(false);
+  }
+
+  // ====== 4阶段进度更新 ======
+  const STAGE_ELS = () => [stagePlanText, stageCodeText, stageBuildText, stageDeliverText];
+  const STAGE_NAMES = ['1. 需求分析', '2. 开发实现', '3. 编译打包', '4. 交付下载'];
+  function updateStageLines(stepCurrent, allDone) {
+    STAGE_ELS().forEach((el, i) => {
+      el.className = 'stage-line';
+      const step = i + 1;
+      if (allDone || step < stepCurrent) {
+        el.className = 'stage-line done';
+        el.textContent = STAGE_NAMES[i] + '：✓ 完成';
+      } else if (step === stepCurrent) {
+        el.className = 'stage-line active';
+        el.textContent = STAGE_NAMES[i] + '：进行中';
+        if (!allDone) currentStageText.textContent = STAGE_NAMES[i] + ' 进行中…';
+      } else {
+        el.textContent = STAGE_NAMES[i] + '：等待';
+      }
+    });
   }
 
   // ====== 项目页渲染 ======
@@ -1159,10 +1219,18 @@
           const msg = data.message || '';
           progressLog.push(msg);
           appendBubble('progress', msg);
+          if (data.step_current) updateStageLines(data.step_current, false);
         } else if (data.type === 'tool_call') appendBubble('progress', '工具：' + (data.tool || ''));
         else if (data.type === 'tool_result') appendBubble('progress', (data.tool || 'tool') + '\n' + (data.result || ''));
         else if (data.type === 'done') {
           setBusy(false);
+          updateStageLines(4, true);
+          currentStageText.textContent = '✓ 任务完成';
+          if (progressLog.length) {
+            projectHistoryText.textContent = progressLog
+              .map((m, i) => '【步骤 ' + (i + 1) + '】\n' + m)
+              .join('\n\n');
+          }
           const links = [];
           if (data.apk_url) links.push({ href: data.apk_url, label: '下载 APK' });
           if (data.image_url) links.push({ href: data.image_url, label: '查看图片' });
@@ -1393,6 +1461,40 @@
         ' (build ' + (data.version_code || data.build || '?') + ')';
     } catch {
       versionText.textContent = '一龙网页版';
+    }
+  }
+
+  // ====== Token 消耗统计 ======
+  async function loadUsageStats() {
+    if (!currentUser) return;
+    usageContent.innerHTML = '<div class="usage-hint">加载中…</div>';
+    try {
+      const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/usage/stats?days=30');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+      const t = data.total || {};
+      const total = t.total_tokens || 0;
+      const input = t.input_tokens || 0;
+      const output = t.output_tokens || 0;
+      const cached = t.cached_input_tokens || 0;
+      function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
+      const rows = [
+        ['总 tokens', fmt(total)],
+        ['输入 tokens', fmt(input)],
+        ['输出 tokens', fmt(output)],
+        ['缓存命中', fmt(cached)],
+      ];
+      // 按功能分组（项目开发 / 运行时小数 top3）
+      const byFeature = (data.by_feature || []).slice(0, 3);
+      usageContent.innerHTML = rows.map(([l, v]) =>
+        '<div class="usage-row"><span class="usage-label">' + l + '</span><span class="usage-value">' + v + '</span></div>'
+      ).join('') +
+      (byFeature.length ? '<div class="usage-hint" style="margin-top:10px;color:var(--ink-soft)">' +
+        byFeature.map((f) => (f.feature || 'other') + ' ' + fmt(f.total_tokens)).join('、') +
+        '</div>' : '') +
+      (total === 0 ? '<div class="usage-hint">近 30 天暂无记录</div>' : '');
+    } catch (err) {
+      usageContent.innerHTML = '<div class="usage-hint" style="color:var(--bubble-error-ink)">加载失败</div>';
     }
   }
 
