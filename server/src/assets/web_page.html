@@ -167,6 +167,19 @@
       align-self: flex-start; margin-top: 16px;
       flex-shrink: 0; padding-left: 6px;
     }
+    .conversation-item .item-delete {
+      display: none;
+      flex-shrink: 0;
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: transparent;
+      border: 0; cursor: pointer;
+      color: #d97a7a;
+      font-size: 18px;
+      line-height: 30px;
+      text-align: center;
+    }
+    .conversation-item:hover .item-delete { display: flex; align-items: center; justify-content: center; }
     .empty-tip {
       padding: 80px 24px;
       text-align: center;
@@ -816,6 +829,19 @@
   </form>
 </div>
 
+<!-- ============ 删除项目确认对话框 ============ -->
+<div class="modal-mask" id="deleteConfirmMask">
+  <div class="modal">
+    <h2>删除项目</h2>
+    <p id="deleteConfirmText" style="color:var(--ink-soft);font-size:14px;margin:0 0 4px">确定要删除这个项目吗？此操作无法撤销。</p>
+    <div class="error-text" id="deleteConfirmError"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="cancelDeleteBtn">取消</button>
+      <button type="button" class="btn-confirm" id="confirmDeleteBtn" style="background:#d97a7a">删除</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ 进度记录对话框 ============ -->
 <div class="modal-mask" id="progressLogMask">
   <div class="modal" style="max-height:72vh;display:flex;flex-direction:column;gap:12px">
@@ -887,6 +913,11 @@
   const profileNickname = $('profileNickname');
   const profileAccount = $('profileAccount');
   const versionText = $('versionText');
+  const deleteConfirmMask = $('deleteConfirmMask');
+  const deleteConfirmText = $('deleteConfirmText');
+  const deleteConfirmError = $('deleteConfirmError');
+  const cancelDeleteBtn = $('cancelDeleteBtn');
+  const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
   const usageContent = $('usageContent');
   const checkUpdateRow = $('checkUpdateRow');
@@ -1111,9 +1142,9 @@
     }
     conversationList.innerHTML = '';
     filtered.forEach((p) => {
-      const item = document.createElement('button');
-      item.type = 'button';
+      const item = document.createElement('div');
       item.className = 'conversation-item' + (currentProject && currentProject.id === p.id ? ' active' : '');
+      item.style.cssText = 'cursor:pointer';
       const status = p.last_task_status || p.status || '准备就绪';
       item.innerHTML =
         '<span class="brand"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" /></span>'
@@ -1121,10 +1152,17 @@
         + '<span class="title"></span>'
         + '<span class="sub"></span>'
         + '</span>'
-        + '<span class="time"></span>';
+        + '<span class="time"></span>'
+        + '<button class="item-delete" title="删除项目" type="button">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>'
+        + '</button>';
       item.querySelector('.title').textContent = p.name || '未命名项目';
       item.querySelector('.sub').textContent = status;
       item.querySelector('.time').textContent = formatTime(p.updated_at);
+      item.querySelector('.item-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDeleteConfirm(p);
+      });
       item.addEventListener('click', () => selectProject(p));
       conversationList.appendChild(item);
     });
@@ -1250,6 +1288,7 @@
         else if (data.type === 'tool_result') appendBubble('progress', (data.tool || 'tool') + '\n' + (data.result || ''));
         else if (data.type === 'done') {
           setBusy(false);
+          stageHint.textContent = '✓ 任务完成，可以继续描述新需求。';
           updateStageLines(4, true);
           currentStageText.textContent = '✓ 任务完成';
           if (progressLog.length) {
@@ -1642,6 +1681,48 @@
     if (socket) { try { socket.close(); } catch {} socket = null; }
     switchTab('chatPage');
     showLogin();
+  });
+
+  // ====== 搜索 ======
+  // ====== 删除项目 ======
+  let pendingDeleteProject = null;
+  function openDeleteConfirm(p) {
+    pendingDeleteProject = p;
+    deleteConfirmText.textContent = '确定要删除项目「' + (p.name || '未命名') + '」吗？此操作无法撤销。';
+    deleteConfirmError.textContent = '';
+    confirmDeleteBtn.disabled = false;
+    deleteConfirmMask.classList.add('active');
+  }
+  cancelDeleteBtn.addEventListener('click', () => { deleteConfirmMask.classList.remove('active'); pendingDeleteProject = null; });
+  deleteConfirmMask.addEventListener('click', (e) => { if (e.target === deleteConfirmMask) { deleteConfirmMask.classList.remove('active'); pendingDeleteProject = null; } });
+  confirmDeleteBtn.addEventListener('click', async () => {
+    if (!pendingDeleteProject) return;
+    confirmDeleteBtn.disabled = true;
+    deleteConfirmError.textContent = '';
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(pendingDeleteProject.id), { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'HTTP ' + res.status);
+      }
+      deleteConfirmMask.classList.remove('active');
+      if (currentProject && currentProject.id === pendingDeleteProject.id) {
+        if (socket) { try { socket.close(); } catch {} socket = null; }
+        currentProject = null;
+        progressLog = [];
+        chatView.classList.add('hidden');
+        conversationList.classList.remove('hidden');
+        inputBar.classList.remove('active');
+        backBtn.style.display = 'none';
+        resetProjectPage();
+        switchTab('chatPage');
+      }
+      pendingDeleteProject = null;
+      await loadProjects();
+    } catch (err) {
+      deleteConfirmError.textContent = '删除失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      confirmDeleteBtn.disabled = false;
+    }
   });
 
   // ====== 搜索 ======
