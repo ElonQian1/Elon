@@ -76,7 +76,7 @@ internal fun parseChatProjectShareMessage(content: String): ChatProjectShare? {
             description = json.optString("description").trim().takeIf { it.isNotBlank() },
             ownerAccount = json.optString("owner_account").trim().takeIf { it.isNotBlank() },
             memberCount = json.optInt("member_count", 1).coerceAtLeast(1),
-            joinMode = json.optString("join_mode", "open").ifBlank { "open" },
+            joinMode = normalizeProjectJoinMode(json.optString("join_mode", "open")),
             latestLog = json.optString("latest_log").trim().takeIf { it.isNotBlank() },
             source = json.optString("source", "store").ifBlank { "store" }
         ).takeIf { it.id.isNotBlank() && it.name.isNotBlank() }
@@ -262,8 +262,9 @@ private fun projectShareActionLabel(share: ChatProjectShare, role: String): Stri
     return when {
         role == "user" -> "打开项目"
         share.source == "local" -> "加入项目"
-        share.joinMode == "invite" -> "接受邀请"
-        share.joinMode == "open" -> "加入项目"
+        normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_INVITE -> "接受邀请"
+        normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_READONLY -> "进入体验"
+        normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_OPEN -> "加入项目"
         else -> "申请加入"
     }
 }

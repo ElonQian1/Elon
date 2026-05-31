@@ -152,7 +152,7 @@ internal class MainChatProjectShareActions(
             id = share.id,
             isJointProject = share.source != "local",
             collaborationProjectId = share.id.takeIf { share.source != "local" },
-            collaborationJoinMode = share.joinMode.takeIf { it.isNotBlank() }
+            collaborationJoinMode = normalizeProjectJoinMode(share.joinMode)
         )
         projects.add(project)
         saveProjects()

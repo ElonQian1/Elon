@@ -100,11 +100,11 @@ internal class MainMarketplaceActions(
                         joinBtn.setTextColor(Color.parseColor("#FFFFFF"))
                         (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#3BA55D"))
                         joinBtn.setOnClickListener { openJoinedProject(project) }
-                        Toast.makeText(activity, "成功加入项目，点击按钮进入", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, projectJoinSuccessToast(project.joinMode), Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
                         joinBtn.isEnabled = true
-                        joinBtn.text = "加入"
+                        joinBtn.text = projectJoinActionLabel(project.joinMode)
                         Toast.makeText(activity, it.message ?: "加入失败", Toast.LENGTH_SHORT).show()
                     }
             }
@@ -325,13 +325,8 @@ internal class MainMarketplaceActions(
         }
 
         // ── 加入按钮（全宽，Discord 绿色）─────────────────────────────────────
-        val joinLabel = when {
-            alreadyJoined -> "进入项目"
-            project.joinMode == "open" -> "加入"
-            else -> "申请加入"
-        }
         val joinBtn = TextView(activity).apply {
-            text = joinLabel
+            text = projectJoinActionLabel(project.joinMode, alreadyJoined)
             textSize = 15f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#FFFFFF"))

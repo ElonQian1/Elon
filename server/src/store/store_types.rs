@@ -185,7 +185,7 @@ pub struct PublicProjectItem {
     pub owner_id: String,
     pub member_count: i64,
     pub is_public: bool,
-    pub join_mode: String, // "open" | "approval" | "invite"
+    pub join_mode: String, // "open" | "approval" | "invite" | "readonly"
     pub last_task_status: Option<String>,
     pub created_at: String,
     pub updated_at: String,

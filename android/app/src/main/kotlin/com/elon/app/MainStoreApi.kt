@@ -28,7 +28,7 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         id = id,
         isJointProject = true,
         collaborationProjectId = id,
-        collaborationJoinMode = joinMode.takeIf { it.isNotBlank() } ?: "invite"
+        collaborationJoinMode = normalizeProjectJoinMode(joinMode)
     )
 }
 
@@ -224,7 +224,7 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     ownerUserId = obj.optString("owner_id", ""),
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
-    joinMode = obj.optString("join_mode", "open"),
+    joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "open")),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     role = obj.optString("role", "member")
 )
@@ -238,7 +238,7 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     ownerUserId = "",
     memberCount = 1,
     isPublic = false,
-    joinMode = obj.optString("join_mode", "invite").takeIf { it.isNotBlank() } ?: "invite",
+    joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
     lastTaskStatus = null
 )
 

@@ -1,27 +1,32 @@
 use axum::{
-    Json,
     extract::{Path as AxumPath, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    agent, agent_routing::is_local_cli_option, ai_cli, intent_router,
-    project_attachment_notes::{append_project_attachment_notes, append_project_cli_attachment_artifacts},
+    agent, agent_intent,
+    agent_routing::is_local_cli_option,
+    ai_cli, intent_router,
+    project_attachment_notes::{
+        append_project_attachment_notes, append_project_cli_attachment_artifacts,
+    },
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
     project_chat_reply::chat_reply_after_intent_gate,
     project_conversation_workspace::{
-        ProjectConversationWorkspace, prepare_project_conversation_workspace,
-        project_conversation_execution_key, project_shared_execution_key,
+        prepare_project_conversation_workspace, project_conversation_execution_key,
+        project_shared_execution_key, ProjectConversationWorkspace,
     },
     project_keys::clean_trace_id,
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
     project_ws_protocol::{ProjectAttachmentRef, ProjectChatRequest},
     store::ProjectAccess,
+    tools,
     types::{AppState, WsMessage},
 };
 
@@ -189,6 +194,32 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let routing_decision = intent_router::classify(&message);
     let needs_project_workflow =
         routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
+    let base_workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    if needs_project_workflow && !can_edit(&project.role) {
+        let apk_url = if agent_intent::is_project_delivery_request(&message, &base_workspace)
+            && tools::find_latest_apk(&base_workspace).is_some()
+        {
+            Some(tools::stable_apk_url(&download_base))
+        } else {
+            None
+        };
+        let message = if apk_url.is_some() {
+            "当前项目已有可下载 APK。你是只读成员，可以下载体验，但不能发起修改代码、编译或发布。"
+                .to_string()
+        } else {
+            "你当前是只读成员，可以在项目频道里询问 AI、查看讨论和结果，但不能发起修改代码、编译或发布。请联系项目 owner 获取协作权限。".to_string()
+        };
+        let _ = tx.send(
+            WsMessage::Done {
+                message,
+                apk_url,
+                image_url: None,
+            }
+            .to_json(),
+        );
+        return;
+    }
     // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务（app_or_web_development=84、
     // image_asset_for_app=86、standalone_image=90），跳过 codex 二次意图门控，
     // 节省每请求 5-15 秒的冷启动+推理时间。confidence < 84 的模糊判定仍走门控防误判。
@@ -205,15 +236,12 @@ pub(crate) async fn run_project_agent_with_scheduler(
             }),
         );
     }
-    let base_workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let prepared_execution_workspace = if needs_project_workflow {
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
-                let _ = tx.send(
-                    WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json(),
-                );
+                let _ = tx
+                    .send(WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json());
                 return;
             }
         }
@@ -344,9 +372,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         }),
                     );
                 }
-                let _ = tx.send(
-                    WsMessage::error(format!("Codex CLI 意图确认失败: {}", error)).to_json(),
-                );
+                let _ = tx
+                    .send(WsMessage::error(format!("Codex CLI 意图确认失败: {}", error)).to_json());
                 return;
             }
         }

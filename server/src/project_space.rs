@@ -16,6 +16,7 @@ use crate::{
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
     project_keys::clean_trace_id,
+    tools,
     types::AppState,
 };
 
@@ -62,6 +63,10 @@ pub async fn get_project_space(
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
+    let access = match project_access(&state, &user.id, &project_id) {
+        Ok(access) => access,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
     let channels = match state
         .store
         .list_project_space_channels(&user.id, &project_id)
@@ -78,6 +83,7 @@ pub async fn get_project_space(
         "project": project,
         "channels": channels,
         "members": members,
+        "latest_apk_url": latest_project_apk_url(&state, &access),
     }))
     .into_response()
 }
@@ -436,7 +442,21 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
 }
 
 fn can_start_channel_ai(role: &str) -> bool {
-    matches!(role, "owner" | "editor" | "member")
+    matches!(role, "owner" | "editor" | "member" | "observer")
+}
+
+fn latest_project_apk_url(
+    state: &AppState,
+    project: &crate::store::ProjectAccess,
+) -> Option<String> {
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    tools::find_latest_apk(&workspace).map(|_| {
+        tools::stable_apk_url(&format!(
+            "{}/api/projects/{}/download",
+            state.public_url, project.id
+        ))
+    })
 }
 
 fn result_message(message: &str, apk_url: Option<&str>, status: Option<&str>) -> String {

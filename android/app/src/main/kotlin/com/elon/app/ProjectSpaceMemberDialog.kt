@@ -128,6 +128,7 @@ internal object ProjectSpaceMemberDialog {
             "owner" -> "所有者"
             "editor" -> "协作者"
             "member" -> "成员"
+            "observer" -> "只读成员"
             else -> member.role.ifBlank { "成员" }
         }
         return member.joinedAt.takeIf { it.isNotBlank() }?.let { "$role · 加入于 $it" } ?: role

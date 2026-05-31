@@ -134,7 +134,7 @@ impl Store {
         Ok(())
     }
 
-    /// 加入项目（open 模式直接成功；返回 Err 表示无法加入）
+    /// 加入项目（open/invite 作为 member；readonly 作为 observer；返回 Err 表示无法加入）
     pub fn join_project(&self, user_id: &str, project_id: &str) -> Result<()> {
         let conn = self.conn()?;
         // 检查项目存在且公开
@@ -153,14 +153,19 @@ impl Store {
         if join_mode == "approval" {
             anyhow::bail!("该项目需要审批才能加入，请联系项目 owner");
         }
-        if join_mode != "open" && join_mode != "invite" {
+        if join_mode != "open" && join_mode != "invite" && join_mode != "readonly" {
             anyhow::bail!("该项目只能通过邀请加入");
         }
+        let role = if join_mode == "readonly" {
+            "observer"
+        } else {
+            "member"
+        };
         // 已经是成员则幂等成功
         conn.execute(
             "INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
-             VALUES (?1, ?2, 'member', ?3)",
-            params![project_id, user_id, now()],
+             VALUES (?1, ?2, ?3, ?4)",
+            params![project_id, user_id, role, now()],
         )?;
         Ok(())
     }
@@ -200,7 +205,7 @@ impl Store {
              FROM project_members pm
              LEFT JOIN users u ON u.id = pm.user_id
              WHERE pm.project_id = ?1
-             ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'member' THEN 1 ELSE 2 END, pm.created_at",
+             ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 WHEN 'member' THEN 2 WHEN 'observer' THEN 3 ELSE 4 END, pm.created_at",
         )?;
         let rows = stmt
             .query_map(params![project_id], |row| {
@@ -461,6 +466,39 @@ mod tests {
             .get_project_access(&invited.id, &project.id)
             .expect("joined user should have project access");
         assert_eq!(access.role, "member");
+    }
+
+    #[test]
+    fn readonly_projects_are_public_but_join_as_observer() {
+        let store = temp_store();
+        let owner = store
+            .create_user("readonly-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let viewer = store
+            .create_user("readonly-viewer@example.com", "secret1", None, None)
+            .expect("viewer should be created");
+        let project = store
+            .create_project(&owner.id, "Readonly Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&project.id, true, "readonly")
+            .expect("project should become readonly public");
+
+        let public_projects = store
+            .list_public_projects(None, 10, 0)
+            .expect("store projects should list");
+        assert_eq!(public_projects.len(), 1);
+        assert_eq!(public_projects[0].join_mode, "readonly");
+
+        store
+            .join_project(&viewer.id, &project.id)
+            .expect("readonly viewer should join");
+        let access = store
+            .get_project_access(&viewer.id, &project.id)
+            .expect("viewer should have project access");
+        assert_eq!(access.role, "observer");
     }
 
     #[test]

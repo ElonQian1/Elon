@@ -36,21 +36,14 @@ internal fun AppProject.projectSpaceId(): String {
 }
 
 internal fun AppProject.projectJoinMode(): String {
-    val mode = collaborationJoinMode?.trim()
-    return when (mode) {
-        "open", "approval", "invite" -> mode
-        else -> "invite"
-    }
+    return normalizeProjectJoinMode(collaborationJoinMode)
 }
 
 internal fun AppProject.markJointDevelopment(remoteProjectId: String? = null, joinMode: String = "invite") {
     remoteProjectId?.trim()?.takeIf { it.isNotBlank() }?.let {
         collaborationProjectId = it
     }
-    collaborationJoinMode = when (joinMode.trim()) {
-        "open", "approval", "invite" -> joinMode.trim()
-        else -> "invite"
-    }
+    collaborationJoinMode = normalizeProjectJoinMode(joinMode)
     isJointProject = true
     updatedAt = System.currentTimeMillis()
 }

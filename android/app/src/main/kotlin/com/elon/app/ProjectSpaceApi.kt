@@ -193,7 +193,8 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
             updatedAt = project.optString("updated_at", "")
         ),
         channels = List(channels.length()) { parseProjectChannel(channels.optJSONObject(it) ?: JSONObject()) },
-        members = List(members.length()) { parseProjectMember(members.optJSONObject(it) ?: JSONObject()) }
+        members = List(members.length()) { parseProjectMember(members.optJSONObject(it) ?: JSONObject()) },
+        latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() }
     )
 }
 

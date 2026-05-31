@@ -208,14 +208,7 @@ internal class MainStoreController(
         }
 
         row.addView(TextView(activity).apply {
-            text = "模板：${project.template}  ·  ${
-                when (project.joinMode) {
-                    "open" -> "可直接加入"
-                    "approval" -> "需审批"
-                    "invite" -> "仅邀请"
-                    else -> project.joinMode
-                }
-            }"
+            text = "模板：${project.template}  ·  ${projectJoinModeSummary(project.joinMode)}"
             setTextColor(Color.parseColor("#666666"))
             textSize = 11f
             setPadding(0, dp(2), 0, 0)
@@ -230,18 +223,13 @@ internal class MainStoreController(
             append("创建者：${project.ownerAccount}\n")
             append("模板：${project.template}\n")
             append("成员：${project.memberCount} 人\n")
-            append("加入方式：${when (project.joinMode) {
-                "open" -> "公开（直接加入）"
-                "approval" -> "需管理员审批"
-                "invite" -> "仅邀请"
-                else -> project.joinMode
-            }}\n")
+            append("加入方式：${projectJoinModeDetail(project.joinMode)}\n")
             if (!project.description.isNullOrBlank()) {
                 append("\n${project.description}")
             }
         }
 
-        val joinLabel = if (project.joinMode == "open") "加入项目" else "申请加入"
+        val joinLabel = projectJoinActionLabel(project.joinMode)
         val builder = AlertDialog.Builder(activity)
             .setTitle(project.name)
             .setMessage(msg)
@@ -266,7 +254,7 @@ internal class MainStoreController(
                 joinStoreProject(http, serverUrl, project.id, token)
                 activity.runOnUiThread {
                     addJoinedProject(project)
-                    Toast.makeText(activity, "已加入「${project.name}」", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, projectJoinSuccessToast(project.joinMode), Toast.LENGTH_SHORT).show()
                     parentDialog.dismiss()
                 }
             } catch (e: Exception) {

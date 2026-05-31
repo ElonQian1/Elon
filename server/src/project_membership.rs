@@ -1,7 +1,7 @@
 /// project_membership.rs — 项目成员关系管理
 ///
 /// 路由（均需登录）：
-///   POST   /api/projects/:id/join        加入公开项目（open 模式直接成功）
+///   POST   /api/projects/:id/join        加入公开项目（open=成员，readonly=只读成员）
 ///   DELETE /api/projects/:id/leave       退出已加入的项目（owner 不可退出）
 ///   GET    /api/projects/:id/members     列出项目所有成员（公开项目无需成员身份）
 ///   PATCH  /api/projects/:id/visibility  设置公开/私有（仅 owner）
@@ -25,7 +25,7 @@ use crate::{
 pub struct VisibilityRequest {
     /// true = 公开，false = 私有
     pub is_public: bool,
-    /// "open" | "approval" | "invite"；默认 "open"
+    /// "open" | "approval" | "invite" | "readonly"；默认 "open"
     pub join_mode: Option<String>,
 }
 
@@ -155,10 +155,10 @@ pub async fn update_visibility(
     }
 
     let join_mode = req.join_mode.as_deref().unwrap_or("open");
-    if !["open", "approval", "invite"].contains(&join_mode) {
+    if !["open", "approval", "invite", "readonly"].contains(&join_mode) {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "join_mode 必须为 open / approval / invite",
+            "join_mode 必须为 open / approval / invite / readonly",
         );
     }
 

@@ -243,6 +243,7 @@ internal class MainProjectActions(
         val options = arrayOf(
             "邀请协作（仅收到项目卡片的人可加入）",
             "发布到商城（所有人可见并可加入）",
+            "广场只读体验（可进入、可问 AI、不能改代码）",
             "商城展示但需审批",
             "私有（仅成员可见）"
         )
@@ -252,7 +253,8 @@ internal class MainProjectActions(
                 val (isPublic, joinMode) = when (which) {
                     0 -> true to "invite"
                     1 -> true to "open"
-                    2 -> true to "approval"
+                    2 -> true to "readonly"
+                    3 -> true to "approval"
                     else -> false to "invite"
                 }
                 doSetVisibility(project, isPublic, joinMode)
@@ -295,6 +297,7 @@ internal class MainProjectActions(
                     !isPublic -> "已设为私有"
                     joinMode == "invite" -> "已设为邀请协作"
                     joinMode == "open" -> "已发布到项目商城"
+                    joinMode == "readonly" -> "已发布到项目广场（只读体验）"
                     else -> "已发布到项目商城（需审批）"
                 }
                 activity.runOnUiThread {

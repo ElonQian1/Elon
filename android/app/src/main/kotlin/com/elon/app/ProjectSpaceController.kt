@@ -1,8 +1,10 @@
 package com.elon.app
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -13,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
+import java.net.URLEncoder
 import kotlin.concurrent.thread
 
 internal class ProjectSpaceController(
@@ -92,8 +95,10 @@ internal class ProjectSpaceController(
         space.channels.forEach { channel ->
             container.addView(channelRow(channel))
         }
-        container.addView(sectionTitle("个人会话"))
-        renderPersonalConversations(container)
+        if (space.project.role != "observer") {
+            container.addView(sectionTitle("个人会话"))
+            renderPersonalConversations(container)
+        }
         container.addView(sectionTitle("成员"))
         container.addView(memberSummary(space.members))
     }
@@ -234,8 +239,14 @@ internal class ProjectSpaceController(
     }
 
     private fun ProjectSpace.defaultGroupChannel(): ProjectChannel? {
-        return channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
-            ?: channels.firstOrNull()
+        return if (project.role == "observer") {
+            channels.firstOrNull { it.kind == AI_CHANNEL_KIND }
+                ?: channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
+                ?: channels.firstOrNull()
+        } else {
+            channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
+                ?: channels.firstOrNull()
+        }
     }
 
     private fun startPolling() {
@@ -335,6 +346,9 @@ internal class ProjectSpaceController(
                 setTextColor(Color.parseColor("#A8A8A8"))
                 setPadding(0, dp(8), 0, 0)
             })
+            space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
+                addView(downloadApkButton(apkUrl))
+            }
         }
     }
 
@@ -494,7 +508,11 @@ internal class ProjectSpaceController(
             "discussion" -> "成员日常讨论和协作交流。"
             "requirements" -> "集中提出功能想法，后续可转为 AI 开发任务。"
             "issues" -> "反馈 bug、安装问题和体验问题。"
-            AI_CHANNEL_KIND -> "在这里发消息会发起集体 AI 开发任务，过程和结果对成员可见。"
+            AI_CHANNEL_KIND -> if (activeSpace?.project?.role == "observer") {
+                "只读模式下可以询问 AI；涉及修改代码、编译或发布的请求会被拒绝。"
+            } else {
+                "在这里发消息会发起集体 AI 开发任务，过程和结果对成员可见。"
+            }
             "builds" -> "构建、发布、APK 下载和部署结果记录。"
             else -> "项目成员共享频道。"
         }
@@ -504,7 +522,42 @@ internal class ProjectSpaceController(
         "owner" -> "所有者"
         "editor" -> "协作者"
         "member" -> "成员"
+        "observer" -> "只读成员"
         else -> role
+    }
+
+    private fun downloadApkButton(apkUrl: String): TextView {
+        return TextView(activity).apply {
+            text = "下载最新 APK"
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(6).toFloat()
+                setColor(Color.parseColor("#3BA55D"))
+            }
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { openApkDownload(apkUrl) }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(42)
+            ).apply { topMargin = dp(14) }
+        }
+    }
+
+    private fun openApkDownload(apkUrl: String) {
+        val token = AuthManager.token(activity)?.trim().orEmpty()
+        if (token.isBlank()) {
+            Toast.makeText(activity, "请先登录后下载 APK", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val separator = if (apkUrl.contains("?")) "&" else "?"
+        val url = "$apkUrl${separator}token=${URLEncoder.encode(token, Charsets.UTF_8.name())}"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        runCatching { activity.startActivity(intent) }
+            .onFailure { Toast.makeText(activity, "无法打开下载链接", Toast.LENGTH_SHORT).show() }
     }
 
     private fun panelBackground(color: String): GradientDrawable {

@@ -3,7 +3,8 @@ package com.elon.app
 internal data class ProjectSpace(
     val project: ProjectSpaceSummary,
     val channels: List<ProjectChannel>,
-    val members: List<ProjectMember>
+    val members: List<ProjectMember>,
+    val latestApkUrl: String?
 )
 
 internal data class ProjectSpaceSummary(
