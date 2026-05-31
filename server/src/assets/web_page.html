@@ -542,7 +542,7 @@
     }
     .input-bar textarea::placeholder { color: var(--ink-faint); }
     .input-bar .model-btn {
-      width: 52px; height: 42px;
+      width: 76px; height: 42px;
       background: var(--panel-3);
       border: 0;
       color: var(--ink);
@@ -1511,6 +1511,10 @@
       'gpt-4o-mini': 'GPT-4o mini',
       'gpt-4.1': 'GPT-4.1',
       'gpt-4.5-preview': 'GPT-4.5 Preview',
+      'gpt-5': 'GPT-5',
+      'gpt-5-codex': 'GPT-5 Codex',
+      'gpt-5.1': 'GPT-5.1',
+      'gpt-5.1-codex': 'GPT-5.1 Codex',
       'claude-3.5-sonnet': 'Claude 3.5 Sonnet',
       'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
       'claude-3.7-sonnet': 'Claude 3.7 Sonnet',
@@ -1523,16 +1527,25 @@
       'gemini-2.0-flash': 'Gemini 2.0 Flash',
       'gemini-2.0-flash-001': 'Gemini 2.0 Flash',
       'gemini-2.5-pro': 'Gemini 2.5 Pro',
-      'gemini-2.5-pro-preview': 'Gemini 2.5 Pro'
+      'gemini-2.5-pro-preview': 'Gemini 2.5 Pro',
+      'hunyuan-turbo': '混元 Turbo',
+      'hunyuan-2.0-instruct-20251111': '混元 2.0 Instruct',
+      'hy-image-v3.0': '混元生图 3.0'
     };
     return names[key] || m;
   }
+  function stripProviderPrefix(label) {
+    let value = (label || '').trim();
+    const prefix = /^(?:github\s*copilot|github\s*(?:版本|版)?|copilot|codex\s*cli|codex\s*(?:版本|版)?|hunyuan|tokenhub|混元)\s*\/\s*/i;
+    while (prefix.test(value)) value = value.replace(prefix, '').trim();
+    return value;
+  }
   function cleanModelLabel(label) {
-    let m = (label || '').trim().replace(/^copilot\s*\/\s*/i, '');
+    let m = stripProviderPrefix(label);
     const bracket = m.match(/\[([^\]]+)\]\s*$/);
     if (bracket && bracket[1].trim()) return friendlyModelName(bracket[1].trim());
     if (m.includes('/')) {
-      const tail = m.split('/').pop().trim();
+      const tail = stripProviderPrefix(m.split('/').pop().trim());
       if (tail) return friendlyModelName(tail);
     }
     return friendlyModelName(m);
@@ -1546,6 +1559,10 @@
     // 与 APK MainActivity.shortModelLabel 对齐
     const m = cleanModelLabel(label);
     if (/^Codex/i.test(m)) return 'Codex';
+    if (/^GitHub/i.test(m)) return 'GitHub';
+    if (m.startsWith('混元')) return m.replace(/ /g, '').slice(0, 6);
+    if (m.startsWith('GPT-5.1')) return 'GPT-5.1';
+    if (m.startsWith('GPT-5')) return 'GPT-5';
     if (m.startsWith('服务器默认') || m === '默认模型') return '默认';
     if (m.startsWith('自定义')) return '自定';
     if (m.startsWith('GPT')) return m.replace(/ /g, '').slice(0, 6);
@@ -1592,7 +1609,7 @@
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
   }
   async function selectAgentOption(option) {
-    if (!option || option.disabled || agentLoading || codexCliOnly) return;
+    if (!option || option.disabled || agentLoading) return;
     const previousAgent = selectedAgent;
     const previousLabel = selectedAgentOption().label;
     selectedAgent = option.name || '';
@@ -1623,16 +1640,19 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       codexCliOnly = !!data.codex_cli_only;
-      if (codexCliOnly) {
-        selectedAgent = '';
-        agentOptions = [{ name: '', label: 'Codex CLI', disabled: true }];
-        updateModelButton('Codex CLI');
-        return;
-      }
-      const options = [{ name: '', label: '默认模型' }].concat((data.available_agents || []).map((it) => ({
+      const serverOptions = (data.available_agents || []).map((it) => ({
         name: it.name || '',
         label: modelOptionLabel(it)
-      })).filter((it) => it.name));
+      })).filter((it) => it.name);
+      if (codexCliOnly) {
+        agentOptions = serverOptions.length ? serverOptions : [{ name: 'codex_cli', label: 'Codex' }];
+        const configured = data.config && data.config.use_agent;
+        if (agentOptions.some((it) => it.name === configured)) selectedAgent = configured;
+        else if (!agentOptions.some((it) => it.name === selectedAgent)) selectedAgent = agentOptions[0].name || '';
+        updateModelButton(selectedAgentOption().label);
+        return;
+      }
+      const options = [{ name: '', label: '默认模型' }].concat(serverOptions);
       agentOptions = options;
       if (!agentSelectionInitialized) {
         const configured = data.config && data.config.use_agent;

@@ -15,6 +15,7 @@ use axum::{
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use crate::{
+    agent_routing::is_local_cli_option,
     ai_cli,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_conversation_workspace::{
@@ -113,7 +114,10 @@ async fn prewarm_project_response(
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
     let agent = if state.ai_cli.codex_cli_only {
-        None
+        requested_agent
+            .as_deref()
+            .filter(|name| is_local_cli_option(&state, name))
+            .map(ToOwned::to_owned)
     } else {
         requested_agent
     };

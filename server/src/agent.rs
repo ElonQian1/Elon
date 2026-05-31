@@ -226,7 +226,7 @@ async fn run_dispatch_with_workspace(
         decision.route
     };
     let backend_agent_name = if codex_cli_only {
-        Some("codex_cli")
+        agent_name.filter(|name| is_local_cli_option(state, name))
     } else if state.ai_cli.enabled {
         agent_name.filter(|name| is_local_cli_option(state, name))
     } else if image_cli_only {

@@ -60,7 +60,7 @@ internal class MainModelActions(
     private val chevronInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
 
     fun selectedAgentForRequest(): String? {
-        return if (codexCliOnly) null else selectedAgentName
+        return selectedAgentName?.takeIf { it.isNotBlank() }
     }
 
     fun restoreCachedModelSelection() {
@@ -84,33 +84,32 @@ internal class MainModelActions(
 
                 val json = JSONObject(body)
                 val serverCodexCliOnly = json.optBoolean("codex_cli_only", false)
+                val config = json.optJSONObject("config") ?: JSONObject()
+                val agents = json.optJSONArray("available_agents") ?: JSONArray()
                 if (serverCodexCliOnly) {
+                    val options = parseModelOptions(agents, includeDefault = false)
+                        .ifEmpty { listOf(ModelOption("Codex", "codex_cli", "codex")) }
+                    val serverUseAgent = jsonStringOrNull(config, "use_agent")
+                        ?.takeIf { configured -> options.any { it.agentName == configured } }
+                    val cachedAgent = cachedModelAgentName()
+                    val effectiveUseAgent = serverUseAgent ?: cachedAgent?.takeIf { cached ->
+                        options.any { it.agentName == cached }
+                    } ?: options.firstOrNull()?.agentName
+                    val label = options.firstOrNull { it.agentName == effectiveUseAgent }?.label
+                        ?: options.first().label
                     activity.runOnUiThread {
                         codexCliOnly = true
-                        modelOptions = listOf(ModelOption("Codex CLI", null))
-                        selectedAgentName = null
-                        currentModelLabel = "Codex CLI"
-                        cacheModelSelection(null, currentModelLabel)
+                        modelOptions = options
+                        selectedAgentName = effectiveUseAgent
+                        currentModelLabel = label
+                        cacheModelSelection(effectiveUseAgent, currentModelLabel)
                         updateModelButton()
                         afterLoad?.invoke()
                     }
                     return@Thread
                 }
 
-                val config = json.optJSONObject("config") ?: JSONObject()
-                val agents = json.optJSONArray("available_agents") ?: JSONArray()
-                val options = mutableListOf(ModelOption("服务器默认", null, ""))
-
-                for (i in 0 until agents.length()) {
-                    val item = agents.getJSONObject(i)
-                    val name = item.optString("name", "")
-                    val model = item.optString("model", "")
-                    val provider = item.optString("provider", "")
-                    val label = displayModelLabel(provider, model, item.optString("label", ""))
-                    if (name.isNotBlank()) {
-                        options.add(ModelOption(label, name, provider))
-                    }
-                }
+                val options = parseModelOptions(agents, includeDefault = true)
 
                 val serverUseAgent = jsonStringOrNull(config, "use_agent")
                     ?.takeIf { configured -> options.any { it.agentName == configured } }
@@ -173,6 +172,24 @@ internal class MainModelActions(
         modelButtonShellProvider()?.contentDescription = "选择模型：$currentModelLabel"
     }
 
+    private fun parseModelOptions(agents: JSONArray, includeDefault: Boolean): MutableList<ModelOption> {
+        val options = mutableListOf<ModelOption>()
+        if (includeDefault) {
+            options.add(ModelOption("服务器默认", null, ""))
+        }
+        for (i in 0 until agents.length()) {
+            val item = agents.getJSONObject(i)
+            val name = item.optString("name", "")
+            val model = item.optString("model", "")
+            val provider = item.optString("provider", "")
+            val label = displayModelLabel(provider, model, item.optString("label", ""))
+            if (name.isNotBlank()) {
+                options.add(ModelOption(label, name, provider))
+            }
+        }
+        return options
+    }
+
     private fun cacheModelSelection(agentName: String?, label: String) {
         prefs.edit().apply {
             if (agentName.isNullOrBlank()) remove(PREF_SELECTED_AGENT)
@@ -208,13 +225,7 @@ internal class MainModelActions(
         // 其余按 provider 分组
         val grouped = selectableOptions
             .filter { it.agentName != null }
-            .groupByTo(linkedMapOf()) { opt ->
-                when (opt.provider.trim().lowercase()) {
-                    "codex" -> "Codex版"
-                    "copilot" -> "GitHub版"
-                    else -> opt.provider.ifBlank { "其他" }
-                }
-            }
+            .groupByTo(linkedMapOf()) { opt -> providerGroupTitle(opt.provider) }
         grouped.forEach { (header, opts) ->
             if (opts.isNotEmpty()) {
                 items.add(PopupRowItem.Header(header))
@@ -222,9 +233,10 @@ internal class MainModelActions(
             }
         }
 
-        val headerHeight = dp(28)
-        val rowHeight = dp(44)
-        val popupWidth = dp(176)
+        val headerHeight = dp(30)
+        val rowHeight = dp(52)
+        val availablePopupWidth = (activity.resources.displayMetrics.widthPixels - dp(24)).coerceAtLeast(dp(176))
+        val popupWidth = dp(296).coerceAtMost(availablePopupWidth)
         val arrowHeight = dp(8)
 
         // 计算总高度（header 行更矮）
@@ -275,11 +287,7 @@ internal class MainModelActions(
                 is PopupRowItem.Option -> {
                     panel.addView(createModelPopupRow(item.option.label, isModelOptionSelected(item.option)) {
                         dismissModelPopup(animate = false)
-                        if (codexCliOnly) {
-                            Toast.makeText(activity, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
-                        } else {
-                            saveModelSelection(item.option)
-                        }
+                        saveModelSelection(item.option)
                     })
                     val next = items.getOrNull(idx + 1)
                     if (next is PopupRowItem.Option) {
@@ -414,7 +422,7 @@ internal class MainModelActions(
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(28)
+                dp(30)
             )
             setPadding(dp(18), 0, dp(14), 0)
             gravity = Gravity.CENTER_VERTICAL
@@ -429,7 +437,7 @@ internal class MainModelActions(
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
+                dp(52)
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
@@ -440,7 +448,7 @@ internal class MainModelActions(
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 includeFontPadding = false
-                maxLines = 1
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 text = title
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
@@ -459,7 +467,7 @@ internal class MainModelActions(
     }
 
     private fun saveModelSelection(option: ModelOption) {
-        if (codexCliOnly) {
+        if (codexCliOnly && option.agentName.isNullOrBlank()) {
             Toast.makeText(activity, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
             return
         }

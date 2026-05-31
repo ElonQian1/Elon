@@ -15,7 +15,6 @@ import org.json.JSONObject
 import com.elon.app.agent.infrastructure.voice.EnginePreference
 import com.elon.app.agent.infrastructure.voice.RecognitionEngineSelector
 import com.elon.app.update.AppUpdateManager
-import java.util.Locale
 
 /**
  * 用户 AI 代理设置页面
@@ -204,63 +203,6 @@ class SettingsActivity : AppCompatActivity() {
         val labels = availableAgents.map { it.label }
         spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, labels).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        }
-    }
-
-    private fun displayModelLabel(provider: String, model: String, rawLabel: String): String {
-        val raw = rawLabel.trim()
-        if (raw.isNotBlank()) {
-            return cleanModelLabel(raw)
-        }
-
-        val modelName = model.trim()
-        val providerLabel = providerDisplayName(provider)
-        if (modelName.isNotBlank() && !modelName.equals("default", ignoreCase = true)) {
-            return "$providerLabel / ${friendlyModelName(modelName)}"
-        }
-        return providerLabel
-    }
-
-    private fun cleanModelLabel(label: String): String {
-        val raw = label.trim()
-        if (raw.isBlank()) return raw
-        val normalized = raw
-            .replace(Regex("^copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
-            .replace(Regex("^github\\s*copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
-            .replace(Regex("^codex\\b", RegexOption.IGNORE_CASE), "Codex版")
-        if (normalized.contains("/")) {
-            val provider = normalized.substringBefore("/").trim()
-            val model = normalized.substringAfter("/").trim()
-            if (provider.isNotBlank() && model.isNotBlank()) {
-                return "$provider / ${friendlyModelName(model)}"
-            }
-        }
-        return normalized
-    }
-
-    private fun providerDisplayName(provider: String): String {
-        return when (provider.trim().lowercase(Locale.US)) {
-            "copilot" -> "GitHub版"
-            "codex" -> "Codex版"
-            else -> provider.trim().ifBlank { "本地模型" }
-        }
-    }
-
-    private fun friendlyModelName(model: String): String {
-        return when (model.trim().lowercase(Locale.US)) {
-            "gpt-4o" -> "GPT-4o"
-            "gpt-4o-mini" -> "GPT-4o mini"
-            "gpt-4.1" -> "GPT-4.1"
-            "gpt-4.5-preview" -> "GPT-4.5 Preview"
-            "claude-3.5-sonnet", "claude-3-5-sonnet-20241022" -> "Claude 3.5 Sonnet"
-            "claude-3.7-sonnet", "claude-3-7-sonnet-20250219" -> "Claude 3.7 Sonnet"
-            "claude-sonnet-4", "claude-sonnet-4-5" -> "Claude Sonnet 4"
-            "o1-mini" -> "o1 mini"
-            "o1-preview" -> "o1 preview"
-            "o3-mini" -> "o3 mini"
-            "gemini-2.0-flash", "gemini-2.0-flash-001" -> "Gemini 2.0 Flash"
-            "gemini-2.5-pro", "gemini-2.5-pro-preview" -> "Gemini 2.5 Pro"
-            else -> model.trim()
         }
     }
 

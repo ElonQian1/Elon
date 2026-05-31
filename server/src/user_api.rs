@@ -28,7 +28,11 @@ pub async fn get_user_agent(
     let config = UserAgentConfig::load(&workspace).unwrap_or_default();
     let mut response_config = config.clone();
     if state.ai_cli.codex_cli_only {
-        response_config.use_agent = None;
+        response_config.use_agent = response_config
+            .use_agent
+            .as_deref()
+            .filter(|name| is_cli_selection(&state, name))
+            .map(ToOwned::to_owned);
         response_config.api_base = None;
         response_config.api_key = None;
         response_config.model = None;
@@ -240,11 +244,7 @@ fn agent_display_meta(name: &str, model: &str) -> (String, String) {
     if let Some(model_id) = name.strip_prefix("copilot:") {
         (
             "copilot".to_string(),
-            format!(
-                "{} / {}",
-                cli_provider_display_name("copilot"),
-                copilot_model_friendly_name(model_id)
-            ),
+            copilot_model_friendly_name(model_id).to_string(),
         )
     } else {
         (name.to_string(), direct_model_label(model, name))
@@ -263,8 +263,9 @@ fn cli_option_display_label(option: &AiCliOption) -> String {
 
 fn cli_provider_display_name(provider: &str) -> &str {
     match provider.trim().to_ascii_lowercase().as_str() {
-        "copilot" => "GitHub版",
-        "codex" => "Codex版",
+        "copilot" => "GitHub",
+        "codex" => "Codex",
+        "hunyuan" | "tokenhub" => "混元",
         _ => provider,
     }
 }
@@ -304,6 +305,10 @@ fn copilot_model_friendly_name(model: &str) -> &str {
         "gpt-4o-mini" => "GPT-4o mini",
         "gpt-4.1" => "GPT-4.1",
         "gpt-4.5-preview" => "GPT-4.5 Preview",
+        "gpt-5" => "GPT-5",
+        "gpt-5-codex" => "GPT-5 Codex",
+        "gpt-5.1" => "GPT-5.1",
+        "gpt-5.1-codex" => "GPT-5.1 Codex",
         "claude-3.5-sonnet" | "claude-3-5-sonnet-20241022" => "Claude 3.5 Sonnet",
         "claude-3.7-sonnet" | "claude-3-7-sonnet-20250219" => "Claude 3.7 Sonnet",
         "claude-sonnet-4" | "claude-sonnet-4-5" => "Claude Sonnet 4",
@@ -314,6 +319,9 @@ fn copilot_model_friendly_name(model: &str) -> &str {
         "o3-mini" => "o3 mini",
         "gemini-2.0-flash" | "gemini-2.0-flash-001" => "Gemini 2.0 Flash",
         "gemini-2.5-pro" | "gemini-2.5-pro-preview" => "Gemini 2.5 Pro",
+        "hunyuan-turbo" => "混元 Turbo",
+        "hunyuan-2.0-instruct-20251111" => "混元 2.0 Instruct",
+        "hy-image-v3.0" => "混元生图 3.0",
         other => other,
     }
 }
@@ -390,7 +398,7 @@ mod tests {
     fn copilot_agent_label_shows_provider_and_model() {
         let (provider, label) = agent_display_meta("copilot:gpt-4o", "gpt-4o");
         assert_eq!(provider, "copilot");
-        assert_eq!(label, "GitHub版 / GPT-4o");
+        assert_eq!(label, "GPT-4o");
     }
 
     #[test]
@@ -412,6 +420,6 @@ mod tests {
             prompt_mode: CliPromptMode::Arg,
             timeout_secs: 1800,
         };
-        assert_eq!(cli_option_display_label(&option), "gpt-5");
+        assert_eq!(cli_option_display_label(&option), "GPT-5");
     }
 }

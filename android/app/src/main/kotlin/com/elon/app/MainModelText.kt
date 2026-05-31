@@ -2,46 +2,58 @@ package com.elon.app
 
 import java.util.Locale
 
+private val PROVIDER_PREFIX_REGEX = Regex(
+    "^(?:github\\s*copilot|github\\s*(?:版本|版)?|copilot|codex\\s*cli|codex\\s*(?:版本|版)?|hunyuan|tokenhub|混元)\\s*/\\s*",
+    RegexOption.IGNORE_CASE
+)
+
 internal fun modelLabel(name: String, model: String): String {
     return if (model.isBlank()) name else "$name [$model]"
 }
 
 internal fun displayModelLabel(provider: String, model: String, rawLabel: String): String {
+    val modelName = model.trim()
+    if (modelName.isNotBlank() && !modelName.equals("default", ignoreCase = true)) {
+        return friendlyModelName(modelName)
+    }
+
     val raw = rawLabel.trim()
     if (raw.isNotBlank()) {
         return cleanModelLabel(raw)
     }
-
-    val modelName = model.trim()
-    val providerLabel = providerDisplayName(provider)
-    if (modelName.isNotBlank() && !modelName.equals("default", ignoreCase = true)) {
-        return "$providerLabel / ${friendlyModelName(modelName)}"
-    }
-    return providerLabel
+    return providerGroupTitle(provider)
 }
 
 internal fun cleanModelLabel(label: String): String {
     val raw = label.trim()
     if (raw.isBlank()) return raw
-    val normalized = raw
-        .replace(Regex("^copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
-        .replace(Regex("^github\\s*copilot\\b", RegexOption.IGNORE_CASE), "GitHub版")
-        .replace(Regex("^codex\\b", RegexOption.IGNORE_CASE), "Codex版")
+    val normalized = stripProviderPrefix(raw)
     if (normalized.contains("/")) {
-        val provider = normalized.substringBefore("/").trim()
-        val model = normalized.substringAfter("/").trim()
-        if (provider.isNotBlank() && model.isNotBlank()) {
-            return "$provider / ${friendlyModelName(model)}"
+        val model = stripProviderPrefix(normalized.substringAfterLast("/").trim())
+        if (model.isNotBlank()) {
+            return friendlyModelName(model)
         }
     }
-    return normalized
+    providerDisplayNameOrNull(normalized)?.let { return it }
+    return friendlyModelName(normalized)
 }
 
-private fun providerDisplayName(provider: String): String {
-    return when (provider.trim().lowercase(Locale.US)) {
-        "copilot" -> "GitHub版"
-        "codex" -> "Codex版"
-        else -> provider.trim().ifBlank { "本地模型" }
+internal fun providerGroupTitle(provider: String): String {
+    return providerDisplayNameOrNull(provider) ?: provider.trim().ifBlank { "其他" }
+}
+
+private fun providerDisplayNameOrNull(provider: String): String? {
+    val compact = provider.trim().replace(" ", "").lowercase(Locale.US)
+    return when (compact) {
+        "copilot", "github", "githubcopilot", "github版", "github版本" -> "GitHub"
+        "codex", "codexcli", "codex版", "codex版本" -> "Codex"
+        "hunyuan", "tokenhub", "混元" -> "混元"
+        "openai" -> "OpenAI"
+        "deepseek" -> "DeepSeek"
+        "claude", "anthropic" -> "Claude"
+        "custom", "自定义" -> "自定义"
+        "local", "localcli", "本地模型" -> "本地模型"
+        else -> null
     }
 }
 
@@ -51,6 +63,10 @@ internal fun friendlyModelName(model: String): String {
         "gpt-4o-mini" -> "GPT-4o mini"
         "gpt-4.1" -> "GPT-4.1"
         "gpt-4.5-preview" -> "GPT-4.5 Preview"
+        "gpt-5" -> "GPT-5"
+        "gpt-5-codex" -> "GPT-5 Codex"
+        "gpt-5.1" -> "GPT-5.1"
+        "gpt-5.1-codex" -> "GPT-5.1 Codex"
         "claude-3.5-sonnet", "claude-3-5-sonnet-20241022" -> "Claude 3.5 Sonnet"
         "claude-3.7-sonnet", "claude-3-7-sonnet-20250219" -> "Claude 3.7 Sonnet"
         "claude-sonnet-4", "claude-sonnet-4-5" -> "Claude Sonnet 4"
@@ -59,6 +75,9 @@ internal fun friendlyModelName(model: String): String {
         "o3-mini" -> "o3 mini"
         "gemini-2.0-flash", "gemini-2.0-flash-001" -> "Gemini 2.0 Flash"
         "gemini-2.5-pro", "gemini-2.5-pro-preview" -> "Gemini 2.5 Pro"
+        "hunyuan-turbo" -> "混元 Turbo"
+        "hunyuan-2.0-instruct-20251111" -> "混元 2.0 Instruct"
+        "hy-image-v3.0" -> "混元生图 3.0"
         else -> model.trim()
     }
 }
@@ -66,8 +85,11 @@ internal fun friendlyModelName(model: String): String {
 internal fun shortModelLabel(label: String): String {
     val m = cleanModelLabel(label)
     return when {
-        m.startsWith("Codex版", ignoreCase = true) -> "Codex"
-        m.startsWith("GitHub版", ignoreCase = true) -> "GitHub"
+        m.startsWith("Codex", ignoreCase = true) -> "Codex"
+        m.startsWith("GitHub", ignoreCase = true) -> "GitHub"
+        m.startsWith("混元") -> m.replace(" ", "").take(6)
+        m.startsWith("GPT-5.1") -> "GPT-5.1"
+        m.startsWith("GPT-5") -> "GPT-5"
         m.startsWith("服务器默认") -> "默认"
         m.startsWith("自定义") -> "自定"
         m.startsWith("GPT") -> m.replace(" ", "").take(6)
@@ -76,5 +98,14 @@ internal fun shortModelLabel(label: String): String {
         m.startsWith("Claude") -> "Cl" + m.substringAfterLast(" ").take(3)
         m.startsWith("Gemini") -> "G" + m.substringAfterLast(" ").take(4)
         else -> m.take(6)
+    }
+}
+
+private fun stripProviderPrefix(label: String): String {
+    var value = label.trim()
+    while (true) {
+        val next = value.replace(PROVIDER_PREFIX_REGEX, "")
+        if (next == value) return value
+        value = next.trim()
     }
 }

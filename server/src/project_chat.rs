@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    agent, ai_cli, intent_router,
+    agent, agent_routing::is_local_cli_option, ai_cli, intent_router,
     project_attachment_notes::{append_project_attachment_notes, append_project_cli_attachment_artifacts},
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
@@ -226,7 +226,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
         .unwrap_or(base_workspace.as_path());
     let workspace_key = workspace.display().to_string();
     let prewarm_agent = if state.ai_cli.codex_cli_only {
-        None
+        agent_name
+            .as_deref()
+            .filter(|name| is_local_cli_option(&state, name))
     } else {
         agent_name.as_deref()
     };
