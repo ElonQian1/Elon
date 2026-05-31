@@ -124,6 +124,9 @@
 
     /* ===== 会话页 ===== */
     .conversation-list { flex: 0 0 auto; }
+    .search-bar { flex: 0 0 auto; padding: 8px 14px; background: var(--panel-2); }
+    .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
+    .search-bar input::placeholder { color: var(--ink-soft); }
     .conversation-item {
       height: 66px;
       background: var(--panel-2);
@@ -679,6 +682,9 @@
     <!-- 会话页：会话列表（默认）/ 进入项目后切到聊天视图 -->
     <div id="chatPage" class="page active">
       <!-- 列表状态 -->
+      <div id="searchBar" class="search-bar hidden">
+        <input id="searchInput" type="search" placeholder="搜索项目名称…" />
+      </div>
       <div id="conversationList" class="conversation-list"></div>
       <!-- 项目内聊天视图 -->
       <div id="chatView" class="chat-view hidden">
@@ -862,6 +868,8 @@
   const chatView = $('chatView');
   const chatList = $('chatList');
   const stageHint = $('stageHint');
+  const searchBar = $('searchBar');
+  const searchInput = $('searchInput');
 
   const projectOverviewText = $('projectOverviewText');
   const currentStageText = $('currentStageText');
@@ -927,6 +935,7 @@
   let socket = null;
   let busy = false;
   let progressLog = [];
+  let searchQuery = '';
   let selectedAgent = '';
   let agentOptions = [];
   let agentSelectionInitialized = false;
@@ -957,6 +966,7 @@
   function setBusy(value) {
     busy = !!value;
     sendBtn.disabled = busy || !currentProject;
+    if (!busy) stageHint.textContent = '点击输入需求，开发进度会自动记录到项目页。';
   }
   function formatTime(iso) {
     if (!iso) return '';
@@ -1085,16 +1095,22 @@
 
   // ====== 会话/项目列表 ======
   function renderConversationList() {
-    if (!projects.length) {
-      conversationList.innerHTML =
-        '<div class="empty-tip">还没有项目<br/>点击右上角 ＋ 新建你的第一个 App'
-        + '<br/><button id="emptyCreateBtn">新建项目</button></div>';
-      const b = $('emptyCreateBtn');
-      if (b) b.addEventListener('click', openNewProject);
+    const filtered = searchQuery
+      ? projects.filter((p) => (p.name || '').toLowerCase().includes(searchQuery))
+      : projects;
+    if (!filtered.length) {
+      conversationList.innerHTML = searchQuery
+        ? '<div class="empty-tip">没有匹配的项目</div>'
+        : '<div class="empty-tip">还没有项目<br/>点击右上角 ＋ 新建你的第一个 App'
+          + '<br/><button id="emptyCreateBtn">新建项目</button></div>';
+      if (!searchQuery) {
+        const b = $('emptyCreateBtn');
+        if (b) b.addEventListener('click', openNewProject);
+      }
       return;
     }
     conversationList.innerHTML = '';
-    projects.forEach((p) => {
+    filtered.forEach((p) => {
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'conversation-item' + (currentProject && currentProject.id === p.id ? ' active' : '');
@@ -1115,6 +1131,9 @@
   }
 
   function selectProject(project) {
+    searchBar.classList.add('hidden');
+    searchQuery = '';
+    searchInput.value = '';
     currentProject = project;
     progressLog = [];
     conversationList.classList.add('hidden');
@@ -1142,7 +1161,10 @@
       } else if (step === stepCurrent) {
         el.className = 'stage-line active';
         el.textContent = STAGE_NAMES[i] + '：进行中';
-        if (!allDone) currentStageText.textContent = STAGE_NAMES[i] + ' 进行中…';
+        if (!allDone) {
+          currentStageText.textContent = STAGE_NAMES[i] + ' 进行中…';
+          stageHint.textContent = STAGE_NAMES[i] + ' 进行中…';
+        }
       } else {
         el.textContent = STAGE_NAMES[i] + '：等待';
       }
@@ -1153,14 +1175,18 @@
   function resetProjectPage() {
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
-    stagePlanText.textContent = '1. 需求分析：等待';
-    stageCodeText.textContent = '2. 开发实现：等待';
-    stageBuildText.textContent = '3. 编译打包：等待';
-    stageDeliverText.textContent = '4. 交付下载：等待';
+    STAGE_ELS().forEach((el, i) => {
+      el.className = 'stage-line';
+      el.textContent = STAGE_NAMES[i] + '：等待';
+    });
     projectHistoryText.textContent = '暂无进度记录';
   }
   function renderProjectPage(p) {
     if (!p) { resetProjectPage(); return; }
+    STAGE_ELS().forEach((el, i) => {
+      el.className = 'stage-line';
+      el.textContent = STAGE_NAMES[i] + '：等待';
+    });
     currentStageText.textContent = p.last_task_status || p.status || '准备就绪';
     const overview = [
       '项目：' + (p.name || ''),
@@ -1618,9 +1644,31 @@
     showLogin();
   });
 
-  // ====== 其他按钮（占位） ======
+  // ====== 搜索 ======
   searchBtn.addEventListener('click', () => {
-    appendBubble('progress', '搜索功能开发中。');
+    if (currentProject) return;
+    const nowHidden = searchBar.classList.toggle('hidden');
+    if (!nowHidden) {
+      searchQuery = '';
+      searchInput.value = '';
+      renderConversationList();
+      searchInput.focus();
+    } else {
+      searchQuery = '';
+      renderConversationList();
+    }
+  });
+  searchInput.addEventListener('input', () => {
+    searchQuery = searchInput.value.trim().toLowerCase();
+    renderConversationList();
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchBar.classList.add('hidden');
+      searchQuery = '';
+      searchInput.value = '';
+      renderConversationList();
+    }
   });
   projectContinueBtn.addEventListener('click', () => {
     if (!currentProject) { switchTab('chatPage'); return; }
