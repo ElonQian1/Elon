@@ -22,6 +22,8 @@ internal class MainProfileQuickActions(
     private val showGuestImportDialog: () -> Unit,
     private val confirmLogout: () -> Unit
 ) {
+    private val tokenUsageCard by lazy { ProfileTokenUsageCard(activity, binding) }
+
     fun setupQuickActions() {
         MainQuickActionBindings(
             activity = activity,
@@ -46,6 +48,7 @@ internal class MainProfileQuickActions(
     fun refreshProfileSummary() {
         if (isBindingInitialized()) {
             UserProfileViews.renderSummary(activity, binding, openProfileDetails)
+            tokenUsageCard.attachAndRefresh()
         }
     }
 

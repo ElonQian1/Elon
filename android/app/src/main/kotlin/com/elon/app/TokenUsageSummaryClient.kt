@@ -14,7 +14,13 @@ internal data class TokenUsageSummaryLine(
 )
 
 internal data class TokenUsageSummary(
-    val lines: List<TokenUsageSummaryLine>
+    val lines: List<TokenUsageSummaryLine>,
+    val days: Int = 30,
+    val totalTokens: Long = 0,
+    val weekTokens: Long = 0,
+    val remainingTokens: Long? = null,
+    val limitTokens: Long? = null,
+    val resetText: String? = null
 )
 
 internal object TokenUsageSummaryClient {
@@ -72,7 +78,15 @@ internal object TokenUsageSummaryClient {
         if (weekTokens != totalTokens) {
             lines += TokenUsageSummaryLine("7天已用", formatTokens(weekTokens))
         }
-        return TokenUsageSummary(lines)
+        return TokenUsageSummary(
+            lines = lines,
+            days = days,
+            totalTokens = totalTokens,
+            weekTokens = weekTokens,
+            remainingTokens = remainingTokens,
+            limitTokens = limitTokens,
+            resetText = resetText
+        )
     }
 
     private fun recentDaysTokens(json: JSONObject, count: Int): Long {
@@ -106,9 +120,9 @@ internal object TokenUsageSummaryClient {
         return null
     }
 
-    private fun formatTokens(tokens: Long): String = "${formatCount(tokens)} tokens"
+    fun formatTokens(tokens: Long): String = "${formatCount(tokens)} tokens"
 
-    private fun formatCount(value: Long): String = when {
+    fun formatCount(value: Long): String = when {
         value >= 1_000_000_000 -> String.format(Locale.US, "%.1fB", value / 1_000_000_000.0)
         value >= 1_000_000 -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
         value >= 1_000 -> String.format(Locale.US, "%.1fK", value / 1_000.0)

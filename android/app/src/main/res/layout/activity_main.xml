@@ -415,6 +415,13 @@
                     android:textColor="#D0D0D0"
                     android:textSize="15sp" />
 
+                <LinearLayout
+                    android:id="@+id/profileUsageContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+
                 <TextView
                     android:id="@+id/profileLoginButton"
                     android:layout_width="match_parent"

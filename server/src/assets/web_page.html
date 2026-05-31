@@ -349,20 +349,96 @@
     }
     /* Token 消耗统计 */
     .usage-section {
-      background: var(--panel);
+      background: #171b20;
       padding: 18px 22px;
       margin-top: 10px !important;
+      border-radius: 8px;
     }
     .usage-section h3 {
-      margin: 0 0 12px;
-      font-size: 15px;
-      font-weight: normal;
-      color: var(--ink);
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #e6eef8;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .usage-section h3 small { font-size: 12px; color: var(--ink-dim); font-weight: normal; }
+    .usage-section h3 small {
+      background: #163221;
+      border-radius: 8px;
+      color: #a8f0c0;
+      font-size: 12px;
+      font-weight: normal;
+      padding: 5px 10px;
+    }
+    .usage-remaining {
+      margin-top: 18px;
+      color: #fff;
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .usage-caption {
+      margin-top: 8px;
+      color: #9ba7b5;
+      font-size: 13px;
+    }
+    .usage-bar {
+      height: 8px;
+      border-radius: 99px;
+      overflow: hidden;
+      background: #2a3038;
+      margin-top: 14px;
+    }
+    .usage-progress {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: var(--brand);
+      transition: width 180ms ease, background 180ms ease;
+    }
+    .usage-progress-label {
+      margin-top: 8px;
+      color: #728092;
+      font-size: 12px;
+    }
+    .usage-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .usage-metric-label {
+      color: #7c8898;
+      font-size: 11px;
+    }
+    .usage-metric-value {
+      color: #e5eaf1;
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 7px;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .usage-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .usage-action {
+      height: 42px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .usage-action.secondary { background: #243141; color: #dce9ff; }
+    .usage-action.primary { background: var(--brand); color: #07140c; }
     .usage-row {
       display: flex;
       justify-content: space-between;
@@ -375,6 +451,12 @@
     .usage-label { color: var(--ink-soft); }
     .usage-value { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 14px; }
     .usage-hint { font-size: 12px; color: var(--ink-dim); margin-top: 8px; }
+    .recharge-message {
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -738,6 +820,33 @@
         </div>
       </div>
 
+      <div class="usage-section">
+        <h3>Token 额度 <small id="usagePeriodText">近30天</small></h3>
+        <div class="usage-remaining" id="usageRemainingText">读取中...</div>
+        <div class="usage-caption" id="usageRemainingCaption">正在同步服务器用量</div>
+        <div class="usage-bar"><div class="usage-progress" id="usageProgress"></div></div>
+        <div class="usage-progress-label" id="usageProgressLabel">额度读取中</div>
+        <div class="usage-metrics">
+          <div>
+            <div class="usage-metric-label">30天已用</div>
+            <div class="usage-metric-value" id="usageMonthValue">—</div>
+          </div>
+          <div>
+            <div class="usage-metric-label">7天已用</div>
+            <div class="usage-metric-value" id="usageWeekValue">—</div>
+          </div>
+          <div>
+            <div class="usage-metric-label">总额度</div>
+            <div class="usage-metric-value" id="usageLimitValue">—</div>
+          </div>
+        </div>
+        <div id="usageContent"></div>
+        <div class="usage-actions">
+          <button class="usage-action secondary" id="usageRefreshBtn" type="button">刷新用量</button>
+          <button class="usage-action primary" id="rechargeQuotaBtn" type="button">充值额度</button>
+        </div>
+      </div>
+
       <!-- APK 推广下载块 -->
       <div class="apk-promo">
         <div class="apk-promo-row">
@@ -767,10 +876,6 @@
         <span>退出登录</span><span class="arrow">›</span>
       </button>
       <div class="profile-version" id="versionText">一龙网页版</div>
-      <div class="usage-section">
-        <h3>消耗统计 <small>近 30 天</small></h3>
-        <div id="usageContent"><div class="usage-hint">加载中…</div></div>
-      </div>
     </div>
 
   </section>
@@ -868,6 +973,18 @@
   </form>
 </div>
 
+<!-- ============ 充值额度对话框 ============ -->
+<div class="modal-mask" id="rechargeMask">
+  <div class="modal">
+    <h2>充值额度</h2>
+    <div class="recharge-message" id="rechargeText"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="closeRechargeBtn">关闭</button>
+      <button type="button" class="btn-confirm" id="copyRechargeUserBtn">复制用户 ID</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -919,7 +1036,17 @@
   const cancelDeleteBtn = $('cancelDeleteBtn');
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
+  const usagePeriodText = $('usagePeriodText');
+  const usageRemainingText = $('usageRemainingText');
+  const usageRemainingCaption = $('usageRemainingCaption');
+  const usageProgress = $('usageProgress');
+  const usageProgressLabel = $('usageProgressLabel');
+  const usageMonthValue = $('usageMonthValue');
+  const usageWeekValue = $('usageWeekValue');
+  const usageLimitValue = $('usageLimitValue');
   const usageContent = $('usageContent');
+  const usageRefreshBtn = $('usageRefreshBtn');
+  const rechargeQuotaBtn = $('rechargeQuotaBtn');
   const checkUpdateRow = $('checkUpdateRow');
   const updateArrow = $('updateArrow');
   const logoutRow = $('logoutRow');
@@ -945,6 +1072,10 @@
   const agentList = $('agentList');
   const agentError = $('agentError');
   const cancelAgentBtn = $('cancelAgentBtn');
+  const rechargeMask = $('rechargeMask');
+  const rechargeText = $('rechargeText');
+  const copyRechargeUserBtn = $('copyRechargeUserBtn');
+  const closeRechargeBtn = $('closeRechargeBtn');
 
   const progressLogMask = $('progressLogMask');
   const progressLogContent = $('progressLogContent');
@@ -1530,37 +1661,144 @@
   }
 
   // ====== Token 消耗统计 ======
+  function formatUsageCount(n) {
+    const value = Number(n || 0);
+    if (value >= 1000000000) return (value / 1000000000).toFixed(1) + 'B';
+    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+    if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+    return String(value);
+  }
+  function pickUsageNumber(source, keys) {
+    if (!source) return null;
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+        const n = Number(source[key]);
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    return null;
+  }
+  function recentUsageTokens(rows, count) {
+    return (rows || []).slice(0, count).reduce((sum, row) => sum + Number(row.total_tokens || 0), 0);
+  }
+  function setUsageProgress(value, color) {
+    usageProgress.style.width = Math.max(0, Math.min(100, value)) + '%';
+    usageProgress.style.background = color;
+  }
+  function usageProgressColor(percent) {
+    if (percent <= 15) return '#ff6b6b';
+    if (percent <= 35) return '#ffb65c';
+    return '#07c160';
+  }
+  function renderUsagePending(label, caption) {
+    usagePeriodText.textContent = label;
+    usageRemainingText.textContent = '读取中...';
+    usageRemainingCaption.textContent = caption;
+    setUsageProgress(0, '#5fa8ff');
+    usageProgressLabel.textContent = '额度读取中';
+    usageMonthValue.textContent = '—';
+    usageWeekValue.textContent = '—';
+    usageLimitValue.textContent = '—';
+    usageContent.innerHTML = '';
+  }
   async function loadUsageStats() {
-    if (!currentUser) return;
-    usageContent.innerHTML = '<div class="usage-hint">加载中…</div>';
+    if (!currentUser) {
+      usagePeriodText.textContent = '未登录';
+      usageRemainingText.textContent = '登录后查看';
+      usageRemainingCaption.textContent = '登录账号后显示剩余额度和 token 消耗';
+      setUsageProgress(0, '#ffb65c');
+      usageProgressLabel.textContent = '未连接账号额度';
+      usageMonthValue.textContent = '—';
+      usageWeekValue.textContent = '—';
+      usageLimitValue.textContent = '—';
+      usageContent.innerHTML = '';
+      return;
+    }
+    renderUsagePending('同步中', '正在同步服务器用量');
     try {
       const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/usage/stats?days=30');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
       const t = data.total || {};
       const total = t.total_tokens || 0;
-      const input = t.input_tokens || 0;
-      const output = t.output_tokens || 0;
-      const cached = t.cached_input_tokens || 0;
-      function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n); }
-      const rows = [
-        ['总 tokens', fmt(total)],
-        ['输入 tokens', fmt(input)],
-        ['输出 tokens', fmt(output)],
-        ['缓存命中', fmt(cached)],
-      ];
-      // 按功能分组（项目开发 / 运行时小数 top3）
+      const byDay = data.by_day || [];
+      const quota = data.quota || data.usage_quota || data.token_quota || data.limits || null;
+      const remaining = pickUsageNumber(quota, ['remaining_tokens', 'tokens_remaining', 'remaining'])
+        ?? pickUsageNumber(data, ['remaining_tokens', 'tokens_remaining']);
+      const limit = pickUsageNumber(quota, ['limit_tokens', 'quota_tokens', 'max_tokens', 'total_limit'])
+        ?? pickUsageNumber(data, ['limit_tokens', 'quota_tokens', 'max_tokens']);
+      const resetText = (quota && (quota.reset_at || quota.resets_at || quota.reset_time || quota.reset)) ||
+        data.reset_at || data.resets_at || data.reset_time || '';
+
+      usagePeriodText.textContent = '近30天';
+      if (remaining === null) {
+        usageRemainingText.textContent = '未配置';
+        usageRemainingCaption.textContent = '服务器暂未返回剩余额度';
+        setUsageProgress(0, '#8fa0b8');
+        usageProgressLabel.textContent = '额度上限未配置';
+      } else {
+        usageRemainingText.textContent = formatUsageCount(remaining);
+        usageRemainingCaption.textContent = '剩余 tokens' + (resetText ? ' · ' + resetText : '');
+        if (limit && limit > 0) {
+          const percent = Math.max(0, Math.min(100, Math.floor((remaining / limit) * 100)));
+          setUsageProgress(percent, usageProgressColor(percent));
+          usageProgressLabel.textContent = '剩余 ' + percent + '% · 总额度 ' + formatUsageCount(limit) + ' tokens';
+        } else {
+          setUsageProgress(100, '#07c160');
+          usageProgressLabel.textContent = '剩余 ' + formatUsageCount(remaining) + ' tokens';
+        }
+      }
+
+      usageMonthValue.textContent = formatUsageCount(total);
+      usageWeekValue.textContent = formatUsageCount(recentUsageTokens(byDay, 7));
+      usageLimitValue.textContent = limit ? formatUsageCount(limit) : '未配置';
+
       const byFeature = (data.by_feature || []).slice(0, 3);
-      usageContent.innerHTML = rows.map(([l, v]) =>
-        '<div class="usage-row"><span class="usage-label">' + l + '</span><span class="usage-value">' + v + '</span></div>'
-      ).join('') +
-      (byFeature.length ? '<div class="usage-hint" style="margin-top:10px;color:var(--ink-soft)">' +
-        byFeature.map((f) => (f.feature || 'other') + ' ' + fmt(f.total_tokens)).join('、') +
+      usageContent.innerHTML = (byFeature.length ? '<div class="usage-hint" style="margin-top:14px;color:var(--ink-soft)">' +
+        byFeature.map((f) => (f.feature || 'other') + ' ' + formatUsageCount(f.total_tokens)).join('、') +
         '</div>' : '') +
       (total === 0 ? '<div class="usage-hint">近 30 天暂无记录</div>' : '');
     } catch (err) {
-      usageContent.innerHTML = '<div class="usage-hint" style="color:var(--bubble-error-ink)">加载失败</div>';
+      usagePeriodText.textContent = '暂不可用';
+      usageRemainingText.textContent = '加载失败';
+      usageRemainingCaption.textContent = (err && err.message) ? err.message : '请稍后重试';
+      setUsageProgress(0, '#e86f6f');
+      usageProgressLabel.textContent = '稍后可点刷新用量重试';
+      usageMonthValue.textContent = '—';
+      usageWeekValue.textContent = '—';
+      usageLimitValue.textContent = '—';
+      usageContent.innerHTML = '';
     }
+  }
+
+  function openRechargeDialog() {
+    const userId = currentUser && currentUser.id ? currentUser.id : '';
+    const account = currentUser && (currentUser.account || currentUser.nickname)
+      ? (currentUser.account || currentUser.nickname)
+      : '未登录';
+    rechargeText.textContent = '当前充值通道由管理员开通。\n\n账号：' + account +
+      '\n用户 ID：' + (userId || '请先登录') +
+      '\n\n复制用户 ID 发给管理员，补充额度后这里会自动刷新。';
+    copyRechargeUserBtn.disabled = !userId;
+    copyRechargeUserBtn.textContent = '复制用户 ID';
+    rechargeMask.classList.add('active');
+  }
+
+  async function copyRechargeUserId() {
+    if (!currentUser || !currentUser.id) return;
+    try {
+      await navigator.clipboard.writeText(currentUser.id);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = currentUser.id;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    copyRechargeUserBtn.textContent = '已复制';
+    setTimeout(() => { copyRechargeUserBtn.textContent = '复制用户 ID'; }, 1600);
   }
 
   // ====== 新建项目 ======
@@ -1652,6 +1890,16 @@
       copyLinkBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> 复制下载链接';
     }, 2200);
   });
+
+  usageRefreshBtn.addEventListener('click', () => {
+    loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+  });
+  rechargeQuotaBtn.addEventListener('click', openRechargeDialog);
+  closeRechargeBtn.addEventListener('click', () => rechargeMask.classList.remove('active'));
+  rechargeMask.addEventListener('click', (e) => {
+    if (e.target === rechargeMask) rechargeMask.classList.remove('active');
+  });
+  copyRechargeUserBtn.addEventListener('click', copyRechargeUserId);
 
   // ====== 检查更新 ======
   checkUpdateRow.addEventListener('click', async () => {
