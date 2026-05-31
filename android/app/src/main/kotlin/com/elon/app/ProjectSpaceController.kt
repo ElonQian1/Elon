@@ -66,8 +66,13 @@ internal class ProjectSpaceController(
                 result.onSuccess {
                     activeSpace = it
                     activeProjectTitle = it.project.name
-                    showProjectSpace(activeProjectTitle, false)
-                    renderActiveSpace()
+                    val defaultChannel = it.defaultGroupChannel()
+                    if (defaultChannel != null) {
+                        openChannel(defaultChannel, animate = false)
+                    } else {
+                        showProjectSpace(activeProjectTitle, false)
+                        renderActiveSpace()
+                    }
                 }.onFailure { error ->
                     renderError(error.message ?: "加载项目空间失败")
                 }
@@ -212,7 +217,7 @@ internal class ProjectSpaceController(
         return true
     }
 
-    private fun openChannel(channel: ProjectChannel) {
+    private fun openChannel(channel: ProjectChannel, animate: Boolean = true) {
         activeChannel = channel
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
         val adapter = ChatAdapter(
@@ -223,9 +228,14 @@ internal class ProjectSpaceController(
         activeAdapter = adapter
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
-        showProjectChannelChat("#${channel.name}", true)
+        showProjectChannelChat("#${channel.name}", animate)
         loadMessages(channel, silent = false, scrollToBottom = true)
         startPolling()
+    }
+
+    private fun ProjectSpace.defaultGroupChannel(): ProjectChannel? {
+        return channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
+            ?: channels.firstOrNull()
     }
 
     private fun startPolling() {
@@ -507,6 +517,7 @@ internal class ProjectSpaceController(
     private companion object {
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
+        const val DEFAULT_GROUP_CHANNEL_KIND = "discussion"
         const val AI_CHANNEL_KIND = "ai_development"
     }
 }
