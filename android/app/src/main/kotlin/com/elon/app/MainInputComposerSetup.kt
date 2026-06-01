@@ -121,23 +121,20 @@ internal class MainInputComposerSetup(
             setOnClickListener { toggleVoiceMode() }
         }
 
-        val collapsedInputTouchListener = View.OnTouchListener { view, event ->
-            when (event.action) {
-                MotionEvent.ACTION_UP -> {
-                    view.isPressed = false
-                    focusInputComposer()
-                    true
-                }
-                MotionEvent.ACTION_DOWN -> {
-                    view.isPressed = true
-                    true
-                }
-                MotionEvent.ACTION_CANCEL -> {
-                    view.isPressed = false
-                    true
-                }
-                else -> true
+        lateinit var inputComposerMotion: InputComposerMotion
+        val openCollapsedInputComposer = {
+            if (!inputComposerMotion.isExpanded && !isVoiceMode()) {
+                inputComposerMotion.prepareKeyboardSynchronizedExpansion()
             }
+            if (!isVoiceMode()) {
+                focusInputComposer()
+            }
+        }
+        val collapsedInputTouchListener = View.OnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                openCollapsedInputComposer()
+            }
+            false
         }
 
         val inputCenterContainer = FrameLayout(activity).apply {
@@ -150,7 +147,7 @@ internal class MainInputComposerSetup(
             minimumHeight = dp(40)
             isClickable = true
             isFocusable = false
-            setOnClickListener { focusInputComposer() }
+            setOnClickListener { openCollapsedInputComposer() }
             setOnTouchListener(collapsedInputTouchListener)
         }
 
@@ -170,11 +167,10 @@ internal class MainInputComposerSetup(
             isClickable = true
             isFocusable = false
             isFocusableInTouchMode = false
-            setOnClickListener { focusInputComposer() }
+            setOnClickListener { openCollapsedInputComposer() }
             setOnTouchListener(collapsedInputTouchListener)
         }
 
-        lateinit var inputComposerMotion: InputComposerMotion
         val expandEditorButton = ImageButton(activity).apply {
             layoutParams = FrameLayout.LayoutParams(dp(34), dp(34), Gravity.TOP or Gravity.END).apply {
                 topMargin = dp(3)
