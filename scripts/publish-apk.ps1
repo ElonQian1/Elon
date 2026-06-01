@@ -579,6 +579,20 @@ $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value
 $oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
 Write-Host "   build.gradle 兜底: v$oldName (build $oldCode) — 不会被本次脚本提交" -ForegroundColor DarkGray
 
+# 查服务器当前已部署版本，作为 claim 的基准（防止 build.gradle 兜底值远低于线上导致重复分配）
+$serverCurrentCode = $oldCode
+$serverCurrentName = $oldName
+try {
+    $serverDeployed = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
+    if ($serverDeployed.versionCode -gt $serverCurrentCode) {
+        $serverCurrentCode = [int]$serverDeployed.versionCode
+        $serverCurrentName = [string]$serverDeployed.versionName
+        Write-Host "   ℹ️  服务器已部署 build $serverCurrentCode (v$serverCurrentName)，以此为 claim 基准" -ForegroundColor DarkGray
+    }
+} catch {
+    Write-Warning "   ⚠️  无法读取服务器当前版本，以 build.gradle 兜底值为 claim 基准"
+}
+
 $builderId = "$env:COMPUTERNAME-$env:USERNAME"
 if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq "-") {
     $builderId = "unknown-builder-" + ([Guid]::NewGuid().ToString().Substring(0,8))
@@ -592,8 +606,8 @@ try {
         builderId          = $builderId
         builderLabel       = $builderLabel
         bump               = 'patch'
-        currentVersionName = $oldName
-        currentVersionCode = $oldCode
+        currentVersionName = $serverCurrentName
+        currentVersionCode = $serverCurrentCode
     })
 } catch {
     Write-Error "❌ /api/release/claim 失败：$_"
