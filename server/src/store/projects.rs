@@ -41,6 +41,9 @@ impl Store {
               (SELECT t.status FROM tasks t
                WHERE t.project_id = p.id
                ORDER BY t.created_at DESC LIMIT 1) AS last_task_status,
+              (SELECT t.apk_url FROM tasks t
+               WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
+               ORDER BY t.created_at DESC LIMIT 1) AS latest_apk_url,
               p.created_at,
               p.updated_at,
               p.created_by AS owner_id
@@ -66,9 +69,10 @@ impl Store {
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
                     last_task_status: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    owner_id: row.get(11).unwrap_or_default(),
+                    latest_apk_url: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    owner_id: row.get(12).unwrap_or_default(),
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -86,6 +90,9 @@ impl Store {
                p.is_public,
                p.join_mode,
                (SELECT t.status FROM tasks t WHERE t.project_id = p.id
+                ORDER BY t.created_at DESC LIMIT 1),
+               (SELECT t.apk_url FROM tasks t
+                WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                 ORDER BY t.created_at DESC LIMIT 1),
                p.created_at,
                p.updated_at,
@@ -105,9 +112,10 @@ impl Store {
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
                     last_task_status: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    owner_id: row.get(11).unwrap_or_default(),
+                    latest_apk_url: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    owner_id: row.get(12).unwrap_or_default(),
                 })
             },
         )
@@ -232,6 +240,9 @@ impl Store {
                p.is_public, p.join_mode,
                (SELECT t.status FROM tasks t WHERE t.project_id = p.id
                 ORDER BY t.created_at DESC LIMIT 1),
+               (SELECT t.apk_url FROM tasks t
+                WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
+                ORDER BY t.created_at DESC LIMIT 1),
                p.created_at, p.updated_at,
                p.created_by AS owner_id
              FROM projects p
@@ -254,9 +265,10 @@ impl Store {
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
                     last_task_status: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    owner_id: row.get(11).unwrap_or_default(),
+                    latest_apk_url: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    owner_id: row.get(12).unwrap_or_default(),
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -499,6 +511,42 @@ mod tests {
             .get_project_access(&viewer.id, &project.id)
             .expect("viewer should have project access");
         assert_eq!(access.role, "observer");
+    }
+
+    #[test]
+    fn public_projects_include_latest_apk_url() {
+        let store = temp_store();
+        let owner = store
+            .create_user("apk-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "APK Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should become public");
+        let task = store
+            .create_task(&project.id, &owner.id, Some("conv"), "build apk")
+            .expect("task should be created");
+        store
+            .finish_task(
+                &task,
+                "done",
+                Some("done"),
+                Some("https://example.test/latest.apk"),
+                None,
+            )
+            .expect("task should finish with apk url");
+
+        let public_projects = store
+            .list_public_projects(None, 10, 0)
+            .expect("store projects should list");
+        assert_eq!(
+            public_projects[0].latest_apk_url.as_deref(),
+            Some("https://example.test/latest.apk")
+        );
     }
 
     #[test]

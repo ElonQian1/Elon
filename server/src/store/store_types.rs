@@ -187,6 +187,7 @@ pub struct PublicProjectItem {
     pub is_public: bool,
     pub join_mode: String, // "open" | "approval" | "invite" | "readonly"
     pub last_task_status: Option<String>,
+    pub latest_apk_url: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

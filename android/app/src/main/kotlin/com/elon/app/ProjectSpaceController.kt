@@ -1,10 +1,8 @@
 package com.elon.app
 
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -15,7 +13,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
-import java.net.URLEncoder
 import kotlin.concurrent.thread
 
 internal class ProjectSpaceController(
@@ -553,11 +550,7 @@ internal class ProjectSpaceController(
             Toast.makeText(activity, "请先登录后下载 APK", Toast.LENGTH_SHORT).show()
             return
         }
-        val separator = if (apkUrl.contains("?")) "&" else "?"
-        val url = "$apkUrl${separator}token=${URLEncoder.encode(token, Charsets.UTF_8.name())}"
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        runCatching { activity.startActivity(intent) }
-            .onFailure { Toast.makeText(activity, "无法打开下载链接", Toast.LENGTH_SHORT).show() }
+        openProjectApkInstall(activity, apkUrl, token)
     }
 
     private fun panelBackground(color: String): GradientDrawable {

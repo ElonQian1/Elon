@@ -20,6 +20,7 @@ internal data class StoreProject(
     val isPublic: Boolean,
     val joinMode: String,
     val lastTaskStatus: String?,
+    val latestApkUrl: String? = null,
     val role: String = "member"
 )
 
@@ -226,6 +227,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     isPublic = obj.optBoolean("is_public", true),
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "open")),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
+    latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
+        ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
     role = obj.optString("role", "member")
 )
 
@@ -239,7 +242,8 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     memberCount = 1,
     isPublic = false,
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
-    lastTaskStatus = null
+    lastTaskStatus = null,
+    latestApkUrl = null
 )
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */

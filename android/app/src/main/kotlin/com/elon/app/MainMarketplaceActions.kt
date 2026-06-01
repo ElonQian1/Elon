@@ -95,11 +95,7 @@ internal class MainMarketplaceActions(
                 result
                     .onSuccess {
                         joinedIds.add(project.id)
-                        joinBtn.text = "进入项目"
-                        joinBtn.isEnabled = true
-                        joinBtn.setTextColor(Color.parseColor("#FFFFFF"))
-                        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#3BA55D"))
-                        joinBtn.setOnClickListener { openJoinedProject(project) }
+                        markProjectJoined(project, joinBtn)
                         Toast.makeText(activity, projectJoinSuccessToast(project.joinMode), Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
@@ -109,6 +105,60 @@ internal class MainMarketplaceActions(
                     }
             }
         }
+    }
+
+    private fun tryInstallProject(project: StoreProject, installBtn: TextView, joinBtn: TextView?) {
+        if (!isAndroidApkInstallSupported()) {
+            Toast.makeText(activity, "当前设备不是 Android，无法直接安装 APK", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val apkUrl = project.latestApkUrl?.trim().orEmpty()
+        if (apkUrl.isBlank()) {
+            Toast.makeText(activity, "这个项目还没有可安装 APK", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!AuthManager.isLoggedIn(activity)) {
+            Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val token = AuthManager.token(activity)?.trim().orEmpty()
+        if (token.isBlank()) {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val shouldJoin = !joinedIds.contains(project.id)
+        installBtn.isEnabled = false
+        installBtn.text = if (shouldJoin) "加入中..." else "准备安装..."
+        thread {
+            val result = runCatching {
+                if (shouldJoin) joinStoreProject(http, serverUrl, project.id, token)
+                apkUrl
+            }
+            activity.runOnUiThread {
+                installBtn.isEnabled = true
+                installBtn.text = "直接安装"
+                result
+                    .onSuccess { url ->
+                        if (shouldJoin) {
+                            joinedIds.add(project.id)
+                            joinBtn?.let { markProjectJoined(project, it) }
+                        }
+                        openProjectApkInstall(activity, url, token)
+                    }
+                    .onFailure {
+                        Toast.makeText(activity, it.message ?: "安装失败", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }
+    }
+
+    private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
+        joinBtn.text = "进入项目"
+        joinBtn.isEnabled = true
+        joinBtn.setTextColor(Color.parseColor("#FFFFFF"))
+        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#3BA55D"))
+        joinBtn.setOnClickListener { openJoinedProject(project) }
     }
 
     // ─── 渲染 ─────────────────────────────────────────────────────────────────
@@ -345,7 +395,42 @@ internal class MainMarketplaceActions(
         } else {
             joinBtn.setOnClickListener { tryJoinProject(project, joinBtn) }
         }
-        body.addView(joinBtn)
+        if (isAndroidApkInstallSupported() && !project.latestApkUrl.isNullOrBlank()) {
+            val actionRow = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(42)
+                ).apply { topMargin = dp(12) }
+            }
+            joinBtn.layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1f
+            ).apply { rightMargin = dp(8) }
+
+            val installBtn = TextView(activity).apply {
+                text = "直接安装"
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#FFFFFF"))
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(6).toFloat()
+                    setColor(Color.parseColor("#5865F2"))
+                }
+                isEnabled = true
+                isClickable = true
+                foreground = selectableForeground()
+                setOnClickListener { tryInstallProject(project, this, joinBtn) }
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            }
+
+            actionRow.addView(joinBtn)
+            actionRow.addView(installBtn)
+            body.addView(actionRow)
+        } else {
+            body.addView(joinBtn)
+        }
 
         card.addView(body)
         return card
