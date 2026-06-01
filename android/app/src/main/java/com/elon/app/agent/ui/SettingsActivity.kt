@@ -314,6 +314,19 @@ class SettingsActivity : Activity() {
                     startActivity(Intent(context, NodeActivity::class.java))
                 }
             })
+
+            addView(Button(context).apply {
+                text = "🏪 项目广场"
+                textSize = 16f
+                setBackgroundColor(Color.parseColor("#283140"))
+                setTextColor(Color.parseColor("#DDE8FC"))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 120
+                ).apply { topMargin = 12 }
+                setOnClickListener {
+                    startActivity(Intent(context, ProjectPlazaActivity::class.java))
+                }
+            })
         }
     }
     

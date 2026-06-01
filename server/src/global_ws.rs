@@ -58,6 +58,7 @@ async fn handle(
     let mut typing_rx = crate::typing_events::subscribe();
     let mut billing_rx = crate::billing_events::subscribe();
     let mut read_receipt_rx = crate::read_receipt_events::subscribe();
+    let mut join_req_rx = crate::join_request_events::subscribe();
 
     // 认证用户上线：注册在线状态并广播给所有已连接用户
     if let Some(ref uid) = authenticated_user_id {
@@ -169,6 +170,17 @@ async fn handle(
                         if tx.send(Message::Text(payload)).await.is_err() { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 跳过积压，客户端轮询时可重新获取 */ }
+                    _ => {}
+                }
+            }
+            // 加入申请事件——精确推给 target_user_id（owner 或申请人）
+            msg = join_req_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id.as_deref() == Some(event.target_user_id.as_str()) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => {}
                     _ => {}
                 }
             }

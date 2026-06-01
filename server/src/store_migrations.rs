@@ -34,6 +34,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (16, "token 用量事件表 + 用户 token 配额表", migration_v16),
     (17, "人民币预存计费：用户余额、充值记录、扣费明细、计费配置", migration_v17),
     (18, "微信支付订单表", migration_v18),
+    (19, "项目加入申请表（approval 审批流程）", migration_v19),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -780,6 +781,35 @@ fn migration_v18(conn: &Connection) -> Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_wechat_pay_orders_user
             ON wechat_pay_orders(user_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v19：项目加入申请表 ────────────────────────────────────────────────────────
+
+fn migration_v19(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        -- 项目加入申请（join_mode='approval' 时使用）
+        CREATE TABLE IF NOT EXISTS project_join_requests (
+            id           TEXT PRIMARY KEY,
+            project_id   TEXT NOT NULL,
+            user_id      TEXT NOT NULL,
+            message      TEXT,                               -- 申请留言
+            status       TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+            reviewed_by  TEXT,                              -- 审批人（owner）user_id
+            reviewed_at  TEXT,
+            created_at   TEXT NOT NULL,
+            updated_at   TEXT NOT NULL,
+            UNIQUE(project_id, user_id),
+            FOREIGN KEY (project_id) REFERENCES projects(id),
+            FOREIGN KEY (user_id)    REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_join_requests_project_status
+            ON project_join_requests(project_id, status, created_at);
+        CREATE INDEX IF NOT EXISTS idx_join_requests_user
+            ON project_join_requests(user_id, created_at DESC);
         "#,
     )?;
     Ok(())

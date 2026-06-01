@@ -52,8 +52,17 @@ pub async fn join_project(
             let msg = e.to_string();
             let status = if msg.contains("不存在") {
                 StatusCode::NOT_FOUND
-            } else if msg.contains("不对外公开") || msg.contains("需要审批") {
+            } else if msg.contains("不对外公开") {
                 StatusCode::FORBIDDEN
+            } else if msg.contains("需要审批") || msg.contains("join_mode=approval") {
+                // 引导客户端改用 /request-join 接口
+                return Json(serde_json::json!({
+                    "ok": false,
+                    "code": "approval_required",
+                    "message": "该项目需要 owner 审批才能加入，请使用「申请加入」功能",
+                    "hint": "POST /api/projects/{id}/request-join"
+                }))
+                .into_response();
             } else {
                 StatusCode::BAD_REQUEST
             };

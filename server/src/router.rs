@@ -14,9 +14,9 @@ use crate::{
     friend_api, global_ws, lan_peer,
     node_api, peer_relay, project_api, project_attachments, project_chat,
     project_conversation_identity, project_deletion, project_downloads, project_git,
-    project_membership, project_space, project_store, release_claim, speech_translate,
-    token_usage_api, user_api, user_memory_api, voice_asr_upload, voice_ws_transcribe,
-    voice_ws_virtual_mic, web,
+    project_join_requests, project_membership, project_space, project_store, release_claim,
+    speech_translate, token_usage_api, user_api, user_memory_api, voice_asr_upload,
+    voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -165,6 +165,23 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:id/visibility",
             axum::routing::patch(project_membership::update_visibility),
+        )
+        // ── 加入申请审批 ──────────────────────────────────────────────────
+        .route(
+            "/api/projects/:id/request-join",
+            post(project_join_requests::request_join),
+        )
+        .route(
+            "/api/projects/:id/join-requests",
+            get(project_join_requests::list_join_requests),
+        )
+        .route(
+            "/api/projects/:id/join-requests/:req_id",
+            axum::routing::patch(project_join_requests::review_join_request),
+        )
+        .route(
+            "/api/me/join-requests",
+            get(project_join_requests::my_join_requests),
         )
         // ── 项目空间：频道、成员协作、集体 AI 开发 ───────────────────────────
         .route(

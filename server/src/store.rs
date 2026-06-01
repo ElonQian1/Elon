@@ -13,6 +13,7 @@ mod conversations;
 mod friend_messages;
 mod friends;
 mod groups;
+mod join_requests;
 mod native_sessions;
 mod project_member_conversations;
 mod project_space;
@@ -36,6 +37,7 @@ use common::{
 pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
 pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
 pub use user_memories::UserMemory;
+pub use store_types::JoinRequestRecord;
 pub use admin_stats::{
     AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary, AdminTrendRow,
     AdminUserDetail, AdminUserUsageRow, UserQuota, estimate_cost_cny,

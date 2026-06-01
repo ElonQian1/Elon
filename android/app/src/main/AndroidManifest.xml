@@ -147,6 +147,18 @@
             android:exported="false"
             android:label="我的节点" />
 
+        <!-- 项目广场 -->
+        <activity
+            android:name="com.elon.app.agent.ui.ProjectPlazaActivity"
+            android:exported="false"
+            android:label="项目广场" />
+
+        <!-- 加入申请审批 (owner 用) -->
+        <activity
+            android:name="com.elon.app.agent.ui.JoinRequestsActivity"
+            android:exported="false"
+            android:label="加入申请" />
+
         <!-- 悬浮球语音 V1 -->
         <activity
             android:name="com.elon.app.agent.infrastructure.floating.FloatingVoiceActivity"

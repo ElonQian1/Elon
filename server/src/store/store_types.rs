@@ -174,6 +174,22 @@ pub struct AdminConversationEntry {
     pub updated_at: String,
 }
 
+/// 项目加入申请记录
+#[derive(Debug, Clone, Serialize)]
+pub struct JoinRequestRecord {
+    pub id: String,
+    pub project_id: String,
+    pub project_name: String,
+    pub user_id: String,
+    pub user_account: String,
+    pub user_avatar: Option<String>,
+    pub message: Option<String>,
+    pub status: String, // "pending" | "approved" | "rejected"
+    pub reviewed_by: Option<String>,
+    pub reviewed_at: Option<String>,
+    pub created_at: String,
+}
+
 // ── 项目商店 / 成员 ───────────────────────────────────────────────────────────
 
 /// 项目商店卡片：公开展示的项目摘要（不含敏感路径信息）
