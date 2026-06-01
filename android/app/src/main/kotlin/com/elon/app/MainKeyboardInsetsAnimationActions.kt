@@ -129,16 +129,23 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     fun requestKeyboardLift() {
+        binding.bottomBarContainer.bringToFront()
+        if (keyboardLiftLockActive && binding.inputEdit.hasFocus() && recentlyRequestedKeyboardLift()) {
+            if (lockedKeyboardLiftHeight <= 0) {
+                applyInitialKeyboardLiftHeight()
+            }
+            return
+        }
+
         liftRequestedAt = SystemClock.uptimeMillis()
         keyboardWasVisibleSinceLift = false
         keyboardLiftLockActive = true
         lockedKeyboardLiftHeight = 0
         lockedKeyboardLiftEstimated = false
         followChatBottomDuringLift = shouldFollowLatestMessage()
-        binding.bottomBarContainer.bringToFront()
-        applyKnownKeyboardHeight(animate = true)
+        applyInitialKeyboardLiftHeight()
         binding.root.post {
-            applyKnownKeyboardHeight(animate = true)
+            applyInitialKeyboardLiftHeight()
         }
         binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, ESTIMATED_LIFT_DELAY_MS)
         binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, ESTIMATED_LIFT_RETRY_DELAY_MS)
@@ -269,6 +276,16 @@ internal class MainKeyboardInsetsAnimationActions(
         applyKeyboardHeight(estimatedKeyboardHeight(), animate = true)
     }
 
+    private fun applyInitialKeyboardLiftHeight() {
+        if (applyKnownKeyboardHeight(animate = true)) return
+        if (!binding.inputEdit.hasFocus()) return
+        val rememberedHeight = rememberedKeyboardHeight()
+        if (rememberedHeight > 0) {
+            lockKeyboardLiftHeight(rememberedHeight, estimated = false)
+            applyKeyboardHeight(rememberedHeight, animate = true)
+        }
+    }
+
     private fun applyKnownKeyboardHeight(animate: Boolean): Boolean {
         if (!binding.inputEdit.hasFocus()) return false
         val frameHeight = keyboardHeightFromVisibleFrame()
@@ -314,7 +331,7 @@ internal class MainKeyboardInsetsAnimationActions(
         if (target > 0 && target != estimatedKeyboardHeight()) {
             usingEstimatedKeyboardHeight = false
         }
-        if (target > 0) {
+        if (target > 0 && !usingEstimatedKeyboardHeight) {
             lastKnownKeyboardHeight = target
         }
         if (target == 0) {
@@ -525,6 +542,14 @@ internal class MainKeyboardInsetsAnimationActions(
         return (rootHeight * 0.42f).toInt()
     }
 
+    private fun rememberedKeyboardHeight(): Int {
+        return when {
+            lastKnownKeyboardHeight > 0 -> lastKnownKeyboardHeight
+            lastKeyboardHeight > 0 && !usingEstimatedKeyboardHeight -> lastKeyboardHeight
+            else -> 0
+        }
+    }
+
     private fun shouldIgnoreZeroKeyboardHeight(keyboardHeight: Int, imeVisible: Boolean): Boolean {
         if (keyboardHeight != 0 || !binding.inputEdit.hasFocus()) {
             return false
@@ -574,8 +599,8 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private companion object {
         private const val ZERO_HEIGHT_GRACE_MS = 900L
-        private const val ESTIMATED_LIFT_DELAY_MS = 180L
-        private const val ESTIMATED_LIFT_RETRY_DELAY_MS = 320L
+        private const val ESTIMATED_LIFT_DELAY_MS = 72L
+        private const val ESTIMATED_LIFT_RETRY_DELAY_MS = 180L
         private const val MIN_REPLACEMENT_PANEL_RATIO = 0.24f
         private const val MAX_REPLACEMENT_PANEL_RATIO = 0.48f
     }
