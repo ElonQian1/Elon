@@ -662,6 +662,7 @@
     .input-bar.active { display: flex; }
     .input-bar textarea {
       flex: 1;
+      min-width: 0;
       background: var(--panel-3);
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -676,25 +677,23 @@
     }
     .input-bar textarea::placeholder { color: var(--ink-faint); }
     .input-bar .model-btn {
-      width: 76px; height: 42px;
+      flex: 0 0 76px; height: 42px;
       background: var(--panel-3);
       border: 0;
       color: var(--ink);
       font-size: 13px;
       border-radius: 6px;
       cursor: pointer;
-      flex-shrink: 0;
     }
     .input-bar .model-btn:hover { background: #353535; }
     .input-bar .send-btn {
-      width: 64px; height: 42px;
+      flex: 0 0 64px; height: 42px;
       background: var(--brand);
       border: 0;
       color: #fff;
       font-size: 15px;
       border-radius: 6px;
       cursor: pointer;
-      flex-shrink: 0;
     }
     .input-bar .send-btn:hover { background: var(--brand-hover); }
     .input-bar .send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
