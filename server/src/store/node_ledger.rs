@@ -1,11 +1,12 @@
-//! 节点积分账本：积分余额查询、扣费、结算。
+//! 节点积分账本：积分余额查询、扣费、结算；节点凭证管理。
 //!
-//! 两张表（由 migration_v15 创建）：
+//! 三张表（由 migration_v18 创建）：
 //! - `node_balances`      每用户的提供者积分余额
 //! - `node_transactions`  每次 LLM 推理完成后的完整流水记录
+//! - `node_credentials`   用户注册的 PC 节点凭证（存 SHA-256 hash）
 
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
 use super::{new_id, now, Store};
@@ -46,6 +47,15 @@ pub struct SettleParams<'a> {
     pub price_per_1k_credits: f64,
     /// 平台抽成比例（默认 0.2）
     pub platform_fee_rate: f64,
+}
+
+/// 节点凭证（不含 secret_hash，仅供 API 展示）
+#[derive(Debug, Serialize)]
+pub struct NodeCredential {
+    pub agent_id: String,
+    pub owner_user_id: String,
+    pub label: String,
+    pub created_at: String,
 }
 
 // ── Store 方法 ────────────────────────────────────────────────────────────────
@@ -169,6 +179,68 @@ impl Store {
                 settled_credits: row.get(8)?,
                 platform_fee_rate: row.get(9)?,
                 created_at: row.get(10)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
+
+    /// 注册一个新节点凭证（存 secret 的 SHA-256 hash，不存明文）。
+    pub fn create_node_credential(
+        &self,
+        agent_id: &str,
+        secret_hash: &str,
+        owner_user_id: &str,
+        label: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO node_credentials (agent_id, secret_hash, owner_user_id, label, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![agent_id, secret_hash, owner_user_id, label.unwrap_or(""), now()],
+        )?;
+        Ok(())
+    }
+
+    /// 查询节点凭证的 secret_hash（用于鉴权）。
+    pub fn get_node_credential_hash(&self, agent_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let hash = conn
+            .query_row(
+                "SELECT secret_hash FROM node_credentials WHERE agent_id = ?1",
+                params![agent_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(hash)
+    }
+
+    /// 查询节点凭证所属的 owner_user_id。
+    pub fn get_node_credential_owner(&self, agent_id: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let owner = conn
+            .query_row(
+                "SELECT owner_user_id FROM node_credentials WHERE agent_id = ?1",
+                params![agent_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(owner)
+    }
+
+    /// 列出某用户注册的所有节点凭证（不含 secret_hash）。
+    pub fn list_node_credentials(&self, owner_user_id: &str) -> Result<Vec<NodeCredential>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT agent_id, owner_user_id, label, created_at
+             FROM node_credentials WHERE owner_user_id = ?1
+             ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(params![owner_user_id], |row| {
+            Ok(NodeCredential {
+                agent_id: row.get(0)?,
+                owner_user_id: row.get(1)?,
+                label: row.get(2)?,
+                created_at: row.get(3)?,
             })
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
