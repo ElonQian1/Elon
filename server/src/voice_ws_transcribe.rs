@@ -19,7 +19,11 @@ use axum::{
     },
     response::IntoResponse,
 };
-use futures::{SinkExt, StreamExt};
+use futures::{
+    future::BoxFuture,
+    stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt,
+};
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -93,90 +97,16 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             project_id,
             conversation_id,
         };
-        let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let _ = sender
-            .send(Message::Text(
-                ServerEvent::Ready { mode: "transcribe_local" }.to_json(),
-            ))
+            .send(Message::Text(ServerEvent::Ready { mode: "transcribe_local" }.to_json()))
             .await;
         info!(target: "voice", user_id, "whisper-local 会话已建立");
-
-        let mut pcm_buf: Vec<u8> = Vec::new();
-        loop {
-            tokio::select! {
-                biased;
-                client_msg = receiver.next() => {
-                    let Some(msg) = client_msg else { break; };
-                    match msg {
-                        Ok(Message::Binary(bytes)) => {
-                            match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
-                                PcmCheck::Ok => pcm_buf.extend_from_slice(&bytes),
-                                PcmCheck::OddBytes => {
-                                    let _ = sender.send(Message::Text(ServerEvent::Error {
-                                        code: "odd_bytes",
-                                        message: "PCM16 帧字节数必须是偶数".into(),
-                                    }.to_json())).await;
-                                    continue;
-                                }
-                                PcmCheck::TooLarge => {
-                                    let _ = sender.send(Message::Text(ServerEvent::Error {
-                                        code: "too_large",
-                                        message: "单帧过大".into(),
-                                    }.to_json())).await;
-                                    continue;
-                                }
-                            }
-                        }
-                        Ok(Message::Text(text)) => {
-                            match serde_json::from_str::<ClientControl>(&text).ok() {
-                                Some(ClientControl::Commit) => {
-                                    if pcm_buf.is_empty() { continue; }
-                                    let pcm = std::mem::take(&mut pcm_buf);
-                                    let transcript = match voice_whisper_local::transcribe_pcm(
-                                        &whisper_cfg, &pcm, sample_rate, channels,
-                                    ).await {
-                                        Ok(t) if t.is_empty() => continue,
-                                        Ok(t) => t,
-                                        Err(err) => {
-                                            warn!(target: "voice", user_id, "whisper 转写失败: {err:#}");
-                                            let _ = sender.send(Message::Text(ServerEvent::Error {
-                                                code: "whisper",
-                                                message: format!("本地转写失败：{err}"),
-                                            }.to_json())).await;
-                                            continue;
-                                        }
-                                    };
-                                    let _ = sender.send(Message::Text(
-                                        ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
-                                    )).await;
-                                    match dispatch_transcript(&state, &target, &transcript, ai_reply_tx.clone()).await {
-                                        Ok(outcome) => {
-                                            let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
-                                                ok: outcome.ok,
-                                                message: outcome.message,
-                                            }.to_json())).await;
-                                        }
-                                        Err(err) => {
-                                            let _ = sender.send(Message::Text(ServerEvent::Error {
-                                                code: "dispatch",
-                                                message: err.to_string(),
-                                            }.to_json())).await;
-                                        }
-                                    }
-                                }
-                                Some(ClientControl::Close) | None => break,
-                                Some(ClientControl::Hello { .. }) => {}
-                            }
-                        }
-                        Ok(Message::Close(_)) | Err(_) => break,
-                        _ => {}
-                    }
-                }
-                Some(raw_json) = ai_reply_rx.recv() => {
-                    let _ = sender.send(Message::Text(raw_json)).await;
-                }
-            }
-        }
+        run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
+            let cfg = whisper_cfg.clone();
+            Box::pin(async move {
+                voice_whisper_local::transcribe_pcm(&cfg, &pcm, sample_rate, channels).await
+            })
+        }).await;
         return Ok(());
     }
 
@@ -206,84 +136,16 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             }
 
             let target = DispatchTarget { user_id: user_id.clone(), project_id, conversation_id };
-            let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
             let _ = sender
                 .send(Message::Text(ServerEvent::Ready { mode: "transcribe_rest" }.to_json()))
                 .await;
             info!(target: "voice", user_id, "Tier 3 REST 转写会话已建立（{} 个候选）", candidates.len());
-
-            let mut pcm_buf: Vec<u8> = Vec::new();
-            loop {
-                tokio::select! {
-                    biased;
-                    client_msg = receiver.next() => {
-                        let Some(msg) = client_msg else { break; };
-                        match msg {
-                            Ok(Message::Binary(bytes)) => {
-                                match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
-                                    PcmCheck::Ok => pcm_buf.extend_from_slice(&bytes),
-                                    PcmCheck::OddBytes => {
-                                        let _ = sender.send(Message::Text(ServerEvent::Error {
-                                            code: "odd_bytes",
-                                            message: "PCM16 帧字节数必须是偶数".into(),
-                                        }.to_json())).await;
-                                    }
-                                    PcmCheck::TooLarge => {
-                                        let _ = sender.send(Message::Text(ServerEvent::Error {
-                                            code: "too_large",
-                                            message: "单帧过大".into(),
-                                        }.to_json())).await;
-                                    }
-                                }
-                            }
-                            Ok(Message::Text(text)) => {
-                                match serde_json::from_str::<ClientControl>(&text).ok() {
-                                    Some(ClientControl::Commit) => {
-                                        if pcm_buf.is_empty() { continue; }
-                                        let pcm = std::mem::take(&mut pcm_buf);
-                                        let transcript = match voice_whisper_rest::transcribe_with_fallback(
-                                            &candidates, &pcm, sample_rate, channels,
-                                        ).await {
-                                            Ok(t) if t.is_empty() => continue,
-                                            Ok(t) => t,
-                                            Err(e) => {
-                                                warn!(target: "voice", user_id, "Tier 3 全部候选失败: {e:#}");
-                                                let _ = sender.send(Message::Text(ServerEvent::Error {
-                                                    code: "asr_all_failed",
-                                                    message: format!("所有转写服务均失败：{e}"),
-                                                }.to_json())).await;
-                                                continue;
-                                            }
-                                        };
-                                        let _ = sender.send(Message::Text(
-                                            ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
-                                        )).await;
-                                        match dispatch_transcript(&state, &target, &transcript, ai_reply_tx.clone()).await {
-                                            Ok(outcome) => {
-                                                let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
-                                                    ok: outcome.ok, message: outcome.message,
-                                                }.to_json())).await;
-                                            }
-                                            Err(e) => {
-                                                let _ = sender.send(Message::Text(ServerEvent::Error {
-                                                    code: "dispatch", message: e.to_string(),
-                                                }.to_json())).await;
-                                            }
-                                        }
-                                    }
-                                    Some(ClientControl::Close) | None => break,
-                                    Some(ClientControl::Hello { .. }) => {}
-                                }
-                            }
-                            Ok(Message::Close(_)) | Err(_) => break,
-                            _ => {}
-                        }
-                    }
-                    Some(raw_json) = ai_reply_rx.recv() => {
-                        let _ = sender.send(Message::Text(raw_json)).await;
-                    }
-                }
-            }
+            run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
+                let cands = candidates.clone();
+                Box::pin(async move {
+                    voice_whisper_rest::transcribe_with_fallback(&cands, &pcm, sample_rate, channels).await
+                })
+            }).await;
             return Ok(());
         }
     };
@@ -392,4 +254,93 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
 
     transcriber.close();
     Ok(())
+}
+
+/// Tier 1（本地 Whisper）和 Tier 3（REST 降级）共用的缓冲式 PCM → ASR → 派发循环。
+///
+/// `transcribe` 接收一次 Commit 积累的 PCM16 字节，返回转写文本（空串表示静音跳过）。
+/// 该函数统一处理：PCM 帧缓冲、Commit 触发转写、TranscriptFinal 推送、CLI 派发
+/// 以及 AI 回复消息回流——两个 Tier 的差异只在传入的 `transcribe` 闭包里。
+async fn run_buffered_loop(
+    state: &Arc<AppState>,
+    sender: &mut SplitSink<WebSocket, Message>,
+    receiver: &mut SplitStream<WebSocket>,
+    target: DispatchTarget,
+    transcribe: impl Fn(Vec<u8>) -> BoxFuture<'static, anyhow::Result<String>>,
+) {
+    let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let mut pcm_buf: Vec<u8> = Vec::new();
+    loop {
+        tokio::select! {
+            biased;
+            client_msg = receiver.next() => {
+                let Some(msg) = client_msg else { break; };
+                match msg {
+                    Ok(Message::Binary(bytes)) => {
+                        match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
+                            PcmCheck::Ok => pcm_buf.extend_from_slice(&bytes),
+                            PcmCheck::OddBytes => {
+                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                    code: "odd_bytes",
+                                    message: "PCM16 帧字节数必须是偶数".into(),
+                                }.to_json())).await;
+                                continue;
+                            }
+                            PcmCheck::TooLarge => {
+                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                    code: "too_large",
+                                    message: "单帧过大".into(),
+                                }.to_json())).await;
+                                continue;
+                            }
+                        }
+                    }
+                    Ok(Message::Text(text)) => {
+                        match serde_json::from_str::<ClientControl>(&text).ok() {
+                            Some(ClientControl::Commit) => {
+                                if pcm_buf.is_empty() { continue; }
+                                let pcm = std::mem::take(&mut pcm_buf);
+                                let transcript = match transcribe(pcm).await {
+                                    Ok(t) if t.trim().is_empty() => continue,
+                                    Ok(t) => t,
+                                    Err(err) => {
+                                        warn!(target: "voice", "ASR 转写失败: {err:#}");
+                                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                                            code: "asr_failed",
+                                            message: format!("转写失败：{err}"),
+                                        }.to_json())).await;
+                                        continue;
+                                    }
+                                };
+                                let _ = sender.send(Message::Text(
+                                    ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
+                                )).await;
+                                match dispatch_transcript(state, &target, &transcript, ai_reply_tx.clone()).await {
+                                    Ok(outcome) => {
+                                        let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
+                                            ok: outcome.ok,
+                                            message: outcome.message,
+                                        }.to_json())).await;
+                                    }
+                                    Err(err) => {
+                                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                                            code: "dispatch",
+                                            message: err.to_string(),
+                                        }.to_json())).await;
+                                    }
+                                }
+                            }
+                            Some(ClientControl::Close) | None => break,
+                            Some(ClientControl::Hello { .. }) => {}
+                        }
+                    }
+                    Ok(Message::Close(_)) | Err(_) => break,
+                    _ => {}
+                }
+            }
+            Some(raw_json) = ai_reply_rx.recv() => {
+                let _ = sender.send(Message::Text(raw_json)).await;
+            }
+        }
+    }
 }
