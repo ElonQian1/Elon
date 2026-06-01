@@ -27,6 +27,10 @@ pub(crate) async fn call_llm(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
+    // 计费前置检查：若用户已开通预存计费且余额为 0，则拒绝调用
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow::anyhow!("{}", msg));
+    }
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -67,8 +71,7 @@ pub(crate) async fn call_llm(
     }
 
     let response: Value = resp.json().await?;
-    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);
-    Ok(response)
+    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);    Ok(response)
 }
 
 /// 调用 LLM API（普通对话，不带工具）
@@ -82,6 +85,10 @@ pub(crate) async fn call_chat_llm(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
+    // 计费前置检查
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow::anyhow!("{}", msg));
+    }
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -123,6 +130,7 @@ pub(crate) async fn call_chat_llm(
 
     let response: Value = resp.json().await?;
     crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);
+    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);
     Ok(response)
 }
 

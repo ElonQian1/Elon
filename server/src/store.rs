@@ -27,6 +27,7 @@ mod users;
 mod node_ledger;
 mod user_memories;
 mod admin_stats;
+mod billing;
 
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
@@ -39,6 +40,7 @@ pub use admin_stats::{
     AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary, AdminTrendRow,
     AdminUserDetail, AdminUserUsageRow, UserQuota, estimate_cost_cny,
 };
+pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };

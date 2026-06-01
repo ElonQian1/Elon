@@ -32,6 +32,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (14, "项目意见频道建议状态", migration_v14),
     (15, "用户长期记忆表", migration_v15),
     (16, "token 用量事件表 + 用户 token 配额表", migration_v16),
+    (17, "人民币预存计费：用户余额、充值记录、扣费明细、计费配置", migration_v17),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -702,5 +703,61 @@ pub(crate) fn add_column_if_missing(
             [],
         )?;
     }
+    Ok(())
+}
+
+// ── v17：人民币预存计费系统 ────────────────────────────────────────────────────
+
+fn migration_v17(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        -- 用户余额（分为单位，不存小数）
+        CREATE TABLE IF NOT EXISTS user_balance (
+            user_id     TEXT PRIMARY KEY,
+            balance_fen INTEGER NOT NULL DEFAULT 0,
+            updated_at  TEXT NOT NULL
+        );
+
+        -- 充值记录
+        CREATE TABLE IF NOT EXISTS recharge_records (
+            id          TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL,
+            amount_fen  INTEGER NOT NULL,
+            method      TEXT NOT NULL DEFAULT 'manual',
+            operator_id TEXT NOT NULL DEFAULT 'admin',
+            note        TEXT,
+            created_at  TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_recharge_user_time
+            ON recharge_records(user_id, created_at DESC);
+
+        -- 每次 LLM 调用的扣费明细
+        CREATE TABLE IF NOT EXISTS billing_events (
+            id                   TEXT PRIMARY KEY,
+            user_id              TEXT NOT NULL,
+            model                TEXT,
+            input_tokens         INTEGER NOT NULL DEFAULT 0,
+            cached_input_tokens  INTEGER NOT NULL DEFAULT 0,
+            output_tokens        INTEGER NOT NULL DEFAULT 0,
+            cost_rmb_fen         INTEGER NOT NULL DEFAULT 0,
+            exchange_rate_x10000 INTEGER NOT NULL DEFAULT 73000,
+            markup_x1000         INTEGER NOT NULL DEFAULT 1200,
+            created_at           TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_billing_events_user_time
+            ON billing_events(user_id, created_at DESC);
+
+        -- 计费全局配置（键值对）
+        CREATE TABLE IF NOT EXISTS billing_config (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at) VALUES
+            ('usd_to_rmb_rate_x10000', '73000', datetime('now')),
+            ('markup_x1000',           '1200',  datetime('now')),
+            ('low_balance_threshold_fen', '100', datetime('now'));
+        "#,
+    )?;
     Ok(())
 }

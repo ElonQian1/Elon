@@ -9,7 +9,8 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, admin_quota, admin_token_stats, api, app_update, auth_api, chat_attachments,
+    admin, admin_quota, admin_token_stats, api, app_update, auth_api, billing_admin,
+    billing_api, chat_attachments,
     friend_api, global_ws, lan_peer,
     node_api, peer_relay, project_api, project_attachments, project_chat,
     project_conversation_identity, project_deletion, project_downloads, project_git,
@@ -395,6 +396,17 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/avatar",
             axum::routing::put(user_api::put_my_avatar)
                 .layer(DefaultBodyLimit::max(800_000)),
+        )
+        // ── 用户计费（余额查询 / 扣费明细）──────────────────────────────────
+        .route("/api/me/balance", get(billing_api::get_my_balance))
+        .route("/api/me/billing", get(billing_api::list_my_billing))
+        // ── 管理员计费（充值 / 余额列表 / 配置）──────────────────────────────
+        .route("/api/admin/billing/recharge", post(billing_admin::recharge_user))
+        .route("/api/admin/billing/users", get(billing_admin::list_users))
+        .route("/api/admin/billing/users/:user_id", get(billing_admin::get_user))
+        .route(
+            "/api/admin/billing/config",
+            get(billing_admin::get_config).put(billing_admin::set_config),
         )
         .layer(cors)
         .with_state(state)
