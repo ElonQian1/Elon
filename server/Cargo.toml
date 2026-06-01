@@ -7,6 +7,10 @@ edition = "2021"
 name = "elon-server"
 path = "src/main.rs"
 
+[[bin]]
+name = "elon-node-agent"
+path = "src/node_agent_main.rs"
+
 [dependencies]
 # 异步运行时
 tokio = { version = "1", features = ["full"] }

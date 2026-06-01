@@ -78,6 +78,8 @@ pub struct AppState {
     pub peer_registry: Arc<RwLock<HashMap<String, PeerEntry>>>,
     /// 已注册的局域网 PC 种子节点（peer_id → LanPeerEntry）
     pub lan_peer_registry: Arc<RwLock<HashMap<String, LanPeerEntry>>>,
+    /// 分布式计算节点注册中心（node_id → NodeEntry，含 LLM 能力与在线状态）
+    pub node_registry: Arc<crate::node_registry::NodeRegistry>,
     /// 反向 WSS 通道接入的 homecli PC agents（agent_id → AgentEntry）
     pub agent_manager: Arc<crate::homecli_agent::AgentManager>,
     /// Short-lived execution gates keyed by project/conversation/merge scope.
@@ -286,6 +288,7 @@ impl AppState {
             image_model,
             peer_registry: Arc::new(RwLock::new(HashMap::new())),
             lan_peer_registry: Arc::new(RwLock::new(HashMap::new())),
+            node_registry: Arc::new(crate::node_registry::NodeRegistry::new()),
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
             project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
             codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),

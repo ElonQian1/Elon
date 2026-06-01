@@ -24,12 +24,14 @@ mod store_types;
 mod tasks;
 mod token_usage;
 mod users;
+mod node_ledger;
 
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
 pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
+pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };

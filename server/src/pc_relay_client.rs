@@ -112,6 +112,7 @@ async fn run_relay_session(
         proto_version: PROTO_VERSION,
         allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
+        owner_user_id: None,
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");
@@ -212,6 +213,15 @@ async fn run_relay_session(
 
             ServerToAgent::Cancel { .. } => {
                 // TODO: 取消正在运行的 CLI 任务（当前忽略）
+            }
+
+            // LLM 流式推理请求 —— pc_relay_client 不处理此消息
+            ServerToAgent::LlmStreamRequest { req_id, .. } => {
+                let err = AgentToServer::LlmStreamError {
+                    req_id,
+                    message: "此节点未配置 LLM 推理能力".into(),
+                };
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
         }
     }

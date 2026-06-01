@@ -2,6 +2,21 @@ use serde::{Deserialize, Serialize};
 
 pub const PROTO_VERSION: u32 = 1;
 
+/// PC 节点上报的单个模型能力描述
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelCapability {
+    /// 模型唯一 ID，如 "llama3:8b" 或 "lm_studio/qwen2"
+    pub model_id: String,
+    /// 用户可见显示名称
+    pub display_name: String,
+    /// 上下文长度（token 数）
+    pub context_len: u32,
+    /// 提供方："ollama" | "lm_studio" | "custom"
+    pub provider: String,
+    /// 每 1000 tokens 消耗的平台积分（节点所有者自定义）
+    pub price_per_1k_credits: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
@@ -43,6 +58,14 @@ pub enum ServerToAgent {
         /// 完整的提示内容
         prompt: String,
     },
+    /// 云端向 PC 节点发起 LLM 推理请求（流式）
+    LlmStreamRequest {
+        req_id: String,
+        model: String,
+        messages: Vec<serde_json::Value>,
+        #[serde(default)]
+        max_tokens: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +79,9 @@ pub enum AgentToServer {
         allowed_clis: Vec<String>,
         #[serde(default)]
         allowed_cwds: Vec<String>,
+        /// 节点归属用户 ID（分布式节点功能，旧版 homecli 不发此字段）
+        #[serde(default)]
+        owner_user_id: Option<String>,
     },
     TaskStarted {
         task_id: String,
@@ -106,6 +132,27 @@ pub enum AgentToServer {
         #[serde(default)]
         error: Option<String>,
     },
+    /// PC 节点上报本机支持的模型列表
+    RegisterCapabilities {
+        models: Vec<ModelCapability>,
+    },
+    /// LLM 推理流式输出片段
+    LlmStreamChunk {
+        req_id: String,
+        delta: String,
+    },
+    /// LLM 推理完成（最后一帧）
+    LlmStreamEnd {
+        req_id: String,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+        finish_reason: String,
+    },
+    /// LLM 推理出错
+    LlmStreamError {
+        req_id: String,
+        message: String,
+    },
 }
 
 impl AgentToServer {
@@ -121,7 +168,11 @@ impl AgentToServer {
             | Self::HttpResponse { .. }
             | Self::HttpError { .. }
             | Self::CliChunk { .. }
-            | Self::CliDone { .. } => None,
+            | Self::CliDone { .. }
+            | Self::RegisterCapabilities { .. }
+            | Self::LlmStreamChunk { .. }
+            | Self::LlmStreamEnd { .. }
+            | Self::LlmStreamError { .. } => None,
         }
     }
 
@@ -130,13 +181,16 @@ impl AgentToServer {
             Self::HttpResponse { req_id, .. }
             | Self::HttpError { req_id, .. }
             | Self::CliChunk { req_id, .. }
-            | Self::CliDone { req_id, .. } => Some(req_id.as_str()),
+            | Self::CliDone { req_id, .. }
+            | Self::LlmStreamChunk { req_id, .. }
+            | Self::LlmStreamEnd { req_id, .. }
+            | Self::LlmStreamError { req_id, .. } => Some(req_id.as_str()),
             _ => None,
         }
     }
 
-    /// CliChunk 需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
+    /// 流式消息需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
     pub fn is_final_req_msg(&self) -> bool {
-        !matches!(self, Self::CliChunk { .. })
+        !matches!(self, Self::CliChunk { .. } | Self::LlmStreamChunk { .. })
     }
 }

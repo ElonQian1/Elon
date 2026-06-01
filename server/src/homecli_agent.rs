@@ -170,6 +170,34 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((task_id, rx))
     }
+
+    /// 向指定节点 agent 发起 LLM 流式推理请求。
+    /// 返回 (req_id, receiver)，receiver 收到 LlmStreamChunk / LlmStreamEnd / LlmStreamError。
+    pub async fn dispatch_llm_stream(
+        &self,
+        agent_id: &str,
+        model: String,
+        messages: Vec<serde_json::Value>,
+        max_tokens: Option<u32>,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::LlmStreamRequest {
+                req_id: req_id.clone(),
+                model,
+                messages,
+                max_tokens,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        Ok((req_id, rx))
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -254,14 +282,15 @@ async fn run_agent_session(
         _ => return Err(anyhow!("expected text register frame")),
     };
     let register: AgentToServer = serde_json::from_str(&text)?;
-    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver) = match register {
+    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id) = match register {
         AgentToServer::Register {
             agent_id,
             version,
             proto_version,
             allowed_clis,
             allowed_cwds,
-        } => (agent_id, version, allowed_clis, allowed_cwds, proto_version),
+            owner_user_id,
+        } => (agent_id, version, allowed_clis, allowed_cwds, proto_version, owner_user_id),
         _ => return Err(anyhow!("first frame must be register")),
     };
 
@@ -297,6 +326,18 @@ async fn run_agent_session(
         .write()
         .await
         .insert(agent_id.clone(), entry);
+
+    // 注册到节点注册表（分布式节点功能）
+    let connected_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    state.node_registry.register(
+        agent_id.clone(),
+        owner_user_id.clone().unwrap_or_default(),
+        vec![],
+        connected_at,
+    ).await;
 
     // Writer: drain cmd_rx → ws_tx.
     let writer = tokio::spawn(async move {
@@ -349,7 +390,16 @@ async fn run_agent_session(
                                 let _ = tx.send(msg);
                             }
                         } else {
-                            // Register/Pong without task_id — ignore (Register already consumed).
+                            // Register/Pong without task_id — 处理节点专属消息
+                            match &msg {
+                                AgentToServer::RegisterCapabilities { models } => {
+                                    state.node_registry.update_capabilities(&agent_id, models.clone()).await;
+                                }
+                                AgentToServer::Pong { .. } => {
+                                    state.node_registry.touch(&agent_id).await;
+                                }
+                                _ => {}
+                            }
                         }
                     }
                     Err(e) => tracing::warn!("bad agent msg: {e}: {t}"),
@@ -364,6 +414,7 @@ async fn run_agent_session(
 
     // Clean up.
     state.agent_manager.agents.write().await.remove(&agent_id);
+    state.node_registry.unregister(&agent_id).await;
     drop(cmd_tx);
     let _ = writer.await;
     tracing::info!(%agent_id, "agent disconnected");

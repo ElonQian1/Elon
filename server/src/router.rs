@@ -10,10 +10,10 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
-    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
-    project_deletion, project_downloads, project_git, project_membership, project_space,
-    project_store, release_claim, speech_translate, token_usage_api, user_api, voice_asr_upload,
-    voice_ws_transcribe, voice_ws_virtual_mic, web,
+    node_api, peer_relay, project_api, project_attachments, project_chat,
+    project_conversation_identity, project_deletion, project_downloads, project_git,
+    project_membership, project_space, project_store, release_claim, speech_translate,
+    token_usage_api, user_api, voice_asr_upload, voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -75,6 +75,13 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/profile",
             axum::routing::patch(project_api::update_profile),
         )
+        // ── 分布式节点 API ──────────────────────────────────────────────────────
+        .route("/api/nodes", get(node_api::list_nodes))
+        .route("/api/nodes/models", get(node_api::list_available_models))
+        .route("/api/me/nodes", get(node_api::my_nodes))
+        .route("/api/me/node-balance", get(node_api::my_node_balance))
+        .route("/api/me/node-transactions", get(node_api::my_node_transactions))
+        // ───────────────────────────────────────────────────────────────────────
         .route(
             "/api/me/friends",
             get(friend_api::list_friends).post(friend_api::add_friend_by_phone),
