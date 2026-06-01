@@ -78,6 +78,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         // ── 分布式节点 API ──────────────────────────────────────────────────────
         .route("/api/nodes", get(node_api::list_nodes))
         .route("/api/nodes/models", get(node_api::list_available_models))
+        .route("/api/nodes/chat", post(node_api::chat_with_node))
         .route("/api/me/nodes", get(node_api::my_nodes))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))

@@ -1,16 +1,17 @@
 //! 分布式节点 REST API。
 //!
 //! 路由（注册在 router.rs）：
-//! - `GET /api/nodes`                 列出所有在线节点（需登录）
-//! - `GET /api/nodes/models`          所有在线节点中可用模型列表（无需登录，供 APK 模型选择用）
-//! - `GET /api/me/node-balance`       查询本用户作为节点提供者的积分余额
-//! - `GET /api/me/node-transactions`  查询最近积分流水（最多 50 条）
+//! - `GET  /api/nodes`                 列出所有在线节点（需登录）
+//! - `GET  /api/nodes/models`          所有在线节点中可用模型列表（无需登录，供 APK 模型选择用）
+//! - `POST /api/nodes/chat`            向节点 LLM 发起对话（需登录，同步阻塞返回）
+//! - `GET  /api/me/node-balance`       查询本用户作为节点提供者的积分余额
+//! - `GET  /api/me/node-transactions`  查询最近积分流水（最多 50 条）
 
 use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use std::sync::Arc;
 
 use crate::{project_auth::auth_from_headers, types::AppState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // ── /api/nodes ────────────────────────────────────────────────────────────────
 
@@ -126,4 +127,148 @@ pub async fn my_nodes(
 
     let nodes = state.node_registry.list_by_owner(&user.id).await;
     Json(serde_json::json!({ "nodes": nodes })).into_response()
+}
+
+// ── /api/nodes/chat ───────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct NodeChatRequest {
+    /// 目标模型 ID，如 "llama3:8b"（需匹配在线节点已上报的 model_id）
+    pub model_id: String,
+    /// OpenAI 格式的 messages 数组
+    pub messages: Vec<serde_json::Value>,
+    /// 最大生成 token 数（可选）
+    pub max_tokens: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct NodeChatResponse {
+    /// 模型生成的完整文本
+    pub content: String,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub model_id: String,
+    pub node_id: String,
+}
+
+/// POST /api/nodes/chat — 向节点 LLM 发起对话（同步等待完整回复）
+///
+/// 调用流程：
+/// 1. 认证用户
+/// 2. 通过 NodeRegistry 找到支持该模型的在线节点
+/// 3. 经 WebSocket 隧道发送推理请求，收集所有流式块
+/// 4. 完成后触发后台积分结算
+/// 5. 返回完整文本 + token 统计
+pub async fn chat_with_node(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<NodeChatRequest>,
+) -> impl IntoResponse {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
+
+    if req.model_id.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "model_id 不能为空"})),
+        )
+            .into_response();
+    }
+    if req.messages.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "messages 不能为空"})),
+        )
+            .into_response();
+    }
+
+    // 找节点、发起请求
+    let (_req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node(
+        &state,
+        &req.model_id,
+        req.messages,
+        req.max_tokens,
+    )
+    .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
+
+    // 收集流式块
+    let mut content = String::new();
+    let mut prompt_tokens: u32 = 0;
+    let mut completion_tokens: u32 = 0;
+
+    while let Some(msg) = rx.recv().await {
+        match msg {
+            homecli_proto::AgentToServer::LlmStreamChunk { delta, .. } => {
+                content.push_str(&delta);
+            }
+            homecli_proto::AgentToServer::LlmStreamEnd {
+                prompt_tokens: pt,
+                completion_tokens: ct,
+                ..
+            } => {
+                prompt_tokens = pt;
+                completion_tokens = ct;
+                break;
+            }
+            homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": message})),
+                )
+                    .into_response();
+            }
+            _ => {}
+        }
+    }
+
+    // 后台积分结算（不阻塞响应）
+    let price = state
+        .node_registry
+        .get_node_model_price(&node_id, &req.model_id)
+        .await
+        .unwrap_or(1.0);
+    let owner = state
+        .node_registry
+        .get_node_owner(&node_id)
+        .await
+        .unwrap_or_default();
+    if !owner.is_empty() {
+        crate::node_router::settle_after_stream(
+            &state,
+            &user.id,
+            &owner,
+            &node_id,
+            &req.model_id,
+            prompt_tokens,
+            completion_tokens,
+            price,
+        );
+    }
+
+    Json(NodeChatResponse {
+        content,
+        prompt_tokens,
+        completion_tokens,
+        model_id: req.model_id,
+        node_id,
+    })
+    .into_response()
 }

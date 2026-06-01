@@ -135,6 +135,23 @@ impl NodeRegistry {
         result
     }
 
+    /// 返回节点属主的 user_id（积分结算时使用）。
+    pub async fn get_node_owner(&self, node_id: &str) -> Option<String> {
+        let nodes = self.nodes.read().await;
+        nodes.get(node_id).map(|e| e.owner_user_id.clone())
+    }
+
+    /// 返回节点上某个模型的报价（积分 / 1k tokens）。
+    pub async fn get_node_model_price(&self, node_id: &str, model_id: &str) -> Option<f64> {
+        let nodes = self.nodes.read().await;
+        nodes.get(node_id).and_then(|e| {
+            e.models
+                .iter()
+                .find(|m| m.model_id == model_id)
+                .map(|m| m.price_per_1k_credits)
+        })
+    }
+
     /// 返回属于指定用户的节点列表。
     pub async fn list_by_owner(&self, owner_user_id: &str) -> Vec<NodeSummary> {
         let nodes = self.nodes.read().await;

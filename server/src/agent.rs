@@ -140,6 +140,47 @@ pub async fn run_for_project_in_workspace(
     }
 }
 
+pub async fn plan_for_project_in_workspace(
+    user_id: &str,
+    project: &ProjectAccess,
+    workspace: &Path,
+    download_base: &str,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let user_config_workspace = state.get_user_workspace(user_id);
+    if let Err(e) = run_backend_with_workspace(
+        user_id,
+        workspace,
+        &user_config_workspace,
+        download_base,
+        Some(ai_cli::NativeSessionScope {
+            project_id: project.id.clone(),
+            user_id: user_id.to_string(),
+            conversation_id: conversation_id.unwrap_or("default").to_string(),
+        }),
+        user_message,
+        None,
+        agent_name,
+        trace_id,
+        CapabilityRoute::CodeAgent,
+        true,
+        false,
+        true,
+        state,
+        &tx,
+    )
+    .await
+    {
+        error!("项目级 AI 规划运行出错: {}", e);
+        let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+    }
+}
+
 async fn run_dispatch_with_workspace(
     user_id: &str,
     workspace: &Path,
@@ -261,6 +302,7 @@ async fn run_dispatch_with_workspace(
                     CapabilityRoute::CodeAgent,
                     true,
                     require_existing_git,
+                    false, // planning_mode: 图片集成走执行路径，不进入规划
                     state,
                     tx,
                 )
@@ -289,6 +331,7 @@ async fn run_dispatch_with_workspace(
         backend_route,
         !(codex_cli_only || image_cli_only),
         require_existing_git,
+        false, // planning_mode: dispatch 走执行路径，规划走 plan_for_project_in_workspace
         state,
         tx,
     )
@@ -308,6 +351,7 @@ async fn run_backend_with_workspace(
     route: CapabilityRoute,
     allow_api_fallback: bool,
     require_existing_git: bool,
+    planning_mode: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -331,21 +375,37 @@ async fn run_backend_with_workspace(
             });
             let primary_option_owned = resolve_cli_option_id(state, preferred_local_agent);
             let primary_option = primary_option_owned.as_deref();
-            let cli_result = ai_cli::run_with_workspace(
-                user_id,
-                workspace,
-                download_base,
-                user_message,
-                combined_preflight_note.as_deref(),
-                primary_option,
-                route,
-                require_existing_git,
-                native_session_scope.clone(),
-                trace_id,
-                state,
-                tx,
-            )
-            .await;
+            let cli_result = if planning_mode {
+                ai_cli::run_plan_with_workspace(
+                    user_id,
+                    workspace,
+                    download_base,
+                    user_message,
+                    combined_preflight_note.as_deref(),
+                    primary_option,
+                    native_session_scope.clone(),
+                    trace_id,
+                    state,
+                    tx,
+                )
+                .await
+            } else {
+                ai_cli::run_with_workspace(
+                    user_id,
+                    workspace,
+                    download_base,
+                    user_message,
+                    combined_preflight_note.as_deref(),
+                    primary_option,
+                    route,
+                    require_existing_git,
+                    native_session_scope.clone(),
+                    trace_id,
+                    state,
+                    tx,
+                )
+                .await
+            };
 
             match cli_result {
                 Ok(()) => Ok(()),
@@ -370,21 +430,37 @@ async fn run_backend_with_workspace(
                         ))
                         .to_json(),
                     );
-                    let fallback_result = ai_cli::run_with_workspace(
-                        user_id,
-                        workspace,
-                        download_base,
-                        user_message,
-                        combined_preflight_note.as_deref(),
-                        Some(fallback_id.as_str()),
-                        route,
-                        require_existing_git,
-                        native_session_scope.clone(),
-                        trace_id,
-                        state,
-                        tx,
-                    )
-                    .await;
+                    let fallback_result = if planning_mode {
+                        ai_cli::run_plan_with_workspace(
+                            user_id,
+                            workspace,
+                            download_base,
+                            user_message,
+                            combined_preflight_note.as_deref(),
+                            Some(fallback_id.as_str()),
+                            native_session_scope.clone(),
+                            trace_id,
+                            state,
+                            tx,
+                        )
+                        .await
+                    } else {
+                        ai_cli::run_with_workspace(
+                            user_id,
+                            workspace,
+                            download_base,
+                            user_message,
+                            combined_preflight_note.as_deref(),
+                            Some(fallback_id.as_str()),
+                            route,
+                            require_existing_git,
+                            native_session_scope.clone(),
+                            trace_id,
+                            state,
+                            tx,
+                        )
+                        .await
+                    };
                     match fallback_result {
                         Ok(()) => Ok(()),
                         Err(fallback_e)
@@ -408,6 +484,7 @@ async fn run_backend_with_workspace(
                                 user_message,
                                 combined_preflight_note.as_deref(),
                                 api_agent_name(state, agent_name),
+                                planning_mode,
                                 state,
                                 tx,
                             )
@@ -437,6 +514,7 @@ async fn run_backend_with_workspace(
                         user_message,
                         combined_preflight_note.as_deref(),
                         api_agent_name(state, agent_name),
+                        planning_mode,
                         state,
                         tx,
                     )
@@ -454,6 +532,7 @@ async fn run_backend_with_workspace(
                 user_message,
                 combined_preflight_note.as_deref(),
                 api_agent_name(state, agent_name),
+                planning_mode,
                 state,
                 tx,
             )
