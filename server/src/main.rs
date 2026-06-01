@@ -44,6 +44,7 @@ mod project_conversation_identity;
 mod project_conversation_workspace;
 mod project_deletion;
 mod project_downloads;
+mod project_execution_mode;
 mod project_git;
 mod project_keys;
 mod project_membership;
