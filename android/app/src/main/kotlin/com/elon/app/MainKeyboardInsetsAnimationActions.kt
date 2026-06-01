@@ -28,6 +28,8 @@ internal class MainKeyboardInsetsAnimationActions(
     private var lastKnownKeyboardHeight = -1
     private var usingEstimatedKeyboardHeight = false
     private var keyboardOverlayMode = false
+    private var preserveOverlayChatPadding = false
+    private var overlayChatPaddingHeight = 0
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
     private var followChatBottomDuringLift = false
@@ -153,17 +155,33 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     fun setKeyboardOverlayMode(enabled: Boolean) {
-        if (keyboardOverlayMode == enabled) return
-        keyboardOverlayMode = enabled
         if (enabled) {
-            bottomOffsetAnimator?.cancel()
-            binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_NONE, null)
-            applyBottomBarOffset(0)
-            applyChatBottomPadding(0)
+            keyboardOverlayMode = true
+            preserveOverlayChatPadding = false
+            overlayChatPaddingHeight = 0
+            applyKeyboardOverlayState()
             return
         }
+        if (!keyboardOverlayMode) return
+        keyboardOverlayMode = false
+        preserveOverlayChatPadding = false
+        overlayChatPaddingHeight = 0
         val target = lastKeyboardHeight.coerceAtLeast(0)
         applyKeyboardHeight(target, animate = true)
+    }
+
+    fun setKeyboardOverlayModePreservingChatPadding() {
+        val currentChatPadding = (binding.chatList.paddingBottom - baseChatListPaddingBottom).coerceAtLeast(0)
+        val rememberedHeight = when {
+            currentChatPadding > 0 -> currentChatPadding
+            lastKeyboardHeight > 0 -> lastKeyboardHeight
+            lastKnownKeyboardHeight > 0 -> lastKnownKeyboardHeight
+            else -> 0
+        }
+        keyboardOverlayMode = true
+        preserveOverlayChatPadding = rememberedHeight > 0
+        overlayChatPaddingHeight = rememberedHeight
+        applyKeyboardOverlayState()
     }
 
     fun replacementPanelHeight(fallbackHeight: Int): Int {
@@ -309,7 +327,8 @@ internal class MainKeyboardInsetsAnimationActions(
         lastKeyboardHeight = target
         if (keyboardOverlayMode) {
             applyBottomBarOffset(0)
-            applyChatBottomPadding(0)
+            val overlayPadding = if (preserveOverlayChatPadding) overlayChatPaddingHeight else 0
+            applyChatBottomPadding(overlayPadding)
             return
         }
         if (animate) {
@@ -325,6 +344,17 @@ internal class MainKeyboardInsetsAnimationActions(
     private fun applyBottomBarOffset(keyboardHeight: Int) {
         bottomOffsetAnimator?.cancel()
         binding.bottomBarContainer.translationY = -keyboardHeight.toFloat()
+    }
+
+    private fun applyKeyboardOverlayState() {
+        bottomOffsetAnimator?.cancel()
+        chatLiftAnimator?.cancel()
+        chatLiftAnimator = null
+        binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_NONE, null)
+        binding.chatList.setLayerType(View.LAYER_TYPE_NONE, null)
+        applyBottomBarOffset(0)
+        val overlayPadding = if (preserveOverlayChatPadding) overlayChatPaddingHeight else 0
+        applyChatBottomPadding(overlayPadding)
     }
 
     private fun animateBottomBarOffset(keyboardHeight: Int) {
