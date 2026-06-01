@@ -15,6 +15,7 @@ use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
     tools,
     types::AppState,
@@ -403,6 +404,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 run_content,
                 run_agent,
                 None,
+                ProjectExecutionMode::Execute,
                 Some(run_trace_id),
                 tx,
             )

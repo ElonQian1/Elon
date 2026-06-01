@@ -15,12 +15,14 @@ pub fn project_ws_job_key(
 pub fn project_ws_fingerprint(
     conversation_id: &str,
     agent_name: Option<&str>,
+    execution_mode: &str,
     message: &str,
 ) -> String {
     format!(
-        "{}\u{1f}{}\u{1f}{}",
+        "{}\u{1f}{}\u{1f}{}\u{1f}{}",
         conversation_id,
         agent_name.unwrap_or(""),
+        execution_mode,
         message
     )
 }

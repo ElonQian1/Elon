@@ -10,6 +10,7 @@ use tokio::sync::broadcast;
 
 use crate::{
     project_attachment_notes::append_project_attachment_notes,
+    project_execution_mode::ProjectExecutionMode,
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_trace_events::record_server_transport,
     project_ws_job::{cancel_project_ws_job, emit_project_job_event, get_or_start_project_ws_job},
@@ -151,10 +152,20 @@ pub(crate) async fn handle_project_ws(
                 "client_request_id": &client_request_id,
                 "message_chars": message.chars().count(),
                 "agent": request.agent.as_deref(),
+                "execution_mode": request.execution_mode.as_deref(),
+                "plan_mode": request.plan_mode,
             }),
         );
-        let fingerprint =
-            project_ws_fingerprint(&conversation_id, request.agent.as_deref(), &message);
+        let execution_mode = ProjectExecutionMode::from_request(
+            request.execution_mode.as_deref(),
+            request.plan_mode,
+        );
+        let fingerprint = project_ws_fingerprint(
+            &conversation_id,
+            request.agent.as_deref(),
+            execution_mode.as_str(),
+            &message,
+        );
         let job = get_or_start_project_ws_job(
             state.clone(),
             user.id.clone(),
@@ -164,6 +175,7 @@ pub(crate) async fn handle_project_ws(
             message,
             request.agent,
             attachments,
+            execution_mode,
             Some(trace_id.clone()),
             client_request_id.clone(),
             fingerprint,

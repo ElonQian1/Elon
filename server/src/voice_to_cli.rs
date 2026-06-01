@@ -8,9 +8,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    project_auth::project_access,
-    project_chat::run_project_agent_with_scheduler,
-    types::AppState,
+    project_auth::project_access, project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode, types::AppState,
 };
 
 pub struct DispatchTarget {
@@ -61,10 +60,7 @@ pub async fn dispatch_transcript(
     }
 
     let char_count = message.chars().count();
-    let download_base = format!(
-        "{}/api/projects/{}/download",
-        state.public_url, project.id
-    );
+    let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
 
     tracing::info!(
         target: "voice",
@@ -84,6 +80,7 @@ pub async fn dispatch_transcript(
         message,
         None, // agent_name
         None, // attachments
+        ProjectExecutionMode::Execute,
         None, // trace_id
         ai_reply_tx,
     )

@@ -13,6 +13,7 @@ use crate::{
         merge_conversation_worktree, project_merge_execution_key, ProjectConversationWorkspace,
     },
     project_events,
+    project_execution_mode::ProjectExecutionMode,
     project_ws_protocol::{is_done_project_ws_message, is_terminal_project_ws_message},
     store::ProjectAccess,
     types::{AppState, WsMessage},
@@ -25,6 +26,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     conversation_id: String,
     message: String,
     agent_name: Option<String>,
+    execution_mode: ProjectExecutionMode,
     trace_id: Option<String>,
     execution_workspace: ProjectConversationWorkspace,
     tx: UnboundedSender<String>,
@@ -39,26 +41,48 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     let agent_name_for_task = agent_name.clone();
     let agent_trace_id = trace_id.clone();
     let agent_workspace = execution_workspace.active_workspace.clone();
+    let planning_task = execution_mode.is_plan();
 
     // Step 1: AI 开始理解需求
-    let _ = tx.send(
-        WsMessage::progress_step("Codex 正在分析需求，准备进入开发流程…", 1, 4, "ai_thinking").to_json(),
-    );
+    if planning_task {
+        let _ = tx.send(WsMessage::progress("AI 正在整理开发计划，不会修改代码。").to_json());
+    } else {
+        let _ = tx.send(
+            WsMessage::progress_step("Codex 正在分析需求，准备进入开发流程…", 1, 4, "ai_thinking")
+                .to_json(),
+        );
+    }
 
     let agent_task = tokio::spawn(async move {
-        agent::run_for_project_in_workspace(
-            &agent_user_id,
-            &agent_project,
-            &agent_workspace,
-            &agent_download_base,
-            Some(&agent_conversation_id),
-            &agent_message,
-            agent_name_for_task.as_deref(),
-            agent_trace_id.as_deref(),
-            &agent_state,
-            agent_tx,
-        )
-        .await;
+        if planning_task {
+            agent::plan_for_project_in_workspace(
+                &agent_user_id,
+                &agent_project,
+                &agent_workspace,
+                &agent_download_base,
+                Some(&agent_conversation_id),
+                &agent_message,
+                agent_name_for_task.as_deref(),
+                agent_trace_id.as_deref(),
+                &agent_state,
+                agent_tx,
+            )
+            .await;
+        } else {
+            agent::run_for_project_in_workspace(
+                &agent_user_id,
+                &agent_project,
+                &agent_workspace,
+                &agent_download_base,
+                Some(&agent_conversation_id),
+                &agent_message,
+                agent_name_for_task.as_deref(),
+                agent_trace_id.as_deref(),
+                &agent_state,
+                agent_tx,
+            )
+            .await;
+        }
     });
 
     let mut terminal_raw = None;
@@ -71,7 +95,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
             break;
         }
         // Step 2: 收到 agent 第一条消息说明 Codex 已开始读写代码
-        if !first_agent_msg_seen {
+        if !planning_task && !first_agent_msg_seen {
             first_agent_msg_seen = true;
             let _ = tx.send(
                 WsMessage::progress_step("Codex 正在读写项目代码…", 2, 4, "code_editing").to_json(),
@@ -81,9 +105,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     }
 
     if let Err(error) = agent_task.await {
-        let _ = tx.send(
-            WsMessage::error(format!("AI 任务异常结束: {}", error)).to_json(),
-        );
+        let _ = tx.send(WsMessage::error(format!("AI 任务异常结束: {}", error)).to_json());
         return;
     }
 
@@ -96,14 +118,15 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
         }
     }
 
-    if terminal_is_done {
+    if terminal_is_done && !planning_task {
         // Step 3: 代码修改完成，准备提交合并
         let _ = tx.send(
-            WsMessage::progress_step("代码修改完成，正在提交并合并…", 3, 4, "code_committing").to_json(),
+            WsMessage::progress_step("代码修改完成，正在提交并合并…", 3, 4, "code_committing")
+                .to_json(),
         );
     }
 
-    if terminal_is_done && execution_workspace.is_isolated() {
+    if terminal_is_done && !planning_task && execution_workspace.is_isolated() {
         let merge_key = project_merge_execution_key(&project.id);
         let merge_tx = tx.clone();
         let merge_state = state.clone();
@@ -120,14 +143,12 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                     );
                 }
                 let _ = merge_tx.send(
-                    WsMessage::progress("代码已在会话分支完成，正在等待项目合并锁。",).to_json(),
+                    WsMessage::progress("代码已在会话分支完成，正在等待项目合并锁。").to_json(),
                 );
             })
             .await;
         let _keep_merge_permit = merge_permit;
-        let _ = tx.send(
-            WsMessage::progress("正在把会话分支串行合并回项目主工作区。",).to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在把会话分支串行合并回项目主工作区。").to_json());
         match merge_conversation_worktree(&execution_workspace) {
             Ok(summary) => {
                 if let Some(trace_id) = trace_id.as_deref() {
@@ -143,7 +164,8 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
                 }
                 // Step 4: 合并完成，任务即将交付
                 let _ = tx.send(
-                    WsMessage::progress_step("分支合并完成，任务即将交付…", 4, 4, "deploying").to_json(),
+                    WsMessage::progress_step("分支合并完成，任务即将交付…", 4, 4, "deploying")
+                        .to_json(),
                 );
                 let _ = tx.send(WsMessage::progress(summary).to_json());
             }
@@ -171,7 +193,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
         }
     }
 
-    if terminal_is_done {
+    if terminal_is_done && !planning_task {
         if let Some(raw) = terminal_raw.take() {
             let original = raw.clone();
             let mut workspaces = vec![execution_workspace.active_workspace.as_path()];
@@ -200,21 +222,13 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
     if let Some(ref raw) = terminal_raw {
         // 方案5: 广播给其他项目成员（发起人已通过 tx 收到结果）
         if terminal_is_done {
-            project_events::publish_task_done(
-                &state,
-                &project.id,
-                &user_id,
-                &conversation_id,
-                raw,
-            );
+            project_events::publish_task_done(&state, &project.id, &user_id, &conversation_id, raw);
         }
     }
 
     if let Some(raw) = terminal_raw {
         let _ = tx.send(raw);
     } else {
-        let _ = tx.send(
-            WsMessage::error("AI 任务结束但没有返回完成状态。").to_json(),
-        );
+        let _ = tx.send(WsMessage::error("AI 任务结束但没有返回完成状态。").to_json());
     }
 }

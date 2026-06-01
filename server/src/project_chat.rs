@@ -21,6 +21,7 @@ use crate::{
         prepare_project_conversation_workspace, project_conversation_execution_key,
         project_shared_execution_key, ProjectConversationWorkspace,
     },
+    project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
@@ -79,6 +80,8 @@ pub async fn chat_project(
             "conversation_id": &conversation_id,
             "message_chars": message.chars().count(),
             "agent": req.agent.as_deref(),
+            "execution_mode": req.execution_mode.as_deref(),
+            "plan_mode": req.plan_mode,
         }),
     );
 
@@ -102,6 +105,7 @@ pub async fn chat_project(
         message,
         req.agent,
         attachments,
+        ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
         Some(trace_id.clone()),
         tx,
     )
@@ -175,6 +179,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     message: String,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
+    execution_mode: ProjectExecutionMode,
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
@@ -188,12 +193,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 "conversation_id": &conversation_id,
                 "message_chars": message.chars().count(),
                 "agent": agent_name.as_deref(),
+                "execution_mode": execution_mode.as_str(),
             }),
         );
     }
     let routing_decision = intent_router::classify(&message);
-    let needs_project_workflow =
-        routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
+    let needs_project_workflow = execution_mode.is_plan()
+        || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
     let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     if needs_project_workflow && !can_edit(&project.role) {
@@ -233,10 +239,11 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 "local_confidence": routing_decision.confidence,
                 "local_reason": routing_decision.reason,
                 "skip_intent_gate": skip_intent_gate,
+                "execution_mode": execution_mode.as_str(),
             }),
         );
     }
-    let prepared_execution_workspace = if needs_project_workflow {
+    let prepared_execution_workspace = if needs_project_workflow && !execution_mode.is_plan() {
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
@@ -284,7 +291,10 @@ pub(crate) async fn run_project_agent_with_scheduler(
         return;
     }
 
-    if skip_intent_gate {
+    if execution_mode.is_plan() {
+        let _ =
+            tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
+    } else if skip_intent_gate {
         if let Some(trace_id) = trace_id.as_deref() {
             state.server_traces.record(
                 trace_id,
@@ -416,7 +426,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let execution_workspace = prepared_execution_workspace
         .unwrap_or_else(|| ProjectConversationWorkspace::shared(base_workspace.clone()));
 
-    let shared_project_permit = if execution_workspace.is_isolated() {
+    let shared_project_permit = if execution_mode.is_plan() || execution_workspace.is_isolated() {
         None
     } else {
         let queued_tx = tx.clone();
@@ -446,7 +456,11 @@ pub(crate) async fn run_project_agent_with_scheduler(
         )
     };
 
-    let message_text = if conversation_permit.was_queued() {
+    let message_text = if execution_mode.is_plan() && conversation_permit.was_queued() {
+        "已轮到本会话规划任务，开始生成计划。"
+    } else if execution_mode.is_plan() {
+        "已获得本会话规划执行权，开始生成计划。"
+    } else if conversation_permit.was_queued() {
         "已轮到本会话任务，开始在会话 worktree 中调用 AI 修改项目。"
     } else if execution_workspace.is_isolated() {
         "已获得本会话执行权，开始在独立 worktree 中调用 AI 修改项目。"
@@ -487,6 +501,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
         conversation_id,
         message,
         agent_name,
+        execution_mode,
         trace_id,
         execution_workspace,
         tx,

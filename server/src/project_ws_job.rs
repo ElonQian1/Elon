@@ -17,6 +17,7 @@ use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::{
     project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode,
     project_keys::project_ws_job_key,
     project_trace_events::record_server_message,
     project_ws_protocol::{
@@ -51,6 +52,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     message: String,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
+    execution_mode: ProjectExecutionMode,
     trace_id: Option<String>,
     client_request_id: String,
     fingerprint: String,
@@ -199,6 +201,7 @@ pub(crate) async fn get_or_start_project_ws_job(
             message,
             agent_name,
             attachments,
+            execution_mode,
             trace_id,
             task_id,
             job_for_task,
@@ -220,6 +223,7 @@ async fn run_project_ws_job(
     message: String,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
+    execution_mode: ProjectExecutionMode,
     trace_id: Option<String>,
     task_id: String,
     job: Arc<ProjectWsJob>,
@@ -236,6 +240,7 @@ async fn run_project_ws_job(
                 "conversation_id": &conversation_id,
                 "message_chars": message.chars().count(),
                 "agent": agent_name.as_deref(),
+                "execution_mode": execution_mode.as_str(),
             }),
         );
     }
@@ -280,6 +285,7 @@ async fn run_project_ws_job(
             task_message,
             task_agent_name,
             task_attachments,
+            execution_mode,
             task_trace_id,
             tx,
         )

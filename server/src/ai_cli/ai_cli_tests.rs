@@ -1,8 +1,8 @@
-use super::*;
 use super::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
 use super::ai_cli_native_session::build_native_session_continuity_note;
 use super::ai_cli_output::parse_intent_gate_result;
 use super::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
+use super::*;
 use crate::store::ConversationMessage;
 use crate::types::{AiCliOption, CliPromptMode};
 
@@ -83,6 +83,7 @@ fn chat_prompt_uses_lightweight_mode() {
         &test_option(),
         intent_router::CapabilityRoute::ChatAgent,
         false,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("轻量聊天模式"));
@@ -109,6 +110,7 @@ fn development_prompt_keeps_project_workflow() {
         &test_option(),
         intent_router::CapabilityRoute::CodeAgent,
         false,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("轻量项目工作流"));
@@ -140,6 +142,24 @@ fn development_prompt_keeps_project_workflow() {
 }
 
 #[test]
+fn plan_prompt_is_read_only_even_for_code_route() {
+    let prompt = build_cli_prompt(
+        Path::new("D:/tmp/project"),
+        "给这个功能做一个计划",
+        Some("source-size guardrail"),
+        &test_option(),
+        intent_router::CapabilityRoute::CodeAgent,
+        false,
+        AiCliRequestMode::Plan,
+    );
+
+    assert!(prompt.contains("当前是 Plan 模式"));
+    assert!(prompt.contains("绝对不要创建、修改、删除文件"));
+    assert!(prompt.contains("按这个计划开始实现"));
+    assert!(prompt.contains("source-size guardrail"));
+}
+
+#[test]
 fn resumed_development_prompt_keeps_source_size_guardrail() {
     let prompt = build_cli_prompt(
         Path::new("D:/tmp/project"),
@@ -148,6 +168,7 @@ fn resumed_development_prompt_keeps_source_size_guardrail() {
         &test_option(),
         intent_router::CapabilityRoute::CodeAgent,
         true,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("source-size guardrail"));
@@ -166,6 +187,7 @@ fn development_prompt_includes_preflight_note() {
         &test_option(),
         intent_router::CapabilityRoute::CodeAgent,
         false,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("项目预检与约束摘要"));
@@ -182,6 +204,7 @@ fn resumed_chat_prompt_is_short() {
         &test_option(),
         intent_router::CapabilityRoute::ChatAgent,
         true,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("Continue the existing Codex CLI native session"));
@@ -198,6 +221,7 @@ fn resumed_development_prompt_reuses_bootstrap_rules() {
         &test_option(),
         intent_router::CapabilityRoute::CodeAgent,
         true,
+        AiCliRequestMode::Execute,
     );
 
     assert!(prompt.contains("full development workflow was already injected"));
