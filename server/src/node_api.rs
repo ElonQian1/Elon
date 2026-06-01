@@ -47,8 +47,10 @@ pub async fn list_available_models(
 
 #[derive(Serialize)]
 struct NodeBalanceResp {
-    user_id: String,
-    credits: f64,
+    /// 当前可用余额（与 Android/Web 约定的字段名）
+    balance: f64,
+    /// 累计历史总收益
+    lifetime_earned: f64,
 }
 
 /// GET /api/me/node-balance — 本用户作为节点提供者的积分余额
@@ -67,18 +69,15 @@ pub async fn my_node_balance(
         }
     };
 
-    match state.store.get_node_balance(&user.id) {
-        Ok(credits) => Json(NodeBalanceResp {
-            user_id: user.id,
-            credits,
-        })
-        .into_response(),
-        Err(e) => (
+    let balance = match state.store.get_node_balance(&user.id) {
+        Ok(v) => v,
+        Err(e) => return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response(),
-    }
+        ).into_response(),
+    };
+    let lifetime_earned = state.store.get_lifetime_earned(&user.id).unwrap_or(0.0);
+    Json(NodeBalanceResp { balance, lifetime_earned }).into_response()
 }
 
 // ── /api/me/node-transactions ─────────────────────────────────────────────────

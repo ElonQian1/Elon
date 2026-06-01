@@ -64,6 +64,19 @@ impl Store {
         Ok(balance)
     }
 
+    /// 查询某提供者用户的累计历史总收益（SUM settled_credits）。
+    pub fn get_lifetime_earned(&self, user_id: &str) -> Result<f64> {
+        let conn = self.conn.lock().unwrap();
+        let total: f64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(settled_credits), 0.0) FROM node_transactions WHERE provider_user_id = ?1",
+                params![user_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0.0);
+        Ok(total)
+    }
+
     /// 结算一次 LLM 推理：
     /// 1. 计算消费金额和提供者收益
     /// 2. 写入 node_transactions 流水

@@ -497,10 +497,52 @@
       font-weight: 700;
       color: #EAEAEA;
     }
+    .node-balance-cta-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px;
+    }
     .node-balance-cta {
       font-size: 13px;
       color: #4DA8FF;
+      cursor: pointer;
     }
+    .node-balance-cta:hover { text-decoration: underline; }
+    .node-balance-tx-btn {
+      font-size: 12px;
+      color: #7ECFFF;
+      background: #0C2D40;
+      border-radius: 8px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .node-balance-tx-btn:hover { background: #143850; }
+    /* 积分流水弹窗 */
+    .node-tx-mask {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:9999;
+      align-items:flex-end; justify-content:center;
+    }
+    .node-tx-mask.active { display:flex; }
+    .node-tx-sheet {
+      background:#151515; border-radius:14px 14px 0 0;
+      width:100%; max-width:640px; max-height:80vh;
+      display:flex; flex-direction:column;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .node-tx-title { font-size:18px; font-weight:700; color:#E6EEF8; margin-bottom:16px; }
+    .node-tx-list { overflow-y:auto; flex:1; }
+    .node-tx-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #222831;
+    }
+    .node-tx-row:last-child { border-bottom: none; }
+    .node-tx-row-top {
+      display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;
+    }
+    .node-tx-model { font-size:14px; font-weight:700; color:#D1E4FF; }
+    .node-tx-earned { font-size:14px; font-weight:700; color:#4ADE80; }
+    .node-tx-meta { font-size:11px; color:#6B7280; }
+    .node-tx-empty { text-align:center; padding:40px 0; color:#6B7280; font-size:14px; }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -911,7 +953,7 @@
       </div>
 
       <!-- 节点积分内联卡片 -->
-      <div class="node-balance-card" id="nodeBalanceCard" onclick="openNodeMarketDialog()">
+      <div class="node-balance-card" id="nodeBalanceCard">
         <div class="node-balance-header">
           <span class="node-balance-title">节点积分</span>
           <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
@@ -926,7 +968,21 @@
             <span class="val" id="nodeLifetimeVal">—</span>
           </div>
         </div>
-        <div class="node-balance-cta">点击进入节点算力市场  →</div>
+        <div class="node-balance-cta-row">
+          <span class="node-balance-cta" onclick="openNodeMarketDialog()">进入节点算力市场  →</span>
+          <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
+        </div>
+      </div>
+
+      <!-- 积分流水明细弹窗 -->
+      <div class="node-tx-mask" id="nodeTxMask">
+        <div class="node-tx-sheet">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <span class="node-tx-title" style="margin-bottom:0">积分流水明细</span>
+            <button onclick="document.getElementById('nodeTxMask').classList.remove('active')" style="background:none;border:none;color:#6B7280;font-size:22px;cursor:pointer;padding:0">×</button>
+          </div>
+          <div class="node-tx-list" id="nodeTxList"><div style="text-align:center;padding:32px 0;color:#6B7280">加载中…</div></div>
+        </div>
       </div>
 
       <button class="profile-row" id="aiSettingsRow">
@@ -2054,6 +2110,41 @@
   function authHeaders() {
     const t = localStorage.getItem('elon_token');
     return t ? { 'Authorization': 'Bearer ' + t } : {};
+  }
+
+  // ====== 积分流水明细弹窗 ======
+  async function openNodeTxDialog() {
+    const mask = document.getElementById('nodeTxMask');
+    const list = document.getElementById('nodeTxList');
+    if (!mask || !list) return;
+    mask.classList.add('active');
+    mask.addEventListener('click', (e) => { if (e.target === mask) mask.classList.remove('active'); }, { once: true });
+    list.innerHTML = '<div style="text-align:center;padding:32px 0;color:#6B7280">加载中…</div>';
+    try {
+      const res = await fetch('/api/me/node-transactions', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const txs = data.transactions || [];
+      if (txs.length === 0) {
+        list.innerHTML = '<div class="node-tx-empty">暂无流水记录</div>';
+        return;
+      }
+      list.innerHTML = txs.map(tx => {
+        const shortNode = tx.node_id.length > 12 ? tx.node_id.slice(-8) : tx.node_id;
+        const tokens = (tx.prompt_tokens || 0) + (tx.completion_tokens || 0);
+        const earned = fmtBal(tx.settled_credits || 0);
+        const ts = (tx.created_at || '').replace('T', ' ').substring(5, 16);
+        return `<div class="node-tx-row">
+          <div class="node-tx-row-top">
+            <span class="node-tx-model">${tx.model_id}</span>
+            <span class="node-tx-earned">+${earned} 积分</span>
+          </div>
+          <div class="node-tx-meta">节点 ${shortNode} · ${tokens} tokens · ${ts}</div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      list.innerHTML = `<div class="node-tx-empty" style="color:#EF4444">加载失败：${e.message}</div>`;
+    }
   }
 
   // ====== 节点积分内联卡片 ======

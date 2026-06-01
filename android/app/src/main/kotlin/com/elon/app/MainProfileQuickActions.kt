@@ -25,8 +25,13 @@ internal class MainProfileQuickActions(
 ) {
     private val tokenUsageCard by lazy { ProfileTokenUsageCard(activity, binding) }
     private val nodeMarketSheet by lazy { NodeMarketSheet(activity, http, serverUrl) }
+    private val nodeTransactionSheet by lazy { NodeTransactionSheet(activity, http, serverUrl) }
     private val nodeBalanceCard by lazy {
-        ProfileNodeBalanceCard(activity, binding, http, serverUrl) { nodeMarketSheet.show() }
+        ProfileNodeBalanceCard(
+            activity, binding, http, serverUrl,
+            openMarket = { nodeMarketSheet.show() },
+            openTransactions = { nodeTransactionSheet.show() }
+        )
     }
 
     fun setupQuickActions() {

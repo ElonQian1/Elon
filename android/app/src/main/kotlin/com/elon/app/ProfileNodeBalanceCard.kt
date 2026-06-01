@@ -25,7 +25,8 @@ internal class ProfileNodeBalanceCard(
     private val binding: ActivityMainBinding,
     private val http: OkHttpClient,
     private val serverUrl: String,
-    private val openMarket: () -> Unit
+    private val openMarket: () -> Unit,
+    private val openTransactions: () -> Unit = {}
 ) {
     private var root: LinearLayout? = null
     private var loadSerial = 0
@@ -122,9 +123,7 @@ internal class ProfileNodeBalanceCard(
                 setColor(Color.parseColor("#171B20"))
                 cornerRadius = dp(8).toFloat()
             }
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { openMarket() }
+            isClickable = false
 
             // 标题行
             addView(LinearLayout(activity).apply {
@@ -174,16 +173,40 @@ internal class ProfileNodeBalanceCard(
                 addView(buildMetricBlock("累计收益", "…") { lifetimeValue = it })
             })
 
-            // 底部提示
-            addView(TextView(activity).apply {
+            // 底部 CTA 行：算力市场 | 积分明细
+            addView(LinearLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).also { it.topMargin = dp(12) }
-                includeFontPadding = false
-                text = "点击进入节点算力市场  →"
-                setTextColor(Color.parseColor("#4DA8FF"))
-                textSize = 13f
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+
+                addView(TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    includeFontPadding = false
+                    text = "进入节点算力市场  →"
+                    setTextColor(Color.parseColor("#4DA8FF"))
+                    textSize = 13f
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { openMarket() }
+                })
+
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = "积分明细"
+                    setTextColor(Color.parseColor("#7ECFFF"))
+                    textSize = 12f
+                    setPadding(dp(10), dp(4), dp(10), dp(4))
+                    background = GradientDrawable().apply {
+                        setColor(Color.parseColor("#0C2D40"))
+                        cornerRadius = dp(8).toFloat()
+                    }
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { openTransactions() }
+                })
             })
         }
         return card
