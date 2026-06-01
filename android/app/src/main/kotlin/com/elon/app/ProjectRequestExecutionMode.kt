@@ -1,6 +1,6 @@
 package com.elon.app
 
-internal enum class ProjectRequestExecutionMode(val wireValue: String) {
+enum class ProjectRequestExecutionMode(val wireValue: String) {
     Execute("execute"),
     Plan("plan");
 

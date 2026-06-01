@@ -63,7 +63,7 @@ internal class NodeMarketSheet(
     // ─── 入口 ───────────────────────────────────────────────────────────────
 
     fun show() {
-        val dialog = AlertDialog.Builder(activity, R.style.Theme_AppCompat_DayNight_Dialog)
+        val dialog = AlertDialog.Builder(activity)
             .setView(buildRootView())
             .create()
         dialog.window?.setLayout(
