@@ -303,6 +303,10 @@ class MainActivity : AppCompatActivity() {
                     // 好友上线/下线，刷新列表以更新绿点
                     friendActions.loadFriends()
                 }
+                is GlobalWsEvent.Typing -> {
+                    // 好友正在输入，通知聊天界面显示"正在输入..."
+                    friendChatActions.handleTypingEvent(event.fromUserId)
+                }
                 else -> Unit
             }
         }

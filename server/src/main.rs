@@ -26,6 +26,7 @@ mod friend_api;
 mod friend_events;
 mod global_ws;
 mod presence_events;
+mod typing_events;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;

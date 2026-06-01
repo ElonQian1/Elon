@@ -101,6 +101,9 @@ class GlobalWsManager(private val serverUrl: String) {
     fun addListener(l: Listener) { listeners.add(l) }
     fun removeListener(l: Listener) { listeners.remove(l) }
 
+    /** 向服务端发送 JSON 文本消息（如 typing 事件）。已连接时返回 true。 */
+    fun send(text: String): Boolean = ws?.send(text) ?: false
+
     // ── 内部实现 ──────────────────────────────────────────────────────────────
 
     private fun connect() {

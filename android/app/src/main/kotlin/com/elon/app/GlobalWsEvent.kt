@@ -49,6 +49,11 @@ sealed class GlobalWsEvent {
         val isOnline: Boolean,
     ) : GlobalWsEvent()
 
+    /** 好友正在输入提示 */
+    data class Typing(
+        val fromUserId: String,
+    ) : GlobalWsEvent()
+
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
     data class Unknown(val raw: String) : GlobalWsEvent()
 
@@ -80,6 +85,9 @@ sealed class GlobalWsEvent {
                 "presence" -> PresenceChange(
                     userId = json.optString("userId", ""),
                     isOnline = json.optBoolean("isOnline", false),
+                )
+                "typing" -> Typing(
+                    fromUserId = json.optString("fromUserId", ""),
                 )
                 else -> Unknown(text)
             }

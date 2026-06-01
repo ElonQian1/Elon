@@ -2,6 +2,8 @@ package com.elon.app
 
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -37,6 +39,30 @@ internal class MainFriendChatActions(
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
 
+    // 正在输入提示：3秒无新事件后自动隐藏
+    private val typingHandler = Handler(Looper.getMainLooper())
+    private val hideTypingRunnable = Runnable { restoreTitleFromTyping() }
+    private var savedFriendTitle = ""
+    private var typingShowing = false
+
+    // 发送打字状态防抖：2秒内最多发一次
+    private var lastTypingSentMs = 0L
+    private val typingWatcher = object : TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        override fun afterTextChanged(s: Editable?) {
+            val friend = activeFriend ?: return
+            val now = System.currentTimeMillis()
+            if (now - lastTypingSentMs < 2_000L) return
+            lastTypingSentMs = now
+            val payload = JSONObject().apply {
+                put("type", "typing")
+                put("toUserId", friend.id)
+            }.toString()
+            (activity.application as? ElonApplication)?.globalWs?.send(payload)
+        }
+    }
+
     private val pollRunnable = object : Runnable {
         override fun run() {
             val friend = activeFriend ?: return
@@ -60,12 +86,18 @@ internal class MainFriendChatActions(
         if (messages.isNotEmpty()) {
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
+        savedFriendTitle = friend.name
+        binding.inputEdit.addTextChangedListener(typingWatcher)
         showFriendChat(friend.name, animate)
         loadMessages(friend, silent = false, scrollToBottom = true)
         startPolling()
     }
 
     fun closeFriendChat() {
+        binding.inputEdit.removeTextChangedListener(typingWatcher)
+        typingHandler.removeCallbacks(hideTypingRunnable)
+        typingShowing = false
+        savedFriendTitle = ""
         activeFriend = null
         activeAdapter = null
         stopPolling()
@@ -91,6 +123,22 @@ internal class MainFriendChatActions(
         if (friend.id != fromUserId) return false
         loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
         return true
+    }
+
+    /** 收到好友的 typing 事件：显示"正在输入..."，3 秒后自动恢复好友名称 */
+    fun handleTypingEvent(fromUserId: String) {
+        val friend = activeFriend ?: return
+        if (friend.id != fromUserId) return
+        typingShowing = true
+        binding.topTitleText.text = "正在输入…"
+        typingHandler.removeCallbacks(hideTypingRunnable)
+        typingHandler.postDelayed(hideTypingRunnable, 3_000L)
+    }
+
+    private fun restoreTitleFromTyping() {
+        if (!typingShowing) return
+        typingShowing = false
+        binding.topTitleText.text = savedFriendTitle
     }
 
     fun stopPolling() {

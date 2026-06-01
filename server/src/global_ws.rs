@@ -55,6 +55,7 @@ async fn handle(
     let mut group_rx = crate::friend_events::subscribe_groups();
     let mut project_task_rx = crate::project_events::subscribe();
     let mut presence_rx = crate::presence_events::subscribe();
+    let mut typing_rx = crate::typing_events::subscribe();
 
     // 认证用户上线：注册在线状态并广播给所有已连接用户
     if let Some(ref uid) = authenticated_user_id {
@@ -136,12 +137,37 @@ async fn handle(
                     _ => {}
                 }
             }
+            // typing 事件 —— 只推给目标用户的连接
+            msg = typing_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id.as_deref() == Some(event.to_user_id.as_str()) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => { /* 跳过积压，不影响体验 */ }
+                    _ => {}
+                }
+            }
             incoming = rx.next() => {
                 match incoming {
                     Some(Ok(Message::Ping(p))) => {
                         if tx.send(Message::Pong(p)).await.is_err() { break; }
                     }
-                    Some(Ok(_)) => {} // 目前忽略客户端发来的文本/二进制
+                    // 解析客户端发来的文本消息
+                    Some(Ok(Message::Text(text))) => {
+                        if let (Some(uid), Ok(json)) = (
+                            authenticated_user_id.as_deref(),
+                            serde_json::from_str::<serde_json::Value>(&text),
+                        ) {
+                            let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                            if msg_type == "typing" {
+                                if let Some(to_uid) = json.get("toUserId").and_then(|v| v.as_str()) {
+                                    crate::typing_events::publish(uid.to_string(), to_uid.to_string());
+                                }
+                            }
+                        }
+                    }
+                    Some(Ok(_)) => {} // 其余类型忽略
                     _ => break,      // 连接关闭或错误
                 }
             }
