@@ -19,6 +19,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 
 internal class ProfileTokenUsageCard(
     private val activity: AppCompatActivity,
@@ -153,9 +154,9 @@ internal class ProfileTokenUsageCard(
             progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    activity.dp(8)
+                    activity.dp(18)
                 ).apply {
-                    topMargin = activity.dp(14)
+                    topMargin = activity.dp(16)
                 }
                 max = 1000
                 progress = 0
@@ -258,9 +259,7 @@ internal class ProfileTokenUsageCard(
     }
 
     private fun renderLoading() {
-        statusPill.text = "同步中"
-        statusPill.setTextColor(Color.parseColor("#D7E8FF"))
-        statusPill.background = roundedRect(Color.parseColor("#253448"), activity.dp(8))
+        applyStatus("同步中", "#D7E8FF", "#253448")
         remainingText.text = "读取中..."
         remainingCaption.text = "正在同步服务器用量"
         updateProgress(0, Color.parseColor("#5FA8FF"))
@@ -273,9 +272,7 @@ internal class ProfileTokenUsageCard(
     }
 
     private fun renderLoggedOut() {
-        statusPill.text = "未登录"
-        statusPill.setTextColor(Color.parseColor("#FFD8A8"))
-        statusPill.background = roundedRect(Color.parseColor("#3A2818"), activity.dp(8))
+        applyStatus("未登录", "#FFD8A8", "#3A2818")
         remainingText.text = "登录后查看"
         remainingCaption.text = "登录账号后显示剩余额度和 token 消耗"
         updateProgress(0, Color.parseColor("#FFB65C"))
@@ -290,25 +287,28 @@ internal class ProfileTokenUsageCard(
     }
 
     private fun renderSummary(summary: TokenUsageSummary) {
-        statusPill.text = "近${summary.days}天"
-        statusPill.setTextColor(Color.parseColor("#A8F0C0"))
-        statusPill.background = roundedRect(Color.parseColor("#163221"), activity.dp(8))
-
         val remaining = summary.remainingTokens
         if (remaining == null) {
+            applyStatus("未配置", "#D7E8FF", "#253448")
             remainingText.text = "未配置"
             remainingCaption.text = "服务器暂未返回剩余额度"
             updateProgress(0, Color.parseColor("#8FA0B8"))
             progressLabel.text = "额度上限未配置"
         } else {
-            remainingText.text = TokenUsageSummaryClient.formatCount(remaining)
-            remainingCaption.text = "剩余 tokens${summary.resetText?.let { " · $it" }.orEmpty()}"
             val percent = remainingPercent(summary)
+            val percentLabel = percentLabel(percent)
+            val limit = summary.limitTokens?.takeIf { it > 0 }
+            applyStatus(statusLabel(percentLabel), statusTextColor(percentLabel), statusBgColor(percentLabel))
+            remainingText.text = limit?.let { "$percentLabel%" }
+                ?: TokenUsageSummaryClient.formatCount(remaining)
+            remainingCaption.text = limit
+                ?.let { "剩余 ${TokenUsageSummaryClient.formatTokens(remaining)} / ${TokenUsageSummaryClient.formatTokens(it)}" }
+                ?: "剩余 ${TokenUsageSummaryClient.formatTokens(remaining)}"
             updateProgress(percent, progressColor(percent))
             progressLabel.text = summary.limitTokens
                 ?.takeIf { it > 0 }
-                ?.let { "剩余 ${percent / 10}% · 总额度 ${TokenUsageSummaryClient.formatTokens(it)}" }
-                ?: "剩余 ${TokenUsageSummaryClient.formatTokens(remaining)}"
+                ?.let { "已用 ${(100 - percentLabel).coerceIn(0, 100)}% · 近${summary.days}天消耗 ${TokenUsageSummaryClient.formatTokens(summary.totalTokens)}" }
+                ?: "额度总量未配置${summary.resetText?.let { " · $it" }.orEmpty()}"
         }
 
         monthValue.text = TokenUsageSummaryClient.formatCount(summary.totalTokens)
@@ -319,9 +319,7 @@ internal class ProfileTokenUsageCard(
     }
 
     private fun renderError(message: String) {
-        statusPill.text = "暂不可用"
-        statusPill.setTextColor(Color.parseColor("#FFC3C3"))
-        statusPill.background = roundedRect(Color.parseColor("#3A1E1E"), activity.dp(8))
+        applyStatus("暂不可用", "#FFC3C3", "#3A1E1E")
         remainingText.text = "加载失败"
         remainingCaption.text = message
         updateProgress(0, Color.parseColor("#E86F6F"))
@@ -347,6 +345,33 @@ internal class ProfileTokenUsageCard(
         progressBar.progress = progress.coerceIn(0, 1000)
         progressBar.progressTintList = ColorStateList.valueOf(color)
         progressBar.progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2A3038"))
+    }
+
+    private fun applyStatus(text: String, textColor: String, bgColor: String) {
+        statusPill.text = text
+        statusPill.setTextColor(Color.parseColor(textColor))
+        statusPill.background = roundedRect(Color.parseColor(bgColor), activity.dp(8))
+    }
+
+    private fun percentLabel(progress: Int): Int =
+        ((progress.coerceIn(0, 1000) / 10.0).roundToInt()).coerceIn(0, 100)
+
+    private fun statusLabel(percent: Int): String = when {
+        percent <= 15 -> "告急"
+        percent <= 35 -> "偏低"
+        else -> "充足"
+    }
+
+    private fun statusTextColor(percent: Int): String = when {
+        percent <= 15 -> "#FFC3C3"
+        percent <= 35 -> "#FFD8A8"
+        else -> "#A8F0C0"
+    }
+
+    private fun statusBgColor(percent: Int): String = when {
+        percent <= 15 -> "#3A1E1E"
+        percent <= 35 -> "#3A2818"
+        else -> "#163221"
     }
 
     private fun openUsageDetails() {

@@ -374,7 +374,7 @@
     .usage-remaining {
       margin-top: 18px;
       color: #fff;
-      font-size: 32px;
+      font-size: 36px;
       font-weight: 700;
       line-height: 1;
       font-variant-numeric: tabular-nums;
@@ -385,11 +385,11 @@
       font-size: 13px;
     }
     .usage-bar {
-      height: 8px;
+      height: 18px;
       border-radius: 99px;
       overflow: hidden;
       background: #2a3038;
-      margin-top: 14px;
+      margin-top: 16px;
     }
     .usage-progress {
       height: 100%;
@@ -822,7 +822,7 @@
 
       <div class="usage-section">
         <h3>Token 额度 <small id="usagePeriodText">近30天</small></h3>
-        <div class="usage-remaining" id="usageRemainingText">读取中...</div>
+        <div class="usage-remaining" id="usageRemainingText">—</div>
         <div class="usage-caption" id="usageRemainingCaption">正在同步服务器用量</div>
         <div class="usage-bar"><div class="usage-progress" id="usageProgress"></div></div>
         <div class="usage-progress-label" id="usageProgressLabel">额度读取中</div>
@@ -1719,8 +1719,28 @@
     if (percent <= 35) return '#ffb65c';
     return '#07c160';
   }
-  function renderUsagePending(label, caption) {
+  function setUsageStatus(label, textColor, bgColor) {
     usagePeriodText.textContent = label;
+    usagePeriodText.style.color = textColor;
+    usagePeriodText.style.background = bgColor;
+  }
+  function usageStatusLabel(percent) {
+    if (percent <= 15) return '告急';
+    if (percent <= 35) return '偏低';
+    return '充足';
+  }
+  function usageStatusTextColor(percent) {
+    if (percent <= 15) return '#ffc3c3';
+    if (percent <= 35) return '#ffd8a8';
+    return '#a8f0c0';
+  }
+  function usageStatusBgColor(percent) {
+    if (percent <= 15) return '#3a1e1e';
+    if (percent <= 35) return '#3a2818';
+    return '#163221';
+  }
+  function renderUsagePending(label, caption) {
+    setUsageStatus(label, '#d7e8ff', '#253448');
     usageRemainingText.textContent = '读取中...';
     usageRemainingCaption.textContent = caption;
     setUsageProgress(0, '#5fa8ff');
@@ -1732,7 +1752,7 @@
   }
   async function loadUsageStats() {
     if (!currentUser) {
-      usagePeriodText.textContent = '未登录';
+      setUsageStatus('未登录', '#ffd8a8', '#3a2818');
       usageRemainingText.textContent = '登录后查看';
       usageRemainingCaption.textContent = '登录账号后显示剩余额度和 token 消耗';
       setUsageProgress(0, '#ffb65c');
@@ -1759,22 +1779,26 @@
       const resetText = (quota && (quota.reset_at || quota.resets_at || quota.reset_time || quota.reset)) ||
         data.reset_at || data.resets_at || data.reset_time || '';
 
-      usagePeriodText.textContent = '近30天';
       if (remaining === null) {
+        setUsageStatus('未配置', '#d7e8ff', '#253448');
         usageRemainingText.textContent = '未配置';
         usageRemainingCaption.textContent = '服务器暂未返回剩余额度';
         setUsageProgress(0, '#8fa0b8');
         usageProgressLabel.textContent = '额度上限未配置';
       } else {
-        usageRemainingText.textContent = formatUsageCount(remaining);
-        usageRemainingCaption.textContent = '剩余 tokens' + (resetText ? ' · ' + resetText : '');
         if (limit && limit > 0) {
-          const percent = Math.max(0, Math.min(100, Math.floor((remaining / limit) * 100)));
+          const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+          setUsageStatus(usageStatusLabel(percent), usageStatusTextColor(percent), usageStatusBgColor(percent));
+          usageRemainingText.textContent = percent + '%';
+          usageRemainingCaption.textContent = '剩余 ' + formatUsageCount(remaining) + ' / ' + formatUsageCount(limit) + ' tokens';
           setUsageProgress(percent, usageProgressColor(percent));
-          usageProgressLabel.textContent = '剩余 ' + percent + '% · 总额度 ' + formatUsageCount(limit) + ' tokens';
+          usageProgressLabel.textContent = '已用 ' + Math.max(0, 100 - percent) + '% · 近30天消耗 ' + formatUsageCount(total) + ' tokens';
         } else {
+          setUsageStatus('已同步', '#a8f0c0', '#163221');
+          usageRemainingText.textContent = formatUsageCount(remaining);
+          usageRemainingCaption.textContent = '剩余 tokens' + (resetText ? ' · ' + resetText : '');
           setUsageProgress(100, '#07c160');
-          usageProgressLabel.textContent = '剩余 ' + formatUsageCount(remaining) + ' tokens';
+          usageProgressLabel.textContent = '额度总量未配置';
         }
       }
 
@@ -1788,7 +1812,7 @@
         '</div>' : '') +
       (total === 0 ? '<div class="usage-hint">近 30 天暂无记录</div>' : '');
     } catch (err) {
-      usagePeriodText.textContent = '暂不可用';
+      setUsageStatus('暂不可用', '#ffc3c3', '#3a1e1e');
       usageRemainingText.textContent = '加载失败';
       usageRemainingCaption.textContent = (err && err.message) ? err.message : '请稍后重试';
       setUsageProgress(0, '#e86f6f');
