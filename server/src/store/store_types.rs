@@ -236,6 +236,10 @@ pub struct ProjectChannelMessage {
     pub kind: String,
     pub content: String,
     pub task_id: Option<String>,
+    pub suggestion_status: Option<String>,
+    pub suggestion_resolved_by: Option<String>,
+    pub suggestion_resolved_by_name: Option<String>,
+    pub suggestion_resolved_at: Option<String>,
     pub created_at: String,
     pub outgoing: bool,
 }

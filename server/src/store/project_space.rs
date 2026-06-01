@@ -9,10 +9,11 @@ use rusqlite::{params, OptionalExtension};
 
 use super::{new_id, now, ProjectChannel, ProjectChannelMessage, ProjectSpaceSummary, Store};
 
-const DEFAULT_CHANNELS: [(&str, &str, i64); 6] = [
+const DEFAULT_CHANNELS: [(&str, &str, i64); 7] = [
     ("公告", "announcements", 10),
     ("讨论", "discussion", 20),
     ("需求", "requirements", 30),
+    ("意见", "suggestions", 35),
     ("问题反馈", "issues", 40),
     ("AI开发", "ai_development", 50),
     ("构建发布", "builds", 60),
@@ -127,9 +128,16 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT m.id, m.project_id, m.channel_id, m.sender_user_id,
                     COALESCE(u.nickname, u.phone, u.email, m.sender_user_id) AS sender_name,
-                    m.kind, m.content, m.task_id, m.created_at
+                    m.kind, m.content, m.task_id,
+                    m.suggestion_status,
+                    m.suggestion_resolved_by,
+                    COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
+                      AS suggestion_resolved_by_name,
+                    m.suggestion_resolved_at,
+                    m.created_at
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
+             LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
              WHERE m.project_id = ?1 AND m.channel_id = ?2
              ORDER BY m.created_at DESC
              LIMIT ?3",
@@ -149,7 +157,11 @@ impl Store {
                         kind: row.get(5)?,
                         content: row.get(6)?,
                         task_id: row.get(7)?,
-                        created_at: row.get(8)?,
+                        suggestion_status: row.get(8)?,
+                        suggestion_resolved_by: row.get(9)?,
+                        suggestion_resolved_by_name: row.get(10)?,
+                        suggestion_resolved_at: row.get(11)?,
+                        created_at: row.get(12)?,
                     })
                 },
             )?
@@ -174,8 +186,13 @@ impl Store {
             return Err(anyhow!("消息内容不能为空"));
         }
         let kind = match kind {
-            "text" | "ai_task" | "ai_progress" | "ai_result" | "system" => kind,
+            "text" | "suggestion" | "ai_task" | "ai_progress" | "ai_result" | "system" => kind,
             _ => "text",
+        };
+        let suggestion_status = if kind == "suggestion" {
+            Some("open")
+        } else {
+            None
         };
         let id = new_id("pcm");
         let created_at = now();
@@ -192,9 +209,10 @@ impl Store {
         }
         conn.execute(
             "INSERT INTO project_channel_messages (
-                id, project_id, channel_id, sender_user_id, kind, content, task_id, created_at
+                id, project_id, channel_id, sender_user_id, kind, content, task_id,
+                suggestion_status, created_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             params![
                 id,
                 project_id,
@@ -203,6 +221,7 @@ impl Store {
                 kind,
                 content,
                 task_id,
+                suggestion_status,
                 created_at
             ],
         )?;
@@ -221,9 +240,91 @@ impl Store {
             kind: kind.to_string(),
             content: content.to_string(),
             task_id: task_id.map(ToOwned::to_owned),
+            suggestion_status: suggestion_status.map(ToOwned::to_owned),
+            suggestion_resolved_by: None,
+            suggestion_resolved_by_name: None,
+            suggestion_resolved_at: None,
             created_at,
             outgoing: sender_user_id.is_some(),
         })
+    }
+
+    pub fn mark_project_suggestion_updated(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        channel_id: &str,
+        message_id: &str,
+    ) -> Result<ProjectChannelMessage> {
+        self.ensure_project_default_channels(project_id)?;
+        let resolved_at = now();
+        let conn = self.conn()?;
+        let channel_kind: Option<String> = conn
+            .query_row(
+                "SELECT kind FROM project_channels WHERE project_id = ?1 AND id = ?2",
+                params![project_id, channel_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if channel_kind.as_deref() != Some("suggestions") {
+            return Err(anyhow!("只有意见频道的建议可以标记为已更新"));
+        }
+
+        let changed = conn.execute(
+            "UPDATE project_channel_messages
+                SET suggestion_status = 'updated',
+                    suggestion_resolved_by = ?1,
+                    suggestion_resolved_at = ?2
+              WHERE project_id = ?3
+                AND channel_id = ?4
+                AND id = ?5
+                AND kind = 'suggestion'",
+            params![user_id, resolved_at, project_id, channel_id, message_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("建议不存在"));
+        }
+        conn.execute(
+            "UPDATE project_channels SET updated_at = ?1 WHERE project_id = ?2 AND id = ?3",
+            params![resolved_at, project_id, channel_id],
+        )?;
+
+        conn.query_row(
+            "SELECT m.id, m.project_id, m.channel_id, m.sender_user_id,
+                    COALESCE(u.nickname, u.phone, u.email, m.sender_user_id) AS sender_name,
+                    m.kind, m.content, m.task_id,
+                    m.suggestion_status,
+                    m.suggestion_resolved_by,
+                    COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
+                      AS suggestion_resolved_by_name,
+                    m.suggestion_resolved_at,
+                    m.created_at
+             FROM project_channel_messages m
+             LEFT JOIN users u ON u.id = m.sender_user_id
+             LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
+            params![project_id, channel_id, message_id],
+            |row| {
+                let sender_user_id: Option<String> = row.get(3)?;
+                Ok(ProjectChannelMessage {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    channel_id: row.get(2)?,
+                    outgoing: sender_user_id.as_deref() == Some(user_id),
+                    sender_user_id,
+                    sender_name: row.get(4)?,
+                    kind: row.get(5)?,
+                    content: row.get(6)?,
+                    task_id: row.get(7)?,
+                    suggestion_status: row.get(8)?,
+                    suggestion_resolved_by: row.get(9)?,
+                    suggestion_resolved_by_name: row.get(10)?,
+                    suggestion_resolved_at: row.get(11)?,
+                    created_at: row.get(12)?,
+                })
+            },
+        )
+        .map_err(Into::into)
     }
 
     pub fn ensure_project_default_channels(&self, project_id: &str) -> Result<()> {
@@ -268,5 +369,74 @@ impl Store {
             params![project_id, channel_id, user_id, now()],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn temp_store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon_project_suggestions_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn default_channels_include_suggestions() {
+        let store = temp_store();
+        let owner = store
+            .create_user("suggestions-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "Suggestions Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        let channels = store
+            .list_project_space_channels(&owner.id, &project.id)
+            .expect("channels should list");
+
+        assert!(channels.iter().any(|channel| channel.kind == "suggestions"));
+    }
+
+    #[test]
+    fn suggestion_message_can_be_marked_updated() {
+        let store = temp_store();
+        let owner = store
+            .create_user("suggestions-resolver@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "Suggestion Resolve", None, None)
+            .expect("project should be created")
+            .project;
+        let channel = store
+            .list_project_space_channels(&owner.id, &project.id)
+            .expect("channels should list")
+            .into_iter()
+            .find(|channel| channel.kind == "suggestions")
+            .expect("suggestions channel should exist");
+
+        let message = store
+            .insert_project_channel_message(
+                &project.id,
+                &channel.id,
+                Some(&owner.id),
+                "suggestion",
+                "希望增加深色模式",
+                None,
+            )
+            .expect("suggestion should insert");
+        assert_eq!(message.suggestion_status.as_deref(), Some("open"));
+
+        let updated = store
+            .mark_project_suggestion_updated(&owner.id, &project.id, &channel.id, &message.id)
+            .expect("suggestion should update");
+
+        assert_eq!(updated.suggestion_status.as_deref(), Some("updated"));
+        assert_eq!(updated.suggestion_resolved_by.as_deref(), Some(owner.id.as_str()));
     }
 }

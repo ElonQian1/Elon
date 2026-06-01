@@ -31,7 +31,11 @@ data class ChatMessage(
     var senderLabel: String? = null,
     var id: String? = null,
     var apkUrl: String? = null,
-    var senderAvatarDataUrl: String? = null
+    var senderAvatarDataUrl: String? = null,
+    var suggestionStatus: String? = null,
+    var suggestionResolvedByName: String? = null,
+    var suggestionResolvedAt: String? = null,
+    var canResolveSuggestion: Boolean = false
 )
 
 class ChatAdapter(
@@ -44,6 +48,7 @@ class ChatAdapter(
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
+    var onSuggestionResolve: ((ChatMessage) -> Unit)? = null
     /** 语音附件长按回调（转文字 / 其他操作），由 Activity 通过 setAdapterAndWireApkActions 注入。 */
     var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
@@ -132,6 +137,7 @@ class ChatAdapter(
                 { attachment -> cb.invoke(message, attachment) }
             }
         )
+        bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
         val projectCardBound = bindChatProjectShareView(
             holder.attachmentList,
             holder.text,

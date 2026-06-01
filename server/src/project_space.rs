@@ -176,13 +176,52 @@ pub async fn send_channel_message(
     if let Err(e) = project_access(&state, &user.id, &project_id) {
         return json_error(StatusCode::FORBIDDEN, e.to_string());
     }
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project_id, &channel_id)
+    {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    let message_kind = if channel_kind == "suggestions" {
+        "suggestion"
+    } else {
+        "text"
+    };
     match state.store.insert_project_channel_message(
         &project_id,
         &channel_id,
         Some(&user.id),
-        "text",
+        message_kind,
         &req.content,
         None,
+    ) {
+        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn mark_suggestion_updated(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id, message_id)): Path<(String, String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    if !can_mark_suggestion_updated(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能标记建议已更新");
+    }
+    match state.store.mark_project_suggestion_updated(
+        &user.id,
+        &project_id,
+        &channel_id,
+        &message_id,
     ) {
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -443,6 +482,10 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
 
 fn can_start_channel_ai(role: &str) -> bool {
     matches!(role, "owner" | "editor" | "member" | "observer")
+}
+
+fn can_mark_suggestion_updated(role: &str) -> bool {
+    matches!(role, "owner" | "editor" | "member")
 }
 
 fn latest_project_apk_url(

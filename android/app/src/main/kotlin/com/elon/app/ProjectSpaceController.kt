@@ -227,6 +227,7 @@ internal class ProjectSpaceController(
             onMessageLongPress = showMessageActions,
             onProjectShareAction = onProjectShareAction
         )
+        adapter.onSuggestionResolve = { message -> markSuggestionUpdated(message) }
         activeAdapter = adapter
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
@@ -494,8 +495,63 @@ internal class ProjectSpaceController(
         return ChatMessage(
             role = role,
             content = content,
-            senderLabel = if (role == "friend") senderName else null
+            senderLabel = if (role == "friend") senderName else null,
+            id = id,
+            suggestionStatus = suggestionStatus,
+            suggestionResolvedByName = suggestionResolvedByName,
+            suggestionResolvedAt = suggestionResolvedAt,
+            canResolveSuggestion = canResolveSuggestion(this)
         )
+    }
+
+    private fun markSuggestionUpdated(message: ChatMessage) {
+        val channel = activeChannel ?: return
+        val messageId = message.id?.takeIf { it.isNotBlank() } ?: run {
+            Toast.makeText(activity, "建议消息还没有同步完成", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!canResolveProjectSuggestion(activeSpace?.project?.role)) {
+            Toast.makeText(activity, "当前角色不能标记建议已更新", Toast.LENGTH_SHORT).show()
+            return
+        }
+        message.canResolveSuggestion = false
+        activeAdapter?.notifyMessageUpdated(messagesByChannel[channel.id]?.indexOf(message) ?: -1)
+        thread {
+            val result = runCatching {
+                markProjectSuggestionUpdated(
+                    http = http,
+                    serverUrl = serverUrl,
+                    context = activity,
+                    projectId = channel.projectId,
+                    channelId = channel.id,
+                    messageId = messageId
+                )
+            }
+            activity.runOnUiThread {
+                if (activeChannel?.id != channel.id) return@runOnUiThread
+                val messages = messagesByChannel[channel.id] ?: return@runOnUiThread
+                val index = messages.indexOfFirst { it.id == messageId }
+                result.onSuccess { updated ->
+                    if (index >= 0) {
+                        messages[index] = updated.toChatMessage()
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    Toast.makeText(activity, "已标记为更新完成", Toast.LENGTH_SHORT).show()
+                }.onFailure { error ->
+                    if (index >= 0) {
+                        messages[index].canResolveSuggestion = canResolveProjectSuggestion(activeSpace?.project?.role)
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    Toast.makeText(activity, error.message ?: "标记失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun canResolveSuggestion(message: ProjectChannelMessage): Boolean {
+        return message.kind == "suggestion" &&
+            message.suggestionStatus != "updated" &&
+            canResolveProjectSuggestion(activeSpace?.project?.role)
     }
 
     private fun channelHint(channel: ProjectChannel): String {
@@ -504,6 +560,7 @@ internal class ProjectSpaceController(
             "announcements" -> "项目公告、规则和重要更新。"
             "discussion" -> "成员日常讨论和协作交流。"
             "requirements" -> "集中提出功能想法，后续可转为 AI 开发任务。"
+            SUGGESTIONS_CHANNEL_KIND -> "游客和成员在这里发布建议，开发者完成后可标记已更新。"
             "issues" -> "反馈 bug、安装问题和体验问题。"
             AI_CHANNEL_KIND -> if (activeSpace?.project?.role == "observer") {
                 "只读模式下可以询问 AI；涉及修改代码、编译或发布的请求会被拒绝。"
@@ -565,5 +622,10 @@ internal class ProjectSpaceController(
         const val SENDING_STATUS = "发送中..."
         const val DEFAULT_GROUP_CHANNEL_KIND = "discussion"
         const val AI_CHANNEL_KIND = "ai_development"
+        const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
     }
+}
+
+private fun canResolveProjectSuggestion(role: String?): Boolean {
+    return role == "owner" || role == "editor" || role == "member"
 }

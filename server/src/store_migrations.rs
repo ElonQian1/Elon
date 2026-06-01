@@ -29,6 +29,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     ),
     (12, "好友聊天 EL 助手上下文消息", migration_v12),
     (13, "每日编译配额表（build_quota）", migration_v13),
+    (14, "项目意见频道建议状态", migration_v14),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -584,6 +585,33 @@ fn migration_v13(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_build_quota_user_date
           ON build_quota(user_id, date);
         "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v14(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "project_channel_messages",
+        "suggestion_status",
+        "suggestion_status TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_channel_messages",
+        "suggestion_resolved_by",
+        "suggestion_resolved_by TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_channel_messages",
+        "suggestion_resolved_at",
+        "suggestion_resolved_at TEXT",
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_channel_messages_suggestions
+         ON project_channel_messages(project_id, channel_id, suggestion_status, created_at)",
+        [],
     )?;
     Ok(())
 }

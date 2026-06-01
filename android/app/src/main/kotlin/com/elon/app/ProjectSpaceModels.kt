@@ -72,6 +72,10 @@ internal data class ProjectChannelMessage(
     val kind: String,
     val content: String,
     val taskId: String?,
+    val suggestionStatus: String?,
+    val suggestionResolvedBy: String?,
+    val suggestionResolvedByName: String?,
+    val suggestionResolvedAt: String?,
     val createdAt: String,
     val outgoing: Boolean
 )

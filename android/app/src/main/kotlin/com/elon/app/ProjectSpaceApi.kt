@@ -157,6 +157,31 @@ internal fun summarizeProjectChannelMessages(
     )
 }
 
+internal fun markProjectSuggestionUpdated(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    channelId: String,
+    messageId: String
+): ProjectChannelMessage {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url(
+                "$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}" +
+                    "/channels/${projectSpaceUrlPart(channelId)}" +
+                    "/messages/${projectSpaceUrlPart(messageId)}/suggestion"
+            )
+            .method("PATCH", "{}".toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "标记失败"))
+        return parseProjectChannelMessage(JSONObject(body).optJSONObject("message") ?: JSONObject())
+    }
+}
+
 private fun postProjectChannelPayload(
     http: OkHttpClient,
     serverUrl: String,
@@ -254,6 +279,10 @@ internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessag
     kind = json.optString("kind", "text"),
     content = json.optString("content", ""),
     taskId = json.optString("task_id").takeIf { it.isNotBlank() },
+    suggestionStatus = json.optString("suggestion_status").takeIf { it.isNotBlank() },
+    suggestionResolvedBy = json.optString("suggestion_resolved_by").takeIf { it.isNotBlank() },
+    suggestionResolvedByName = json.optString("suggestion_resolved_by_name").takeIf { it.isNotBlank() },
+    suggestionResolvedAt = json.optString("suggestion_resolved_at").takeIf { it.isNotBlank() },
     createdAt = json.optString("created_at", ""),
     outgoing = json.optBoolean("outgoing", false)
 )

@@ -170,6 +170,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_space::list_channel_messages).post(project_space::send_channel_message),
         )
         .route(
+            "/api/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion",
+            axum::routing::patch(project_space::mark_suggestion_updated),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/ai-tasks",
             post(project_space::start_channel_ai_task),
         )
