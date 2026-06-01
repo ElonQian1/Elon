@@ -9,6 +9,7 @@ internal class MainProfileQuickActions(
     private val binding: ActivityMainBinding,
     private val http: OkHttpClient,
     private val serverVersionUrl: String,
+    private val serverUrl: String,
     private val isBindingInitialized: () -> Boolean,
     private val refreshAccountUi: () -> Unit,
     private val fillPlanPrompt: () -> Unit,
@@ -23,6 +24,7 @@ internal class MainProfileQuickActions(
     private val confirmLogout: () -> Unit
 ) {
     private val tokenUsageCard by lazy { ProfileTokenUsageCard(activity, binding) }
+    private val nodeMarketSheet by lazy { NodeMarketSheet(activity, http, serverUrl) }
 
     fun setupQuickActions() {
         MainQuickActionBindings(
@@ -36,7 +38,8 @@ internal class MainProfileQuickActions(
             openAgentCenter = openAgentCenter,
             showPromotionDialog = showPromotionDialog,
             showGuestImportDialog = showGuestImportDialog,
-            confirmLogout = confirmLogout
+            confirmLogout = confirmLogout,
+            openNodeMarket = { nodeMarketSheet.show() }
         ).setupQuickActions()
         refreshAccountUi()
         refreshProfileSummary()

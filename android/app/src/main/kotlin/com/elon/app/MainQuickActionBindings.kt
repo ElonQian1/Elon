@@ -16,7 +16,8 @@ internal class MainQuickActionBindings(
     private val openAgentCenter: () -> Unit,
     private val showPromotionDialog: () -> Unit,
     private val showGuestImportDialog: () -> Unit,
-    private val confirmLogout: () -> Unit
+    private val confirmLogout: () -> Unit,
+    private val openNodeMarket: (() -> Unit)? = null
 ) {
     fun setupQuickActions() {
         binding.quickPlanButton.setOnClickListener {
@@ -42,6 +43,7 @@ internal class MainQuickActionBindings(
         binding.projectSettingsButton.setOnClickListener { openSettings() }
         binding.profileSettingsButton.setOnClickListener { openSettings() }
         binding.profileAgentButton.setOnClickListener { openAgentCenter() }
+        binding.profileNodeMarketButton.setOnClickListener { openNodeMarket?.invoke() }
         binding.profileCheckUpdateButton.setOnClickListener {
             AppUpdateManager(activity).manualCheck()
         }

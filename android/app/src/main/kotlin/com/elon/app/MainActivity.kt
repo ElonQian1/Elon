@@ -847,6 +847,7 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverVersionUrl = serverVersionUrl,
+            serverUrl = serverUrl,
             isBindingInitialized = { ::binding.isInitialized },
             refreshAccountUi = {
                 if (::binding.isInitialized) accountActions().refreshAccountUi()
