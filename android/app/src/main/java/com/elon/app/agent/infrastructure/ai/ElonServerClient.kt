@@ -8,10 +8,15 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
  * 🖥️ 一龙服务器 AI 客户端
@@ -37,6 +42,12 @@ class ElonServerClient(
         private const val TAG = "ElonServerClient"
         private const val TIMEOUT_MS = 60_000  // 服务器 CLI 可能较慢
     }
+
+    /** OkHttp 客户端（SSE 长连接，120s readTimeout）*/
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .build()
 
     /**
      * 向服务器发送用户消息，返回 AI 回复文本。
@@ -103,5 +114,60 @@ class ElonServerClient(
             Log.e(TAG, "读取 token 失败", e)
             null
         }
+    }
+
+    /**
+     * SSE 流式聊天：服务器实时推送每一步进度，函数返回最终回复文本。
+     *
+     * @param onEvent(type, message) 在 IO 线程回调。
+     *   type = "progress" | "done" | "error" | 其他 WsMessage type
+     */
+    suspend fun chatStream(
+        projectId: String,
+        message: String,
+        conversationId: String? = null,
+        onEvent: (type: String, message: String) -> Unit = { _, _ -> }
+    ): String = withContext(Dispatchers.IO) {
+        val token = getAuthToken()
+            ?: throw IllegalStateException("未登录，请先在 elon APP 中登录")
+
+        val body = JSONObject().apply {
+            put("message", message)
+            if (conversationId != null) put("conversation_id", conversationId)
+        }.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        val request = Request.Builder()
+            .url("$serverUrl/api/projects/$projectId/chat/stream")
+            .post(body)
+            .addHeader("Authorization", "Bearer $token")
+            .addHeader("Accept", "text/event-stream")
+            .build()
+
+        Log.d(TAG, "→ SSE POST .../chat/stream  message=${message.take(40)}")
+        var finalReply = ""
+
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val err = response.body?.string() ?: "HTTP ${response.code}"
+                throw RuntimeException("服务器返回 ${response.code}：$err")
+            }
+            val source = response.body?.source()
+                ?: throw RuntimeException("响应体为空")
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line() ?: break
+                if (!line.startsWith("data: ")) continue
+                val data = line.removePrefix("data: ").trim()
+                if (data.isEmpty()) continue
+                runCatching {
+                    val json = JSONObject(data)
+                    val type = json.optString("type")
+                    val msg = json.optString("message")
+                    onEvent(type, msg)
+                    if (type == "done") finalReply = msg
+                }
+            }
+        }
+        Log.d(TAG, "← SSE 完成，reply=${finalReply.take(60)}")
+        finalReply.ifBlank { "（无回复）" }
     }
 }

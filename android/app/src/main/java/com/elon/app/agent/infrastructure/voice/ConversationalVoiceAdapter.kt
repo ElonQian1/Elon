@@ -5,8 +5,11 @@
 package com.elon.app.agent.infrastructure.voice
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.elon.app.AgentVoiceBridge
+import com.elon.app.AsrFallbackSettings
 import com.elon.app.agent.application.conversation.*
 import com.elon.app.agent.domain.conversation.*
 import kotlinx.coroutines.*
@@ -33,7 +36,11 @@ import kotlinx.coroutines.flow.StateFlow
  * adapter.stop()   // 结束对话
  * ```
  */
-class ConversationalVoiceAdapter(private val context: Context) {
+class ConversationalVoiceAdapter(
+    private val context: Context,
+    /** 云端 ASR / SSE 进度回调时使用的服务器地址 */
+    private val serverUrl: String = "http://43.139.149.158:8080"
+) {
     
     companion object {
         private const val TAG = "ConversationAdapter"
@@ -46,12 +53,22 @@ class ConversationalVoiceAdapter(private val context: Context) {
     
     /** 多引擎语音识别（含自动回退：系统默认 → 品牌引擎 → Google，任意引擎失败自动切换下一个）*/
     private val agentVoiceBridge = AgentVoiceBridge(context)
-    
+
     /** 快速响应缓存 - 即时响应常见问候 */
     private val quickResponseCache = QuickResponseCache
-    
+
     /** TTS 服务 - 语音合成输出 */
     private var ttsService: TextToSpeechService? = null
+
+    // ==================== 云端 ASR 兜底 ====================
+
+    /** 本地引擎全部失败后切换为 true，后续 start() 走云端录音 */
+    private var useCloudAsr = false
+
+    /** 云端 ASR 实例（懒创建，用完保留以复用 OkHttpClient）*/
+    private var cloudAsrFallback: CloudAsrFallback? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     // ==================== 协程管理 ====================
     
@@ -177,8 +194,19 @@ class ConversationalVoiceAdapter(private val context: Context) {
             }
         }
         agentVoiceBridge.onError = { error ->
-            Log.e(TAG, "🎤 ASR 错误: $error")
-            conversationManager.onError(error)
+            if (AsrFallbackSettings.isServerFallbackEnabled(context)) {
+                Log.i(TAG, "🎤 本地 ASR 全部失败，切换云端识别: $error")
+                useCloudAsr = true
+                // 先通知 UI"已切换"，然后立即开始云端录音
+                mainHandler.post {
+                    listener?.onProgress("本地语音引擎不可用，已切换云端识别")
+                    listener?.onListeningStarted()
+                }
+                startCloudAsr()
+            } else {
+                Log.e(TAG, "🎤 ASR 错误: $error")
+                conversationManager.onError(error)
+            }
         }
     }
     
@@ -190,8 +218,8 @@ class ConversationalVoiceAdapter(private val context: Context) {
      * 调用后进入聆听状态，等待用户说话
      */
     fun start() {
-        Log.i(TAG, "▶️ 开始语音对话")
-        agentVoiceBridge.start()
+        Log.i(TAG, "▶️ 开始语音对话 (cloud=$useCloudAsr)")
+        if (useCloudAsr) startCloudAsr() else agentVoiceBridge.start()
     }
     
     /**
@@ -201,7 +229,11 @@ class ConversationalVoiceAdapter(private val context: Context) {
      */
     fun stop() {
         Log.i(TAG, "⏹️ 停止语音对话")
-        agentVoiceBridge.stop()
+        if (useCloudAsr) {
+            cloudAsrFallback?.stop()
+        } else {
+            agentVoiceBridge.stop()
+        }
         ttsService?.stop()
         conversationManager.reset()
     }
@@ -212,18 +244,25 @@ class ConversationalVoiceAdapter(private val context: Context) {
      * 用于用户主动触发新一轮对话
      */
     fun restartListening() {
-        Log.d(TAG, "🔄 重新开始聆听")
-        
+        Log.d(TAG, "🔄 重新开始聆听 (cloud=$useCloudAsr)")
+
         // 先重置对话状态，避免旧状态影响
         conversationManager.reset()
-        
-        // 停止当前的 ASR
-        agentVoiceBridge.stop()
-        
-        scope.launch {
-            delay(300) // 增加延迟，确保 ASR 完全停止
-            Log.d(TAG, "🔄 延迟后启动 ASR")
-            agentVoiceBridge.start()
+
+        if (useCloudAsr) {
+            // 云端模式：直接启动新一轮录音
+            scope.launch {
+                delay(300)
+                startCloudAsr()
+            }
+        } else {
+            // 本地模式：停止 ASR 后重新启动
+            agentVoiceBridge.stop()
+            scope.launch {
+                delay(300) // 增加延迟，确保 ASR 完全停止
+                Log.d(TAG, "🔄 延迟后启动 ASR")
+                agentVoiceBridge.start()
+            }
         }
     }
     
@@ -254,6 +293,7 @@ class ConversationalVoiceAdapter(private val context: Context) {
         Log.i(TAG, "🧹 释放资源")
         scope.cancel()
         agentVoiceBridge.destroy()
+        cloudAsrFallback?.destroy()
         ttsService?.destroy()
         conversationManager.destroy()
     }
@@ -327,12 +367,43 @@ class ConversationalVoiceAdapter(private val context: Context) {
     
     /**
      * 设置响应生成器（智能对话模式）
-     * 
+     *
      * 如果设置，会使用 AI 生成自然对话回复
      */
     fun setResponseGenerator(generator: ResponseGenerator?) {
+        // CliResponseGenerator：注入 onProgress 回调，把服务器步骤提示转发给 UI
+        if (generator is CliResponseGenerator) {
+            generator.onProgress = { step ->
+                mainHandler.post { listener?.onProgress(step) }
+            }
+        }
         conversationManager.responseGenerator = generator
         Log.i(TAG, if (generator != null) "✅ 已设置智能响应生成器" else "⚠️ 未设置响应生成器，使用模板回复")
+    }
+
+    // ==================== 私有方法 ====================
+
+    /**
+     * 启动云端 ASR 录音（MediaRecorder + 上传到 /api/voice/asr）。
+     * 调用后开始录音，最长 8 秒自动截止；收到文字后走 conversationManager.onSpeechEnd。
+     */
+    private fun startCloudAsr() {
+        val fallback = cloudAsrFallback
+            ?: CloudAsrFallback(context, serverUrl).also { cloudAsrFallback = it }
+
+        fallback.onRecordStart = {
+            mainHandler.post { listener?.onListeningStarted() }
+        }
+        fallback.start { text ->
+            // 回调在 mainHandler 上执行
+            if (!text.isNullOrBlank()) {
+                Log.i(TAG, "☁️ 云端 ASR 结果: $text")
+                conversationManager.onSpeechEnd(text)
+            } else {
+                Log.w(TAG, "☁️ 云端 ASR 返回空结果")
+                conversationManager.onError("云端语音识别失败，请检查网络")
+            }
+        }
     }
 }
 
@@ -383,7 +454,10 @@ interface VoiceConversationListener {
     
     /** 发生错误 */
     fun onError(error: String) {}
-    
+
+    /** AI 处理进度（步骤描述，如"正在分析代码"）- 思考阶段实时显示 */
+    fun onProgress(step: String) {}
+
     /** 回到空闲状态 */
     fun onIdle() {}
 }

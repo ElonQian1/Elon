@@ -4,6 +4,8 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use futures::stream;
+use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -170,6 +172,108 @@ pub async fn chat_project(
 
 pub use crate::project_prewarm::{prewarm_project, prewarm_user_project};
 
+/// POST /api/projects/:project_id/chat/stream
+/// 与 chat_project 逻辑相同，但通过 SSE 实时推送 WsMessage 进度事件，
+/// 让悬浮球等轻量客户端能看到 AI 处理进度，不必阻塞等待。
+pub async fn chat_project_stream(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath(project_id): AxumPath<String>,
+    Json(req): Json<ProjectChatRequest>,
+) -> Response {
+    use axum::response::sse::{Event, Sse};
+
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    if !can_edit(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
+    }
+    let message = req.message.trim().to_string();
+    if message.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
+    }
+    let conversation_id = match state.store.ensure_conversation(
+        &project.id,
+        &user.id,
+        req.conversation_id.as_deref(),
+        req.conversation_title.as_deref(),
+    ) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let attachments = req.attachments.clone();
+    let message = append_project_attachment_notes(
+        &state, &project, &conversation_id, message, req.attachments.as_deref(),
+    );
+    let trace_id = clean_trace_id(req.trace_id.as_deref());
+    let task_id = match state.store.create_task(
+        &project.id, &user.id, Some(&conversation_id), &message,
+    ) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    run_project_agent_with_scheduler(
+        state.clone(),
+        user.id.clone(),
+        project,
+        format!("{}/api/projects/{}/download", state.public_url, project_id),
+        conversation_id,
+        message,
+        req.agent,
+        attachments,
+        ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
+        Some(trace_id),
+        tx,
+    )
+    .await;
+
+    // 把 mpsc receiver 转成 SSE stream。
+    // 每条 WsMessage JSON 推一次 data event；channel 关闭时 stream 自然结束。
+    let sse_stream = stream::unfold(
+        (rx, state, task_id),
+        |(mut rx, state, task_id)| async move {
+            match rx.recv().await {
+                None => None,
+                Some(raw) => {
+                    // done/error 时更新 task 状态（幂等，重复调用无害）
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                        match v.get("type").and_then(|t| t.as_str()) {
+                            Some("done") => {
+                                let reply = v["message"].as_str().unwrap_or("");
+                                let _ = state.store.finish_task(
+                                    &task_id, "done", Some(reply), None, None,
+                                );
+                            }
+                            Some("error") => {
+                                let msg = v["message"].as_str().unwrap_or("error");
+                                let _ = state.store.finish_task(
+                                    &task_id, "failed", Some(msg), None, Some(msg),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                    let event =
+                        Ok::<Event, Infallible>(Event::default().data(raw));
+                    Some((event, (rx, state, task_id)))
+                }
+            }
+        },
+    );
+
+    Sse::new(sse_stream)
+        .keep_alive(axum::response::sse::KeepAlive::default())
+        .into_response()
+}
+
+
 pub(crate) async fn run_project_agent_with_scheduler(
     state: Arc<AppState>,
     user_id: String,
@@ -221,6 +325,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 message,
                 apk_url,
                 image_url: None,
+                model_used: None,
+                node_id: None,
             }
             .to_json(),
         );
@@ -350,6 +456,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         message: reply,
                         apk_url: None,
                         image_url: None,
+                        model_used: None,
+                        node_id: None,
                     }
                     .to_json(),
                 );

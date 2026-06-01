@@ -37,15 +37,26 @@ class CliResponseGenerator(
     /** 同一语音会话复用一个 conversationId，让服务器保持上下文 */
     private var currentConversationId: String? = null
 
+    /**
+     * 进度回调，在 IO 线程调用。
+     * 每收到一条服务器 WsMessage（type=progress/step）时回调消息文本，
+     * 供 UI 在"思考中"阶段展示具体步骤。
+     */
+    var onProgress: ((String) -> Unit)? = null
+
     override suspend fun generate(intent: IntentAnalysisResult): Response {
-        Log.d(TAG, "🖥️ CLI 请求: ${intent.normalizedInput.take(40)}")
+        Log.d(TAG, "🖥️ CLI 流式请求: ${intent.normalizedInput.take(40)}")
         return try {
-            val reply = serverClient.chat(
+            val reply = serverClient.chatStream(
                 projectId = projectId,
                 message = intent.normalizedInput,
                 conversationId = currentConversationId
-            )
-            Log.i(TAG, "🖥️ CLI 回复: ${reply.take(60)}")
+            ) { type, message ->
+                if (type == "progress" || type == "step" || type == "thinking") {
+                    onProgress?.invoke(message)
+                }
+            }
+            Log.i(TAG, "🖥️ CLI 回复完成: ${reply.take(60)}")
             Response(
                 tier = ResponseTier.NORMAL,
                 text = reply,
@@ -60,12 +71,24 @@ class CliResponseGenerator(
                 emotion = Emotion.APOLOGETIC
             )
         } catch (e: Exception) {
-            Log.e(TAG, "CLI 请求失败", e)
-            Response(
-                tier = ResponseTier.FAST,
-                text = "服务器响应失败，请检查网络或稍后再试",
-                emotion = Emotion.APOLOGETIC
-            )
+            Log.w(TAG, "SSE 请求失败，降级到同步 chat", e)
+            // 降级：回退到普通 HTTP chat
+            try {
+                val reply = serverClient.chat(
+                    projectId = projectId,
+                    message = intent.normalizedInput,
+                    conversationId = currentConversationId
+                )
+                Log.i(TAG, "🖥️ 降级回复: ${reply.take(60)}")
+                Response(tier = ResponseTier.NORMAL, text = reply, emotion = Emotion.HELPFUL)
+            } catch (e2: Exception) {
+                Log.e(TAG, "降级也失败", e2)
+                Response(
+                    tier = ResponseTier.FAST,
+                    text = "服务器响应失败，请检查网络或稍后再试",
+                    emotion = Emotion.APOLOGETIC
+                )
+            }
         }
     }
 

@@ -117,8 +117,11 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         // 初始化 TTS
         ttsService = AndroidTTSService(this)
 
-        // 初始化对话适配器
-        voiceAdapter = ConversationalVoiceAdapter(this).apply {
+        // 初始化对话适配器（传 serverUrl 以支持云端 ASR 兜底）
+        voiceAdapter = ConversationalVoiceAdapter(
+            this,
+            config.cliServerUrl.ifBlank { "http://43.139.149.158:8080" }
+        ).apply {
             setTTSService(ttsService)
 
             // 按回退顺序依次尝试，使用第一个有配置的模式
@@ -223,6 +226,13 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             runOnUiThread {
                 statusText.text = "思考中..."
                 voiceIndicator.text = "🧠"
+            }
+        }
+
+        override fun onProgress(step: String) {
+            runOnUiThread {
+                // 在思考阶段实时展示 AI 处理步骤（截取前 30 字，避免截断 UI）
+                statusText.text = step.take(30)
             }
         }
         
