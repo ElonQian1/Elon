@@ -34,7 +34,7 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
-pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
+pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
 pub use user_memories::UserMemory;
 pub use admin_stats::{
     AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary, AdminTrendRow,

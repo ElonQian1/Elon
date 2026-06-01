@@ -33,7 +33,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (15, "用户长期记忆表", migration_v15),
     (16, "token 用量事件表 + 用户 token 配额表", migration_v16),
     (17, "人民币预存计费：用户余额、充值记录、扣费明细、计费配置", migration_v17),
-    (18, "分布式节点积分账本（node_balances + node_transactions + node_credentials）", migration_v18),
+    (18, "微信支付订单表", migration_v18),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -763,46 +763,23 @@ fn migration_v17(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+// ── v18：微信支付订单表 ────────────────────────────────────────────────────────
+
 fn migration_v18(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
-        -- 节点提供者积分余额（每用户一行）
-        CREATE TABLE IF NOT EXISTS node_balances (
-            user_id    TEXT PRIMARY KEY,
-            credits    REAL NOT NULL DEFAULT 0.0,
-            updated_at TEXT NOT NULL
+        -- 微信支付待确认订单（仅用于回调时查找对应用户）
+        CREATE TABLE IF NOT EXISTS wechat_pay_orders (
+            out_trade_no   TEXT PRIMARY KEY,  -- 商户订单号
+            user_id        TEXT NOT NULL,
+            amount_fen     INTEGER NOT NULL,
+            status         TEXT NOT NULL DEFAULT 'pending', -- pending | paid | failed
+            wechat_tx_id   TEXT,             -- 微信交易号（paid 后填充）
+            created_at     TEXT NOT NULL,
+            updated_at     TEXT NOT NULL
         );
-
-        -- 每次 LLM 推理完成后的积分流水记录
-        CREATE TABLE IF NOT EXISTS node_transactions (
-            id                 TEXT PRIMARY KEY,
-            consumer_user_id   TEXT NOT NULL,
-            provider_user_id   TEXT NOT NULL,
-            node_id            TEXT NOT NULL,
-            model_id           TEXT NOT NULL,
-            prompt_tokens      INTEGER NOT NULL DEFAULT 0,
-            completion_tokens  INTEGER NOT NULL DEFAULT 0,
-            charged_credits    REAL NOT NULL DEFAULT 0.0,
-            settled_credits    REAL NOT NULL DEFAULT 0.0,
-            platform_fee_rate  REAL NOT NULL DEFAULT 0.2,
-            created_at         TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_node_txn_provider_time
-            ON node_transactions(provider_user_id, created_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_node_txn_consumer_time
-            ON node_transactions(consumer_user_id, created_at DESC);
-
-        -- 用户注册的 PC 节点凭证（用于 /agent/ws 动态鉴权）
-        -- secret_hash 存储 SHA-256 hex，不存明文
-        CREATE TABLE IF NOT EXISTS node_credentials (
-            agent_id       TEXT PRIMARY KEY,
-            secret_hash    TEXT NOT NULL,
-            owner_user_id  TEXT NOT NULL,
-            label          TEXT,
-            created_at     TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_node_creds_owner
-            ON node_credentials(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_wechat_pay_orders_user
+            ON wechat_pay_orders(user_id, created_at DESC);
         "#,
     )?;
     Ok(())

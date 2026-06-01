@@ -213,6 +213,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- ========== 微信 App 支付回调（固定包名，微信强制要求）========== -->
+        <activity
+            android:name=".wxapi.WXPayEntryActivity"
+            android:exported="true"
+            android:launchMode="singleTop" />
+
     </application>
 
 </manifest>

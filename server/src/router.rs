@@ -5,12 +5,12 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, api, app_update, auth_api, billing_admin,
-    billing_api, chat_attachments,
+    billing_api, billing_pay, chat_attachments,
     friend_api, global_ws, lan_peer,
     node_api, peer_relay, project_api, project_attachments, project_chat,
     project_conversation_identity, project_deletion, project_downloads, project_git,
@@ -50,9 +50,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     // 应用自身 APK 更新文件目录（由发布脚本部署后填充）
     let app_dir = state.data_dir.join("app");
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
-    // 节点 agent 二进制下载目录（由 publish-node-agent.ps1 部署）
-    let downloads_dir = state.data_dir.join("downloads");
-    std::fs::create_dir_all(&downloads_dir).ok();
 
     Router::new()
         .route("/", get(web::web_page))
@@ -89,7 +86,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
         .route("/api/me/nodes", get(node_api::my_nodes))
-        .route("/api/me/nodes/register", post(node_api::register_node))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
         // ───────────────────────────────────────────────────────────────────────
@@ -306,8 +302,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
         .route("/app/version.json", get(peer_relay::version_json))
         .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
-        // ── 节点 agent 二进制下载（elon-node-agent Linux/Windows）────────
-        .nest_service("/downloads", ServeDir::new(&downloads_dir))
         // ── P2P 同WiFi 中继 ──────────────────────────────────────────────
         // Seeder 设备连接 WS 注册自己为种子
         .route("/app/peer/ws", get(peer_relay::peer_ws_handler))
@@ -406,6 +400,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         // ── 用户计费（余额查询 / 扣费明细）──────────────────────────────────
         .route("/api/me/balance", get(billing_api::get_my_balance))
         .route("/api/me/billing", get(billing_api::list_my_billing))
+        // ── 微信支付（创建订单 / 异步回调 / 订单查询）────────────────────────
+        .route("/api/me/pay/create_order", post(billing_pay::create_order))
+        .route("/api/me/pay/orders", get(billing_pay::list_my_orders))
+        .route("/api/pay/notify", post(billing_pay::pay_notify))
         // ── 管理员计费（充值 / 余额列表 / 配置）──────────────────────────────
         .route("/api/admin/billing/recharge", post(billing_admin::recharge_user))
         .route("/api/admin/billing/users", get(billing_admin::list_users))

@@ -58,6 +58,10 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 hex = "0.4"
 
+# 微信支付 v3 —— RSA-SHA256 请求签名 & AES-256-GCM 回调解密
+rsa = { version = "0.9", features = ["pkcs8"] }
+aes-gcm = "0.10"
+
 # 实时语音管线（方案 B：连接 OpenAI Realtime Transcription WSS）
 # rustls 与 reqwest 保持一致，避免 musl 交叉编译时需要 OpenSSL
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
