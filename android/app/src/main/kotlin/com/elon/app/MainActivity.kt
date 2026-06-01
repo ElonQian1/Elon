@@ -959,7 +959,10 @@ class MainActivity : AppCompatActivity() {
                 s.friends.addAll(list)
             },
             onFriendsChanged = {
-                if (::binding.isInitialized) homeListActions.renderConversationList()
+                if (::binding.isInitialized) {
+                    homeListActions.renderConversationList()
+                    refreshChatTabBadge()
+                }
             }
         )
     }
@@ -976,7 +979,10 @@ class MainActivity : AppCompatActivity() {
                 s.groups.addAll(list)
             },
             onGroupsChanged = {
-                if (::binding.isInitialized) homeListActions.renderConversationList()
+                if (::binding.isInitialized) {
+                    homeListActions.renderConversationList()
+                    refreshChatTabBadge()
+                }
             },
             openGroup = { group ->
                 friendChatActions.closeFriendChat()
@@ -984,6 +990,11 @@ class MainActivity : AppCompatActivity() {
                 groupChatActions.openGroup(group, animate = true)
             }
         )
+    }
+
+    private fun refreshChatTabBadge() {
+        val total = s.friends.sumOf { it.unreadCount } + s.groups.sumOf { it.unreadCount }
+        navigationController.updateChatTabBadge(total)
     }
 
     private fun showGitProjectDialog() {

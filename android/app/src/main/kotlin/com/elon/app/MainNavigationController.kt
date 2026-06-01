@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -715,6 +716,24 @@ internal class MainNavigationController(
         tab.setTextColor(color)
         tab.textSize = 12f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
+    }
+
+    /** 更新"好友"tab 未读消息角标。count=0 时隐藏角标。 */
+    fun updateChatTabBadge(count: Int) {
+        val badge = binding.tabChatBadge
+        if (count <= 0) {
+            badge.visibility = View.GONE
+            return
+        }
+        badge.text = if (count > 99) "99+" else count.toString()
+        badge.textSize = if (count > 99) 7f else 9f
+        if (badge.background == null || badge.background !is GradientDrawable) {
+            badge.background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#E53935"))
+            }
+        }
+        badge.visibility = View.VISIBLE
     }
 
     private fun clearPageTranslations() {

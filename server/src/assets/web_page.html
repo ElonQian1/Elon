@@ -1055,9 +1055,10 @@
   </form>
 
   <nav class="tabs-bar">
-    <button class="tab active" data-tab="chatPage" data-title="会话区">
+    <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="会话区" style="position:relative">
       <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
       <span>会话</span>
+      <span id="tabChatBadge" style="display:none;position:absolute;top:4px;right:calc(50% - 22px);background:#E53935;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;line-height:16px;text-align:center;padding:0 3px;"></span>
     </button>
     <button class="tab" data-tab="projectPage" data-title="项目">
       <span class="ic"><img src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" /></span>
