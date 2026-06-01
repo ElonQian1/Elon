@@ -457,6 +457,50 @@
       line-height: 1.65;
       white-space: pre-wrap;
     }
+    .node-balance-card {
+      background: #171B20;
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .node-balance-card:hover { background: #1b2026; }
+    .node-balance-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .node-balance-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #E6EEF8;
+    }
+    .node-balance-status {
+      font-size: 11px;
+      color: #7ECFFF;
+      background: #0C2D40;
+      padding: 4px 10px;
+      border-radius: 8px;
+    }
+    .node-balance-metrics {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 12px;
+    }
+    .node-balance-metric label {
+      display: block;
+      font-size: 11px;
+      color: #7A8A9A;
+      margin-bottom: 2px;
+    }
+    .node-balance-metric .val {
+      font-size: 26px;
+      font-weight: 700;
+      color: #EAEAEA;
+    }
+    .node-balance-cta {
+      font-size: 13px;
+      color: #4DA8FF;
+    }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -866,6 +910,25 @@
         <div class="download-link-box" id="downloadLinkBox">生成中…</div>
       </div>
 
+      <!-- 节点积分内联卡片 -->
+      <div class="node-balance-card" id="nodeBalanceCard" onclick="openNodeMarketDialog()">
+        <div class="node-balance-header">
+          <span class="node-balance-title">节点积分</span>
+          <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
+        </div>
+        <div class="node-balance-metrics">
+          <div class="node-balance-metric">
+            <label>可用余额</label>
+            <span class="val" id="nodeBalanceVal">—</span>
+          </div>
+          <div class="node-balance-metric">
+            <label>累计收益</label>
+            <span class="val" id="nodeLifetimeVal">—</span>
+          </div>
+        </div>
+        <div class="node-balance-cta">点击进入节点算力市场  →</div>
+      </div>
+
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
@@ -1242,6 +1305,7 @@
     if (tabId === 'profilePage') {
       refreshDownloadPage();
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+      loadNodeBalance().catch((e) => console.warn('loadNodeBalance failed:', e));
     }
   }
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
@@ -1990,6 +2054,33 @@
   function authHeaders() {
     const t = localStorage.getItem('elon_token');
     return t ? { 'Authorization': 'Bearer ' + t } : {};
+  }
+
+  // ====== 节点积分内联卡片 ======
+  async function loadNodeBalance() {
+    const statusEl = document.getElementById('nodeBalanceStatus');
+    const balEl    = document.getElementById('nodeBalanceVal');
+    const lifEl    = document.getElementById('nodeLifetimeVal');
+    if (!balEl) return;
+    if (!isLoggedIn()) {
+      if (statusEl) statusEl.textContent = '未登录';
+      balEl.textContent = '--';
+      lifEl.textContent = '--';
+      return;
+    }
+    if (statusEl) statusEl.textContent = '加载中…';
+    try {
+      const res = await fetch('/api/me/node-balance', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const b = await res.json();
+      balEl.textContent = fmtBal(b.balance || 0);
+      lifEl.textContent = fmtBal(b.lifetime_earned || 0);
+      if (statusEl) statusEl.textContent = '';
+    } catch {
+      balEl.textContent = '--';
+      lifEl.textContent = '--';
+      if (statusEl) statusEl.textContent = '暂不可用';
+    }
   }
 
 
