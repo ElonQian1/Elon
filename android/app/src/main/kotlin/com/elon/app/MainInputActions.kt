@@ -389,6 +389,7 @@ internal class MainInputActions(
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
+            ttsSpeakerButton = { inputComposerViewsOrNull()?.ttsSpeakerButton },
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
             collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,

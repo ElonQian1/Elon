@@ -15,6 +15,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -35,7 +36,8 @@ internal data class MainInputComposerViews(
     val attachmentPanel: LinearLayout,
     val emojiPanel: LinearLayout,
     val runtimeInputModeStrip: RuntimeInputModeStrip,
-    val expandEditorButton: ImageButton
+    val expandEditorButton: ImageButton,
+    val ttsSpeakerButton: ImageButton
 )
 
 internal class MainInputComposerSetup(
@@ -325,7 +327,33 @@ internal class MainInputComposerSetup(
             setOnClickListener { sendMessage() }
         }
 
+        val ttsSpeakerButton = ImageButton(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                marginEnd = dp(0)
+            }
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(
+                if (VoiceSpeaker.isTtsEnabled(activity)) R.drawable.ic_input_tts_on_circle
+                else R.drawable.ic_input_tts_off_circle
+            )
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            contentDescription = "切换AI语音朗读"
+            visibility = View.GONE
+            setOnClickListener {
+                val enabled = !VoiceSpeaker.isTtsEnabled(activity)
+                VoiceSpeaker.setTtsEnabled(activity, enabled)
+                setImageResource(
+                    if (enabled) R.drawable.ic_input_tts_on_circle
+                    else R.drawable.ic_input_tts_off_circle
+                )
+                val msg = if (enabled) "AI 回复将自动朗读" else "已关闭语音朗读"
+                Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
+            }
+        }
+
         inputBarContainer.addView(inputModeButton)
+        inputBarContainer.addView(ttsSpeakerButton)
         inputBarContainer.addView(modelButtonShell)
         inputBarContainer.addView(emojiButton)
         inputBarContainer.addView(planModeButton)
@@ -409,7 +437,8 @@ internal class MainInputComposerSetup(
             attachmentPanel = attachmentPanel,
             emojiPanel = emojiPanel,
             runtimeInputModeStrip = runtimeInputModeStrip,
-            expandEditorButton = expandEditorButton
+            expandEditorButton = expandEditorButton,
+            ttsSpeakerButton = ttsSpeakerButton
         )
     }
 

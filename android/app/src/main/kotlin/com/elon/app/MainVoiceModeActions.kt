@@ -23,6 +23,7 @@ internal class MainVoiceModeActions(
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
     private val setVoiceMode: (Boolean) -> Unit,
+    private val ttsSpeakerButton: () -> ImageButton?,
     private val collapseAttachmentPanel: () -> Unit,
     private val collapseEmojiPanel: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
@@ -52,6 +53,17 @@ internal class MainVoiceModeActions(
             binding.inputEdit.visibility = View.GONE
             modelButtonShell()?.visibility = View.GONE
             voiceButton.visibility = View.VISIBLE
+            // 语音朗读开关只在 CLOUD_REALTIME 模式下显示
+            val speakerBtn = ttsSpeakerButton()
+            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.CLOUD_REALTIME) {
+                speakerBtn?.setImageResource(
+                    if (VoiceSpeaker.isTtsEnabled(activity)) R.drawable.ic_input_tts_on_circle
+                    else R.drawable.ic_input_tts_off_circle
+                )
+                speakerBtn?.visibility = View.VISIBLE
+            } else {
+                speakerBtn?.visibility = View.GONE
+            }
         } else {
             modeButton.setImageResource(R.drawable.ic_input_voice_circle)
             emojiButton()?.visibility = View.VISIBLE
@@ -67,6 +79,7 @@ internal class MainVoiceModeActions(
                 View.GONE
             }
             voiceButton.visibility = View.GONE
+            ttsSpeakerButton()?.visibility = View.GONE
         }
         updateSendButtonVisual()
         updateAdaptiveInputHeight()
