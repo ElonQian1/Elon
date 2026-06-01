@@ -121,6 +121,25 @@ internal class MainInputComposerSetup(
             setOnClickListener { toggleVoiceMode() }
         }
 
+        val collapsedInputTouchListener = View.OnTouchListener { view, event ->
+            when (event.action) {
+                MotionEvent.ACTION_UP -> {
+                    view.isPressed = false
+                    focusInputComposer()
+                    true
+                }
+                MotionEvent.ACTION_DOWN -> {
+                    view.isPressed = true
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    true
+                }
+                else -> true
+            }
+        }
+
         val inputCenterContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -132,6 +151,7 @@ internal class MainInputComposerSetup(
             isClickable = true
             isFocusable = false
             setOnClickListener { focusInputComposer() }
+            setOnTouchListener(collapsedInputTouchListener)
         }
 
         val collapsedInputPreview = TextView(activity).apply {
@@ -148,7 +168,10 @@ internal class MainInputComposerSetup(
             setTextColor(Color.parseColor("#A8D0D0D0"))
             textSize = 15f
             isClickable = true
+            isFocusable = false
+            isFocusableInTouchMode = false
             setOnClickListener { focusInputComposer() }
+            setOnTouchListener(collapsedInputTouchListener)
         }
 
         lateinit var inputComposerMotion: InputComposerMotion
@@ -186,7 +209,13 @@ internal class MainInputComposerSetup(
             textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!isVoiceMode()) {
-                    inputComposerMotion.setExpanded(hasFocus, animate = shouldAnimateInputFocus())
+                    if (!hasFocus || !inputComposerMotion.isKeyboardSynchronizedExpansionPending) {
+                        inputComposerMotion.setExpanded(
+                            hasFocus,
+                            animate = shouldAnimateInputFocus(),
+                            animateLayoutHeight = !hasFocus
+                        )
+                    }
                     updateSendButtonVisual()
                     updateAdaptiveInputHeight()
                 }
@@ -385,7 +414,7 @@ internal class MainInputComposerSetup(
         )
         inputEdit.setOnClickListener {
             if (!inputComposerMotion.isExpanded && !isVoiceMode()) {
-                inputComposerMotion.setExpanded(true, animate = true)
+                inputComposerMotion.prepareKeyboardSynchronizedExpansion()
             }
             if (!isVoiceMode()) {
                 focusInputComposer()

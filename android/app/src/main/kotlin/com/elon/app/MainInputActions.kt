@@ -108,7 +108,10 @@ internal class MainInputActions(
         updateRunningInputModeStrip()
         updateSendButtonVisual()
         adaptiveInputHeightActions.updateAdaptiveInputHeight()
-        keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(binding).also { it.install() }
+        keyboardInsetsAnimationActions = MainKeyboardInsetsAnimationActions(
+            binding = binding,
+            inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion }
+        ).also { it.install() }
     }
 
     fun inputComposerViewsOrNull(): MainInputComposerViews? = inputComposerViews

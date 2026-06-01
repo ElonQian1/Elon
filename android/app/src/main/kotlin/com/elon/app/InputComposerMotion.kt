@@ -22,9 +22,14 @@ internal class InputComposerMotion(
     private val expandedModelEndMargin: Int
     private val expandedPlanWidth: Int
     private val expandedPlanEndMargin: Int
+    private var keyboardSyncTransition: ComposerTransition? = null
+    private var keyboardSyncProgress = 0f
 
     var isExpanded: Boolean = false
         private set
+
+    val isKeyboardSynchronizedExpansionPending: Boolean
+        get() = keyboardSyncTransition != null
 
     init {
         val density = modelButton.resources.displayMetrics.density
@@ -43,65 +48,90 @@ internal class InputComposerMotion(
         val target = height.coerceAtLeast(0)
         expandedTextHeight = target
         if (!isExpanded) return
+        if (keyboardSyncTransition != null) {
+            keyboardSyncTransition = createTransition(expanded = true)
+            keyboardSyncTransition?.let { applyTransition(it, keyboardSyncProgress, animateLayoutHeight = true) }
+            return
+        }
         animateHeight(expandedInputContainer, target, animate)
     }
 
-    fun setExpanded(expanded: Boolean, animate: Boolean) {
-        if (isExpanded == expanded && expandedInputContainer.height == targetExpandedHeight(expanded)) return
+    fun prepareKeyboardSynchronizedExpansion() {
+        if (isExpanded && keyboardSyncTransition == null) return
+        expandAnimator?.cancel()
+        textHeightAnimator?.cancel()
+        isExpanded = true
+        keyboardSyncProgress = 0f
+        keyboardSyncTransition = createTransition(expanded = true).also { transition ->
+            prepareTransition(transition)
+            applyTransition(transition, 0f, animateLayoutHeight = true)
+        }
+    }
+
+    fun applyKeyboardSynchronizedExpansionProgress(progress: Float): Boolean {
+        val transition = keyboardSyncTransition ?: return false
+        keyboardSyncProgress = progress.coerceIn(0f, 1f)
+        applyTransition(transition, keyboardSyncProgress, animateLayoutHeight = true)
+        if (keyboardSyncProgress >= 1f) {
+            completeTransition(transition)
+            keyboardSyncTransition = null
+        }
+        return true
+    }
+
+    fun finishKeyboardSynchronizedExpansion(animate: Boolean): Boolean {
+        val transition = keyboardSyncTransition ?: return false
+        expandAnimator?.cancel()
+        if (!animate) {
+            applyTransition(transition, 1f, animateLayoutHeight = true)
+            completeTransition(transition)
+            keyboardSyncTransition = null
+            keyboardSyncProgress = 0f
+            return true
+        }
+        val startProgress = keyboardSyncProgress.coerceIn(0f, 1f)
+        expandAnimator = ValueAnimator.ofFloat(startProgress, 1f).apply {
+            duration = ((1f - startProgress) * 220L).toLong().coerceAtLeast(80L)
+            interpolator = this@InputComposerMotion.interpolator
+            addUpdateListener { animator ->
+                keyboardSyncProgress = animator.animatedValue as Float
+                applyTransition(transition, keyboardSyncProgress, animateLayoutHeight = true)
+            }
+            addListener(
+                onEnd = {
+                    applyTransition(transition, 1f, animateLayoutHeight = true)
+                    completeTransition(transition)
+                    keyboardSyncTransition = null
+                    keyboardSyncProgress = 0f
+                }
+            )
+            start()
+        }
+        return true
+    }
+
+    fun setExpanded(expanded: Boolean, animate: Boolean, animateLayoutHeight: Boolean = true) {
+        if (expanded && keyboardSyncTransition != null) return
+        keyboardSyncTransition = null
+        keyboardSyncProgress = 0f
+        if (isExpanded == expanded) {
+            if (!expanded || expandedInputContainer.height == targetExpandedHeight(expanded)) return
+            animateHeight(expandedInputContainer, targetExpandedHeight(expanded), animate && animateLayoutHeight)
+            return
+        }
         isExpanded = expanded
         expandAnimator?.cancel()
 
-        val startHeight = expandedInputContainer.height
-        val endHeight = targetExpandedHeight(expanded)
-        val startPillAlpha = collapsedInputContainer.alpha
-        val endPillAlpha = if (expanded) 0f else 1f
-        val textVerticalTravel = collapsedInputContainer.resources.displayMetrics.density * 6f
-        val textHorizontalTravel = collapsedInputContainer.resources.displayMetrics.density * 10f
-        val startTextTranslationY = collapsedText.translationY
-        val endTextTranslationY = if (expanded) -textVerticalTravel else 0f
-        val startTextTranslationX = collapsedText.translationX
-        val endTextTranslationX = if (expanded) textHorizontalTravel else 0f
-        val startTextAlpha = collapsedText.alpha
-        val endTextAlpha = if (expanded) 0f else 1f
-        val startModelAlpha = modelButton.alpha
-        val endModelAlpha = if (expanded) 1f else 0f
-        val startPlanAlpha = planModeButton.alpha
-        val endPlanAlpha = if (expanded) 1f else 0f
-        val startModelWidth = currentOptionalWidth(modelButton, expanded)
-        val endModelWidth = if (expanded) expandedModelWidth else 0
-        val startModelMargin = currentOptionalEndMargin(modelButton, expanded)
-        val endModelMargin = if (expanded) expandedModelEndMargin else 0
-        val startPlanWidth = currentOptionalWidth(planModeButton, expanded)
-        val endPlanWidth = if (expanded) expandedPlanWidth else 0
-        val startPlanMargin = currentOptionalEndMargin(planModeButton, expanded)
-        val endPlanMargin = if (expanded) expandedPlanEndMargin else 0
-        val startRightWidth = rightControls.width.takeIf { it > 0 } ?: rightControls.layoutParams.width
-        val endRightWidth = rightControlsTargetWidth()
+        val transition = createTransition(expanded)
+        prepareTransition(transition)
 
-        collapsedInputContainer.visibility = View.VISIBLE
-        if (expanded) {
-            setOptionalButtonWidth(modelButton, startModelWidth, startModelMargin)
-            setOptionalButtonWidth(planModeButton, startPlanWidth, startPlanMargin)
-            modelButton.visibility = View.VISIBLE
-            planModeButton.visibility = View.VISIBLE
+        if (expanded && !animateLayoutHeight) {
+            setExpandedHeight(transition.endHeight)
         }
 
         if (!animate) {
-            setExpandedHeight(endHeight)
-            collapsedInputContainer.alpha = endPillAlpha
-            collapsedText.translationY = endTextTranslationY
-            collapsedText.translationX = endTextTranslationX
-            collapsedText.alpha = endTextAlpha
-            modelButton.alpha = endModelAlpha
-            planModeButton.alpha = endPlanAlpha
-            setOptionalButtonWidth(modelButton, endModelWidth, endModelMargin)
-            setOptionalButtonWidth(planModeButton, endPlanWidth, endPlanMargin)
-            setRightControlsWidth(endRightWidth)
-            collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
-            if (!expanded) {
-                modelButton.visibility = View.GONE
-                planModeButton.visibility = View.GONE
-            }
+            applyTransition(transition, 1f, animateLayoutHeight = true)
+            completeTransition(transition)
             return
         }
 
@@ -110,40 +140,106 @@ internal class InputComposerMotion(
             interpolator = this@InputComposerMotion.interpolator
             addUpdateListener { animator ->
                 val t = animator.animatedValue as Float
-                setExpandedHeight(lerp(startHeight, endHeight, t))
-                collapsedInputContainer.alpha = lerp(startPillAlpha, endPillAlpha, t)
-                collapsedText.translationY = lerp(startTextTranslationY, endTextTranslationY, t)
-                collapsedText.translationX = lerp(startTextTranslationX, endTextTranslationX, t)
-                collapsedText.alpha = lerp(startTextAlpha, endTextAlpha, t)
-                modelButton.alpha = lerp(startModelAlpha, endModelAlpha, t)
-                planModeButton.alpha = lerp(startPlanAlpha, endPlanAlpha, t)
-                setOptionalButtonWidth(
-                    modelButton,
-                    lerp(startModelWidth, endModelWidth, t),
-                    lerp(startModelMargin, endModelMargin, t)
-                )
-                setOptionalButtonWidth(
-                    planModeButton,
-                    lerp(startPlanWidth, endPlanWidth, t),
-                    lerp(startPlanMargin, endPlanMargin, t)
-                )
-                setRightControlsWidth(lerp(startRightWidth, endRightWidth, t))
+                applyTransition(transition, t, animateLayoutHeight)
             }
             addListener(
                 onEnd = {
-                    collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
-                    if (!expanded) {
-                        modelButton.visibility = View.GONE
-                        planModeButton.visibility = View.GONE
-                    }
+                    setExpandedHeight(transition.endHeight)
+                    completeTransition(transition)
                 }
             )
             start()
         }
     }
 
+    private fun createTransition(expanded: Boolean): ComposerTransition {
+        val textVerticalTravel = collapsedInputContainer.resources.displayMetrics.density * 6f
+        val textHorizontalTravel = collapsedInputContainer.resources.displayMetrics.density * 10f
+        return ComposerTransition(
+            expanded = expanded,
+            startHeight = expandedInputContainer.height,
+            endHeight = targetExpandedHeight(expanded),
+            startPillAlpha = collapsedInputContainer.alpha,
+            endPillAlpha = if (expanded) 0f else 1f,
+            startTextTranslationY = collapsedText.translationY,
+            endTextTranslationY = if (expanded) -textVerticalTravel else 0f,
+            startTextTranslationX = collapsedText.translationX,
+            endTextTranslationX = if (expanded) textHorizontalTravel else 0f,
+            startTextAlpha = collapsedText.alpha,
+            endTextAlpha = if (expanded) 0f else 1f,
+            startModelAlpha = modelButton.alpha,
+            endModelAlpha = if (expanded) 1f else 0f,
+            startPlanAlpha = planModeButton.alpha,
+            endPlanAlpha = if (expanded) 1f else 0f,
+            startModelWidth = currentOptionalWidth(modelButton, expanded),
+            endModelWidth = if (expanded) expandedModelWidth else 0,
+            startModelMargin = currentOptionalEndMargin(modelButton, expanded),
+            endModelMargin = if (expanded) expandedModelEndMargin else 0,
+            startPlanWidth = currentOptionalWidth(planModeButton, expanded),
+            endPlanWidth = if (expanded) expandedPlanWidth else 0,
+            startPlanMargin = currentOptionalEndMargin(planModeButton, expanded),
+            endPlanMargin = if (expanded) expandedPlanEndMargin else 0,
+            startRightWidth = rightControls.width.takeIf { it > 0 } ?: rightControls.layoutParams.width,
+            endRightWidth = rightControlsTargetWidth()
+        )
+    }
+
+    private fun prepareTransition(transition: ComposerTransition) {
+        collapsedInputContainer.visibility = View.VISIBLE
+        if (transition.expanded) {
+            setOptionalButtonWidth(modelButton, transition.startModelWidth, transition.startModelMargin)
+            setOptionalButtonWidth(planModeButton, transition.startPlanWidth, transition.startPlanMargin)
+            modelButton.visibility = View.VISIBLE
+            planModeButton.visibility = View.VISIBLE
+        }
+    }
+
+    private fun applyTransition(
+        transition: ComposerTransition,
+        progress: Float,
+        animateLayoutHeight: Boolean
+    ) {
+        val t = progress.coerceIn(0f, 1f)
+        if (animateLayoutHeight) {
+            setExpandedHeight(lerp(transition.startHeight, transition.endHeight, t))
+        }
+        collapsedInputContainer.alpha = lerp(transition.startPillAlpha, transition.endPillAlpha, t)
+        collapsedText.translationY = lerp(transition.startTextTranslationY, transition.endTextTranslationY, t)
+        collapsedText.translationX = lerp(transition.startTextTranslationX, transition.endTextTranslationX, t)
+        collapsedText.alpha = lerp(transition.startTextAlpha, transition.endTextAlpha, t)
+        modelButton.alpha = lerp(transition.startModelAlpha, transition.endModelAlpha, t)
+        planModeButton.alpha = lerp(transition.startPlanAlpha, transition.endPlanAlpha, t)
+        setOptionalButtonWidth(
+            modelButton,
+            lerp(transition.startModelWidth, transition.endModelWidth, t),
+            lerp(transition.startModelMargin, transition.endModelMargin, t)
+        )
+        setOptionalButtonWidth(
+            planModeButton,
+            lerp(transition.startPlanWidth, transition.endPlanWidth, t),
+            lerp(transition.startPlanMargin, transition.endPlanMargin, t)
+        )
+        setRightControlsWidth(lerp(transition.startRightWidth, transition.endRightWidth, t))
+    }
+
+    private fun completeTransition(transition: ComposerTransition) {
+        collapsedInputContainer.visibility = if (transition.expanded) View.INVISIBLE else View.VISIBLE
+        if (!transition.expanded) {
+            modelButton.visibility = View.GONE
+            planModeButton.visibility = View.GONE
+        }
+    }
+
     private fun targetExpandedHeight(expanded: Boolean): Int {
-        return if (expanded) expandedTextHeight else 0
+        return if (expanded) {
+            expandedTextHeight.takeIf { it > 0 } ?: defaultExpandedTextHeight()
+        } else {
+            0
+        }
+    }
+
+    private fun defaultExpandedTextHeight(): Int {
+        return (expandedInputContainer.resources.displayMetrics.density * 46f).toInt()
     }
 
     private fun animateHeight(view: View, target: Int, animate: Boolean) {
@@ -209,6 +305,34 @@ internal class InputComposerMotion(
     private fun lerp(start: Int, end: Int, t: Float): Int {
         return (start + (end - start) * t).toInt()
     }
+
+    private data class ComposerTransition(
+        val expanded: Boolean,
+        val startHeight: Int,
+        val endHeight: Int,
+        val startPillAlpha: Float,
+        val endPillAlpha: Float,
+        val startTextTranslationY: Float,
+        val endTextTranslationY: Float,
+        val startTextTranslationX: Float,
+        val endTextTranslationX: Float,
+        val startTextAlpha: Float,
+        val endTextAlpha: Float,
+        val startModelAlpha: Float,
+        val endModelAlpha: Float,
+        val startPlanAlpha: Float,
+        val endPlanAlpha: Float,
+        val startModelWidth: Int,
+        val endModelWidth: Int,
+        val startModelMargin: Int,
+        val endModelMargin: Int,
+        val startPlanWidth: Int,
+        val endPlanWidth: Int,
+        val startPlanMargin: Int,
+        val endPlanMargin: Int,
+        val startRightWidth: Int,
+        val endRightWidth: Int
+    )
 }
 
 private fun ValueAnimator.addListener(onEnd: () -> Unit) {

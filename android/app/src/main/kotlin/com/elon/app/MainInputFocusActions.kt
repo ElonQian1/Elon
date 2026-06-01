@@ -73,13 +73,13 @@ internal class MainInputFocusActions(
             setVoiceMode(false)
             applyVoiceMode()
         }
+        requestKeyboardLift()
         inputComposerMotion()?.let { motion ->
             if (!motion.isExpanded) {
-                motion.setExpanded(true, animate = true)
+                motion.prepareKeyboardSynchronizedExpansion()
             }
         }
         focusAndShowKeyboard()
-        requestKeyboardLift()
         binding.inputEdit.post {
             focusAndShowKeyboard()
             requestKeyboardLift()
