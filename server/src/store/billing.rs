@@ -450,7 +450,7 @@ impl Store {
         )?;
 
         // 4. 插入充值记录（method=wechat_pay）
-        let rid = new_id();
+        let rid = new_id("rchrg");
         tx.execute(
             "INSERT INTO recharge_records (id, user_id, amount_fen, method, operator_id, note, created_at)
              VALUES (?1, ?2, ?3, 'wechat_pay', 'system', ?4, ?5)",

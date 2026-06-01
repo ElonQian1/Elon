@@ -55,7 +55,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # SQLite 数据保存
 rusqlite = { version = "0.31", features = ["bundled"] }
-sha2 = "0.10"
+sha2 = { version = "0.10", features = ["oid"] }
 hex = "0.4"
 
 # 微信支付 v3 —— RSA-SHA256 请求签名 & AES-256-GCM 回调解密
