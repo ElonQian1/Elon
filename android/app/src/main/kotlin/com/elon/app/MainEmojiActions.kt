@@ -44,7 +44,7 @@ internal class MainEmojiActions(
     private val emojiButton: () -> ImageButton?,
     private val collapseAttachmentPanel: () -> Unit,
     private val setKeyboardOverlayMode: (Boolean) -> Unit,
-    private val setKeyboardOverlayModePreservingChatPadding: () -> Unit,
+    private val setKeyboardOverlayModeForPanelReplacement: () -> Unit,
     private val replacementPanelHeight: (Int) -> Int,
     private val addPendingEmojiAttachment: (CustomEmojiItem) -> Boolean,
     private val updateSendButtonVisual: () -> Unit,
@@ -156,7 +156,7 @@ internal class MainEmojiActions(
         setPanelHeight(panel, targetEmojiPanelHeight())
         panel.alpha = 1f
         panel.translationY = 0f
-        setKeyboardOverlayModePreservingChatPadding()
+        setKeyboardOverlayModeForPanelReplacement()
         hideKeyboard()
         updateEmojiButton(EmojiButtonState.PANEL)
     }

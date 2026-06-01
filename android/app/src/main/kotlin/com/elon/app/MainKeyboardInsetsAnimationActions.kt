@@ -28,8 +28,7 @@ internal class MainKeyboardInsetsAnimationActions(
     private var lastKnownKeyboardHeight = -1
     private var usingEstimatedKeyboardHeight = false
     private var keyboardOverlayMode = false
-    private var preserveOverlayChatPadding = false
-    private var overlayChatPaddingHeight = 0
+    private var suppressBottomBarLayoutSyncUntil = 0L
     private var liftRequestedAt = 0L
     private var keyboardWasVisibleSinceLift = false
     private var followChatBottomDuringLift = false
@@ -164,31 +163,20 @@ internal class MainKeyboardInsetsAnimationActions(
     fun setKeyboardOverlayMode(enabled: Boolean) {
         if (enabled) {
             keyboardOverlayMode = true
-            preserveOverlayChatPadding = false
-            overlayChatPaddingHeight = 0
             applyKeyboardOverlayState()
             return
         }
         if (!keyboardOverlayMode) return
         keyboardOverlayMode = false
-        preserveOverlayChatPadding = false
-        overlayChatPaddingHeight = 0
+        suppressBottomBarLayoutSyncUntil = 0L
         val target = lastKeyboardHeight.coerceAtLeast(0)
         applyKeyboardHeight(target, animate = true)
     }
 
-    fun setKeyboardOverlayModePreservingChatPadding() {
-        val currentChatPadding = (binding.chatList.paddingBottom - baseChatListPaddingBottom).coerceAtLeast(0)
-        val rememberedHeight = when {
-            currentChatPadding > 0 -> currentChatPadding
-            lastKeyboardHeight > 0 -> lastKeyboardHeight
-            lastKnownKeyboardHeight > 0 -> lastKnownKeyboardHeight
-            else -> 0
-        }
+    fun setKeyboardOverlayModeForPanelReplacement() {
         keyboardOverlayMode = true
-        preserveOverlayChatPadding = rememberedHeight > 0
-        overlayChatPaddingHeight = rememberedHeight
-        applyKeyboardOverlayState()
+        suppressBottomBarLayoutSyncUntil = SystemClock.uptimeMillis() + PANEL_REPLACEMENT_LAYOUT_SYNC_SUPPRESS_MS
+        applyKeyboardOverlayState(adjustChatScroll = false)
     }
 
     fun replacementPanelHeight(fallbackHeight: Int): Int {
@@ -248,6 +236,7 @@ internal class MainKeyboardInsetsAnimationActions(
     private fun installBottomBarLayoutSync() {
         binding.bottomBarContainer.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (binding.chatPage.visibility != View.VISIBLE) return@addOnLayoutChangeListener
+            if (SystemClock.uptimeMillis() < suppressBottomBarLayoutSyncUntil) return@addOnLayoutChangeListener
             val oldHeight = oldBottom - oldTop
             val newHeight = bottom - top
             val heightDelta = newHeight - oldHeight
@@ -344,8 +333,7 @@ internal class MainKeyboardInsetsAnimationActions(
         lastKeyboardHeight = target
         if (keyboardOverlayMode) {
             applyBottomBarOffset(0)
-            val overlayPadding = if (preserveOverlayChatPadding) overlayChatPaddingHeight else 0
-            applyChatBottomPadding(overlayPadding)
+            applyChatBottomPadding(0)
             return
         }
         if (animate) {
@@ -363,15 +351,18 @@ internal class MainKeyboardInsetsAnimationActions(
         binding.bottomBarContainer.translationY = -keyboardHeight.toFloat()
     }
 
-    private fun applyKeyboardOverlayState() {
+    private fun applyKeyboardOverlayState(adjustChatScroll: Boolean = true) {
         bottomOffsetAnimator?.cancel()
         chatLiftAnimator?.cancel()
         chatLiftAnimator = null
         binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_NONE, null)
         binding.chatList.setLayerType(View.LAYER_TYPE_NONE, null)
         applyBottomBarOffset(0)
-        val overlayPadding = if (preserveOverlayChatPadding) overlayChatPaddingHeight else 0
-        applyChatBottomPadding(overlayPadding)
+        if (adjustChatScroll) {
+            applyChatBottomPadding(0)
+        } else {
+            applyChatBottomPaddingWithoutScroll(0)
+        }
     }
 
     private fun animateBottomBarOffset(keyboardHeight: Int) {
@@ -456,6 +447,25 @@ internal class MainKeyboardInsetsAnimationActions(
         } else if (anchor != null) {
             layoutManager?.scrollToPositionWithOffset(anchor.position, anchor.offset)
         }
+        if (keyboardHeight == 0) {
+            followChatBottomDuringLift = false
+        }
+    }
+
+    private fun applyChatBottomPaddingWithoutScroll(keyboardHeight: Int) {
+        val targetBottom = baseChatListPaddingBottom + keyboardHeight
+        if (binding.chatList.paddingBottom == targetBottom) {
+            if (keyboardHeight == 0) {
+                followChatBottomDuringLift = false
+            }
+            return
+        }
+        binding.chatList.setPadding(
+            binding.chatList.paddingLeft,
+            binding.chatList.paddingTop,
+            binding.chatList.paddingRight,
+            targetBottom
+        )
         if (keyboardHeight == 0) {
             followChatBottomDuringLift = false
         }
@@ -601,6 +611,7 @@ internal class MainKeyboardInsetsAnimationActions(
         private const val ZERO_HEIGHT_GRACE_MS = 900L
         private const val ESTIMATED_LIFT_DELAY_MS = 72L
         private const val ESTIMATED_LIFT_RETRY_DELAY_MS = 180L
+        private const val PANEL_REPLACEMENT_LAYOUT_SYNC_SUPPRESS_MS = 420L
         private const val MIN_REPLACEMENT_PANEL_RATIO = 0.24f
         private const val MAX_REPLACEMENT_PANEL_RATIO = 0.48f
     }

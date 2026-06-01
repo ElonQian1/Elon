@@ -363,8 +363,8 @@ internal class MainInputActions(
             setKeyboardOverlayMode = { enabled ->
                 keyboardInsetsAnimationActions?.setKeyboardOverlayMode(enabled)
             },
-            setKeyboardOverlayModePreservingChatPadding = {
-                keyboardInsetsAnimationActions?.setKeyboardOverlayModePreservingChatPadding()
+            setKeyboardOverlayModeForPanelReplacement = {
+                keyboardInsetsAnimationActions?.setKeyboardOverlayModeForPanelReplacement()
             },
             replacementPanelHeight = { fallback ->
                 keyboardInsetsAnimationActions?.replacementPanelHeight(fallback) ?: fallback
