@@ -33,6 +33,7 @@ internal class MainProfileQuickActions(
             openTransactions = { nodeTransactionSheet.show() }
         )
     }
+    private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
 
     fun setupQuickActions() {
         MainQuickActionBindings(
@@ -61,6 +62,7 @@ internal class MainProfileQuickActions(
             UserProfileViews.renderSummary(activity, binding, openProfileDetails)
             tokenUsageCard.attachAndRefresh()
             nodeBalanceCard.attachAndRefresh()
+            myNodesCard.attachAndRefresh()
         }
     }
 

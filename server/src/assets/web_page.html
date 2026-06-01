@@ -543,6 +543,43 @@
     .node-tx-earned { font-size:14px; font-weight:700; color:#4ADE80; }
     .node-tx-meta { font-size:11px; color:#6B7280; }
     .node-tx-empty { text-align:center; padding:40px 0; color:#6B7280; font-size:14px; }
+    /* 我的节点卡片 */
+    .my-nodes-card {
+      background: #0E1318;
+      border-radius: 8px;
+      padding: 16px 22px;
+      margin-top: 10px;
+    }
+    .my-nodes-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .my-nodes-title { font-size: 15px; font-weight: 700; color: #E6EEF8; }
+    .my-nodes-status {
+      font-size: 11px; color: #7ECFFF;
+      background: #0C2D40; border-radius: 8px;
+      padding: 4px 10px;
+    }
+    .my-nodes-status.online { color: #4ADE80; background: #0D2A1A; }
+    .my-nodes-status.offline { color: #9CA3AF; background: #1A1A1A; }
+    .my-node-row {
+      display: flex; align-items: center;
+      background: #141B22; border-radius: 6px;
+      padding: 10px 12px; margin-top: 8px;
+    }
+    .my-node-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0; margin-right: 10px;
+    }
+    .my-node-dot.online { background: #4ADE80; }
+    .my-node-dot.offline { background: #4B5563; }
+    .my-node-info { flex: 1; min-width: 0; }
+    .my-node-id { font-size: 13px; font-weight: 700; color: #D1E4FF; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-id.offline { color: #6B7280; }
+    .my-node-models { font-size: 11px; color: #4B5563; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-badge { font-size: 11px; color: #7ECFFF; flex-shrink: 0; margin-left: 8px; }
+    .my-node-badge.offline { color: #4B5563; }
+    .my-nodes-empty { text-align: center; color: #4B5563; font-size: 12px; padding: 12px 0 4px; line-height: 1.6; }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -985,6 +1022,15 @@
         </div>
       </div>
 
+      <!-- 我的节点状态卡片 -->
+      <div class="my-nodes-card" id="myNodesCard">
+        <div class="my-nodes-header">
+          <span class="my-nodes-title">我的节点</span>
+          <span class="my-nodes-status" id="myNodesStatus">加载中…</span>
+        </div>
+        <div id="myNodesList"></div>
+      </div>
+
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
@@ -1362,6 +1408,7 @@
       refreshDownloadPage();
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
       loadNodeBalance().catch((e) => console.warn('loadNodeBalance failed:', e));
+      loadMyNodes().catch((e) => console.warn('loadMyNodes failed:', e));
     }
   }
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
@@ -2171,6 +2218,62 @@
       balEl.textContent = '--';
       lifEl.textContent = '--';
       if (statusEl) statusEl.textContent = '暂不可用';
+    }
+  }
+
+  async function loadMyNodes() {
+    const card = document.getElementById('myNodesCard');
+    const statusEl = document.getElementById('myNodesStatus');
+    const listEl = document.getElementById('myNodesList');
+    if (!card || !listEl) return;
+    card.style.display = '';
+    if (!isLoggedIn()) {
+      if (statusEl) { statusEl.textContent = '未登录'; statusEl.className = 'my-nodes-status'; }
+      listEl.innerHTML = '';
+      return;
+    }
+    if (statusEl) { statusEl.textContent = '加载中…'; statusEl.className = 'my-nodes-status'; }
+    try {
+      const res = await fetch('/api/me/nodes', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const nodes = data.nodes || [];
+      listEl.innerHTML = '';
+      if (nodes.length === 0) {
+        listEl.innerHTML = '<div class="my-nodes-empty">暂无注册节点<br>运行 elon-node-agent 即可在此显示</div>';
+        if (statusEl) { statusEl.textContent = '无节点'; statusEl.className = 'my-nodes-status'; }
+        return;
+      }
+      const onlineCnt = nodes.filter((n) => n.online).length;
+      if (statusEl) {
+        if (onlineCnt > 0) {
+          statusEl.textContent = `在线 ${onlineCnt}/${nodes.length}`;
+          statusEl.className = 'my-nodes-status online';
+        } else {
+          statusEl.textContent = '全部离线';
+          statusEl.className = 'my-nodes-status offline';
+        }
+      }
+      nodes.forEach((node) => {
+        const online = !!node.online;
+        const nodeId = node.node_id || '';
+        const shortId = nodeId.length > 16 ? '…' + nodeId.slice(-14) : nodeId;
+        const models = (node.models || []).map((m) => m.model_id).filter(Boolean);
+        const modelText = models.slice(0, 3).join('  ·  ') + (models.length > 3 ? `  +${models.length - 3}` : '');
+        const row = document.createElement('div');
+        row.className = 'my-node-row';
+        row.innerHTML = `
+          <div class="my-node-dot ${online ? 'online' : 'offline'}"></div>
+          <div class="my-node-info">
+            <div class="my-node-id ${online ? '' : 'offline'}">${shortId}</div>
+            ${models.length ? `<div class="my-node-models">${modelText}</div>` : ''}
+          </div>
+          <div class="my-node-badge ${online ? '' : 'offline'}">${models.length} 模型</div>
+        `;
+        listEl.appendChild(row);
+      });
+    } catch {
+      if (statusEl) { statusEl.textContent = '暂不可用'; statusEl.className = 'my-nodes-status'; }
     }
   }
 
