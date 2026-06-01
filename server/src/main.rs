@@ -31,6 +31,7 @@ mod friend_api;
 mod friend_events;
 mod global_ws;
 mod presence_events;
+mod read_receipt_events;
 mod typing_events;
 mod homecli_agent;
 mod image_generation;
