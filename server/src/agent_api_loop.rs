@@ -109,6 +109,8 @@ pub(crate) async fn run_api_inner_with_workspace(
                     message: reply.to_string(),
                     apk_url: None,
                     image_url: None,
+                    model_used: None,
+                    node_id: None,
                 }
                 .to_json(),
             );
@@ -138,6 +140,8 @@ pub(crate) async fn run_api_inner_with_workspace(
                 message: reply,
                 apk_url: None,
                 image_url: None,
+                model_used: None,
+                node_id: None,
             }
             .to_json(),
         );
@@ -226,6 +230,8 @@ pub(crate) async fn run_api_inner_with_workspace(
                     message: final_text,
                     apk_url: apk_url.clone(),
                     image_url: None,
+                    model_used: None,
+                    node_id: None,
                 }
                 .to_json(),
             );
@@ -332,6 +338,8 @@ pub(crate) async fn run_api_inner_with_workspace(
             message: "任务执行完毕".into(),
             apk_url,
             image_url: None,
+            model_used: None,
+            node_id: None,
         }
         .to_json(),
     );
@@ -376,6 +384,8 @@ async fn run_api_plan(
             message: reply,
             apk_url: None,
             image_url: None,
+            model_used: None,
+            node_id: None,
         }
         .to_json(),
     );

@@ -205,6 +205,8 @@ async fn run_dispatch_with_workspace(
                     message: "我看了当前项目状态，APK 已经生成了。你现在最需要的是下载安装测试，所以我先把下载链接给你。".into(),
                     apk_url: Some(apk_url),
                     image_url: None,
+                    model_used: None,
+                    node_id: None,
                 }
                 .to_json(),
             );

@@ -4,10 +4,13 @@
 //! - `GET  /api/nodes`                 列出所有在线节点（需登录）
 //! - `GET  /api/nodes/models`          所有在线节点中可用模型列表（无需登录，供 APK 模型选择用）
 //! - `POST /api/nodes/chat`            向节点 LLM 发起对话（需登录，同步阻塞返回）
+//! - `GET  /api/me/nodes`              本用户自己的节点列表
+//! - `POST /api/me/nodes/register`     注册一个新 PC 节点，获取 agent_id 和 secret
 //! - `GET  /api/me/node-balance`       查询本用户作为节点提供者的积分余额
 //! - `GET  /api/me/node-transactions`  查询最近积分流水（最多 50 条）
 
 use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
+use sha2::Digest as _;
 use std::sync::Arc;
 
 use crate::{project_auth::auth_from_headers, types::AppState};
@@ -41,6 +44,46 @@ pub async fn list_available_models(
 ) -> impl IntoResponse {
     let models = state.node_registry.available_models().await;
     Json(AvailableModelsResp { models }).into_response()
+}
+
+// ── /api/me/nodes/register ────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct RegisterNodeRequest {
+    pub label: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct RegisterNodeResponse {
+    pub agent_id: String,
+    pub agent_secret: String,
+    pub cloud_ws_url: String,
+    pub owner_user_id: String,
+}
+
+/// POST /api/me/nodes/register — 为当前用户生成一个新的 PC 节点凭证
+pub async fn register_node(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<RegisterNodeRequest>,
+) -> impl IntoResponse {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    };
+    let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(8).collect::<String>();
+    let agent_id = format!("node-{}-{}", user.id.chars().take(6).collect::<String>(), random_suffix);
+    let agent_secret = uuid::Uuid::new_v4().to_string().replace('-', "")
+        + &uuid::Uuid::new_v4().to_string().replace('-', "");
+    let secret_hash = hex::encode(sha2::Sha256::digest(agent_secret.as_bytes()));
+    if let Err(e) = state.store.create_node_credential(&agent_id, &secret_hash, &user.id, req.label.as_deref()) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("创建凭证失败: {e}")}))).into_response();
+    }
+    let cloud_ws_url = format!(
+        "ws://{}",
+        std::env::var("ELON_PUBLIC_HOST").unwrap_or_else(|_| "43.139.149.158:8080".to_string())
+    );
+    Json(RegisterNodeResponse { agent_id, agent_secret, cloud_ws_url, owner_user_id: user.id }).into_response()
 }
 
 // ── /api/me/node-balance ──────────────────────────────────────────────────────

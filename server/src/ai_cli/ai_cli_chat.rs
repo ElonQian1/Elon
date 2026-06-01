@@ -125,6 +125,8 @@ pub(crate) fn finish_lightweight_chat_fallback(
             message: message.into(),
             apk_url: None,
             image_url: None,
+            model_used: None,
+            node_id: None,
         }
         .to_json(),
     );

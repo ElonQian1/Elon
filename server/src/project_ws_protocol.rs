@@ -207,8 +207,8 @@ fn terminal_event_from_task(task: &TaskSnapshot) -> String {
         WsMessage::Done {
             message: "任务已完成，正在恢复之前保存的结果。".into(),
             apk_url: task.apk_url.clone(),
-            image_url: None,
-        }
+            image_url: None,            model_used: None,
+            node_id: None,        }
         .to_json()
     } else {
         WsMessage::error(
@@ -384,6 +384,8 @@ mod tests {
             message: "finished".into(),
             apk_url: task.apk_url.clone(),
             image_url: None,
+            model_used: None,
+            node_id: None,
         }
         .to_json();
 

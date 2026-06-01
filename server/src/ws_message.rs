@@ -54,6 +54,10 @@ pub enum WsMessage {
         apk_url: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         image_url: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model_used: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        node_id: Option<String>,
     },
     /// 发生错误
     Error {
