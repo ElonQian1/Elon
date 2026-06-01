@@ -6,6 +6,7 @@ package com.elon.app.agent.infrastructure.voice
 
 import android.content.Context
 import android.util.Log
+import com.elon.app.AgentVoiceBridge
 import com.elon.app.agent.application.conversation.*
 import com.elon.app.agent.domain.conversation.*
 import kotlinx.coroutines.*
@@ -43,8 +44,8 @@ class ConversationalVoiceAdapter(private val context: Context) {
     /** 对话管理器 - 控制对话状态和流程 */
     private val conversationManager = ConversationManager()
     
-    /** 流式语音识别 - 实时转文字 */
-    private val streamingASR = StreamingASR(context)
+    /** 多引擎语音识别（含自动回退：系统默认 → 品牌引擎 → Google，任意引擎失败自动切换下一个）*/
+    private val agentVoiceBridge = AgentVoiceBridge(context)
     
     /** 快速响应缓存 - 即时响应常见问候 */
     private val quickResponseCache = QuickResponseCache
@@ -162,39 +163,22 @@ class ConversationalVoiceAdapter(private val context: Context) {
     }
     
     /**
-     * 配置语音识别
+     * 配置语音识别（通过 AgentVoiceBridge 获得多引擎自动回退）
      */
     private fun setupASR() {
-        streamingASR.callback = object : StreamingASRCallback {
-            
-            override fun onReady() {
-                Log.d(TAG, "🎤 ASR 准备就绪")
+        agentVoiceBridge.onStart = { conversationManager.onSpeechStart() }
+        agentVoiceBridge.onPartial = { text -> conversationManager.onPartialResult(text, 1.0f) }
+        agentVoiceBridge.onFinal = { text -> conversationManager.onSpeechEnd(text) }
+        agentVoiceBridge.onEnd = {
+            // AgentVoiceBridge 对空结果不会触发 onFinal，直接触发 onEnd；
+            // 若 conversationManager 仍在监听中（未拿到文字），通知其以空结果结束，避免 UI 卡住。
+            if (conversationManager.currentState.value == com.elon.app.agent.domain.conversation.ConversationState.LISTENING) {
+                conversationManager.onSpeechEnd("")
             }
-            
-            override fun onSpeechStart() {
-                conversationManager.onSpeechStart()
-            }
-            
-            override fun onPartialResult(text: String, confidence: Float) {
-                conversationManager.onPartialResult(text, confidence)
-            }
-            
-            override fun onFinalResult(text: String) {
-                conversationManager.onSpeechEnd(text)
-            }
-            
-            override fun onSpeechEnd() {
-                // VAD 判断语音结束，但等待最终结果
-            }
-            
-            override fun onError(error: String) {
-                Log.e(TAG, "🎤 ASR 错误: $error")
-                conversationManager.onError(error)
-            }
-
-            override fun onErrorCode(code: Int, message: String) {
-                Log.w(TAG, "🎤 ASR 错误码: code=$code, msg=$message")
-            }
+        }
+        agentVoiceBridge.onError = { error ->
+            Log.e(TAG, "🎤 ASR 错误: $error")
+            conversationManager.onError(error)
         }
     }
     
@@ -207,7 +191,7 @@ class ConversationalVoiceAdapter(private val context: Context) {
      */
     fun start() {
         Log.i(TAG, "▶️ 开始语音对话")
-        streamingASR.startListening()
+        agentVoiceBridge.start()
     }
     
     /**
@@ -217,7 +201,7 @@ class ConversationalVoiceAdapter(private val context: Context) {
      */
     fun stop() {
         Log.i(TAG, "⏹️ 停止语音对话")
-        streamingASR.stopListening()
+        agentVoiceBridge.stop()
         ttsService?.stop()
         conversationManager.reset()
     }
@@ -234,12 +218,12 @@ class ConversationalVoiceAdapter(private val context: Context) {
         conversationManager.reset()
         
         // 停止当前的 ASR
-        streamingASR.stopListening()
+        agentVoiceBridge.stop()
         
         scope.launch {
             delay(300) // 增加延迟，确保 ASR 完全停止
             Log.d(TAG, "🔄 延迟后启动 ASR")
-            streamingASR.startListening()
+            agentVoiceBridge.start()
         }
     }
     
@@ -269,7 +253,7 @@ class ConversationalVoiceAdapter(private val context: Context) {
     fun destroy() {
         Log.i(TAG, "🧹 释放资源")
         scope.cancel()
-        streamingASR.destroy()
+        agentVoiceBridge.destroy()
         ttsService?.destroy()
         conversationManager.destroy()
     }
