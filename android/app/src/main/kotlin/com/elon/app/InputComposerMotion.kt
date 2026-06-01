@@ -97,7 +97,7 @@ internal class InputComposerMotion(
             setOptionalButtonWidth(modelButton, endModelWidth, endModelMargin)
             setOptionalButtonWidth(planModeButton, endPlanWidth, endPlanMargin)
             setRightControlsWidth(endRightWidth)
-            collapsedInputContainer.visibility = if (expanded) View.GONE else View.VISIBLE
+            collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
             if (!expanded) {
                 modelButton.visibility = View.GONE
                 planModeButton.visibility = View.GONE
@@ -131,7 +131,7 @@ internal class InputComposerMotion(
             }
             addListener(
                 onEnd = {
-                    collapsedInputContainer.visibility = if (expanded) View.GONE else View.VISIBLE
+                    collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
                     if (!expanded) {
                         modelButton.visibility = View.GONE
                         planModeButton.visibility = View.GONE
