@@ -41,6 +41,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #b8b8b8;
       --tab-active: #d0d0d0;
+      --bottom-menu-height: 64px;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -61,7 +62,7 @@
     .app {
       display: grid;
       min-height: 100vh;
-      grid-template-rows: 50px 1fr auto 52px;
+      grid-template-rows: 50px 1fr auto auto;
       grid-template-columns: 1fr;
       grid-template-areas:
         "toolbar"
@@ -642,6 +643,7 @@
       grid-area: input;
       background: var(--panel);
       display: none;
+      min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       padding: 8px 10px;
       /* iOS 键盘收起后底部安全区域 */
       padding-bottom: max(8px, env(safe-area-inset-bottom));
@@ -694,6 +696,7 @@
       background: var(--panel);
       display: flex;
       align-items: stretch;
+      min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       /* iOS Home 条安全区域：防止内容被遮挡 */
       padding-bottom: env(safe-area-inset-bottom);
     }

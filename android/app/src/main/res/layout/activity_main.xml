@@ -587,6 +587,7 @@
         android:id="@+id/bottomBarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="#1E1E1E"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -714,7 +715,7 @@
         <LinearLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
+            android:layout_height="@dimen/main_bottom_menu_height"
             android:layout_gravity="bottom"
             android:background="#1E1E1E"
             android:orientation="horizontal">

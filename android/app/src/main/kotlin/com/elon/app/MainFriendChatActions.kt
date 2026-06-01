@@ -57,6 +57,9 @@ internal class MainFriendChatActions(
         activeAdapter = adapter
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
+        if (messages.isNotEmpty()) {
+            binding.chatList.jumpToLatestMessageBeforeNextDraw()
+        }
         showFriendChat(friend.name, animate)
         loadMessages(friend, silent = false, scrollToBottom = true)
         startPolling()
@@ -253,13 +256,13 @@ internal class MainFriendChatActions(
                                 current.content != incoming.content ||
                                 current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
                                 current.attachments != incoming.attachments
-                        }
+                    }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)
-                    activeAdapter?.notifyDataSetChanged()
                     if (scrollToBottom && currentMessages.isNotEmpty()) {
-                        binding.chatList.scrollToPosition(currentMessages.lastIndex)
+                        binding.chatList.jumpToLatestMessageBeforeNextDraw()
                     }
+                    activeAdapter?.notifyDataSetChanged()
                     if (changed || !silent || allowPendingRefresh) {
                         onFriendSummariesChanged()
                     }

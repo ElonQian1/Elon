@@ -75,12 +75,14 @@ internal class MainInputComposerSetup(
         val inputEdit = binding.inputEdit
         val modelButton = binding.modelButton
         val sendButton = binding.sendButton
+        val bottomMenuHeight = activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_height)
 
         inputEdit.detachFromParent()
         modelButton.detachFromParent()
         sendButton.detachFromParent()
         root.removeAllViews()
         root.orientation = LinearLayout.VERTICAL
+        root.minimumHeight = bottomMenuHeight
         root.setPadding(0, 0, 0, 0)
         root.setBackgroundColor(Color.parseColor("#1E1E1E"))
 
@@ -97,9 +99,9 @@ internal class MainInputComposerSetup(
         val inputBarContainer = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(60)
+                bottomMenuHeight
             )
-            minimumHeight = dp(60)
+            minimumHeight = bottomMenuHeight
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(14), dp(6), dp(14), dp(6))
