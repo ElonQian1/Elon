@@ -717,7 +717,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/main_bottom_menu_height"
             android:layout_gravity="bottom"
-            android:background="@color/elon_surface_card"
+            android:background="@color/elon_nav_bg"
             android:orientation="horizontal">
 
             <FrameLayout

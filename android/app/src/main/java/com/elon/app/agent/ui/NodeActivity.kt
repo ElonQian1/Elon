@@ -502,7 +502,7 @@ class NodeActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle("✅ 节点已注册！")
-            .setMessage("Agent ID：${result.agentId}\n\n⚠️ Secret 只显示一次，请立即复制保存到 PC：\n\n${result.agentSecret}\n\n点击"复制启动命令"获取完整启动脚本。")
+            .setMessage("Agent ID：${result.agentId}\n\n⚠️ Secret 只显示一次，请立即复制保存到 PC：\n\n${result.agentSecret}\n\n点击“复制启动命令”获取完整启动脚本。")
             .setPositiveButton("复制 Linux 命令") { _, _ ->
                 copyToClipboard("Linux 启动命令", linuxCmd)
             }

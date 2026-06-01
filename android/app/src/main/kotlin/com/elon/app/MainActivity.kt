@@ -1,12 +1,15 @@
 package com.elon.app
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.View
 import android.widget.PopupWindow
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import java.util.Date
@@ -173,6 +176,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applySystemBarColors()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         createActions.onCreate(intent)
@@ -226,6 +230,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        applySystemBarColors()
         resumeActions.onResume()
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
@@ -238,6 +243,22 @@ class MainActivity : AppCompatActivity() {
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
         if (::agentPageController.isInitialized) agentPageController.refresh()
+    }
+
+    private fun applySystemBarColors() {
+        window.statusBarColor = ContextCompat.getColor(this, R.color.elon_bg_app)
+        window.navigationBarColor = ContextCompat.getColor(this, R.color.elon_nav_bg)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+        var flags = window.decorView.systemUiVisibility
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
+        }
+        window.decorView.systemUiVisibility = flags
     }
 
     private val resumeActions: MainResumeActions by lazy {
