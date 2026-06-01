@@ -120,6 +120,24 @@ internal class UserMemoriesCard(
         return http.newCall(req).execute().use { it.isSuccessful }
     }
 
+    private fun createMemory(content: String, category: String): Boolean {
+        val json = org.json.JSONObject().apply {
+            put("content", content.trim())
+            put("category", category)
+            put("importance", 6)
+        }.toString()
+        val body = json.toByteArray(Charsets.UTF_8).let {
+            okhttp3.RequestBody.create(
+                okhttp3.MediaType.parse("application/json; charset=utf-8"), it
+            )
+        }
+        val req = AuthManager.applyAuth(
+            activity,
+            Request.Builder().url("$serverUrl/api/memories").post(body)
+        ).build()
+        return http.newCall(req).execute().use { it.isSuccessful }
+    }
+
     // ─── UI 构建 ─────────────────────────────────────────────────────────────
 
     private fun buildCard(): LinearLayout {
@@ -166,6 +184,20 @@ internal class UserMemoriesCard(
                     }
                 }
                 addView(statusPill)
+
+                // + 按钮
+                addView(TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.marginStart = dp(8) }
+                    includeFontPadding = false
+                    text = "+"
+                    textSize = 20f
+                    setTextColor(Color.parseColor("#7ECFFF"))
+                    setPadding(dp(6), 0, dp(2), 0)
+                    setOnClickListener { showAddDialog() }
+                })
             })
 
             // 副标题说明
@@ -275,6 +307,64 @@ internal class UserMemoriesCard(
                     refresh()
                 } else {
                     Toast.makeText(activity, "删除失败，请重试", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // ─── 手动添加 ─────────────────────────────────────────────────────────────
+
+    private fun showAddDialog() {
+        val input = android.widget.EditText(activity).apply {
+            hint = "例如：我是 Rust 开发者，偏好完整代码"
+            maxLines = 3
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setTextColor(Color.parseColor("#E6EEF8"))
+            setHintTextColor(Color.parseColor("#4B5563"))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#141B22"))
+                cornerRadius = dp(6).toFloat()
+            }
+        }
+        // 分类选择 Spinner
+        val categories = arrayOf("fact - 事实", "preference - 偏好", "profile - 个人信息", "goal - 目标")
+        val categoryKeys = arrayOf("fact", "preference", "profile", "goal")
+        val spinner = android.widget.Spinner(activity).apply {
+            adapter = android.widget.ArrayAdapter(activity,
+                android.R.layout.simple_spinner_dropdown_item, categories)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.topMargin = dp(10) }
+        }
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(input)
+            addView(spinner)
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("主动告诉 AI")
+            .setView(container)
+            .setPositiveButton("保存") { _, _ ->
+                val text = input.text.toString().trim()
+                val category = categoryKeys[spinner.selectedItemPosition]
+                if (text.isNotEmpty()) doCreate(text, category)
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doCreate(content: String, category: String) {
+        thread(name = "create-memory") {
+            val ok = runCatching { createMemory(content, category) }.getOrDefault(false)
+            activity.runOnUiThread {
+                if (ok) {
+                    refresh()
+                } else {
+                    Toast.makeText(activity, "保存失败，请重试", Toast.LENGTH_SHORT).show()
                 }
             }
         }

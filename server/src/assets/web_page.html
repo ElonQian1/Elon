@@ -1034,7 +1034,10 @@
       <div class="my-nodes-card" id="memoriesCard">
         <div class="my-nodes-header">
           <span class="my-nodes-title">AI 记住的你</span>
-          <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
+            <button id="addMemoryBtn" title="主动告诉 AI" style="background:none;border:none;color:#7ECFFF;cursor:pointer;font-size:20px;line-height:1;padding:0 4px;">+</button>
+          </span>
         </div>
         <p style="font-size:11px;color:#4B5563;margin:4px 0 8px">AI 在对话中自动记录，让每次回答更贴合你</p>
         <div id="memoriesList"></div>
@@ -2351,6 +2354,40 @@
 
   function escHtml(s) {
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── 手动添加记忆 ──────────────────────────────────────────────────────────
+  const CATEGORY_LABELS = { fact: '事实', preference: '偏好', profile: '个人信息', goal: '目标' };
+
+  document.getElementById('addMemoryBtn')?.addEventListener('click', () => {
+    if (!isLoggedIn()) { alert('请先登录'); return; }
+    showAddMemoryDialog();
+  });
+
+  function showAddMemoryDialog() {
+    // 用简单 prompt 弹框（网页端轻量实现）
+    const content = prompt('主动告诉 AI（例如：我是 Rust 开发者，偏好完整代码）：');
+    if (!content || !content.trim()) return;
+    const catOpts = Object.entries(CATEGORY_LABELS).map(([k,v]) => `${k} - ${v}`).join('\n');
+    const catRaw = prompt(`选择类别（直接输入关键词）：\n${catOpts}`, 'fact');
+    const cat = ['fact','preference','profile','goal'].find((k) => (catRaw||'').toLowerCase().includes(k)) || 'fact';
+    doCreateMemory(content.trim(), cat);
+  }
+
+  async function doCreateMemory(content, category) {
+    try {
+      const res = await fetch('/api/memories', {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, category, importance: 6 }),
+      });
+      if (res.ok) {
+        await loadMemories();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert('保存失败：' + (d.error || res.status));
+      }
+    } catch { alert('网络错误，请重试'); }
   }
 
 

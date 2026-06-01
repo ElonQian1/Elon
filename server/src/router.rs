@@ -77,7 +77,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             axum::routing::patch(project_api::update_profile),
         )
         // ── 用户记忆 API ────────────────────────────────────────────────────────
-        .route("/api/memories", get(user_memory_api::list_memories))
+        .route("/api/memories", get(user_memory_api::list_memories).post(user_memory_api::create_memory))
         .route("/api/memories/:id", delete(user_memory_api::delete_memory))
         // ── 分布式节点 API ──────────────────────────────────────────────────────
         .route("/api/nodes", get(node_api::list_nodes))
