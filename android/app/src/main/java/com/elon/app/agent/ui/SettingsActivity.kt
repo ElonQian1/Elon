@@ -311,7 +311,7 @@ class SettingsActivity : Activity() {
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }
                 setOnClickListener {
-                    android.widget.Toast.makeText(context, "节点管理功能即将上线", android.widget.Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(context, NodeActivity::class.java))
                 }
             })
         }

@@ -45,7 +45,7 @@ async fn run_casual_chat(
     user_id: &str,
     user_message: &str,
     memories: &[crate::store::UserMemory],
-) -> Result<String> {
+) -> Result<(String, Option<String>, String)> {
     let system_content = if memories.is_empty() {
         casual_chat_prompt().to_string()
     } else {
@@ -71,6 +71,13 @@ async fn run_casual_chat(
         }),
     ];
 
+    // 优先尝试路由到在线 PC 节点（当模型名与节点上报模型匹配时）
+    if let Some((content, node_id, model_id)) =
+        crate::agent_llm_call::try_casual_chat_via_node(state, &agent.model, &messages, user_id).await
+    {
+        return Ok((content, Some(node_id), model_id));
+    }
+
     let response = call_chat_llm(state, agent, &messages, user_id, "chat").await?;
 
     let reply = response["choices"][0]["message"]["content"]
@@ -79,11 +86,7 @@ async fn run_casual_chat(
         .trim()
         .to_string();
 
-    Ok(if reply.is_empty() {
-        "我在，你可以继续说。".into()
-    } else {
-        reply
-    })
+    Ok((if reply.is_empty() { "我在，你可以继续说。".into() } else { reply }, None, agent.model.clone()))
 }
 
 pub(crate) async fn run_api_inner_with_workspace(
@@ -124,7 +127,7 @@ pub(crate) async fn run_api_inner_with_workspace(
         );
 
         let memories = state.store.get_user_memories(user_id, 20).unwrap_or_default();
-        let reply = run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
+        let (reply, chat_node_id, chat_model) = run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
         // 异步提取本轮记忆，不阻塞响应
         {
             let state2 = state.clone();
@@ -140,8 +143,8 @@ pub(crate) async fn run_api_inner_with_workspace(
                 message: reply,
                 apk_url: None,
                 image_url: None,
-                model_used: Some(agent.model.clone()),
-                node_id: None,
+                model_used: Some(chat_model),
+                node_id: chat_node_id,
             }
             .to_json(),
         );

@@ -5,7 +5,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tower_http::services::ServeFile;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::types::AppState;
 use crate::{
@@ -50,6 +50,9 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     // 应用自身 APK 更新文件目录（由发布脚本部署后填充）
     let app_dir = state.data_dir.join("app");
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
+    // 节点 agent 二进制下载目录（由 publish-node-agent.ps1 部署）
+    let downloads_dir = state.data_dir.join("downloads");
+    std::fs::create_dir_all(&downloads_dir).ok();
 
     Router::new()
         .route("/", get(web::web_page))
@@ -303,6 +306,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         // version.json 动态生成（注入在线 seeder 的 mirrors 字段）
         .route("/app/version.json", get(peer_relay::version_json))
         .route_service("/app/ElonSpeed-latest.apk", ServeFile::new(latest_apk))
+        // ── 节点 agent 二进制下载（elon-node-agent Linux/Windows）────────
+        .nest_service("/downloads", ServeDir::new(&downloads_dir))
         // ── P2P 同WiFi 中继 ──────────────────────────────────────────────
         // Seeder 设备连接 WS 注册自己为种子
         .route("/app/peer/ws", get(peer_relay::peer_ws_handler))

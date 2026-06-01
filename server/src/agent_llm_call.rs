@@ -227,3 +227,83 @@ pub(crate) fn execute_tool(
         _ => Err(anyhow::anyhow!("未知工具: {}", tool_name)),
     }
 }
+
+/// 尝试将对话路由到在线 PC 节点 LLM。
+///
+/// 当且仅当 `model` 名称与在线节点上报的 `model_id` 完全匹配时路由；
+/// 否则返回 `None`（调用方应降级到云端 LLM）。
+///
+/// 返回 `Some((content, node_id, model_id))` 或 `None`。
+pub(crate) async fn try_casual_chat_via_node(
+    state: &Arc<AppState>,
+    model: &str,
+    messages: &[Value],
+    user_id: &str,
+) -> Option<(String, String, String)> {
+    // 如果没有在线节点支持该模型，立即返回 None
+    let node_id = state.node_registry.find_node_for_model(model).await?;
+
+    let dispatch = crate::node_router::dispatch_to_node(
+        state,
+        model,
+        messages.to_vec(),
+        Some(1024),
+    ).await;
+
+    let (_req_id, actual_node_id, mut rx) = match dispatch {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!("节点路由失败，降级到云端 LLM: {e}");
+            return None;
+        }
+    };
+
+    let mut content = String::new();
+    let mut prompt_tokens: u32 = 0;
+    let mut completion_tokens: u32 = 0;
+
+    while let Some(msg) = rx.recv().await {
+        match msg {
+            homecli_proto::AgentToServer::LlmStreamChunk { delta, .. } => {
+                content.push_str(&delta);
+            }
+            homecli_proto::AgentToServer::LlmStreamEnd {
+                prompt_tokens: pt,
+                completion_tokens: ct,
+                ..
+            } => {
+                prompt_tokens = pt;
+                completion_tokens = ct;
+                break;
+            }
+            homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                tracing::warn!("节点推理错误，降级到云端 LLM: {message}");
+                return None;
+            }
+            _ => {}
+        }
+    }
+
+    if content.is_empty() {
+        return None;
+    }
+
+    // 后台结算积分
+    let price = state.node_registry.get_node_model_price(&actual_node_id, model).await.unwrap_or(1.0);
+    let owner = state.node_registry.get_node_owner(&actual_node_id).await.unwrap_or_default();
+    if !owner.is_empty() {
+        crate::node_router::settle_after_stream(
+            state,
+            user_id,
+            &owner,
+            &actual_node_id,
+            model,
+            prompt_tokens,
+            completion_tokens,
+            price,
+        );
+    }
+
+    let _ = node_id; // used above for find check
+    Some((content, actual_node_id, model.to_string()))
+}

@@ -141,6 +141,12 @@
             android:exported="false"
             android:label="Agent 设置" />
 
+        <!-- 节点管理 -->
+        <activity
+            android:name="com.elon.app.agent.ui.NodeActivity"
+            android:exported="false"
+            android:label="我的节点" />
+
         <!-- 悬浮球语音 V1 -->
         <activity
             android:name="com.elon.app.agent.infrastructure.floating.FloatingVoiceActivity"
