@@ -1031,6 +1031,15 @@
         <div id="myNodesList"></div>
       </div>
 
+      <div class="my-nodes-card" id="memoriesCard">
+        <div class="my-nodes-header">
+          <span class="my-nodes-title">AI 记住的你</span>
+          <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
+        </div>
+        <p style="font-size:11px;color:#4B5563;margin:4px 0 8px">AI 在对话中自动记录，让每次回答更贴合你</p>
+        <div id="memoriesList"></div>
+      </div>
+
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
@@ -1410,6 +1419,7 @@
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
       loadNodeBalance().catch((e) => console.warn('loadNodeBalance failed:', e));
       loadMyNodes().catch((e) => console.warn('loadMyNodes failed:', e));
+      loadMemories().catch((e) => console.warn('loadMemories failed:', e));
     }
   }
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
@@ -2282,6 +2292,68 @@
   aiSettingsRow.addEventListener('click', openAgentDialog);
   modelBtn.addEventListener('click', openAgentDialog);
   if (nodeMarketRow) nodeMarketRow.addEventListener('click', openNodeMarketDialog);
+
+  // ====== AI 记忆列表 ======
+  const CATEGORY_COLORS = { preference: '#7ECFFF', profile: '#4ADE80', goal: '#FCD34D', fact: '#6B7280' };
+  async function loadMemories() {
+    const card = document.getElementById('memoriesCard');
+    const statusEl = document.getElementById('memoriesStatus');
+    const listEl = document.getElementById('memoriesList');
+    if (!card || !listEl) return;
+    card.style.display = '';
+    if (!isLoggedIn()) {
+      if (statusEl) statusEl.textContent = '未登录';
+      listEl.innerHTML = '';
+      return;
+    }
+    if (statusEl) statusEl.textContent = '加载中…';
+    try {
+      const res = await fetch('/api/memories?limit=30', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const memories = data.memories || [];
+      listEl.innerHTML = '';
+      if (memories.length === 0) {
+        listEl.innerHTML = '<div class="my-nodes-empty">还没有记忆<br>多和 AI 对话，它会逐渐记住你的偏好</div>';
+        if (statusEl) statusEl.textContent = '空';
+        return;
+      }
+      if (statusEl) statusEl.textContent = `${memories.length} 条`;
+      memories.forEach((m) => {
+        const color = CATEGORY_COLORS[m.category] || CATEGORY_COLORS.fact;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;background:#141B22;border-radius:6px;';
+        row.innerHTML = `
+          <div style="width:3px;min-height:30px;align-self:stretch;background:${color};border-radius:2px;flex-shrink:0;"></div>
+          <span style="flex:1;font-size:13px;color:#C8D8EE;line-height:1.5;">${escHtml(m.content)}</span>
+          <button data-id="${escHtml(m.id)}" data-content="${escHtml(m.content)}" style="background:none;border:none;color:#4B5563;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" title="删除">✕</button>
+        `;
+        row.querySelector('button').addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          const id = btn.dataset.id;
+          const content = btn.dataset.content;
+          if (!confirm(`删除这条记忆？\n「${content}」`)) return;
+          try {
+            const r = await fetch(`/api/memories/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+            if (r.ok || r.status === 204) {
+              await loadMemories();
+            } else {
+              alert('删除失败，请重试');
+            }
+          } catch { alert('网络错误'); }
+        });
+        listEl.appendChild(row);
+      });
+    } catch {
+      if (statusEl) statusEl.textContent = '暂不可用';
+    }
+  }
+
+  function escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+
   cancelAgentBtn.addEventListener('click', () => agentMask.classList.remove('active'));
   agentMask.addEventListener('click', (e) => { if (e.target === agentMask) agentMask.classList.remove('active'); });
 

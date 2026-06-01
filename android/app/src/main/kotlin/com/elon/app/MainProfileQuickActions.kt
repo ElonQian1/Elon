@@ -34,6 +34,7 @@ internal class MainProfileQuickActions(
         )
     }
     private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
+    private val userMemoriesCard by lazy { UserMemoriesCard(activity, binding, http, serverUrl) }
 
     fun setupQuickActions() {
         MainQuickActionBindings(
@@ -63,6 +64,7 @@ internal class MainProfileQuickActions(
             tokenUsageCard.attachAndRefresh()
             nodeBalanceCard.attachAndRefresh()
             myNodesCard.attachAndRefresh()
+            userMemoriesCard.attachAndRefresh()
         }
     }
 
