@@ -131,6 +131,10 @@ internal class MainEmojiActions(
         collapseAttachmentPanel()
         val panel = emojiPanel() ?: return
         panelAnimator?.cancel()
+        if (isKeyboardVisible()) {
+            showEmojiPanelReplacingKeyboard(panel)
+            return
+        }
         isOpen = true
         keyboardVisibleOverEmojiPanel = false
         keyboardOverlayRequestedAt = 0L
@@ -140,6 +144,19 @@ internal class MainEmojiActions(
         panel.translationY = dp(10).toFloat()
         hideKeyboard()
         animateEmojiPanel(panel, expand = true)
+        updateEmojiButton(EmojiButtonState.PANEL)
+    }
+
+    private fun showEmojiPanelReplacingKeyboard(panel: LinearLayout) {
+        isOpen = true
+        keyboardVisibleOverEmojiPanel = false
+        keyboardOverlayRequestedAt = 0L
+        panel.visibility = View.VISIBLE
+        setPanelHeight(panel, targetEmojiPanelHeight())
+        panel.alpha = 1f
+        panel.translationY = 0f
+        setKeyboardOverlayMode(true)
+        hideKeyboard()
         updateEmojiButton(EmojiButtonState.PANEL)
     }
 

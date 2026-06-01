@@ -191,6 +191,7 @@ internal class MainInputFocusActions(
             keyboardDismissCheckPending = false
             if (!keyboardVisibleSinceFocus) return@postDelayed
             if (isKeyboardVisible() || isImeVisible()) return@postDelayed
+            if (isEmojiPanelOpen()) return@postDelayed
             if (!binding.inputEdit.hasFocus()) return@postDelayed
             if (inputComposerMotion()?.isExpanded != true) return@postDelayed
             keyboardVisibleSinceFocus = false
