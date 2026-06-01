@@ -5,6 +5,6 @@
     android:viewportWidth="30"
     android:viewportHeight="30">
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="@color/elon_text_primary"
         android:pathData="M9,6h10l4,4v14h-14zM19,6v5h4M6,10h2v14h10v2h-12z" />
 </vector>

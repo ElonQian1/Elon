@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#101010"
+    android:background="@color/elon_bg_app"
     android:fillViewport="true">
 
     <LinearLayout
@@ -17,7 +17,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="6dp"
             android:text="Agent 自动化"
-            android:textColor="#E8E8E8"
+            android:textColor="@color/elon_text_primary"
             android:textSize="22sp"
             android:textStyle="bold" />
 
@@ -26,7 +26,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
             android:text="开启后可在任意 App 唤起悬浮球，让 AI 自动操作手机完成任务。"
-            android:textColor="#888888"
+            android:textColor="@color/elon_text_tertiary"
             android:textSize="14sp" />
 
         <!-- 步骤 1：悬浮窗权限 -->
@@ -34,7 +34,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:orientation="vertical"
             android:padding="16dp">
 
@@ -49,7 +49,7 @@
                     android:layout_height="24dp"
                     android:gravity="center"
                     android:text="○"
-                    android:textColor="#888888"
+                    android:textColor="@color/elon_text_tertiary"
                     android:textSize="16sp" />
 
                 <LinearLayout
@@ -63,7 +63,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="步骤 1：悬浮窗权限"
-                        android:textColor="#E0E0E0"
+                        android:textColor="@color/elon_text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -73,7 +73,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="未授权"
-                        android:textColor="#888888"
+                        android:textColor="@color/elon_text_tertiary"
                         android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -83,10 +83,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="42dp"
                 android:layout_marginTop="12dp"
-                android:background="#252525"
+                android:background="@color/elon_button_secondary_bg"
                 android:gravity="center"
                 android:text="前往授权悬浮窗"
-                android:textColor="#4DA6FF"
+                android:textColor="@color/elon_link_primary"
                 android:textSize="14sp"
                 android:visibility="visible" />
         </LinearLayout>
@@ -96,7 +96,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:orientation="vertical"
             android:padding="16dp">
 
@@ -111,7 +111,7 @@
                     android:layout_height="24dp"
                     android:gravity="center"
                     android:text="○"
-                    android:textColor="#888888"
+                    android:textColor="@color/elon_text_tertiary"
                     android:textSize="16sp" />
 
                 <LinearLayout
@@ -125,7 +125,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="步骤 2：无障碍服务"
-                        android:textColor="#E0E0E0"
+                        android:textColor="@color/elon_text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -135,7 +135,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="未开启"
-                        android:textColor="#888888"
+                        android:textColor="@color/elon_text_tertiary"
                         android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -145,7 +145,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="开启路径：设置 → 无障碍 → 已下载的应用 → Elon Speed → 开启"
-                android:textColor="#666666"
+                android:textColor="@color/elon_text_tertiary"
                 android:textSize="12sp" />
 
             <TextView
@@ -153,10 +153,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="42dp"
                 android:layout_marginTop="12dp"
-                android:background="#252525"
+                android:background="@color/elon_button_secondary_bg"
                 android:gravity="center"
                 android:text="前往无障碍设置"
-                android:textColor="#4DA6FF"
+                android:textColor="@color/elon_link_primary"
                 android:textSize="14sp"
                 android:visibility="visible" />
         </LinearLayout>
@@ -166,7 +166,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:orientation="vertical"
             android:padding="16dp">
 
@@ -181,7 +181,7 @@
                     android:layout_height="24dp"
                     android:gravity="center"
                     android:text="○"
-                    android:textColor="#888888"
+                    android:textColor="@color/elon_text_tertiary"
                     android:textSize="16sp" />
 
                 <LinearLayout
@@ -195,7 +195,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="步骤 3：悬浮球"
-                        android:textColor="#E0E0E0"
+                        android:textColor="@color/elon_text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -205,7 +205,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="未启动"
-                        android:textColor="#888888"
+                        android:textColor="@color/elon_text_tertiary"
                         android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -215,10 +215,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_marginTop="12dp"
-                android:background="#1E3A5C"
+                android:background="@color/elon_badge_info_bg"
                 android:gravity="center"
                 android:text="启动悬浮球"
-                android:textColor="#4DA6FF"
+                android:textColor="@color/elon_link_primary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -228,7 +228,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="悬浮球悬停在屏幕上，单击语音输入任务，双击文字输入。返回本页可随时关闭。"
-            android:textColor="#555555"
+            android:textColor="@color/elon_text_tertiary"
             android:textSize="12sp" />
 
     </LinearLayout>

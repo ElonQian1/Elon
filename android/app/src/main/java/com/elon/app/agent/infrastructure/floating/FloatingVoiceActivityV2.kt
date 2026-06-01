@@ -1,4 +1,4 @@
-﻿// infrastructure/floating/FloatingVoiceActivityV2.kt
+// infrastructure/floating/FloatingVoiceActivityV2.kt
 // module: infrastructure/floating | layer: infrastructure | role: voice-input-activity-v2
 // summary: 语音输入透明Activity V2 - 使用 ConversationalVoiceAdapter 实现智能对话
 
@@ -411,7 +411,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         statusText = TextView(this).apply {
             text = "正在准备..."
             textSize = 16f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             gravity = Gravity.CENTER
         }
         card.addView(statusText, LinearLayout.LayoutParams(
@@ -426,7 +426,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         resultText = TextView(this).apply {
             text = ""
             textSize = 18f
-            setTextColor(Color.parseColor("#4FC3F7"))
+            setTextColor(Color.parseColor("#6091CF"))
             gravity = Gravity.CENTER
             maxLines = 5
             minHeight = (60 * density).toInt()
@@ -443,7 +443,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         responseText = TextView(this).apply {
             text = ""
             textSize = 14f
-            setTextColor(Color.parseColor("#81C784"))
+            setTextColor(Color.parseColor("#58BE6A"))
             gravity = Gravity.CENTER
             maxLines = 3
             visibility = android.view.View.GONE
@@ -460,9 +460,9 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         cancelButton = Button(this).apply {
             text = "❌ 取消"
             textSize = 14f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#666666"))
+                setColor(Color.parseColor("#283140"))
                 cornerRadius = 20 * density
             }
             background = bg
@@ -481,7 +481,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         val tipText = TextView(this).apply {
             text = "说完会自动执行，点击空白处取消"
             textSize = 11f
-            setTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#6F7785"))
             gravity = Gravity.CENTER
         }
         card.addView(tipText, LinearLayout.LayoutParams(
@@ -515,7 +515,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             )
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#2D2D2D"))
+                setColor(Color.parseColor("#181B20"))
                 cornerRadius = 24 * density
             }
             background = bg

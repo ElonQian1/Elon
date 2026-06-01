@@ -41,7 +41,7 @@ internal object UserProfileViews {
         if (bitmap != null) {
             return ImageView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(size, size)
-                background = roundedRect(Color.parseColor("#2A2A2A"), context.dp(10))
+                background = roundedRect(Color.parseColor("#283140"), context.dp(10))
                 clipToOutline = true
                 contentDescription = "头像"
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -50,11 +50,11 @@ internal object UserProfileViews {
         }
         return TextView(context).apply {
             layoutParams = ViewGroup.LayoutParams(size, size)
-            background = roundedRect(Color.parseColor("#333333"), context.dp(10))
+            background = roundedRect(Color.parseColor("#283140"), context.dp(10))
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(profile.displayName)
-            setTextColor(Color.parseColor("#F2F2F2"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -85,7 +85,7 @@ internal object UserProfileViews {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#D0D0D0"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 textSize = 17f
             })
             if (trailing != null) {
@@ -94,7 +94,7 @@ internal object UserProfileViews {
                 addView(TextView(context).apply {
                     includeFontPadding = false
                     text = value.orEmpty()
-                    setTextColor(Color.parseColor("#8E8E8E"))
+                    setTextColor(Color.parseColor("#6F7785"))
                     textSize = 16f
                 })
             }
@@ -110,7 +110,7 @@ internal object UserProfileViews {
             ).apply {
                 marginStart = context.dp(22)
             }
-            setBackgroundColor(Color.parseColor("#242424"))
+            setBackgroundColor(Color.parseColor("#181B20"))
         }
     }
 
@@ -133,7 +133,7 @@ internal object UserProfileViews {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(context.dp(22), context.dp(18), context.dp(18), context.dp(18))
-            setBackgroundColor(Color.parseColor("#151515"))
+            setBackgroundColor(Color.parseColor("#0F1217"))
             isClickable = true
             foreground = selectableForeground(context)
             setOnClickListener { onClick() }
@@ -147,7 +147,7 @@ internal object UserProfileViews {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "▦"
-                setTextColor(Color.parseColor("#8FA0B8"))
+                setTextColor(Color.parseColor("#A6AFBD"))
                 textSize = 24f
             })
             addView(arrow(context))
@@ -165,7 +165,7 @@ internal object UserProfileViews {
                 includeFontPadding = false
                 maxLines = 1
                 text = profile.displayName
-                setTextColor(Color.parseColor("#E2E2E2"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 textSize = 24f
                 setTypeface(typeface, Typeface.BOLD)
             })
@@ -173,7 +173,7 @@ internal object UserProfileViews {
                 includeFontPadding = false
                 maxLines = 1
                 text = "账号：${profile.wechatId}"
-                setTextColor(Color.parseColor("#8E8E8E"))
+                setTextColor(Color.parseColor("#6F7785"))
                 textSize = 15f
                 setPadding(0, context.dp(12), 0, 0)
             })
@@ -181,7 +181,7 @@ internal object UserProfileViews {
                 includeFontPadding = false
                 maxLines = 1
                 text = profile.signature
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#A6AFBD"))
                 textSize = 13f
                 setPadding(0, context.dp(14), 0, 0)
             })
@@ -194,7 +194,7 @@ internal object UserProfileViews {
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "›"
-            setTextColor(Color.parseColor("#555555"))
+            setTextColor(Color.parseColor("#6F7785"))
             textSize = 32f
         }
     }

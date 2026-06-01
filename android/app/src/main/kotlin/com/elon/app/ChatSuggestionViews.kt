@@ -38,9 +38,9 @@ internal fun bindChatSuggestionStatus(
         setTextColor(
             Color.parseColor(
                 when {
-                    updated -> "#3BA55D"
-                    actionable -> "#FFFFFF"
-                    else -> "#9A9A9A"
+                    updated -> "#58BE6A"
+                    actionable -> "#F2F5FA"
+                    else -> "#A6AFBD"
                 }
             )
         )
@@ -48,7 +48,7 @@ internal fun bindChatSuggestionStatus(
         setPadding(context.dp(10), context.dp(5), context.dp(10), context.dp(5))
         background = GradientDrawable().apply {
             cornerRadius = context.dp(12).toFloat()
-            setColor(Color.parseColor(if (actionable) "#3BA55D" else "#262626"))
+            setColor(Color.parseColor(if (actionable) "#58BE6A" else "#262626"))
         }
         isClickable = actionable
         isFocusable = actionable

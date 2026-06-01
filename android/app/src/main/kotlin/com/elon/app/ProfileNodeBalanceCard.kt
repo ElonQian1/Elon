@@ -120,7 +120,7 @@ internal class ProfileNodeBalanceCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(18), dp(22), dp(18))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#171B20"))
+                setColor(Color.parseColor("#181B20"))
                 cornerRadius = dp(8).toFloat()
             }
             isClickable = false
@@ -138,7 +138,7 @@ internal class ProfileNodeBalanceCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "节点积分"
-                    setTextColor(Color.parseColor("#E6EEF8"))
+                    setTextColor(Color.parseColor("#F2F5FA"))
                     textSize = 16f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -149,9 +149,9 @@ internal class ProfileNodeBalanceCard(
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     text = "加载中…"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#7ECFFF"))
+                    setTextColor(Color.parseColor("#81B3D9"))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#0C2D40"))
+                        setColor(Color.parseColor("#152C3E"))
                         cornerRadius = dp(8).toFloat()
                     }
                 }
@@ -186,7 +186,7 @@ internal class ProfileNodeBalanceCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "进入节点算力市场  →"
-                    setTextColor(Color.parseColor("#4DA8FF"))
+                    setTextColor(Color.parseColor("#6091CF"))
                     textSize = 13f
                     isClickable = true
                     isFocusable = true
@@ -196,11 +196,11 @@ internal class ProfileNodeBalanceCard(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = "积分明细"
-                    setTextColor(Color.parseColor("#7ECFFF"))
+                    setTextColor(Color.parseColor("#81B3D9"))
                     textSize = 12f
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#0C2D40"))
+                        setColor(Color.parseColor("#152C3E"))
                         cornerRadius = dp(8).toFloat()
                     }
                     isClickable = true
@@ -217,7 +217,7 @@ internal class ProfileNodeBalanceCard(
         val valueView = TextView(activity).apply {
             includeFontPadding = false
             text = initValue
-            setTextColor(Color.parseColor("#EAEAEA"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             textSize = 26f
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -228,7 +228,7 @@ internal class ProfileNodeBalanceCard(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = label
-                setTextColor(Color.parseColor("#7A8A9A"))
+                setTextColor(Color.parseColor("#6F7785"))
                 textSize = 11f
             })
             addView(valueView)

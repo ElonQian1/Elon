@@ -1,4 +1,4 @@
-﻿// infrastructure/floating/FloatingBallView.kt
+// infrastructure/floating/FloatingBallView.kt
 // module: infrastructure/floating | layer: infrastructure | role: floating-ball-view
 // summary: 悬浮球视图 - 可拖拽、支持单击/双击检测、状态动画、玻璃拟态设计
 
@@ -58,14 +58,14 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
         private const val LONG_PRESS_TIMEOUT = 500L    // 长按超时
         
         // 颜色主题
-        private val COLOR_IDLE_START = Color.parseColor("#667eea")      // 紫蓝渐变起点
-        private val COLOR_IDLE_END = Color.parseColor("#764ba2")        // 紫蓝渐变终点
-        private val COLOR_LISTENING_START = Color.parseColor("#11998e") // 青绿渐变
-        private val COLOR_LISTENING_END = Color.parseColor("#38ef7d")
-        private val COLOR_EXECUTING_START = Color.parseColor("#4facfe") // 天蓝渐变
-        private val COLOR_EXECUTING_END = Color.parseColor("#00f2fe")
-        private val COLOR_ERROR_START = Color.parseColor("#ff416c")     // 红粉渐变
-        private val COLOR_ERROR_END = Color.parseColor("#ff4b2b")
+        private val COLOR_IDLE_START = Color.parseColor("#6091CF")      // 紫蓝渐变起点
+        private val COLOR_IDLE_END = Color.parseColor("#152C3E")        // 紫蓝渐变终点
+        private val COLOR_LISTENING_START = Color.parseColor("#58BE6A") // 青绿渐变
+        private val COLOR_LISTENING_END = Color.parseColor("#81B3D9")
+        private val COLOR_EXECUTING_START = Color.parseColor("#6091CF") // 天蓝渐变
+        private val COLOR_EXECUTING_END = Color.parseColor("#81B3D9")
+        private val COLOR_ERROR_START = Color.parseColor("#D97A7A")     // 红粉渐变
+        private val COLOR_ERROR_END = Color.parseColor("#D97A7A")
     }
     
     // 回调
@@ -112,8 +112,8 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
                 setColor(Color.TRANSPARENT)
                 // 使用渐变模拟发光效果
                 colors = intArrayOf(
-                    Color.parseColor("#40667eea"),  // 半透明紫色
-                    Color.parseColor("#00667eea")   // 完全透明
+                    Color.parseColor("#406091CF"),  // 半透明紫色
+                    Color.parseColor("#006091CF")   // 完全透明
                 )
                 gradientType = GradientDrawable.RADIAL_GRADIENT
                 gradientRadius = outerGlowSizePx / 2f
@@ -130,8 +130,8 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 colors = intArrayOf(
-                    Color.parseColor("#50667eea"),
-                    Color.parseColor("#20764ba2")
+                    Color.parseColor("#506091CF"),
+                    Color.parseColor("#20152C3E")
                 )
                 gradientType = GradientDrawable.RADIAL_GRADIENT
                 gradientRadius = ballSizePx * 0.6f
@@ -185,7 +185,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
             text = "✨"  // 默认空闲状态图标
             textSize = 22f
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             // 添加文字阴影增强立体感
             setShadowLayer(4f, 0f, 2f, Color.parseColor("#40000000"))
         }
@@ -292,14 +292,14 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
             when (state) {
                 FloatingBallState.IDLE -> {
                     setGradientColors(COLOR_IDLE_START, COLOR_IDLE_END)
-                    setGlowColor("#667eea")
+                    setGlowColor("#6091CF")
                     iconView.text = "✨"
                     startBreatheAnimation()
                 }
                 
                 FloatingBallState.LISTENING -> {
                     setGradientColors(COLOR_LISTENING_START, COLOR_LISTENING_END)
-                    setGlowColor("#11998e")
+                    setGlowColor("#58BE6A")
                     iconView.text = "🎙️"
                     startPulseAnimation()
                     startGlowAnimation()
@@ -307,7 +307,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
                 
                 FloatingBallState.EXECUTING -> {
                     setGradientColors(COLOR_EXECUTING_START, COLOR_EXECUTING_END)
-                    setGlowColor("#4facfe")
+                    setGlowColor("#6091CF")
                     iconView.text = "⚡"
                     startRotationAnimation()
                     startGlowAnimation()
@@ -315,7 +315,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
                 
                 FloatingBallState.ERROR -> {
                     setGradientColors(COLOR_ERROR_START, COLOR_ERROR_END)
-                    setGlowColor("#ff416c")
+                    setGlowColor("#D97A7A")
                     iconView.text = "⚠️"
                     startShakeAnimation()
                 }

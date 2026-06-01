@@ -303,7 +303,7 @@ internal class VoiceRecordingOverlay(
 
 private class VoiceWaveBubbleView(context: Context) : View(context) {
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#3FBE7A")
+        color = Color.parseColor("#58BE6A")
         style = Paint.Style.FILL
     }
     private val cancelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -465,7 +465,7 @@ private class VoiceActionTrayView(
         style = Paint.Style.FILL
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#EDEDED")
+        color = Color.parseColor("#F2F5FA")
         textAlign = Paint.Align.CENTER
         textSize = sp(15f)
     }
@@ -569,7 +569,7 @@ private class VoiceActionTrayView(
     }
 
     private fun drawOption(canvas: Canvas, label: String, x: Float, centerY: Float, selected: Boolean) {
-        textPaint.color = Color.parseColor(if (selected) "#FFFFFF" else "#E4E4E4")
+        textPaint.color = Color.parseColor(if (selected) "#F2F5FA" else "#F2F5FA")
         textPaint.isFakeBoldText = selected
         val fontMetrics = textPaint.fontMetrics
         val baseline = centerY - (fontMetrics.ascent + fontMetrics.descent) / 2f

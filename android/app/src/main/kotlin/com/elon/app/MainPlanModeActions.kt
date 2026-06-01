@@ -57,11 +57,11 @@ internal class MainPlanModeActions(
         } else {
             "开启先规划"
         }
-        view.setTextColor(Color.parseColor(if (enabled) "#101010" else "#D7D7D7"))
+        view.setTextColor(Color.parseColor(if (enabled) "#101010" else "#F2F5FA"))
         view.background = GradientDrawable().apply {
             cornerRadius = dp(16).toFloat()
-            setColor(Color.parseColor(if (enabled) "#BDEFD3" else "#2A2A2A"))
-            setStroke(dp(1), Color.parseColor(if (enabled) "#D9FFE8" else "#3A3A3A"))
+            setColor(Color.parseColor(if (enabled) "#BDEFD3" else "#283140"))
+            setStroke(dp(1), Color.parseColor(if (enabled) "#D9FFE8" else "#1E2126"))
         }
     }
 }

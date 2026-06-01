@@ -23,6 +23,7 @@
 | 完整开发流程或任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | `.github/instructions/git-deploy-workflow.instructions.md` 的 APK 部署章节 |
 | Gradle 下载或 Android 首次编译环境异常 | `docs/android-setup.md` |
+| APP UI、主题、颜色、按钮、卡片、底部导航、状态胶囊 | `docs/APP 颜色规范.md`；涉及 APK 与网页同步时再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | Copilot 配置或 VS Code Customizations | `.github/prompts/`、`.github/agents/`、`.github/skills/` |
 | 查询聊天记录、会话时间线、APK下载地址溯源、诊断"为什么这么慢" | `docs/query-chat-records.md` |
 

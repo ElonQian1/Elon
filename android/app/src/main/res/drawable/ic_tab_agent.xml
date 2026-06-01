@@ -9,7 +9,7 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M7,9 L7,17 Q7,18 8,18 L16,18 Q17,18 17,17 L17,9 Q17,8 16,8 L8,8 Q7,8 7,9 Z"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:strokeWidth="1.5" />
@@ -17,38 +17,38 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M12,8 L12,5"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeWidth="1.5" />
     <path
-        android:fillColor="#B8B8B8"
+        android:fillColor="@color/elon_text_secondary"
         android:pathData="M12,4.5 m-1,0 a1,1 0,1 0,2 0 a1,1 0,1 0,-2 0" />
     <!-- 左眼 -->
     <path
-        android:fillColor="#B8B8B8"
+        android:fillColor="@color/elon_text_secondary"
         android:pathData="M10,12 m-1,0 a1,1 0,1 0,2 0 a1,1 0,1 0,-2 0" />
     <!-- 右眼 -->
     <path
-        android:fillColor="#B8B8B8"
+        android:fillColor="@color/elon_text_secondary"
         android:pathData="M14,12 m-1,0 a1,1 0,1 0,2 0 a1,1 0,1 0,-2 0" />
     <!-- 嘴巴 -->
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M10,15 Q12,16.5 14,15"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeWidth="1.2" />
     <!-- 两侧耳朵/连接点 -->
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M7,13 L5,13"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeWidth="1.5" />
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M17,13 L19,13"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeWidth="1.5" />
 </vector>

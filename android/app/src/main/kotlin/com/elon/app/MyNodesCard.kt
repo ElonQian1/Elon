@@ -73,9 +73,9 @@ internal class MyNodesCard(
                         } else {
                             val online = nodes.count { it.online }
                             statusPill.text = if (online > 0) "在线 $online/${nodes.size}" else "全部离线"
-                            statusPill.setTextColor(Color.parseColor(if (online > 0) "#4ADE80" else "#9CA3AF"))
+                            statusPill.setTextColor(Color.parseColor(if (online > 0) "#58BE6A" else "#6F7785"))
                             val pillBg = statusPill.background as? GradientDrawable
-                            pillBg?.setColor(Color.parseColor(if (online > 0) "#0D2A1A" else "#1A1A1A"))
+                            pillBg?.setColor(Color.parseColor(if (online > 0) "#152C3E" else "#181B20"))
                             statusPill.visibility = View.VISIBLE
                             nodes.forEach { node ->
                                 nodeListContainer.addView(buildNodeRow(node))
@@ -132,7 +132,7 @@ internal class MyNodesCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(16), dp(22), dp(16))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0E1318"))
+                setColor(Color.parseColor("#0F1217"))
                 cornerRadius = dp(8).toFloat()
             }
 
@@ -149,7 +149,7 @@ internal class MyNodesCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "我的节点"
-                    setTextColor(Color.parseColor("#E6EEF8"))
+                    setTextColor(Color.parseColor("#F2F5FA"))
                     textSize = 15f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -160,9 +160,9 @@ internal class MyNodesCard(
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     text = "加载中…"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#7ECFFF"))
+                    setTextColor(Color.parseColor("#81B3D9"))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#0C2D40"))
+                        setColor(Color.parseColor("#152C3E"))
                         cornerRadius = dp(8).toFloat()
                     }
                 }
@@ -190,7 +190,7 @@ internal class MyNodesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#141B22"))
+            setColor(Color.parseColor("#181B20"))
             cornerRadius = dp(6).toFloat()
         }
 
@@ -201,7 +201,7 @@ internal class MyNodesCard(
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(if (node.online) "#4ADE80" else "#4B5563"))
+                setColor(Color.parseColor(if (node.online) "#58BE6A" else "#6F7785"))
             }
         })
 
@@ -215,7 +215,7 @@ internal class MyNodesCard(
                 text = formatNodeId(node.nodeId)
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(if (node.online) "#D1E4FF" else "#6B7280"))
+                setTextColor(Color.parseColor(if (node.online) "#F2F5FA" else "#6F7785"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -230,7 +230,7 @@ internal class MyNodesCard(
                     text = node.models.take(3).joinToString("  ·  ") +
                             if (node.models.size > 3) "  +${node.models.size - 3}" else ""
                     textSize = 11f
-                    setTextColor(Color.parseColor("#4B5563"))
+                    setTextColor(Color.parseColor("#6F7785"))
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 })
@@ -242,7 +242,7 @@ internal class MyNodesCard(
             includeFontPadding = false
             text = "${node.models.size} 模型"
             textSize = 11f
-            setTextColor(Color.parseColor(if (node.online) "#7ECFFF" else "#4B5563"))
+            setTextColor(Color.parseColor(if (node.online) "#81B3D9" else "#6F7785"))
             gravity = Gravity.CENTER
         })
     }
@@ -255,7 +255,7 @@ internal class MyNodesCard(
         includeFontPadding = false
         text = "暂无注册节点\n运行 elon-node-agent 即可在此显示"
         textSize = 12f
-        setTextColor(Color.parseColor("#4B5563"))
+        setTextColor(Color.parseColor("#6F7785"))
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, dp(8))
     }

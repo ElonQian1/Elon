@@ -93,8 +93,8 @@ internal class MainAttachmentPanelActions(
             }
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#242424"))
-                setStroke(dp(1), Color.parseColor("#444444"))
+                setColor(Color.parseColor("#181B20"))
+                setStroke(dp(1), Color.parseColor("#1E2126"))
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL
@@ -114,7 +114,7 @@ internal class MainAttachmentPanelActions(
                 }
                 includeFontPadding = false
                 text = label
-                setTextColor(Color.WHITE)
+                setTextColor(Color.parseColor("#F2F5FA"))
                 textSize = 14f
             })
             setOnClickListener {

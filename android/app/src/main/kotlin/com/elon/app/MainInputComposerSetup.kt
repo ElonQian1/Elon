@@ -86,7 +86,7 @@ internal class MainInputComposerSetup(
         root.orientation = LinearLayout.VERTICAL
         root.minimumHeight = bottomMenuHeight
         root.setPadding(0, 0, 0, 0)
-        root.setBackgroundColor(Color.parseColor("#1E1E1E"))
+        root.setBackgroundColor(Color.parseColor("#181B20"))
 
         val expandedInputContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -201,7 +201,7 @@ internal class MainInputComposerSetup(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "按住 说话"
-            setTextColor(Color.parseColor("#D0D0D0"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             textSize = 15f
             visibility = View.GONE
             setOnTouchListener { _, event ->

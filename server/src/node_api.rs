@@ -8,10 +8,14 @@
 //! - `GET  /api/me/node-transactions`  查询最近积分流水（最多 50 条）
 
 use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::{project_auth::auth_from_headers, types::AppState};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 // ── /api/nodes ────────────────────────────────────────────────────────────────
 
@@ -35,12 +39,81 @@ struct AvailableModelsResp {
     models: Vec<homecli_proto::ModelCapability>,
 }
 
+#[derive(Deserialize)]
+pub struct RegisterNodeRequest {
+    pub node_id: Option<String>,
+    pub models: Vec<homecli_proto::ModelCapability>,
+}
+
+#[derive(Serialize)]
+pub struct RegisterNodeResponse {
+    pub node_id: String,
+    pub owner_user_id: String,
+    pub models: Vec<homecli_proto::ModelCapability>,
+    pub connected_at: u64,
+    pub online: bool,
+}
+
 /// GET /api/nodes/models — 当前可用的 LLM 模型列表（无需登录）
 pub async fn list_available_models(
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     let models = state.node_registry.available_models().await;
     Json(AvailableModelsResp { models }).into_response()
+}
+
+/// POST /api/me/nodes/register - register or refresh a user-owned compute node.
+pub async fn register_node(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<RegisterNodeRequest>,
+) -> impl IntoResponse {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
+    };
+
+    if req.models.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": "models must not be empty"})),
+        )
+            .into_response();
+    }
+
+    let node_id = req
+        .node_id
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| format!("node_{}", Uuid::new_v4().simple()));
+    let connected_at = current_unix_secs();
+    let models = req.models;
+    state
+        .node_registry
+        .register(node_id.clone(), user.id.clone(), models.clone(), connected_at)
+        .await;
+
+    Json(RegisterNodeResponse {
+        node_id,
+        owner_user_id: user.id,
+        models,
+        connected_at,
+        online: true,
+    })
+    .into_response()
+}
+
+fn current_unix_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }
 
 // ── /api/me/node-balance ──────────────────────────────────────────────────────

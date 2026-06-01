@@ -156,8 +156,8 @@ internal class MainMarketplaceActions(
     private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
         joinBtn.text = "进入项目"
         joinBtn.isEnabled = true
-        joinBtn.setTextColor(Color.parseColor("#FFFFFF"))
-        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#3BA55D"))
+        joinBtn.setTextColor(Color.parseColor("#07120A"))
+        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#58BE6A"))
         joinBtn.setOnClickListener { openJoinedProject(project) }
     }
 
@@ -169,7 +169,7 @@ internal class MainMarketplaceActions(
         container.addView(TextView(activity).apply {
             text = "加载中..."
             textSize = 14f
-            setTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#6F7785"))
             gravity = Gravity.CENTER
             setPadding(0, dp(60), 0, dp(60))
             layoutParams = LinearLayout.LayoutParams(
@@ -203,7 +203,7 @@ internal class MainMarketplaceActions(
             container.addView(TextView(activity).apply {
                 text = "暂无公开项目"
                 textSize = 15f
-                setTextColor(Color.parseColor("#888888"))
+                setTextColor(Color.parseColor("#6F7785"))
                 gravity = Gravity.CENTER
                 setPadding(dp(24), dp(60), dp(24), dp(60))
                 layoutParams = LinearLayout.LayoutParams(
@@ -218,7 +218,7 @@ internal class MainMarketplaceActions(
         container.addView(TextView(activity).apply {
             text = "公开项目广场 · ${projects.size} 个项目"
             textSize = 12f
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(Color.parseColor("#6F7785"))
             setPadding(dp(16), dp(16), dp(16), dp(8))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -242,7 +242,7 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = dp(12).toFloat()
-                setColor(Color.parseColor("#1E1E1E"))
+                setColor(Color.parseColor("#181B20"))
             }
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -277,7 +277,7 @@ internal class MainMarketplaceActions(
         val avatarText = TextView(activity).apply {
             text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
             textSize = 22f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             gravity = Gravity.CENTER
             background = object : ShapeDrawable(OvalShape()) {
                 init { paint.color = Color.parseColor("#00000066") }
@@ -317,7 +317,7 @@ internal class MainMarketplaceActions(
         body.addView(TextView(activity).apply {
             text = project.name
             textSize = 17f
-            setTextColor(Color.parseColor("#F0F0F0"))
+            setTextColor(Color.parseColor("#07120A"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
@@ -341,7 +341,7 @@ internal class MainMarketplaceActions(
             val dot = "\u25CF"  // ●
             text = "$dot  ${project.memberCount} 位成员"
             textSize = 12f
-            setTextColor(Color.parseColor("#3BA55D"))  // Discord 绿
+            setTextColor(Color.parseColor("#58BE6A"))  // Discord 绿
         })
 
         // 作者
@@ -350,7 +350,7 @@ internal class MainMarketplaceActions(
             metaRow.addView(TextView(activity).apply {
                 text = "  ·  创建者: $owner"
                 textSize = 12f
-                setTextColor(Color.parseColor("#888888"))
+                setTextColor(Color.parseColor("#6F7785"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -364,7 +364,7 @@ internal class MainMarketplaceActions(
             body.addView(TextView(activity).apply {
                 text = desc
                 textSize = 13f
-                setTextColor(Color.parseColor("#A0A0A0"))
+                setTextColor(Color.parseColor("#6F7785"))
                 maxLines = 3
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 layoutParams = LinearLayout.LayoutParams(
@@ -379,10 +379,10 @@ internal class MainMarketplaceActions(
             text = projectJoinActionLabel(project.joinMode, alreadyJoined)
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#FFFFFF"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor("#3BA55D"))
+                setColor(Color.parseColor("#58BE6A"))
             }
             isEnabled = true
             layoutParams = LinearLayout.LayoutParams(
@@ -413,7 +413,7 @@ internal class MainMarketplaceActions(
                 text = "直接安装"
                 textSize = 15f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#FFFFFF"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(6).toFloat()
                     setColor(Color.parseColor("#5865F2"))

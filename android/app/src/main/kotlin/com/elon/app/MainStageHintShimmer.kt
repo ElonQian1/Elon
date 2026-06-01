@@ -31,7 +31,7 @@ internal class MainStageHintShimmer(
         animator = null
         binding.stageHintText.paint.shader = null
         binding.stageHintText.alpha = 1f
-        binding.stageHintText.setTextColor(Color.parseColor("#B8B8B8"))
+        binding.stageHintText.setTextColor(Color.parseColor("#A6AFBD"))
         binding.stageHintText.invalidate()
     }
 
@@ -57,11 +57,11 @@ internal class MainStageHintShimmer(
                 width.toFloat(),
                 0f,
                 intArrayOf(
-                    Color.parseColor("#9A9A9A"),
+                    Color.parseColor("#A6AFBD"),
                     Color.parseColor("#CFCFCF"),
                     Color.parseColor("#F6F6F6"),
-                    Color.parseColor("#D8D8D8"),
-                    Color.parseColor("#9A9A9A")
+                    Color.parseColor("#F2F5FA"),
+                    Color.parseColor("#A6AFBD")
                 ),
                 floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
                 Shader.TileMode.CLAMP

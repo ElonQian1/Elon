@@ -7,7 +7,7 @@
     <!-- Shopping bag body -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
@@ -15,14 +15,14 @@
     <!-- Horizontal divider at top of bag -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
         android:pathData="M3,6 L21,6" />
     <!-- Bag handle arc -->
     <path
         android:fillColor="@android:color/transparent"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeWidth="1.7"
         android:strokeLineCap="round"
         android:pathData="M16,10 C16,12.21 14.21,14 12,14 C9.79,14 8,12.21 8,10" />

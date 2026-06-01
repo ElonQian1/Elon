@@ -1,4 +1,4 @@
-﻿// infrastructure/floating/FloatingInputActivity.kt
+// infrastructure/floating/FloatingInputActivity.kt
 // module: infrastructure/floating | layer: infrastructure | role: text-input-activity
 // summary: 文字输入透明Activity - 从悬浮球双击触发
 
@@ -72,7 +72,7 @@ class FloatingInputActivity : AppCompatActivity() {
             )
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#2D2D2D"))
+                setColor(Color.parseColor("#181B20"))
                 cornerRadius = 20 * density
             }
             background = bg
@@ -86,7 +86,7 @@ class FloatingInputActivity : AppCompatActivity() {
         val titleText = TextView(this).apply {
             text = "⌨️ 输入任务"
             textSize = 20f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             gravity = Gravity.CENTER
         }
         card.addView(titleText, LinearLayout.LayoutParams(
@@ -98,16 +98,16 @@ class FloatingInputActivity : AppCompatActivity() {
         inputField = EditText(this).apply {
             hint = "请输入任务目标...\n例如：打开微信，给张三发消息"
             textSize = 16f
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#6F7785"))
             minLines = 3
             maxLines = 5
             gravity = Gravity.TOP or Gravity.START
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#1A1A1A"))
+                setColor(Color.parseColor("#0F1217"))
                 cornerRadius = 12 * density
-                setStroke((1 * density).toInt(), Color.parseColor("#444444"))
+                setStroke((1 * density).toInt(), Color.parseColor("#1E2126"))
             }
             background = bg
             setPadding(
@@ -145,7 +145,7 @@ class FloatingInputActivity : AppCompatActivity() {
         val cancelButton = Button(this).apply {
             text = "取消"
             textSize = 14f
-            setTextColor(Color.parseColor("#AAAAAA"))
+            setTextColor(Color.parseColor("#A6AFBD"))
             setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { finish() }
         }
@@ -158,10 +158,10 @@ class FloatingInputActivity : AppCompatActivity() {
         val sendButton = Button(this).apply {
             text = "🚀 执行"
             textSize = 14f
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#07120A"))
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#4CAF50"))
+                setColor(Color.parseColor("#58BE6A"))
                 cornerRadius = 8 * density
             }
             background = bg
@@ -192,7 +192,7 @@ class FloatingInputActivity : AppCompatActivity() {
         val quickTasksLabel = TextView(this).apply {
             text = "快捷任务："
             textSize = 12f
-            setTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#6F7785"))
         }
         card.addView(quickTasksLabel, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -216,10 +216,10 @@ class FloatingInputActivity : AppCompatActivity() {
             val chip = TextView(this).apply {
                 text = task
                 textSize = 12f
-                setTextColor(Color.parseColor("#CCCCCC"))
+                setTextColor(Color.parseColor("#DDE8FC"))
                 
                 val bg = GradientDrawable().apply {
-                    setColor(Color.parseColor("#333333"))
+                    setColor(Color.parseColor("#283140"))
                     cornerRadius = 16 * density
                 }
                 background = bg
