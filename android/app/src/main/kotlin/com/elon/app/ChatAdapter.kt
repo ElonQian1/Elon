@@ -415,8 +415,11 @@ class ChatAdapter(
         avatar ?: return
         val profile = cachedUserProfile ?: UserProfileStore.load(avatar.context).also {
             cachedUserProfile = it
+            cachedUserBitmap = null  // profile 更新时清除 bitmap 缓存
         }
-        val bitmap = UserProfileStore.decodeAvatar(profile.avatarDataUrl)
+        val bitmap = cachedUserBitmap ?: UserProfileStore.decodeAvatar(profile.avatarDataUrl).also {
+            cachedUserBitmap = it
+        }
         if (bitmap != null) {
             val radius = (6 * avatar.resources.displayMetrics.density + 0.5f).toInt()
             avatar.background = RoundedBitmapDrawableFactory.create(avatar.resources, bitmap).apply {
