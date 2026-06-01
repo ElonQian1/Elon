@@ -18,7 +18,9 @@ internal class MainInputFocusActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val inputComposerMotion: () -> InputComposerMotion?,
+    private val isEmojiPanelOpen: () -> Boolean,
     private val isEmojiKeyboardOverlayActive: () -> Boolean,
+    private val showKeyboardOverEmojiPanel: () -> Unit,
     private val requestKeyboardLift: () -> Unit,
     private val releaseKeyboardLift: () -> Unit,
     private val setSuppressInputFocusAnimation: (Boolean) -> Unit,
@@ -34,6 +36,27 @@ internal class MainInputFocusActions(
 
     fun focusInputComposer() {
         if (!isFriendChatActive() && activeConversation().ended) return
+        if (isEmojiPanelOpen()) {
+            installKeyboardCollapseWatcher()
+            if (isVoiceMode()) {
+                setVoiceMode(false)
+                applyVoiceMode()
+            }
+            inputComposerMotion()?.let { motion ->
+                if (!motion.isExpanded) {
+                    motion.setExpanded(true, animate = false)
+                }
+            }
+            if (!binding.inputEdit.hasFocus()) {
+                binding.inputEdit.requestFocusFromTouch()
+                if (!binding.inputEdit.hasFocus()) {
+                    binding.inputEdit.requestFocus()
+                }
+            }
+            binding.inputEdit.isCursorVisible = true
+            showKeyboardOverEmojiPanel()
+            return
+        }
         if (isEmojiKeyboardOverlayActive()) {
             installKeyboardCollapseWatcher()
             if (!binding.inputEdit.hasFocus()) {

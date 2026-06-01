@@ -586,16 +586,12 @@ internal class MainEmojiActions(
             .show()
     }
 
-    private fun toggleKeyboardOverEmojiPanel() {
+    fun showKeyboardOverEmojiPanel() {
         if (keyboardVisibleOverEmojiPanel && !isKeyboardVisible()) {
             keyboardVisibleOverEmojiPanel = false
             keyboardOverlayRequestedAt = 0L
         }
         if (keyboardVisibleOverEmojiPanel) {
-            hideKeyboard()
-            keyboardVisibleOverEmojiPanel = false
-            keyboardOverlayRequestedAt = 0L
-            updateEmojiButton(EmojiButtonState.PANEL)
             return
         }
 
@@ -615,6 +611,21 @@ internal class MainEmojiActions(
         }
         keyboardVisibleOverEmojiPanel = true
         updateEmojiButton(EmojiButtonState.KEYBOARD_OVER_PANEL)
+    }
+
+    private fun toggleKeyboardOverEmojiPanel() {
+        if (keyboardVisibleOverEmojiPanel && !isKeyboardVisible()) {
+            keyboardVisibleOverEmojiPanel = false
+            keyboardOverlayRequestedAt = 0L
+        }
+        if (keyboardVisibleOverEmojiPanel) {
+            hideKeyboard()
+            keyboardVisibleOverEmojiPanel = false
+            keyboardOverlayRequestedAt = 0L
+            updateEmojiButton(EmojiButtonState.PANEL)
+            return
+        }
+        showKeyboardOverEmojiPanel()
     }
 
     private fun isKeyboardVisible(): Boolean {
