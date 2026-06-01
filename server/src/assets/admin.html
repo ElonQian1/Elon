@@ -121,6 +121,7 @@ const ADMIN_HTML: &str = r#"<!DOCTYPE html>
   <button class="tab-btn" onclick="switchTab('users',this)">馃懃 鐢ㄦ埛鍒楄〃</button>
   <button class="tab-btn" onclick="switchTab('projects',this)">馃摝 鐢ㄦ埛椤圭洰</button>
   <button class="tab-btn" onclick="switchTab('sessions',this)">馃摫 娲昏穬璁惧</button>
+  <button class="tab-btn" onclick="switchTab('tokens',this)">📊 Token 用量</button>
 </div>
 
 <!-- 鈹€鈹€ AI 浠ｇ悊鏍囩椤?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ -->
@@ -538,6 +539,8 @@ function switchTab(name, btn) {
   if (name === 'users') loadUsers();
   if (name === 'projects') loadProjects();
   if (name === 'sessions') loadSessions();
+
+  if (name === 'tokens') loadTokenStats();
 }
 
 // 鈹€鈹€鈹€ 鐢ㄦ埛鍒楄〃 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -743,6 +746,370 @@ function renderConvs(data) {
 }
 function closeConvModal() {
   document.getElementById('convModal').style.display = 'none';
+}
+</script>
+
+<!-- ── Token 用量标签页 ─────────────────────────────────────────────────── -->
+<div id="tab-tokens" class="tab-pane">
+<div class="container">
+  <div class="toolbar" style="margin-bottom:16px">
+    <h2>📊 Token 用量统计</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <label style="font-size:13px;color:var(--text-dim)">周期</label>
+      <select id="statsDays" onchange="loadTokenStats()" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px">
+        <option value="7">近 7 天</option>
+        <option value="30" selected>近 30 天</option>
+        <option value="90">近 90 天</option>
+      </select>
+      <button class="btn btn-ghost" onclick="loadTokenStats()">🔄 刷新</button>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div id="tokenSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px">
+    <div class="loader"></div>
+  </div>
+
+  <!-- 趋势图 -->
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px">每日 Token 趋势</h3>
+    </div>
+    <div style="position:relative;height:200px">
+      <canvas id="tokenTrendChart"></canvas>
+    </div>
+  </div>
+
+  <!-- 用户排行榜 -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px">用户用量排行</h3>
+      <span id="tokenUsersSubtitle" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">#</th>
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px;text-align:right">输入 Token</th>
+            <th style="padding:8px 10px;text-align:right">输出 Token</th>
+            <th style="padding:8px 10px;text-align:right">总计</th>
+            <th style="padding:8px 10px;text-align:right">估算费用(CNY)</th>
+            <th style="padding:8px 10px;text-align:right">本月已用</th>
+            <th style="padding:8px 10px">配额限制</th>
+            <th style="padding:8px 10px">状态</th>
+            <th style="padding:8px 10px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="tokenUsersBody">
+          <tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 配额设置弹窗 -->
+<div id="quotaModal" class="modal-overlay">
+  <div class="modal" style="max-width:420px">
+    <h3>设置用户配额</h3>
+    <div id="quotaUserInfo" style="font-size:13px;color:var(--text-dim);margin-bottom:16px"></div>
+    <div class="form-group">
+      <label>月度 Token 上限（留空 = 无限制）</label>
+      <input type="number" id="quotaLimit" placeholder="例如：1000000" min="1">
+    </div>
+    <div class="form-group">
+      <label>封禁原因（填写后自动封禁）</label>
+      <input type="text" id="quotaBlockReason" placeholder="留空表示不封禁">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="quotaBlocked">
+      <label for="quotaBlocked">手动封禁此用户的 AI 功能</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeQuotaModal()">取消</button>
+      <button class="btn btn-danger" onclick="deleteUserQuota()" style="margin-right:auto">移除配额</button>
+      <button class="btn btn-primary" onclick="saveUserQuota()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 用户详情弹窗 -->
+<div id="userDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:12px;padding:24px;width:92%;max-width:860px;max-height:85vh;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 id="userDetailTitle" style="margin:0;font-size:16px">用户用量详情</h3>
+      <button onclick="closeUserDetail()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text)">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1">
+      <div id="userDetailContent" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="loader"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Chart.js lazy-load ──────────────────────────────────────────────────────
+let chartJsLoaded = false;
+let trendChartInstance = null;
+
+function loadChartJs(cb) {
+  if (chartJsLoaded) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  s.onload = () => { chartJsLoaded = true; cb(); };
+  document.head.appendChild(s);
+}
+
+// ── Token 用量主加载 ────────────────────────────────────────────────────────
+let currentQuotaUserId = null;
+
+function loadTokenStats() {
+  const days = document.getElementById('statsDays').value;
+  loadSummary(days);
+  loadTrend(days);
+  loadUsersTable(days);
+}
+
+function loadSummary(days) {
+  const cards = document.getElementById('tokenSummaryCards');
+  cards.innerHTML = '<div class="loader"></div>';
+  fetch('/api/admin/token-stats/summary?days=' + days, { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.json())
+    .then(d => {
+      cards.innerHTML = [
+        summaryCard('📦 周期总 Token', fmtNum(d.total_tokens_period), 'var(--accent)'),
+        summaryCard('📅 今日 Token', fmtNum(d.total_tokens_today), 'var(--success)'),
+        summaryCard('💰 估算费用', '¥' + d.estimated_cost_cny.toFixed(4), '#fbbf24'),
+        summaryCard('👥 活跃用户', d.active_users_period, 'var(--text-dim)'),
+        summaryCard('📞 调用次数', fmtNum(d.call_count_period), 'var(--text-dim)'),
+      ].join('');
+    })
+    .catch(e => { cards.innerHTML = '<span style="color:var(--danger)">' + esc(String(e)) + '</span>'; });
+}
+
+function summaryCard(label, val, color) {
+  return `<div class="card" style="text-align:center;padding:20px 12px">
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${label}</div>
+    <div style="font-size:24px;font-weight:700;color:${color}">${val}</div>
+  </div>`;
+}
+
+function loadTrend(days) {
+  fetch('/api/admin/token-stats/trend?days=' + days, { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.json())
+    .then(d => renderTrendChart(d.trend || []))
+    .catch(() => {});
+}
+
+function renderTrendChart(rows) {
+  loadChartJs(() => {
+    const sorted = [...rows].sort((a, b) => a.date < b.date ? -1 : 1);
+    const labels = sorted.map(r => r.date);
+    const inputData = sorted.map(r => r.input_tokens);
+    const outputData = sorted.map(r => r.output_tokens);
+    const ctx = document.getElementById('tokenTrendChart').getContext('2d');
+    if (trendChartInstance) trendChartInstance.destroy();
+    trendChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: '输入 Token', data: inputData, backgroundColor: 'rgba(108,99,255,0.6)', stack: 's' },
+          { label: '输出 Token', data: outputData, backgroundColor: 'rgba(74,222,128,0.6)', stack: 's' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#2a2d3e' } },
+          y: { stacked: true, ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => fmtNum(v) }, grid: { color: '#2a2d3e' } },
+        }
+      }
+    });
+  });
+}
+
+function loadUsersTable(days) {
+  const tbody = document.getElementById('tokenUsersBody');
+  tbody.innerHTML = '<tr><td colspan="10" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>';
+  fetch('/api/admin/token-stats/users?days=' + days + '&limit=100', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('tokenUsersSubtitle').textContent = '共 ' + (d.users || []).length + ' 名用户';
+      renderUsersTable(d.users || []);
+    })
+    .catch(e => {
+      tbody.innerHTML = '<tr><td colspan="10" style="color:var(--danger);padding:12px">' + esc(String(e)) + '</td></tr>';
+    });
+}
+
+function renderUsersTable(users) {
+  const tbody = document.getElementById('tokenUsersBody');
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--text-dim)">暂无用量数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map((u, i) => {
+    const statusHtml = u.is_blocked
+      ? '<span style="color:#ff4d6d;font-size:11px">🚫 封禁</span>'
+      : (u.monthly_token_limit && u.current_month_tokens >= u.monthly_token_limit)
+        ? '<span style="color:#fbbf24;font-size:11px">⚠️ 超限</span>'
+        : '<span style="color:#4ade80;font-size:11px">✅ 正常</span>';
+    const quotaHtml = u.monthly_token_limit
+      ? `${fmtNum(u.current_month_tokens)} / ${fmtNum(u.monthly_token_limit)}`
+      : '<span style="color:var(--text-dim)">无限制</span>';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px;color:var(--text-dim)">${i+1}</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(u.account)}</div>
+        ${u.nickname ? '<div style="font-size:11px;color:var(--text-dim)">' + esc(u.nickname) + '</div>' : ''}
+        <div style="font-size:10px;color:var(--text-dim)">${esc(u.user_id)}</div>
+      </td>
+      <td style="padding:8px 10px;text-align:right">${fmtNum(u.input_tokens)}</td>
+      <td style="padding:8px 10px;text-align:right">${fmtNum(u.output_tokens)}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600">${fmtNum(u.total_tokens)}</td>
+      <td style="padding:8px 10px;text-align:right;color:#fbbf24">¥${u.estimated_cost_cny.toFixed(4)}</td>
+      <td style="padding:8px 10px;text-align:right;font-size:12px">${fmtNum(u.current_month_tokens)}</td>
+      <td style="padding:8px 10px;font-size:12px">${quotaHtml}</td>
+      <td style="padding:8px 10px">${statusHtml}</td>
+      <td style="padding:8px 10px">
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="openUserDetail('${esc(u.user_id)}','${esc(u.account)}')">详情</button>
+        <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;margin-top:4px" onclick="openQuotaModal('${esc(u.user_id)}','${esc(u.account)}',${u.monthly_token_limit||'null'},${u.is_blocked},'${esc(u.block_reason||'')}')">配额</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── 配额弹窗 ────────────────────────────────────────────────────────────────
+function openQuotaModal(uid, account, limit, blocked, reason) {
+  currentQuotaUserId = uid;
+  document.getElementById('quotaUserInfo').textContent = '用户：' + account + '（' + uid + '）';
+  document.getElementById('quotaLimit').value = limit || '';
+  document.getElementById('quotaBlocked').checked = !!blocked;
+  document.getElementById('quotaBlockReason').value = reason || '';
+  document.getElementById('quotaModal').classList.add('open');
+}
+
+function closeQuotaModal() {
+  document.getElementById('quotaModal').classList.remove('open');
+  currentQuotaUserId = null;
+}
+
+function saveUserQuota() {
+  if (!currentQuotaUserId) return;
+  const limitVal = document.getElementById('quotaLimit').value.trim();
+  const blocked = document.getElementById('quotaBlocked').checked;
+  const reason = document.getElementById('quotaBlockReason').value.trim();
+  const body = {
+    monthly_token_limit: limitVal ? parseInt(limitVal) : null,
+    is_blocked: blocked,
+    block_reason: reason || null,
+  };
+  fetch('/api/admin/quotas/' + encodeURIComponent(currentQuotaUserId), {
+    method: 'PUT',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { closeQuotaModal(); loadTokenStats(); }
+    else alert('保存失败：' + JSON.stringify(d));
+  }).catch(e => alert('请求失败：' + e));
+}
+
+function deleteUserQuota() {
+  if (!currentQuotaUserId) return;
+  if (!confirm('确定要移除该用户的配额设置吗？')) return;
+  fetch('/api/admin/quotas/' + encodeURIComponent(currentQuotaUserId), {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token },
+  }).then(r => r.json()).then(d => {
+    if (d.ok) { closeQuotaModal(); loadTokenStats(); }
+    else alert('删除失败：' + JSON.stringify(d));
+  }).catch(e => alert('请求失败：' + e));
+}
+
+// ── 用户详情弹窗 ──────────────────────────────────────────────────────────
+function openUserDetail(uid, account) {
+  const modal = document.getElementById('userDetailModal');
+  document.getElementById('userDetailTitle').textContent = '用量详情 — ' + account;
+  document.getElementById('userDetailContent').innerHTML = '<div class="loader"></div>';
+  modal.style.display = 'flex';
+  const days = document.getElementById('statsDays').value;
+  fetch('/api/admin/token-stats/users/' + encodeURIComponent(uid) + '?days=' + days, {
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).then(r => r.json()).then(d => renderUserDetail(d))
+    .catch(e => { document.getElementById('userDetailContent').innerHTML = '<span style="color:var(--danger)">' + esc(String(e)) + '</span>'; });
+}
+
+function closeUserDetail() {
+  document.getElementById('userDetailModal').style.display = 'none';
+}
+
+function renderUserDetail(d) {
+  const byModel = (d.by_model || []).map(m =>
+    `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 8px">${esc(m.model)}</td>
+      <td style="padding:6px 8px;text-align:right">${fmtNum(m.input_tokens)}</td>
+      <td style="padding:6px 8px;text-align:right">${fmtNum(m.output_tokens)}</td>
+      <td style="padding:6px 8px;text-align:right;color:#fbbf24">¥${m.estimated_cost_cny.toFixed(4)}</td>
+      <td style="padding:6px 8px;text-align:right">${m.call_count}</td>
+    </tr>`
+  ).join('');
+
+  const byFeature = (d.by_feature || []).map(f =>
+    `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 8px">${esc(f.feature)}</td>
+      <td style="padding:6px 8px;text-align:right">${fmtNum(f.total_tokens)}</td>
+      <td style="padding:6px 8px;text-align:right">${f.call_count}</td>
+    </tr>`
+  ).join('');
+
+  document.getElementById('userDetailContent').innerHTML = `
+    <div>
+      <h4 style="font-size:13px;color:var(--text-dim);margin-bottom:8px">按模型分布</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:var(--text-dim)">
+          <th style="padding:6px 8px;text-align:left">模型</th>
+          <th style="padding:6px 8px;text-align:right">输入</th>
+          <th style="padding:6px 8px;text-align:right">输出</th>
+          <th style="padding:6px 8px;text-align:right">费用</th>
+          <th style="padding:6px 8px;text-align:right">次数</th>
+        </tr></thead>
+        <tbody>${byModel || '<tr><td colspan="5" style="padding:12px;color:var(--text-dim);text-align:center">暂无数据</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div>
+      <h4 style="font-size:13px;color:var(--text-dim);margin-bottom:8px">按功能分布</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:var(--text-dim)">
+          <th style="padding:6px 8px;text-align:left">功能</th>
+          <th style="padding:6px 8px;text-align:right">总 Token</th>
+          <th style="padding:6px 8px;text-align:right">次数</th>
+        </tr></thead>
+        <tbody>${byFeature || '<tr><td colspan="3" style="padding:12px;color:var(--text-dim);text-align:center">暂无数据</td></tr>'}</tbody>
+      </table>
+      <div style="margin-top:20px;padding:12px;background:var(--bg);border-radius:8px">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">周期汇总（${d.period_days} 天）</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+          <div>总 Token：<strong>${fmtNum(d.total_tokens)}</strong></div>
+          <div>估算费用：<strong style="color:#fbbf24">¥${(d.estimated_cost_cny||0).toFixed(4)}</strong></div>
+          <div>输入：<strong>${fmtNum(d.input_tokens)}</strong></div>
+          <div>输出：<strong>${fmtNum(d.output_tokens)}</strong></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function fmtNum(n) {
+  if (n === null || n === undefined) return '0';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
+  return String(n);
 }
 </script>
 

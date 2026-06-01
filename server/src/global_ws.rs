@@ -54,12 +54,24 @@ async fn handle(
     let mut friend_rx = crate::friend_events::subscribe();
     let mut group_rx = crate::friend_events::subscribe_groups();
     let mut project_task_rx = crate::project_events::subscribe();
+    let mut presence_rx = crate::presence_events::subscribe();
+
+    // 认证用户上线：注册在线状态并广播给所有已连接用户
+    if let Some(ref uid) = authenticated_user_id {
+        state.online_users.write().await.insert(uid.clone());
+        crate::presence_events::publish_online(uid.clone());
+    }
 
     // 连接时若服务器已有更新版本，立即推送一次，无需等待下次广播
     if let Some(event) =
         crate::app_update::latest_update_event_for_client(&state, client_version_code).await
     {
         if tx.send(Message::Text(event)).await.is_err() {
+            // 连接前就断了，直接下线注销
+            if let Some(ref uid) = authenticated_user_id {
+                state.online_users.write().await.remove(uid.as_str());
+                crate::presence_events::publish_offline(uid.clone());
+            }
             return;
         }
     }
@@ -110,6 +122,20 @@ async fn handle(
                     _ => {}
                 }
             }
+            // 在线状态变更——推给所有已认证连接（客户端按好友关系过滤）
+            msg = presence_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) => {
+                        // 不把自己的上线事件推回给自己
+                        if authenticated_user_id.as_deref() != Some(event.user_id.as_str()) {
+                            let Some(payload) = event.to_json() else { continue; };
+                            if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        }
+                    }
+                    Err(RecvError::Lagged(_)) => { /* 下次列表刷新可以重新获取在线状态 */ }
+                    _ => {}
+                }
+            }
             incoming = rx.next() => {
                 match incoming {
                     Some(Ok(Message::Ping(p))) => {
@@ -120,5 +146,11 @@ async fn handle(
                 }
             }
         }
+    }
+
+    // 用户断线：注销在线状态
+    if let Some(ref uid) = authenticated_user_id {
+        state.online_users.write().await.remove(uid.as_str());
+        crate::presence_events::publish_offline(uid.clone());
     }
 }

@@ -26,6 +26,7 @@ mod token_usage;
 mod users;
 mod node_ledger;
 mod user_memories;
+mod admin_stats;
 
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
@@ -34,6 +35,10 @@ use common::{
 pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
 pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
 pub use user_memories::UserMemory;
+pub use admin_stats::{
+    AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary, AdminTrendRow,
+    AdminUserDetail, AdminUserUsageRow, UserQuota, estimate_cost_cny,
+};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
 };

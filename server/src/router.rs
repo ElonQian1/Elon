@@ -9,7 +9,8 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, api, app_update, auth_api, chat_attachments, friend_api, global_ws, lan_peer,
+    admin, admin_quota, admin_token_stats, api, app_update, auth_api, chat_attachments,
+    friend_api, global_ws, lan_peer,
     node_api, peer_relay, project_api, project_attachments, project_chat,
     project_conversation_identity, project_deletion, project_downloads, project_git,
     project_membership, project_space, project_store, release_claim, speech_translate,
@@ -341,6 +342,33 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(admin::list_project_conversations),
         )
         .route("/api/admin/sessions", get(admin::list_sessions))
+        // ── Token 用量统计 ────────────────────────────────────────────────────
+        .route(
+            "/api/admin/token-stats/summary",
+            get(admin_token_stats::get_platform_summary),
+        )
+        .route(
+            "/api/admin/token-stats/users",
+            get(admin_token_stats::get_users_usage),
+        )
+        .route(
+            "/api/admin/token-stats/users/:user_id",
+            get(admin_token_stats::get_user_detail),
+        )
+        .route(
+            "/api/admin/token-stats/trend",
+            get(admin_token_stats::get_platform_trend),
+        )
+        // ── 用户配额管理 ──────────────────────────────────────────────────────
+        .route(
+            "/api/admin/quotas",
+            get(admin_quota::list_quotas),
+        )
+        .route(
+            "/api/admin/quotas/:user_id",
+            axum::routing::put(admin_quota::upsert_quota)
+                .delete(admin_quota::delete_quota),
+        )
         .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),

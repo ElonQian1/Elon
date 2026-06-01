@@ -24,7 +24,7 @@ use crate::types::{AgentConfig, AppState};
 // 鉴权工具函数
 // ─────────────────────────────────────────────
 
-fn check_auth(headers: &HeaderMap, token: &str) -> bool {
+pub(crate) fn check_auth(headers: &HeaderMap, token: &str) -> bool {
     headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())

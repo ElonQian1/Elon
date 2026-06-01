@@ -5,6 +5,8 @@ use tracing::info;
 
 mod admin;
 mod admin_html;
+mod admin_quota;
+mod admin_token_stats;
 mod agent;
 mod agent_api_loop;
 mod agent_intent;
@@ -23,6 +25,7 @@ mod errors;
 mod friend_api;
 mod friend_events;
 mod global_ws;
+mod presence_events;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;

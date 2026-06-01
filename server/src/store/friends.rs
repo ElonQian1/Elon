@@ -146,6 +146,7 @@ impl Store {
                     last_message: row.get(6)?,
                     last_message_at: row.get(7)?,
                     unread_count: row.get(8)?,
+                    is_online: false,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -271,6 +272,7 @@ fn friend_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FriendPr
         last_message: None,
         last_message_at: None,
         unread_count: 0,
+        is_online: false,
     })
 }
 

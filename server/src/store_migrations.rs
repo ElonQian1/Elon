@@ -31,6 +31,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (13, "每日编译配额表（build_quota）", migration_v13),
     (14, "项目意见频道建议状态", migration_v14),
     (15, "用户长期记忆表", migration_v15),
+    (16, "token 用量事件表 + 用户 token 配额表", migration_v16),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -636,6 +637,46 @@ fn migration_v15(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_user_memories_user_importance
           ON user_memories(user_id, importance DESC, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v16：token 用量事件表 + 用户配额表 ───────────────────────────────────────────
+
+fn migration_v16(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        -- token 用量事件（按调用记录）
+        CREATE TABLE IF NOT EXISTS token_usage_events (
+          id                  TEXT PRIMARY KEY,
+          user_id             TEXT NOT NULL,
+          feature             TEXT NOT NULL DEFAULT 'unknown',
+          usage_mode          TEXT NOT NULL DEFAULT 'server_api_key',
+          model               TEXT,
+          input_tokens        INTEGER NOT NULL DEFAULT 0,
+          cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens       INTEGER NOT NULL DEFAULT 0,
+          reasoning_tokens    INTEGER NOT NULL DEFAULT 0,
+          total_tokens        INTEGER NOT NULL DEFAULT 0,
+          created_at          TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_token_usage_user_time
+          ON token_usage_events(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_token_usage_model_time
+          ON token_usage_events(model, created_at DESC);
+
+        -- 用户 token 月度配额
+        CREATE TABLE IF NOT EXISTS user_token_quota (
+          user_id              TEXT PRIMARY KEY,
+          monthly_token_limit  INTEGER,
+          is_blocked           INTEGER NOT NULL DEFAULT 0,
+          block_reason         TEXT,
+          created_at           TEXT NOT NULL,
+          updated_at           TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
         "#,
     )?;
     Ok(())

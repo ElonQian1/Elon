@@ -78,7 +78,13 @@ pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.list_friends(&user.id) {
-        Ok(friends) => Json(serde_json::json!({ "friends": friends })).into_response(),
+        Ok(mut friends) => {
+            let online = state.online_users.read().await;
+            for f in &mut friends {
+                f.is_online = online.contains(&f.id);
+            }
+            Json(serde_json::json!({ "friends": friends })).into_response()
+        }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }
