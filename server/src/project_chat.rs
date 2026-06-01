@@ -325,6 +325,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 message,
                 apk_url,
                 image_url: None,
+                model_used: None,
+                node_id: None,
             }
             .to_json(),
         );
@@ -454,6 +456,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
                         message: reply,
                         apk_url: None,
                         image_url: None,
+                        model_used: None,
+                        node_id: None,
                     }
                     .to_json(),
                 );
