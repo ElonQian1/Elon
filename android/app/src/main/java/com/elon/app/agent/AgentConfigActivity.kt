@@ -1,4 +1,4 @@
-﻿// interface/AgentConfigActivity.kt
+// interface/AgentConfigActivity.kt
 package com.elon.app.agent
 
 import android.app.Activity
@@ -16,17 +16,17 @@ import android.view.View
 import android.widget.*
 import com.elon.app.agent.infrastructure.auth.AuthService
 
-// 暗黑主题色常量
-private const val BG          = "#0D0D0D"
-private const val SURFACE     = "#1A1A1A"
-private const val SURFACE2    = "#242424"
-private const val ACCENT      = "#4FC3F7"   // 主强调色（浅蓝）
-private const val ACCENT2     = "#81D4FA"   // 次强调色
-private const val TEXT_PRIM   = "#EFEFEF"
-private const val TEXT_SEC    = "#AAAAAA"
-private const val TEXT_DIM    = "#666666"
-private const val DIVIDER     = "#2C2C2C"
-private const val BTN_PRIMARY = "#1565C0"
+// Elon 暗色冷灰体系色常量，和 docs/APP 颜色规范.md 保持一致。
+private const val BG          = "#101010"
+private const val SURFACE     = "#181B20"
+private const val SURFACE2    = "#283140"
+private const val ACCENT      = "#6091CF"
+private const val ACCENT2     = "#81B3D9"
+private const val TEXT_PRIM   = "#F2F5FA"
+private const val TEXT_SEC    = "#A6AFBD"
+private const val TEXT_DIM    = "#6F7785"
+private const val DIVIDER     = "#1E2126"
+private const val BTN_PRIMARY = "#58BE6A"
 private const val BTN_DANGER  = "#B71C1C"
 
 /**
@@ -304,7 +304,7 @@ class AgentConfigActivity : Activity() {
                 addView(TextView(this@AgentConfigActivity).apply {
                     text = if (isLoggedIn) "@${user?.username ?: ""}  ☁️ 已同步" else "登录后可同步配置、使用服务器 CLI"
                     textSize = 12f
-                    setTextColor(Color.parseColor(if (isLoggedIn) "#4CAF50" else TEXT_SEC))
+                    setTextColor(Color.parseColor(if (isLoggedIn) BTN_PRIMARY else TEXT_SEC))
                 })
             })
 
@@ -313,7 +313,7 @@ class AgentConfigActivity : Activity() {
                 accountStatusText = this
                 text = if (isLoggedIn) "登出" else "登录"
                 textSize = 13f
-                setTextColor(Color.WHITE)
+                setTextColor(Color.parseColor(if (isLoggedIn) TEXT_PRIM else "#07120A"))
                 setBackgroundColor(Color.parseColor(if (isLoggedIn) BTN_DANGER else BTN_PRIMARY))
                 setPadding(dp(16), dp(4), dp(16), dp(4))
                 setOnClickListener {
@@ -353,7 +353,7 @@ class AgentConfigActivity : Activity() {
         val lp = LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, dp(4), 0) }
 
         addView(createDarkButton("💾 保存", color = BTN_PRIMARY, lp = lp) { saveConfig() })
-        addView(createDarkButton("🔍 检查", color = "#1B5E20", lp = lp) { testConnection() })
+        addView(createDarkButton("🔍 检查", color = SURFACE2, lp = lp) { testConnection() })
     }
 
     private fun createDarkButton(
@@ -364,7 +364,7 @@ class AgentConfigActivity : Activity() {
     ): Button = Button(this).apply {
         text = label
         textSize = 14f
-        setTextColor(Color.WHITE)
+        setTextColor(Color.parseColor(if (color == BTN_PRIMARY) "#07120A" else TEXT_PRIM))
         setBackgroundColor(Color.parseColor(color))
         layoutParams = lp ?: LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
@@ -590,7 +590,7 @@ class AgentConfigActivity : Activity() {
             v1Enabled -> "✅ V1 无障碍服务运行中"
             else      -> "⚠️ 无障碍服务未启用 — 点击下方按钮前往开启"
         }
-        statusText.setTextColor(Color.parseColor(if (v1Enabled || v2Enabled) "#4CAF50" else "#FF7043"))
+        statusText.setTextColor(Color.parseColor(if (v1Enabled || v2Enabled) BTN_PRIMARY else "#FF7043"))
     }
 
     private fun isServiceEnabled(serviceName: String): Boolean {

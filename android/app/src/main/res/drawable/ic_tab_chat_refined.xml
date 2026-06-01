@@ -7,14 +7,14 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M6.9,6.4 L21.1,6.4 C22.6,6.4 23.7,7.5 23.7,9 L23.7,16.7 C23.7,18.2 22.6,19.3 21.1,19.3 L14.5,19.3 L8.8,22.7 L8.8,19.3 L6.9,19.3 C5.4,19.3 4.3,18.2 4.3,16.7 L4.3,9 C4.3,7.5 5.4,6.4 6.9,6.4 Z"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:strokeWidth="1.8" />
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M8.9,11 L18.8,11 M8.9,14.6 L16.2,14.6"
-        android:strokeColor="#B8B8B8"
+        android:strokeColor="@color/elon_text_secondary"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:strokeWidth="1.65" />

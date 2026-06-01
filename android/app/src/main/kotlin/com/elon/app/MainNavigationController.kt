@@ -711,7 +711,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
-        val color = Color.parseColor(if (selected) "#E1E1E1" else "#A8A8A8")
+        val color = Color.parseColor(if (selected) "#F2F5FA" else "#A6AFBD")
         tab.isSelected = selected
         tab.setTextColor(color)
         tab.textSize = 12f

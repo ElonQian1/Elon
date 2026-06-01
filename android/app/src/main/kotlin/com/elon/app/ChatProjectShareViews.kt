@@ -149,7 +149,7 @@ private fun buildChatProjectShareCard(
         orientation = LinearLayout.VERTICAL
         background = GradientDrawable().apply {
             cornerRadius = context.projectDp(8).toFloat()
-            setColor(Color.parseColor("#1E1E1E"))
+            setColor(Color.parseColor("#181B20"))
         }
         clipToOutline = true
         layoutParams = LinearLayout.LayoutParams(width.coerceAtLeast(context.projectDp(210)), LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -179,7 +179,7 @@ private fun buildChatProjectShareCard(
         text = share.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
         gravity = Gravity.CENTER
         includeFontPadding = false
-        setTextColor(Color.WHITE)
+        setTextColor(Color.parseColor("#F2F5FA"))
         textSize = 20f
         background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
@@ -198,7 +198,7 @@ private fun buildChatProjectShareCard(
     body.addView(TextView(context).apply {
         text = share.name
         textSize = 16f
-        setTextColor(Color.parseColor("#F0F0F0"))
+        setTextColor(Color.parseColor("#F2F5FA"))
         setTypeface(typeface, android.graphics.Typeface.BOLD)
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
@@ -206,7 +206,7 @@ private fun buildChatProjectShareCard(
     body.addView(TextView(context).apply {
         text = projectShareMetaText(share)
         textSize = 12f
-        setTextColor(Color.parseColor("#8C8C8C"))
+        setTextColor(Color.parseColor("#6F7785"))
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -219,7 +219,7 @@ private fun buildChatProjectShareCard(
         body.addView(TextView(context).apply {
             text = desc
             textSize = 13f
-            setTextColor(Color.parseColor("#A0A0A0"))
+            setTextColor(Color.parseColor("#6F7785"))
             maxLines = 3
             ellipsize = TextUtils.TruncateAt.END
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -234,10 +234,10 @@ private fun buildChatProjectShareCard(
             textSize = 14.5f
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#F2F5FA"))
             background = GradientDrawable().apply {
                 cornerRadius = context.projectDp(6).toFloat()
-                setColor(Color.parseColor("#3BA55D"))
+                setColor(Color.parseColor("#58BE6A"))
             }
             isClickable = true
             setOnClickListener { onProjectShareAction(share) }
@@ -286,7 +286,7 @@ private fun projectShareInitiatorView(
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         gravity = Gravity.CENTER
-        setTextColor(Color.parseColor("#777777"))
+        setTextColor(Color.parseColor("#6F7785"))
         layoutParams = LinearLayout.LayoutParams(cardWidth, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = context.projectDp(7)

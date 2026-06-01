@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0D0D0D">
+    android:background="@color/elon_bg_app">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,10 +15,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="#0D2137"
+            android:background="@color/elon_badge_info_bg"
             android:padding="12dp"
             android:text="当前测试阶段已锁定 Codex CLI。\n• 聊天、意图分析和代码协作统一走 Codex CLI\n• 暂不切换到其他 AI 代理或自定义 API 模型\n• 恢复多模型前会同步更新服务端和 APK 设置"
-            android:textColor="#4FC3F7"
+            android:textColor="@color/elon_badge_info_text"
             android:textSize="13sp" />
 
         <!-- ── 选择模式 ── -->
@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:text="AI 模型模式"
-            android:textColor="#EFEFEF"
+            android:textColor="@color/elon_text_primary"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -36,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:orientation="vertical"
             android:padding="4dp">
 
@@ -46,7 +46,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="🌐  使用服务器默认模型（推荐）"
-                android:textColor="#EFEFEF"
+                android:textColor="@color/elon_text_primary"
                 android:textSize="14sp" />
 
             <RadioButton
@@ -55,7 +55,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="📋  选择预设模型"
-                android:textColor="#EFEFEF"
+                android:textColor="@color/elon_text_primary"
                 android:textSize="14sp" />
 
             <RadioButton
@@ -64,7 +64,7 @@
                 android:layout_height="48dp"
                 android:paddingStart="12dp"
                 android:text="🔧  自定义 API Key 和模型"
-                android:textColor="#EFEFEF"
+                android:textColor="@color/elon_text_primary"
                 android:textSize="14sp" />
         </RadioGroup>
 
@@ -82,7 +82,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="6dp"
                 android:text="选择模型"
-                android:textColor="#EFEFEF"
+                android:textColor="@color/elon_text_primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
@@ -90,7 +90,7 @@
                 android:id="@+id/agentSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="#242424"
+                android:background="@color/elon_surface_card"
                 android:padding="8dp" />
         </LinearLayout>
 
@@ -108,19 +108,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="API 地址（Base URL）"
-                android:textColor="#AAAAAA"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customBase"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#1A1A1A"
+                android:background="@color/elon_surface_card"
                 android:hint="https://api.deepseek.com/v1"
                 android:inputType="textUri"
                 android:padding="12dp"
-                android:textColor="#EFEFEF"
-                android:textColorHint="#666666"
+                android:textColor="@color/elon_text_primary"
+                android:textColorHint="@color/elon_text_tertiary"
                 android:textSize="14sp" />
 
             <TextView
@@ -128,19 +128,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="API 密钥"
-                android:textColor="#AAAAAA"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#1A1A1A"
+                android:background="@color/elon_surface_card"
                 android:hint="sk-..."
                 android:inputType="textPassword"
                 android:padding="12dp"
-                android:textColor="#EFEFEF"
-                android:textColorHint="#666666"
+                android:textColor="@color/elon_text_primary"
+                android:textColorHint="@color/elon_text_tertiary"
                 android:textSize="14sp" />
 
             <TextView
@@ -148,19 +148,19 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:text="模型名称"
-                android:textColor="#AAAAAA"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="12sp" />
             <EditText
                 android:id="@+id/customModel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="#1A1A1A"
+                android:background="@color/elon_surface_card"
                 android:hint="deepseek-chat"
                 android:inputType="text"
                 android:padding="12dp"
-                android:textColor="#EFEFEF"
-                android:textColorHint="#666666"
+                android:textColor="@color/elon_text_primary"
+                android:textColorHint="@color/elon_text_tertiary"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -170,19 +170,19 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
             android:text="我的昵称（可选，仅管理员可见）"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/elon_text_secondary"
             android:textSize="12sp" />
         <EditText
             android:id="@+id/nicknameEdit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:hint="输入昵称..."
             android:inputType="text"
             android:padding="12dp"
-            android:textColor="#EFEFEF"
-            android:textColorHint="#666666"
+            android:textColor="@color/elon_text_primary"
+            android:textColorHint="@color/elon_text_tertiary"
             android:textSize="14sp" />
 
         <!-- ── 语音输入模式 ── -->
@@ -192,7 +192,7 @@
             android:layout_marginTop="8dp"
             android:layout_marginBottom="4dp"
             android:text="语音输入模式"
-            android:textColor="#EFEFEF"
+            android:textColor="@color/elon_text_primary"
             android:textSize="13sp"
             android:textStyle="bold" />
         <TextView
@@ -200,7 +200,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
             android:text="选择麦克风按钮使用哪种识别管线"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/elon_text_secondary"
             android:textSize="11sp" />
         <RadioGroup
             android:id="@+id/voiceModeGroup"
@@ -213,28 +213,28 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="端上识别（推荐，低延迟）"
-                android:textColor="#EFEFEF" />
+                android:textColor="@color/elon_text_primary" />
             <RadioButton
                 android:id="@+id/voiceModeCloud"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="云端直连（PCM 流→服务器→AI 直发）"
-                android:textColor="#EFEFEF" />
+                android:textColor="@color/elon_text_primary" />
             <RadioButton
                 android:id="@+id/voiceModeVoiceMsg"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="🎤 语音消息（录音发送气泡，可播放）"
-                android:textColor="#EFEFEF" />
+                android:textColor="@color/elon_text_primary" />
         </RadioGroup>
 
         <Button
             android:id="@+id/manageEngineButton"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:backgroundTint="#FF9800"
+            android:backgroundTint="@color/elon_button_secondary_bg"
             android:text="🎙 管理识别引擎（测试 / 选择 / 排除）"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/elon_button_secondary_text"
             android:textSize="13sp" />
 
         <!-- ── 本地引擎回退链摘要 ── -->
@@ -244,9 +244,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="4dp"
-            android:background="#111111"
+            android:background="@color/elon_surface_subtle"
             android:padding="10dp"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/elon_text_secondary"
             android:textSize="11sp" />
 
         <!-- ── 服务器 Whisper 兜底开关 ── -->
@@ -256,7 +256,7 @@
             android:layout_marginTop="12dp"
             android:layout_marginBottom="2dp"
             android:text="本地引擎回退链"
-            android:textColor="#EFEFEF"
+            android:textColor="@color/elon_text_primary"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -264,7 +264,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
-            android:background="#1A1A1A"
+            android:background="@color/elon_surface_card"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="12dp">
@@ -279,7 +279,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="云端 Whisper 兜底"
-                    android:textColor="#EFEFEF"
+                    android:textColor="@color/elon_text_primary"
                     android:textSize="14sp" />
 
                 <TextView
@@ -287,7 +287,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="本地全部引擎失败时，上传录音到服务器转写（需联网）"
-                    android:textColor="#888888"
+                    android:textColor="@color/elon_text_tertiary"
                     android:textSize="11sp" />
             </LinearLayout>
 
@@ -297,8 +297,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
                 android:checked="true"
-                android:thumbTint="#4FC3F7"
-                android:trackTint="#1A3A4A" />
+                android:thumbTint="@color/elon_badge_info_text"
+                android:trackTint="@color/elon_badge_info_bg" />
         </LinearLayout>
 
         <!-- ── 保存按钮 ── -->
@@ -306,9 +306,9 @@
             android:id="@+id/saveButton"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:backgroundTint="#2196F3"
+            android:backgroundTint="@color/elon_button_primary_bg"
             android:text="保存配置"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/elon_button_primary_text"
             android:textSize="16sp"
             android:textStyle="bold" />
 
@@ -318,9 +318,9 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="12dp"
-            android:backgroundTint="#7B1FA2"
+            android:backgroundTint="@color/elon_button_secondary_bg"
             android:text="📊 Token 用量统计"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/elon_button_secondary_text"
             android:textSize="14sp" />
 
         <!-- ── 检查更新 ── -->
@@ -329,9 +329,9 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginTop="12dp"
-            android:backgroundTint="#4CAF50"
+            android:backgroundTint="@color/elon_button_primary_bg"
             android:text="检查更新"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/elon_button_primary_text"
             android:textSize="14sp" />
 
         <!-- ── 用户 ID 展示 ── -->
@@ -341,7 +341,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:gravity="center"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/elon_text_secondary"
             android:textSize="11sp" />
 
     </LinearLayout>

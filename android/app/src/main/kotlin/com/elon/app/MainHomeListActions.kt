@@ -132,7 +132,7 @@ internal class MainHomeListActions(
                 bottomMargin = dp(8)
             }
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#202020"))
+            setBackgroundColor(Color.parseColor("#181B20"))
             addView(
                 createProjectHeaderButton("＋ 新建项目") {
                     showCreateProjectDialog()
@@ -143,7 +143,7 @@ internal class MainHomeListActions(
                     topMargin = dp(12)
                     bottomMargin = dp(12)
                 }
-                setBackgroundColor(Color.parseColor("#4A4A4A"))
+                setBackgroundColor(Color.parseColor("#283140"))
             })
             addView(
                 createProjectHeaderButton("项目广场") {
@@ -162,7 +162,7 @@ internal class MainHomeListActions(
             )
             gravity = Gravity.CENTER
             text = label
-            setTextColor(Color.parseColor("#D0D0D0"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             textSize = 16f
             setPadding(dp(20), 0, dp(20), 0)
             isClickable = true
@@ -181,7 +181,7 @@ internal class MainHomeListActions(
             }
             gravity = Gravity.CENTER_VERTICAL
             text = title
-            setTextColor(Color.parseColor("#8E8E8E"))
+            setTextColor(Color.parseColor("#6F7785"))
             textSize = 13f
             setPadding(dp(20), 0, dp(20), 0)
         }
@@ -195,7 +195,7 @@ internal class MainHomeListActions(
             )
             gravity = Gravity.CENTER_VERTICAL
             text = textValue
-            setTextColor(Color.parseColor("#6F6F6F"))
+            setTextColor(Color.parseColor("#6F7785"))
             textSize = 14f
             setPadding(dp(20), 0, dp(20), 0)
         }

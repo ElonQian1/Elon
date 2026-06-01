@@ -204,7 +204,7 @@ internal class SideMenuUsageDropdown(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     text = note
-                    setTextColor(Color.parseColor("#666666"))
+                    setTextColor(Color.parseColor("#6F7785"))
                     textSize = 11.5f
                     setPadding(dp(8), 0, 0, 0)
                 })

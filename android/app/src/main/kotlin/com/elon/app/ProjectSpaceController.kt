@@ -302,7 +302,7 @@ internal class ProjectSpaceController(
         container.addView(TextView(activity).apply {
             text = "正在进入项目空间..."
             textSize = 15f
-            setTextColor(Color.parseColor("#B8B8B8"))
+            setTextColor(Color.parseColor("#A6AFBD"))
             gravity = Gravity.CENTER
             setPadding(dp(24), dp(80), dp(24), dp(80))
         })
@@ -324,12 +324,12 @@ internal class ProjectSpaceController(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(18), dp(20), dp(18))
-            background = panelBackground("#202020")
+            background = panelBackground("#181B20")
             addView(TextView(activity).apply {
                 text = space.project.name
                 textSize = 20f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F0F0F0"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -341,7 +341,7 @@ internal class ProjectSpaceController(
                     space.project.description?.let { append("\n").append(it) }
                 }
                 textSize = 13f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#A6AFBD"))
                 setPadding(0, dp(8), 0, 0)
             })
             space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
@@ -355,7 +355,7 @@ internal class ProjectSpaceController(
             text = textValue
             textSize = 13f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#888888"))
+            setTextColor(Color.parseColor("#6F7785"))
             setPadding(dp(20), dp(18), dp(20), dp(8))
         }
     }
@@ -364,7 +364,7 @@ internal class ProjectSpaceController(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground("#1A1A1A")
+            background = panelBackground("#181B20")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openChannel(channel) }
@@ -375,12 +375,12 @@ internal class ProjectSpaceController(
                     if (channel.unreadCount > 0) append("  ·  ").append(channel.unreadCount).append(" 条未读")
                 }
                 textSize = 16f
-                setTextColor(Color.parseColor("#E2E2E2"))
+                setTextColor(Color.parseColor("#F2F5FA"))
             })
             addView(TextView(activity).apply {
                 text = channelHint(channel)
                 textSize = 12f
-                setTextColor(Color.parseColor("#8E8E8E"))
+                setTextColor(Color.parseColor("#6F7785"))
                 setPadding(0, dp(5), 0, 0)
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -396,9 +396,9 @@ internal class ProjectSpaceController(
                 members.take(12).joinToString("  ·  ") { "${it.account} (${roleLabel(it.role)})" }
             }
             textSize = 13f
-            setTextColor(Color.parseColor("#B8B8B8"))
+            setTextColor(Color.parseColor("#A6AFBD"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#1A1A1A")
+            background = panelBackground("#181B20")
         }
     }
 
@@ -423,7 +423,7 @@ internal class ProjectSpaceController(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground(if (active) "#232323" else "#1A1A1A")
+            background = panelBackground(if (active) "#283140" else "#181B20")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openPersonalAiChat(index) }
@@ -438,14 +438,14 @@ internal class ProjectSpaceController(
                     if (conversation.ended) append("  ·  已结束")
                 }
                 textSize = 16f
-                setTextColor(Color.parseColor("#E2E2E2"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
                 text = personalConversationHint(conversation)
                 textSize = 12f
-                setTextColor(Color.parseColor("#8E8E8E"))
+                setTextColor(Color.parseColor("#6F7785"))
                 setPadding(0, dp(5), 0, 0)
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -457,9 +457,9 @@ internal class ProjectSpaceController(
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#D8D8D8"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#171717")
+            background = panelBackground("#181B20")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { showCreatePersonalConversation() }
@@ -470,9 +470,9 @@ internal class ProjectSpaceController(
         return TextView(activity).apply {
             text = "暂无个人会话"
             textSize = 13f
-            setTextColor(Color.parseColor("#8E8E8E"))
+            setTextColor(Color.parseColor("#6F7785"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#1A1A1A")
+            background = panelBackground("#181B20")
         }
     }
 
@@ -587,10 +587,10 @@ internal class ProjectSpaceController(
             textSize = 15f
             gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
+            setTextColor(Color.parseColor("#07120A"))
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor("#3BA55D"))
+                setColor(Color.parseColor("#58BE6A"))
             }
             isClickable = true
             foreground = selectableForeground()

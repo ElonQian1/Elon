@@ -232,7 +232,7 @@ class ChatAdapter(
         status.visibility = if (text == null) View.GONE else View.VISIBLE
         status.text = text.orEmpty()
         status.setTextColor(Color.parseColor(
-            if (canRetry) "#C62828" else if (message.isRead && message.role == "user") "#4CAF50" else "#66111111"
+            if (canRetry) "#C62828" else if (message.isRead && message.role == "user") "#58BE6A" else "#66111111"
         ))
         status.isClickable = canRetry
         status.isFocusable = canRetry
@@ -489,11 +489,11 @@ class ChatAdapter(
     }
 
     private fun messageTextColor(role: String): Int = when (role) {
-        "ai", "ai-intent", "friend" -> Color.parseColor("#F4F4F4")
+        "ai", "ai-intent", "friend" -> Color.parseColor("#F2F5FA")
         "ai-stopped" -> Color.parseColor("#D9B66B")
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#9A9A9A")
+        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#A6AFBD")
         "error" -> Color.parseColor("#C62828")
-        else -> Color.parseColor("#111111")
+        else -> Color.parseColor("#07120A")
     }
 
     private fun startShimmer(holder: VH, expectedRole: String) {
@@ -510,11 +510,11 @@ class ChatAdapter(
                 width.toFloat(),
                 0f,
                 intArrayOf(
-                    Color.parseColor("#9A9A9A"),
+                    Color.parseColor("#A6AFBD"),
                     Color.parseColor("#CFCFCF"),
                     Color.parseColor("#F6F6F6"),
-                    Color.parseColor("#D8D8D8"),
-                    Color.parseColor("#9A9A9A")
+                    Color.parseColor("#F2F5FA"),
+                    Color.parseColor("#A6AFBD")
                 ),
                 floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
                 Shader.TileMode.CLAMP
@@ -671,11 +671,11 @@ class ChatAdapter(
     private fun buildEvidenceShader(width: Int): LinearGradient = LinearGradient(
         0f, 0f, width.toFloat(), 0f,
         intArrayOf(
-            Color.parseColor("#8D8D8D"),
+            Color.parseColor("#6F7785"),
             Color.parseColor("#CFCFCF"),
             Color.parseColor("#F6F6F6"),
-            Color.parseColor("#D8D8D8"),
-            Color.parseColor("#8D8D8D")
+            Color.parseColor("#F2F5FA"),
+            Color.parseColor("#6F7785")
         ),
         floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
         Shader.TileMode.CLAMP

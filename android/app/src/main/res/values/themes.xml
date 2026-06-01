@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ElonApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">#101010</item>
-        <item name="colorPrimaryVariant">#101010</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:statusBarColor">#101010</item>
-        <item name="android:navigationBarColor">#1E1E1E</item>
+        <item name="colorPrimary">@color/elon_bg_app</item>
+        <item name="colorPrimaryVariant">@color/elon_bg_app</item>
+        <item name="colorOnPrimary">@color/elon_text_primary</item>
+        <item name="android:statusBarColor">@color/elon_bg_app</item>
+        <item name="android:navigationBarColor">@color/elon_nav_bg</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
     </style>
 
@@ -14,7 +14,7 @@
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#B8B8B8</item>
+        <item name="android:textColor">@color/elon_text_secondary</item>
         <item name="android:textSize">12sp</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:drawablePadding">1dp</item>
@@ -31,7 +31,7 @@
         <item name="android:layout_marginEnd">8dp</item>
         <item name="android:background">@drawable/bg_quick_button</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#D0D0D0</item>
+        <item name="android:textColor">@color/elon_text_primary</item>
         <item name="android:textSize">13sp</item>
         <item name="android:clickable">true</item>
         <item name="android:foreground">?attr/selectableItemBackground</item>
@@ -42,7 +42,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:paddingTop">8dp</item>
         <item name="android:paddingBottom">8dp</item>
-        <item name="android:textColor">#B8B8B8</item>
+        <item name="android:textColor">@color/elon_text_secondary</item>
         <item name="android:textSize">14sp</item>
     </style>
 
@@ -53,7 +53,7 @@
         <item name="android:layout_margin">5dp</item>
         <item name="android:background">@drawable/bg_dark_button</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#D0D0D0</item>
+        <item name="android:textColor">@color/elon_text_primary</item>
         <item name="android:textSize">15sp</item>
         <item name="android:clickable">true</item>
         <item name="android:foreground">?attr/selectableItemBackground</item>
@@ -74,7 +74,7 @@
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:textColor">#D8D8D8</item>
+        <item name="android:textColor">@color/elon_text_primary</item>
         <item name="android:textSize">11sp</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:drawablePadding">3dp</item>

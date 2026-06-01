@@ -113,13 +113,13 @@ internal class ChatProjectSideMenuView(
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             addView(menuText(title).apply {
-                setTextColor(Color.parseColor("#D0D0D0"))
+                setTextColor(Color.parseColor("#F2F5FA"))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             })
             if (showAddButton) {
                 addView(ImageButton(context).apply {
                     setImageResource(R.drawable.ic_add_circle_simple)
-                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#D0D0D0"))
+                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#F2F5FA"))
                     background = null
                     scaleType = ImageView.ScaleType.CENTER
                     contentDescription = "发起联合项目"
@@ -143,7 +143,7 @@ internal class ChatProjectSideMenuView(
             foreground = selectableForeground()
             addView(ImageView(context).apply {
                 setImageResource(iconRes)
-                imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C9C9C9"))
+                imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#A6AFBD"))
                 scaleType = ImageView.ScaleType.CENTER
             }, LinearLayout.LayoutParams(dp(26), dp(26)))
             addView(menuText(title).apply {
@@ -163,7 +163,7 @@ internal class ChatProjectSideMenuView(
             if (active) {
                 background = GradientDrawable().apply {
                     cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#242424"))
+                    setColor(Color.parseColor("#181B20"))
                 }
             }
             setOnClickListener { onClick() }
@@ -209,7 +209,7 @@ internal class ChatProjectSideMenuView(
                     })
                     addView(TextView(context).apply {
                         text = project.latestProjectLog()
-                        setTextColor(Color.parseColor("#666666"))
+                        setTextColor(Color.parseColor("#6F7785"))
                         textSize = 10.5f
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.END
@@ -220,7 +220,7 @@ internal class ChatProjectSideMenuView(
                     text = if (expanded) "⌃" else "⌄"
                     gravity = Gravity.CENTER
                     includeFontPadding = false
-                    setTextColor(Color.parseColor("#BDBDBD"))
+                    setTextColor(Color.parseColor("#A6AFBD"))
                     textSize = 16f
                     isClickable = true
                     foreground = selectableForeground()
@@ -256,7 +256,7 @@ internal class ChatProjectSideMenuView(
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#6F7785"))
             textSize = 11.5f
             this.text = text
         }
@@ -264,7 +264,7 @@ internal class ChatProjectSideMenuView(
 
     private fun emptyRow(text: String): TextView {
         return menuText(text).apply {
-            setTextColor(Color.parseColor("#666666"))
+            setTextColor(Color.parseColor("#6F7785"))
             textSize = 14f
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
         }
@@ -277,7 +277,7 @@ internal class ChatProjectSideMenuView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#C9C9C9"))
+            setTextColor(Color.parseColor("#A6AFBD"))
             textSize = 17f
         }
     }

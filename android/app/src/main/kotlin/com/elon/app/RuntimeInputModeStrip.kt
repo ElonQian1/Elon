@@ -26,7 +26,7 @@ internal class RuntimeInputModeStrip(
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(4), dp(4), dp(4), dp(4))
-        background = roundedBg("#202020", "#353535")
+        background = roundedBg("#181B20", "#283140")
         visibility = View.GONE
     }
 
@@ -35,7 +35,7 @@ internal class RuntimeInputModeStrip(
         gravity = Gravity.CENTER_VERTICAL
         includeFontPadding = false
         text = "运行中输入"
-        setTextColor(Color.parseColor("#B8B8B8"))
+        setTextColor(Color.parseColor("#A6AFBD"))
         textSize = 12.5f
         setPadding(dp(10), 0, dp(6), 0)
     }
@@ -53,7 +53,7 @@ internal class RuntimeInputModeStrip(
             includeFontPadding = false
             text = mode.label
             textSize = 12f
-            setTextColor(Color.parseColor("#D8D8D8"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             setPadding(dp(10), 0, dp(10), 0)
             setOnClickListener { onModeSelected(mode) }
         }
@@ -75,11 +75,11 @@ internal class RuntimeInputModeStrip(
         buttons.forEach { (mode, button) ->
             val active = mode == selected
             button.setTypeface(Typeface.DEFAULT, if (active) Typeface.BOLD else Typeface.NORMAL)
-            button.setTextColor(Color.parseColor(if (active) "#101010" else "#D8D8D8"))
+            button.setTextColor(Color.parseColor(if (active) "#101010" else "#F2F5FA"))
             button.background = if (active) {
-                roundedBg("#E4E4E4", "#E4E4E4")
+                roundedBg("#F2F5FA", "#F2F5FA")
             } else {
-                roundedBg("#2A2A2A", "#3A3A3A")
+                roundedBg("#283140", "#1E2126")
             }
         }
     }

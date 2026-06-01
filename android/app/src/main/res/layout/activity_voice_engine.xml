@@ -3,20 +3,20 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#121212">
+    android:background="@color/elon_bg_app">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp"
-        android:background="#1E1E1E">
+        android:background="@color/elon_surface_card">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="语音识别引擎管理"
-            android:textColor="#EFEFEF"
+            android:textColor="@color/elon_text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
 
@@ -26,7 +26,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="正在加载…"
-            android:textColor="#AAAAAA"
+            android:textColor="@color/elon_text_secondary"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -39,7 +39,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="云端识别语言："
-                android:textColor="#CCCCCC"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="13sp" />
             <Spinner
                 android:id="@+id/whisperLanguageSpinner"
@@ -61,7 +61,7 @@
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:text="识别精度 (beam_size)："
-                android:textColor="#CCCCCC"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="13sp" />
             <Spinner
                 android:id="@+id/whisperBeamSizeSpinner"
@@ -81,7 +81,7 @@
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:text="静音过滤 (vad_filter)："
-                android:textColor="#CCCCCC"
+                android:textColor="@color/elon_text_secondary"
                 android:textSize="13sp" />
             <Switch
                 android:id="@+id/whisperVadFilterSwitch"
@@ -104,13 +104,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="上文感知识别："
-                    android:textColor="#CCCCCC"
+                    android:textColor="@color/elon_text_secondary"
                     android:textSize="13sp" />
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="(condition_on_previous_text，关闭可防止错误传染)"
-                    android:textColor="#888888"
+                    android:textColor="@color/elon_text_tertiary"
                     android:textSize="11sp" />
             </LinearLayout>
             <Switch
@@ -130,9 +130,9 @@
                 android:layout_weight="1"
                 android:layout_height="44dp"
                 android:layout_marginEnd="6dp"
-                android:backgroundTint="#1565C0"
+                android:backgroundTint="@color/elon_button_primary_bg"
                 android:text="测试全部引擎"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/elon_button_primary_text"
                 android:textSize="13sp" />
             <Button
                 android:id="@+id/clearHealthButton"
@@ -140,9 +140,9 @@
                 android:layout_weight="1"
                 android:layout_height="44dp"
                 android:layout_marginStart="6dp"
-                android:backgroundTint="#37474F"
+                android:backgroundTint="@color/elon_button_secondary_bg"
                 android:text="清空测试记录"
-                android:textColor="#CCCCCC"
+                android:textColor="@color/elon_button_secondary_text"
                 android:textSize="13sp" />
         </LinearLayout>
     </LinearLayout>
@@ -151,7 +151,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#121212"
+        android:background="@color/elon_bg_app"
         android:layout_marginTop="8dp">
 
         <LinearLayout

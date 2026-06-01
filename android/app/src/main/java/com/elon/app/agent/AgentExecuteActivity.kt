@@ -26,6 +26,21 @@ import com.elon.app.agent.infrastructure.floating.ReportSubmitDialog
 import com.elon.app.agent.infrastructure.floating.ConversationalVoiceActivity
 import com.elon.app.agent.infrastructure.voice.VoiceRecognitionHelper
 
+private const val APP_BG = "#101010"
+private const val CARD_BG = "#181B20"
+private const val SUBTLE_BG = "#0F1217"
+private const val TEXT_PRIMARY = "#F2F5FA"
+private const val TEXT_SECONDARY = "#A6AFBD"
+private const val TEXT_TERTIARY = "#6F7785"
+private const val BUTTON_SECONDARY_BG = "#283140"
+private const val BUTTON_SECONDARY_TEXT = "#DDE8FC"
+private const val BUTTON_PRIMARY_BG = "#58BE6A"
+private const val BUTTON_PRIMARY_TEXT = "#07120A"
+private const val LINK_PRIMARY = "#6091CF"
+private const val BADGE_INFO_BG = "#152C3E"
+private const val BADGE_INFO_TEXT = "#81B3D9"
+private const val DANGER_TEXT = "#D97A7A"
+
 /**
  * 🎯 Agent 独立执行界面
  * 
@@ -156,7 +171,7 @@ class AgentExecuteActivity : Activity() {
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
-            setBackgroundColor(Color.parseColor("#F5F5F5"))
+            setBackgroundColor(Color.parseColor(APP_BG))
         }
         
         // === 标题区 ===
@@ -167,7 +182,7 @@ class AgentExecuteActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 8
             ).apply { setMargins(0, 0, 0, 16) }
-            setBackgroundColor(Color.GRAY)
+            setBackgroundColor(Color.parseColor(TEXT_TERTIARY))
         }
         mainLayout.addView(statusIndicator)
         
@@ -207,25 +222,27 @@ class AgentExecuteActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 
                 addView(TextView(this@AgentExecuteActivity).apply {
-                    text = "AI Agent"
-                    textSize = 20f
-                    setTypeface(null, Typeface.BOLD)
-                })
-                addView(TextView(this@AgentExecuteActivity).apply {
-                    text = "语音/文字输入，自动执行任务"
-                    textSize = 12f
-                    setTextColor(Color.GRAY)
-                })
+                text = "AI Agent"
+                textSize = 20f
+                setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor(TEXT_PRIMARY))
+            })
+            addView(TextView(this@AgentExecuteActivity).apply {
+                text = "语音/文字输入，自动执行任务"
+                textSize = 12f
+                setTextColor(Color.parseColor(TEXT_SECONDARY))
+            })
             })
             
             // ⚙️ 设置按钮
             addView(Button(this@AgentExecuteActivity).apply {
                 text = "⚙️"
-                textSize = 18f
-                setBackgroundColor(Color.TRANSPARENT)
-                setOnClickListener {
-                    startActivity(Intent(this@AgentExecuteActivity, AgentConfigActivity::class.java))
-                }
+            textSize = 18f
+            setBackgroundColor(Color.TRANSPARENT)
+            setTextColor(Color.parseColor(LINK_PRIMARY))
+            setOnClickListener {
+                startActivity(Intent(this@AgentExecuteActivity, AgentConfigActivity::class.java))
+            }
             })
         }
     }
@@ -233,7 +250,7 @@ class AgentExecuteActivity : Activity() {
     private fun createInputSection(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(CARD_BG))
             setPadding(24, 24, 24, 24)
             
             // 标题行（带语音按钮）
@@ -245,14 +262,15 @@ class AgentExecuteActivity : Activity() {
                     text = "🎯 输入任务目标"
                     textSize = 16f
                     setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.parseColor(TEXT_PRIMARY))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 
                 // 语音输入按钮
                 voiceButton = Button(this@AgentExecuteActivity).apply {
                     text = "🎤 语音"
                     textSize = 12f
-                    setBackgroundColor(Color.parseColor("#2196F3"))
-                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                    setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                     setOnClickListener { toggleVoiceInput() }
                 }
                 addView(voiceButton)
@@ -263,7 +281,7 @@ class AgentExecuteActivity : Activity() {
             voiceStatusText = TextView(this@AgentExecuteActivity).apply {
                 text = ""
                 textSize = 12f
-                setTextColor(Color.parseColor("#2196F3"))
+                setTextColor(Color.parseColor(LINK_PRIMARY))
                 visibility = View.GONE
                 gravity = Gravity.CENTER
                 setPadding(0, 8, 0, 0)
@@ -275,7 +293,9 @@ class AgentExecuteActivity : Activity() {
                 minLines = 3
                 maxLines = 5
                 gravity = Gravity.TOP
-                setBackgroundColor(Color.parseColor("#F0F0F0"))
+                setTextColor(Color.parseColor(TEXT_PRIMARY))
+                setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+                setBackgroundColor(Color.parseColor(SUBTLE_BG))
                 setPadding(16, 16, 16, 16)
             }
             addView(goalInput, LinearLayout.LayoutParams(
@@ -290,16 +310,16 @@ class AgentExecuteActivity : Activity() {
             
             executeButton = Button(this@AgentExecuteActivity).apply {
                 text = "▶️ 执行任务"
-                setBackgroundColor(Color.parseColor("#4CAF50"))
-                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(BUTTON_PRIMARY_BG))
+                setTextColor(Color.parseColor(BUTTON_PRIMARY_TEXT))
                 setOnClickListener { executeGoal() }
             }
             buttonLayout.addView(executeButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             
             stopButton = Button(this@AgentExecuteActivity).apply {
                 text = "⏹️ 停止"
-                setBackgroundColor(Color.parseColor("#F44336"))
-                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                 isEnabled = false
                 setOnClickListener { stopExecution() }
             }
@@ -319,13 +339,14 @@ class AgentExecuteActivity : Activity() {
     private fun createPresetSection(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(CARD_BG))
             setPadding(24, 24, 24, 24)
             
             addView(TextView(this@AgentExecuteActivity).apply {
                 text = "⚡ 常用任务"
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
+                setTextColor(Color.parseColor(TEXT_PRIMARY))
             })
             
             presetButtonsLayout = LinearLayout(this@AgentExecuteActivity).apply {
@@ -344,6 +365,8 @@ class AgentExecuteActivity : Activity() {
                 presetButtonsLayout.addView(Button(this@AgentExecuteActivity).apply {
                     text = label
                     textSize = 12f
+                    setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                    setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                     setOnClickListener {
                         goalInput.setText(goal)
                     }
@@ -364,7 +387,7 @@ class AgentExecuteActivity : Activity() {
     private fun createProgressSection(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(CARD_BG))
             setPadding(24, 24, 24, 24)
             visibility = View.GONE
             tag = "progress_section"
@@ -372,6 +395,7 @@ class AgentExecuteActivity : Activity() {
             progressText = TextView(this@AgentExecuteActivity).apply {
                 text = "准备中..."
                 textSize = 14f
+                setTextColor(Color.parseColor(TEXT_SECONDARY))
             }
             addView(progressText)
             
@@ -388,8 +412,8 @@ class AgentExecuteActivity : Activity() {
             viewReportButton = Button(this@AgentExecuteActivity).apply {
                 text = "📋 查看执行报告"
                 textSize = 14f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor("#4A90D9"))
+                setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
+                setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
                 visibility = View.GONE
                 setOnClickListener { showExecutionReport() }
             }
@@ -408,7 +432,7 @@ class AgentExecuteActivity : Activity() {
     private fun createLogSection(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(CARD_BG))
             setPadding(24, 24, 24, 24)
             
             addView(LinearLayout(this@AgentExecuteActivity).apply {
@@ -418,11 +442,14 @@ class AgentExecuteActivity : Activity() {
                     text = "📋 执行日志"
                     textSize = 14f
                     setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.parseColor(TEXT_PRIMARY))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 
                 addView(Button(this@AgentExecuteActivity).apply {
                     text = "清空"
                     textSize = 12f
+                    setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                    setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                     setOnClickListener { logOutput.text = "" }
                 })
             })
@@ -430,8 +457,8 @@ class AgentExecuteActivity : Activity() {
             logOutput = TextView(this@AgentExecuteActivity).apply {
                 text = "等待执行...\n"
                 textSize = 11f
-                setTextColor(Color.DKGRAY)
-                setBackgroundColor(Color.parseColor("#FAFAFA"))
+                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setBackgroundColor(Color.parseColor(SUBTLE_BG))
                 setPadding(12, 12, 12, 12)
                 maxLines = 50
                 movementMethod = ScrollingMovementMethod()
@@ -502,7 +529,7 @@ class AgentExecuteActivity : Activity() {
         goalInput.isEnabled = !executing
         
         statusIndicator.setBackgroundColor(
-            if (executing) Color.parseColor("#FF9800") else Color.GRAY
+            Color.parseColor(if (executing) LINK_PRIMARY else TEXT_TERTIARY)
         )
         
         // 手动查找进度区
@@ -551,14 +578,14 @@ class AgentExecuteActivity : Activity() {
             updateUI(executing = false)
             
             if (success) {
-                statusIndicator.setBackgroundColor(Color.parseColor("#4CAF50"))
+                statusIndicator.setBackgroundColor(Color.parseColor(BUTTON_PRIMARY_BG))
                 appendLog("✅ 执行成功!")
                 if (result.isNotEmpty()) {
                     appendLog("📊 结果: $result")
                 }
                 Toast.makeText(this, "✅ 任务完成!", Toast.LENGTH_SHORT).show()
             } else {
-                statusIndicator.setBackgroundColor(Color.parseColor("#F44336"))
+                statusIndicator.setBackgroundColor(Color.parseColor(DANGER_TEXT))
                 appendLog("❌ 执行失败: $result")
                 Toast.makeText(this, "❌ 任务失败", Toast.LENGTH_SHORT).show()
             }
@@ -607,7 +634,8 @@ class AgentExecuteActivity : Activity() {
                 handler.post {
                     voiceStatusText.text = "❌ $error"
                     voiceButton.text = "🎤 语音"
-                    voiceButton.setBackgroundColor(Color.parseColor("#2196F3"))
+                    voiceButton.setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                    voiceButton.setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                     Toast.makeText(this@AgentExecuteActivity, error as CharSequence, Toast.LENGTH_SHORT).show()
                 }
             }
@@ -615,12 +643,14 @@ class AgentExecuteActivity : Activity() {
                 handler.post {
                     if (listening) {
                         voiceButton.text = "🔴 停止"
-                        voiceButton.setBackgroundColor(Color.parseColor("#F44336"))
+                        voiceButton.setBackgroundColor(Color.parseColor(BADGE_INFO_BG))
+                        voiceButton.setTextColor(Color.parseColor(BADGE_INFO_TEXT))
                         voiceStatusText.text = "🎤 正在聆听..."
                         voiceStatusText.visibility = View.VISIBLE
                     } else {
                         voiceButton.text = "🎤 语音"
-                        voiceButton.setBackgroundColor(Color.parseColor("#2196F3"))
+                        voiceButton.setBackgroundColor(Color.parseColor(BUTTON_SECONDARY_BG))
+                        voiceButton.setTextColor(Color.parseColor(BUTTON_SECONDARY_TEXT))
                         // 不要在这里隐藏 voiceStatusText，让它显示识别结果
                     }
                 }
@@ -682,7 +712,7 @@ class AgentExecuteActivity : Activity() {
     private fun createFloatingBallSection(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor(CARD_BG))
             setPadding(24, 24, 24, 24)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -714,11 +744,12 @@ class AgentExecuteActivity : Activity() {
                         text = "悬浮球"
                         textSize = 16f
                         setTypeface(null, Typeface.BOLD)
+                        setTextColor(Color.parseColor(TEXT_PRIMARY))
                     })
                     addView(TextView(this@AgentExecuteActivity).apply {
                         text = "单击语音 | 双击文字"
                         textSize = 12f
-                        setTextColor(Color.GRAY)
+                        setTextColor(Color.parseColor(TEXT_SECONDARY))
                     })
                 })
             }
@@ -745,7 +776,7 @@ class AgentExecuteActivity : Activity() {
             addView(TextView(this@AgentExecuteActivity).apply {
                 text = "开启后，悬浮球将显示在所有界面上方。\n• 单击悬浮球 → 语音输入任务\n• 双击悬浮球 → 文字输入任务\n• 长按拖动 → 移动位置"
                 textSize = 12f
-                setTextColor(Color.parseColor("#888888"))
+                setTextColor(Color.parseColor(TEXT_TERTIARY))
                 setPadding(0, 16, 0, 0)
             })
             
@@ -754,8 +785,8 @@ class AgentExecuteActivity : Activity() {
                 addView(Button(this@AgentExecuteActivity).apply {
                     text = "⚠️ 需要悬浮窗权限，点击授权"
                     textSize = 12f
-                    setBackgroundColor(Color.parseColor("#FFF3E0"))
-                    setTextColor(Color.parseColor("#E65100"))
+                    setBackgroundColor(Color.parseColor(BADGE_INFO_BG))
+                    setTextColor(Color.parseColor(BADGE_INFO_TEXT))
                     setOnClickListener {
                         FloatingBallService.requestOverlayPermission(this@AgentExecuteActivity)
                     }
@@ -826,10 +857,13 @@ class AgentExecuteActivity : Activity() {
                 else -> "📋 查看执行报告"
             }
             viewReportButton.setBackgroundColor(when (performanceScore) {
-                "POOR" -> Color.parseColor("#E53935")   // 红色
-                "FAIR" -> Color.parseColor("#FB8C00")   // 橙色
-                else -> Color.parseColor("#4CAF50")     // 绿色
+                "POOR" -> Color.parseColor(DANGER_TEXT)
+                "FAIR" -> Color.parseColor(LINK_PRIMARY)
+                else -> Color.parseColor(BUTTON_PRIMARY_BG)
             })
+            viewReportButton.setTextColor(Color.parseColor(
+                if (performanceScore == "GOOD") BUTTON_PRIMARY_TEXT else BUTTON_SECONDARY_TEXT
+            ))
         }
     }
     

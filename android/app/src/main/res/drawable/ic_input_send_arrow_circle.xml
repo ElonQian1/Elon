@@ -5,12 +5,12 @@
     android:viewportWidth="30"
     android:viewportHeight="30">
     <path
-        android:fillColor="#C9C9C9"
+        android:fillColor="@color/elon_text_secondary"
         android:pathData="M15,2.5a12.5,12.5 0,1 0,0.1 0" />
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M15,22 L15,8.5 M9.6,13.9 L15,8.5 L20.4,13.9"
-        android:strokeColor="#202020"
+        android:strokeColor="@color/elon_surface_card"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:strokeWidth="2.2" />

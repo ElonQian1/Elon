@@ -7,15 +7,15 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M13,3.6a9.4,9.4 0,1 0,0.1 0"
-        android:strokeColor="#D0D0D0"
+        android:strokeColor="@color/elon_text_primary"
         android:strokeWidth="1.7" />
     <path
-        android:fillColor="#D0D0D0"
+        android:fillColor="@color/elon_text_primary"
         android:pathData="M9.2,10.2a1.15,1.15 0,1 0,0.1 0M16.7,10.2a1.15,1.15 0,1 0,0.1 0" />
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M8.7,15.2c1,1.5 2.4,2.2 4.3,2.2c1.9,0 3.4,-0.8 4.3,-2.2"
-        android:strokeColor="#D0D0D0"
+        android:strokeColor="@color/elon_text_primary"
         android:strokeLineCap="round"
         android:strokeWidth="1.55" />
 </vector>
