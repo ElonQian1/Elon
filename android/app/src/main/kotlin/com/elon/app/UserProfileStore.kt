@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import android.util.LruCache
 import java.io.ByteArrayOutputStream
 
 internal data class UserProfile(
@@ -17,6 +18,11 @@ internal data class UserProfile(
 )
 
 internal object UserProfileStore {
+    // 头像 Bitmap 内存缓存：key = dataUrl hashCode，最多 4MB（约 50 张 320x320 头像）
+    private val avatarCache = object : LruCache<Int, Bitmap>(4 * 1024 * 1024) {
+        override fun sizeOf(key: Int, value: Bitmap) = value.byteCount
+    }
+
     private const val KEY_NAME = "profile_display_name"
     private const val KEY_SIGNATURE = "profile_signature"
     private const val KEY_AVATAR_DATA_URL = "profile_avatar_data_url"
@@ -63,10 +69,12 @@ internal object UserProfileStore {
 
     fun decodeAvatar(dataUrl: String?): Bitmap? {
         val data = dataUrl?.substringAfter(",", "")?.takeIf { it.isNotBlank() } ?: return null
+        val key = dataUrl.hashCode()
+        avatarCache.get(key)?.let { return it }
         return runCatching {
             val bytes = Base64.decode(data, Base64.DEFAULT)
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        }.getOrNull()
+        }.getOrNull()?.also { avatarCache.put(key, it) }
     }
 
     fun avatarDataUrlFromUri(context: Context, uri: Uri): String {
