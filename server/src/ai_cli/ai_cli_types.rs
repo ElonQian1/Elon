@@ -8,6 +8,18 @@ pub struct NativeSessionScope {
     pub conversation_id: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiCliRequestMode {
+    Execute,
+    Plan,
+}
+
+impl AiCliRequestMode {
+    pub fn is_plan(self) -> bool {
+        self == Self::Plan
+    }
+}
+
 /// 意图网关分类结果。
 #[derive(Debug, Clone, PartialEq)]
 pub struct IntentGateResult {

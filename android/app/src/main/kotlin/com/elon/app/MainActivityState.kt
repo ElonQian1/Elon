@@ -19,6 +19,7 @@ class MainActivityState {
     // ── 请求与连接状态 ───────────────────────────────────────────────────────
     var waitingForReply = false
     var activeRequestIsDevelopment = false
+    var activeRequestIsPlanning = false
     var serverResponseToken = 0
     var appInForeground = false
     var pendingRequestPayload: String? = null

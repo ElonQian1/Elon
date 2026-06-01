@@ -1,7 +1,7 @@
 ﻿use std::path::Path;
 
 use crate::{
-    ai_cli::{codex_thread_uri, truncate_chars},
+    ai_cli::{codex_thread_uri, truncate_chars, AiCliRequestMode},
     intent_router,
     store::ConversationMessage,
     types::AiCliOption,
@@ -14,7 +14,11 @@ pub(crate) fn build_cli_prompt(
     option: &AiCliOption,
     route: intent_router::CapabilityRoute,
     prompt_bootstrapped: bool,
+    request_mode: AiCliRequestMode,
 ) -> String {
+    if request_mode.is_plan() {
+        return build_plan_cli_prompt(workspace, user_message, preflight_note, option);
+    }
     if route == intent_router::CapabilityRoute::ChatAgent {
         if prompt_bootstrapped {
             return build_resumed_chat_cli_prompt(workspace, user_message, option);
@@ -31,6 +35,53 @@ pub(crate) fn build_cli_prompt(
         );
     }
     build_development_cli_prompt(workspace, user_message, preflight_note, option)
+}
+
+pub(crate) fn build_plan_cli_prompt(
+    workspace: &Path,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    option: &AiCliOption,
+) -> String {
+    let model_text = option
+        .model
+        .as_deref()
+        .map(|model| format!("，当前模型：{}", model))
+        .unwrap_or_default();
+    let preflight_text = preflight_note
+        .map(|note| format!("\n项目预检提示：\n{note}\n"))
+        .unwrap_or_default();
+    format!(
+        r#"你是「一龙」平台里的项目规划助手。当前是 Plan 模式。无论当前 CLI 或模型是否有原生 plan mode，本轮都必须按只规划语义执行。
+
+当前 CLI：{provider}{model_text}
+当前项目目录：{workspace}
+{preflight_text}
+
+硬规则：
+- 只做需求拆解、方案设计、风险判断和验证计划。
+- 可以读取当前项目中与需求直接相关的文件、目录结构和说明文档；不要做大范围无关扫描。
+- 绝对不要创建、修改、删除文件；不要运行格式化、构建、测试、提交、push、部署或 APK 发布命令。
+- 如果发现需求不清楚，先给出建议计划，并把需要用户确认的问题列在最后。
+- 输出中文，给小白也能看懂的步骤。避免工具日志和内部命令流水账。
+- 结尾必须明确说明：用户确认后可以发送「按这个计划开始实现」进入真正开发。
+
+输出结构：
+1. 我理解的目标
+2. 推荐方案
+3. 需要改动的模块或页面
+4. 实施步骤
+5. 验证与发布方式
+6. 需要你确认的问题
+
+用户请求：
+{user_message}"#,
+        provider = option.provider,
+        model_text = model_text,
+        workspace = workspace.display(),
+        preflight_text = preflight_text,
+        user_message = user_message
+    )
 }
 
 pub(crate) fn build_prewarm_cli_prompt(workspace: &Path, option: &AiCliOption) -> String {

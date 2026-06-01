@@ -11,11 +11,19 @@ object CodexInteractionPresentation {
         visibleText: String,
         outgoingText: String,
         isDevelopment: Boolean,
+        executionMode: ProjectRequestExecutionMode = ProjectRequestExecutionMode.Execute,
         hasAttachments: Boolean
     ): ChatMessage {
         val summary = summarizeIntent(visibleText.ifBlank { outgoingText })
-        val routeLabel = if (isDevelopment) "开发任务" else "普通对话"
-        val nextAction = if (isDevelopment) {
+        val isPlanMode = executionMode.isPlan
+        val routeLabel = when {
+            isPlanMode -> "先规划"
+            isDevelopment -> "开发任务"
+            else -> "普通对话"
+        }
+        val nextAction = if (isPlanMode) {
+            "我会先生成计划，不改代码；你确认后再开始实现。"
+        } else if (isDevelopment) {
             "我会按「确认意图 → 定位代码 → 修改验证 → 交付结果」推进。"
         } else {
             "我会直接用对话方式回复，不启动项目代码修改。"
@@ -26,7 +34,9 @@ object CodexInteractionPresentation {
             ""
         }
 
-        val content = if (isDevelopment) {
+        val content = if (isPlanMode) {
+            "我理解你想先做计划：$summary\n$nextAction$attachmentLine"
+        } else if (isDevelopment) {
             "我理解你是想让我进入开发流程：$summary\n$nextAction$attachmentLine"
         } else {
             "我理解你是在普通交流：$summary\n$nextAction$attachmentLine"
@@ -48,7 +58,9 @@ object CodexInteractionPresentation {
         return ChatMessage(
             role = "ai-intent",
             content = content,
-            evidenceTitle = if (isDevelopment) {
+            evidenceTitle = if (isPlanMode) {
+                "理解意图 · 先规划"
+            } else if (isDevelopment) {
                 "理解意图 · 进入开发流程"
             } else {
                 "理解意图 · 直接回复"

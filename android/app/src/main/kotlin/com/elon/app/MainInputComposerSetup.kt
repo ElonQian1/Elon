@@ -29,6 +29,7 @@ internal data class MainInputComposerViews(
     val collapsedInputPreview: TextView,
     val modelButtonShell: FrameLayout,
     val modelChevron: ImageView,
+    val planModeButton: TextView,
     val inputRightControls: FrameLayout,
     val inputComposerMotion: InputComposerMotion,
     val attachmentPanel: LinearLayout,
@@ -53,6 +54,7 @@ internal class MainInputComposerSetup(
     private val cancelSpeechToText: () -> Unit,
     private val onVoiceTouchMove: (Float, Float) -> Unit = { _, _ -> },
     private val showModelPopupOrLoad: () -> Unit,
+    private val togglePlanMode: () -> Unit,
     private val sendMessage: () -> Unit,
     private val toggleAttachmentPanel: () -> Unit,
     private val toggleEmojiPanel: () -> Unit,
@@ -263,6 +265,22 @@ internal class MainInputComposerSetup(
         modelButtonShell.addView(modelButton)
         modelButtonShell.addView(modelChevron)
 
+        val planModeButton = TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(68), dp(32)).apply {
+                marginEnd = dp(8)
+            }
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            text = "先规划"
+            textSize = 12.5f
+            isClickable = true
+            isFocusable = true
+            contentDescription = "开启先规划"
+            setOnClickListener { togglePlanMode() }
+        }
+
         val emojiButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
                 marginEnd = dp(8)
@@ -306,6 +324,7 @@ internal class MainInputComposerSetup(
         inputBarContainer.addView(inputModeButton)
         inputBarContainer.addView(modelButtonShell)
         inputBarContainer.addView(emojiButton)
+        inputBarContainer.addView(planModeButton)
         inputBarContainer.addView(inputCenterContainer)
         inputRightControls.addView(attachmentButton)
         inputRightControls.addView(sendButton)
@@ -379,6 +398,7 @@ internal class MainInputComposerSetup(
             collapsedInputPreview = collapsedInputPreview,
             modelButtonShell = modelButtonShell,
             modelChevron = modelChevron,
+            planModeButton = planModeButton,
             inputRightControls = inputRightControls,
             inputComposerMotion = inputComposerMotion,
             attachmentPanel = attachmentPanel,

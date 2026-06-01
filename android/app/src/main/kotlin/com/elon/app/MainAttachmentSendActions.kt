@@ -14,15 +14,22 @@ internal class MainAttachmentSendActions(
     private val setSendEnabled: (Boolean) -> Unit,
     private val appendMessage: (ChatMessage) -> Unit,
     private val updateMessage: (ChatMessage) -> Unit,
-    private val startPreparedMessageAfterUserBubble: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit
+    private val startPreparedMessageAfterUserBubble:
+        (String, String, JsonArray, SendTarget, List<ChatAttachment>, ProjectRequestExecutionMode) -> Unit
 ) {
-    fun uploadAttachmentsThenSend(visibleText: String, outgoingText: String, target: SendTarget) {
+    fun uploadAttachmentsThenSend(
+        visibleText: String,
+        outgoingText: String,
+        target: SendTarget,
+        executionMode: ProjectRequestExecutionMode
+    ) {
         uploadPreparedAttachments(
             visibleText = visibleText,
             outgoingText = outgoingText,
             target = target,
             attachments = pendingAttachments(),
-            existingMessage = null
+            existingMessage = null,
+            executionMode = executionMode
         )
     }
 
@@ -44,7 +51,8 @@ internal class MainAttachmentSendActions(
             outgoingText = outgoingText,
             target = target,
             attachments = attachments,
-            existingMessage = message
+            existingMessage = message,
+            executionMode = ProjectRequestExecutionMode.Execute
         )
     }
 
@@ -53,7 +61,8 @@ internal class MainAttachmentSendActions(
         outgoingText: String,
         target: SendTarget,
         attachments: List<PendingAttachment>,
-        existingMessage: ChatMessage?
+        existingMessage: ChatMessage?,
+        executionMode: ProjectRequestExecutionMode
     ) {
         setSendEnabled(false)
         val optimisticMessage = existingMessage ?: ChatMessage(role = "user", content = visibleText)
@@ -115,7 +124,14 @@ internal class MainAttachmentSendActions(
                         "elapsed_ms" to (System.currentTimeMillis() - startedAt)
                     )
                 )
-                startPreparedMessageAfterUserBubble(visibleText, outgoingText, refs, target, uploadedAttachments)
+                startPreparedMessageAfterUserBubble(
+                    visibleText,
+                    outgoingText,
+                    refs,
+                    target,
+                    uploadedAttachments,
+                    executionMode
+                )
             }
         }.start()
     }

@@ -21,6 +21,7 @@ internal class MainPreparedMessageActions(
     private val looksLikeDirectImageRequest: (String) -> Boolean,
     private val rememberConversationTask: (SendTarget, String, String, Boolean) -> Unit,
     private val setActiveRequestIsDevelopment: (Boolean) -> Unit,
+    private val setActiveRequestIsPlanning: (Boolean) -> Unit,
     private val resetRequestState: () -> Unit,
     private val acceptDevelopmentRequest: (String) -> Unit,
     private val updateProjectViews: (String) -> Unit,
@@ -40,14 +41,16 @@ internal class MainPreparedMessageActions(
         outgoingText: String,
         attachmentRefs: JsonArray,
         target: SendTarget,
-        chatAttachments: List<ChatAttachment>
+        chatAttachments: List<ChatAttachment>,
+        executionMode: ProjectRequestExecutionMode = ProjectRequestExecutionMode.Execute
     ) = startPreparedMessageInternal(
         visibleText,
         outgoingText,
         attachmentRefs,
         target,
         chatAttachments,
-        appendUserBubble = true
+        appendUserBubble = true,
+        executionMode = executionMode
     )
 
     fun startPreparedMessageAfterUserBubble(
@@ -55,14 +58,16 @@ internal class MainPreparedMessageActions(
         outgoingText: String,
         attachmentRefs: JsonArray,
         target: SendTarget,
-        chatAttachments: List<ChatAttachment>
+        chatAttachments: List<ChatAttachment>,
+        executionMode: ProjectRequestExecutionMode = ProjectRequestExecutionMode.Execute
     ) = startPreparedMessageInternal(
         visibleText,
         outgoingText,
         attachmentRefs,
         target,
         chatAttachments,
-        appendUserBubble = false
+        appendUserBubble = false,
+        executionMode = executionMode
     )
 
     private fun startPreparedMessageInternal(
@@ -71,7 +76,8 @@ internal class MainPreparedMessageActions(
         attachmentRefs: JsonArray,
         target: SendTarget,
         chatAttachments: List<ChatAttachment>,
-        appendUserBubble: Boolean
+        appendUserBubble: Boolean,
+        executionMode: ProjectRequestExecutionMode
     ) {
         if (!restoreSendTarget(target)) {
             Toast.makeText(activity, "Target conversation no longer exists.", Toast.LENGTH_LONG).show()
@@ -85,13 +91,13 @@ internal class MainPreparedMessageActions(
         }
 
         val traceId = "ui_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
-        val payload = buildPayload(traceId, target, outgoingText, attachmentRefs)
+        val payload = buildPayload(traceId, target, outgoingText, attachmentRefs, executionMode)
         val payloadJson = payload.toString()
-        val requestIsDevelopment = looksLikeDevelopmentRequest(outgoingText) &&
-            !looksLikeDirectImageRequest(outgoingText)
+        val requestIsDevelopment = executionMode.isPlan ||
+            (looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText))
 
         if (appendUserBubble) appendUserMessage(visibleText, chatAttachments)
-        recordSendTrace(traceId, target, outgoingText, attachmentRefs)
+        recordSendTrace(traceId, target, outgoingText, attachmentRefs, executionMode)
         binding.inputEdit.text.clear()
         collapseInputComposer()
 
@@ -99,7 +105,8 @@ internal class MainPreparedMessageActions(
         setSendEnabled(false)
         setActiveRequestIsDevelopment(requestIsDevelopment)
         resetRequestState()
-        updateRequestPresentation(visibleText, outgoingText, requestIsDevelopment, attachmentRefs)
+        setActiveRequestIsPlanning(executionMode.isPlan)
+        updateRequestPresentation(visibleText, outgoingText, requestIsDevelopment, executionMode, attachmentRefs)
         ensureBackgroundKeepAlive(requestIsDevelopment)
 
         val responseToken = nextServerResponseToken()
@@ -111,7 +118,8 @@ internal class MainPreparedMessageActions(
         traceId: String,
         target: SendTarget,
         outgoingText: String,
-        attachmentRefs: JsonArray
+        attachmentRefs: JsonArray,
+        executionMode: ProjectRequestExecutionMode
     ): JsonObject {
         return JsonObject().apply {
             addProperty("trace_id", traceId)
@@ -122,6 +130,8 @@ internal class MainPreparedMessageActions(
             addProperty("conversation_id", target.conversationId)
             addProperty("conversation_title", target.conversationTitle)
             addProperty("message", outgoingText)
+            addProperty("execution_mode", executionMode.wireValue)
+            addProperty("plan_mode", executionMode.isPlan)
             selectedAgentForRequest()?.let { addProperty("agent", it) }
             if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
         }
@@ -141,7 +151,8 @@ internal class MainPreparedMessageActions(
         traceId: String,
         target: SendTarget,
         outgoingText: String,
-        attachmentRefs: JsonArray
+        attachmentRefs: JsonArray,
+        executionMode: ProjectRequestExecutionMode
     ) {
         DebugTraceStore.record(
             "ui_chat_send",
@@ -150,6 +161,7 @@ internal class MainPreparedMessageActions(
                 "project_id" to target.projectId,
                 "conversation_id" to target.conversationId,
                 "chars" to outgoingText.length,
+                "execution_mode" to executionMode.wireValue,
                 "attachment_refs" to attachmentRefs.size()
             )
         )
@@ -159,6 +171,7 @@ internal class MainPreparedMessageActions(
         visibleText: String,
         outgoingText: String,
         requestIsDevelopment: Boolean,
+        executionMode: ProjectRequestExecutionMode,
         attachmentRefs: JsonArray
     ) {
         if (requestIsDevelopment) {
@@ -171,6 +184,7 @@ internal class MainPreparedMessageActions(
                 visibleText = visibleText,
                 outgoingText = outgoingText,
                 isDevelopment = requestIsDevelopment,
+                executionMode = executionMode,
                 hasAttachments = attachmentRefs.size() > 0
             )
         )

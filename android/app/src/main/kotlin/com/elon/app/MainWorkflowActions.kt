@@ -9,7 +9,10 @@ internal class MainWorkflowActions(
     private val chatAdapter: () -> ChatAdapter,
     private val activeRequestIsDevelopment: () -> Boolean,
     private val setActiveRequestIsDevelopment: (Boolean) -> Unit,
+    private val activeRequestIsPlanning: () -> Boolean,
+    private val setActiveRequestIsPlanning: (Boolean) -> Unit,
     private val setWaitingForReply: (Boolean) -> Unit,
+    private val preparePlanImplementationPrompt: () -> Unit,
     private val clearPendingRequestPayload: () -> Unit,
     private val clearPendingReconnectForActiveWork: () -> Unit,
     private val resetReconnectAttempts: () -> Unit,
@@ -151,6 +154,8 @@ internal class MainWorkflowActions(
         MainAssistantTerminalActions(
             getActiveRequestIsDevelopment = activeRequestIsDevelopment,
             setActiveRequestIsDevelopment = setActiveRequestIsDevelopment,
+            getActiveRequestIsPlanning = activeRequestIsPlanning,
+            setActiveRequestIsPlanning = setActiveRequestIsPlanning,
             setWaitingForReply = setWaitingForReply,
             setSendEnabled = sendEnabledActions()::setSendEnabled,
             clearPendingRequestPayload = clearPendingRequestPayload,
@@ -170,6 +175,7 @@ internal class MainWorkflowActions(
             resetFoldedCliLog = { foldedCliLogActions.reset() },
             aiMessageWithCurrentEvidence = evidenceActions::aiMessageWithCurrentEvidence,
             appendMessage = messageAppendActions::appendMessage,
+            preparePlanImplementationPrompt = preparePlanImplementationPrompt,
             workflowStoppedMessage = { reason ->
                 mainWorkflowStoppedMessage(reason, activeRequestIsDevelopment())
             }

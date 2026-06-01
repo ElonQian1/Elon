@@ -13,7 +13,7 @@ internal class MainRunningInputActions(
     private val appendMessage: (ChatMessage) -> Unit,
     private val updateMessage: (ChatMessage) -> Unit,
     private val startPreparedMessageAfterUserBubble:
-        (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit,
+        (String, String, JsonArray, SendTarget, List<ChatAttachment>, ProjectRequestExecutionMode) -> Unit,
     private val startTaskWorkService: (String, String?, Boolean, String?) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
     private val expandOutgoing: (String, MutableList<ChatMessage>) -> String
@@ -48,7 +48,14 @@ internal class MainRunningInputActions(
         }
         val target = SendTarget(project.id, project.title, conversation.id, conversation.title)
         val outgoing = expandOutgoing(queued.content, conversation.messages)
-        startPreparedMessageAfterUserBubble(queued.content, outgoing, JsonArray(), target, emptyList())
+        startPreparedMessageAfterUserBubble(
+            queued.content,
+            outgoing,
+            JsonArray(),
+            target,
+            emptyList(),
+            ProjectRequestExecutionMode.Execute
+        )
     }
 
     private fun remindCurrent(text: String) {
@@ -92,7 +99,8 @@ internal class MainRunningInputActions(
             fork.outgoingText,
             JsonArray(),
             fork.target,
-            emptyList()
+            emptyList(),
+            ProjectRequestExecutionMode.Execute
         )
     }
 

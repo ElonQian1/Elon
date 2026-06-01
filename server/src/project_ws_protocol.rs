@@ -14,6 +14,8 @@ pub struct ProjectChatRequest {
     pub client_request_id: Option<String>,
     pub message: String,
     pub agent: Option<String>,
+    pub execution_mode: Option<String>,
+    pub plan_mode: Option<bool>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
@@ -125,11 +127,12 @@ pub fn project_client_request_id(
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| {
             stable_request_id(&format!(
-                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
                 project_id,
                 user_id,
                 conversation_id,
                 request.agent.as_deref().unwrap_or(""),
+                request.execution_mode.as_deref().unwrap_or(""),
                 message
             ))
         })
@@ -190,6 +193,8 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         client_request_id: None,
         message: raw.to_string(),
         agent: None,
+        execution_mode: None,
+        plan_mode: None,
         conversation_id: None,
         conversation_title: None,
         attachments: None,

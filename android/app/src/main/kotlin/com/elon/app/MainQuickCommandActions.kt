@@ -10,10 +10,12 @@ internal class MainQuickCommandActions(
     private val activeConversation: () -> AppConversation,
     private val showCreateConversationDialog: () -> Unit,
     private val showChat: () -> Unit,
-    private val sendMessage: () -> Unit
+    private val sendMessage: () -> Unit,
+    private val enablePlanModeWithStarterPrompt: () -> Unit
 ) {
     fun fillPlanPrompt() {
-        replaceInput("我想开发一个 App，请先帮我拆解功能、页面和开发计划：")
+        showChat()
+        enablePlanModeWithStarterPrompt()
     }
 
     fun sendQuickCommand(text: String) {

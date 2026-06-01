@@ -41,6 +41,12 @@ internal class MainInputActions(
     private var speechInputActions: MainSpeechInputActions? = null
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
+    private val planModeActions by lazy {
+        MainPlanModeActions(
+            inputEdit = { binding.inputEdit },
+            dp = uiTools()::dp
+        )
+    }
 
     fun setupInputComposer() {
         fullScreenEditorOverlay = FullScreenEditorOverlay(
@@ -71,6 +77,7 @@ internal class MainInputActions(
             cancelSpeechToText = { speechInputActions().cancelSpeechToText() },
             onVoiceTouchMove = { rawX, rawY -> speechInputActions().onVoiceTouchMove(rawX, rawY) },
             showModelPopupOrLoad = { modelActions().showModelPopupOrLoad() },
+            togglePlanMode = { planModeActions.togglePlanMode() },
             sendMessage = { sendMessageActions.sendMessage() },
             toggleAttachmentPanel = { attachmentPanelActions.toggleAttachmentPanel() },
             toggleEmojiPanel = { emojiActions.toggleEmojiPanel() },
@@ -90,6 +97,7 @@ internal class MainInputActions(
         ).setup()
 
         inputComposerViews = views
+        planModeActions.bind(views.planModeButton)
         pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(activity, pendingAttachments) {
             collapsedInputPreviewActions.updateCollapsedInputPreview()
             updateSendButtonVisual()
@@ -244,10 +252,16 @@ internal class MainInputActions(
             activeConversation = projectStateActions()::activeConversation,
             appendMessage = workflowActions().messageAppendActions::appendMessage,
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
-            uploadAttachmentsThenSend = { visibleText, outgoingText, target ->
-                attachmentSendActions.uploadAttachmentsThenSend(visibleText, outgoingText, target)
+            uploadAttachmentsThenSend = { visibleText, outgoingText, target, executionMode ->
+                attachmentSendActions.uploadAttachmentsThenSend(
+                    visibleText,
+                    outgoingText,
+                    target,
+                    executionMode
+                )
             },
             startPreparedMessage = preparedMessageActions()::startPreparedMessage,
+            consumeExecutionModeForSend = planModeActions::consumeForSend,
             handleRunningInput = runningInputActions::handleRunningInput,
             trySendFriendMessage = trySendFriendMessage
         )
@@ -293,6 +307,17 @@ internal class MainInputActions(
             updateMessage = workflowActions().messageAppendActions::updateMessage,
             startPreparedMessageAfterUserBubble = preparedMessageActions()::startPreparedMessageAfterUserBubble
         )
+    }
+
+    fun enablePlanModeWithStarterPrompt() {
+        planModeActions.enableWithStarterPrompt()
+        inputFocusActions.focusInputComposer()
+    }
+
+    fun preparePlanImplementationPrompt() {
+        planModeActions.prepareImplementationPrompt()
+        updateSendButtonVisual()
+        collapsedInputPreviewActions.updateCollapsedInputPreview()
     }
 
     val pendingAttachmentActions: MainPendingAttachmentActions by lazy {

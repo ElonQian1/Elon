@@ -13,8 +13,10 @@ internal class MainSendMessageActions(
     private val activeConversation: () -> AppConversation,
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
-    private val uploadAttachmentsThenSend: (String, String, SendTarget) -> Unit,
-    private val startPreparedMessage: (String, String, JsonArray, SendTarget, List<ChatAttachment>) -> Unit,
+    private val uploadAttachmentsThenSend: (String, String, SendTarget, ProjectRequestExecutionMode) -> Unit,
+    private val startPreparedMessage:
+        (String, String, JsonArray, SendTarget, List<ChatAttachment>, ProjectRequestExecutionMode) -> Unit,
+    private val consumeExecutionModeForSend: () -> ProjectRequestExecutionMode,
     private val handleRunningInput:
         (RunningInputMode, String, String, Boolean) -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean
@@ -48,12 +50,13 @@ internal class MainSendMessageActions(
             return
         }
         val target = currentSendTarget()
+        val executionMode = consumeExecutionModeForSend()
         collapseInputComposer()
         if (pendingAttachments.isNotEmpty()) {
-            uploadAttachmentsThenSend(text, outgoingText, target)
+            uploadAttachmentsThenSend(text, outgoingText, target, executionMode)
             return
         }
-        startPreparedMessage(text, outgoingText, JsonArray(), target, emptyList())
+        startPreparedMessage(text, outgoingText, JsonArray(), target, emptyList(), executionMode)
     }
 
     private fun currentSendTarget(): SendTarget {

@@ -82,7 +82,10 @@ class MainActivity : AppCompatActivity() {
             chatAdapter = { chatAdapter },
             activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
             setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
+            activeRequestIsPlanning = { s.activeRequestIsPlanning },
+            setActiveRequestIsPlanning = { s.activeRequestIsPlanning = it },
             setWaitingForReply = { s.waitingForReply = it },
+            preparePlanImplementationPrompt = { inputActions.preparePlanImplementationPrompt() },
             clearPendingRequestPayload = { s.pendingRequestPayload = null },
             clearPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { s.reconnectAttempts = 0 },
@@ -319,9 +322,11 @@ class MainActivity : AppCompatActivity() {
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions::rememberConversationTask,
             setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
+            setActiveRequestIsPlanning = { s.activeRequestIsPlanning = it },
             resetRequestState = {
                 s.pendingReconnectForActiveWork = false
                 s.reconnectAttempts = 0
+                s.activeRequestIsPlanning = false
                 conversationTaskRegistryActions.persistActiveWork()
                 workflowActions.foldedCliLogActions.reset()
                 workflowActions.evidenceActions.clearCurrentEvidence()
@@ -1015,7 +1020,8 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             showChat = { navigationController.showChat() },
-            sendMessage = { inputActions.sendMessageActions.sendMessage() }
+            sendMessage = { inputActions.sendMessageActions.sendMessage() },
+            enablePlanModeWithStarterPrompt = { inputActions.enablePlanModeWithStarterPrompt() }
         )
     }
 

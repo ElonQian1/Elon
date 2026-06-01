@@ -78,6 +78,7 @@ pub(crate) async fn run_api_inner_with_workspace(
     user_message: &str,
     preflight_note: Option<&str>,
     agent_name: Option<&str>,
+    planning_mode: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -135,6 +136,11 @@ pub(crate) async fn run_api_inner_with_workspace(
     }
     let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
     let workspace_str = workspace.to_string_lossy().to_string();
+
+    if planning_mode {
+        return run_api_plan(state, &agent, user_id, &workspace_str, user_message, preflight_note, tx)
+            .await;
+    }
 
     let _ = tx.send(
         WsMessage::progress(format!("正在使用 AI 代理: {} ({})", agent.name, agent.model))
@@ -302,5 +308,48 @@ pub(crate) async fn run_api_inner_with_workspace(
         .to_json(),
     );
 
+    Ok(())
+}
+
+async fn run_api_plan(
+    state: &Arc<AppState>,
+    agent: &crate::types::AgentConfig,
+    user_id: &str,
+    workspace: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    let _ = tx.send(
+        WsMessage::progress(format!("正在使用 AI 代理规划: {} ({})", agent.name, agent.model))
+            .to_json(),
+    );
+    let note = preflight_note.unwrap_or("无");
+    let messages = vec![
+        json!({
+            "role": "system",
+            "content": "你是一龙项目规划助手。当前是 Plan 模式：只生成计划，不调用工具，不修改文件，不构建、不提交、不发布。输出中文，给小白也能看懂。"
+        }),
+        json!({
+            "role": "user",
+            "content": format!(
+                "当前项目目录：{}\n项目预检提示：{}\n\n用户请求：{}\n\n请输出：1. 我理解的目标 2. 推荐方案 3. 需要改动的模块或页面 4. 实施步骤 5. 验证与发布方式 6. 需要确认的问题。结尾提醒用户确认后发送「按这个计划开始实现」。",
+                workspace, note, user_message
+            )
+        }),
+    ];
+    let response = call_chat_llm(state, agent, &messages, user_id, "plan").await?;
+    let reply = response["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("计划生成完成。确认后发送「按这个计划开始实现」。")
+        .to_string();
+    let _ = tx.send(
+        WsMessage::Done {
+            message: reply,
+            apk_url: None,
+            image_url: None,
+        }
+        .to_json(),
+    );
     Ok(())
 }

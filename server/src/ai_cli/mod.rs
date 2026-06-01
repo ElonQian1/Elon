@@ -13,7 +13,7 @@ mod ai_cli_types;
 #[cfg(test)]
 mod ai_cli_tests;
 
-pub use self::ai_cli_types::{IntentGateResult, NativeSessionScope};
+pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
@@ -68,6 +68,73 @@ pub async fn run_with_workspace(
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     let started = std::time::Instant::now();
+    let request_mode = AiCliRequestMode::Execute;
+    run_with_workspace_mode(
+        user_id,
+        workspace,
+        download_base,
+        user_message,
+        preflight_note,
+        option_id,
+        route,
+        require_existing_git,
+        native_session_scope,
+        trace_id,
+        state,
+        tx,
+        request_mode,
+        started,
+    )
+    .await
+}
+
+pub async fn run_plan_with_workspace(
+    user_id: &str,
+    workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    option_id: Option<&str>,
+    native_session_scope: Option<NativeSessionScope>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    run_with_workspace_mode(
+        user_id,
+        workspace,
+        download_base,
+        user_message,
+        preflight_note,
+        option_id,
+        intent_router::CapabilityRoute::CodeAgent,
+        false,
+        native_session_scope,
+        trace_id,
+        state,
+        tx,
+        AiCliRequestMode::Plan,
+        std::time::Instant::now(),
+    )
+    .await
+}
+
+async fn run_with_workspace_mode(
+    user_id: &str,
+    workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    option_id: Option<&str>,
+    route: intent_router::CapabilityRoute,
+    require_existing_git: bool,
+    native_session_scope: Option<NativeSessionScope>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+    request_mode: AiCliRequestMode,
+    started: std::time::Instant,
+) -> Result<()> {
 
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
@@ -79,7 +146,7 @@ pub async fn run_with_workspace(
     if pc_relay_enabled {
         if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
-            match run_via_pc_agent(&agent_id, user_message, preflight_note, state, tx).await {
+            match run_via_pc_agent(&agent_id, user_message, preflight_note, request_mode, state, tx).await {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
@@ -101,7 +168,9 @@ pub async fn run_with_workspace(
 
     std::fs::create_dir_all(workspace)?;
 
-    let development_task = route != intent_router::CapabilityRoute::ChatAgent
+    let planning_task = request_mode.is_plan();
+    let development_task = planning_task
+        || route != intent_router::CapabilityRoute::ChatAgent
         || intent_router::looks_like_development_request(user_message);
     let lightweight_chat_task =
         route == intent_router::CapabilityRoute::ChatAgent && !development_task;
@@ -109,12 +178,14 @@ pub async fn run_with_workspace(
     if lightweight_chat_task {
         cap_option_timeout(&mut option, chat_timeout_cap_secs(tiny_chat_task));
     }
-    if development_task {
+    if development_task && !planning_task {
         ensure_git(workspace, user_id, require_existing_git)?;
     }
 
-    let android_task = development_task && looks_like_android_task(user_message);
-    if development_task {
+    let android_task = development_task && !planning_task && looks_like_android_task(user_message);
+    if planning_task {
+        let _ = tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
+    } else if development_task {
         let _ = tx.send(
             WsMessage::progress("正在准备项目工作区。")
             .to_json(),
@@ -163,7 +234,7 @@ pub async fn run_with_workspace(
     let mut prompt_bootstrapped = session_state
         .as_ref()
         .map(|state| {
-            if development_task {
+            if development_task && !planning_task {
                 state.dev_bootstrapped
             } else {
                 state.chat_bootstrapped
@@ -194,6 +265,7 @@ pub async fn run_with_workspace(
         &option,
         route,
         prompt_bootstrapped,
+        request_mode,
     );
     let mut initial_option = option.clone();
     if lightweight_chat_task && native_session_id.is_some() {
@@ -264,6 +336,7 @@ pub async fn run_with_workspace(
                 &option,
                 route,
                 prompt_bootstrapped,
+                request_mode,
             );
             let mut fresh_option = option.clone();
             cap_option_timeout(
@@ -352,6 +425,7 @@ pub async fn run_with_workspace(
             &option,
             route,
             prompt_bootstrapped,
+            request_mode,
         );
         if !lightweight_chat_task && !tiny_chat_task {
             if let Some(note) = native_session_continuity_note(
@@ -455,7 +529,7 @@ pub async fn run_with_workspace(
         );
         stored_session_id = Some(thread_id);
     }
-    if output.success {
+    if output.success && !planning_task {
         if let (Some(scope), Some(session_id)) = (
             native_session_scope
                 .as_ref()
@@ -475,7 +549,9 @@ pub async fn run_with_workspace(
         }
     }
     // 从 Codex CLI stdout 解析 token 用量并写入数据库
-    let cli_feature = if development_task {
+    let cli_feature = if planning_task {
+        "codex_cli_plan"
+    } else if development_task {
         "codex_cli_dev"
     } else {
         "codex_cli_chat"
@@ -535,18 +611,32 @@ async fn run_via_pc_agent(
     agent_id: &str,
     user_message: &str,
     preflight_note: Option<&str>,
+    request_mode: AiCliRequestMode,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    let prompt = match preflight_note {
-        Some(note) => format!(
-            "你是一龙开发助手，帮助用户开发移动端 App。\n\n注意：{}\n\n用户请求：{}",
-            note, user_message
-        ),
-        None => format!(
-            "你是一龙开发助手，帮助用户开发移动端 App。\n\n用户请求：{}",
-            user_message
-        ),
+    let prompt = if request_mode.is_plan() {
+        match preflight_note {
+            Some(note) => format!(
+                "你是一龙开发助手。当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n注意：{}\n\n用户请求：{}\n\n请输出目标理解、推荐方案、涉及模块、实施步骤、验证发布方式和待确认问题，并提醒用户确认后发送「按这个计划开始实现」。",
+                note, user_message
+            ),
+            None => format!(
+                "你是一龙开发助手。当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n用户请求：{}\n\n请输出目标理解、推荐方案、涉及模块、实施步骤、验证发布方式和待确认问题，并提醒用户确认后发送「按这个计划开始实现」。",
+                user_message
+            ),
+        }
+    } else {
+        match preflight_note {
+            Some(note) => format!(
+                "你是一龙开发助手，帮助用户开发移动端 App。\n\n注意：{}\n\n用户请求：{}",
+                note, user_message
+            ),
+            None => format!(
+                "你是一龙开发助手，帮助用户开发移动端 App。\n\n用户请求：{}",
+                user_message
+            ),
+        }
     };
 
     let (_, mut rx) = state
