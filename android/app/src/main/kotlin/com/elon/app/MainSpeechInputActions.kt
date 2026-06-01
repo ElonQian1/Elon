@@ -65,8 +65,6 @@ internal class MainSpeechInputActions(
     private var voiceMessageAsrAllFailed = false
     // 方案 B：实时语音 → 转写 → AI 投递
     private var realtimeController: RealtimeVoiceController? = null
-    // TTS：AI 回复语音朗读（Android 系统 TextToSpeech MVP）
-    private val voiceSpeaker = VoiceSpeaker(activity)
     // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
     private var agentBridge: AgentVoiceBridge? = null
     private var agentVoiceActive = false
@@ -185,7 +183,6 @@ internal class MainSpeechInputActions(
         isListeningForSpeech = false
         realtimeController?.shutdown()
         realtimeController = null
-        voiceSpeaker.release()
         agentBridge?.destroy()
         agentBridge = null
         agentVoiceActive = false
@@ -423,7 +420,6 @@ internal class MainSpeechInputActions(
         isHoldActive = true
         isSpeechCanceled = false
         voiceHoldButton().text = "连接中..."
-        voiceSpeaker.stop()  // 开始新语音时停止正在朗读的 AI 回复
 
         val ctrl = RealtimeVoiceController(
             context = activity,
@@ -451,7 +447,6 @@ internal class MainSpeechInputActions(
                     voiceHoldButton().text = "按住 说话"
                     Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
                 }
-                voiceSpeaker.speak(message)  // AI 回复语音朗读
                 realtimeController = null
             },
             onAiError = { msg ->

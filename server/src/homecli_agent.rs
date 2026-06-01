@@ -22,6 +22,7 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, ServerToAgent};
 use serde::{Deserialize, Serialize};
+use sha2::Digest as _;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -295,13 +296,29 @@ async fn run_agent_session(
     };
 
     // Auth check: presented token must equal the secret bound to agent_id.
-    let expected = match secrets.get(&agent_id) {
-        Some(s) => s,
-        None => return Err(anyhow!("unknown agent_id: {agent_id}")),
+    // Priority: env var secrets (static, for legacy/admin agents) → DB credentials (dynamic, user-registered nodes).
+    let auth_ok = if let Some(expected) = secrets.get(&agent_id) {
+        constant_time_eq(expected.as_bytes(), presented_token.as_bytes())
+    } else {
+        // Check DB-stored node credentials (secret stored as SHA-256 hex)
+        let presented_hash = hex::encode(sha2::Sha256::digest(presented_token.as_bytes()));
+        matches!(
+            state.store.get_node_credential_hash(&agent_id),
+            Ok(Some(ref stored)) if stored == &presented_hash
+        )
     };
-    if !constant_time_eq(expected.as_bytes(), presented_token.as_bytes()) {
-        return Err(anyhow!("bad secret for agent_id={agent_id}"));
+    if !auth_ok {
+        return Err(anyhow!("auth failed for agent_id={agent_id}"));
     }
+
+    // If agent registered via DB credentials, resolve owner from DB
+    let resolved_owner_user_id = if owner_user_id.is_some() {
+        owner_user_id.clone()
+    } else if !secrets.contains_key(&agent_id) {
+        state.store.get_node_credential_owner(&agent_id).ok().flatten()
+    } else {
+        None
+    };
 
     tracing::info!(%agent_id, %version, "agent registered");
 
@@ -334,7 +351,7 @@ async fn run_agent_session(
         .unwrap_or(0);
     state.node_registry.register(
         agent_id.clone(),
-        owner_user_id.clone().unwrap_or_default(),
+        resolved_owner_user_id.clone().unwrap_or_default(),
         vec![],
         connected_at,
     ).await;

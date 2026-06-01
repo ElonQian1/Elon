@@ -86,7 +86,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
         .route("/api/me/nodes", get(node_api::my_nodes))
-        .route("/api/me/nodes/register", post(node_api::register_node))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
         // ───────────────────────────────────────────────────────────────────────
@@ -199,10 +198,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/chat",
             post(project_chat::chat_project),
-        )
-        .route(
-            "/api/projects/:project_id/chat/stream",
-            post(project_chat::chat_project_stream),
         )
         .route(
             "/api/projects/:project_id/prewarm",

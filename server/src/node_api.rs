@@ -50,18 +50,26 @@ pub async fn list_available_models(
 
 #[derive(Deserialize)]
 pub struct RegisterNodeRequest {
+    /// 用户给这个节点起的名字，如 "我的游戏 PC"
     pub label: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct RegisterNodeResponse {
+    /// 分配给节点的 agent_id，配置到 NODE_AGENT_ID 环境变量
     pub agent_id: String,
+    /// 明文 secret（只在注册时返回一次，不存储明文）
     pub agent_secret: String,
+    /// 节点应连接的服务器 WebSocket 地址
     pub cloud_ws_url: String,
+    /// 对应的 owner user_id（节点需要配置到 NODE_OWNER_USER_ID）
     pub owner_user_id: String,
 }
 
 /// POST /api/me/nodes/register — 为当前用户生成一个新的 PC 节点凭证
+///
+/// 生成随机 agent_id + secret，将 secret 的 SHA-256 hash 存入 DB，
+/// 明文 secret 只在此响应中返回一次，用户需立即保存到节点的环境变量。
 pub async fn register_node(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -69,21 +77,48 @@ pub async fn register_node(
 ) -> impl IntoResponse {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
-        Err(e) => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
     };
+
+    // 生成随机 agent_id 和 secret
     let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(8).collect::<String>();
-    let agent_id = format!("node-{}-{}", user.id.chars().take(6).collect::<String>(), random_suffix);
+    let agent_id = format!("node-{}-{}", &user.id.chars().take(6).collect::<String>(), random_suffix);
     let agent_secret = uuid::Uuid::new_v4().to_string().replace('-', "")
         + &uuid::Uuid::new_v4().to_string().replace('-', "");
+
+    // 存储 secret 的 SHA-256 hash
     let secret_hash = hex::encode(sha2::Sha256::digest(agent_secret.as_bytes()));
-    if let Err(e) = state.store.create_node_credential(&agent_id, &secret_hash, &user.id, req.label.as_deref()) {
-        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error": format!("创建凭证失败: {e}")}))).into_response();
+    if let Err(e) = state.store.create_node_credential(
+        &agent_id,
+        &secret_hash,
+        &user.id,
+        req.label.as_deref(),
+    ) {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": format!("创建凭证失败: {e}")})),
+        )
+            .into_response();
     }
+
     let cloud_ws_url = format!(
         "ws://{}",
         std::env::var("ELON_PUBLIC_HOST").unwrap_or_else(|_| "43.139.149.158:8080".to_string())
     );
-    Json(RegisterNodeResponse { agent_id, agent_secret, cloud_ws_url, owner_user_id: user.id }).into_response()
+
+    Json(RegisterNodeResponse {
+        agent_id,
+        agent_secret,
+        cloud_ws_url,
+        owner_user_id: user.id,
+    })
+    .into_response()
 }
 
 // ── /api/me/node-balance ──────────────────────────────────────────────────────

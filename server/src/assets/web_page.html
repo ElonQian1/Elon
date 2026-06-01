@@ -1594,7 +1594,7 @@
   }
 
   // ====== 聊天气泡 ======
-  function appendBubble(kind, text, links) {
+  function appendBubble(kind, text, links, modelUsed, nodeId) {
     const nowMs = Date.now();
     const block = document.createElement('div');
     block.className = 'chat-message-block';
@@ -1626,6 +1626,12 @@
         a.textContent = '\n' + lk.label;
         bubble.appendChild(a);
       });
+    }
+    if (kind === 'ai' && modelUsed) {
+      const attr = document.createElement('div');
+      attr.style.cssText = 'font-size:11px;color:#888;margin-top:4px;';
+      attr.textContent = (nodeId ? '🖥️ ' : '✦ ') + modelUsed;
+      bubble.appendChild(attr);
     }
     row.appendChild(bubble);
     block.appendChild(row);
@@ -1677,7 +1683,7 @@
           const links = [];
           if (data.apk_url) links.push({ href: data.apk_url, label: '下载 APK' });
           if (data.image_url) links.push({ href: data.image_url, label: '查看图片' });
-          appendBubble('ai', data.message || '已完成。', links);
+          appendBubble('ai', data.message || '已完成。', links, data.model_used, data.node_id);
           loadProjects();
           if (data.apk_url) refreshDownloadPage().catch(() => {});
         } else if (data.type === 'error') {
