@@ -55,6 +55,7 @@ async fn handle(
     let mut group_rx = crate::friend_events::subscribe_groups();
     let mut project_task_rx = crate::project_events::subscribe();
     let mut presence_rx = crate::presence_events::subscribe();
+    let mut billing_rx = crate::billing_events::subscribe();
 
     // 认证用户上线：注册在线状态并广播给所有已连接用户
     if let Some(ref uid) = authenticated_user_id {
@@ -133,6 +134,17 @@ async fn handle(
                         }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次列表刷新可以重新获取在线状态 */ }
+                    _ => {}
+                }
+            }
+            // 余额低于阈值——只推给对应用户
+            msg = billing_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id.as_deref() == Some(event.user_id.as_str()) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => {}
                     _ => {}
                 }
             }
