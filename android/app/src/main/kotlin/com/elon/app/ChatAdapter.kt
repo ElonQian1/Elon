@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Matrix
@@ -52,6 +53,7 @@ class ChatAdapter(
     /** 语音附件长按回调（转文字 / 其他操作），由 Activity 通过 setAdapterAndWireApkActions 注入。 */
     var onVoiceAttachmentLongPress: ((message: ChatMessage, attachment: ChatAttachment) -> Unit)? = null
     private var cachedUserProfile: UserProfile? = null
+    private var cachedUserBitmap: Bitmap? = null
     private var selectionMode = false
     private var selectionChangedListener: ((Int) -> Unit)? = null
     private val selectedPositions = linkedSetOf<Int>()
