@@ -537,6 +537,22 @@ internal class MainHomeRows(
                     setTypeface(typeface, Typeface.BOLD)
                 })
             }
+            // 在线绿点（右下角，10dp，与未读红点不重叠）
+            if (friend.isOnline) {
+                addView(android.view.View(activity).apply {
+                    val dotSize = dp(10)
+                    layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
+                        gravity = Gravity.BOTTOM or Gravity.END
+                        bottomMargin = -dp(1)
+                        rightMargin = -dp(1)
+                    }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#4CAF50"))
+                        setStroke(dp(2), Color.parseColor("#1A1A1A"))
+                    }
+                })
+            }
         }
     }
 

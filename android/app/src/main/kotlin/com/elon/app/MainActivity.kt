@@ -299,6 +299,10 @@ class MainActivity : AppCompatActivity() {
                     groupChatActions.handleRealtimeMessage(event.groupId)
                     groupActions.loadGroups()
                 }
+                is GlobalWsEvent.PresenceChange -> {
+                    // 好友上线/下线，刷新列表以更新绿点
+                    friendActions.loadFriends()
+                }
                 else -> Unit
             }
         }

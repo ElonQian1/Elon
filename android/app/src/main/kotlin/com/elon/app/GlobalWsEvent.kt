@@ -43,6 +43,12 @@ sealed class GlobalWsEvent {
         val createdAt: String,
     ) : GlobalWsEvent()
 
+    /** 好友在线状态变更：isOnline=true 表示上线，false 表示下线 */
+    data class PresenceChange(
+        val userId: String,
+        val isOnline: Boolean,
+    ) : GlobalWsEvent()
+
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
     data class Unknown(val raw: String) : GlobalWsEvent()
 
@@ -70,6 +76,10 @@ sealed class GlobalWsEvent {
                     messageId = json.optString("messageId", ""),
                     content = json.optString("content", ""),
                     createdAt = json.optString("createdAt", ""),
+                )
+                "presence" -> PresenceChange(
+                    userId = json.optString("userId", ""),
+                    isOnline = json.optBoolean("isOnline", false),
                 )
                 else -> Unknown(text)
             }

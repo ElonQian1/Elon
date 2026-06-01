@@ -31,7 +31,8 @@ internal data class AppFriend(
     val friendSince: String?,
     val lastMessage: String?,
     val lastMessageAt: Long?,
-    val unreadCount: Int
+    val unreadCount: Int,
+    val isOnline: Boolean = false,
 )
 
 internal class MainFriendActions(
@@ -328,7 +329,8 @@ internal class MainFriendActions(
             friendSince = json.optString("friend_since", "").trim().takeIf { it.isNotEmpty() },
             lastMessage = json.optString("last_message", "").trim().takeIf { it.isNotEmpty() },
             lastMessageAt = parseServerTime(json.optString("last_message_at", "").trim()),
-            unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0)
+            unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0),
+            isOnline = json.optBoolean("is_online", false),
         )
     }
 
