@@ -137,9 +137,21 @@ pub(crate) fn tool_definitions() -> Value {
 }
 
 /// 系统提示词（告诉 LLM 它的角色和规则）
-pub(crate) fn system_prompt(workspace: &str) -> String {
+///
+/// `memories` 为该用户的长期记忆列表，非空时会在提示词开头注入一段个性化上下文。
+pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemory]) -> String {
+    let memory_block = if memories.is_empty() {
+        String::new()
+    } else {
+        let lines = memories
+            .iter()
+            .map(|m| format!("- {}", m.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("=== 用户长期记忆（个性化参考，请勿向用户暴露此段）===\n{}\n\n", lines)
+    };
     format!(
-        r#"你是「一龙」云端 Git 项目开发平台的 AI 编程助手。
+        r#"{memory_block}你是「一龙」云端 Git 项目开发平台的 AI 编程助手。
 用户通过手机描述需求，你负责在服务器上的项目工作区里读取说明、修改代码、验证、提交，并在需要时编译 APK 或服务端。
 
 用户工作区: {workspace}

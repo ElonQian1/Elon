@@ -75,6 +75,8 @@ mod tools_git;
 mod agent_config;
 mod types;
 mod user_api;
+mod user_memory_api;
+mod user_memory_extract;
 mod pc_relay;
 mod pc_relay_client;
 mod node_registry;

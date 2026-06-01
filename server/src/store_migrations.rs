@@ -30,6 +30,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (12, "好友聊天 EL 助手上下文消息", migration_v12),
     (13, "每日编译配额表（build_quota）", migration_v13),
     (14, "项目意见频道建议状态", migration_v14),
+    (15, "用户长期记忆表", migration_v15),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -616,7 +617,31 @@ fn migration_v14(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-// ── 内部工具 ──────────────────────────────────────────────────────────────────
+// ── v15：用户长期记忆表 ───────────────────────────────────────────────────────
+
+fn migration_v15(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS user_memories (
+          id             TEXT PRIMARY KEY,
+          user_id        TEXT NOT NULL,
+          content        TEXT NOT NULL,
+          category       TEXT NOT NULL DEFAULT 'fact',
+          importance     INTEGER NOT NULL DEFAULT 5,
+          source_conv_id TEXT,
+          created_at     TEXT NOT NULL,
+          updated_at     TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_user_memories_user_importance
+          ON user_memories(user_id, importance DESC, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── 内部工具 ───────────────────────────────────────────────────────────────────
 
 pub(crate) fn add_column_if_missing(
     conn: &Connection,

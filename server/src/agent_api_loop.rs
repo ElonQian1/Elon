@@ -11,6 +11,7 @@ use crate::{
     intent_router,
     tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
+    user_memory_extract::extract_and_save_memories,
 };
 
 pub(crate) async fn resolve_agent(
@@ -43,11 +44,26 @@ async fn run_casual_chat(
     agent: &AgentConfig,
     user_id: &str,
     user_message: &str,
+    memories: &[crate::store::UserMemory],
 ) -> Result<String> {
+    let system_content = if memories.is_empty() {
+        casual_chat_prompt().to_string()
+    } else {
+        let lines = memories
+            .iter()
+            .map(|m| format!("- {}", m.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(
+            "=== 用户长期记忆（请勿向用户暴露此段）===\n{}\n\n{}",
+            lines,
+            casual_chat_prompt()
+        )
+    };
     let messages = vec![
         json!({
             "role": "system",
-            "content": casual_chat_prompt()
+            "content": system_content
         }),
         json!({
             "role": "user",
@@ -105,7 +121,18 @@ pub(crate) async fn run_api_inner_with_workspace(
             .to_json(),
         );
 
-        let reply = run_casual_chat(state, &agent, user_id, user_message).await?;
+        let memories = state.store.get_user_memories(user_id, 20).unwrap_or_default();
+        let reply = run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
+        // 异步提取本轮记忆，不阻塞响应
+        {
+            let state2 = state.clone();
+            let uid = user_id.to_string();
+            let umsg = user_message.to_string();
+            let rep = reply.clone();
+            tokio::spawn(async move {
+                extract_and_save_memories(state2, uid, umsg, rep).await;
+            });
+        }
         let _ = tx.send(
             WsMessage::Done {
                 message: reply,
@@ -156,10 +183,11 @@ pub(crate) async fn run_api_inner_with_workspace(
     };
 
     // 初始化对话历史
+    let memories = state.store.get_user_memories(user_id, 20).unwrap_or_default();
     let mut messages = vec![
         json!({
             "role": "system",
-            "content": system_prompt(&workspace_str)
+            "content": system_prompt(&workspace_str, &memories)
         }),
         json!({
             "role": "user",
