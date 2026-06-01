@@ -310,7 +310,7 @@ internal class MainFriendChatActions(
                     if (scrollToBottom && currentMessages.isNotEmpty()) {
                         binding.chatList.jumpToLatestMessageBeforeNextDraw()
                     }
-                    activeAdapter?.notifyDataSetChanged()
+                    if (changed) activeAdapter?.notifyDataSetChanged()
                     if (changed || !silent || allowPendingRefresh) {
                         onFriendSummariesChanged()
                     }
