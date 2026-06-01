@@ -192,7 +192,7 @@ internal class MainFriendChatActions(
                         val index = messages.indexOfFirst { it.id == messageId }
                         if (index >= 0) {
                             messages.removeAt(index)
-                            activeAdapter?.notifyItemRemoved(index)
+                            activeAdapter?.notifyMessageRemoved(index)
                         }
                         onFriendSummariesChanged()
                         onDeleted()
@@ -373,7 +373,8 @@ internal class MainFriendChatActions(
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
             senderLabel = if (outgoing || isElAssistant) null else senderName ?: friend.name,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
-            senderAvatarDataUrl = if (outgoing || isElAssistant) null else friend.avatarDataUrl
+            senderAvatarDataUrl = if (outgoing || isElAssistant) null else friend.avatarDataUrl,
+            createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L
         )
     }
 

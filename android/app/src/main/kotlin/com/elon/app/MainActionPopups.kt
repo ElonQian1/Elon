@@ -4,6 +4,7 @@ import android.graphics.drawable.Drawable
 import android.view.View
 import android.widget.PopupWindow
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 
@@ -67,21 +68,34 @@ internal class MainActionPopups(
     }
 
     fun showMessageActionPopup(anchor: View, message: ChatMessage, text: String) {
-        val actions = mutableListOf(
-            TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) },
-            TopAction("转发", R.drawable.ic_msg_forward) { shareActions().forwardMessageText(text) },
-            TopAction("收藏", R.drawable.ic_msg_favorite) { shareActions().toastMessageAction("已收藏") },
-            TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) },
-            TopAction("多选", R.drawable.ic_msg_multi) { startMultiSelect(message) },
-            TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) },
-            TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") },
-            TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) },
-            TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") }
-        )
-        if (canRequestAiReply()) {
+        val hasText = text.isNotBlank()
+        val actions = mutableListOf<TopAction>()
+        if (hasText) {
+            actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) })
+            actions.add(TopAction("转发", R.drawable.ic_msg_forward) { shareActions().forwardMessageText(text) })
+            actions.add(TopAction("收藏", R.drawable.ic_msg_favorite) { shareActions().toastMessageAction("已收藏") })
+        }
+        actions.add(TopAction("时间", R.drawable.ic_msg_time) { showMessageTime(message) })
+        actions.add(TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) })
+        actions.add(TopAction("多选", R.drawable.ic_msg_multi) { startMultiSelect(message) })
+        if (hasText) {
+            actions.add(TopAction("引用", R.drawable.ic_msg_quote) { quoteMessage(text) })
+            actions.add(TopAction("提醒", R.drawable.ic_msg_remind) { shareActions().toastMessageAction("提醒准备中") })
+            actions.add(TopAction("搜一搜", R.drawable.ic_msg_search) { shareActions().searchMessageText(text) })
+            actions.add(TopAction("从当前听", R.drawable.ic_msg_listen) { shareActions().toastMessageAction("从当前听准备中") })
+        }
+        if (hasText && canRequestAiReply()) {
             actions.add(TopAction("AI回复", R.drawable.ic_msg_ai_reply) { requestAiReply(message) })
         }
         setActionPopup(renderer().showMessageActionPopup(anchor, getActionPopup(), actions))
+    }
+
+    private fun showMessageTime(message: ChatMessage) {
+        AlertDialog.Builder(activity)
+            .setTitle("消息时间")
+            .setMessage(formatChatMessageExactTime(message.createdAtMs))
+            .setPositiveButton("知道了", null)
+            .show()
     }
 
     fun showProjectShareActionPopup(anchor: View, message: ChatMessage, share: ChatProjectShare) {

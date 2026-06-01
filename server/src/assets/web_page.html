@@ -214,6 +214,15 @@
       /* iOS 惯性滚动 */
       -webkit-overflow-scrolling: touch;
     }
+    .chat-message-block { display: flex; flex-direction: column; gap: 5px; }
+    .chat-timeline-label {
+      align-self: center;
+      color: #8a8a8e;
+      font-size: 13px;
+      line-height: 1;
+      padding: 8px 0 2px;
+      user-select: none;
+    }
     .bubble-row { display: flex; align-items: flex-end; gap: 8px; }
     .bubble-row.user { justify-content: flex-end; }
     .bubble {
@@ -1288,6 +1297,7 @@
   let agentSelectionInitialized = false;
   let agentLoading = false;
   let codexCliOnly = false;
+  let lastChatTimelineMs = 0;
 
   // ====== 工具 ======
   function api(path, options = {}) {
@@ -1326,6 +1336,31 @@
       }
       return (d.getMonth() + 1) + '/' + d.getDate();
     } catch { return ''; }
+  }
+  function formatChatTimelineLabel(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dayDiff = Math.round((today - day) / 86400000);
+    const hhmm = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    if (dayDiff === 0) return hhmm;
+    if (dayDiff === 1) return '昨天 ' + hhmm;
+    if (dayDiff > 1 && dayDiff < 7) return ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()] + ' ' + hhmm;
+    if (d.getFullYear() === now.getFullYear()) return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hhmm;
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hhmm;
+  }
+  function formatChatExactTime(ms) {
+    if (!ms) return '';
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' +
+      ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][d.getDay()] + ' ' +
+      d.getHours().toString().padStart(2, '0') + ':' +
+      d.getMinutes().toString().padStart(2, '0') + ':' +
+      d.getSeconds().toString().padStart(2, '0');
   }
 
   // ====== 登录/注册 ======
@@ -1499,6 +1534,7 @@
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
     chatList.innerHTML = '';
+    lastChatTimelineMs = 0;
     appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
     inputBar.classList.add('active');
     backBtn.style.display = '';
@@ -1560,6 +1596,20 @@
 
   // ====== 聊天气泡 ======
   function appendBubble(kind, text, links) {
+    const nowMs = Date.now();
+    const block = document.createElement('div');
+    block.className = 'chat-message-block';
+    const showTimeline = !lastChatTimelineMs ||
+      new Date(nowMs).toDateString() !== new Date(lastChatTimelineMs).toDateString() ||
+      nowMs - lastChatTimelineMs >= 5 * 60 * 1000;
+    if (showTimeline) {
+      const label = document.createElement('div');
+      label.className = 'chat-timeline-label';
+      label.textContent = formatChatTimelineLabel(nowMs);
+      block.appendChild(label);
+    }
+    lastChatTimelineMs = nowMs;
+
     const row = document.createElement('div');
     row.className = 'bubble-row' + (kind === 'user' ? ' user' : '');
     const bubble = document.createElement('div');
@@ -1567,6 +1617,7 @@
       kind === 'progress' ? 'progress' :
       kind === 'error' ? 'error' : 'ai');
     bubble.textContent = text || '';
+    bubble.title = formatChatExactTime(nowMs);
     if (links && links.length) {
       links.forEach((lk) => {
         const a = document.createElement('a');
@@ -1578,7 +1629,8 @@
       });
     }
     row.appendChild(bubble);
-    chatList.appendChild(row);
+    block.appendChild(row);
+    chatList.appendChild(block);
     chatList.scrollTop = chatList.scrollHeight;
   }
 

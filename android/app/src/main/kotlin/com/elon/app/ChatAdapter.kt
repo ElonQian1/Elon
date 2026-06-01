@@ -36,7 +36,8 @@ data class ChatMessage(
     var suggestionStatus: String? = null,
     var suggestionResolvedByName: String? = null,
     var suggestionResolvedAt: String? = null,
-    var canResolveSuggestion: Boolean = false
+    var canResolveSuggestion: Boolean = false,
+    var createdAtMs: Long = System.currentTimeMillis()
 )
 
 class ChatAdapter(
@@ -62,6 +63,7 @@ class ChatAdapter(
 
     inner class VH(view: View) : RecyclerView.ViewHolder(view) {
         val selectionCheck: TextView? = view.findViewById(R.id.messageSelectionCheck)
+        val timelineLabel: TextView? = view.findViewById(R.id.messageTimelineLabel)
         val text: TextView = view.findViewById(R.id.messageText)
         val status: TextView? = view.findViewById(R.id.messageStatus)
         val attachmentList: LinearLayout? = view.findViewById(R.id.messageAttachmentList)
@@ -131,6 +133,7 @@ class ChatAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val message = messages[position]
         holder.stopShimmer()
+        bindTimelineLabel(holder.timelineLabel, position)
         bindChatAttachmentViews(
             holder.attachmentList,
             message.attachments,
@@ -246,10 +249,17 @@ class ChatAdapter(
 
     fun notifyMessageUpdated(index: Int) {
         if (index in messages.indices) notifyItemChanged(index)
+        if (index + 1 in messages.indices) notifyItemChanged(index + 1)
+    }
+
+    fun notifyMessageRemoved(index: Int) {
+        notifyItemRemoved(index)
+        if (index in messages.indices) notifyItemChanged(index)
     }
 
     fun refreshUserProfile() {
         cachedUserProfile = null
+        cachedUserBitmap = null
         notifyDataSetChanged()
     }
 
@@ -312,6 +322,21 @@ class ChatAdapter(
 
         messages.add(msg)
         notifyItemInserted(messages.size - 1)
+    }
+
+    private fun bindTimelineLabel(label: TextView?, position: Int) {
+        label ?: return
+        val message = messages.getOrNull(position) ?: run {
+            label.visibility = View.GONE
+            return
+        }
+        if (!shouldShowChatTimelineLabel(messages, position)) {
+            label.visibility = View.GONE
+            return
+        }
+        val text = formatChatTimelineLabel(message.createdAtMs)
+        label.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
+        label.text = text
     }
 
     private fun bindMessageActions(holder: VH, message: ChatMessage, projectCardBound: Boolean) {

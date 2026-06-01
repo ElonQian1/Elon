@@ -192,7 +192,7 @@ internal class MainGroupChatActions(
                         val index = messages.indexOfFirst { it.id == messageId }
                         if (index >= 0) {
                             messages.removeAt(index)
-                            activeAdapter?.notifyItemRemoved(index)
+                            activeAdapter?.notifyMessageRemoved(index)
                         }
                         onGroupSummariesChanged()
                         onDeleted()
@@ -379,7 +379,8 @@ internal class MainGroupChatActions(
             attachments = chatAttachmentsFromJsonArray(json.optJSONArray("attachments")).takeIf { it.isNotEmpty() },
             senderLabel = if (outgoing || isElAssistant) null else senderName,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
-            senderAvatarDataUrl = senderAvatar
+            senderAvatarDataUrl = senderAvatar,
+            createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L
         )
     }
 

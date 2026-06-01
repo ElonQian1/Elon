@@ -500,7 +500,8 @@ internal class ProjectSpaceController(
             suggestionStatus = suggestionStatus,
             suggestionResolvedByName = suggestionResolvedByName,
             suggestionResolvedAt = suggestionResolvedAt,
-            canResolveSuggestion = canResolveSuggestion(this)
+            canResolveSuggestion = canResolveSuggestion(this),
+            createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
         )
     }
 

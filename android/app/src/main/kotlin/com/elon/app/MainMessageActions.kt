@@ -20,7 +20,7 @@ internal class MainMessageActions(
 ) {
     fun showMessageActions(anchor: View, message: ChatMessage) {
         val text = shareableMessageText(message)
-        if (text.isBlank()) return
+        if (text.isBlank() && message.attachments.isNullOrEmpty()) return
         showMessageActionPopup(anchor, message, text)
     }
 
@@ -29,7 +29,7 @@ internal class MainMessageActions(
         val index = messages.indexOf(message)
         if (index < 0) return
         messages.removeAt(index)
-        chatAdapter().notifyItemRemoved(index)
+        chatAdapter().notifyMessageRemoved(index)
         saveConversations()
         renderConversationList()
         Toast.makeText(activity, "已删除", Toast.LENGTH_SHORT).show()

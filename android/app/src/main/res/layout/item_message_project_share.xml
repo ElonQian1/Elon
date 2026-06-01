@@ -8,6 +8,18 @@
     android:paddingEnd="24dp"
     android:paddingBottom="8dp">
 
+    <TextView
+        android:id="@+id/messageTimelineLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingTop="10dp"
+        android:paddingBottom="2dp"
+        android:textColor="#8A8A8E"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/messageAttachmentList"
         android:layout_width="match_parent"

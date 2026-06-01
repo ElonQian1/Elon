@@ -1,12 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingStart="4dp"
-    android:paddingTop="6dp"
-    android:paddingEnd="4dp"
-    android:paddingBottom="6dp">
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/messageTimelineLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:paddingTop="10dp"
+        android:paddingBottom="2dp"
+        android:textColor="#8A8A8E"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="4dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="6dp">
 
     <TextView
         android:id="@+id/messageSelectionCheck"
@@ -80,4 +97,6 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/messageBubble" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</LinearLayout>
