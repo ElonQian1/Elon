@@ -7,7 +7,7 @@ package com.elon.app.wxapi
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import com.tencent.mm.opensdk.constants.ConstantsAPI
+import com.elon.app.WechatPayClient
 import com.tencent.mm.opensdk.modelbase.BaseReq
 import com.tencent.mm.opensdk.modelbase.BaseResp
 import com.tencent.mm.opensdk.openapi.IWXAPIEventHandler
