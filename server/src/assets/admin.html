@@ -117,6 +117,7 @@
   <button class="tab-btn" onclick="switchTab('projects',this)">馃摝 鐢ㄦ埛椤圭洰</button>
   <button class="tab-btn" onclick="switchTab('sessions',this)">馃摫 娲昏穬璁惧</button>
   <button class="tab-btn" onclick="switchTab('tokens',this)">📊 Token 用量</button>
+  <button class="tab-btn" onclick="switchTab('billing',this)">💰 预存充值</button>
 </div>
 
 <!-- 鈹€鈹€ AI 浠ｇ悊鏍囩椤?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ -->
@@ -536,6 +537,7 @@ function switchTab(name, btn) {
   if (name === 'sessions') loadSessions();
 
   if (name === 'tokens') loadTokenStats();
+  if (name === 'billing') loadBilling();
 }
 
 // 鈹€鈹€鈹€ 鐢ㄦ埛鍒楄〃 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -804,6 +806,90 @@ function closeConvModal() {
     </div>
   </div>
 </div>
+</div>
+
+<!-- ── 预存充值标签页 ─────────────────────────────────────────────────── -->
+<div id="tab-billing" class="tab-pane">
+<div class="container">
+  <div class="toolbar" style="margin-bottom:16px">
+    <h2>💰 预存余额管理</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" onclick="openRechargeModal()">＋ 手动充值</button>
+      <button class="btn btn-ghost" onclick="loadBilling()">🔄 刷新</button>
+    </div>
+  </div>
+  <!-- 计费配置概览 -->
+  <div id="billingConfigCard" style="margin-bottom:24px"></div>
+  <!-- 用户余额列表 -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-size:15px">用户余额列表</h3>
+      <span id="billingUsersCount" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px;text-align:right">余额（元）</th>
+            <th style="padding:8px 10px;text-align:right">本月消费</th>
+            <th style="padding:8px 10px">最近充值时间</th>
+            <th style="padding:8px 10px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="billingUsersBody">
+          <tr><td colspan="5" style="padding:24px;text-align:center"><div class="loader"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- 充值弹窗 -->
+<div id="rechargeModal" class="modal-overlay">
+  <div class="modal" style="max-width:440px">
+    <h3>手动充值</h3>
+    <div class="form-group">
+      <label>用户 ID</label>
+      <input id="rUserId" placeholder="user_id" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>充值金额（元，如 50 表示 50.00 元）</label>
+      <input type="number" id="rAmount" placeholder="50.00" min="0.01" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>备注（可选）</label>
+      <input id="rNote" placeholder="微信转账 / 支付宝转账 / 赠送..." autocomplete="off" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeRechargeModal()">取消</button>
+      <button class="btn btn-primary" onclick="doRecharge()">确认充值</button>
+    </div>
+  </div>
+</div>
+
+<!-- 计费配置弹窗 -->
+<div id="billingConfigModal" class="modal-overlay">
+  <div class="modal" style="max-width:440px">
+    <h3>计费配置</h3>
+    <div class="form-group">
+      <label>USD → CNY 汇率（如 7.3）</label>
+      <input type="number" id="cfgRate" placeholder="7.3" min="1" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>加价倍数（如 1.2 表示成本 × 1.2）</label>
+      <input type="number" id="cfgMarkup" placeholder="1.2" min="1.0" step="0.1" />
+    </div>
+    <div class="form-group">
+      <label>低余额警告阈值（元，低于此值推送提醒）</label>
+      <input type="number" id="cfgThreshold" placeholder="1.00" min="0" step="0.01" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConfigModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+    </div>
+  </div>
 </div>
 
 <!-- 配额设置弹窗 -->
@@ -1105,6 +1191,150 @@ function fmtNum(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
   return String(n);
+}
+</script>
+
+<script>
+// ── 预存充值管理 ──────────────────────────────────────────────────────────────
+
+async function loadBilling() {
+  const tbody = document.getElementById('billingUsersBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center"><div class="loader"></div></td></tr>';
+  try {
+    const [usersRes, configRes] = await Promise.all([
+      apiFetch('GET', '/api/admin/billing/users?page=1&size=200'),
+      apiFetch('GET', '/api/admin/billing/config'),
+    ]);
+    if (configRes.ok) {
+      const cfg = await configRes.json();
+      renderBillingConfig(cfg);
+    }
+    if (usersRes.ok) {
+      const d = await usersRes.json();
+      renderBillingUsers(d.users || []);
+    } else {
+      const j = await usersRes.json().catch(() => ({}));
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--danger);padding:16px">' + esc(j.error || '加载失败') + '</td></tr>';
+    }
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--danger);padding:16px">' + esc(String(e)) + '</td></tr>';
+  }
+}
+
+function renderBillingConfig(cfg) {
+  const card = document.getElementById('billingConfigCard');
+  const rateRaw = cfg.usd_to_rmb_rate_x10000 || 73000;
+  const rate = (rateRaw / 10000).toFixed(4);
+  const markup = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
+  const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
+  card.innerHTML = `<div class="card" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;padding:16px 20px">
+    <div><span style="font-size:12px;color:var(--text-dim)">汇率 &nbsp;</span><strong>1 USD = ${rate} CNY</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">加价 &nbsp;</span><strong>×${markup}</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">低余额预警 &nbsp;</span><strong>¥${threshold}</strong></div>
+    <button class="btn btn-ghost" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="openConfigModal()">修改配置</button>
+  </div>`;
+}
+
+function renderBillingUsers(users) {
+  const tbody = document.getElementById('billingUsersBody');
+  const countEl = document.getElementById('billingUsersCount');
+  countEl.textContent = '共 ' + users.length + ' 名用户';
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-dim)">暂无充值记录，所有用户余额为空时不受限制</td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map(u => {
+    const bal = (u.balance_fen / 100).toFixed(2);
+    const spent = ((u.this_month_spent_fen || 0) / 100).toFixed(2);
+    const balColor = u.balance_fen <= 0 ? 'var(--danger)' : u.balance_fen < 500 ? 'var(--warn)' : 'var(--success)';
+    const rechargeAt = u.last_recharge_at || '<span style="color:var(--text-dim)">—</span>';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(u.account || u.user_id)}</div>
+        ${u.nickname ? '<div style="font-size:11px;color:var(--text-dim)">' + esc(u.nickname) + '</div>' : ''}
+        <div style="font-size:10px;color:var(--text-dim)">${esc(u.user_id)}</div>
+      </td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;font-size:16px;color:${balColor}">¥${bal}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--warn)">¥${spent}</td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${typeof rechargeAt === 'string' && u.last_recharge_at ? esc(rechargeAt) : rechargeAt}</td>
+      <td style="padding:8px 10px">
+        <button class="btn btn-success" style="padding:4px 12px;font-size:12px" onclick="openRechargeModal('${esc(u.user_id)}','${esc(u.account||'')}')">充值</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openRechargeModal(userId, account) {
+  document.getElementById('rUserId').value = userId || '';
+  document.getElementById('rAmount').value = '';
+  document.getElementById('rNote').value = '';
+  document.getElementById('rechargeModal').classList.add('open');
+  setTimeout(() => document.getElementById(userId ? 'rAmount' : 'rUserId').focus(), 100);
+}
+
+function closeRechargeModal() {
+  document.getElementById('rechargeModal').classList.remove('open');
+}
+
+async function doRecharge() {
+  const userId = document.getElementById('rUserId').value.trim();
+  const amountStr = document.getElementById('rAmount').value.trim();
+  const note = document.getElementById('rNote').value.trim();
+  if (!userId) return toast('请输入用户 ID', 'err');
+  const amount = parseFloat(amountStr);
+  if (!amountStr || isNaN(amount) || amount <= 0) return toast('请输入有效金额（元）', 'err');
+  const amount_fen = Math.round(amount * 100);
+  try {
+    const res = await apiFetch('POST', '/api/admin/billing/recharge', {
+      user_id: userId,
+      amount_fen,
+      note: note || null,
+    });
+    const j = await res.json();
+    if (!res.ok) return toast(j.error || '充值失败', 'err');
+    closeRechargeModal();
+    toast('✅ 已充值 ¥' + amount.toFixed(2) + ' → ' + userId, 'ok');
+    loadBilling();
+  } catch(e) {
+    toast('网络错误：' + e.message, 'err');
+  }
+}
+
+function openConfigModal() {
+  apiFetch('GET', '/api/admin/billing/config').then(r => r.json()).then(cfg => {
+    document.getElementById('cfgRate').value = ((cfg.usd_to_rmb_rate_x10000 || 73000) / 10000).toFixed(4);
+    document.getElementById('cfgMarkup').value = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
+    document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
+    document.getElementById('billingConfigModal').classList.add('open');
+  }).catch(() => {
+    document.getElementById('billingConfigModal').classList.add('open');
+  });
+}
+
+function closeConfigModal() {
+  document.getElementById('billingConfigModal').classList.remove('open');
+}
+
+async function saveConfig() {
+  const rateStr = document.getElementById('cfgRate').value.trim();
+  const markupStr = document.getElementById('cfgMarkup').value.trim();
+  const threshStr = document.getElementById('cfgThreshold').value.trim();
+  if (!rateStr || isNaN(parseFloat(rateStr))) return toast('汇率格式无效', 'err');
+  if (!markupStr || isNaN(parseFloat(markupStr))) return toast('加价倍数格式无效', 'err');
+  const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
+  const markup_x1000 = String(Math.round(parseFloat(markupStr) * 1000));
+  const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
+  try {
+    const r1 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'usd_to_rmb_rate_x10000', value: rate_x10000 });
+    const r2 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'markup_x1000', value: markup_x1000 });
+    const r3 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'low_balance_threshold_fen', value: threshold_fen });
+    if (!r1.ok || !r2.ok || !r3.ok) return toast('部分配置保存失败', 'err');
+    closeConfigModal();
+    toast('配置已保存', 'ok');
+    loadBilling();
+  } catch(e) {
+    toast('保存失败：' + e.message, 'err');
+  }
 }
 </script>
 
