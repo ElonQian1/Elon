@@ -401,6 +401,7 @@ internal class MainInputActions(
             binding = binding,
             dp = uiTools()::dp,
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
+            inputRightControls = { inputComposerViewsOrNull()?.inputRightControls },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },
             hasPendingAttachments = { pendingAttachments.isNotEmpty() },

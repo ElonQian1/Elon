@@ -11,6 +11,7 @@ internal class InputComposerMotion(
     private val collapsedInputContainer: FrameLayout,
     private val collapsedText: View,
     private val modelButton: View,
+    private val planModeButton: View,
     private val rightControls: FrameLayout
 ) {
     private val interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
@@ -19,16 +20,23 @@ internal class InputComposerMotion(
     private var expandedTextHeight = 0
     private val expandedModelWidth: Int
     private val expandedModelEndMargin: Int
+    private val expandedPlanWidth: Int
+    private val expandedPlanEndMargin: Int
 
     var isExpanded: Boolean = false
         private set
 
     init {
+        val density = modelButton.resources.displayMetrics.density
         val params = modelButton.layoutParams as? ViewGroup.MarginLayoutParams
-        val fallbackWidth = (modelButton.resources.displayMetrics.density * 86f).toInt()
-        val fallbackMargin = (modelButton.resources.displayMetrics.density * 10f).toInt()
+        val fallbackWidth = (density * 76f).toInt()
+        val fallbackMargin = (density * 8f).toInt()
         expandedModelWidth = params?.width?.takeIf { it > 0 } ?: fallbackWidth
         expandedModelEndMargin = params?.marginEnd ?: fallbackMargin
+
+        val planParams = planModeButton.layoutParams as? ViewGroup.MarginLayoutParams
+        expandedPlanWidth = planParams?.width?.takeIf { it > 0 } ?: (density * 64f).toInt()
+        expandedPlanEndMargin = planParams?.marginEnd ?: (density * 6f).toInt()
     }
 
     fun updateExpandedTextHeight(height: Int, animate: Boolean) {
@@ -57,17 +65,25 @@ internal class InputComposerMotion(
         val endTextAlpha = if (expanded) 0f else 1f
         val startModelAlpha = modelButton.alpha
         val endModelAlpha = if (expanded) 1f else 0f
-        val startModelWidth = currentModelWidth(expanded)
-        val endModelWidth = modelButtonTargetWidth(expanded)
-        val startModelMargin = currentModelEndMargin(expanded)
-        val endModelMargin = modelButtonTargetEndMargin(expanded)
+        val startPlanAlpha = planModeButton.alpha
+        val endPlanAlpha = if (expanded) 1f else 0f
+        val startModelWidth = currentOptionalWidth(modelButton, expanded)
+        val endModelWidth = if (expanded) expandedModelWidth else 0
+        val startModelMargin = currentOptionalEndMargin(modelButton, expanded)
+        val endModelMargin = if (expanded) expandedModelEndMargin else 0
+        val startPlanWidth = currentOptionalWidth(planModeButton, expanded)
+        val endPlanWidth = if (expanded) expandedPlanWidth else 0
+        val startPlanMargin = currentOptionalEndMargin(planModeButton, expanded)
+        val endPlanMargin = if (expanded) expandedPlanEndMargin else 0
         val startRightWidth = rightControls.width.takeIf { it > 0 } ?: rightControls.layoutParams.width
-        val endRightWidth = rightControlsTargetWidth(expanded)
+        val endRightWidth = rightControlsTargetWidth()
 
         collapsedInputContainer.visibility = View.VISIBLE
         if (expanded) {
-            setModelButtonWidth(startModelWidth, startModelMargin)
+            setOptionalButtonWidth(modelButton, startModelWidth, startModelMargin)
+            setOptionalButtonWidth(planModeButton, startPlanWidth, startPlanMargin)
             modelButton.visibility = View.VISIBLE
+            planModeButton.visibility = View.VISIBLE
         }
 
         if (!animate) {
@@ -77,10 +93,15 @@ internal class InputComposerMotion(
             collapsedText.translationX = endTextTranslationX
             collapsedText.alpha = endTextAlpha
             modelButton.alpha = endModelAlpha
-            setModelButtonWidth(endModelWidth, endModelMargin)
+            planModeButton.alpha = endPlanAlpha
+            setOptionalButtonWidth(modelButton, endModelWidth, endModelMargin)
+            setOptionalButtonWidth(planModeButton, endPlanWidth, endPlanMargin)
             setRightControlsWidth(endRightWidth)
-            collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
-            if (!expanded) modelButton.visibility = View.GONE
+            collapsedInputContainer.visibility = if (expanded) View.GONE else View.VISIBLE
+            if (!expanded) {
+                modelButton.visibility = View.GONE
+                planModeButton.visibility = View.GONE
+            }
             return
         }
 
@@ -95,13 +116,26 @@ internal class InputComposerMotion(
                 collapsedText.translationX = lerp(startTextTranslationX, endTextTranslationX, t)
                 collapsedText.alpha = lerp(startTextAlpha, endTextAlpha, t)
                 modelButton.alpha = lerp(startModelAlpha, endModelAlpha, t)
-                setModelButtonWidth(lerp(startModelWidth, endModelWidth, t), lerp(startModelMargin, endModelMargin, t))
+                planModeButton.alpha = lerp(startPlanAlpha, endPlanAlpha, t)
+                setOptionalButtonWidth(
+                    modelButton,
+                    lerp(startModelWidth, endModelWidth, t),
+                    lerp(startModelMargin, endModelMargin, t)
+                )
+                setOptionalButtonWidth(
+                    planModeButton,
+                    lerp(startPlanWidth, endPlanWidth, t),
+                    lerp(startPlanMargin, endPlanMargin, t)
+                )
                 setRightControlsWidth(lerp(startRightWidth, endRightWidth, t))
             }
             addListener(
                 onEnd = {
-                    collapsedInputContainer.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
-                    if (!expanded) modelButton.visibility = View.GONE
+                    collapsedInputContainer.visibility = if (expanded) View.GONE else View.VISIBLE
+                    if (!expanded) {
+                        modelButton.visibility = View.GONE
+                        planModeButton.visibility = View.GONE
+                    }
                 }
             )
             start()
@@ -135,38 +169,30 @@ internal class InputComposerMotion(
         expandedInputContainer.layoutParams = params
     }
 
-    private fun rightControlsTargetWidth(expanded: Boolean): Int {
-        val addWidth = rightControls.resources.displayMetrics.density * if (expanded) 88f else 42f
+    private fun rightControlsTargetWidth(): Int {
+        val addWidth = rightControls.resources.displayMetrics.density * 42f
         return addWidth.toInt()
     }
 
-    private fun currentModelWidth(expanded: Boolean): Int {
-        if (modelButton.visibility == View.GONE && expanded) return 0
-        return modelButton.width.takeIf { it > 0 } ?: modelButton.layoutParams.width.coerceAtLeast(0)
+    private fun currentOptionalWidth(view: View, expanding: Boolean): Int {
+        if (view.visibility == View.GONE && expanding) return 0
+        return view.width.takeIf { it > 0 } ?: view.layoutParams.width.coerceAtLeast(0)
     }
 
-    private fun currentModelEndMargin(expanded: Boolean): Int {
-        val params = modelButton.layoutParams as? ViewGroup.MarginLayoutParams ?: return 0
-        if (modelButton.visibility == View.GONE && expanded) return 0
+    private fun currentOptionalEndMargin(view: View, expanding: Boolean): Int {
+        val params = view.layoutParams as? ViewGroup.MarginLayoutParams ?: return 0
+        if (view.visibility == View.GONE && expanding) return 0
         return params.marginEnd
     }
 
-    private fun modelButtonTargetWidth(expanded: Boolean): Int {
-        return if (expanded) expandedModelWidth else 0
-    }
-
-    private fun modelButtonTargetEndMargin(expanded: Boolean): Int {
-        return if (expanded) expandedModelEndMargin else 0
-    }
-
-    private fun setModelButtonWidth(width: Int, endMargin: Int) {
-        val params = modelButton.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+    private fun setOptionalButtonWidth(view: View, width: Int, endMargin: Int) {
+        val params = view.layoutParams as? ViewGroup.MarginLayoutParams ?: return
         val targetWidth = width.coerceAtLeast(0)
         val targetMargin = endMargin.coerceAtLeast(0)
         if (params.width == targetWidth && params.marginEnd == targetMargin) return
         params.width = targetWidth
         params.marginEnd = targetMargin
-        modelButton.layoutParams = params
+        view.layoutParams = params
     }
 
     private fun setRightControlsWidth(width: Int) {

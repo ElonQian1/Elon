@@ -12,6 +12,7 @@ internal class MainSendButtonVisualActions(
     private val binding: ActivityMainBinding,
     private val dp: (Int) -> Int,
     private val attachmentButton: () -> ImageButton?,
+    private val inputRightControls: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
     private val hasPendingAttachments: () -> Boolean,
@@ -47,6 +48,15 @@ internal class MainSendButtonVisualActions(
                 Gravity.END or Gravity.CENTER_VERTICAL
             }
             attachmentParams?.let { button.layoutParams = it }
+        }
+
+        inputRightControls()?.let { controls ->
+            val controlsParams = controls.layoutParams
+            val targetWidth = dp(if (sendMode) 84 else 42)
+            if (controlsParams.width != targetWidth) {
+                controlsParams.width = targetWidth
+                controls.layoutParams = controlsParams
+            }
         }
 
         val conversationEnded = !isFriendChatActive() && activeConversation().ended

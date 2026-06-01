@@ -104,12 +104,12 @@ internal class MainInputComposerSetup(
             minimumHeight = bottomMenuHeight
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setPadding(dp(10), dp(6), dp(10), dp(6))
         }
 
         val inputModeButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                marginEnd = dp(10)
+                marginEnd = dp(8)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_circle)
@@ -223,8 +223,8 @@ internal class MainInputComposerSetup(
         }
 
         val modelButtonShell = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(86), dp(32)).apply {
-                marginEnd = dp(10)
+            layoutParams = LinearLayout.LayoutParams(dp(76), dp(32)).apply {
+                marginEnd = dp(8)
             }
             background = activity.getDrawable(R.drawable.bg_model_pill_light)
             alpha = 0f
@@ -246,7 +246,7 @@ internal class MainInputComposerSetup(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(16), 0, dp(30), 0)
+            setPadding(dp(14), 0, dp(27), 0)
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
             setTextColor(Color.parseColor("#2D2D2D"))
             textSize = 12.5f
@@ -255,7 +255,7 @@ internal class MainInputComposerSetup(
 
         val modelChevron = ImageView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(dp(13), dp(13), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                marginEnd = dp(13)
+                marginEnd = dp(11)
             }
             setImageResource(R.drawable.ic_input_model_chevron)
             scaleType = ImageView.ScaleType.CENTER
@@ -268,8 +268,8 @@ internal class MainInputComposerSetup(
         modelButtonShell.addView(modelChevron)
 
         val planModeButton = TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(68), dp(32)).apply {
-                marginEnd = dp(8)
+            layoutParams = LinearLayout.LayoutParams(dp(64), dp(32)).apply {
+                marginEnd = dp(6)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
@@ -277,6 +277,8 @@ internal class MainInputComposerSetup(
             ellipsize = TextUtils.TruncateAt.END
             text = "先规划"
             textSize = 12.5f
+            alpha = 0f
+            visibility = View.GONE
             isClickable = true
             isFocusable = true
             contentDescription = "开启先规划"
@@ -285,7 +287,7 @@ internal class MainInputComposerSetup(
 
         val emojiButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                marginEnd = dp(8)
+                marginEnd = dp(6)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_emoji_circle)
@@ -350,6 +352,7 @@ internal class MainInputComposerSetup(
             collapsedInputContainer = inputCenterContainer,
             collapsedText = collapsedInputPreview,
             modelButton = modelButtonShell,
+            planModeButton = planModeButton,
             rightControls = inputRightControls
         )
         inputEdit.setOnClickListener {
