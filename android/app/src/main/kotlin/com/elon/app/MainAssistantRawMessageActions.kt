@@ -48,11 +48,13 @@ internal class MainAssistantRawMessageActions(
                     val rawContent = jsonStringOrNull(json, "message") ?: ""
                     val apkUrl = jsonStringOrNull(json, "apk_url")
                     val imageUrl = jsonStringOrNull(json, "image_url")
+                    val modelUsed = jsonStringOrNull(json, "model_used")
+                    val nodeId = jsonStringOrNull(json, "node_id")
                     // 若已收到流式 AI 回复，done.message 与最后一条 assistant_message 相同，
                     // 传空串给 handleDone 避免重复气泡
                     val content = if (receivedStreamingReplyThisTurn) "" else rawContent
                     receivedStreamingReplyThisTurn = false
-                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl) ?: return
+                    assistantTerminalActions().handleDone(content, apkUrl, imageUrl, modelUsed, nodeId) ?: return
                 }
                 "error" -> {
                     receivedStreamingReplyThisTurn = false

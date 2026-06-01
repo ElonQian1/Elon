@@ -39,7 +39,11 @@ data class ChatMessage(
     var canResolveSuggestion: Boolean = false,
     var createdAtMs: Long = System.currentTimeMillis(),
     /** 仅对自己发出的消息（role == "user"）有效：对方已读时为 true */
-    var isRead: Boolean = false
+    var isRead: Boolean = false,
+    /** 回答本条消息的模型 ID，如 "gpt-4o-mini"、"qwen2:7b" */
+    var modelUsed: String? = null,
+    /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
+    var nodeId: String? = null
 )
 
 class ChatAdapter(
@@ -77,6 +81,7 @@ class ChatAdapter(
         val userAvatar: TextView? = view.findViewById(R.id.userAvatar)
         val friendAvatar: TextView? = view.findViewById(R.id.friendAvatar)
         val apkActionBar: LinearLayout? = view.findViewById(R.id.apkActionBar)
+        val modelAttribution: TextView? = view.findViewById(R.id.modelAttributionText)
         var shimmerAnimator: ValueAnimator? = null
         var evidenceShimmerAnimator: ValueAnimator? = null
 
@@ -172,6 +177,7 @@ class ChatAdapter(
         bindSelectionVisual(holder, message, projectCardBound, position)
         bindMessageActions(holder, message, projectCardBound)
         bindEvidence(holder, message, position)
+        bindModelAttribution(holder, message)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
         val canPause = position == messages.lastIndex && message.role in activeWorkflowRoles && onPauseWork != null
         holder.pauseButton?.visibility = if (canPause) View.VISIBLE else View.GONE
@@ -538,6 +544,17 @@ class ChatAdapter(
                 start()
             }
         }
+    }
+
+    private fun bindModelAttribution(holder: VH, message: ChatMessage) {
+        val tv = holder.modelAttribution ?: return
+        val model = message.modelUsed
+        if (model.isNullOrBlank() || message.role !in setOf("ai", "assistant")) {
+            tv.visibility = View.GONE
+            return
+        }
+        tv.text = if (!message.nodeId.isNullOrBlank()) "🖥️ $model" else "✦ $model"
+        tv.visibility = View.VISIBLE
     }
 
     private fun bindEvidence(holder: VH, message: ChatMessage, position: Int) {

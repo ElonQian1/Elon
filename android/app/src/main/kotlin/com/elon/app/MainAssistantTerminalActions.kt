@@ -23,7 +23,7 @@ internal class MainAssistantTerminalActions(
     private val preparePlanImplementationPrompt: () -> Unit,
     private val workflowStoppedMessage: (String) -> String
 ) {
-    fun handleDone(content: String, apkUrl: String?, imageUrl: String?): ChatMessage? {
+    fun handleDone(content: String, apkUrl: String?, imageUrl: String?, modelUsed: String? = null, nodeId: String? = null): ChatMessage? {
         resetPendingRequestState()
         val wasDevelopment = getActiveRequestIsDevelopment()
         val wasPlanning = getActiveRequestIsPlanning()
@@ -58,7 +58,10 @@ internal class MainAssistantTerminalActions(
             finalReplyMessage(planAwareContent(content, wasPlanning), visibleApkUrl, imageUrl, wasDevelopment),
             chatAttachmentFromImageUrl(imageUrl)
         ).let { msg ->
-            if (visibleApkUrl != null) msg.copy(apkUrl = visibleApkUrl) else msg
+            var result = if (visibleApkUrl != null) msg.copy(apkUrl = visibleApkUrl) else msg
+            if (modelUsed != null) result = result.copy(modelUsed = modelUsed)
+            if (nodeId != null) result = result.copy(nodeId = nodeId)
+            result
         }
     }
 
