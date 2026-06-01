@@ -12,8 +12,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import kotlin.concurrent.thread
 
@@ -126,11 +128,7 @@ internal class UserMemoriesCard(
             put("category", category)
             put("importance", 6)
         }.toString()
-        val body = json.toByteArray(Charsets.UTF_8).let {
-            okhttp3.RequestBody.create(
-                okhttp3.MediaType.parse("application/json; charset=utf-8"), it
-            )
-        }
+        val body = json.toRequestBody("application/json; charset=utf-8".toMediaType())
         val req = AuthManager.applyAuth(
             activity,
             Request.Builder().url("$serverUrl/api/memories").post(body)
