@@ -690,13 +690,29 @@ if (-not $Force) {
     try {
         $serverNow = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
         $serverNowCode = [int]$serverNow.versionCode
-        if ($serverNowCode -ge $newCode) {
+        # 服务器 SHA（version.json 里可能是 sourceSha 或 gitSha）
+        $serverNowSha = if ($serverNow.sourceSha) { [string]$serverNow.sourceSha } else { [string]$serverNow.gitSha }
+        $serverNowShaShort = if ($serverNowSha.Length -ge 7) { $serverNowSha.Substring(0,7) } else { $serverNowSha }
+
+        # 判断逻辑：
+        #   serverNowCode > newCode          → 真的有更新版本，中止
+        #   serverNowCode == newCode
+        #     且 server SHA == 本机 SHA      → 完全相同，已发布，中止
+        #     且 server SHA != 本机 SHA      → 旧 SHA 占用了同一版本号槽，本机代码更新，继续覆盖
+        $serverIsAhead   = $serverNowCode -gt $newCode
+        $sameCodeSameSha = ($serverNowCode -eq $newCode) -and ($serverNowShaShort -eq $sha)
+
+        if ($serverIsAhead -or $sameCodeSameSha) {
             Write-Host ""
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host "   ⚠️  APK 发布已中止：服务器已有更新版本" -ForegroundColor Yellow
-            Write-Host "   服务器当前：build $serverNowCode (v$($serverNow.versionName))" -ForegroundColor Yellow
-            Write-Host "   本次编译：  build $newCode (v$versionName)" -ForegroundColor Yellow
-            Write-Host "   原因：另一台 PC 在本机编译期间已经发布了同等或更新的 APK。" -ForegroundColor Yellow
+            Write-Host "   服务器当前：build $serverNowCode (v$($serverNow.versionName)) · SHA $serverNowShaShort" -ForegroundColor Yellow
+            Write-Host "   本次编译：  build $newCode (v$versionName) · SHA $sha" -ForegroundColor Yellow
+            if ($serverIsAhead) {
+                Write-Host "   原因：另一台 PC 在本机编译期间已经发布了更高版本号的 APK。" -ForegroundColor Yellow
+            } else {
+                Write-Host "   原因：服务器已有完全相同的版本（同 build 号 + 同 SHA），无需重复发布。" -ForegroundColor Yellow
+            }
             Write-Host "   处理：本次本机编译的 APK 作废；服务器分配的 build $newCode 槽位将释放回 in-flight 列表。" -ForegroundColor Yellow
             Write-Host "   如需本机验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
             Write-Host "   如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
@@ -705,7 +721,13 @@ if (-not $Force) {
             Complete-Release -Success:$false -ErrorMessage "server already has newer apk: build $serverNowCode"
             exit 0
         }
-        Write-Host "   ✅ 服务器版本检查通过（服务器 $serverNowCode < 本次 $newCode）" -ForegroundColor Green
+
+        if ($serverNowCode -eq $newCode) {
+            # serverNowCode == newCode 且 SHA 不同 → 旧代码占槽，本次代码更新，覆盖
+            Write-Host "   ℹ️  服务器有同版本号 build $serverNowCode 但 SHA 不同（服务器:$serverNowShaShort 本机:$sha），旧槽被旧代码占用，继续覆盖..." -ForegroundColor Cyan
+        } else {
+            Write-Host "   ✅ 服务器版本检查通过（服务器 $serverNowCode < 本次 $newCode）" -ForegroundColor Green
+        }
     } catch {
         Write-Warning "   ⚠️  上传前无法读取服务器 version.json，跳过祖先检查：$_"
     }
