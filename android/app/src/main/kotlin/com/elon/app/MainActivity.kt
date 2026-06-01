@@ -307,6 +307,10 @@ class MainActivity : AppCompatActivity() {
                     // 好友正在输入，通知聊天界面显示"正在输入..."
                     friendChatActions.handleTypingEvent(event.fromUserId)
                 }
+                is GlobalWsEvent.ReadReceipt -> {
+                    // 好友已读回执，更新消息"已读"状态
+                    friendChatActions.handleReadReceiptEvent(event.fromUserId, event.lastReadAt)
+                }
                 else -> Unit
             }
         }

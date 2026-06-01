@@ -37,7 +37,9 @@ data class ChatMessage(
     var suggestionResolvedByName: String? = null,
     var suggestionResolvedAt: String? = null,
     var canResolveSuggestion: Boolean = false,
-    var createdAtMs: Long = System.currentTimeMillis()
+    var createdAtMs: Long = System.currentTimeMillis(),
+    /** 仅对自己发出的消息（role == "user"）有效：对方已读时为 true */
+    var isRead: Boolean = false
 )
 
 class ChatAdapter(
@@ -220,11 +222,18 @@ class ChatAdapter(
 
     private fun bindSendStatus(holder: VH, message: ChatMessage) {
         val status = holder.status ?: return
-        val text = message.sendStatus?.takeIf { it.isNotBlank() }
         val canRetry = message.canRetryFailedAttachmentSend()
+        val text = when {
+            canRetry -> "发送失败，点此重试"
+            message.sendStatus?.isNotBlank() == true -> message.sendStatus!!
+            message.isRead && message.role == "user" -> "已读"
+            else -> null
+        }
         status.visibility = if (text == null) View.GONE else View.VISIBLE
-        status.text = if (canRetry) "发送失败，点此重试" else text.orEmpty()
-        status.setTextColor(Color.parseColor(if (canRetry) "#C62828" else "#66111111"))
+        status.text = text.orEmpty()
+        status.setTextColor(Color.parseColor(
+            if (canRetry) "#C62828" else if (message.isRead && message.role == "user") "#4CAF50" else "#66111111"
+        ))
         status.isClickable = canRetry
         status.isFocusable = canRetry
         status.setOnClickListener(

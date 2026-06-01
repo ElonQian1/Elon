@@ -141,6 +141,22 @@ internal class MainFriendChatActions(
         binding.topTitleText.text = savedFriendTitle
     }
 
+    /** 收到好友的 read_receipt 事件：标记该好友已读的所有自己发出的消息 */
+    fun handleReadReceiptEvent(fromUserId: String, lastReadAt: String) {
+        val lastReadAtMs = parseChatMessageCreatedAt(lastReadAt) ?: return
+        val messages = messagesByFriend[fromUserId] ?: return
+        var changed = false
+        for (msg in messages) {
+            if (msg.role == "user" && !msg.isRead && msg.createdAtMs in 1..lastReadAtMs) {
+                msg.isRead = true
+                changed = true
+            }
+        }
+        if (changed && activeFriend?.id == fromUserId) {
+            activeAdapter?.notifyDataSetChanged()
+        }
+    }
+
     fun stopPolling() {
         polling = false
         pollHandler.removeCallbacks(pollRunnable)

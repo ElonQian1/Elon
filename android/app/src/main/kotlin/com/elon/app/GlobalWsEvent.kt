@@ -54,6 +54,12 @@ sealed class GlobalWsEvent {
         val fromUserId: String,
     ) : GlobalWsEvent()
 
+    /** 消息已读回执：fromUserId 已读取至 lastReadAt 时间戳的消息 */
+    data class ReadReceipt(
+        val fromUserId: String,
+        val lastReadAt: String,
+    ) : GlobalWsEvent()
+
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
     data class Unknown(val raw: String) : GlobalWsEvent()
 
@@ -88,6 +94,10 @@ sealed class GlobalWsEvent {
                 )
                 "typing" -> Typing(
                     fromUserId = json.optString("fromUserId", ""),
+                )
+                "read_receipt" -> ReadReceipt(
+                    fromUserId = json.optString("fromUserId", ""),
+                    lastReadAt = json.optString("lastReadAt", ""),
                 )
                 else -> Unknown(text)
             }

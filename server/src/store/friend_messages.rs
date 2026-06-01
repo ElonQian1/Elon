@@ -199,6 +199,8 @@ fn mark_friend_messages_read(conn: &Connection, user_id: &str, friend_id: &str) 
          DO UPDATE SET last_read_at = excluded.last_read_at",
         params![user_id, friend_id, now],
     )?;
+    // 实时通知原发送方（friend_id）：user_id 已读至 now
+    crate::read_receipt_events::publish(user_id.to_string(), friend_id.to_string(), now);
     Ok(())
 }
 
