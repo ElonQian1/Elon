@@ -86,7 +86,7 @@ internal class MainInputComposerSetup(
         root.orientation = LinearLayout.VERTICAL
         root.minimumHeight = bottomMenuHeight
         root.setPadding(0, 0, 0, 0)
-        root.setBackgroundColor(Color.parseColor("#181B20"))
+        root.setBackgroundColor(activity.getColor(R.color.elon_nav_bg))
 
         val expandedInputContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(

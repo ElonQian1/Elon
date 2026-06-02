@@ -20,6 +20,6 @@
     <color name="elon_badge_neutral_bg">#283345</color>
     <color name="elon_badge_neutral_text">#B8C4D8</color>
 
-    <color name="elon_nav_bg">#1E1E1E</color>
+    <color name="elon_nav_bg">#181B20</color>
     <color name="elon_nav_active_bg">#262626</color>
 </resources>

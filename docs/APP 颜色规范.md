@@ -26,7 +26,7 @@
 | 蓝色胶囊文字 | `color.badge.info.text` | `#81B3D9` |
 | 状态胶囊背景，比如“未配置” | `color.badge.neutral.bg` | `#283345` |
 | 状态胶囊文字 | `color.badge.neutral.text` | `#B8C4D8` |
-| 底部导航背景 | `color.nav.bg` | `#1E1E1E` |
+| 底部导航背景 | `color.nav.bg` | `#181B20` |
 | 底部导航选中背景 | `color.nav.active.bg` | `#262626` |
 
 ## 使用原则
