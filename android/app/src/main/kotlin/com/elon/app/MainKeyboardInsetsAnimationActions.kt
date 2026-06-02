@@ -560,10 +560,42 @@ internal class MainKeyboardInsetsAnimationActions(
         if (rootHeight <= 0 || visibleFrame.bottom <= 0) return 0
 
         val hiddenHeight = (rootHeight - visibleFrame.bottom).coerceAtLeast(0)
+        if (shouldUseFreshVisibleFrameKeyboardHeight(hiddenHeight, rootHeight)) {
+            return visibleFrameKeyboardHeightWithoutBaseline(hiddenHeight)
+        }
         if (baselineHiddenHeight < 0 || hiddenHeight < baselineHiddenHeight) {
             baselineHiddenHeight = hiddenHeight
         }
-        return (hiddenHeight - baselineHiddenHeight.coerceAtLeast(0)).coerceAtLeast(0)
+        val keyboardHeight = (hiddenHeight - baselineHiddenHeight.coerceAtLeast(0)).coerceAtLeast(0)
+        if (
+            keyboardHeight == 0 &&
+            keyboardLiftLockActive &&
+            binding.inputEdit.hasFocus() &&
+            visibleFrameLooksLikeKeyboard(hiddenHeight, rootHeight)
+        ) {
+            return visibleFrameKeyboardHeightWithoutBaseline(hiddenHeight)
+        }
+        return keyboardHeight
+    }
+
+    private fun shouldUseFreshVisibleFrameKeyboardHeight(hiddenHeight: Int, rootHeight: Int): Boolean {
+        if (baselineHiddenHeight >= 0) return false
+        if (!keyboardLiftLockActive || !binding.inputEdit.hasFocus()) return false
+        return visibleFrameLooksLikeKeyboard(hiddenHeight, rootHeight)
+    }
+
+    private fun visibleFrameLooksLikeKeyboard(hiddenHeight: Int, rootHeight: Int): Boolean {
+        if (hiddenHeight <= 0 || rootHeight <= 0) return false
+        val density = binding.root.resources.displayMetrics.density
+        val minKeyboardHeight = maxOf((density * 120f).toInt(), (rootHeight * 0.18f).toInt())
+        return hiddenHeight > minKeyboardHeight
+    }
+
+    private fun visibleFrameKeyboardHeightWithoutBaseline(hiddenHeight: Int): Int {
+        val systemBottom = ViewCompat.getRootWindowInsets(binding.root)
+            ?.getInsets(WindowInsetsCompat.Type.systemBars())
+            ?.bottom ?: 0
+        return (hiddenHeight - systemBottom).coerceAtLeast(0)
     }
 
     private fun keyboardHeightFromInsetsOrFrame(insets: WindowInsetsCompat): Int {
