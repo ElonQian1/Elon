@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.text.TextUtils
@@ -50,8 +51,9 @@ internal class SideMenuUsageDropdown(
             chevron = ImageView(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
                 setImageResource(R.drawable.ic_input_model_chevron)
+                imageTintList = ColorStateList.valueOf(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 scaleType = ImageView.ScaleType.CENTER
-                alpha = 0.9f
+                alpha = 1f
                 rotation = 0f
                 isClickable = false
                 isFocusable = false
@@ -187,7 +189,7 @@ internal class SideMenuUsageDropdown(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 text = line.label
-                setTextColor(Color.parseColor("#2F2F2F"))
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 12.5f
             })
             addView(TextView(activity).apply {
@@ -195,7 +197,7 @@ internal class SideMenuUsageDropdown(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 text = line.value
-                setTextColor(Color.parseColor("#2F2F2F"))
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 12.5f
             })
             line.note?.takeIf { it.isNotBlank() }?.let { note ->
@@ -204,7 +206,7 @@ internal class SideMenuUsageDropdown(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     text = note
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                     textSize = 11.5f
                     setPadding(dp(8), 0, 0, 0)
                 })
