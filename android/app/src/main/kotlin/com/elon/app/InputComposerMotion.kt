@@ -16,20 +16,16 @@ internal class InputComposerMotion(
 ) {
     private val interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var expandAnimator: ValueAnimator? = null
+    private var expandAnimatorTarget: Boolean? = null
     private var textHeightAnimator: ValueAnimator? = null
     private var expandedTextHeight = 0
     private val expandedModelWidth: Int
     private val expandedModelEndMargin: Int
     private val expandedPlanWidth: Int
     private val expandedPlanEndMargin: Int
-    private var keyboardSyncTransition: ComposerTransition? = null
-    private var keyboardSyncProgress = 0f
 
     var isExpanded: Boolean = false
         private set
-
-    val isKeyboardSynchronizedExpansionPending: Boolean
-        get() = keyboardSyncTransition != null
 
     init {
         val density = modelButton.resources.displayMetrics.density
@@ -48,85 +44,24 @@ internal class InputComposerMotion(
         val target = height.coerceAtLeast(0)
         expandedTextHeight = target
         if (!isExpanded) return
-        if (keyboardSyncTransition != null) {
-            keyboardSyncTransition = createTransition(expanded = true)
-            keyboardSyncTransition?.let { applyTransition(it, keyboardSyncProgress, animateLayoutHeight = true) }
-            return
-        }
+        if (expandAnimator?.isRunning == true && expandAnimatorTarget == true) return
         animateHeight(expandedInputContainer, target, animate)
     }
 
-    fun prepareKeyboardSynchronizedExpansion() {
-        if (isExpanded && keyboardSyncTransition == null) return
-        expandAnimator?.cancel()
-        textHeightAnimator?.cancel()
-        isExpanded = true
-        keyboardSyncProgress = 0f
-        keyboardSyncTransition = createTransition(expanded = true).also { transition ->
-            prepareTransition(transition)
-            applyTransition(transition, 0f, animateLayoutHeight = true)
-        }
-    }
-
     fun expandForTextInput(animate: Boolean) {
-        keyboardSyncTransition = null
-        keyboardSyncProgress = 0f
         setExpanded(expanded = true, animate = animate, animateLayoutHeight = true)
     }
 
-    fun applyKeyboardSynchronizedExpansionProgress(progress: Float): Boolean {
-        val transition = keyboardSyncTransition ?: return false
-        keyboardSyncProgress = progress.coerceIn(0f, 1f)
-        applyTransition(transition, keyboardSyncProgress, animateLayoutHeight = true)
-        if (keyboardSyncProgress >= 1f) {
-            completeTransition(transition)
-            keyboardSyncTransition = null
-        }
-        return true
-    }
-
-    fun finishKeyboardSynchronizedExpansion(animate: Boolean): Boolean {
-        val transition = keyboardSyncTransition ?: return false
-        expandAnimator?.cancel()
-        if (!animate) {
-            applyTransition(transition, 1f, animateLayoutHeight = true)
-            completeTransition(transition)
-            keyboardSyncTransition = null
-            keyboardSyncProgress = 0f
-            return true
-        }
-        val startProgress = keyboardSyncProgress.coerceIn(0f, 1f)
-        expandAnimator = ValueAnimator.ofFloat(startProgress, 1f).apply {
-            duration = ((1f - startProgress) * 220L).toLong().coerceAtLeast(80L)
-            interpolator = this@InputComposerMotion.interpolator
-            addUpdateListener { animator ->
-                keyboardSyncProgress = animator.animatedValue as Float
-                applyTransition(transition, keyboardSyncProgress, animateLayoutHeight = true)
-            }
-            addListener(
-                onEnd = {
-                    applyTransition(transition, 1f, animateLayoutHeight = true)
-                    completeTransition(transition)
-                    keyboardSyncTransition = null
-                    keyboardSyncProgress = 0f
-                }
-            )
-            start()
-        }
-        return true
-    }
-
     fun setExpanded(expanded: Boolean, animate: Boolean, animateLayoutHeight: Boolean = true) {
-        if (expanded && keyboardSyncTransition != null) return
-        keyboardSyncTransition = null
-        keyboardSyncProgress = 0f
         if (isExpanded == expanded) {
+            if (expandAnimator?.isRunning == true && expandAnimatorTarget == expanded) return
             if (!expanded || expandedInputContainer.height == targetExpandedHeight(expanded)) return
             animateHeight(expandedInputContainer, targetExpandedHeight(expanded), animate && animateLayoutHeight)
             return
         }
         isExpanded = expanded
         expandAnimator?.cancel()
+        expandAnimatorTarget = null
 
         val transition = createTransition(expanded)
         prepareTransition(transition)
@@ -138,9 +73,12 @@ internal class InputComposerMotion(
         if (!animate) {
             applyTransition(transition, 1f, animateLayoutHeight = true)
             completeTransition(transition)
+            expandAnimatorTarget = null
             return
         }
 
+        var cancelled = false
+        expandAnimatorTarget = expanded
         expandAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 240L
             interpolator = this@InputComposerMotion.interpolator
@@ -148,12 +86,22 @@ internal class InputComposerMotion(
                 val t = animator.animatedValue as Float
                 applyTransition(transition, t, animateLayoutHeight)
             }
-            addListener(
-                onEnd = {
-                    setExpandedHeight(transition.endHeight)
-                    completeTransition(transition)
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    cancelled = true
                 }
-            )
+
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (!cancelled) {
+                        setExpandedHeight(targetExpandedHeight(transition.expanded))
+                        completeTransition(transition)
+                    }
+                    if (expandAnimator === animation) {
+                        expandAnimatorTarget = null
+                        expandAnimator = null
+                    }
+                }
+            })
             start()
         }
     }
@@ -207,7 +155,8 @@ internal class InputComposerMotion(
     ) {
         val t = progress.coerceIn(0f, 1f)
         if (animateLayoutHeight) {
-            setExpandedHeight(lerp(transition.startHeight, transition.endHeight, t))
+            val endHeight = if (transition.expanded) targetExpandedHeight(expanded = true) else transition.endHeight
+            setExpandedHeight(lerp(transition.startHeight, endHeight, t))
         }
         collapsedInputContainer.alpha = lerp(transition.startPillAlpha, transition.endPillAlpha, t)
         collapsedText.translationY = lerp(transition.startTextTranslationY, transition.endTextTranslationY, t)
@@ -339,12 +288,4 @@ internal class InputComposerMotion(
         val startRightWidth: Int,
         val endRightWidth: Int
     )
-}
-
-private fun ValueAnimator.addListener(onEnd: () -> Unit) {
-    addListener(object : android.animation.AnimatorListenerAdapter() {
-        override fun onAnimationEnd(animation: android.animation.Animator) {
-            onEnd()
-        }
-    })
 }

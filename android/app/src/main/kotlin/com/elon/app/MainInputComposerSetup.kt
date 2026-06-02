@@ -124,8 +124,6 @@ internal class MainInputComposerSetup(
         lateinit var inputComposerMotion: InputComposerMotion
         val openCollapsedInputComposer = {
             if (!isVoiceMode()) {
-                inputComposerMotion.expandForTextInput(animate = true)
-                updateAdaptiveInputHeight()
                 focusInputComposer()
             }
         }
@@ -204,11 +202,12 @@ internal class MainInputComposerSetup(
             textSize = 15f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!isVoiceMode()) {
-                    if (!hasFocus || !inputComposerMotion.isKeyboardSynchronizedExpansionPending) {
+                    if (hasFocus) {
+                        inputComposerMotion.expandForTextInput(animate = shouldAnimateInputFocus())
+                    } else {
                         inputComposerMotion.setExpanded(
-                            hasFocus,
-                            animate = shouldAnimateInputFocus(),
-                            animateLayoutHeight = !hasFocus
+                            expanded = false,
+                            animate = shouldAnimateInputFocus()
                         )
                     }
                     updateSendButtonVisual()
@@ -409,8 +408,6 @@ internal class MainInputComposerSetup(
         )
         inputEdit.setOnClickListener {
             if (!isVoiceMode()) {
-                inputComposerMotion.expandForTextInput(animate = true)
-                updateAdaptiveInputHeight()
                 focusInputComposer()
             }
         }

@@ -16,8 +16,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.elon.app.databinding.ActivityMainBinding
 
 internal class MainKeyboardInsetsAnimationActions(
-    private val binding: ActivityMainBinding,
-    private val inputComposerMotion: () -> InputComposerMotion? = { null }
+    private val binding: ActivityMainBinding
 ) {
     private val fallbackInterpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var bottomOffsetAnimator: ValueAnimator? = null
@@ -78,7 +77,6 @@ internal class MainKeyboardInsetsAnimationActions(
                     bottomOffsetAnimator?.cancel()
                     chatLiftAnimator?.cancel()
                     binding.bottomBarContainer.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-                    inputComposerMotion()?.applyKeyboardSynchronizedExpansionProgress(0f)
                 }
 
                 override fun onStart(
@@ -113,9 +111,6 @@ internal class MainKeyboardInsetsAnimationActions(
                         val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
                         markKeyboardVisibleIfNeeded(keyboardHeight)
                         if (!shouldIgnoreZeroKeyboardHeight(keyboardHeight, imeVisible)) {
-                            inputComposerMotion()?.applyKeyboardSynchronizedExpansionProgress(
-                                keyboardExpansionProgress(keyboardHeight, imeAnimation)
-                            )
                             applyKeyboardHeight(
                                 keyboardHeight,
                                 animate = false,
@@ -139,7 +134,6 @@ internal class MainKeyboardInsetsAnimationActions(
                         binding.inputEdit.hasFocus() &&
                         insets?.isVisible(WindowInsetsCompat.Type.ime()) == true
                     ) {
-                        inputComposerMotion()?.finishKeyboardSynchronizedExpansion(animate = false)
                         applyKeyboardHeight(lockedKeyboardLiftHeight, animate = false)
                         imeAnimationStartHeight = 0
                         imeAnimationEndHeight = 0
@@ -357,7 +351,6 @@ internal class MainKeyboardInsetsAnimationActions(
         if (fallbackHeight <= 0) return
         usingEstimatedKeyboardHeight = true
         lockKeyboardLiftHeight(fallbackHeight, estimated = true)
-        inputComposerMotion()?.finishKeyboardSynchronizedExpansion(animate = true)
         applyKeyboardHeight(fallbackHeight, animate = true)
     }
 
@@ -397,9 +390,6 @@ internal class MainKeyboardInsetsAnimationActions(
             applyBottomBarOffset(0)
             applyChatBottomPadding(0)
             return
-        }
-        if (target > 0 && !runningImeAnimation) {
-            inputComposerMotion()?.finishKeyboardSynchronizedExpansion(animate)
         }
         if (animate) {
             animateBottomBarOffset(target)
@@ -657,18 +647,6 @@ internal class MainKeyboardInsetsAnimationActions(
         if (start == end) return start
         val fraction = animation.getInterpolatedFraction().coerceIn(0f, 1f)
         return (start + (end - start) * fraction).toInt().coerceAtLeast(0)
-    }
-
-    private fun keyboardExpansionProgress(
-        keyboardHeight: Int,
-        animation: WindowInsetsAnimationCompat
-    ): Float {
-        val start = imeAnimationStartHeight.coerceAtLeast(0)
-        val end = imeAnimationEndHeight.coerceAtLeast(0)
-        if (end > start) {
-            return ((keyboardHeight - start).toFloat() / (end - start).toFloat()).coerceIn(0f, 1f)
-        }
-        return animation.getInterpolatedFraction().coerceIn(0f, 1f)
     }
 
     private fun lockKeyboardLiftHeight(height: Int, estimated: Boolean) {

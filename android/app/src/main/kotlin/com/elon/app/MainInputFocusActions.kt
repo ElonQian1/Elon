@@ -74,7 +74,9 @@ internal class MainInputFocusActions(
             setVoiceMode(false)
             applyVoiceMode()
         }
-        inputComposerMotion()?.expandForTextInput(animate = !binding.inputEdit.hasFocus())
+        val shouldAnimateComposer = !binding.inputEdit.hasFocus() ||
+            inputComposerMotion()?.isExpanded != true
+        inputComposerMotion()?.expandForTextInput(animate = shouldAnimateComposer)
         updateAdaptiveInputHeight()
         requestKeyboardLift()
         focusAndShowKeyboard()
@@ -84,7 +86,6 @@ internal class MainInputFocusActions(
         }
         binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 90L)
         binding.inputEdit.postDelayed({ focusAndShowKeyboardIfComposerOpen() }, 220L)
-        binding.inputEdit.postDelayed({ finishPendingComposerExpansionIfNeeded() }, 280L)
     }
 
     fun collapseInputComposerForBack(): Boolean {
@@ -147,20 +148,6 @@ internal class MainInputFocusActions(
             .show(WindowInsetsCompat.Type.ime())
         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(binding.inputEdit, InputMethodManager.SHOW_IMPLICIT)
-    }
-
-    private fun finishPendingComposerExpansionIfNeeded() {
-        if (isVoiceMode()) return
-        val motion = inputComposerMotion() ?: return
-        if (!motion.isKeyboardSynchronizedExpansionPending) return
-        if (!binding.inputEdit.hasFocus()) {
-            focusAndShowKeyboard()
-            if (!binding.inputEdit.hasFocus()) return
-        }
-        motion.finishKeyboardSynchronizedExpansion(animate = true)
-        binding.inputEdit.post { showKeyboard() }
-        updateSendButtonVisual()
-        updateAdaptiveInputHeight()
     }
 
     private fun installKeyboardCollapseWatcher() {
