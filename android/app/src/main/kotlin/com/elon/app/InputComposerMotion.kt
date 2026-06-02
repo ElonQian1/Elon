@@ -68,6 +68,12 @@ internal class InputComposerMotion(
         }
     }
 
+    fun expandForTextInput(animate: Boolean) {
+        keyboardSyncTransition = null
+        keyboardSyncProgress = 0f
+        setExpanded(expanded = true, animate = animate, animateLayoutHeight = true)
+    }
+
     fun applyKeyboardSynchronizedExpansionProgress(progress: Float): Boolean {
         val transition = keyboardSyncTransition ?: return false
         keyboardSyncProgress = progress.coerceIn(0f, 1f)

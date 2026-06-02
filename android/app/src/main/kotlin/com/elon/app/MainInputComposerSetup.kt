@@ -123,10 +123,9 @@ internal class MainInputComposerSetup(
 
         lateinit var inputComposerMotion: InputComposerMotion
         val openCollapsedInputComposer = {
-            if (!inputComposerMotion.isExpanded && !isVoiceMode()) {
-                inputComposerMotion.prepareKeyboardSynchronizedExpansion()
-            }
             if (!isVoiceMode()) {
+                inputComposerMotion.expandForTextInput(animate = true)
+                updateAdaptiveInputHeight()
                 focusInputComposer()
             }
         }
@@ -409,10 +408,9 @@ internal class MainInputComposerSetup(
             rightControls = inputRightControls
         )
         inputEdit.setOnClickListener {
-            if (!inputComposerMotion.isExpanded && !isVoiceMode()) {
-                inputComposerMotion.prepareKeyboardSynchronizedExpansion()
-            }
             if (!isVoiceMode()) {
+                inputComposerMotion.expandForTextInput(animate = true)
+                updateAdaptiveInputHeight()
                 focusInputComposer()
             }
         }

@@ -167,7 +167,6 @@ internal class MainKeyboardInsetsAnimationActions(
         if (keyboardLiftLockActive && binding.inputEdit.hasFocus() && recentlyRequestedKeyboardLift()) {
             return
         }
-        inputComposerMotion()?.prepareKeyboardSynchronizedExpansion()
 
         liftRequestedAt = SystemClock.uptimeMillis()
         keyboardWasVisibleSinceLift = false
