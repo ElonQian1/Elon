@@ -180,6 +180,7 @@ internal class MainKeyboardInsetsAnimationActions(
         followChatBottomDuringLift = shouldFollowLatestMessage()
         binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, ESTIMATED_LIFT_DELAY_MS)
         binding.root.postDelayed({ applyKnownOrEstimatedKeyboardHeight() }, ESTIMATED_LIFT_RETRY_DELAY_MS)
+        binding.root.postDelayed({ applyFinalEstimatedKeyboardLiftIfNeeded() }, FINAL_ESTIMATED_LIFT_DELAY_MS)
     }
 
     fun releaseKeyboardLift() {
@@ -341,6 +342,24 @@ internal class MainKeyboardInsetsAnimationActions(
         val estimatedHeight = estimatedKeyboardHeight()
         lockKeyboardLiftHeight(estimatedHeight, estimated = true)
         applyKeyboardHeight(estimatedHeight, animate = true)
+    }
+
+    private fun applyFinalEstimatedKeyboardLiftIfNeeded() {
+        if (!binding.inputEdit.hasFocus()) return
+        if (!keyboardLiftLockActive) return
+        if (lastKeyboardHeight > 0) return
+        if (kotlin.math.abs(binding.bottomBarContainer.translationY) > 1f) return
+        if (runningImeAnimation) {
+            binding.root.postDelayed({ applyFinalEstimatedKeyboardLiftIfNeeded() }, FINAL_ESTIMATED_LIFT_RETRY_DELAY_MS)
+            return
+        }
+
+        val fallbackHeight = lockedKeyboardLiftHeight.takeIf { it > 0 } ?: estimatedKeyboardHeight()
+        if (fallbackHeight <= 0) return
+        usingEstimatedKeyboardHeight = true
+        lockKeyboardLiftHeight(fallbackHeight, estimated = true)
+        inputComposerMotion()?.finishKeyboardSynchronizedExpansion(animate = true)
+        applyKeyboardHeight(fallbackHeight, animate = true)
     }
 
     private fun applyKeyboardHeight(
@@ -736,6 +755,8 @@ internal class MainKeyboardInsetsAnimationActions(
         private const val ZERO_HEIGHT_GRACE_MS = 900L
         private const val ESTIMATED_LIFT_DELAY_MS = 320L
         private const val ESTIMATED_LIFT_RETRY_DELAY_MS = 520L
+        private const val FINAL_ESTIMATED_LIFT_DELAY_MS = 760L
+        private const val FINAL_ESTIMATED_LIFT_RETRY_DELAY_MS = 180L
         private const val PANEL_REPLACEMENT_LAYOUT_SYNC_SUPPRESS_MS = 420L
         private const val MIN_REPLACEMENT_PANEL_RATIO = 0.24f
         private const val MAX_REPLACEMENT_PANEL_RATIO = 0.48f
