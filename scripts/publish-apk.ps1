@@ -41,7 +41,13 @@ param(
     [switch]$SkipBuild,
 
     # 跳过上传前的"服务器已发布更新 versionCode"检查，强制覆盖
-    [switch]$Force
+    [switch]$Force,
+
+    # 恢复用：当线上 version.json 曾回退，但用户手机已安装更高 build 时，
+    # 以该已安装 build 作为 claim 最低基线，仍由服务器分配下一个版本号。
+    [int]$CurrentInstalledVersionCode = 0,
+
+    [string]$CurrentInstalledVersionName = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -82,6 +88,26 @@ function Invoke-ReleaseApi {
     } finally {
         if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
     }
+}
+
+function Invoke-HttpJson {
+    param(
+        [Parameter(Mandatory)] [string]$Url,
+        [int]$TimeoutSec = 10
+    )
+    $raw = & curl.exe --noproxy '*' -s --max-time $TimeoutSec -w "`n__HTTP_STATUS__:%{http_code}" $Url 2>&1
+    $rawText = ($raw -join "`n")
+    if ($LASTEXITCODE -ne 0) {
+        throw "curl GET 失败 (exit=$LASTEXITCODE): $rawText"
+    }
+    $statusLine = ($rawText -split "`n") | Where-Object { $_ -match '^__HTTP_STATUS__:' } | Select-Object -Last 1
+    $bodyText = ($rawText -replace "(?s)\n?__HTTP_STATUS__:\d+\s*$","")
+    $status = if ($statusLine) { [int]($statusLine -replace '^__HTTP_STATUS__:','') } else { 0 }
+    if ($status -lt 200 -or $status -ge 300) {
+        throw "HTTP ${status}: $bodyText"
+    }
+    if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
+    return ($bodyText | ConvertFrom-Json)
 }
 
 $script:ReleaseToken = $null
@@ -271,7 +297,7 @@ function Get-DeployedApkSha {
     # 优先 HTTP 查询 /app/version.json：快、不依赖 SSH、不会挂死。
     # SSH 仅作为 fallback，且必须设连接超时避免阻塞构建/轮询。
     try {
-        $published = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
+        $published = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
         $sha = [string]$published.gitSha
         if ($sha -match '^[0-9a-f]{40}$') { return $sha }
     } catch {
@@ -583,7 +609,7 @@ Write-Host "   build.gradle 兜底: v$oldName (build $oldCode) — 不会被本�
 $serverCurrentCode = $oldCode
 $serverCurrentName = $oldName
 try {
-    $serverDeployed = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
+    $serverDeployed = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
     if ($serverDeployed.versionCode -gt $serverCurrentCode) {
         $serverCurrentCode = [int]$serverDeployed.versionCode
         $serverCurrentName = [string]$serverDeployed.versionName
@@ -591,6 +617,14 @@ try {
     }
 } catch {
     Write-Warning "   ⚠️  无法读取服务器当前版本，以 build.gradle 兜底值为 claim 基准"
+}
+
+if ($CurrentInstalledVersionCode -gt $serverCurrentCode) {
+    $serverCurrentCode = $CurrentInstalledVersionCode
+    if (-not [string]::IsNullOrWhiteSpace($CurrentInstalledVersionName)) {
+        $serverCurrentName = $CurrentInstalledVersionName
+    }
+    Write-Host "   ℹ️  已安装版本基线: build $serverCurrentCode (v$serverCurrentName)，以此为 claim 最低基准" -ForegroundColor DarkGray
 }
 
 $builderId = "$env:COMPUTERNAME-$env:USERNAME"
@@ -622,6 +656,10 @@ $newName = [string]$claim.assignedVersionName
 $newCode = [int]$claim.assignedVersionCode
 if ([string]::IsNullOrWhiteSpace($newName) -or $newCode -le 0) {
     Write-Error "❌ release/claim 未返回有效的 assignedVersionName/Code: $($claim | ConvertTo-Json -Compress)"
+}
+if ($newCode -le $serverCurrentCode) {
+    Complete-Release -Success:$false -ErrorMessage "claim returned non-incrementing apk build $newCode from baseline $serverCurrentCode"
+    Write-Error "❌ release/claim 分配的 build $newCode 未高于基线 build $serverCurrentCode，已停止发布。"
 }
 $InFlightCount = if ($claim.PSObject.Properties.Match('inFlightCount').Count) { [int]$claim.inFlightCount } else { 1 }
 Write-Host "   ✅ 已分配版本号: v$newName (build $newCode) [token=$($script:ReleaseToken.Substring(0,8))..., in-flight=$InFlightCount]" -ForegroundColor Green
@@ -702,7 +740,7 @@ Write-Host "📋 version.json 已生成" -ForegroundColor Green
 # 与 publish-server.ps1 里的祖先检查策略类似：服务器已有更新版本 → 中止上传。
 if (-not $Force) {
     try {
-        $serverNow = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10 -NoProxy
+        $serverNow = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
         $serverNowCode = [int]$serverNow.versionCode
         # 服务器 SHA（version.json 里可能是 sourceSha 或 gitSha）
         $serverNowSha = if ($serverNow.sourceSha) { [string]$serverNow.sourceSha } else { [string]$serverNow.gitSha }
@@ -762,7 +800,7 @@ Write-Host "🔍 验证服务器响应..." -ForegroundColor Cyan
 Start-Sleep -Seconds 1
 
 try {
-    $resp = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
+    $resp = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
     Write-Host "   服务器返回: v$($resp.versionName) (build $($resp.versionCode))" -ForegroundColor Green
     if ($resp.versionCode -eq $newCode) {
         Write-Host "   ✅ versionCode 一致，发布成功！" -ForegroundColor Green
