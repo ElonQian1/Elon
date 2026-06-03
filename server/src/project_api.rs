@@ -29,6 +29,13 @@ pub struct CreateProjectRequest {
 }
 
 #[derive(Deserialize)]
+pub struct RegisterExternalProjectRequest {
+    pub name: String,
+    pub workspace_path: String,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct UpdateProfileRequest {
     pub nickname: Option<String>,
 }
@@ -106,6 +113,53 @@ pub async fn create_project(
 
     Json(serde_json::json!({ "project": project, "reused_existing": reused_existing }))
         .into_response()
+}
+
+/// 注册一个指向外部本地路径的项目（如本机 D:\rust\active-projects\bb64a）。
+/// 不会自动创建/初始化目录，仅在 DB 中登记，并验证路径已存在。
+pub async fn register_external_project(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<RegisterExternalProjectRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+
+    let workspace_path = req.workspace_path.trim();
+    if workspace_path.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "workspace_path 不能为空");
+    }
+    let pb = std::path::Path::new(workspace_path);
+    if !pb.exists() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            format!("workspace_path 不存在: {}", workspace_path),
+        );
+    }
+    if !pb.is_dir() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "workspace_path 必须指向一个目录",
+        );
+    }
+
+    let create_result = match state.store.register_external_project(
+        &user.id,
+        &req.name,
+        req.description.as_deref(),
+        workspace_path,
+    ) {
+        Ok(r) => r,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+
+    Json(serde_json::json!({
+        "project": create_result.project,
+        "reused_existing": create_result.reused_existing,
+    }))
+    .into_response()
 }
 
 pub async fn ws_project_handler(

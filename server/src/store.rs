@@ -155,6 +155,91 @@ impl Store {
         })
     }
 
+    /// 注册一个指向外部本地路径的项目（如 D:\rust\active-projects\bb64a）。
+    /// source_type='local_path'，workspace_path 写入项目记录。
+    /// 同名项目复用现有记录（reused_existing=true）。
+    pub fn register_external_project(
+        &self,
+        user_id: &str,
+        name: &str,
+        description: Option<&str>,
+        workspace_path: &str,
+    ) -> Result<CreateProjectResult> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(anyhow!("项目名称不能为空"));
+        }
+        let workspace_path = workspace_path.trim();
+        if workspace_path.is_empty() {
+            return Err(anyhow!("workspace_path 不能为空"));
+        }
+        let template = "local";
+        let source_type = "local_path";
+
+        let now = now();
+        let conn = self.conn()?;
+
+        if let Some(project) = find_owner_project_by_name(&conn, user_id, name)? {
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
+
+        let id = new_id("prj");
+        let workspace_key = id.clone();
+        let description = clean_optional(description);
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO projects (
+                id, name, description, workspace_key, template, source_type, workspace_path,
+                status, created_by, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', ?8, ?9, ?9)",
+            params![id, name, description, workspace_key, template, source_type, workspace_path, user_id, now],
+        )?;
+        tx.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, 'owner', ?3)",
+            params![id, user_id, now],
+        )?;
+        tx.execute(
+            "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
+             VALUES (?1, ?2, ?3, 'project_registered_external', ?4, ?5)",
+            params![
+                new_id("evt"),
+                id,
+                user_id,
+                serde_json::json!({
+                    "name": name,
+                    "workspace_path": workspace_path,
+                }).to_string(),
+                now
+            ],
+        )?;
+        tx.commit()?;
+
+        Ok(CreateProjectResult {
+            project: ProjectSummary {
+                id,
+                name: name.to_string(),
+                description: description.map(ToOwned::to_owned),
+                workspace_key,
+                template: template.to_string(),
+                source_type: source_type.into(),
+                repo_url: None,
+                branch: None,
+                workspace_path: Some(workspace_path.to_string()),
+                status: "active".into(),
+                role: "owner".into(),
+                last_task_status: None,
+                last_apk_url: None,
+                updated_at: now,
+            },
+            reused_existing: false,
+        })
+    }
+
     pub fn ensure_device_user(&self, user_id: &str) -> Result<PublicUser> {
         let id = safe_external_id(user_id, "default");
         let now = now();

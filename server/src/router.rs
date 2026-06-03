@@ -135,6 +135,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/me/projects", get(project_api::list_my_projects))
         .route("/api/projects", post(project_api::create_project))
+        .route(
+            "/api/projects/external",
+            post(project_api::register_external_project),
+        )
         .route("/api/projects/:id", delete(project_deletion::delete_project))
         // ── 项目商店 ─────────────────────────────────────────────────────
         .route(

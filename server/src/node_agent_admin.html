@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>elon-node-agent 管理</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 24px auto; padding: 0 16px; background: #0f1419; color: #e6edf3; }
+  h1 { font-size: 22px; margin-bottom: 8px; }
+  .status { padding: 12px 16px; border-radius: 6px; margin: 8px 0 16px; }
+  .status.on  { background: #1f3a26; border-left: 4px solid #2ea043; }
+  .status.off { background: #3a1f26; border-left: 4px solid #f85149; }
+  .grid { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; padding: 12px 16px; background: #161b22; border-radius: 6px; }
+  .label { color: #8b949e; }
+  .val { word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #161b22; border-radius: 6px; overflow: hidden; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #21262d; }
+  th { background: #21262d; color: #8b949e; font-weight: 500; }
+  .hint { color: #8b949e; font-size: 13px; margin: 24px 0 8px; }
+  code { background: #21262d; padding: 1px 6px; border-radius: 3px; }
+  button { background: #238636; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #2ea043; }
+</style>
+</head>
+<body>
+  <h1>elon-node-agent 本地管理</h1>
+  <div id="connStatus" class="status off">加载中…</div>
+
+  <h3>当前配置</h3>
+  <div class="grid" id="cfg"></div>
+
+  <h3>本地模型 <button onclick="load()">刷新</button></h3>
+  <table id="models">
+    <thead><tr><th>模型 ID</th><th>提供方</th><th>价格 (credits/1k)</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <p class="hint">⚙️ 修改配置：通过环境变量启动节点代理（重启后生效）。</p>
+  <pre style="background:#161b22;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px;">
+NODE_CLOUD_URL       云端 WebSocket 地址（默认 ws://43.139.149.158:8080/agent/ws）
+NODE_AGENT_ID        本节点唯一 ID（必填）
+NODE_AGENT_SECRET    认证密钥 64 字符 hex（必填）
+NODE_OWNER_USER_ID   你的 elon 用户 ID（必填）
+NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
+NODE_LM_STUDIO_URL   LM Studio 地址（可选）
+NODE_CUSTOM_LLM_URL  自定义 OpenAI 兼容地址（可选）
+NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
+NODE_ADMIN_PORT      本管理页端口（默认 7799）
+  </pre>
+
+<script>
+async function load() {
+  const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
+  if (!r) { document.getElementById('connStatus').textContent = '加载失败'; return; }
+  const s = document.getElementById('connStatus');
+  s.className = 'status ' + (r.connected ? 'on' : 'off');
+  s.textContent = (r.connected ? '🟢 已连接到云端' : '🔴 未连接到云端') + ' — ' + (r.last_event || '');
+  const cfg = document.getElementById('cfg');
+  cfg.innerHTML = '';
+  const rows = [
+    ['版本', r.version], ['Agent ID', r.agent_id], ['Owner User', r.owner_user_id],
+    ['云端', r.cloud_url], ['Ollama', r.ollama_url],
+    ['LM Studio', r.lm_studio_url || '(未配置)'],
+    ['自定义 LLM', r.custom_url || '(未配置)'],
+    ['默认价格', r.price_per_1k + ' credits/1k tokens']
+  ];
+  for (const [k, v] of rows) {
+    cfg.innerHTML += `<div class="label">${k}</div><div class="val">${v ?? ''}</div>`;
+  }
+  const tbody = document.querySelector('#models tbody');
+  tbody.innerHTML = '';
+  if (!r.models || r.models.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:#8b949e;text-align:center;padding:24px">未发现本地模型，检查 Ollama / LM Studio 是否在运行</td></tr>';
+  } else {
+    for (const m of r.models) {
+      tbody.innerHTML += `<tr><td><code>${m.model_id}</code></td><td>${m.provider}</td><td>${m.price_per_1k_credits}</td></tr>`;
+    }
+  }
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

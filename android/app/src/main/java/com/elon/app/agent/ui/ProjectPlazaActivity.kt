@@ -522,6 +522,23 @@ class ProjectPlazaActivity : Activity() {
                 setTextColor(Color.parseColor(if (totalPending > 0) PENDING_COLOR else TEXT_SECONDARY))
                 setPadding(24, 20, 24, 8)
             })
+            // 注册本地项目按钮（用于把外部本地路径项目注册到云端）
+            contentArea.addView(Button(this@ProjectPlazaActivity).apply {
+                text = "+ 注册本地项目（外部路径）"
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(PRIMARY_BG))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    marginStart = 16
+                    marginEnd = 16
+                    topMargin = 8
+                    bottomMargin = 8
+                }
+                setOnClickListener { showRegisterExternalDialog() }
+            })
             if (projects == null || projects.length() == 0) {
                 contentArea.addView(buildEmptyView("你还没有创建任何项目"))
                 return@launch
@@ -737,6 +754,78 @@ class ProjectPlazaActivity : Activity() {
             conn.responseCode in 200..299
         } catch (e: Exception) {
             false
+        }
+    }
+
+    // ── 注册外部本地路径项目 ────────────────────────────────────────────────
+
+    private fun showRegisterExternalDialog() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        val nameInput = EditText(this).apply {
+            hint = "项目名称（如：bb64a）"
+            textSize = 14f
+            setTextColor(Color.parseColor(TEXT_PRIMARY))
+            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+        }
+        val pathInput = EditText(this).apply {
+            hint = "本机绝对路径（如：D:\\rust\\active-projects\\bb64a）"
+            textSize = 14f
+            setTextColor(Color.parseColor(TEXT_PRIMARY))
+            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+        }
+        val descInput = EditText(this).apply {
+            hint = "描述（可选）"
+            textSize = 14f
+            setTextColor(Color.parseColor(TEXT_PRIMARY))
+            setHintTextColor(Color.parseColor(TEXT_TERTIARY))
+            maxLines = 3
+        }
+        container.addView(nameInput)
+        container.addView(pathInput)
+        container.addView(descInput)
+        AlertDialog.Builder(this)
+            .setTitle("注册本地项目")
+            .setMessage("把已存在的本机目录登记为云端项目。注册后该项目 owner=你，可通过『成员管理』邀请/审批其他用户加入。注意：路径必须存在于服务器/PC 节点上。")
+            .setView(container)
+            .setPositiveButton("注册") { _, _ ->
+                val n = nameInput.text.toString().trim()
+                val p = pathInput.text.toString().trim()
+                val d = descInput.text.toString().trim()
+                if (n.isEmpty() || p.isEmpty()) {
+                    Toast.makeText(this, "名称和路径都不能为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                doRegisterExternal(n, p, d.ifEmpty { null })
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun doRegisterExternal(name: String, path: String, description: String?) {
+        scope.launch {
+            val body = JSONObject().apply {
+                put("name", name)
+                put("workspace_path", path)
+                if (description != null) put("description", description)
+            }
+            val result = withContext(Dispatchers.IO) {
+                postJson("${authService.getServerUrl()}/api/projects/external", body)
+            }
+            val project = result?.optJSONObject("project")
+            if (project != null && project.optString("id").isNotEmpty()) {
+                val reused = result.optBoolean("reused_existing", false)
+                Toast.makeText(
+                    this@ProjectPlazaActivity,
+                    if (reused) "已存在同名项目，复用：${project.optString("name")}" else "注册成功：${project.optString("name")}",
+                    Toast.LENGTH_LONG,
+                ).show()
+                showOwnerReview()
+            } else {
+                Toast.makeText(this@ProjectPlazaActivity, extractApiError(result, "注册失败"), Toast.LENGTH_LONG).show()
+            }
         }
     }
 

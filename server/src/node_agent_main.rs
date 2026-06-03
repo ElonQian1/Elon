@@ -30,8 +30,9 @@ use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, ModelCapability, ServerToAgent, PROTO_VERSION};
 use serde::Deserialize;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
@@ -468,16 +469,19 @@ async fn run_session(cfg: &NodeConfig) -> Result<()> {
     read_result
 }
 
-async fn run_loop(cfg: NodeConfig) {
+async fn run_loop(cfg: NodeConfig, runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
+        runtime.set_connected(false, "连接中…").await;
         match run_session(&cfg).await {
             Ok(()) => {
                 info!("连接正常断开，{:.1}s 后重连", backoff.as_secs_f32());
+                runtime.set_connected(false, "已断开，等待重连").await;
                 backoff = Duration::from_secs(2);
             }
             Err(e) => {
                 warn!("连接错误: {e:#}，{:.1}s 后重连", backoff.as_secs_f32());
+                runtime.set_connected(false, &format!("错误: {}", e)).await;
             }
         }
         tokio::time::sleep(backoff).await;
@@ -502,6 +506,87 @@ async fn main() -> Result<()> {
     info!("   Ollama: {}", cfg.ollama_url);
     info!("   积分价格: {} credits/1k tokens", cfg.price_per_1k);
 
-    run_loop(cfg).await;
+    let runtime = Arc::new(NodeRuntime::new(cfg.clone()));
+    spawn_admin_server(runtime.clone());
+
+    run_loop(cfg, runtime).await;
     Ok(())
+}
+
+// ── 本地 Web 管理页 (端口可通过 NODE_ADMIN_PORT 配置，默认 7799) ──────────
+
+#[derive(Default)]
+struct NodeStatus {
+    connected: bool,
+    last_event: String,
+    models_cached: Vec<ModelCapability>,
+}
+
+struct NodeRuntime {
+    cfg: NodeConfig,
+    status: RwLock<NodeStatus>,
+}
+
+impl NodeRuntime {
+    fn new(cfg: NodeConfig) -> Self {
+        Self { cfg, status: RwLock::new(NodeStatus::default()) }
+    }
+
+    async fn set_connected(&self, on: bool, evt: &str) {
+        let mut s = self.status.write().await;
+        s.connected = on;
+        s.last_event = evt.to_string();
+    }
+
+    async fn set_models(&self, models: Vec<ModelCapability>) {
+        self.status.write().await.models_cached = models;
+    }
+}
+
+fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
+    let port: u16 = std::env::var("NODE_ADMIN_PORT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(7799);
+    let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
+    tokio::spawn(async move {
+        let app = axum::Router::new()
+            .route("/", axum::routing::get(admin_index))
+            .route("/api/status", axum::routing::get(admin_status))
+            .with_state(runtime);
+        match tokio::net::TcpListener::bind(addr).await {
+            Ok(listener) => {
+                info!("🖥️  本地管理页: http://127.0.0.1:{}/", port);
+                if let Err(e) = axum::serve(listener, app).await {
+                    warn!("admin server 退出: {e}");
+                }
+            }
+            Err(e) => warn!("admin server 无法监听 {addr}: {e}"),
+        }
+    });
+}
+
+async fn admin_index() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("node_agent_admin.html"))
+}
+
+async fn admin_status(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let live = discover_models(&rt.cfg).await;
+    rt.set_models(live.clone()).await;
+    let st = rt.status.read().await;
+    axum::Json(serde_json::json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "agent_id": rt.cfg.agent_id,
+        "owner_user_id": rt.cfg.owner_user_id,
+        "cloud_url": rt.cfg.cloud_url,
+        "ollama_url": rt.cfg.ollama_url,
+        "lm_studio_url": rt.cfg.lm_studio_url,
+        "custom_url": rt.cfg.custom_url,
+        "price_per_1k": rt.cfg.price_per_1k,
+        "connected": st.connected,
+        "last_event": st.last_event,
+        "models": live,
+    }))
 }
