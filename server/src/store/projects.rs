@@ -201,6 +201,64 @@ impl Store {
         Ok(())
     }
 
+    /// 修改成员角色（仅 viewer/editor/member/observer 之间互转；不可改 owner，不可改自己）
+    pub fn update_member_role(
+        &self,
+        project_id: &str,
+        target_user_id: &str,
+        new_role: &str,
+    ) -> Result<()> {
+        if !["editor", "member", "observer", "viewer"].contains(&new_role) {
+            anyhow::bail!("role 必须为 editor / member / observer / viewer");
+        }
+        // viewer 是 APK 端展示别名，落库统一为 observer（保持与 join_mode=readonly 一致）
+        let role_db = if new_role == "viewer" {
+            "observer"
+        } else {
+            new_role
+        };
+        let conn = self.conn()?;
+        let current_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, target_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match current_role.as_deref() {
+            None => anyhow::bail!("目标用户不是该项目成员"),
+            Some("owner") => anyhow::bail!("不能修改 owner 的角色"),
+            _ => {}
+        }
+        conn.execute(
+            "UPDATE project_members SET role = ?3 WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, target_user_id, role_db],
+        )?;
+        Ok(())
+    }
+
+    /// 移除成员（owner 不可被移除，需要由 handler 层确保调用者是 owner）
+    pub fn remove_member(&self, project_id: &str, target_user_id: &str) -> Result<()> {
+        let conn = self.conn()?;
+        let current_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, target_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match current_role.as_deref() {
+            None => anyhow::bail!("目标用户不是该项目成员"),
+            Some("owner") => anyhow::bail!("不能移除项目 owner"),
+            _ => {}
+        }
+        conn.execute(
+            "DELETE FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, target_user_id],
+        )?;
+        Ok(())
+    }
+
     /// 列出项目所有成员（公开项目任何人可查；私有项目在 handler 层校验权限）
     pub fn list_project_members(&self, project_id: &str) -> Result<Vec<ProjectMemberEntry>> {
         let conn = self.conn()?;

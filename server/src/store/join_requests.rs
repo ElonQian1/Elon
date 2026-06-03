@@ -211,7 +211,7 @@ impl Store {
         let now_str = now();
 
         // 校验申请存在且 pending
-        let (req_project_id, user_id, status): (String, String, String) = conn
+        let (req_project_id, applicant_user_id, status): (String, String, String) = conn
             .query_row(
                 "SELECT project_id, user_id, status FROM project_join_requests WHERE id = ?1",
                 params![req_id],
@@ -251,7 +251,7 @@ impl Store {
         conn.execute(
             "INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
              VALUES (?1, ?2, 'member', ?3)",
-            params![req_project_id, user_id, now_str],
+            params![req_project_id, applicant_user_id, now_str],
         )?;
 
         drop(conn);
@@ -323,5 +323,58 @@ impl Store {
                 .map_err(Into::into)
             })
             .unwrap_or(0)
+    }
+
+    /// 列出某 owner 名下所有项目的待审批数（含 0 也返回，便于前端展示项目列表）
+    ///
+    /// 返回 `Vec<(project_id, project_name, pending_count)>`
+    pub fn list_owned_projects_with_pending_counts(
+        &self,
+        owner_user_id: &str,
+    ) -> Result<Vec<(String, String, i64)>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT p.id, p.name,
+                    (SELECT COUNT(*) FROM project_join_requests jr
+                     WHERE jr.project_id = p.id AND jr.status = 'pending') AS pending
+             FROM projects p
+             JOIN project_members pm ON pm.project_id = p.id
+             WHERE pm.user_id = ?1 AND pm.role = 'owner'
+                   AND p.status != 'deleted'
+             ORDER BY pending DESC, p.created_at DESC",
+        )?;
+        let rows = stmt
+            .query_map(params![owner_user_id], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    /// 撤销自己的申请（仅 pending 状态可撤销）
+    pub fn cancel_my_join_request(&self, req_id: &str, user_id: &str) -> Result<()> {
+        let conn = self.conn()?;
+        let (req_user_id, status): (String, String) = conn
+            .query_row(
+                "SELECT user_id, status FROM project_join_requests WHERE id = ?1",
+                params![req_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(|_| anyhow!("申请记录不存在"))?;
+        if req_user_id != user_id {
+            anyhow::bail!("仅可撤销自己提交的申请");
+        }
+        if status != "pending" {
+            anyhow::bail!("申请已处理（当前状态：{status}），无法撤销");
+        }
+        conn.execute(
+            "DELETE FROM project_join_requests WHERE id = ?1",
+            params![req_id],
+        )?;
+        Ok(())
     }
 }

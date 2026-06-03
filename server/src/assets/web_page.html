@@ -1070,9 +1070,12 @@
       <button class="profile-row" id="nodeMarketRow">
         <span>节点算力市场</span><span class="arrow">›</span>
       </button>
+      <!-- 项目广场入口（网页端暂未实现广场列表 UI，仅 APK 端可用，因此先隐藏避免误用） -->
+      <!--
       <button class="profile-row" id="projectPlazaRow">
         <span>项目广场</span><span class="arrow">›</span>
       </button>
+      -->
       <button class="profile-row" id="checkUpdateRow">
         <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
       </button>
@@ -1242,7 +1245,7 @@
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
   const nodeMarketRow = $('nodeMarketRow');
-  const projectPlazaRow = $('projectPlazaRow');
+  const projectPlazaRow = $('projectPlazaRow'); // 隐藏入口，元素可能不存在
   const usagePeriodText = $('usagePeriodText');
   const usageRemainingText = $('usageRemainingText');
   const usageRemainingCaption = $('usageRemainingCaption');

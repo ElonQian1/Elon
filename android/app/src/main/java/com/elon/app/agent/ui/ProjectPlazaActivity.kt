@@ -57,6 +57,7 @@ class ProjectPlazaActivity : Activity() {
     private lateinit var contentArea: LinearLayout
     private lateinit var tabDiscover: Button
     private lateinit var tabMyRequests: Button
+    private lateinit var tabOwnerReview: Button
     private var currentTab = "discover"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,6 +65,16 @@ class ProjectPlazaActivity : Activity() {
         authService = AuthService(this)
         setContentView(buildLayout())
         showDiscover()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 从 JoinRequestsActivity 返回时刷新（特别是 owner_review tab 的 badge）
+        when (currentTab) {
+            "owner_review" -> showOwnerReview()
+            "my_requests" -> showMyRequests()
+            else -> {}
+        }
     }
 
     // ── 顶层布局 ─────────────────────────────────────────────────────────────
@@ -147,6 +158,15 @@ class ProjectPlazaActivity : Activity() {
                 setOnClickListener { switchTab("my_requests") }
             }
             addView(tabMyRequests, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+            tabOwnerReview = Button(context).apply {
+                text = "我管理的"
+                textSize = 14f
+                setBackgroundColor(Color.TRANSPARENT)
+                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                setOnClickListener { switchTab("owner_review") }
+            }
+            addView(tabOwnerReview, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
     }
 
@@ -156,9 +176,11 @@ class ProjectPlazaActivity : Activity() {
         val inactiveColor = Color.parseColor(TEXT_SECONDARY)
         tabDiscover.setTextColor(if (tab == "discover") activeColor else inactiveColor)
         tabMyRequests.setTextColor(if (tab == "my_requests") activeColor else inactiveColor)
+        tabOwnerReview.setTextColor(if (tab == "owner_review") activeColor else inactiveColor)
         when (tab) {
             "discover" -> showDiscover()
             "my_requests" -> showMyRequests()
+            "owner_review" -> showOwnerReview()
         }
     }
 
@@ -475,6 +497,128 @@ class ProjectPlazaActivity : Activity() {
         }
     }
 
+    // ── Tab3: owner 审批中心 ──────────────────────────────────────────────────
+
+    private fun showOwnerReview() {
+        contentArea.removeAllViews()
+        if (!authService.isLoggedIn()) {
+            contentArea.addView(buildEmptyView("请先登录管理你创建的项目"))
+            return
+        }
+        contentArea.addView(buildLoadingView())
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { fetchOwnedProjects() }
+            contentArea.removeAllViews()
+            if (result == null) {
+                contentArea.addView(buildErrorView("加载失败，请检查网络"))
+                return@launch
+            }
+            val projects = result.optJSONArray("projects")
+            val totalPending = result.optInt("total_pending", 0)
+            // 顶部摘要
+            contentArea.addView(TextView(this@ProjectPlazaActivity).apply {
+                text = if (totalPending > 0) "共有 $totalPending 个待审批申请" else "暂无待审批申请"
+                textSize = 13f
+                setTextColor(Color.parseColor(if (totalPending > 0) PENDING_COLOR else TEXT_SECONDARY))
+                setPadding(24, 20, 24, 8)
+            })
+            if (projects == null || projects.length() == 0) {
+                contentArea.addView(buildEmptyView("你还没有创建任何项目"))
+                return@launch
+            }
+            val list = LinearLayout(this@ProjectPlazaActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, 80)
+            }
+            for (i in 0 until projects.length()) {
+                list.addView(buildOwnedProjectCard(projects.getJSONObject(i)))
+            }
+            contentArea.addView(list)
+        }
+    }
+
+    private fun fetchOwnedProjects(): JSONObject? {
+        return try {
+            val url = "${authService.getServerUrl()}/api/me/owned-projects/pending-counts"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            conn.setRequestProperty("Authorization", "Bearer ${authService.getToken()}")
+            val resp = BufferedReader(InputStreamReader(conn.inputStream)).readText()
+            JSONObject(resp)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun buildOwnedProjectCard(project: JSONObject): LinearLayout {
+        val projectId = project.optString("project_id")
+        val projectName = project.optString("project_name", "未知项目")
+        val pendingCount = project.optInt("pending_count", 0)
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Color.parseColor(CARD))
+            setPadding(24, 24, 24, 24)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = 12
+                marginStart = 16
+                marginEnd = 16
+            }
+
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                addView(TextView(context).apply {
+                    text = projectName
+                    textSize = 15f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.parseColor(TEXT_PRIMARY))
+                })
+                addView(TextView(context).apply {
+                    text = if (pendingCount > 0) "$pendingCount 条待审批" else "已全部处理"
+                    textSize = 12f
+                    setTextColor(Color.parseColor(if (pendingCount > 0) PENDING_COLOR else TEXT_TERTIARY))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { topMargin = 4 }
+                })
+            })
+
+            // 红点 badge
+            if (pendingCount > 0) {
+                addView(TextView(context).apply {
+                    text = if (pendingCount > 99) "99+" else pendingCount.toString()
+                    textSize = 12f
+                    setTypeface(null, Typeface.BOLD)
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.parseColor(DANGER))
+                    setPadding(16, 6, 16, 6)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { marginEnd = 12 }
+                })
+            }
+
+            addView(TextView(context).apply {
+                text = "›"
+                textSize = 22f
+                setTextColor(Color.parseColor(TEXT_TERTIARY))
+            })
+
+            setOnClickListener {
+                JoinRequestsActivity.start(this@ProjectPlazaActivity, projectId, projectName)
+            }
+        }
+    }
+
     private fun buildRequestCard(req: JSONObject): LinearLayout {
         val projectName = req.optString("project_name", "未知项目")
         val status = req.optString("status", "pending")
@@ -541,6 +685,58 @@ class ProjectPlazaActivity : Activity() {
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { topMargin = 8 }
             })
+
+            // pending 时显示"撤销申请"按钮
+            if (status == "pending") {
+                val reqId = req.optString("id")
+                addView(Button(context).apply {
+                    text = "撤销申请"
+                    textSize = 13f
+                    setBackgroundColor(Color.parseColor(SECONDARY_BG))
+                    setTextColor(Color.parseColor(SECONDARY_TEXT))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = 12
+                        gravity = Gravity.END
+                    }
+                    setOnClickListener { confirmCancelRequest(reqId) }
+                })
+            }
+        }
+    }
+
+    private fun confirmCancelRequest(reqId: String) {
+        AlertDialog.Builder(this)
+            .setTitle("撤销申请")
+            .setMessage("确认撤销此次加入申请？撤销后可重新提交。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("确认撤销") { _, _ ->
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) { cancelMyRequest(reqId) }
+                    if (ok) {
+                        Toast.makeText(this@ProjectPlazaActivity, "已撤销", Toast.LENGTH_SHORT).show()
+                        showMyRequests()
+                    } else {
+                        Toast.makeText(this@ProjectPlazaActivity, "撤销失败，请稍后重试", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun cancelMyRequest(reqId: String): Boolean {
+        return try {
+            val url = "${authService.getServerUrl()}/api/me/join-requests/$reqId"
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.requestMethod = "DELETE"
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+            conn.setRequestProperty("Authorization", "Bearer ${authService.getToken()}")
+            conn.responseCode in 200..299
+        } catch (e: Exception) {
+            false
         }
     }
 

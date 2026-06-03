@@ -166,6 +166,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/projects/:id/visibility",
             axum::routing::patch(project_membership::update_visibility),
         )
+        .route(
+            "/api/projects/:id/members/:user_id",
+            axum::routing::patch(project_membership::update_member_role)
+                .delete(project_membership::remove_member),
+        )
         // ── 加入申请审批 ──────────────────────────────────────────────────
         .route(
             "/api/projects/:id/request-join",
@@ -182,6 +187,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/me/join-requests",
             get(project_join_requests::my_join_requests),
+        )
+        .route(
+            "/api/me/join-requests/:req_id",
+            axum::routing::delete(project_join_requests::cancel_my_join_request),
+        )
+        .route(
+            "/api/me/owned-projects/pending-counts",
+            get(project_join_requests::owned_projects_pending_counts),
         )
         // ── 项目空间：频道、成员协作、集体 AI 开发 ───────────────────────────
         .route(
