@@ -1070,6 +1070,9 @@
       <button class="profile-row" id="nodeMarketRow">
         <span>节点算力市场</span><span class="arrow">›</span>
       </button>
+      <button class="profile-row" id="projectPlazaRow">
+        <span>项目广场</span><span class="arrow">›</span>
+      </button>
       <button class="profile-row" id="checkUpdateRow">
         <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
       </button>
@@ -1239,6 +1242,7 @@
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
   const nodeMarketRow = $('nodeMarketRow');
+  const projectPlazaRow = $('projectPlazaRow');
   const usagePeriodText = $('usagePeriodText');
   const usageRemainingText = $('usageRemainingText');
   const usageRemainingCaption = $('usageRemainingCaption');
@@ -2365,6 +2369,12 @@
   aiSettingsRow.addEventListener('click', openAgentDialog);
   modelBtn.addEventListener('click', openAgentDialog);
   if (nodeMarketRow) nodeMarketRow.addEventListener('click', openNodeMarketDialog);
+  if (projectPlazaRow) {
+    projectPlazaRow.addEventListener('click', () => {
+      // 网页侧同步提供项目广场入口；审批管理以 APK 体验为主。
+      window.open('/api/store/projects?limit=30', '_blank', 'noopener');
+    });
+  }
 
   // ====== AI 记忆列表 ======
   const CATEGORY_COLORS = { preference: '#81B3D9', profile: '#58BE6A', goal: '#FCD34D', fact: '#6F7785' };

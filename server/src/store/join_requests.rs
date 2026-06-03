@@ -197,22 +197,43 @@ impl Store {
     }
 
     /// 审批通过：将申请标记 approved，并添加成员（role=member）
+    ///
+    /// 安全要求：
+    /// - req_id 必须属于 project_id（防止跨项目审批）
+    /// - reviewer_user_id 必须是该项目 owner
     pub fn approve_join_request(
         &self,
         req_id: &str,
+        project_id: &str,
         reviewer_user_id: &str,
     ) -> Result<JoinRequestRecord> {
         let conn = self.conn()?;
         let now_str = now();
 
         // 校验申请存在且 pending
-        let (project_id, user_id, status): (String, String, String) = conn
+        let (req_project_id, user_id, status): (String, String, String) = conn
             .query_row(
                 "SELECT project_id, user_id, status FROM project_join_requests WHERE id = ?1",
                 params![req_id],
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|_| anyhow!("申请记录不存在"))?;
+
+        if req_project_id != project_id {
+            anyhow::bail!("申请记录不属于当前项目");
+        }
+
+        // 仅 owner 可审批
+        let reviewer_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, reviewer_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if reviewer_role.as_deref() != Some("owner") {
+            anyhow::bail!("仅项目 owner 可审批加入申请");
+        }
 
         if status != "pending" {
             anyhow::bail!("申请已处理（当前状态：{status}）");
@@ -230,7 +251,7 @@ impl Store {
         conn.execute(
             "INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
              VALUES (?1, ?2, 'member', ?3)",
-            params![project_id, user_id, now_str],
+            params![req_project_id, user_id, now_str],
         )?;
 
         drop(conn);
@@ -238,21 +259,42 @@ impl Store {
     }
 
     /// 拒绝申请
+    ///
+    /// 安全要求：
+    /// - req_id 必须属于 project_id（防止跨项目审批）
+    /// - reviewer_user_id 必须是该项目 owner
     pub fn reject_join_request(
         &self,
         req_id: &str,
+        project_id: &str,
         reviewer_user_id: &str,
     ) -> Result<JoinRequestRecord> {
         let conn = self.conn()?;
         let now_str = now();
 
-        let status: String = conn
+        let (req_project_id, status): (String, String) = conn
             .query_row(
-                "SELECT status FROM project_join_requests WHERE id = ?1",
+                "SELECT project_id, status FROM project_join_requests WHERE id = ?1",
                 params![req_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .map_err(|_| anyhow!("申请记录不存在"))?;
+
+        if req_project_id != project_id {
+            anyhow::bail!("申请记录不属于当前项目");
+        }
+
+        // 仅 owner 可审批
+        let reviewer_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, reviewer_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if reviewer_role.as_deref() != Some("owner") {
+            anyhow::bail!("仅项目 owner 可审批加入申请");
+        }
 
         if status != "pending" {
             anyhow::bail!("申请已处理（当前状态：{status}）");

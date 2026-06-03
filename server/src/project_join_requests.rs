@@ -108,9 +108,9 @@ pub async fn list_join_requests(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    // 仅 owner/editor 可查看申请列表
+    // 仅 owner 可查看申请列表
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access) if access.role == "owner" || access.role == "editor" => {}
+        Ok(access) if access.role == "owner" => {}
         Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可管理加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
@@ -150,8 +150,12 @@ pub async fn review_join_request(
     }
 
     let result = match req.action.as_str() {
-        "approve" => state.store.approve_join_request(&req_id, &user.id),
-        "reject" => state.store.reject_join_request(&req_id, &user.id),
+        "approve" => state
+            .store
+            .approve_join_request(&req_id, &project_id, &user.id),
+        "reject" => state
+            .store
+            .reject_join_request(&req_id, &project_id, &user.id),
         _ => return json_error(StatusCode::BAD_REQUEST, "action 必须为 approve 或 reject"),
     };
 
@@ -175,6 +179,8 @@ pub async fn review_join_request(
             let msg = e.to_string();
             let status = if msg.contains("不存在") {
                 StatusCode::NOT_FOUND
+            } else if msg.contains("不属于当前项目") || msg.contains("仅项目 owner") {
+                StatusCode::FORBIDDEN
             } else if msg.contains("已处理") {
                 StatusCode::CONFLICT
             } else {

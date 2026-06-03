@@ -401,7 +401,7 @@ class ProjectPlazaActivity : Activity() {
                 if (code == "approval_required") {
                     showApplyDialog(projectId, projectName)
                 } else {
-                    val msg = result?.optString("message") ?: "加入失败"
+                    val msg = extractApiError(result, "加入失败")
                     Toast.makeText(this@ProjectPlazaActivity, msg, Toast.LENGTH_LONG).show()
                 }
             }
@@ -425,7 +425,7 @@ class ProjectPlazaActivity : Activity() {
                 // 切换到"我的申请"tab 查看状态
                 switchTab("my_requests")
             } else {
-                val msg = result?.optString("message") ?: "申请失败"
+                val msg = extractApiError(result, "申请失败")
                 Toast.makeText(this@ProjectPlazaActivity, msg, Toast.LENGTH_LONG).show()
             }
         }
@@ -596,5 +596,13 @@ class ProjectPlazaActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(32, 80, 32, 80)
         }
+    }
+
+    private fun extractApiError(result: JSONObject?, fallback: String): String {
+        val message = result?.optString("message")?.trim().orEmpty()
+        if (message.isNotEmpty()) return message
+        val error = result?.optString("error")?.trim().orEmpty()
+        if (error.isNotEmpty()) return error
+        return fallback
     }
 }

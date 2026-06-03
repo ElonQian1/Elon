@@ -273,7 +273,7 @@ class JoinRequestsActivity : Activity() {
                 Toast.makeText(this@JoinRequestsActivity, msg, Toast.LENGTH_SHORT).show()
                 loadRequests() // 刷新列表
             } else {
-                val msg = result?.optString("message") ?: "操作失败"
+                val msg = extractApiError(result, "操作失败")
                 Toast.makeText(this@JoinRequestsActivity, msg, Toast.LENGTH_LONG).show()
             }
         }
@@ -318,5 +318,13 @@ class JoinRequestsActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(32, 80, 32, 80)
         }
+    }
+
+    private fun extractApiError(result: JSONObject?, fallback: String): String {
+        val message = result?.optString("message")?.trim().orEmpty()
+        if (message.isNotEmpty()) return message
+        val error = result?.optString("error")?.trim().orEmpty()
+        if (error.isNotEmpty()) return error
+        return fallback
     }
 }
