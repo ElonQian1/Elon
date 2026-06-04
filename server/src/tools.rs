@@ -44,6 +44,9 @@ pub fn write_file(project_root: &Path, relative_path: &str, content: &str) -> Re
         std::fs::create_dir_all(parent)?;
     }
     std::fs::write(&full_path, content)?;
+    if should_normalize_written_file(&full_path, content) {
+        normalize_text_file_line_endings_if_needed(&full_path)?;
+    }
     Ok(format!("已写入 {} ({} 字节)", relative_path, content.len()))
 }
 
@@ -170,6 +173,9 @@ pub fn build_project(project_root: &Path, target: &str, user_id: &str) -> Result
     if !version_note.is_empty() {
         info!("[工具] {}", version_note);
     }
+
+    // 构建前顺手归一化可执行脚本的行尾，避免 shebang 读取到 \r。
+    normalize_project_scripts_for_shell(&work_dir)?;
 
     // 启动子进程并设置 10 分钟超时防护
     let mut child = Command::new("bash")
@@ -402,6 +408,10 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
     }
 
     info!("[工具] 执行命令: {}", command);
+
+    // 命令执行前，自动归一化命令里引用到的脚本文件行尾。
+    normalize_referenced_scripts(project_root, command)?;
+
     let output = Command::new("bash")
         .args(["-c", command])
         .current_dir(project_root)
@@ -452,6 +462,87 @@ fn safe_path(project_root: &Path, relative_path: &str) -> Result<PathBuf> {
         return Err(anyhow!("路径越界: {}", relative_path));
     }
     Ok(full)
+}
+
+fn normalize_referenced_scripts(project_root: &Path, command: &str) -> Result<()> {
+    for token in command.split_whitespace() {
+        let candidate = token
+            .trim_matches(|c: char| matches!(c, '\'' | '"' | '`' | ';' | '&' | '|' | '(' | ')'))
+            .trim_start_matches("./")
+            .trim_start_matches(".\\");
+
+        if candidate.is_empty() || candidate.starts_with('-') {
+            continue;
+        }
+
+        let path = project_root.join(candidate);
+        if is_script_file(&path) && path.exists() {
+            let _ = normalize_text_file_line_endings_if_needed(&path)?;
+        }
+    }
+    Ok(())
+}
+
+fn normalize_project_scripts_for_shell(project_root: &Path) -> Result<()> {
+    normalize_project_scripts_recursive(project_root)?;
+    Ok(())
+}
+
+fn normalize_project_scripts_recursive(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    if path.is_dir() {
+        for entry in std::fs::read_dir(path)? {
+            let entry = entry?;
+            normalize_project_scripts_recursive(&entry.path())?;
+        }
+        return Ok(())
+    }
+
+    if is_script_file(path) {
+        let _ = normalize_text_file_line_endings_if_needed(path)?;
+    }
+    Ok(())
+}
+
+fn is_script_file(path: &Path) -> bool {
+    let file_name = match path.file_name().and_then(|v| v.to_str()) {
+        Some(name) => name,
+        None => return false,
+    };
+    if file_name == "gradlew" || file_name == "bash" {
+        return true;
+    }
+
+    matches!(
+        path.extension().and_then(|v| v.to_str()).map(|v| v.to_ascii_lowercase()),
+        Some(ext) if matches!(ext.as_str(), "py" | "sh" | "bash")
+    )
+}
+
+fn should_normalize_written_file(path: &Path, content: &str) -> bool {
+    if is_script_file(path) || path.file_name().and_then(|v| v.to_str()) == Some("gradlew") {
+        return true;
+    }
+
+    content.starts_with("#!")
+}
+
+fn normalize_text_file_line_endings_if_needed(path: &Path) -> Result<bool> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(_) => return Ok(false),
+    };
+
+    let normalized = content.replace("\r\n", "\n");
+    if normalized == content {
+        return Ok(false);
+    }
+
+    std::fs::write(path, normalized)?;
+    Ok(true)
 }
 
 /// 对尚不存在的路径，沿祖先链找到最近存在的目录 canonicalize，再拼接剩余路径段
