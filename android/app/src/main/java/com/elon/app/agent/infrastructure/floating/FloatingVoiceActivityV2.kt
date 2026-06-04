@@ -132,31 +132,36 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                 for (mode in config.voiceModeOrder) {
                     when (mode) {
                         AgentConfigActivity.VOICE_MODE_APIKEY -> {
-                            if (config.hunyuanApiKey.isNotEmpty()) {
-                                val intentAnalyzer = IntentAnalyzer(config.hunyuanApiKey)
+                            if (config.hunyuanApiKey.isNotEmpty() || config.openaiApiKey.isNotEmpty()) {
+                                val intentAnalyzer = IntentAnalyzer(this@ConversationalVoiceActivity)
                                 setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
-                                setResponseGenerator(SmartResponseGenerator(config.hunyuanApiKey))
+                                setResponseGenerator(SmartResponseGenerator(this@ConversationalVoiceActivity))
                                 activatedMode = mode
                                 Log.i(TAG, "✅ API Key 模式已激活（优先级 #${config.voiceModeOrder.indexOf(mode) + 1}）")
                                 return@cascade
                             } else {
-                                skipped.add("混元 API Key（未填写）")
+                                skipped.add("混元/OpenAI API Key（未填写）")
                                 Log.i(TAG, "⏭️ API Key 未配置，跳过")
                             }
                         }
                         AgentConfigActivity.VOICE_MODE_CLI -> {
-                            if (config.cliProjectId.isNotEmpty()) {
+                            // 重构后：优先读主 UI 当前项目，没有才退到 AgentConfig.cliProjectId
+                            val effectiveProjectId = com.elon.app.agent.infrastructure.auth.MainAppBridge
+                                .effectiveCliProjectId(this@ConversationalVoiceActivity)
+                                ?: ""
+                            if (effectiveProjectId.isNotEmpty()) {
                                 setIntentAnalyzer(PassthroughIntentAnalyzer())
                                 setResponseGenerator(CliResponseGenerator(
                                     context   = this@ConversationalVoiceActivity,
-                                    projectId = config.cliProjectId,
-                                    serverUrl = config.cliServerUrl
+                                    projectId = effectiveProjectId,
+                                    serverUrl = com.elon.app.agent.infrastructure.auth.MainAppBridge
+                                        .serverUrl(this@ConversationalVoiceActivity)
                                 ))
                                 activatedMode = mode
-                                Log.i(TAG, "✅ CLI 模式已激活 project=${config.cliProjectId}")
+                                Log.i(TAG, "✅ CLI 模式已激活 project=$effectiveProjectId")
                                 return@cascade
                             } else {
-                                skipped.add("服务器 CLI（未填写 Project ID）")
+                                skipped.add("服务器 CLI（未登录主 UI 或未选项目）")
                                 Log.i(TAG, "⏭️ CLI Project ID 未配置，跳过")
                             }
                         }

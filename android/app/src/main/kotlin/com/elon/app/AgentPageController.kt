@@ -9,7 +9,9 @@ import android.view.accessibility.AccessibilityManager
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.AgentService
+import com.elon.app.agent.infrastructure.ai.AIClientFactory
 import com.elon.app.agent.infrastructure.floating.FloatingBallService
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.databinding.PageAgentBinding
@@ -35,6 +37,9 @@ class AgentPageController(
         page.btnRequestOverlay.setOnClickListener { requestOverlayPermission() }
         page.btnOpenAccessibility.setOnClickListener { openAccessibilitySettings() }
         page.btnToggleFloatingBall.setOnClickListener { toggleFloatingBall() }
+        page.btnOpenAgentConfig.setOnClickListener {
+            activity.startActivity(Intent(activity, AgentConfigActivity::class.java))
+        }
         refresh()
     }
 
@@ -72,6 +77,9 @@ class AgentPageController(
         page.btnToggleFloatingBall.text = if (floatingOk) "停止悬浮球" else "启动悬浮球"
         page.btnToggleFloatingBall.alpha = if (canStart) 1.0f else 0.4f
         page.btnToggleFloatingBall.isEnabled = canStart
+
+        // AI 链路状态：让用户清楚悬浮球到底走哪条
+        page.agentAiStatusText.text = AIClientFactory.describe(activity)
     }
 
     // ------ 权限操作 ------

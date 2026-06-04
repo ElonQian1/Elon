@@ -80,11 +80,8 @@ class FloatingVoiceActivity : AppCompatActivity() {
         // 初始化语音助手
         voiceHelper = VoiceRecognitionHelper(this)
         
-        // 初始化意图分析器
-        val apiKey = AgentConfigActivity.getApiKey(this)
-        if (apiKey.isNotEmpty()) {
-            intentAnalyzer = IntentAnalyzer(apiKey)
-        }
+        // 初始化意图分析器（重构后总是初始化，AIClientFactory 会选链路）
+        intentAnalyzer = IntentAnalyzer(this)
         
         // 创建UI
         createUI()

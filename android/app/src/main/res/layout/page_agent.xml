@@ -223,6 +223,52 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- 步骤 4：Agent 高级配置（API Key / CLI / 视觉模型，可选） -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:background="@color/elon_surface_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="步骤 4：AI 链路（可选）"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/agentAiStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="默认走服务器 CLI（已登录主账号且有项目即可）"
+                android:textColor="@color/elon_text_tertiary"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="如需自定义 AI（混元 / 通义 / DeepSeek / OpenAI）或备用服务器，进入下方高级配置。"
+                android:textColor="@color/elon_text_tertiary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/btnOpenAgentConfig"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:layout_marginTop="12dp"
+                android:background="@color/elon_button_secondary_bg"
+                android:gravity="center"
+                android:text="打开 Agent 高级配置"
+                android:textColor="@color/elon_link_primary"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <!-- 说明 -->
         <TextView
             android:layout_width="match_parent"

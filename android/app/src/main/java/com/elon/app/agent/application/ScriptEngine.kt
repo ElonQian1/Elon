@@ -17,7 +17,7 @@ import com.elon.app.agent.domain.execution.ExecutionState
 import com.elon.app.agent.domain.execution.ExecutionStateManager
 import com.elon.app.agent.domain.screen.ScreenCaptureMode
 import com.elon.app.agent.domain.script.*
-import com.elon.app.agent.infrastructure.ai.HunyuanAIClient
+import com.elon.app.agent.infrastructure.ai.AIClientFactory
 import com.elon.app.agent.infrastructure.debug.DebugInterface
 import com.elon.app.agent.infrastructure.popup.PopupDismisser
 import com.google.gson.Gson
@@ -34,10 +34,12 @@ import java.util.UUID
  * 2. 执行脚本 - 按步骤执行脚本（支持多种执行模式）
  * 3. 自我改进 - 执行失败时 AI 自动优化脚本
  * 4. 持久化 - 保存和加载脚本
+ *
+ * **重构后**：不再接收 apiKey，通过 [AIClientFactory] 自动选择
+ * Hunyuan / OpenAI 兼容 / 服务器 CLI 其中一条可用链路。
  */
 class ScriptEngine(
-    private val service: AccessibilityService,
-    private val apiKey: String
+    private val service: AccessibilityService
 ) {
     companion object {
         private const val TAG = "ScriptEngine"
@@ -46,7 +48,7 @@ class ScriptEngine(
     }
     
     private val gson: Gson = GsonBuilder().setPrettyPrinting().create()
-    private val aiClient = HunyuanAIClient(apiKey)
+    private val aiClient = AIClientFactory.create(service)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     // 🔧 调试接口

@@ -12,7 +12,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import com.elon.app.agent.domain.screen.UINode
-import com.elon.app.agent.infrastructure.ai.HunyuanAIClient
+import com.elon.app.agent.infrastructure.ai.AIClientFactory
 import com.elon.app.agent.infrastructure.vision.ScreenAnalyzer
 import com.elon.app.agent.infrastructure.vision.ScreenAnalysis
 import kotlinx.coroutines.*
@@ -23,10 +23,11 @@ import org.json.JSONObject
  * AI 自主执行引擎
  * 
  * 完整闭环：分析 → 规划 → 执行 → 观察 → 纠错
+ *
+ * **重构后**：不再接收 apiKey，通过 [AIClientFactory] 自动选择 AI 链路。
  */
 class AIAutonomousEngine(
-    private val service: AccessibilityService,
-    private val apiKey: String
+    private val service: AccessibilityService
 ) {
     companion object {
         private const val TAG = "AIAutonomousEngine"
@@ -35,7 +36,7 @@ class AIAutonomousEngine(
         private const val STEP_DELAY_MS = 1500L
     }
     
-    private val aiClient = HunyuanAIClient(apiKey)
+    private val aiClient = AIClientFactory.create(service)
     private val screenAnalyzer = ScreenAnalyzer()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     

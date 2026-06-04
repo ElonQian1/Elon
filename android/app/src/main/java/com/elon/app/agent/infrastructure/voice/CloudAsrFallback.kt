@@ -168,7 +168,8 @@ class CloudAsrFallback(
     }
 
     private fun uploadToServer(file: File): String {
-        val token = context.getSharedPreferences("auth", Context.MODE_PRIVATE)
+        // 修复：原代码从错误的 prefs("auth") 读，AuthManager 实际存在 prefs("elon") 里。
+        val token = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
             .getString("auth_token", null)
             ?: throw IllegalStateException("未登录，无法使用云端 ASR")
 

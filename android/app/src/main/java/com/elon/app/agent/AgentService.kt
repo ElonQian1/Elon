@@ -106,6 +106,14 @@ class AgentService : AccessibilityService() {
          * 检查服务是否运行
          */
         fun isRunning(): Boolean = instance != null
+
+        /**
+         * 停止当前正在运行的 Agent 任务。
+         * AgentActivity / 主 UI 可调用。服务未运行时为空操作。
+         */
+        fun stop() {
+            instance?.stopCurrentExecution()
+        }
     }
 
     override fun onServiceConnected() {
@@ -407,15 +415,10 @@ class AgentService : AccessibilityService() {
     private fun executeSmartly(userInput: String) {
         Log.i(TAG, "🧠 智能执行: $userInput")
         
-        val apiKey = AgentConfigActivity.getApiKey(this)
-        if (apiKey.isEmpty()) {
-            sendLogBroadcast("❌ 请先配置 API Key")
-            sendCompleteBroadcast(false, "未配置 API Key")
-            return
-        }
-        
+        // 重构后：不再检查 apiKey，ScriptEngine 会通过 AIClientFactory 自动选择 AI 链路。
+        // 如果用户既没填 Key 也没登录/选项目，chat() 调用时会抛可读异常。
         if (scriptEngine == null) {
-            scriptEngine = ScriptEngine(this, apiKey)
+            scriptEngine = ScriptEngine(this)
         }
         
         currentJob = scope.launch {
@@ -472,15 +475,9 @@ class AgentService : AccessibilityService() {
     private fun executeGoalIndependently(goal: String) {
         Log.i(TAG, "🎯 开始独立执行: $goal")
         
-        val apiKey = AgentConfigActivity.getApiKey(this)
-        if (apiKey.isEmpty()) {
-            sendLogBroadcast("❌ 请先配置 API Key")
-            sendCompleteBroadcast(false, "未配置 API Key")
-            return
-        }
-        
+        // 重构后：不再检查 apiKey。ScriptEngine 通过 AIClientFactory 选链路。
         if (scriptEngine == null) {
-            scriptEngine = ScriptEngine(this, apiKey)
+            scriptEngine = ScriptEngine(this)
         }
         
         currentJob = scope.launch {
@@ -534,9 +531,9 @@ class AgentService : AccessibilityService() {
     }
     
     /**
-     * 停止当前执行
+     * 停止当前执行（供 companion AgentService.stop() 调用）
      */
-    private fun stopCurrentExecution() {
+    fun stopCurrentExecution() {
         currentJob?.cancel()
         currentJob = null
         sendLogBroadcast("⏹️ 已停止执行")

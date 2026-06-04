@@ -104,12 +104,16 @@ class ElonServerClient(
 
     /**
      * 从 elon APP 的 SharedPreferences 读取登录 token。
-     * elon APP 的 AuthManager 把 token 存在 "auth" 表的 "auth_token" key 里。
+     *
+     * **修复**：旧版本读的是 SharedPreferences("auth")，但 [com.elon.app.AuthManager]
+     * 实际把 token 存在 SharedPreferences("elon") → "auth_token"。
+     * 旧代码因此永远读不到 token，agent 的服务器 CLI 兜底彻底失效。
+     *
+     * 现统一通过 [com.elon.app.agent.infrastructure.auth.MainAppBridge] 读取。
      */
     private fun getAuthToken(): String? {
         return try {
-            val prefs = context.getSharedPreferences("auth", Context.MODE_PRIVATE)
-            prefs.getString("auth_token", null)?.takeIf { it.isNotBlank() }
+            com.elon.app.agent.infrastructure.auth.MainAppBridge.authToken(context)
         } catch (e: Exception) {
             Log.e(TAG, "读取 token 失败", e)
             null

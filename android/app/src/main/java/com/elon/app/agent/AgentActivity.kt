@@ -45,12 +45,13 @@ class AgentActivity : Activity() {
                 return@setOnClickListener
             }
             
-            // TODO: 调用 AgentService.executeGoal(goal)
+            // 经过 InputGateway 统一入口（含意图分析+防抖），再走 AIClientFactory 选链路
+            AgentService.executeTask(goal)
             Snackbar.make(it, "开始执行: $goal", Snackbar.LENGTH_SHORT).show()
         }
         
         stopButton.setOnClickListener {
-            // TODO: 调用 AgentService.stop()
+            AgentService.stop()
             Snackbar.make(it, "Agent 已停止", Snackbar.LENGTH_SHORT).show()
         }
         

@@ -4,6 +4,7 @@
 
 package com.elon.app.agent.infrastructure.voice
 
+import android.content.Context
 import android.util.Log
 import com.elon.app.agent.application.Message
 import com.elon.app.agent.application.conversation.IntentAnalysisResult
@@ -11,7 +12,7 @@ import com.elon.app.agent.application.conversation.ResponseGenerator
 import com.elon.app.agent.domain.conversation.Emotion
 import com.elon.app.agent.domain.conversation.Response
 import com.elon.app.agent.domain.conversation.ResponseTier
-import com.elon.app.agent.infrastructure.ai.HunyuanAIClient
+import com.elon.app.agent.infrastructure.ai.AIClientFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,9 +26,11 @@ import kotlinx.coroutines.withContext
  * 2. 问候语 → 生成友好回应
  * 3. 闲聊 → 调用 AI 生成回复
  * 4. 问答 → 调用 AI 回答问题
+ *
+ * **重构后**：不再接收 apiKey，通过 [AIClientFactory] 自动选择 AI 链路。
  */
 class SmartResponseGenerator(
-    private val apiKey: String
+    context: Context
 ) : ResponseGenerator {
     
     companion object {
@@ -47,7 +50,7 @@ class SmartResponseGenerator(
 - 保持口语化，不要太正式"""
     }
     
-    private val aiClient = HunyuanAIClient(apiKey)
+    private val aiClient = AIClientFactory.create(context)
     
     override suspend fun generate(intent: IntentAnalysisResult): Response {
         Log.d(TAG, "🎭 [响应生成开始] input=${intent.normalizedInput}, operation=${intent.isOperation}, complete=${intent.isComplete}")

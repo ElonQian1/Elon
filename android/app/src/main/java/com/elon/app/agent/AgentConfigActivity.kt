@@ -42,7 +42,7 @@ class AgentConfigActivity : Activity() {
         const val VOICE_MODE_CLI    = "cli"
 
         val DEFAULT_MODE_ORDER: List<String> = listOf(VOICE_MODE_APIKEY, VOICE_MODE_CLI, VOICE_MODE_SIMPLE)
-        private const val DEFAULT_ORDER_STR = "apikey,cli,simple"
+        private const val DEFAULT_ORDER_STR = "cli,apikey,simple"
 
         fun getAgentConfig(context: Context): AgentConfig {
             val prefs = context.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
@@ -110,6 +110,12 @@ class AgentConfigActivity : Activity() {
 
         // === 账号状态卡片 ===
         layout.addView(createAccountCard())
+
+        // === 重构说明：默认走服务器 CLI ===
+        layout.addView(createHint(
+            "💡 默认：不填任何 Key 也能用 —— 只要上面已登录主账号且在主页选中一个项目，Agent 会自动走服务器 CLI。\n" +
+            "填入 API Key 后会优先使用你自己的混元/OpenAI 兑现金。"
+        ))
 
         layout.addView(createDivider())
 

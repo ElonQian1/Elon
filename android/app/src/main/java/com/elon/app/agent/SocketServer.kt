@@ -125,6 +125,9 @@ class SocketServer(private val service: AccessibilityService) {
     
     /**
      * 设置 API Key 并持久化保存
+     *
+     * **重构后**：AI 引擎/脚本引擎不再依赖 apiKey，
+     * 调用只是保存 Key 以供后续 [AIClientFactory] 自动选链路。
      */
     fun setApiKey(key: String) {
         apiKey = key
@@ -132,8 +135,8 @@ class SocketServer(private val service: AccessibilityService) {
             // 保存到 SharedPreferences
             saveApiKey(key)
             
-            aiEngine = AIAutonomousEngine(service, key)
-            scriptEngine = ScriptEngine(service, key)  // 🆕 初始化脚本引擎
+            aiEngine = AIAutonomousEngine(service)
+            scriptEngine = ScriptEngine(service)  // 🆕 初始化脚本引擎
             Log.i("Agent", "AI 引擎和脚本引擎已初始化，API Key 已保存")
         }
     }
@@ -153,6 +156,9 @@ class SocketServer(private val service: AccessibilityService) {
     
     /**
      * 从 SharedPreferences 加载 API Key
+     *
+     * **重构后**：无论是否有 Key 都初始化 AI/脚本引擎，
+     * AIClientFactory 会走到服务器 CLI 兜底。
      */
     fun loadSavedApiKey() {
         try {
@@ -160,12 +166,14 @@ class SocketServer(private val service: AccessibilityService) {
             val savedKey = prefs.getString(KEY_API_KEY, "") ?: ""
             if (savedKey.isNotBlank()) {
                 apiKey = savedKey
-                aiEngine = AIAutonomousEngine(service, savedKey)
-                scriptEngine = ScriptEngine(service, savedKey)  // 🆕 初始化脚本引擎
-                Log.i("Agent", "已加载保存的 API Key，AI 引擎和脚本引擎已就绪")
+                Log.i("Agent", "已加载保存的 API Key")
             } else {
-                Log.i("Agent", "没有保存的 API Key")
+                Log.i("Agent", "没有保存的 API Key，将依赖服务器 CLI 或其他配置")
             }
+            // 无论是否有 Key，都初始化引擎。
+            aiEngine = AIAutonomousEngine(service)
+            scriptEngine = ScriptEngine(service)
+            Log.i("Agent", "AI 引擎和脚本引擎已就绪")
         } catch (e: Exception) {
             Log.e("Agent", "加载 API Key 失败", e)
         }

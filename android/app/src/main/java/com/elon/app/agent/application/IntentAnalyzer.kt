@@ -4,8 +4,9 @@
 
 package com.elon.app.agent.application
 
+import android.content.Context
 import android.util.Log
-import com.elon.app.agent.infrastructure.ai.HunyuanAIClient
+import com.elon.app.agent.infrastructure.ai.AIClientFactory
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,8 +15,10 @@ import kotlinx.coroutines.withContext
  * 🧠 轻量级意图分析器
  * 
  * 用于快速判断用户输入是否完整，不需要 AccessibilityService
+ *
+ * **重构后**：不再接收 apiKey，通过 [AIClientFactory] 自动选择 AI 链路。
  */
-class IntentAnalyzer(private val apiKey: String) {
+class IntentAnalyzer(context: Context) {
     
     companion object {
         private const val TAG = "IntentAnalyzer"
@@ -41,7 +44,7 @@ class IntentAnalyzer(private val apiKey: String) {
     }
     
     private val gson = Gson()
-    private val aiClient = HunyuanAIClient(apiKey)
+    private val aiClient = AIClientFactory.create(context)
     
     /**
      * 分析结果
