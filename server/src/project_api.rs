@@ -33,6 +33,9 @@ pub struct RegisterExternalProjectRequest {
     pub name: String,
     pub workspace_path: String,
     pub description: Option<String>,
+    /// 若提供，表示项目位于该 PC 节点上（workspace_path 是 PC 上的绝对路径），
+    /// 服务器不会做本地路径存在性校验。
+    pub node_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -131,18 +134,22 @@ pub async fn register_external_project(
     if workspace_path.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "workspace_path 不能为空");
     }
-    let pb = std::path::Path::new(workspace_path);
-    if !pb.exists() {
-        return json_error(
-            StatusCode::BAD_REQUEST,
-            format!("workspace_path 不存在: {}", workspace_path),
-        );
-    }
-    if !pb.is_dir() {
-        return json_error(
-            StatusCode::BAD_REQUEST,
-            "workspace_path 必须指向一个目录",
-        );
+    // 仅当请求方未声明 node_id（即项目应在服务器本机）时才校验路径存在；
+    // PC 节点项目的路径在用户 PC 上，服务器看不到，跳过校验。
+    if req.node_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
+        let pb = std::path::Path::new(workspace_path);
+        if !pb.exists() {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                format!("workspace_path 不存在: {}", workspace_path),
+            );
+        }
+        if !pb.is_dir() {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "workspace_path 必须指向一个目录",
+            );
+        }
     }
 
     let create_result = match state.store.register_external_project(

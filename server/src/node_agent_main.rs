@@ -41,9 +41,14 @@ use tracing::{info, warn};
 #[derive(Clone)]
 struct NodeConfig {
     cloud_url: String,
+    /// 云端 HTTP/HTTPS 地址（用于 REST API 调用，如注册外部项目）。
+    /// 默认从 cloud_url 派生：ws://X → http://X，wss://X → https://X。
+    cloud_http_url: String,
     agent_id: String,
     agent_secret: String,
     owner_user_id: String,
+    /// 可选：你的 elon 登录 token（用于本地 Web 管理页代理调用云端 API，例如注册外部项目）
+    user_token: Option<String>,
     /// 本地 Ollama 地址
     ollama_url: String,
     /// 可选：LM Studio 地址
@@ -54,16 +59,29 @@ struct NodeConfig {
     price_per_1k: f64,
 }
 
+fn derive_http_url(ws_url: &str) -> String {
+    if let Some(rest) = ws_url.strip_prefix("wss://") {
+        format!("https://{}", rest.split('/').next().unwrap_or(rest))
+    } else if let Some(rest) = ws_url.strip_prefix("ws://") {
+        format!("http://{}", rest.split('/').next().unwrap_or(rest))
+    } else {
+        ws_url.to_string()
+    }
+}
+
 impl NodeConfig {
     fn from_env() -> Result<Self> {
         let cloud_url = std::env::var("NODE_CLOUD_URL")
             .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".into());
+        let cloud_http_url = std::env::var("NODE_CLOUD_HTTP_URL")
+            .unwrap_or_else(|_| derive_http_url(&cloud_url));
         let agent_id = std::env::var("NODE_AGENT_ID")
             .map_err(|_| anyhow!("必须设置 NODE_AGENT_ID 环境变量"))?;
         let agent_secret = std::env::var("NODE_AGENT_SECRET")
             .map_err(|_| anyhow!("必须设置 NODE_AGENT_SECRET 环境变量"))?;
         let owner_user_id = std::env::var("NODE_OWNER_USER_ID")
             .map_err(|_| anyhow!("必须设置 NODE_OWNER_USER_ID（你的 elon 用户 ID）"))?;
+        let user_token = std::env::var("NODE_USER_TOKEN").ok().filter(|v| !v.is_empty());
         let ollama_url = std::env::var("NODE_OLLAMA_URL")
             .unwrap_or_else(|_| "http://localhost:11434".into());
         let lm_studio_url = std::env::var("NODE_LM_STUDIO_URL").ok().filter(|v| !v.is_empty());
@@ -75,9 +93,11 @@ impl NodeConfig {
 
         Ok(Self {
             cloud_url,
+            cloud_http_url,
             agent_id,
             agent_secret,
             owner_user_id,
+            user_token,
             ollama_url,
             lm_studio_url,
             custom_url,
@@ -553,6 +573,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
         let app = axum::Router::new()
             .route("/", axum::routing::get(admin_index))
             .route("/api/status", axum::routing::get(admin_status))
+            .route("/api/register-project", axum::routing::post(admin_register_project))
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -581,6 +602,8 @@ async fn admin_status(
         "agent_id": rt.cfg.agent_id,
         "owner_user_id": rt.cfg.owner_user_id,
         "cloud_url": rt.cfg.cloud_url,
+        "cloud_http_url": rt.cfg.cloud_http_url,
+        "user_token_configured": rt.cfg.user_token.is_some(),
         "ollama_url": rt.cfg.ollama_url,
         "lm_studio_url": rt.cfg.lm_studio_url,
         "custom_url": rt.cfg.custom_url,
@@ -589,4 +612,101 @@ async fn admin_status(
         "last_event": st.last_event,
         "models": live,
     }))
+}
+
+#[derive(Deserialize)]
+struct AdminRegisterReq {
+    name: String,
+    workspace_path: String,
+    description: Option<String>,
+}
+
+/// 本地管理页 → 注册外部本地项目到云端。
+/// 流程：
+///   1. 在 PC 本地校验路径存在且为目录（这是关键 —— 服务器看不到 PC 路径）
+///   2. 用 NODE_USER_TOKEN 调用云端 POST /api/projects/external，附带 node_id 让服务器跳过路径校验
+async fn admin_register_project(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<AdminRegisterReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    let name = req.name.trim();
+    let path = req.workspace_path.trim();
+    if name.is_empty() || path.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "ok": false, "error": "name 和 workspace_path 不能为空" })),
+        );
+    }
+
+    // 1) PC 本地校验
+    let pb = std::path::Path::new(path);
+    if !pb.exists() {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": format!("PC 本地路径不存在: {}", path),
+            })),
+        );
+    }
+    if !pb.is_dir() {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "ok": false, "error": "workspace_path 必须是目录" })),
+        );
+    }
+
+    // 2) 必须有 token 才能调用云端
+    let token = match rt.cfg.user_token.as_ref() {
+        Some(t) => t.clone(),
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": "未配置 NODE_USER_TOKEN 环境变量。请在 APK 登录后从『我的』→『设置』复制 token 到 PC 节点启动环境中。",
+                })),
+            );
+        }
+    };
+
+    // 3) 转发到云端
+    let url = format!("{}/api/projects/external", rt.cfg.cloud_http_url.trim_end_matches('/'));
+    let body = serde_json::json!({
+        "name": name,
+        "workspace_path": path,
+        "description": req.description,
+        "node_id": rt.cfg.agent_id,
+    });
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .unwrap_or_default();
+    match client.post(&url).bearer_auth(&token).json(&body).send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            let json: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
+            if status.is_success() {
+                (StatusCode::OK, axum::Json(serde_json::json!({
+                    "ok": true,
+                    "cloud": json,
+                })))
+            } else {
+                (StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+                 axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": format!("云端返回 {}: {}", status, json),
+                })))
+            }
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": format!("调用云端失败: {}", e),
+            })),
+        ),
+    }
 }

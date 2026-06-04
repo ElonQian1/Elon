@@ -4,21 +4,31 @@
 <meta charset="UTF-8" />
 <title>elon-node-agent 管理</title>
 <style>
-  body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 24px auto; padding: 0 16px; background: #0f1419; color: #e6edf3; }
+  body { font-family: -apple-system, "Segoe UI", sans-serif; max-width: 920px; margin: 24px auto; padding: 0 16px; background: #0f1419; color: #e6edf3; }
   h1 { font-size: 22px; margin-bottom: 8px; }
+  h3 { margin-top: 28px; }
   .status { padding: 12px 16px; border-radius: 6px; margin: 8px 0 16px; }
   .status.on  { background: #1f3a26; border-left: 4px solid #2ea043; }
   .status.off { background: #3a1f26; border-left: 4px solid #f85149; }
-  .grid { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; padding: 12px 16px; background: #161b22; border-radius: 6px; }
+  .grid { display: grid; grid-template-columns: 200px 1fr; gap: 8px 16px; padding: 12px 16px; background: #161b22; border-radius: 6px; }
   .label { color: #8b949e; }
   .val { word-break: break-all; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; background: #161b22; border-radius: 6px; overflow: hidden; }
   th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #21262d; }
   th { background: #21262d; color: #8b949e; font-weight: 500; }
-  .hint { color: #8b949e; font-size: 13px; margin: 24px 0 8px; }
   code { background: #21262d; padding: 1px 6px; border-radius: 3px; }
-  button { background: #238636; color: white; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  button { background: #238636; color: white; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; }
   button:hover { background: #2ea043; }
+  button:disabled { background: #30363d; cursor: not-allowed; }
+  input, textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 8px 10px; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+  input:focus, textarea:focus { outline: none; border-color: #58a6ff; }
+  .form-row { margin: 10px 0; }
+  .form-row label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+  .card { background: #161b22; border-radius: 6px; padding: 16px; }
+  .warn { background: #3a2e1f; border-left: 4px solid #d29922; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
+  .ok-toast { background: #1f3a26; border-left: 4px solid #2ea043; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
+  .err-toast { background: #3a1f26; border-left: 4px solid #f85149; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
+  pre { background: #161b22; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -28,24 +38,52 @@
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
 
-  <h3>本地模型 <button onclick="load()">刷新</button></h3>
+  <h3>注册本地项目（绑定到本 PC 节点）</h3>
+  <div class="card">
+    <div id="tokenWarn" class="warn" style="display:none">
+      ⚠️ 未配置 <code>NODE_USER_TOKEN</code>，无法注册项目。<br />
+      解决：从 APK 登录后获取 token，重启 node-agent 前设置：<br />
+      <code>$env:NODE_USER_TOKEN = "你的 token"</code>
+    </div>
+    <div class="form-row">
+      <label>项目名称（同名复用现有）</label>
+      <input id="regName" placeholder="如：江西吉安商会" />
+    </div>
+    <div class="form-row">
+      <label>本机绝对路径（必须存在且为目录）</label>
+      <input id="regPath" placeholder="如：D:\rust\active-projects\江西吉安商会" />
+    </div>
+    <div class="form-row">
+      <label>描述（可选）</label>
+      <textarea id="regDesc" rows="2" placeholder="一句话介绍这个项目"></textarea>
+    </div>
+    <button id="regBtn" onclick="registerProject()">注册到云端</button>
+    <div id="regResult"></div>
+    <p style="font-size:12px;color:#8b949e;margin-top:12px">
+      流程：本地校验路径存在 → 调用云端 <code>POST /api/projects/external</code>（附 <code>node_id</code>，
+      让服务器跳过本地路径校验）→ 项目自动绑定到本节点，owner = 你。注册成功后在 APK『项目广场 / 我的项目』可见。
+    </p>
+  </div>
+
+  <h3>本地模型 <button style="padding:4px 10px;font-size:12px" onclick="load()">刷新</button></h3>
   <table id="models">
     <thead><tr><th>模型 ID</th><th>提供方</th><th>价格 (credits/1k)</th></tr></thead>
     <tbody></tbody>
   </table>
 
-  <p class="hint">⚙️ 修改配置：通过环境变量启动节点代理（重启后生效）。</p>
-  <pre style="background:#161b22;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px;">
+  <h3>环境变量参考</h3>
+  <pre>
 NODE_CLOUD_URL       云端 WebSocket 地址（默认 ws://43.139.149.158:8080/agent/ws）
+NODE_CLOUD_HTTP_URL  云端 HTTP 地址（默认从 NODE_CLOUD_URL 派生）
 NODE_AGENT_ID        本节点唯一 ID（必填）
 NODE_AGENT_SECRET    认证密钥 64 字符 hex（必填）
 NODE_OWNER_USER_ID   你的 elon 用户 ID（必填）
+NODE_USER_TOKEN      你的 elon 登录 token（注册外部项目需要）
 NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
 NODE_LM_STUDIO_URL   LM Studio 地址（可选）
 NODE_CUSTOM_LLM_URL  自定义 OpenAI 兼容地址（可选）
 NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
-NODE_ADMIN_PORT      本管理页端口（默认 7799）
-  </pre>
+NODE_ADMIN_PORT      本管理页端口（默认 7799）</pre>
 
 <script>
 async function load() {
@@ -58,7 +96,9 @@ async function load() {
   cfg.innerHTML = '';
   const rows = [
     ['版本', r.version], ['Agent ID', r.agent_id], ['Owner User', r.owner_user_id],
-    ['云端', r.cloud_url], ['Ollama', r.ollama_url],
+    ['云端 WS', r.cloud_url], ['云端 HTTP', r.cloud_http_url],
+    ['用户 Token', r.user_token_configured ? '✅ 已配置' : '❌ 未配置 (NODE_USER_TOKEN)'],
+    ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],
     ['自定义 LLM', r.custom_url || '(未配置)'],
     ['默认价格', r.price_per_1k + ' credits/1k tokens']
@@ -66,6 +106,9 @@ async function load() {
   for (const [k, v] of rows) {
     cfg.innerHTML += `<div class="label">${k}</div><div class="val">${v ?? ''}</div>`;
   }
+  document.getElementById('tokenWarn').style.display = r.user_token_configured ? 'none' : 'block';
+  document.getElementById('regBtn').disabled = !r.user_token_configured;
+
   const tbody = document.querySelector('#models tbody');
   tbody.innerHTML = '';
   if (!r.models || r.models.length === 0) {
@@ -76,6 +119,42 @@ async function load() {
     }
   }
 }
+
+async function registerProject() {
+  const name = document.getElementById('regName').value.trim();
+  const path = document.getElementById('regPath').value.trim();
+  const desc = document.getElementById('regDesc').value.trim();
+  const out = document.getElementById('regResult');
+  out.innerHTML = '';
+  if (!name || !path) { out.innerHTML = '<div class="err-toast">名称和路径必填</div>'; return; }
+  const btn = document.getElementById('regBtn');
+  btn.disabled = true;
+  btn.textContent = '注册中…';
+  try {
+    const resp = await fetch('/api/register-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, workspace_path: path, description: desc || null }),
+    });
+    const j = await resp.json();
+    if (resp.ok && j.ok) {
+      const p = (j.cloud && j.cloud.project) || {};
+      const reused = j.cloud && j.cloud.reused_existing;
+      out.innerHTML = `<div class="ok-toast">${reused ? '已存在同名项目，复用' : '✅ 注册成功'}：<code>${p.name || name}</code> (id: <code>${p.id || '?'}</code>)</div>`;
+      document.getElementById('regName').value = '';
+      document.getElementById('regPath').value = '';
+      document.getElementById('regDesc').value = '';
+    } else {
+      out.innerHTML = `<div class="err-toast">❌ ${j.error || ('HTTP ' + resp.status)}</div>`;
+    }
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '注册到云端';
+  }
+}
+
 load();
 setInterval(load, 5000);
 </script>
