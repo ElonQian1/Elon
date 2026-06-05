@@ -80,6 +80,20 @@
                 app:tint="@color/elon_text_secondary" />
 
             <ImageButton
+                android:id="@+id/voiceCallButton"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="52dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="实时语音通话"
+                android:padding="9dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_top_phone"
+                android:visibility="gone"
+                app:tint="@color/elon_text_primary" />
+
+            <ImageButton
                 android:id="@+id/moreButton"
                 android:layout_width="44dp"
                 android:layout_height="match_parent"

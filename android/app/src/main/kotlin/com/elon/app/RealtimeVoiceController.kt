@@ -93,6 +93,7 @@ internal class RealtimeVoiceController(
 
     /** 一句话结束 → 触发 commit（转写完成 / 静音补尾）。 */
     fun commitUtterance() {
+        recorder.stop()
         ws?.commit()
     }
 

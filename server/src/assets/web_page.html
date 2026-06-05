@@ -957,6 +957,9 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
     </button>
     <h1 id="topTitle">会话区</h1>
+    <button class="icon-btn" id="voiceCallBtn" title="实时语音" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.17a2 2 0 0 1 2.11-.45c.84.29 1.71.5 2.61.62A2 2 0 0 1 22 16.92z"/></svg>
+    </button>
     <button class="icon-btn" id="searchBtn" title="搜索">
       <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M11.6 5.8a5.8 5.8 0 1 0 0.01 0"/><path d="M16.1 16.1 L21.8 21.8"/></svg>
     </button>
@@ -1204,6 +1207,17 @@
   </div>
 </div>
 
+<!-- ============ 实时语音提示 ============ -->
+<div class="modal-mask" id="voiceCallMask">
+  <div class="modal">
+    <h2>实时语音</h2>
+    <p style="color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0">实时语音通话需要使用 Android APK。网页版保留同位置入口，但不模拟原生麦克风和系统朗读。</p>
+    <div class="actions">
+      <button type="button" class="btn-confirm" id="voiceCallCloseBtn">知道了</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ 进度记录对话框 ============ -->
 <div class="modal-mask" id="progressLogMask">
   <div class="modal" style="max-height:72vh;display:flex;flex-direction:column;gap:12px">
@@ -1261,6 +1275,7 @@
 
   const topTitle = $('topTitle');
   const backBtn = $('backBtn');
+  const voiceCallBtn = $('voiceCallBtn');
   const addBtn = $('addBtn');
   const searchBtn = $('searchBtn');
 
@@ -1290,6 +1305,8 @@
   const deleteConfirmMask = $('deleteConfirmMask');
   const deleteConfirmText = $('deleteConfirmText');
   const deleteConfirmError = $('deleteConfirmError');
+  const voiceCallMask = $('voiceCallMask');
+  const voiceCallCloseBtn = $('voiceCallCloseBtn');
   const cancelDeleteBtn = $('cancelDeleteBtn');
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
@@ -1517,6 +1534,7 @@
     inputBar.classList.toggle('active', inChat);
     // 返回按钮：仅"会话"页进入项目后显示
     backBtn.style.display = inChat ? '' : 'none';
+    voiceCallBtn.style.display = 'none';
     // 新建按钮：仅会话页显示
     addBtn.style.display = (tabId === 'chatPage' && !currentProject) ? '' : 'none';
     searchBtn.style.display = (tabId === 'chatPage' && !currentProject) ? '' : 'none';
@@ -1540,11 +1558,22 @@
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
     backBtn.style.display = 'none';
+    voiceCallBtn.style.display = 'none';
     addBtn.style.display = '';
     searchBtn.style.display = '';
     topTitle.textContent = '会话区';
     resetProjectPage();
     renderConversationList();
+  });
+
+  voiceCallBtn.addEventListener('click', () => {
+    voiceCallMask.classList.add('active');
+  });
+  voiceCallCloseBtn.addEventListener('click', () => {
+    voiceCallMask.classList.remove('active');
+  });
+  voiceCallMask.addEventListener('click', (e) => {
+    if (e.target === voiceCallMask) voiceCallMask.classList.remove('active');
   });
 
   // ====== 会话/项目列表 ======
