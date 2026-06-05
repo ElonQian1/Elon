@@ -54,9 +54,13 @@ PORT='$Port'
 RESTART_MAIN='$restartMain'
 
 cd "`$WORKER_DIR"
+unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
+export NO_PROXY='127.0.0.1,localhost'
+export no_proxy='127.0.0.1,localhost'
+export PIP_CONFIG_FILE=/dev/null
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install --upgrade pip --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
+.venv/bin/python -m pip install --no-cache-dir --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com -r requirements.txt
 
 cat >/etc/systemd/system/elon-tts-worker.service <<UNIT
 [Unit]
