@@ -18,7 +18,10 @@ import java.util.UUID
  *
  * 生命周期：与 MainSpeechInputActions 保持一致，在 destroy() 时调用 [release]。
  */
-internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
+internal class VoiceSpeaker(
+    context: Context,
+    private val respectUserToggle: Boolean = true
+) : TextToSpeech.OnInitListener {
 
     companion object {
         private const val TAG = "VoiceSpeaker"
@@ -95,7 +98,7 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         profile: VoiceTtsProfile? = null,
         onDone: (() -> Unit)? = null
     ) {
-        if (!isTtsEnabled(appContext)) {
+        if (respectUserToggle && !isTtsEnabled(appContext)) {
             onDone?.invoke()
             return
         }
