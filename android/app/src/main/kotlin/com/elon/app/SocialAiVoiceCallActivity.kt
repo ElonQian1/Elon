@@ -13,6 +13,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
@@ -62,8 +64,8 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private lateinit var userTranscript: TextView
     private lateinit var aiTranscript: TextView
     private lateinit var micButton: TextView
-    private lateinit var speakerButton: TextView
-    private lateinit var endButton: TextView
+    private lateinit var speakerButton: ImageButton
+    private lateinit var endButton: ImageButton
     private lateinit var pulseBars: List<View>
 
     private var controller: RealtimeVoiceController? = null
@@ -272,14 +274,15 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
             }
-            speakerButton = controlButton("扬声器", secondary = true).apply {
+            speakerButton = iconControlButton(R.drawable.ic_voice_call_speaker_off, secondary = true).apply {
+                contentDescription = "切换扬声器"
                 setOnClickListener { toggleSpeaker() }
             }
             micButton = controlButton("开始说话", secondary = false).apply {
                 setOnClickListener { handleMicTap() }
             }
-            endButton = controlButton("结束", secondary = true).apply {
-                setTextColor(primaryTextColor)
+            endButton = iconControlButton(R.drawable.ic_voice_call_hangup, secondary = true).apply {
+                contentDescription = "结束通话"
                 background = rounded(Color.parseColor("#3A2024"), 22, Color.parseColor("#553038"))
                 setOnClickListener { finish() }
             }
@@ -305,6 +308,18 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                 rounded(primaryActionColor, 22)
             }
             setTextColor(if (secondary) secondaryActionTextColor else primaryActionTextColor)
+        }
+
+    private fun iconControlButton(iconRes: Int, secondary: Boolean): ImageButton =
+        ImageButton(this).apply {
+            setImageResource(iconRes)
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            background = if (secondary) {
+                rounded(secondaryActionColor, 22)
+            } else {
+                rounded(primaryActionColor, 22)
+            }
         }
 
     private fun handleMicTap() {
@@ -410,7 +425,11 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     }
 
     private fun updateSpeakerButton() {
-        speakerButton.text = if (VoiceSpeaker.isTtsEnabled(this)) "扬声器开" else "扬声器关"
+        val enabled = VoiceSpeaker.isTtsEnabled(this)
+        speakerButton.setImageResource(
+            if (enabled) R.drawable.ic_voice_call_speaker_on else R.drawable.ic_voice_call_speaker_off
+        )
+        speakerButton.contentDescription = if (enabled) "关闭扬声器" else "打开扬声器"
     }
 
     private fun setCallState(state: CallState) {
