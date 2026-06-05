@@ -6,6 +6,7 @@ package com.elon.app.agent.application
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.provider.Settings
 import android.util.Log
 
 /**
@@ -105,17 +106,22 @@ object LocalBasicActionExecutor {
             return Result.Handled("已返回")
         }
 
-        // 4. 打开应用（仅"纯打开"，带复合后续意图的交给 AI）
+        // 4. 打开应用 / 系统功能（仅"纯打开"，带复合后续意图的交给 AI）
         if (openVerbs.any { goal.contains(it) }) {
-            val resolved = resolveApp(goal) ?: return Result.NotHandled
-            val (name, pkg) = resolved
-            if (!isPureOpen(goal, name)) return Result.NotHandled
-            return if (launchApp(service, pkg)) {
-                Result.Handled("已打开$name")
-            } else {
-                // 本地启动失败（未安装等），回退 AI 脚本流程再试
-                Result.NotHandled
+            // 4a. 先按"应用"解析：内置常用表 + PackageManager 动态解析任意已安装应用
+            resolveApp(service, goal)?.let { app ->
+                if (!isPureOpen(goal, app.name)) return Result.NotHandled
+                return if (launchApp(service, app.pkg)) Result.Handled("已打开${app.name}")
+                       else Result.NotHandled
             }
+            // 4b. 应用没匹配到 → 系统功能兜底（设置/WiFi/蓝牙等，跨厂商用 Intent action）
+            resolveSystemAction(g)?.let { sys ->
+                if (!isSimpleOpen(goal)) return Result.NotHandled
+                return if (startIntent(service, sys.intent)) Result.Handled("已打开${sys.name}")
+                       else Result.NotHandled
+            }
+            // 4c. 都没命中（可能是未安装应用或更复杂意图）→ 交给 AI
+            return Result.NotHandled
         }
 
         return Result.NotHandled
@@ -127,12 +133,104 @@ object LocalBasicActionExecutor {
     private fun matchesAny(lowerGoal: String, keys: List<String>): Boolean =
         keys.any { lowerGoal.contains(it) }
 
-    /** 在 goal 中查找应用名，最长匹配优先（"哔哩哔哩"优先于"b站"等）。 */
-    private fun resolveApp(goal: String): Pair<String, String>? {
-        val match = appPackages.keys
+    /** 解析到的应用：显示名 + 包名。 */
+    private data class AppMatch(val name: String, val pkg: String)
+
+    /**
+     * 解析"打开 XXX"里的应用：
+     *   1. 内置常用表优先（快、准，且确认已安装）；
+     *   2. 未命中时用 PackageManager 动态遍历已安装应用，按显示名（label）匹配。
+     * 这样无需为每个应用预置脚本，任意已安装应用都能本地打开。
+     */
+    private fun resolveApp(service: AccessibilityService, goal: String): AppMatch? {
+        // 内置常用表：最长匹配优先（"哔哩哔哩"优先于"b站"）
+        val builtin = appPackages.keys
             .filter { goal.contains(it, ignoreCase = true) }
-            .maxByOrNull { it.length } ?: return null
-        return match to appPackages.getValue(match)
+            .maxByOrNull { it.length }
+        if (builtin != null) {
+            val pkg = appPackages.getValue(builtin)
+            if (service.packageManager.getLaunchIntentForPackage(pkg) != null) {
+                return AppMatch(builtin, pkg)
+            }
+        }
+        // 动态：按应用显示名匹配已安装应用
+        return resolveByLabel(service, goal)
+    }
+
+    /** 去掉动词和修饰词后，用剩余文本去匹配已安装应用的显示名。 */
+    private fun resolveByLabel(service: AccessibilityService, goal: String): AppMatch? {
+        val query = stripQuery(goal)
+        if (query.length < 2) return null
+
+        val pm = service.packageManager
+        val mainIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val infos = try {
+            pm.queryIntentActivities(mainIntent, 0)
+        } catch (e: Exception) {
+            Log.w(TAG, "查询已安装应用失败: ${e.message}")
+            return null
+        }
+
+        var exact: AppMatch? = null
+        var partial: AppMatch? = null
+        var partialLen = Int.MAX_VALUE
+        for (info in infos) {
+            val label = info.loadLabel(pm).toString().trim()
+            if (label.isEmpty()) continue
+            val pkg = info.activityInfo.packageName
+            if (label == query) {
+                exact = AppMatch(label, pkg)
+                break
+            }
+            if (label.contains(query) || query.contains(label)) {
+                // 选最短 label（最具体），减少歧义
+                if (label.length < partialLen) {
+                    partial = AppMatch(label, pkg)
+                    partialLen = label.length
+                }
+            }
+        }
+        return exact ?: partial
+    }
+
+    /** 去掉动词和常见修饰词，得到用户想打开的应用名。 */
+    private fun stripQuery(goal: String): String {
+        var q = goal
+        for (verb in openVerbs) q = q.replace(verb, "")
+        for (filler in listOf("请", "帮我", "麻烦", "一下", "的", "app", "应用", "软件", "给我", "打開")) {
+            q = q.replace(filler, "", ignoreCase = true)
+        }
+        return q.trim().trim('，', ',', '。', '.', '!', '！', '~', ' ')
+    }
+
+    /** 系统功能动作：无独立应用入口的系统设置项，用 Intent action 打开（跨厂商通用）。 */
+    private data class SystemAction(val name: String, val intent: Intent)
+
+    private fun resolveSystemAction(lowerGoal: String): SystemAction? {
+        fun act(a: String) = Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return when {
+            lowerGoal.contains("wifi") || lowerGoal.contains("无线网") ->
+                SystemAction("WiFi 设置", act(Settings.ACTION_WIFI_SETTINGS))
+            lowerGoal.contains("蓝牙") ->
+                SystemAction("蓝牙设置", act(Settings.ACTION_BLUETOOTH_SETTINGS))
+            lowerGoal.contains("飞行模式") || lowerGoal.contains("无线和网络") ->
+                SystemAction("无线和网络", act(Settings.ACTION_WIRELESS_SETTINGS))
+            lowerGoal.contains("定位") || lowerGoal.contains("位置信息") ->
+                SystemAction("定位设置", act(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+            lowerGoal.contains("流量") || lowerGoal.contains("数据使用") ->
+                SystemAction("流量设置", act(Settings.ACTION_DATA_USAGE_SETTINGS))
+            // "设置/系统设置" 放最后兜底，避免吃掉上面更具体的设置项
+            lowerGoal.contains("设置") ->
+                SystemAction("系统设置", act(Settings.ACTION_SETTINGS))
+            else -> null
+        }
+    }
+
+    /** 系统设置类指令通常很短：足够短且不含复合连接词才算"纯打开"。 */
+    private fun isSimpleOpen(goal: String): Boolean {
+        if (goal.length > 12) return false
+        val compound = listOf("然后", "接着", "并", "给", "发消息", "搜索", "播放", "之后")
+        return compound.none { goal.contains(it) }
     }
 
     /** 判断是否为"纯打开应用"：去掉动词、应用名、常见修饰词后无实质剩余。 */
@@ -160,6 +258,17 @@ object LocalBasicActionExecutor {
             true
         } catch (e: Exception) {
             Log.w(TAG, "本地启动失败 $pkg: ${e.message}")
+            false
+        }
+    }
+
+    private fun startIntent(service: AccessibilityService, intent: Intent): Boolean {
+        return try {
+            service.startActivity(intent)
+            Log.i(TAG, "⚡ 本地打开系统功能: ${intent.action}")
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "打开系统功能失败 ${intent.action}: ${e.message}")
             false
         }
     }
