@@ -8,6 +8,7 @@ import android.content.Context
 import android.util.Log
 import com.elon.app.agent.AgentService
 import com.elon.app.agent.application.LocalBasicActionExecutor
+import com.elon.app.agent.application.LocalChatResponder
 import com.elon.app.agent.application.conversation.IntentAnalysisResult
 import com.elon.app.agent.application.conversation.ResponseGenerator
 import com.elon.app.agent.application.conversation.StreamingIntentAnalyzer
@@ -61,11 +62,22 @@ class CliResponseGenerator(
                     )
                 }
                 LocalBasicActionExecutor.Result.NotHandled -> {
-                    // 不是纯基础动作，继续交服务器 CLI 处理
+                    // 不是纯基础动作，继续往下判断
                 }
             }
         } else {
             Log.w(TAG, "无障碍服务未开启，无法本地直控，转服务器处理")
+        }
+
+        // 💬 本地常识问答：今天几号 / 现在几点 / 星期几 / 电量
+        // 这类手机本地就能答准，服务器 CLI 反而不擅长（它是改代码用的），本地秒答。
+        LocalChatResponder.tryAnswer(context, intent.normalizedInput)?.let { answer ->
+            Log.i(TAG, "💬 本地常识问答：$answer")
+            return Response(
+                tier = ResponseTier.FAST,
+                text = answer,
+                emotion = Emotion.HELPFUL
+            )
         }
 
         Log.d(TAG, "🖥️ CLI 流式请求: ${intent.normalizedInput.take(40)}")
