@@ -42,7 +42,9 @@ class ElonServerAIClient(
             ?: messages.joinToString("\n") { "${it.role}: ${it.content}" }
 
         Log.d(TAG, "→ server CLI chat (project=$projectId, conv=${conversationId ?: "<new>"})")
-        val reply = server.chat(projectId, userMsg, conversationId)
+        // agent 子系统（闲聊 / 意图分析 / 生成手机脚本）借用服务器 AI 的对话能力，
+        // 始终走轻量 chat，绝不触发服务器项目 Codex 开发工作流（避免超时/报错）。
+        val reply = server.chat(projectId, userMsg, conversationId, chatOnly = true)
         // ElonServerClient.chat 当前只返回 reply 文本；如果未来返回 conversation_id，
         // 在那里把 conversationId 回填到这里即可（保持单调会话）。
         return reply

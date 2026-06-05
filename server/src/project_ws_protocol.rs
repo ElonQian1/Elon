@@ -21,6 +21,9 @@ pub struct ProjectChatRequest {
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
     /// 方案8: 客户端声明的 WS 协议版本，旧客户端为 None（服务器按 v1 处理）
     pub protocol_version: Option<u32>,
+    /// 仅闲聊：true 时强制走轻量 casual chat，绝不进入项目 Codex 开发工作流。
+    /// 悬浮球语音 agent 借用 AI 对话能力时设为 true，避免误判为开发任务而启动 Codex 导致超时。
+    pub chat_only: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -199,6 +202,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         conversation_title: None,
         attachments: None,
         protocol_version: None,
+        chat_only: None,
     })
 }
 

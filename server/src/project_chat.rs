@@ -98,20 +98,37 @@ pub async fn chat_project(
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
-    run_project_agent_with_scheduler(
-        state.clone(),
-        user.id.clone(),
-        project,
-        download_base,
-        conversation_id.clone(),
-        message,
-        req.agent,
-        attachments,
-        ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
-        Some(trace_id.clone()),
-        tx,
-    )
-    .await;
+    if req.chat_only.unwrap_or(false) {
+        // 轻量对话：agent 子系统（悬浮球语音）借用服务器 AI 的对话能力，
+        // 强制走 casual chat，绝不触发项目 Codex 工作流（避免误判开发任务而超时）。
+        agent::run_for_project(
+            &user.id,
+            &project,
+            &download_base,
+            Some(&conversation_id),
+            &message,
+            req.agent.as_deref(),
+            Some(trace_id.as_str()),
+            &state,
+            tx,
+        )
+        .await;
+    } else {
+        run_project_agent_with_scheduler(
+            state.clone(),
+            user.id.clone(),
+            project,
+            download_base,
+            conversation_id.clone(),
+            message,
+            req.agent,
+            attachments,
+            ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
+            Some(trace_id.clone()),
+            tx,
+        )
+        .await;
+    }
 
     let mut reply = String::new();
     let mut apk_url = None;
