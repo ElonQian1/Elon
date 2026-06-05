@@ -46,35 +46,35 @@ object AIClientFactory {
      */
     fun create(context: Context): AIClient {
         val ctx = context.applicationContext
-
-        // 优先级 1：腾讯混元（沿用旧版主链路）
         val cfg = AgentConfigActivity.getAgentConfig(ctx)
+        val token = MainAppBridge.authToken(ctx)
+        val projectId = MainAppBridge.effectiveCliProjectId(ctx)
+
+        // 优先级 1：服务器 Codex CLI（主链路）
+        // 所有闲聊和手机脚本生成都走 Codex，保证 AGENTS.md 能被读取、脚本能被正确生成。
+        if (!token.isNullOrBlank() && !projectId.isNullOrBlank()) {
+            Log.i(TAG, "→ 选择 ElonServer CLI（project=$projectId）[首选]")
+            return cachedElonServerClient
+                ?: ElonServerAIClient(ctx, projectId).also { cachedElonServerClient = it }
+        }
+
+        // 优先级 2：用户自带混元 API Key（未登录服务器时的兜底）
         if (cfg.hunyuanApiKey.isNotBlank()) {
-            Log.i(TAG, "→ 选择 Hunyuan（用户自带 Key）")
+            Log.i(TAG, "→ 选择 Hunyuan（用户自带 Key，兜底）")
             return HunyuanAIClient(cfg.hunyuanApiKey)
         }
 
-        // 优先级 2：OpenAI 兼容（DeepSeek / 通义千问 / 任意兼容）
+        // 优先级 3：用户自带 OpenAI 兼容 Key（兜底）
         if (cfg.openaiApiKey.isNotBlank()) {
-            Log.i(TAG, "→ 选择 OpenAICompat（用户自带 Key）")
+            Log.i(TAG, "→ 选择 OpenAICompat（用户自带 Key，兜底）")
             return OpenAICompatAIClient(
                 apiKey = cfg.openaiApiKey,
                 provider = LLMProvider.OPENAI_COMPATIBLE
             )
         }
 
-        // 优先级 3：服务器 CLI 兜底（用户已登录主 UI 且选了项目）
-        val token = MainAppBridge.authToken(ctx)
-        val projectId = MainAppBridge.effectiveCliProjectId(ctx)
-        if (!token.isNullOrBlank() && !projectId.isNullOrBlank()) {
-            Log.i(TAG, "→ 选择 ElonServer CLI（project=$projectId）")
-            // 单例：所有调用方共享同一个实例和 conversationId
-            return cachedElonServerClient
-                ?: ElonServerAIClient(ctx, projectId).also { cachedElonServerClient = it }
-        }
-
         // 都没有 → 返回 NoOp，让调用方在 chat 时收到友好错误
-        Log.w(TAG, "→ 无可用 AI（既无 Key 也未登录/未选项目）")
+        Log.w(TAG, "→ 无可用 AI（未登录服务器，也没有配置 API Key）")
         return UnconfiguredAIClient(reason = describeMissingConfig(token.isNullOrBlank(), projectId.isNullOrBlank()))
     }
 

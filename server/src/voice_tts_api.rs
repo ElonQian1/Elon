@@ -44,14 +44,14 @@ pub struct TtsRequest {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct TtsCatalogResponse {
-    worker_configured: bool,
-    worker_url: Option<String>,
-    default_provider: String,
-    llm_rewrite_enabled: bool,
-    voices: Vec<voice_tts_catalog::TtsVoicePreset>,
-    emotions: Vec<voice_tts_catalog::TtsEmotionPreset>,
-    intensities: Vec<voice_tts_catalog::TtsIntensityPreset>,
+pub struct TtsCatalogResponse {
+    pub worker_configured: bool,
+    pub worker_url: Option<String>,
+    pub default_provider: String,
+    pub llm_rewrite_enabled: bool,
+    pub voices: Vec<voice_tts_catalog::TtsVoicePreset>,
+    pub emotions: Vec<voice_tts_catalog::TtsEmotionPreset>,
+    pub intensities: Vec<voice_tts_catalog::TtsIntensityPreset>,
 }
 
 pub async fn catalog_handler() -> Json<TtsCatalogResponse> {
