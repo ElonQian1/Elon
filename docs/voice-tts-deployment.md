@@ -42,6 +42,35 @@ ELON_TTS_CACHE_ENABLED=true
 ELON_TTS_LLM_REWRITE_ENABLED=false
 ```
 
+## 当前生产部署
+
+生产机 `43.139.149.158` 当前没有 GPU，也没有 Docker。为了先让 APK 真实播放服务器返回的女声情绪音频，
+仓库提供了一个轻量 Python Worker：
+
+```text
+server/tts_worker/edge_tts_worker.py
+```
+
+它实现同一个 `/synthesize` 合约，内部使用 Edge 在线神经女声，并把本项目的
+`voiceId`、`emotionId`、`speed` 映射到不同女声、语速、音高和音量。这样主服务、
+APK、缓存、鉴权和降级链路都和生产级模型 Worker 保持一致；后续如果有 GPU 或模型资产，
+只需要替换 Worker 内部实现，不需要改 Rust API 或 APK。
+
+Windows 部署：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy-tts-worker.ps1
+```
+
+脚本会：
+
+1. 上传 `server/tts_worker` 到 `/root/Elon/server/tts_worker`
+2. 创建 Python venv 并安装依赖
+3. 创建并启动 `elon-tts-worker.service`
+4. 写入 `/root/Elon/server/.env` 的 `ELON_TTS_WORKER_URL=http://127.0.0.1:5010`
+5. 重启 `elon-server.service`
+6. 验证 `/health` 和 `/api/voice/tts/catalog`
+
 ## Worker HTTP 合约
 
 Rust 主服务会请求：
@@ -128,4 +157,3 @@ powershell -ExecutionPolicy Bypass -File scripts\check-tts-stack.ps1
 ```
 
 它会检查 Python、conda、常见 TTS 包和 `ELON_TTS_WORKER_URL` 是否存在。
-
