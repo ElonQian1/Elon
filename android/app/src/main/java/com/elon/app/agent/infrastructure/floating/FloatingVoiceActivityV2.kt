@@ -63,7 +63,11 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     private var ttsService: TextToSpeechService? = null
     
     private val handler = Handler(Looper.getMainLooper())
-    
+
+    /** Activity 是否处于前台（resumed）。后台时不自动重启 ASR，避免拿不到麦克风。 */
+    @Volatile
+    private var isActivityResumed = false
+
     // ==================== 权限请求 ====================
     
     private val requestPermissionLauncher = registerForActivityResult(
@@ -594,7 +598,42 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     }
     
     // ==================== 生命周期管理 ====================
-    
+
+    /**
+     * 🔁 再次点悬浮球时（singleInstance 实例已存在）走这里，而不是 onCreate。
+     *
+     * 修复：之前未重写 onNewIntent，导致完成一次语音命令（如打开微信）后
+     * 再点悬浮球，窗口出来了却不重启 ASR，表现为“听不到说话”。
+     */
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Log.i(TAG, "🔁 onNewIntent：重新唤起语音对话，重启聚听")
+        // 清理上一轮文字，重新开始聚听
+        resultText.text = ""
+        responseText.text = ""
+        responseText.visibility = android.view.View.GONE
+        statusText.text = "请说话..."
+        voiceIndicator.text = "🔴"
+        // 延迟到 onResume 之后再重启，确保窗口已在前台能拿到麦克风
+        handler.postDelayed({
+            if (!isFinishing) voiceAdapter.restartListening()
+        }, 300)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isActivityResumed = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isActivityResumed = false
+        // 退到后台（如被微信覆盖）时停掉聚听，避免后台空跑 ASR；下次回前台由 onNewIntent 重启。
+        voiceAdapter.stop()
+        handler.removeCallbacksAndMessages(null)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
