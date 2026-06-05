@@ -6,6 +6,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 
@@ -33,6 +34,7 @@ internal class RealtimeVoiceWsClient(
     enum class Mode(val path: String, val label: String) {
         VirtualMic("/ws/voice/virtual-mic", "virtual_mic"),
         Transcribe("/ws/voice/transcribe", "transcribe"),
+        RealtimeChat("/ws/voice/realtime-chat", "realtime_chat"),
     }
 
     object Target {
@@ -51,6 +53,12 @@ internal class RealtimeVoiceWsClient(
         fun onAiDone(message: String, apkUrl: String?) {}
         /** AI 任务出错（对应 WsMessage.Error）。 */
         fun onAiError(message: String) {}
+        /** Realtime Chat：服务端回传的 PCM16 音频片段。 */
+        fun onRealtimeAudio(chunk: ByteArray) {}
+        /** Realtime Chat：检测到用户开始说话，通常用于清空 AI 播放缓冲。 */
+        fun onRealtimeSpeechStarted() {}
+        fun onRealtimeSpeechStopped() {}
+        fun onRealtimeResponseDone() {}
         fun onServerError(code: String, message: String) {}
         fun onClosed() {}
     }
@@ -93,6 +101,10 @@ internal class RealtimeVoiceWsClient(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 handleServerText(text)
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                listener.onRealtimeAudio(bytes.toByteArray())
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -164,6 +176,11 @@ internal class RealtimeVoiceWsClient(
                 obj.optString("message"),
                 obj.optString("apk_url").takeIf { it.isNotBlank() },
             )
+            "realtime_speech_started" -> listener.onRealtimeSpeechStarted()
+            "realtime_speech_stopped" -> listener.onRealtimeSpeechStopped()
+            "realtime_ai_transcript_delta" -> listener.onAiProgress(obj.optString("text"))
+            "realtime_ai_transcript_done" -> listener.onAiDone(obj.optString("text"), null)
+            "realtime_response_done" -> listener.onRealtimeResponseDone()
             "error" -> {
                 // "error" 既可能来自 ServerEvent（code+message），也可能来自 WsMessage（message）
                 val code = obj.optString("code")

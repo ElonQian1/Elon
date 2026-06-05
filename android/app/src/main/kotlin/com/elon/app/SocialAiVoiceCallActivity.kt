@@ -59,7 +59,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
 
     private lateinit var serverUrl: String
     private lateinit var userId: String
-    private lateinit var speaker: VoiceSpeaker
+    private lateinit var player: RealtimePcmPlayer
     private lateinit var statusText: TextView
     private lateinit var userTranscript: TextView
     private lateinit var aiTranscript: TextView
@@ -71,6 +71,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private var controller: RealtimeVoiceController? = null
     private var callState = CallState.Idle
     private var lastAiMessage = ""
+    private var audioOutputEnabled = true
 
     private val recordAudioPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -88,7 +89,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             ?: ServerUrlManager.getActive(this)
         userId = intent.getStringExtra(EXTRA_USER_ID)?.takeIf { it.isNotBlank() }
             ?: AuthManager.effectiveUserId(this)
-        speaker = VoiceSpeaker(this)
+        player = RealtimePcmPlayer().also { it.outputEnabled = audioOutputEnabled }
         applySystemBars()
         setContentView(buildContentView())
         setCallState(CallState.Idle)
@@ -99,7 +100,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     override fun onDestroy() {
         controller?.shutdown()
         controller = null
-        speaker.release()
+        player.release()
         super.onDestroy()
     }
 
@@ -327,7 +328,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
         when (callState) {
             CallState.Idle -> ensurePermissionAndStart()
             CallState.Listening -> Toast.makeText(this, "我一直听着，直接说就好", Toast.LENGTH_SHORT).show()
-            CallState.Processing -> Toast.makeText(this, "我正在想，等我一下", Toast.LENGTH_SHORT).show()
+            CallState.Processing -> Toast.makeText(this, "可以直接插话，我会听见", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -348,17 +349,19 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             statusText.text = "我在听，继续说"
             return
         }
-        speaker.stop()
+        if (!player.start()) {
+            Toast.makeText(this, "无法启动通话音频播放", Toast.LENGTH_SHORT).show()
+        }
+        player.clear()
         userTranscript.text = "正在听你说"
-        aiTranscript.text = "我在听"
+        aiTranscript.text = "我在这儿"
         setCallState(CallState.Listening)
         controller = RealtimeVoiceController(
             context = this,
             baseHttpUrl = serverUrl,
             userId = userId,
-            mode = RealtimeVoiceWsClient.Mode.Transcribe,
+            mode = RealtimeVoiceWsClient.Mode.RealtimeChat,
             target = RealtimeVoiceWsClient.Target.SocialAiDirect,
-            continuousAutoCommit = true,
             onTranscriptDelta = { text ->
                 runOnUiThread {
                     if (text.isNotBlank()) userTranscript.text = text
@@ -367,22 +370,14 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             onTranscriptFinal = { text ->
                 runOnUiThread {
                     if (text.isNotBlank()) userTranscript.text = text
-                    if (callState == CallState.Listening) statusText.text = "收到，我想一下"
-                }
-            },
-            onCliDispatched = { ok, _ ->
-                runOnUiThread {
-                    if (ok) {
-                        setCallState(CallState.Processing)
-                    } else {
-                        showFailure("这句话没有发出去，重试一下")
-                    }
+                    if (callState == CallState.Listening) statusText.text = "我听见了"
                 }
             },
             onAiProgress = { text ->
                 runOnUiThread {
                     if (text.isNotBlank()) aiTranscript.text = text
-                    statusText.text = "一龙AI 正在回你"
+                    setCallState(CallState.Processing)
+                    statusText.text = "一龙AI 正在说"
                 }
             },
             onAiDone = { message, _ ->
@@ -390,21 +385,35 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                     val reply = message.trim().ifBlank { "我在呢。" }
                     lastAiMessage = reply
                     aiTranscript.text = reply
-                    setCallState(CallState.Processing)
-                    statusText.text = "一龙AI 正在说"
-                    speaker.speak(reply) {
-                        runOnUiThread {
-                            controller?.resumeAutoListening()
-                            setCallState(CallState.Listening)
-                            statusText.text = "我在听，继续说"
-                        }
-                    }
+                    setCallState(CallState.Listening)
+                    statusText.text = "我在听，继续说"
                 }
             },
             onAiError = { message ->
                 runOnUiThread {
                     aiTranscript.text = "一龙AI 出错：${message.take(60)}"
                     controller?.resumeAutoListening()
+                    setCallState(CallState.Listening)
+                    statusText.text = "我在听，继续说"
+                }
+            },
+            onRealtimeAudio = { chunk ->
+                player.play(chunk)
+            },
+            onRealtimeSpeechStarted = {
+                runOnUiThread {
+                    player.clear()
+                    setCallState(CallState.Listening)
+                    statusText.text = "我在听，你说"
+                }
+            },
+            onRealtimeSpeechStopped = {
+                runOnUiThread {
+                    statusText.text = "我听见了"
+                }
+            },
+            onRealtimeResponseDone = {
+                runOnUiThread {
                     setCallState(CallState.Listening)
                     statusText.text = "我在听，继续说"
                 }
@@ -419,6 +428,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private fun finishTurn(nextStatus: String) {
         controller?.shutdown()
         controller = null
+        player.clear()
         setCallState(CallState.Idle)
         statusText.text = nextStatus
     }
@@ -430,15 +440,14 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     }
 
     private fun toggleSpeaker() {
-        val enabled = !VoiceSpeaker.isTtsEnabled(this)
-        VoiceSpeaker.setTtsEnabled(this, enabled)
+        audioOutputEnabled = !audioOutputEnabled
+        player.outputEnabled = audioOutputEnabled
+        if (!audioOutputEnabled) player.clear()
         updateSpeakerButton()
-        if (enabled && lastAiMessage.isNotBlank()) speaker.speak(lastAiMessage)
-        if (!enabled) speaker.stop()
     }
 
     private fun updateSpeakerButton() {
-        val enabled = VoiceSpeaker.isTtsEnabled(this)
+        val enabled = audioOutputEnabled
         speakerButton.setImageResource(
             if (enabled) R.drawable.ic_voice_call_speaker_on else R.drawable.ic_voice_call_speaker_off
         )

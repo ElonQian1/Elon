@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -124,7 +125,9 @@ class PersonalProfileActivity : AppCompatActivity() {
         rows.addView(UserProfileViews.divider(this))
         rows.addView(UserProfileViews.row(this, "账号", current.wechatId))
         rows.addView(UserProfileViews.divider(this))
-        rows.addView(UserProfileViews.row(this, "我的二维码", ""))
+        rows.addView(UserProfileViews.row(this, "我的二维码", "") {
+            startActivity(Intent(this, PersonalQrCodeActivity::class.java))
+        })
         rows.addView(UserProfileViews.spacer(this, 10))
         rows.addView(UserProfileViews.row(this, "地区", "未设置"))
         rows.addView(UserProfileViews.divider(this))

@@ -42,6 +42,10 @@ internal class RealtimeVoiceController(
     private val onAiProgress: (String) -> Unit = {},
     private val onAiDone: (String, String?) -> Unit = { _, _ -> },
     private val onAiError: (String) -> Unit = {},
+    private val onRealtimeAudio: (ByteArray) -> Unit = {},
+    private val onRealtimeSpeechStarted: () -> Unit = {},
+    private val onRealtimeSpeechStopped: () -> Unit = {},
+    private val onRealtimeResponseDone: () -> Unit = {},
     private val onError: (String) -> Unit = {},
 ) {
     private val recorder = RealtimePcmRecorder(
@@ -99,6 +103,14 @@ internal class RealtimeVoiceController(
                     this@RealtimeVoiceController.onAiError(message).also {
                         resumeAutoListening()
                     }
+                override fun onRealtimeAudio(chunk: ByteArray): Unit =
+                    this@RealtimeVoiceController.onRealtimeAudio(chunk)
+                override fun onRealtimeSpeechStarted(): Unit =
+                    this@RealtimeVoiceController.onRealtimeSpeechStarted()
+                override fun onRealtimeSpeechStopped(): Unit =
+                    this@RealtimeVoiceController.onRealtimeSpeechStopped()
+                override fun onRealtimeResponseDone(): Unit =
+                    this@RealtimeVoiceController.onRealtimeResponseDone()
 
                 override fun onServerError(code: String, message: String) {
                     onError("[$code] $message")
@@ -116,6 +128,10 @@ internal class RealtimeVoiceController(
 
     /** 一句话结束 → 触发 commit（转写完成 / 静音补尾）。 */
     fun commitUtterance() {
+        if (mode == RealtimeVoiceWsClient.Mode.RealtimeChat) {
+            ws?.commit()
+            return
+        }
         if (continuousAutoCommit) {
             commitAutoTurn()
             return
@@ -145,6 +161,10 @@ internal class RealtimeVoiceController(
     val isRecording: Boolean get() = recorder.isRecording
 
     private fun handlePcmChunk(chunk: ByteArray) {
+        if (mode == RealtimeVoiceWsClient.Mode.RealtimeChat) {
+            ws?.sendPcm(chunk)
+            return
+        }
         if (!continuousAutoCommit) {
             ws?.sendPcm(chunk)
             return

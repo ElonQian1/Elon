@@ -1,0 +1,229 @@
+//! 方案 C：`/ws/voice/realtime-chat` —— Android PCM ↔ OpenAI Realtime 语音对话。
+
+use axum::{
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
+    response::IntoResponse,
+};
+use futures::{SinkExt, StreamExt};
+use std::sync::Arc;
+use tracing::{info, warn};
+
+use crate::{
+    friend_events,
+    social_ai::realtime_social_ai_prompt,
+    store::{SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID},
+    types::AppState,
+    voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
+    voice_config::{RealtimeChatConfig, MAX_BUFFERED_BYTES},
+    voice_openai_realtime_chat::{RealtimeChatEvent, RealtimeChatSession},
+    voice_protocol::{ClientControl, ServerEvent, VOICE_TARGET_SOCIAL_AI_DIRECT},
+};
+
+pub async fn ws_realtime_chat_handler(
+    State(state): State<Arc<AppState>>,
+    ws: WebSocketUpgrade,
+) -> impl IntoResponse {
+    ws.on_upgrade(|socket| async move {
+        if let Err(err) = handle(state, socket).await {
+            warn!(target: "voice", "realtime chat 连接异常退出: {err:#}");
+        }
+    })
+}
+
+async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
+    let (mut sender, mut receiver) = socket.split();
+    let hello = match receiver.next().await {
+        Some(Ok(Message::Text(t))) => serde_json::from_str::<ClientControl>(&t).ok(),
+        _ => None,
+    };
+    let Some(ClientControl::Hello {
+        user_id,
+        target,
+        sample_rate,
+        channels,
+        ..
+    }) = hello
+    else {
+        let _ = sender
+            .send(Message::Text(
+                ServerEvent::Error {
+                    code: "bad_hello",
+                    message: "首帧必须是 hello 文本消息".into(),
+                }
+                .to_json(),
+            ))
+            .await;
+        return Ok(());
+    };
+    if target.as_deref() != Some(VOICE_TARGET_SOCIAL_AI_DIRECT) {
+        let _ = sender
+            .send(Message::Text(
+                ServerEvent::Error {
+                    code: "unsupported_target",
+                    message: "全双工实时通话暂只支持一龙AI私聊".into(),
+                }
+                .to_json(),
+            ))
+            .await;
+        return Ok(());
+    }
+    if let Err(msg) = check_format_declaration(sample_rate, channels) {
+        let _ = sender
+            .send(Message::Text(
+                ServerEvent::Error {
+                    code: "bad_format",
+                    message: msg,
+                }
+                .to_json(),
+            ))
+            .await;
+        return Ok(());
+    }
+
+    let history = state
+        .store
+        .list_recent_friend_messages_for_social_ai(&user_id, SOCIAL_AI_USER_ID, 12)
+        .unwrap_or_default();
+    let instructions = realtime_social_ai_prompt(&history);
+    let cfg = RealtimeChatConfig::from_env();
+    let mut session = match RealtimeChatSession::connect(&cfg, instructions).await {
+        Ok(session) => session,
+        Err(err) => {
+            let _ = sender
+                .send(Message::Text(
+                    ServerEvent::Error {
+                        code: "realtime_chat_connect",
+                        message: err.to_string(),
+                    }
+                    .to_json(),
+                ))
+                .await;
+            return Ok(());
+        }
+    };
+
+    let _ = sender
+        .send(Message::Text(
+            ServerEvent::Ready {
+                mode: "realtime_chat",
+            }
+            .to_json(),
+        ))
+        .await;
+    info!(target: "voice", user_id, "realtime chat 会话已建立");
+
+    loop {
+        tokio::select! {
+            biased;
+            client_msg = receiver.next() => {
+                let Some(msg) = client_msg else { break; };
+                match msg {
+                    Ok(Message::Binary(bytes)) => {
+                        match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
+                            PcmCheck::Ok => {
+                                if let Err(err) = session.append_pcm(bytes.to_vec()) {
+                                    warn!(target: "voice", "Realtime Chat 上行音频失败: {err:#}");
+                                    break;
+                                }
+                            }
+                            PcmCheck::OddBytes => {
+                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                    code: "odd_bytes",
+                                    message: "PCM16 帧字节数必须是偶数".into(),
+                                }.to_json())).await;
+                            }
+                            PcmCheck::TooLarge => {
+                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                    code: "too_large",
+                                    message: "单帧过大".into(),
+                                }.to_json())).await;
+                            }
+                        }
+                    }
+                    Ok(Message::Text(text)) => {
+                        match serde_json::from_str::<ClientControl>(&text).ok() {
+                            Some(ClientControl::Commit) => {
+                                let _ = session.commit();
+                            }
+                            Some(ClientControl::Close) | None => break,
+                            Some(ClientControl::Hello { .. }) => {}
+                        }
+                    }
+                    Ok(Message::Close(_)) | Err(_) => break,
+                    _ => {}
+                }
+            }
+            Some(event) = session.event_rx.recv() => {
+                match event {
+                    RealtimeChatEvent::SessionUpdated => {}
+                    RealtimeChatEvent::UserSpeechStarted => {
+                        let _ = sender.send(Message::Text(ServerEvent::RealtimeSpeechStarted.to_json())).await;
+                    }
+                    RealtimeChatEvent::UserSpeechStopped => {
+                        let _ = sender.send(Message::Text(ServerEvent::RealtimeSpeechStopped.to_json())).await;
+                    }
+                    RealtimeChatEvent::UserTranscriptDelta(text) => {
+                        let _ = sender.send(Message::Text(ServerEvent::TranscriptDelta { text }.to_json())).await;
+                    }
+                    RealtimeChatEvent::UserTranscriptFinal(text) => {
+                        let text = text.trim().to_string();
+                        if !text.is_empty() {
+                            store_user_voice_message(&state, &user_id, &text);
+                            let _ = sender.send(Message::Text(ServerEvent::TranscriptFinal { text }.to_json())).await;
+                        }
+                    }
+                    RealtimeChatEvent::AiTranscriptDelta(text) => {
+                        let _ = sender.send(Message::Text(ServerEvent::RealtimeAiTranscriptDelta { text }.to_json())).await;
+                    }
+                    RealtimeChatEvent::AiTranscriptDone(text) => {
+                        let text = text.trim().to_string();
+                        if !text.is_empty() {
+                            store_ai_voice_message(&state, &user_id, &text);
+                            let _ = sender.send(Message::Text(ServerEvent::RealtimeAiTranscriptDone { text }.to_json())).await;
+                        }
+                    }
+                    RealtimeChatEvent::AudioDelta(bytes) => {
+                        let _ = sender.send(Message::Binary(bytes)).await;
+                    }
+                    RealtimeChatEvent::AudioDone | RealtimeChatEvent::ResponseDone => {
+                        let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
+                    }
+                    RealtimeChatEvent::Error(message) => {
+                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                            code: "realtime_chat",
+                            message,
+                        }.to_json())).await;
+                    }
+                    RealtimeChatEvent::Closed => break,
+                }
+            }
+        }
+    }
+
+    session.close();
+    Ok(())
+}
+
+fn store_user_voice_message(state: &Arc<AppState>, user_id: &str, text: &str) {
+    match state
+        .store
+        .send_friend_message(user_id, SOCIAL_AI_USER_ID, text, None)
+    {
+        Ok(message) => friend_events::publish_friend_message(&message),
+        Err(err) => warn!(target: "voice", "保存用户实时语音消息失败: {err:#}"),
+    }
+}
+
+fn store_ai_voice_message(state: &Arc<AppState>, user_id: &str, text: &str) {
+    match state.store.insert_direct_social_ai_reply(user_id, text) {
+        Ok(message) => friend_events::publish_friend_message(&message),
+        Err(err) => warn!(
+            target: "voice",
+            ai = SOCIAL_AI_DISPLAY_NAME,
+            "保存一龙AI实时语音回复失败: {err:#}"
+        ),
+    }
+}

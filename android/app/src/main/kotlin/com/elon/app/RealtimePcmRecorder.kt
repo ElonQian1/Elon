@@ -3,6 +3,9 @@ package com.elon.app
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +37,9 @@ internal class RealtimePcmRecorder(
 
     private var audioRecord: AudioRecord? = null
     private var captureJob: Job? = null
+    private var acousticEchoCanceler: AcousticEchoCanceler? = null
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var automaticGainControl: AutomaticGainControl? = null
 
     @Volatile
     var isRecording: Boolean = false
@@ -56,7 +62,7 @@ internal class RealtimePcmRecorder(
 
         val recorder = try {
             AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 SAMPLE_RATE_HZ,
                 channelConfig,
                 audioFormat,
@@ -73,6 +79,7 @@ internal class RealtimePcmRecorder(
         }
 
         audioRecord = recorder
+        attachAudioEffects(recorder.audioSessionId)
         isRecording = true
         recorder.startRecording()
 
@@ -118,5 +125,48 @@ internal class RealtimePcmRecorder(
         runCatching { audioRecord?.stop() }
         runCatching { audioRecord?.release() }
         audioRecord = null
+        releaseAudioEffects()
+    }
+
+    private fun attachAudioEffects(sessionId: Int) {
+        releaseAudioEffects()
+        if (sessionId <= 0) return
+        acousticEchoCanceler = createEffect(
+            available = AcousticEchoCanceler.isAvailable(),
+            create = { AcousticEchoCanceler.create(sessionId) },
+            name = "AEC",
+        )
+        noiseSuppressor = createEffect(
+            available = NoiseSuppressor.isAvailable(),
+            create = { NoiseSuppressor.create(sessionId) },
+            name = "NS",
+        )
+        automaticGainControl = createEffect(
+            available = AutomaticGainControl.isAvailable(),
+            create = { AutomaticGainControl.create(sessionId) },
+            name = "AGC",
+        )
+    }
+
+    private fun <T> createEffect(available: Boolean, create: () -> T?, name: String): T? {
+        if (!available) return null
+        return runCatching {
+            create()?.also { effect ->
+                when (effect) {
+                    is AcousticEchoCanceler -> effect.enabled = true
+                    is NoiseSuppressor -> effect.enabled = true
+                    is AutomaticGainControl -> effect.enabled = true
+                }
+            }
+        }.onFailure { Log.w(TAG, "启用 $name 失败", it) }.getOrNull()
+    }
+
+    private fun releaseAudioEffects() {
+        runCatching { acousticEchoCanceler?.release() }
+        runCatching { noiseSuppressor?.release() }
+        runCatching { automaticGainControl?.release() }
+        acousticEchoCanceler = null
+        noiseSuppressor = null
+        automaticGainControl = null
     }
 }

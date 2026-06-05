@@ -64,6 +64,10 @@ internal object UserProfileStore {
             .apply()
     }
 
+    fun personalQrPayload(context: Context): String {
+        return AuthManager.effectiveUserId(context)
+    }
+
     fun avatarInitial(name: String): String =
         name.trim().firstOrNull()?.toString()?.ifBlank { "我" } ?: "我"
 
