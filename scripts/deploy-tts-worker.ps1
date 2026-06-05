@@ -19,6 +19,7 @@ if (-not $gitRoot) {
 $RepoRoot = $gitRoot.Trim()
 $LocalWorkerDir = Join-Path $RepoRoot "server\tts_worker"
 $RemoteWorkerDir = "$RemoteRoot/server/tts_worker"
+$RemoteVenvDir = "$RemoteRoot/.runtime/tts-worker/venv"
 
 if (-not (Test-Path (Join-Path $LocalWorkerDir "edge_tts_worker.py"))) {
     Write-Error "Missing local worker files: $LocalWorkerDir"
@@ -50,6 +51,7 @@ set -euo pipefail
 
 REMOTE_ROOT='$RemoteRoot'
 WORKER_DIR='$RemoteWorkerDir'
+VENV_DIR='$RemoteVenvDir'
 PORT='$Port'
 RESTART_MAIN='$restartMain'
 
@@ -58,9 +60,13 @@ unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 export NO_PROXY='127.0.0.1,localhost'
 export no_proxy='127.0.0.1,localhost'
 export PIP_CONFIG_FILE=/dev/null
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
-.venv/bin/python -m pip install --no-cache-dir --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com -r requirements.txt
+mkdir -p "`$(dirname "`$VENV_DIR")"
+if [ -d "`$WORKER_DIR/.venv" ]; then
+    rm -rf "`$WORKER_DIR/.venv"
+fi
+python3 -m venv "`$VENV_DIR"
+"`$VENV_DIR/bin/python" -m pip install --upgrade pip --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com
+"`$VENV_DIR/bin/python" -m pip install --no-cache-dir --index-url http://mirrors.tencentyun.com/pypi/simple --trusted-host mirrors.tencentyun.com -r requirements.txt
 
 cat >/etc/systemd/system/elon-tts-worker.service <<UNIT
 [Unit]
@@ -74,7 +80,7 @@ User=root
 WorkingDirectory=$RemoteWorkerDir
 Environment=ELON_TTS_WORKER_HOST=127.0.0.1
 Environment=ELON_TTS_WORKER_PORT=$Port
-ExecStart=$RemoteWorkerDir/.venv/bin/python -m uvicorn edge_tts_worker:app --host 127.0.0.1 --port $Port
+ExecStart=$RemoteVenvDir/bin/python -m uvicorn edge_tts_worker:app --host 127.0.0.1 --port $Port
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:/root/elon-tts-worker.log
