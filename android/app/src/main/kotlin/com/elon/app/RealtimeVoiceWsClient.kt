@@ -63,6 +63,9 @@ internal class RealtimeVoiceWsClient(
     private var ws: WebSocket? = null
 
     @Volatile
+    private var closeRequested: Boolean = false
+
+    @Volatile
     var isOpen: Boolean = false
         private set
 
@@ -72,6 +75,7 @@ internal class RealtimeVoiceWsClient(
             .replaceFirst(Regex("^https://"), "wss://")
             .trimEnd('/') + mode.path
         val req = Request.Builder().url(wsUrl).build()
+        closeRequested = false
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 isOpen = true
@@ -93,6 +97,7 @@ internal class RealtimeVoiceWsClient(
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 isOpen = false
+                closeRequested = true
                 webSocket.close(1000, null)
             }
 
@@ -106,6 +111,10 @@ internal class RealtimeVoiceWsClient(
                 isOpen = false
                 shutdownOkHttp()
                 Log.w("RealtimeVoiceWs", "ws failure", t)
+                if (closeRequested) {
+                    listener.onClosed()
+                    return
+                }
                 val detail = t.message
                     ?: t.javaClass.simpleName.takeIf { it.isNotBlank() }
                     ?: "连接异常"
@@ -127,6 +136,7 @@ internal class RealtimeVoiceWsClient(
         val current = ws
         ws = null
         isOpen = false
+        closeRequested = true
         runCatching { current?.send("""{"type":"close"}""") }
         runCatching { current?.close(1000, "client close") }
         shutdownOkHttp()
