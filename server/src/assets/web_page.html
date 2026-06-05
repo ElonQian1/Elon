@@ -769,29 +769,36 @@
     .modal-mask.active { display: flex; }
     .modal {
       background: var(--popup-panel-bg);
-      border-radius: 10px;
-      padding: 24px 22px;
+      border: 1px solid rgba(242, 245, 250, 0.06);
+      border-radius: 12px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+      padding: 24px;
       width: 100%; max-width: 420px;
       display: grid; gap: 14px;
     }
-    .modal h2 { margin: 0; font-size: 17px; color: var(--ink); font-weight: normal; }
+    .modal h2 { margin: 0; font-size: 22px; color: var(--ink); font-weight: 700; }
     .modal label { display: block; font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
     .modal input, .modal textarea, .modal select {
       width: 100%;
-      background: var(--panel-3);
+      background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 8px;
       color: var(--ink-strong);
-      padding: 9px 12px;
+      padding: 11px 12px;
       outline: none;
       font-size: 14px;
     }
+    .modal input::placeholder, .modal textarea::placeholder { color: var(--ink-faint); }
+    .modal input:focus, .modal textarea:focus, .modal select:focus {
+      border-color: rgba(88, 190, 106, 0.72);
+      box-shadow: 0 0 0 2px rgba(88, 190, 106, 0.14);
+    }
     .modal textarea { min-height: 72px; resize: vertical; }
-    .modal .actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal .actions { display: flex; gap: 12px; justify-content: flex-end; }
     .modal .btn-cancel, .modal .btn-confirm {
-      height: 38px; padding: 0 16px;
-      border: 0; border-radius: 6px;
-      font-size: 14px; cursor: pointer;
+      height: 44px; padding: 0 18px;
+      border: 0; border-radius: 8px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
     }
     .modal .btn-cancel { background: var(--panel-3); color: var(--ink); }
     .modal .btn-confirm { background: var(--brand); color: var(--brand-ink); }
