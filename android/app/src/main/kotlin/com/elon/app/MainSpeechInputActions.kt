@@ -426,13 +426,13 @@ internal class MainSpeechInputActions(
             projectId = null
             conversationId = null
             target = RealtimeVoiceWsClient.Target.SocialAiDirect
-            socialAiVoiceSpeaker().stop()
         } else {
             val project = activeProject()
             projectId = project.id.takeIf { it.isNotBlank() } ?: return false
             conversationId = activeConversation().id
             target = null
         }
+        realtimeVoiceSpeaker?.stop()
 
         isHoldActive = true
         isSpeechCanceled = false
@@ -468,9 +468,10 @@ internal class MainSpeechInputActions(
                 activity.runOnUiThread {
                     voiceHoldButton().text = "按住 说话"
                     if (directSocialAi) {
-                        socialAiVoiceSpeaker().speak(message)
+                        realtimeSpeaker().speak(message)
                     } else {
                         Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
+                        realtimeSpeaker().speak(message)
                     }
                 }
                 realtimeController = null
@@ -495,7 +496,7 @@ internal class MainSpeechInputActions(
         return true
     }
 
-    private fun socialAiVoiceSpeaker(): VoiceSpeaker {
+    private fun realtimeSpeaker(): VoiceSpeaker {
         return realtimeVoiceSpeaker ?: VoiceSpeaker(activity).also {
             realtimeVoiceSpeaker = it
         }

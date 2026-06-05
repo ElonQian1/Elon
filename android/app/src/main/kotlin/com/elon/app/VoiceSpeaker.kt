@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import android.util.Log
 import java.util.Locale
 import java.util.UUID
@@ -13,6 +14,7 @@ import java.util.UUID
  *
  * 用途：AI 完成回复后，通过系统语音引擎朗读回复文本。
  * 语言：简体中文（zh-CN），不可用时回退系统默认语言。
+ * 情感：按文本内容选择轻量情感档位，映射到系统 TTS 的语速和音高。
  *
  * 生命周期：与 MainSpeechInputActions 保持一致，在 destroy() 时调用 [release]。
  */
@@ -40,8 +42,10 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     private var ready = false
     private var pendingText: String? = null
+    private var pendingProfile: VoiceTtsProfile? = null
     private var pendingDone: (() -> Unit)? = null
     private var activeDone: (() -> Unit)? = null
+    private var preferredVoiceApplied = false
 
     /** 上一条 utterance 是否还在播放（用于打断判断）。 */
     val isSpeaking: Boolean get() = tts?.isSpeaking == true
@@ -57,8 +61,8 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
             Log.w(TAG, "zh-CN 不可用，使用系统默认语言")
             engine.setLanguage(Locale.getDefault())
         }
-        engine.setSpeechRate(1.05f)  // 稍微快一点更自然
-        engine.setPitch(1.0f)
+        applyPreferredVoice(engine)
+        applyProfile(engine, VoiceTtsEmotion.profileFor(""))
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
             override fun onDone(utteranceId: String?) {
@@ -71,10 +75,12 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         })
         ready = true
         pendingText?.let { text ->
+            val profile = pendingProfile
             val done = pendingDone
             pendingText = null
+            pendingProfile = null
             pendingDone = null
-            speak(text, done)
+            speak(text, profile, done)
         }
         Log.d(TAG, "TTS 初始化成功")
     }
@@ -83,7 +89,11 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
      * 朗读文本。若上一条还在朗读，立即打断并播放新内容（QUEUE_FLUSH）。
      * 超长文本截断到 [MAX_SPEAK_CHARS] 字符，避免朗读时间过长。
      */
-    fun speak(text: String, onDone: (() -> Unit)? = null) {
+    fun speak(
+        text: String,
+        profile: VoiceTtsProfile? = null,
+        onDone: (() -> Unit)? = null
+    ) {
         if (!isTtsEnabled(appContext)) {
             onDone?.invoke()
             return
@@ -96,12 +106,15 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         val engine = tts
         if (!ready || engine == null) {
             pendingText = content
+            pendingProfile = profile
             pendingDone = onDone
             return
         }
         pendingText = null
+        pendingProfile = null
         pendingDone = null
         activeDone = onDone
+        applyProfile(engine, profile ?: VoiceTtsEmotion.profileFor(content))
         val params = Bundle()
         val result = engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
         if (result == TextToSpeech.ERROR) finishSpeakCallback()
@@ -110,6 +123,7 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     /** 立即停止当前朗读（用户开始新一轮语音输入时调用）。 */
     fun stop() {
         pendingText = null
+        pendingProfile = null
         pendingDone = null
         activeDone = null
         if (tts?.isSpeaking == true) tts?.stop()
@@ -118,17 +132,54 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     /** 释放资源（Activity onDestroy）。 */
     fun release() {
         pendingText = null
+        pendingProfile = null
         pendingDone = null
         activeDone = null
         tts?.stop()
         tts?.shutdown()
         tts = null
         ready = false
+        preferredVoiceApplied = false
     }
 
     private fun finishSpeakCallback() {
         val callback = activeDone
         activeDone = null
         callback?.invoke()
+    }
+
+    private fun applyProfile(engine: TextToSpeech, profile: VoiceTtsProfile) {
+        engine.setSpeechRate(profile.speechRate)
+        engine.setPitch(profile.pitch)
+        Log.d(TAG, "TTS profile=${profile.id} rate=${profile.speechRate} pitch=${profile.pitch}")
+    }
+
+    private fun applyPreferredVoice(engine: TextToSpeech) {
+        if (preferredVoiceApplied) return
+        preferredVoiceApplied = true
+        val selected = engine.voices
+            ?.filter { it.locale.language == Locale.CHINESE.language }
+            ?.maxByOrNull(::voiceScore)
+            ?: return
+        runCatching {
+            engine.voice = selected
+            Log.d(TAG, "TTS voice=${selected.name}")
+        }.onFailure { error ->
+            Log.w(TAG, "设置 TTS voice 失败: ${error.message}")
+        }
+    }
+
+    private fun voiceScore(voice: Voice): Int {
+        val name = voice.name.lowercase(Locale.ROOT)
+        var score = 0
+        if (voice.locale.country.equals(Locale.CHINA.country, ignoreCase = true)) score += 20
+        if (voice.locale.script.equals(Locale.SIMPLIFIED_CHINESE.script, ignoreCase = true)) score += 10
+        if (voice.isNetworkConnectionRequired) score -= 8
+        if (name.contains("female") || name.contains("woman") || name.contains("girl")) score += 35
+        if (name.contains("xia") || name.contains("xiao") || name.contains("mei")) score += 18
+        if (name.contains("male") || name.contains("man")) score -= 30
+        score += voice.quality / 10
+        score -= voice.latency / 20
+        return score
     }
 }
