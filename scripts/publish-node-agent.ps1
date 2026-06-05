@@ -23,19 +23,40 @@ $Bin = "elon-node-agent"
 
 Write-Host "=== elon-node-agent 构建 + 发布 ===" -ForegroundColor Cyan
 
+# 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
+$ServerDir = Join-Path $PSScriptRoot "..\server"
+Push-Location $ServerDir
+try {
+    $meta = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+    $TargetDir = $meta.target_directory
+} finally { Pop-Location }
+if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
+Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
+
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
 Write-Host "[1/4] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
 Push-Location (Join-Path $PSScriptRoot "..\server")
 try {
-    $env:RUSTFLAGS = "-C target-cpu=x86-64"
-    cargo build --release --bin $Bin --target x86_64-unknown-linux-musl
+    # musl 交叉编译需要 C 工具链（ring 依赖 gcc）；用 cargo-zigbuild 提供 zig cc，
+    # 与 publish-server.ps1 同方案，避免缺少 x86_64-linux-musl-gcc 时编译失败。
+    $hasZigbuild = $null -ne (Get-Command "cargo-zigbuild" -ErrorAction SilentlyContinue)
+    if (-not $hasZigbuild) { $hasZigbuild = $null -ne (cargo zigbuild --version 2>$null) }
+    if (-not $hasZigbuild) {
+        Write-Host "  安装 cargo-zigbuild..." -ForegroundColor Yellow
+        cargo install cargo-zigbuild
+        if ($LASTEXITCODE -ne 0) { throw "cargo-zigbuild 安装失败（需先安装 zig 并加入 PATH）" }
+    }
+    # 强制通用 CPU，避免全局 target-cpu=native 产出服务器/他人机器无法运行的指令
+    $unitSeparator = [char]0x1f
+    $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+    cargo zigbuild --release --bin $Bin --target x86_64-unknown-linux-musl
     if ($LASTEXITCODE -ne 0) { throw "Linux 编译失败" }
 } finally {
-    Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
+    Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
     Pop-Location
 }
 
-$LinuxBin = Join-Path $PSScriptRoot "..\server\target\x86_64-unknown-linux-musl\release\$Bin"
+$LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
 if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
 
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
@@ -48,7 +69,7 @@ try {
     Pop-Location
 }
 
-$WinBin = Join-Path $PSScriptRoot "..\server\target\release\$Bin.exe"
+$WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
