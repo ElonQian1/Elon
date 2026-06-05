@@ -77,15 +77,45 @@
   <h1>elon-node-agent 本地管理</h1>
   <div id="connStatus" class="status off">加载中…</div>
 
+  <h3>登录</h3>
+  <div class="card">
+    <div id="loggedOut">
+      <p style="font-size:13px;color:#8b949e;margin-top:0">
+        只需登录一次。登录后节点会自动注册并记住凭证，以后启动无需任何配置。
+      </p>
+      <div class="form-row">
+        <label>账号（手机号 / 邮箱）</label>
+        <input id="loginAccount" placeholder="你的 elon 账号" autocomplete="username" />
+      </div>
+      <div class="form-row">
+        <label>密码</label>
+        <input id="loginPassword" type="password" placeholder="你的 elon 密码" autocomplete="current-password" />
+      </div>
+      <button id="loginBtn" onclick="doLogin()">登录并连接</button>
+      <div id="loginResult"></div>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-size:12px;color:#8b949e">高级：直接粘贴 token 登录</summary>
+        <div class="form-row" style="margin-top:8px">
+          <input id="loginToken" placeholder="粘贴 elon 登录 token" />
+        </div>
+        <button onclick="doLoginToken()" style="background:#30363d">用 token 登录</button>
+      </details>
+    </div>
+    <div id="loggedIn" style="display:none">
+      <div class="ok-toast" style="margin:0">
+        ✅ 已登录，节点 ID: <code id="loggedInAgent">-</code>
+        <button onclick="doLogout()" style="background:#6e2630;float:right;padding:4px 12px;font-size:12px">登出</button>
+      </div>
+    </div>
+  </div>
+
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
 
   <h3>注册本地项目（绑定到本 PC 节点）</h3>
   <div class="card">
     <div id="tokenWarn" class="warn" style="display:none">
-      ⚠️ 未配置 <code>NODE_USER_TOKEN</code>，无法注册项目。<br />
-      解决：从 APK 登录后获取 token，重启 node-agent 前设置：<br />
-      <code>$env:NODE_USER_TOKEN = "你的 token"</code>
+      ⚠️ 尚未登录，无法注册项目。请先在上方「登录」卡片用账号密码登录。
     </div>
     <div class="form-row">
       <label>项目名称（同名复用现有）</label>
@@ -113,14 +143,14 @@
     <tbody></tbody>
   </table>
 
-  <h3>环境变量参考</h3>
+  <h3>环境变量参考（高级，普通用户无需配置）</h3>
   <pre>
+登录后所有凭证自动持久化到本地，普通用户不用设置任何变量。以下仅供高级/服务器场景：
+
 NODE_CLOUD_URL       云端 WebSocket 地址（默认 ws://43.139.149.158:8080/agent/ws）
-NODE_CLOUD_HTTP_URL  云端 HTTP 地址（默认从 NODE_CLOUD_URL 派生）
-NODE_AGENT_ID        本节点唯一 ID（必填）
-NODE_AGENT_SECRET    认证密钥 64 字符 hex（必填）
-NODE_OWNER_USER_ID   你的 elon 用户 ID（必填）
-NODE_USER_TOKEN      你的 elon 登录 token（注册外部项目需要）
+NODE_USER_TOKEN      登录 token：设置后首次启动自动注册，免去网页登录
+NODE_AGENT_ID        手动指定节点 ID（搭配 NODE_AGENT_SECRET 跳过自动注册）
+NODE_AGENT_SECRET    手动指定密钥
 NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
 NODE_LM_STUDIO_URL   LM Studio 地址（可选）
 NODE_CUSTOM_LLM_URL  自定义 OpenAI 兼容地址（可选）
@@ -135,12 +165,21 @@ async function load() {
   const s = document.getElementById('connStatus');
   s.className = 'status ' + (r.connected ? 'on' : 'off');
   s.textContent = (r.connected ? '🟢 已连接到云端' : '🔴 未连接到云端') + ' — ' + (r.last_event || '');
+
+  // 登录状态
+  document.getElementById('loggedOut').style.display = r.logged_in ? 'none' : 'block';
+  document.getElementById('loggedIn').style.display = r.logged_in ? 'block' : 'none';
+  if (r.logged_in) {
+    document.getElementById('loggedInAgent').textContent = r.agent_id || '-';
+  }
+
   const cfg = document.getElementById('cfg');
   cfg.innerHTML = '';
   const rows = [
-    ['版本', r.version], ['Agent ID', r.agent_id], ['Owner User', r.owner_user_id],
-    ['云端 WS', r.cloud_url], ['云端 HTTP', r.cloud_http_url],
-    ['用户 Token', r.user_token_configured ? '✅ 已配置' : '❌ 未配置 (NODE_USER_TOKEN)'],
+    ['版本', r.version],
+    ['登录状态', r.logged_in ? '✅ 已登录' : '❌ 未登录'],
+    ['节点 ID', r.agent_id || '(登录后自动生成)'],
+    ['云端', r.cloud_url],
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],
     ['自定义 LLM', r.custom_url || '(未配置)'],
@@ -149,8 +188,8 @@ async function load() {
   for (const [k, v] of rows) {
     cfg.innerHTML += `<div class="label">${k}</div><div class="val">${v ?? ''}</div>`;
   }
-  document.getElementById('tokenWarn').style.display = r.user_token_configured ? 'none' : 'block';
-  document.getElementById('regBtn').disabled = !r.user_token_configured;
+  document.getElementById('tokenWarn').style.display = r.logged_in ? 'none' : 'block';
+  document.getElementById('regBtn').disabled = !r.logged_in;
 
   const tbody = document.querySelector('#models tbody');
   tbody.innerHTML = '';
@@ -161,6 +200,49 @@ async function load() {
       tbody.innerHTML += `<tr><td><code>${m.model_id}</code></td><td>${m.provider}</td><td>${m.price_per_1k_credits}</td></tr>`;
     }
   }
+}
+
+async function postLogin(payload, btn, out) {
+  out.innerHTML = '';
+  if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '登录中…'; }
+  try {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const j = await resp.json();
+    if (resp.ok && j.ok) {
+      out.innerHTML = `<div class="ok-toast">✅ 登录成功，节点 ID: <code>${j.agent_id || '?'}</code>，正在连接云端…</div>`;
+      setTimeout(load, 800);
+    } else {
+      out.innerHTML = `<div class="err-toast">❌ ${j.error || ('HTTP ' + resp.status)}</div>`;
+    }
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${e}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.t || '登录'; }
+  }
+}
+
+function doLogin() {
+  const account = document.getElementById('loginAccount').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const out = document.getElementById('loginResult');
+  if (!account || !password) { out.innerHTML = '<div class="err-toast">请填写账号和密码</div>'; return; }
+  postLogin({ account, password }, document.getElementById('loginBtn'), out);
+}
+
+function doLoginToken() {
+  const token = document.getElementById('loginToken').value.trim();
+  const out = document.getElementById('loginResult');
+  if (!token) { out.innerHTML = '<div class="err-toast">请粘贴 token</div>'; return; }
+  postLogin({ token }, null, out);
+}
+
+async function doLogout() {
+  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  setTimeout(load, 300);
 }
 
 async function registerProject() {

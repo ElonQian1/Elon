@@ -1,54 +1,49 @@
 //! elon-node-agent：用户 PC 端节点代理，将本机 LLM 算力贡献给 elon 平台。
 //!
-//! ## 使用方法
+//! ## 使用方法（普通用户：零配置）
+//!
+//! 1. 双击启动器（或直接运行 `elon-node-agent`），它会启动本地管理页 http://127.0.0.1:7799/
+//! 2. 在管理页用 **账号 + 密码** 登录一次（也可直接粘贴 token）
+//! 3. 节点自动向云端注册，生成 agent_id + secret 并持久化到本地配置文件
+//! 4. 之后每次启动自动读取凭证、自动连接，无需再配置
+//!
+//! ## 高级用户（可选环境变量覆盖）
 //!
 //! ```bash
-//! # Linux / macOS
-//! export NODE_CLOUD_URL=ws://43.139.149.158:8080/agent/ws
-//! export NODE_AGENT_ID=my-pc-node-1
-//! export NODE_AGENT_SECRET=<64字符随机hex>
-//! export NODE_OWNER_USER_ID=<你的 elon 用户 ID>
-//! export NODE_OLLAMA_URL=http://localhost:11434   # 可选，默认值即此
-//! ./elon-node-agent
-//!
-//! # Windows PowerShell
-//! $env:NODE_CLOUD_URL = "ws://43.139.149.158:8080/agent/ws"
-//! $env:NODE_AGENT_ID = "my-pc-node-1"
-//! $env:NODE_AGENT_SECRET = "<64字符随机hex>"
-//! $env:NODE_OWNER_USER_ID = "<你的 elon 用户 ID>"
-//! .\elon-node-agent.exe
+//! NODE_CLOUD_URL       云端 WebSocket 地址（默认 ws://43.139.149.158:8080/agent/ws）
+//! NODE_USER_TOKEN      登录 token：设置后首次启动自动注册，无需网页登录
+//! NODE_AGENT_ID        手动指定节点 ID（搭配 NODE_AGENT_SECRET 跳过自动注册）
+//! NODE_AGENT_SECRET    手动指定密钥
+//! NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
 //! ```
 //!
 //! ## 工作流
 //!
 //! 1. 启动后扫描本机 Ollama / LM Studio / 自定义 OpenAI-compatible 端口
-//! 2. 连接云端 /agent/ws，发送 Register + RegisterCapabilities
+//! 2. 有凭证 → 连接云端 /agent/ws，发送 Register + RegisterCapabilities
 //! 3. 监听 LlmStreamRequest，转发给本地 LLM，流式返回 LlmStreamChunk + LlmStreamEnd
-//! 4. 断线后自动重连（指数退避 2s ~ 60s）
+//! 4. 断线后自动重连（指数退避 2s ~ 60s）；未登录时等待网页登录
 
 use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, ModelCapability, ServerToAgent, PROTO_VERSION};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
 
+/// 静态运行配置（云端地址、本地模型地址、价格），均有合理默认值，普通用户无需配置。
 #[derive(Clone)]
 struct NodeConfig {
     cloud_url: String,
-    /// 云端 HTTP/HTTPS 地址（用于 REST API 调用，如注册外部项目）。
+    /// 云端 HTTP/HTTPS 地址（用于 REST API 调用，如登录、注册节点、注册外部项目）。
     /// 默认从 cloud_url 派生：ws://X → http://X，wss://X → https://X。
     cloud_http_url: String,
-    agent_id: String,
-    agent_secret: String,
-    owner_user_id: String,
-    /// 可选：你的 elon 登录 token（用于本地 Web 管理页代理调用云端 API，例如注册外部项目）
-    user_token: Option<String>,
     /// 本地 Ollama 地址
     ollama_url: String,
     /// 可选：LM Studio 地址
@@ -57,6 +52,25 @@ struct NodeConfig {
     custom_url: Option<String>,
     /// 每 1k tokens 收取的平台积分（默认 0.1）
     price_per_1k: f64,
+}
+
+/// 节点凭证：由「一次登录」自动换取并持久化，普通用户永远不用手动填。
+#[derive(Clone)]
+struct Credentials {
+    agent_id: String,
+    agent_secret: String,
+    owner_user_id: String,
+    /// 用户的 elon 登录 token（用于代理调用云端 API，例如注册外部项目）
+    user_token: Option<String>,
+}
+
+/// 持久化到磁盘的状态（`%APPDATA%\elon-node-agent\node.json` / `~/.config/elon-node-agent/node.json`）。
+#[derive(Default, Serialize, Deserialize)]
+struct PersistedState {
+    agent_id: Option<String>,
+    agent_secret: Option<String>,
+    owner_user_id: Option<String>,
+    user_token: Option<String>,
 }
 
 fn derive_http_url(ws_url: &str) -> String {
@@ -69,19 +83,147 @@ fn derive_http_url(ws_url: &str) -> String {
     }
 }
 
+/// 本机名，作为节点 label / 登录设备名。
+fn machine_label() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "pc".into())
+}
+
+/// 凭证持久化文件路径。
+fn state_path() -> PathBuf {
+    let base = if cfg!(windows) {
+        std::env::var("APPDATA").ok().map(PathBuf::from)
+    } else {
+        std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .map(PathBuf::from)
+            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
+    };
+    base.unwrap_or_else(|| PathBuf::from("."))
+        .join("elon-node-agent")
+        .join("node.json")
+}
+
+fn load_persisted() -> PersistedState {
+    std::fs::read_to_string(state_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_persisted(s: &PersistedState) {
+    let p = state_path();
+    if let Some(dir) = p.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(json) = serde_json::to_string_pretty(s) {
+        let _ = std::fs::write(&p, json);
+    }
+}
+
+impl PersistedState {
+    fn from_creds(c: &Credentials) -> Self {
+        Self {
+            agent_id: Some(c.agent_id.clone()),
+            agent_secret: Some(c.agent_secret.clone()),
+            owner_user_id: Some(c.owner_user_id.clone()),
+            user_token: c.user_token.clone(),
+        }
+    }
+}
+
+/// 从环境变量 / 持久化文件解析已有凭证；都没有时返回 None（需登录）。
+/// 环境变量优先（供高级用户/服务器覆盖），否则用上次持久化的结果。
+fn initial_credentials(persisted: &PersistedState) -> Option<Credentials> {
+    let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let agent_id = env_nonempty("NODE_AGENT_ID").or_else(|| persisted.agent_id.clone())?;
+    let agent_secret = env_nonempty("NODE_AGENT_SECRET").or_else(|| persisted.agent_secret.clone())?;
+    let owner_user_id = env_nonempty("NODE_OWNER_USER_ID")
+        .or_else(|| persisted.owner_user_id.clone())
+        .unwrap_or_default();
+    let user_token = env_nonempty("NODE_USER_TOKEN").or_else(|| persisted.user_token.clone());
+    Some(Credentials { agent_id, agent_secret, owner_user_id, user_token })
+}
+
+/// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
+async fn provision_node(cfg: &NodeConfig, token: &str) -> Result<Credentials> {
+    let url = format!("{}/api/me/nodes/register", cfg.cloud_http_url.trim_end_matches('/'));
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .unwrap_or_default();
+    let resp = client
+        .post(&url)
+        .bearer_auth(token)
+        .json(&serde_json::json!({ "label": machine_label() }))
+        .send()
+        .await?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("注册节点失败 {}: {}", status, body));
+    }
+    let j: serde_json::Value = resp.json().await?;
+    let agent_id = j
+        .get("agent_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("响应缺少 agent_id"))?
+        .to_string();
+    let agent_secret = j
+        .get("agent_secret")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("响应缺少 agent_secret"))?
+        .to_string();
+    let owner_user_id = j
+        .get("owner_user_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    Ok(Credentials {
+        agent_id,
+        agent_secret,
+        owner_user_id,
+        user_token: Some(token.to_string()),
+    })
+}
+
+/// 账号 + 密码登录云端，换取 token。
+async fn cloud_login(cfg: &NodeConfig, account: &str, password: &str) -> Result<String> {
+    let url = format!("{}/api/auth/login", cfg.cloud_http_url.trim_end_matches('/'));
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .unwrap_or_default();
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({
+            "account": account,
+            "password": password,
+            "device_name": machine_label(),
+        }))
+        .send()
+        .await?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(anyhow!("登录失败 {}: {}", status, body));
+    }
+    let j: serde_json::Value = resp.json().await?;
+    j.get("token")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| anyhow!("登录响应缺少 token"))
+}
+
 impl NodeConfig {
     fn from_env() -> Result<Self> {
         let cloud_url = std::env::var("NODE_CLOUD_URL")
             .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".into());
         let cloud_http_url = std::env::var("NODE_CLOUD_HTTP_URL")
             .unwrap_or_else(|_| derive_http_url(&cloud_url));
-        let agent_id = std::env::var("NODE_AGENT_ID")
-            .map_err(|_| anyhow!("必须设置 NODE_AGENT_ID 环境变量"))?;
-        let agent_secret = std::env::var("NODE_AGENT_SECRET")
-            .map_err(|_| anyhow!("必须设置 NODE_AGENT_SECRET 环境变量"))?;
-        let owner_user_id = std::env::var("NODE_OWNER_USER_ID")
-            .map_err(|_| anyhow!("必须设置 NODE_OWNER_USER_ID（你的 elon 用户 ID）"))?;
-        let user_token = std::env::var("NODE_USER_TOKEN").ok().filter(|v| !v.is_empty());
         let ollama_url = std::env::var("NODE_OLLAMA_URL")
             .unwrap_or_else(|_| "http://localhost:11434".into());
         let lm_studio_url = std::env::var("NODE_LM_STUDIO_URL").ok().filter(|v| !v.is_empty());
@@ -94,10 +236,6 @@ impl NodeConfig {
         Ok(Self {
             cloud_url,
             cloud_http_url,
-            agent_id,
-            agent_secret,
-            owner_user_id,
-            user_token,
             ollama_url,
             lm_studio_url,
             custom_url,
@@ -375,12 +513,16 @@ fn ws_text(msg: &AgentToServer) -> Message {
 
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
-async fn run_session(cfg: &NodeConfig) -> Result<()> {
+async fn run_session(
+    cfg: &NodeConfig,
+    creds: &Credentials,
+    runtime: &Arc<NodeRuntime>,
+) -> Result<()> {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     let mut request = cfg.cloud_url.as_str().into_client_request()?;
     request
         .headers_mut()
-        .insert("Authorization", format!("Bearer {}", cfg.agent_secret).parse()?);
+        .insert("Authorization", format!("Bearer {}", creds.agent_secret).parse()?);
 
     let (ws_stream, _) = connect_async(request).await?;
     info!("✅ 已连接到云端: {}", cfg.cloud_url);
@@ -413,13 +555,14 @@ async fn run_session(cfg: &NodeConfig) -> Result<()> {
 
     // 发送 Register
     out_tx.send(ws_text(&AgentToServer::Register {
-        agent_id: cfg.agent_id.clone(),
+        agent_id: creds.agent_id.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: PROTO_VERSION,
         allowed_clis: vec![],
         allowed_cwds: vec![],
-        owner_user_id: Some(cfg.owner_user_id.clone()),
+        owner_user_id: Some(creds.owner_user_id.clone()),
     }))?;
+    runtime.set_connected(true, "已连接，贡献算力中").await;
 
     // 发送 RegisterCapabilities
     out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
@@ -440,10 +583,19 @@ async fn run_session(cfg: &NodeConfig) -> Result<()> {
 
     let cfg_r = cfg.clone();
     let out_tx_r = out_tx.clone();
-    // 读取服务器消息
+    // 读取服务器消息；同时监听凭证变更（登录/登出）以便重连或断开
     let read_result: Result<()> = async {
-        while let Some(frame) = ws_read.next().await {
-            let frame = frame.map_err(|e| anyhow!("ws read: {e}"))?;
+        loop {
+            let frame = tokio::select! {
+                _ = runtime.wake.notified() => {
+                    info!("凭证已变更，断开当前会话以应用新状态");
+                    break;
+                }
+                frame = ws_read.next() => match frame {
+                    Some(f) => f.map_err(|e| anyhow!("ws read: {e}"))?,
+                    None => break,
+                },
+            };
             match frame {
                 Message::Text(t) => {
                     let msg: ServerToAgent = match serde_json::from_str(&t) {
@@ -489,13 +641,23 @@ async fn run_session(cfg: &NodeConfig) -> Result<()> {
     read_result
 }
 
-async fn run_loop(cfg: NodeConfig, runtime: Arc<NodeRuntime>) {
+async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
+        let creds = match runtime.creds().await {
+            Some(c) => c,
+            None => {
+                runtime
+                    .set_connected(false, "未登录：请在管理页登录后开始贡献算力")
+                    .await;
+                // 等待登录事件唤醒（带 2s 超时轮询，避免错过通知）
+                let _ = tokio::time::timeout(Duration::from_secs(2), runtime.wake.notified()).await;
+                continue;
+            }
+        };
         runtime.set_connected(false, "连接中…").await;
-        match run_session(&cfg).await {
+        match run_session(&runtime.cfg, &creds, &runtime).await {
             Ok(()) => {
-                info!("连接正常断开，{:.1}s 后重连", backoff.as_secs_f32());
                 runtime.set_connected(false, "已断开，等待重连").await;
                 backoff = Duration::from_secs(2);
             }
@@ -521,15 +683,47 @@ async fn main() -> Result<()> {
         .init();
 
     let cfg = NodeConfig::from_env()?;
-    info!("🚀 elon-node-agent {} 启动 (agent_id: {})", env!("CARGO_PKG_VERSION"), cfg.agent_id);
+    let persisted = load_persisted();
+    let mut creds = initial_credentials(&persisted);
+
+    // 有登录 token 但还没有节点凭证 → 自动注册一次
+    if creds.is_none() {
+        let token = std::env::var("NODE_USER_TOKEN")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .or_else(|| persisted.user_token.clone());
+        if let Some(tok) = token {
+            info!("检测到登录 token，正在自动注册节点…");
+            match provision_node(&cfg, &tok).await {
+                Ok(c) => {
+                    info!("✅ 节点已自动注册: {}", c.agent_id);
+                    save_persisted(&PersistedState::from_creds(&c));
+                    creds = Some(c);
+                }
+                Err(e) => warn!("自动注册失败（可在管理页重新登录）: {e:#}"),
+            }
+        }
+    }
+
+    match &creds {
+        Some(c) => info!(
+            "🚀 elon-node-agent {} 启动 (agent_id: {})",
+            env!("CARGO_PKG_VERSION"),
+            c.agent_id
+        ),
+        None => info!(
+            "🚀 elon-node-agent {} 启动（未登录，请打开管理页 http://127.0.0.1:7799/ 登录）",
+            env!("CARGO_PKG_VERSION")
+        ),
+    }
     info!("   云端: {}", cfg.cloud_url);
     info!("   Ollama: {}", cfg.ollama_url);
     info!("   积分价格: {} credits/1k tokens", cfg.price_per_1k);
 
-    let runtime = Arc::new(NodeRuntime::new(cfg.clone()));
+    let runtime = Arc::new(NodeRuntime::new(cfg, creds));
     spawn_admin_server(runtime.clone());
 
-    run_loop(cfg, runtime).await;
+    run_loop(runtime).await;
     Ok(())
 }
 
@@ -544,12 +738,34 @@ struct NodeStatus {
 
 struct NodeRuntime {
     cfg: NodeConfig,
+    creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
+    /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
+    wake: Notify,
 }
 
 impl NodeRuntime {
-    fn new(cfg: NodeConfig) -> Self {
-        Self { cfg, status: RwLock::new(NodeStatus::default()) }
+    fn new(cfg: NodeConfig, creds: Option<Credentials>) -> Self {
+        Self {
+            cfg,
+            creds: RwLock::new(creds),
+            status: RwLock::new(NodeStatus::default()),
+            wake: Notify::new(),
+        }
+    }
+
+    async fn creds(&self) -> Option<Credentials> {
+        self.creds.read().await.clone()
+    }
+
+    /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
+    async fn set_creds(&self, c: Option<Credentials>) {
+        match &c {
+            Some(c) => save_persisted(&PersistedState::from_creds(c)),
+            None => save_persisted(&PersistedState::default()),
+        }
+        *self.creds.write().await = c;
+        self.wake.notify_waiters();
     }
 
     async fn set_connected(&self, on: bool, evt: &str) {
@@ -573,6 +789,8 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
         let app = axum::Router::new()
             .route("/", axum::routing::get(admin_index))
             .route("/api/status", axum::routing::get(admin_status))
+            .route("/api/login", axum::routing::post(admin_login))
+            .route("/api/logout", axum::routing::post(admin_logout))
             .route("/api/register-project", axum::routing::post(admin_register_project))
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
@@ -596,14 +814,16 @@ async fn admin_status(
 ) -> axum::Json<serde_json::Value> {
     let live = discover_models(&rt.cfg).await;
     rt.set_models(live.clone()).await;
+    let creds = rt.creds().await;
     let st = rt.status.read().await;
     axum::Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "agent_id": rt.cfg.agent_id,
-        "owner_user_id": rt.cfg.owner_user_id,
+        "logged_in": creds.is_some(),
+        "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
+        "owner_user_id": creds.as_ref().map(|c| c.owner_user_id.clone()),
+        "user_token_configured": creds.as_ref().map(|c| c.user_token.is_some()).unwrap_or(false),
         "cloud_url": rt.cfg.cloud_url,
         "cloud_http_url": rt.cfg.cloud_http_url,
-        "user_token_configured": rt.cfg.user_token.is_some(),
         "ollama_url": rt.cfg.ollama_url,
         "lm_studio_url": rt.cfg.lm_studio_url,
         "custom_url": rt.cfg.custom_url,
@@ -612,6 +832,72 @@ async fn admin_status(
         "last_event": st.last_event,
         "models": live,
     }))
+}
+
+#[derive(Deserialize)]
+struct AdminLoginReq {
+    /// 账号（手机号/邮箱），搭配 password 登录
+    account: Option<String>,
+    password: Option<String>,
+    /// 或直接粘贴已有的 elon 登录 token
+    token: Option<String>,
+}
+
+/// 本地管理页 → 登录并自动注册节点。
+/// 流程：账号+密码换 token（或直接用粘贴的 token）→ 调用云端注册节点拿 agent_id+secret → 持久化 → 唤醒重连。
+async fn admin_login(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<AdminLoginReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    // 1) 取得 token：优先直接粘贴的 token，否则账号+密码登录
+    let token = if let Some(t) = req.token.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+        t
+    } else {
+        let account = req.account.unwrap_or_default();
+        let account = account.trim();
+        let password = req.password.unwrap_or_default();
+        if account.is_empty() || password.is_empty() {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({ "ok": false, "error": "请填写账号和密码，或直接粘贴 token" })),
+            );
+        }
+        match cloud_login(&rt.cfg, account, &password).await {
+            Ok(t) => t,
+            Err(e) => {
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    axum::Json(serde_json::json!({ "ok": false, "error": format!("登录失败: {e}") })),
+                );
+            }
+        }
+    };
+
+    // 2) 用 token 注册/换取节点凭证
+    match provision_node(&rt.cfg, &token).await {
+        Ok(c) => {
+            let agent_id = c.agent_id.clone();
+            rt.set_creds(Some(c)).await;
+            (
+                StatusCode::OK,
+                axum::Json(serde_json::json!({ "ok": true, "agent_id": agent_id })),
+            )
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            axum::Json(serde_json::json!({ "ok": false, "error": format!("注册节点失败: {e}") })),
+        ),
+    }
+}
+
+/// 本地管理页 → 登出：清除本地凭证并断开。
+async fn admin_logout(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    rt.set_creds(None).await;
+    (axum::http::StatusCode::OK, axum::Json(serde_json::json!({ "ok": true })))
 }
 
 #[derive(Deserialize)]
@@ -658,15 +944,27 @@ async fn admin_register_project(
         );
     }
 
-    // 2) 必须有 token 才能调用云端
-    let token = match rt.cfg.user_token.as_ref() {
+    // 2) 必须已登录（有凭证 + token）才能调用云端
+    let creds = match rt.creds().await {
+        Some(c) => c,
+        None => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": "尚未登录，请先在页面顶部用账号密码登录。",
+                })),
+            );
+        }
+    };
+    let token = match creds.user_token.as_ref() {
         Some(t) => t.clone(),
         None => {
             return (
                 StatusCode::UNAUTHORIZED,
                 axum::Json(serde_json::json!({
                     "ok": false,
-                    "error": "未配置 NODE_USER_TOKEN 环境变量。请在 APK 登录后从『我的』→『设置』复制 token 到 PC 节点启动环境中。",
+                    "error": "当前节点凭证不含登录 token，请在页面顶部重新登录。",
                 })),
             );
         }
@@ -678,7 +976,7 @@ async fn admin_register_project(
         "name": name,
         "workspace_path": path,
         "description": req.description,
-        "node_id": rt.cfg.agent_id,
+        "node_id": creds.agent_id,
     });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))

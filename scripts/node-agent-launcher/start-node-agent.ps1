@@ -57,14 +57,7 @@ if (Test-PortOpen $port) {
     return
 }
 
-# ── 未运行 → 校验配置 + 找 exe + 启动 ────────────────────────────────────────
-foreach ($req in 'NODE_AGENT_ID', 'NODE_AGENT_SECRET', 'NODE_OWNER_USER_ID') {
-    if (-not [Environment]::GetEnvironmentVariable($req, 'Process')) {
-        Show-Msg "缺少必填配置：$req`n`n请编辑同目录的 node-agent.env 后重试。`n（首次使用：把 node-agent.env.example 复制为 node-agent.env 并填写）"
-        return
-    }
-}
-
+# ── 未运行 → 找 exe + 启动（无需任何凭证，登录在网页里完成）─────────────────
 $exe = $env:NODE_AGENT_EXE
 if (-not $exe -or -not (Test-Path $exe)) {
     $exe = Join-Path $here 'elon-node-agent.exe'
