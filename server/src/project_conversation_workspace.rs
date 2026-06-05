@@ -168,8 +168,12 @@ pub(crate) fn merge_conversation_worktree(
     std::thread::spawn(move || {
         // 先 remove worktree（git 会取消注册并删除目录）
         let _ = Command::new("git")
-            .args(["worktree", "remove", "--force",
-                  &active_for_cleanup.to_string_lossy()])
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                &active_for_cleanup.to_string_lossy(),
+            ])
             .current_dir(&base_for_cleanup)
             .output();
         // 删除已合并的会话分支

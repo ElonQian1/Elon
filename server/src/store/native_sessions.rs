@@ -1,7 +1,7 @@
 use anyhow::Result;
-use rusqlite::{OptionalExtension, params};
+use rusqlite::{params, OptionalExtension};
 
-use super::{NativeAgentSessionState, Store, new_id, now, safe_external_id};
+use super::{new_id, now, safe_external_id, NativeAgentSessionState, Store};
 
 impl Store {
     pub fn get_native_agent_session(

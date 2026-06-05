@@ -66,7 +66,11 @@ pub fn settle_after_stream(
         match state.store.settle_node_inference(params) {
             Ok(tx) => tracing::debug!(
                 "💰 节点积分结算: {} → {} | {}+{} tokens | {:.4} credits",
-                consumer, provider, prompt_tokens, completion_tokens, tx.settled_credits
+                consumer,
+                provider,
+                prompt_tokens,
+                completion_tokens,
+                tx.settled_credits
             ),
             Err(e) => tracing::error!("节点积分结算失败: {e}"),
         }

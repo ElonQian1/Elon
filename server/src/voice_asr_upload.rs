@@ -25,8 +25,7 @@ use tracing::{info, warn};
 use crate::{
     project_auth::{auth_from_headers, json_error},
     types::AppState,
-    voice_whisper_local,
-    voice_whisper_rest,
+    voice_whisper_local, voice_whisper_rest,
 };
 
 #[derive(Serialize)]
@@ -75,7 +74,10 @@ pub async fn asr_upload_handler(
                 match field.bytes().await {
                     Ok(b) => {
                         if b.len() > MAX_AUDIO_BYTES {
-                            return json_error(StatusCode::PAYLOAD_TOO_LARGE, "音频文件过大（最大 10 MB）");
+                            return json_error(
+                                StatusCode::PAYLOAD_TOO_LARGE,
+                                "音频文件过大（最大 10 MB）",
+                            );
                         }
                         audio_bytes = Some(b.to_vec());
                     }
@@ -134,17 +136,23 @@ pub async fn asr_upload_handler(
 
     // 优先级：本地 Whisper → OpenAI Whisper REST
     let text = transcribe_audio(
-        &state, &audio, &mime_hint,
+        &state,
+        &audio,
+        &mime_hint,
         language_override.as_deref(),
         beam_size_override,
         vad_filter_override,
         condition_on_previous_override,
-    ).await;
+    )
+    .await;
 
     match text {
         Ok(t) if t.trim().is_empty() => {
             // Whisper 返回空串：可能是纯噪声/静音，不算错误
-            Json(AsrResponse { text: String::new() }).into_response()
+            Json(AsrResponse {
+                text: String::new(),
+            })
+            .into_response()
         }
         Ok(t) => {
             info!(target: "voice_asr", "ASR 转写成功：{}", &t[..t.len().min(80)]);
@@ -152,7 +160,10 @@ pub async fn asr_upload_handler(
         }
         Err(e) => {
             warn!(target: "voice_asr", "ASR 转写失败: {e:#}");
-            json_error(StatusCode::SERVICE_UNAVAILABLE, &format!("语音识别服务暂不可用：{e}"))
+            json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &format!("语音识别服务暂不可用：{e}"),
+            )
         }
     }
 }
@@ -178,9 +189,15 @@ async fn transcribe_audio(
         if let Some(lang) = language {
             cfg.language = lang.to_string();
         }
-        if let Some(v) = beam_size { cfg.beam_size = v; }
-        if let Some(v) = vad_filter { cfg.vad_filter = v; }
-        if let Some(v) = condition_on_previous_text { cfg.condition_on_previous_text = v; }
+        if let Some(v) = beam_size {
+            cfg.beam_size = v;
+        }
+        if let Some(v) = vad_filter {
+            cfg.vad_filter = v;
+        }
+        if let Some(v) = condition_on_previous_text {
+            cfg.condition_on_previous_text = v;
+        }
         match transcribe_raw_via_local_whisper(&cfg, audio, mime).await {
             Ok(t) => return Ok(t),
             Err(e) => {

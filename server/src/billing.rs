@@ -28,9 +28,7 @@ fn model_price(model: &str) -> (f64, f64, f64) {
         (0.25, 0.03, 1.25)
     } else if m.contains("claude-opus-4") || m.contains("claude-opus") {
         (15.0, 1.5, 75.0)
-    } else if m.contains("claude-sonnet-4")
-        || m.contains("claude-3-7")
-        || m.contains("claude-3.7")
+    } else if m.contains("claude-sonnet-4") || m.contains("claude-3-7") || m.contains("claude-3.7")
     {
         (3.0, 0.3, 15.0)
     } else if m.contains("claude-3-5-sonnet") || m.contains("claude-3.5-sonnet") {
@@ -140,7 +138,16 @@ pub fn deduct_from_response(store: &Store, user_id: &str, model: &str, response:
         return;
     }
 
-    match store.billing_deduct(user_id, cost_fen, Some(model), input, cached, output, rate, markup) {
+    match store.billing_deduct(
+        user_id,
+        cost_fen,
+        Some(model),
+        input,
+        cached,
+        output,
+        rate,
+        markup,
+    ) {
         Ok(new_balance) => {
             // 低余额警告（低于阈值推送 WS 通知）
             let threshold = store

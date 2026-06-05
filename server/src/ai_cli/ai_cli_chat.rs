@@ -2,11 +2,15 @@ use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
+use super::{
+    ai_cli_process::{configured_timeout_cap, is_cli_timeout_error},
+    ai_cli_trace::record_lightweight_chat_fallback,
+    IntentGateResult,
+};
 use crate::{
     intent_router,
     types::{AppState, WsMessage},
 };
-use super::{IntentGateResult, ai_cli_process::{configured_timeout_cap, is_cli_timeout_error}, ai_cli_trace::record_lightweight_chat_fallback};
 
 const DEFAULT_CHAT_TIMEOUT_CAP_SECS: u64 = 30;
 pub(crate) const DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS: u64 = 8;

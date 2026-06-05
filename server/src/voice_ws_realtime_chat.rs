@@ -19,7 +19,9 @@ use crate::{
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
     voice_config::{RealtimeChatConfig, MAX_BUFFERED_BYTES},
     voice_openai_realtime_chat::{RealtimeChatEvent, RealtimeChatSession},
-    voice_protocol::{ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL, VOICE_TARGET_SOCIAL_AI_DIRECT},
+    voice_protocol::{
+        ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL, VOICE_TARGET_SOCIAL_AI_DIRECT,
+    },
 };
 
 pub async fn ws_realtime_chat_handler(

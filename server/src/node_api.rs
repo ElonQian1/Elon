@@ -9,7 +9,12 @@
 //! - `GET  /api/me/node-balance`       查询本用户作为节点提供者的积分余额
 //! - `GET  /api/me/node-transactions`  查询最近积分流水（最多 50 条）
 
-use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use sha2::Digest as _;
 use std::sync::Arc;
 
@@ -25,7 +30,11 @@ pub async fn list_nodes(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     if let Err(e) = auth_from_headers(&state, &headers) {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error": e.to_string()}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response();
     }
     let nodes = state.node_registry.list_online().await;
     Json(serde_json::json!({ "nodes": nodes })).into_response()
@@ -39,9 +48,7 @@ struct AvailableModelsResp {
 }
 
 /// GET /api/nodes/models — 当前可用的 LLM 模型列表（无需登录）
-pub async fn list_available_models(
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+pub async fn list_available_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let models = state.node_registry.available_models().await;
     Json(AvailableModelsResp { models }).into_response()
 }
@@ -87,19 +94,27 @@ pub async fn register_node(
     };
 
     // 生成随机 agent_id 和 secret
-    let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "").chars().take(8).collect::<String>();
-    let agent_id = format!("node-{}-{}", &user.id.chars().take(6).collect::<String>(), random_suffix);
+    let random_suffix = uuid::Uuid::new_v4()
+        .to_string()
+        .replace('-', "")
+        .chars()
+        .take(8)
+        .collect::<String>();
+    let agent_id = format!(
+        "node-{}-{}",
+        &user.id.chars().take(6).collect::<String>(),
+        random_suffix
+    );
     let agent_secret = uuid::Uuid::new_v4().to_string().replace('-', "")
         + &uuid::Uuid::new_v4().to_string().replace('-', "");
 
     // 存储 secret 的 SHA-256 hash
     let secret_hash = hex::encode(sha2::Sha256::digest(agent_secret.as_bytes()));
-    if let Err(e) = state.store.create_node_credential(
-        &agent_id,
-        &secret_hash,
-        &user.id,
-        req.label.as_deref(),
-    ) {
+    if let Err(e) =
+        state
+            .store
+            .create_node_credential(&agent_id, &secret_hash, &user.id, req.label.as_deref())
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("创建凭证失败: {e}")})),
@@ -149,13 +164,20 @@ pub async fn my_node_balance(
 
     let balance = match state.store.get_node_balance(&user.id) {
         Ok(v) => v,
-        Err(e) => return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        ).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
     };
     let lifetime_earned = state.store.get_lifetime_earned(&user.id).unwrap_or(0.0);
-    Json(NodeBalanceResp { balance, lifetime_earned }).into_response()
+    Json(NodeBalanceResp {
+        balance,
+        lifetime_earned,
+    })
+    .into_response()
 }
 
 // ── /api/me/node-transactions ─────────────────────────────────────────────────
@@ -187,10 +209,7 @@ pub async fn my_node_transactions(
 }
 
 /// GET /api/me/nodes — 本用户自己的节点列表（含在线状态）
-pub async fn my_nodes(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
+pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) -> impl IntoResponse {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
         Err(e) => {

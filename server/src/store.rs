@@ -7,6 +7,8 @@ use std::{
 
 use crate::store_schema::apply_migrations;
 
+mod admin_stats;
+mod billing;
 mod build_quota;
 mod common;
 mod conversations;
@@ -15,6 +17,7 @@ mod friends;
 mod groups;
 mod join_requests;
 mod native_sessions;
+mod node_ledger;
 mod project_member_conversations;
 mod project_space;
 mod projects;
@@ -24,31 +27,30 @@ mod social_ai_selected;
 mod store_types;
 mod tasks;
 mod token_usage;
-mod users;
-mod node_ledger;
 mod user_memories;
-mod admin_stats;
-mod billing;
+mod users;
 
+pub use admin_stats::{
+    estimate_cost_cny, AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary,
+    AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
+};
+pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
-pub use token_usage::{TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals};
 pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
-pub use user_memories::UserMemory;
-pub use store_types::JoinRequestRecord;
-pub use admin_stats::{
-    AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary, AdminTrendRow,
-    AdminUserDetail, AdminUserUsageRow, UserQuota, estimate_cost_cny,
-};
-pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_FRIEND_ACCOUNT,
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 pub(crate) use social_ai_pending::SocialAiPendingMention;
+pub use store_types::JoinRequestRecord;
 pub use store_types::*;
+pub use token_usage::{
+    TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals,
+};
+pub use user_memories::UserMemory;
 
 pub struct Store {
     conn: Mutex<Connection>,
@@ -247,7 +249,17 @@ impl Store {
                 status, created_by, created_at, updated_at
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', ?8, ?9, ?9)",
-            params![id, name, description, workspace_key, template, source_type, workspace_path, user_id, now],
+            params![
+                id,
+                name,
+                description,
+                workspace_key,
+                template,
+                source_type,
+                workspace_path,
+                user_id,
+                now
+            ],
         )?;
         tx.execute(
             "INSERT INTO project_members (project_id, user_id, role, created_at)

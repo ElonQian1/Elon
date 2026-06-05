@@ -14,8 +14,7 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{
-        client::IntoClientRequest, http::header::HeaderValue,
-        protocol::Message as TgMessage,
+        client::IntoClientRequest, http::header::HeaderValue, protocol::Message as TgMessage,
     },
 };
 
@@ -105,9 +104,9 @@ impl RealtimeTranscriber {
                             .to_string(),
                         )
                     }
-                    UplinkCommand::Commit => TgMessage::Text(
-                        json!({"type": "input_audio_buffer.commit"}).to_string(),
-                    ),
+                    UplinkCommand::Commit => {
+                        TgMessage::Text(json!({"type": "input_audio_buffer.commit"}).to_string())
+                    }
                     UplinkCommand::Close => {
                         let _ = write.send(TgMessage::Close(None)).await;
                         break;
@@ -133,14 +132,12 @@ impl RealtimeTranscriber {
                 match kind {
                     k if k.ends_with("transcription.delta") => {
                         if let Some(delta) = v.get("delta").and_then(Value::as_str) {
-                            let _ = tx_event_recv
-                                .send(TranscriptEvent::Delta(delta.to_string()));
+                            let _ = tx_event_recv.send(TranscriptEvent::Delta(delta.to_string()));
                         }
                     }
                     k if k.ends_with("transcription.completed") => {
                         if let Some(text) = v.get("transcript").and_then(Value::as_str) {
-                            let _ = tx_event_recv
-                                .send(TranscriptEvent::Final(text.to_string()));
+                            let _ = tx_event_recv.send(TranscriptEvent::Final(text.to_string()));
                         }
                     }
                     "error" => {

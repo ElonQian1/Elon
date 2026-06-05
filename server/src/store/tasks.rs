@@ -1,10 +1,11 @@
 use anyhow::Result;
-use rusqlite::{OptionalExtension, params};
+use rusqlite::{params, OptionalExtension};
 
-use super::{MAX_TASK_EVENTS_PER_TASK, Store, TaskSnapshot, clean_optional, new_id, now, safe_external_id};
+use super::{
+    clean_optional, new_id, now, safe_external_id, Store, TaskSnapshot, MAX_TASK_EVENTS_PER_TASK,
+};
 
 impl Store {
-
     pub fn create_task(
         &self,
         project_id: &str,
@@ -268,10 +269,7 @@ impl Store {
 
     /// 获取项目的构建缓存：`Some((git_sha, apk_url))`。
     /// 若 last_build_sha 或 last_build_apk_url 任一为空则返回 None。
-    pub fn get_project_build_cache(
-        &self,
-        project_id: &str,
-    ) -> Result<Option<(String, String)>> {
+    pub fn get_project_build_cache(&self, project_id: &str) -> Result<Option<(String, String)>> {
         self.conn()?
             .query_row(
                 "SELECT last_build_sha, last_build_apk_url \
@@ -313,7 +311,6 @@ impl Store {
         )?;
         Ok(count > 0)
     }
-
 }
 
 #[cfg(test)]

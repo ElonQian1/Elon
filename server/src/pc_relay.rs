@@ -51,20 +51,14 @@ pub async fn pc_relay_handler(
         .headers()
         .iter()
         .filter(|(k, _)| !skip_headers.contains(&k.as_str()))
-        .filter_map(|(k, v)| {
-            v.to_str().ok().map(|v| (k.to_string(), v.to_string()))
-        })
+        .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_string())))
         .collect();
 
     // 读取 body（限制 32 MB）
     let body_bytes = match axum::body::to_bytes(req.into_body(), 32 * 1024 * 1024).await {
         Ok(b) => b,
         Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                format!("body read error: {e}"),
-            )
-                .into_response();
+            return (StatusCode::BAD_REQUEST, format!("body read error: {e}")).into_response();
         }
     };
     let body_b64 = if body_bytes.is_empty() {
@@ -94,10 +88,7 @@ pub async fn pc_relay_handler(
 
             let mut response = Response::builder().status(status_code);
             for (k, v) in &resp_headers {
-                if let (Ok(name), Ok(val)) = (
-                    k.parse::<HeaderName>(),
-                    v.parse::<HeaderValue>(),
-                ) {
+                if let (Ok(name), Ok(val)) = (k.parse::<HeaderName>(), v.parse::<HeaderValue>()) {
                     response = response.header(name, val);
                 }
             }
@@ -110,7 +101,11 @@ pub async fn pc_relay_handler(
             format!("PC relay error: {message}"),
         )
             .into_response(),
-        Ok(_) => (StatusCode::INTERNAL_SERVER_ERROR, "unexpected relay response").into_response(),
+        Ok(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unexpected relay response",
+        )
+            .into_response(),
         Err(e) => {
             let body = format!("{{\"error\":\"PC 未在线或连接超时: {e}\"}}");
             (

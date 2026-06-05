@@ -53,8 +53,8 @@ impl Store {
     /// 返回 `None` 表示该用户尚未开通计费，应放行。
     pub fn billing_get_balance(&self, user_id: &str) -> Result<Option<i64>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare_cached("SELECT balance_fen FROM user_balance WHERE user_id = ?1")?;
+        let mut stmt =
+            conn.prepare_cached("SELECT balance_fen FROM user_balance WHERE user_id = ?1")?;
         let mut rows = stmt.query(params![user_id])?;
         match rows.next()? {
             Some(row) => Ok(Some(row.get(0)?)),
@@ -157,7 +157,15 @@ impl Store {
             r#"INSERT INTO recharge_records
                (id, user_id, amount_fen, method, operator_id, note, created_at)
                VALUES (?1,?2,?3,?4,?5,?6,?7)"#,
-            params![record_id, user_id, amount_fen, method, operator_id, note, ts],
+            params![
+                record_id,
+                user_id,
+                amount_fen,
+                method,
+                operator_id,
+                note,
+                ts
+            ],
         )?;
         tx.commit()?;
         Ok(new_balance)
@@ -221,8 +229,7 @@ impl Store {
     /// 读取计费配置项。
     pub fn billing_get_config(&self, key: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn
-            .prepare_cached("SELECT value FROM billing_config WHERE key = ?1")?;
+        let mut stmt = conn.prepare_cached("SELECT value FROM billing_config WHERE key = ?1")?;
         let mut rows = stmt.query(params![key])?;
         match rows.next()? {
             Some(row) => Ok(Some(row.get(0)?)),
@@ -380,7 +387,12 @@ impl Store {
     // ── 微信支付订单 ──────────────────────────────────────────────────────────
 
     /// 创建待支付订单记录。
-    pub fn pay_order_create(&self, out_trade_no: &str, user_id: &str, amount_fen: i64) -> Result<()> {
+    pub fn pay_order_create(
+        &self,
+        out_trade_no: &str,
+        user_id: &str,
+        amount_fen: i64,
+    ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT OR IGNORE INTO wechat_pay_orders
@@ -394,30 +406,36 @@ impl Store {
     /// 查询订单（out_trade_no → user_id + amount_fen + status）。
     pub fn pay_order_find(&self, out_trade_no: &str) -> Result<Option<(String, i64, String)>> {
         let conn = self.conn.lock().unwrap();
-        let row = conn.query_row(
-            "SELECT user_id, amount_fen, status FROM wechat_pay_orders WHERE out_trade_no = ?1",
-            params![out_trade_no],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?, r.get::<_, String>(2)?)),
-        ).ok();
+        let row = conn
+            .query_row(
+                "SELECT user_id, amount_fen, status FROM wechat_pay_orders WHERE out_trade_no = ?1",
+                params![out_trade_no],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, i64>(1)?,
+                        r.get::<_, String>(2)?,
+                    ))
+                },
+            )
+            .ok();
         Ok(row)
     }
 
     /// 将订单标记为已支付，同时为用户充值。
     /// 幂等：status 已是 'paid' 时直接返回 Ok，不重复充值。
-    pub fn pay_order_complete(
-        &self,
-        out_trade_no: &str,
-        wechat_tx_id: &str,
-    ) -> Result<()> {
+    pub fn pay_order_complete(&self, out_trade_no: &str, wechat_tx_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
 
         // 查订单
-        let row: Option<(String, i64, String)> = tx.query_row(
-            "SELECT user_id, amount_fen, status FROM wechat_pay_orders WHERE out_trade_no = ?1",
-            params![out_trade_no],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        ).ok();
+        let row: Option<(String, i64, String)> = tx
+            .query_row(
+                "SELECT user_id, amount_fen, status FROM wechat_pay_orders WHERE out_trade_no = ?1",
+                params![out_trade_no],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .ok();
 
         let (user_id, amount_fen, status) = match row {
             Some(r) => r,
@@ -462,9 +480,12 @@ impl Store {
     }
 
     /// 分页查询用户的支付订单（最新在前）。
-    pub fn pay_orders_list_user(&self, user_id: &str, size: i64, offset: i64)
-        -> Result<Vec<serde_json::Value>>
-    {
+    pub fn pay_orders_list_user(
+        &self,
+        user_id: &str,
+        size: i64,
+        offset: i64,
+    ) -> Result<Vec<serde_json::Value>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare_cached(
             "SELECT out_trade_no, amount_fen, status, wechat_tx_id, created_at, updated_at
@@ -489,5 +510,3 @@ impl Store {
         Ok(rows)
     }
 }
-
-

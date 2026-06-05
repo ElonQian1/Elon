@@ -105,7 +105,15 @@ impl Store {
             "INSERT INTO user_memories
              (id, user_id, content, category, importance, source_conv_id, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
-            params![id, user_id, content, category, importance, source_conv_id, ts],
+            params![
+                id,
+                user_id,
+                content,
+                category,
+                importance,
+                source_conv_id,
+                ts
+            ],
         )?;
         // 超出上限时删最低 importance 的条目（在同一连接内，避免 Mutex 重入）
         conn.execute(

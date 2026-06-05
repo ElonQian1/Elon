@@ -181,7 +181,8 @@ impl Store {
                 created_at: row.get(10)?,
             })
         })?;
-        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
     }
 
     /// 注册一个新节点凭证（存 secret 的 SHA-256 hash，不存明文）。
@@ -196,7 +197,13 @@ impl Store {
         conn.execute(
             "INSERT INTO node_credentials (agent_id, secret_hash, owner_user_id, label, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![agent_id, secret_hash, owner_user_id, label.unwrap_or(""), now()],
+            params![
+                agent_id,
+                secret_hash,
+                owner_user_id,
+                label.unwrap_or(""),
+                now()
+            ],
         )?;
         Ok(())
     }
@@ -243,6 +250,7 @@ impl Store {
                 created_at: row.get(3)?,
             })
         })?;
-        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
     }
 }

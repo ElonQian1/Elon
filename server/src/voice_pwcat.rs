@@ -49,10 +49,7 @@ impl PwcatHandle {
         let mut child = command
             .spawn()
             .with_context(|| format!("启动 pw-cat 失败：{}", cfg.pwcat_path))?;
-        let stdin = child
-            .stdin
-            .take()
-            .context("pw-cat 未能打开 stdin")?;
+        let stdin = child.stdin.take().context("pw-cat 未能打开 stdin")?;
 
         Ok(Self {
             child,
@@ -64,7 +61,10 @@ impl PwcatHandle {
     /// 写入一段 PCM16 字节。要求长度是偶数。
     pub async fn write_pcm(&mut self, pcm: &[u8]) -> Result<()> {
         let stdin = self.stdin.as_mut().context("pw-cat stdin 已关闭")?;
-        stdin.write_all(pcm).await.context("写入 pw-cat stdin 失败")?;
+        stdin
+            .write_all(pcm)
+            .await
+            .context("写入 pw-cat stdin 失败")?;
         self.written_bytes += pcm.len() as u64;
         Ok(())
     }

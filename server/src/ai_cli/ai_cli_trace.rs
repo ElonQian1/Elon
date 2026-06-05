@@ -1,11 +1,14 @@
 use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 
+use super::{
+    ai_cli_output::{extract_thread_id, truncate_chars},
+    codex_thread_uri, CliOutput, NativeSessionScope,
+};
 use crate::{
     intent_router,
     types::{AiCliOption, AppState},
 };
-use super::{codex_thread_uri, CliOutput, NativeSessionScope, ai_cli_output::{extract_thread_id, truncate_chars}};
 
 #[derive(Clone, Copy)]
 pub(crate) struct CliTraceContext<'a> {

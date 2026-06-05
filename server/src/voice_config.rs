@@ -37,10 +37,8 @@ pub struct VirtualMicConfig {
 impl VirtualMicConfig {
     pub fn from_env() -> Self {
         Self {
-            pwcat_path: env::var("ELON_PWCAT_PATH")
-                .unwrap_or_else(|_| "pw-cat".to_string()),
-            target_sink: env::var("ELON_VOICE_SINK")
-                .unwrap_or_else(|_| "codex_sink".to_string()),
+            pwcat_path: env::var("ELON_PWCAT_PATH").unwrap_or_else(|_| "pw-cat".to_string()),
+            target_sink: env::var("ELON_VOICE_SINK").unwrap_or_else(|_| "codex_sink".to_string()),
             end_silence_ms: env::var("ELON_VOICE_END_SILENCE_MS")
                 .ok()
                 .and_then(|v| v.parse().ok())

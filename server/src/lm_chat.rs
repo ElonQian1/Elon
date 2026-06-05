@@ -65,10 +65,17 @@ pub async fn lm_chat_handler(
             req.conversation_id.as_deref(),
             Some("悬浮球语音会话"),
         )
-        .unwrap_or_else(|_| req.conversation_id.clone().unwrap_or_else(|| "default".into()));
+        .unwrap_or_else(|_| {
+            req.conversation_id
+                .clone()
+                .unwrap_or_else(|| "default".into())
+        });
 
     // ── 2. 把用户长期记忆注入 system prompt ──────────────────────────────────
-    let memories = state.store.get_user_memories(&user.id, 15).unwrap_or_default();
+    let memories = state
+        .store
+        .get_user_memories(&user.id, 15)
+        .unwrap_or_default();
     let mut messages = req.messages.clone();
     if !memories.is_empty() {
         let memory_block = memories
@@ -76,9 +83,8 @@ pub async fn lm_chat_handler(
             .map(|m| format!("- {}", m.content))
             .collect::<Vec<_>>()
             .join("\n");
-        let memory_note = format!(
-            "\n\n=== 关于这位用户的长期记忆（仅供参考，勿对用户提及）===\n{memory_block}"
-        );
+        let memory_note =
+            format!("\n\n=== 关于这位用户的长期记忆（仅供参考，勿对用户提及）===\n{memory_block}");
         let has_system = messages.first().and_then(|m| m["role"].as_str()) == Some("system");
         if has_system {
             if let Some(sys) = messages.first_mut() {
@@ -104,10 +110,7 @@ pub async fn lm_chat_handler(
             .position(|m| m["role"].as_str() != Some("system"))
             .unwrap_or(messages.len());
         for (i, h) in history.iter().enumerate() {
-            messages.insert(
-                insert_at + i,
-                json!({"role": h.role, "content": h.content}),
-            );
+            messages.insert(insert_at + i, json!({"role": h.role, "content": h.content}));
         }
     }
 

@@ -18,11 +18,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::{
-    admin::check_auth,
-    project_auth::json_error,
-    types::AppState,
-};
+use crate::{admin::check_auth, project_auth::json_error, types::AppState};
 
 // ── POST /api/admin/billing/recharge ─────────────────────────────────────────
 
@@ -142,10 +138,7 @@ pub async fn get_user(
 
 // ── GET /api/admin/billing/config ─────────────────────────────────────────────
 
-pub async fn get_config(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     if !check_auth(&headers, &state.admin_token) {
         return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
     }

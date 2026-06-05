@@ -67,7 +67,10 @@ pub(crate) fn api_agent_name<'a>(
     agent_name.filter(|name| !is_local_cli_option(state, name) && !is_api_backend_alias(name))
 }
 
-pub(crate) fn resolve_cli_option_id(state: &Arc<AppState>, agent_name: Option<&str>) -> Option<String> {
+pub(crate) fn resolve_cli_option_id(
+    state: &Arc<AppState>,
+    agent_name: Option<&str>,
+) -> Option<String> {
     let name = agent_name.map(str::trim).filter(|name| !name.is_empty())?;
 
     if is_local_default_alias(name) {
@@ -88,7 +91,10 @@ pub(crate) fn resolve_cli_option_id(state: &Arc<AppState>, agent_name: Option<&s
             .ai_cli
             .options
             .iter()
-            .find(|opt| opt.provider.eq_ignore_ascii_case("codex") || opt.id.to_ascii_lowercase().contains("codex"))
+            .find(|opt| {
+                opt.provider.eq_ignore_ascii_case("codex")
+                    || opt.id.to_ascii_lowercase().contains("codex")
+            })
             .map(|opt| opt.id.clone());
     }
 

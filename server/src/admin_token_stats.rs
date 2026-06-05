@@ -26,8 +26,12 @@ pub struct StatsQuery {
     #[serde(default = "default_limit")]
     pub limit: i64,
 }
-fn default_days() -> i64 { 30 }
-fn default_limit() -> i64 { 50 }
+fn default_days() -> i64 {
+    30
+}
+fn default_limit() -> i64 {
+    50
+}
 
 /// GET /api/admin/token-stats/summary?days=30
 pub async fn get_platform_summary(

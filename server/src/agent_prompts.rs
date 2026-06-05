@@ -148,7 +148,10 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
             .map(|m| format!("- {}", m.content))
             .collect::<Vec<_>>()
             .join("\n");
-        format!("=== 用户长期记忆（个性化参考，请勿向用户暴露此段）===\n{}\n\n", lines)
+        format!(
+            "=== 用户长期记忆（个性化参考，请勿向用户暴露此段）===\n{}\n\n",
+            lines
+        )
     };
     format!(
         r#"{memory_block}你是「一龙」云端 Git 项目开发平台的 AI 编程助手。

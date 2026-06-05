@@ -93,12 +93,10 @@ impl AiCliConfig {
 
         let allow_api_fallback = env_bool("AI_ALLOW_API_FALLBACK", false);
 
-        let fallback_cli_option = std::env::var("AI_CLI_FALLBACK")
-            .ok()
-            .filter(|id| {
-                let id = id.trim().to_ascii_lowercase();
-                !id.is_empty() && options.iter().any(|opt| opt.id.eq_ignore_ascii_case(&id))
-            });
+        let fallback_cli_option = std::env::var("AI_CLI_FALLBACK").ok().filter(|id| {
+            let id = id.trim().to_ascii_lowercase();
+            !id.is_empty() && options.iter().any(|opt| opt.id.eq_ignore_ascii_case(&id))
+        });
 
         Self {
             enabled,

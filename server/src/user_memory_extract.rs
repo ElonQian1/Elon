@@ -10,11 +10,7 @@ use serde::Deserialize;
 use serde_json::json;
 use tracing::{debug, warn};
 
-use crate::{
-    agent_api_loop::resolve_agent,
-    agent_llm_call::call_chat_llm,
-    types::AppState,
-};
+use crate::{agent_api_loop::resolve_agent, agent_llm_call::call_chat_llm, types::AppState};
 
 /// 从一轮对话中提取记忆并写入数据库。
 ///
@@ -64,7 +60,8 @@ pub async fn extract_and_save_memories(
         }),
     ];
 
-    let response = match call_chat_llm(&state, &agent, &messages, &user_id, "memory_extract").await {
+    let response = match call_chat_llm(&state, &agent, &messages, &user_id, "memory_extract").await
+    {
         Ok(r) => r,
         Err(e) => {
             warn!("记忆提取 LLM 调用失败 user={user_id}: {e}");
@@ -99,13 +96,10 @@ pub async fn extract_and_save_memories(
         }
         let category = normalize_category(&item.category);
         let importance = item.importance.clamp(1, 10);
-        if let Err(e) = state.store.insert_user_memory(
-            &user_id,
-            &content,
-            &category,
-            importance,
-            None,
-        ) {
+        if let Err(e) = state
+            .store
+            .insert_user_memory(&user_id, &content, &category, importance, None)
+        {
             warn!("记忆写入失败 user={user_id}: {e}");
         }
     }

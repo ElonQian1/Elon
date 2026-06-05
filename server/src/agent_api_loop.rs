@@ -8,8 +8,7 @@ use crate::{
     agent_llm_call::{call_chat_llm, call_llm, execute_tool},
     agent_prompts::system_prompt,
     agent_routing::{casual_chat_prompt, is_local_cli_option, quick_casual_reply},
-    intent_router,
-    tools,
+    intent_router, tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
     user_memory_extract::extract_and_save_memories,
 };
@@ -73,7 +72,8 @@ async fn run_casual_chat(
 
     // 优先尝试路由到在线 PC 节点（当模型名与节点上报模型匹配时）
     if let Some((content, node_id, model_id)) =
-        crate::agent_llm_call::try_casual_chat_via_node(state, &agent.model, &messages, user_id).await
+        crate::agent_llm_call::try_casual_chat_via_node(state, &agent.model, &messages, user_id)
+            .await
     {
         return Ok((content, Some(node_id), model_id));
     }
@@ -86,7 +86,15 @@ async fn run_casual_chat(
         .trim()
         .to_string();
 
-    Ok((if reply.is_empty() { "我在，你可以继续说。".into() } else { reply }, None, agent.model.clone()))
+    Ok((
+        if reply.is_empty() {
+            "我在，你可以继续说。".into()
+        } else {
+            reply
+        },
+        None,
+        agent.model.clone(),
+    ))
 }
 
 pub(crate) async fn run_api_inner_with_workspace(
@@ -122,12 +130,19 @@ pub(crate) async fn run_api_inner_with_workspace(
 
         let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
         let _ = tx.send(
-            WsMessage::progress(format!("正在使用 AI 代理聊天: {} ({})", agent.name, agent.model))
+            WsMessage::progress(format!(
+                "正在使用 AI 代理聊天: {} ({})",
+                agent.name, agent.model
+            ))
             .to_json(),
         );
 
-        let memories = state.store.get_user_memories(user_id, 20).unwrap_or_default();
-        let (reply, chat_node_id, chat_model) = run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
+        let memories = state
+            .store
+            .get_user_memories(user_id, 20)
+            .unwrap_or_default();
+        let (reply, chat_node_id, chat_model) =
+            run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
         // 异步提取本轮记忆，不阻塞响应
         {
             let state2 = state.clone();
@@ -172,12 +187,23 @@ pub(crate) async fn run_api_inner_with_workspace(
     let workspace_str = workspace.to_string_lossy().to_string();
 
     if planning_mode {
-        return run_api_plan(state, &agent, user_id, &workspace_str, user_message, preflight_note, tx)
-            .await;
+        return run_api_plan(
+            state,
+            &agent,
+            user_id,
+            &workspace_str,
+            user_message,
+            preflight_note,
+            tx,
+        )
+        .await;
     }
 
     let _ = tx.send(
-        WsMessage::progress(format!("正在使用 AI 代理: {} ({})", agent.name, agent.model))
+        WsMessage::progress(format!(
+            "正在使用 AI 代理: {} ({})",
+            agent.name, agent.model
+        ))
         .to_json(),
     );
 
@@ -190,7 +216,10 @@ pub(crate) async fn run_api_inner_with_workspace(
     };
 
     // 初始化对话历史
-    let memories = state.store.get_user_memories(user_id, 20).unwrap_or_default();
+    let memories = state
+        .store
+        .get_user_memories(user_id, 20)
+        .unwrap_or_default();
     let mut messages = vec![
         json!({
             "role": "system",
@@ -202,10 +231,7 @@ pub(crate) async fn run_api_inner_with_workspace(
         }),
     ];
 
-    let _ = tx.send(
-        WsMessage::progress("AI 正在理解需求...")
-        .to_json(),
-    );
+    let _ = tx.send(WsMessage::progress("AI 正在理解需求...").to_json());
 
     // 追踪 APK 下载链接（build_project 成功后填入）
     let mut apk_url: Option<String> = None;
@@ -285,7 +311,10 @@ pub(crate) async fn run_api_inner_with_workspace(
                     if let Err(ref e) = r {
                         warn!("PC agent 构建失败，回退到服务器本地构建: {}", e);
                         let _ = tx.send(
-                            WsMessage::progress(format!("PC agent 不可用（{}），尝试服务器本地构建...", e))
+                            WsMessage::progress(format!(
+                                "PC agent 不可用（{}），尝试服务器本地构建...",
+                                e
+                            ))
                             .to_json(),
                         );
                         execute_tool(state, &workspace, &tool_name, &args, user_id)
@@ -304,7 +333,9 @@ pub(crate) async fn run_api_inner_with_workspace(
                                 let _apk_name = line.trim_start_matches("##APK_FILE:").trim();
                                 apk_url = Some(tools::stable_apk_url(download_base));
                                 let _ = tx.send(
-                                    WsMessage::progress(format!("APK 编译成功，正在生成下载链接..."))
+                                    WsMessage::progress(format!(
+                                        "APK 编译成功，正在生成下载链接..."
+                                    ))
                                     .to_json(),
                                 );
                             }
@@ -360,8 +391,11 @@ async fn run_api_plan(
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
     let _ = tx.send(
-        WsMessage::progress(format!("正在使用 AI 代理规划: {} ({})", agent.name, agent.model))
-            .to_json(),
+        WsMessage::progress(format!(
+            "正在使用 AI 代理规划: {} ({})",
+            agent.name, agent.model
+        ))
+        .to_json(),
     );
     let note = preflight_note.unwrap_or("无");
     let messages = vec![

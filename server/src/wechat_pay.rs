@@ -17,8 +17,8 @@
 
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
-use rsa::{pkcs1v15::SigningKey, pkcs8::DecodePrivateKey, RsaPrivateKey};
 use rsa::signature::{SignatureEncoding, Signer};
+use rsa::{pkcs1v15::SigningKey, pkcs8::DecodePrivateKey, RsaPrivateKey};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use uuid::Uuid;
@@ -51,7 +51,14 @@ impl WechatPayConfig {
             .unwrap_or_else(|_| "https://placeholder.example.com/api/pay/notify".to_string());
         // 允许环境变量中用 \n 字面量代替真正的换行符
         let private_key_pem = private_key_pem.replace("\\n", "\n");
-        Some(Self { app_id, mch_id, serial_no, private_key_pem, api_v3_key, notify_url })
+        Some(Self {
+            app_id,
+            mch_id,
+            serial_no,
+            private_key_pem,
+            api_v3_key,
+            notify_url,
+        })
     }
 }
 
@@ -124,7 +131,10 @@ pub fn decrypt_notify_resource(
     }
     let nonce_bytes = nonce.as_bytes();
     if nonce_bytes.len() != 12 {
-        return Err(anyhow!("nonce_str 长度必须为 12 字节，实际 {} 字节", nonce_bytes.len()));
+        return Err(anyhow!(
+            "nonce_str 长度必须为 12 字节，实际 {} 字节",
+            nonce_bytes.len()
+        ));
     }
 
     let key = Key::<Aes256Gcm>::from_slice(key_bytes);
@@ -133,7 +143,13 @@ pub fn decrypt_notify_resource(
     let ciphertext = B64.decode(ciphertext_b64)?;
 
     let plaintext = cipher
-        .decrypt(nonce, Payload { msg: &ciphertext, aad: associated_data.as_bytes() })
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &ciphertext,
+                aad: associated_data.as_bytes(),
+            },
+        )
         .map_err(|e| anyhow!("AES-GCM 解密失败: {:?}", e))?;
 
     Ok(String::from_utf8(plaintext)?)
@@ -154,7 +170,7 @@ struct CreateAppOrderRequest<'a> {
 
 #[derive(Serialize)]
 struct OrderAmount {
-    total: i64,   // 分
+    total: i64, // 分
     currency: &'static str,
 }
 
@@ -198,7 +214,10 @@ pub async fn create_app_order(
         description,
         out_trade_no,
         notify_url: &cfg.notify_url,
-        amount: OrderAmount { total: amount_fen, currency: "CNY" },
+        amount: OrderAmount {
+            total: amount_fen,
+            currency: "CNY",
+        },
     })?;
 
     let auth = build_auth_header(cfg, "POST", url_path, &body)?;
@@ -220,14 +239,16 @@ pub async fn create_app_order(
         return Err(anyhow!("微信支付下单失败 HTTP {status}: {text}"));
     }
 
-    let parsed: CreateOrderResponse = serde_json::from_str(&text)
-        .map_err(|e| anyhow!("解析微信响应失败: {e}\n原始: {text}"))?;
+    let parsed: CreateOrderResponse =
+        serde_json::from_str(&text).map_err(|e| anyhow!("解析微信响应失败: {e}\n原始: {text}"))?;
 
     if let (Some(code), Some(msg)) = (&parsed.code, &parsed.message) {
         return Err(anyhow!("微信支付错误 {code}: {msg}"));
     }
 
-    let prepay_id = parsed.prepay_id.ok_or_else(|| anyhow!("微信未返回 prepay_id: {text}"))?;
+    let prepay_id = parsed
+        .prepay_id
+        .ok_or_else(|| anyhow!("微信未返回 prepay_id: {text}"))?;
 
     // 对 prepayid 重新签名，供 Android 调起支付
     let ts = timestamp_secs();

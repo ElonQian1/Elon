@@ -91,10 +91,7 @@ pub async fn report_client_usage(
     let cached = body.cached_input_tokens.unwrap_or(0).max(0);
     let output = body.output_tokens.unwrap_or(0).max(0);
     let reasoning = body.reasoning_tokens.unwrap_or(0).max(0);
-    let total = body
-        .total_tokens
-        .unwrap_or(input + output)
-        .max(0);
+    let total = body.total_tokens.unwrap_or(input + output).max(0);
 
     let feature = sanitize_label(&body.feature, "unknown");
 
@@ -210,22 +207,65 @@ pub(crate) fn record_codex_usage_from_stdout(
         match ty {
             "token_count" => {
                 // camelCase (旧 Codex) 或 snake_case (新 Codex) 都兼容
-                input += pick(&v, &["inputTokens", "input_tokens", "prompt_tokens", "input"]);
-                cached += pick(&v, &["cachedInputTokens", "cached_input_tokens", "cache_read_input_tokens"]);
-                output += pick(&v, &["outputTokens", "output_tokens", "completion_tokens", "output"]);
-                reasoning += pick(&v, &["reasoningTokens", "reasoning_tokens", "reasoning_output_tokens"]);
+                input += pick(
+                    &v,
+                    &["inputTokens", "input_tokens", "prompt_tokens", "input"],
+                );
+                cached += pick(
+                    &v,
+                    &[
+                        "cachedInputTokens",
+                        "cached_input_tokens",
+                        "cache_read_input_tokens",
+                    ],
+                );
+                output += pick(
+                    &v,
+                    &[
+                        "outputTokens",
+                        "output_tokens",
+                        "completion_tokens",
+                        "output",
+                    ],
+                );
+                reasoning += pick(
+                    &v,
+                    &[
+                        "reasoningTokens",
+                        "reasoning_tokens",
+                        "reasoning_output_tokens",
+                    ],
+                );
                 found = true;
             }
             "turn.completed" => {
                 // usage 可能在 v["usage"] 或直接在 v 里
-                let u = if !v["usage"].is_null() { &v["usage"] } else { &v };
+                let u = if !v["usage"].is_null() {
+                    &v["usage"]
+                } else {
+                    &v
+                };
                 let i = pick(u, &["input_tokens", "inputTokens", "prompt_tokens"]);
                 let o = pick(u, &["output_tokens", "outputTokens", "completion_tokens"]);
                 if i > 0 || o > 0 {
                     input += i;
-                    cached += pick(u, &["cached_input_tokens", "cachedInputTokens", "cache_read_input_tokens"]);
+                    cached += pick(
+                        u,
+                        &[
+                            "cached_input_tokens",
+                            "cachedInputTokens",
+                            "cache_read_input_tokens",
+                        ],
+                    );
                     output += o;
-                    reasoning += pick(u, &["reasoning_output_tokens", "reasoningTokens", "reasoning_tokens"]);
+                    reasoning += pick(
+                        u,
+                        &[
+                            "reasoning_output_tokens",
+                            "reasoningTokens",
+                            "reasoning_tokens",
+                        ],
+                    );
                     found = true;
                 }
             }

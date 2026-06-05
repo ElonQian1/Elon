@@ -49,7 +49,12 @@ pub async fn create_order(
 
     let cfg = match WechatPayConfig::from_env() {
         Some(c) => c,
-        None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "微信支付未配置，请联系管理员"),
+        None => {
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "微信支付未配置，请联系管理员",
+            )
+        }
     };
 
     // 生成商户订单号：取用户ID前8位 + 时间戳 + 随机6位
@@ -59,7 +64,10 @@ pub async fn create_order(
     let out_trade_no = format!("{uid8}{ts}{nonce6}");
 
     // 落库（幂等）
-    if let Err(e) = state.store.pay_order_create(&out_trade_no, &user.id, body.amount_fen) {
+    if let Err(e) = state
+        .store
+        .pay_order_create(&out_trade_no, &user.id, body.amount_fen)
+    {
         tracing::warn!("pay_order_create error: {e}");
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建订单失败");
     }
@@ -120,8 +128,13 @@ pub async fn pay_notify(
 
     // 只处理 SUCCESS 状态
     if txn.trade_state != "SUCCESS" {
-        tracing::debug!("pay_notify: 订单 {} 状态 {} 不是 SUCCESS，跳过", txn.out_trade_no, txn.trade_state);
-        return Json(json!({"code": "SUCCESS", "message": "non-success state ignored"})).into_response();
+        tracing::debug!(
+            "pay_notify: 订单 {} 状态 {} 不是 SUCCESS，跳过",
+            txn.out_trade_no,
+            txn.trade_state
+        );
+        return Json(json!({"code": "SUCCESS", "message": "non-success state ignored"}))
+            .into_response();
     }
 
     let tx_id = txn.transaction_id.as_deref().unwrap_or(&txn.out_trade_no);
@@ -155,8 +168,12 @@ pub struct OrdersQuery {
     #[serde(default = "default_size")]
     size: i64,
 }
-fn default_page() -> i64 { 1 }
-fn default_size() -> i64 { 20 }
+fn default_page() -> i64 {
+    1
+}
+fn default_size() -> i64 {
+    20
+}
 
 pub async fn list_my_orders(
     State(state): State<Arc<AppState>>,

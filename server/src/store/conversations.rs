@@ -6,8 +6,8 @@ use anyhow::Result;
 use rusqlite::params;
 
 use super::{
-    AdminConversationEntry, ConversationMessage, Store, clean_optional, new_id, now,
-    safe_external_id,
+    clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
+    Store,
 };
 
 impl Store {

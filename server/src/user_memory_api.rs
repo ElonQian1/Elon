@@ -137,7 +137,11 @@ pub async fn create_memory(
         .store
         .insert_user_memory(&user.id, &content, &category, importance, None)
     {
-        Ok(()) => Json(CreateMemoryResp { ok: true, message: "已添加" }).into_response(),
+        Ok(()) => Json(CreateMemoryResp {
+            ok: true,
+            message: "已添加",
+        })
+        .into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

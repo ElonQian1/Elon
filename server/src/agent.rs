@@ -11,8 +11,7 @@ use crate::{
         is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
-        api_agent_name, choose_backend, has_api_agents, is_local_cli_option,
-        resolve_cli_option_id,
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
     },
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
@@ -134,9 +133,7 @@ pub async fn run_for_project_in_workspace(
     .await
     {
         error!("项目级 AI 代理运行出错: {}", e);
-        let _ = tx.send(
-            WsMessage::error(e.to_string()).to_json(),
-        );
+        let _ = tx.send(WsMessage::error(e.to_string()).to_json());
     }
 }
 
@@ -230,8 +227,8 @@ async fn run_dispatch_with_workspace(
 
     let codex_cli_only = state.ai_cli.codex_cli_only;
     // ImageThenCode: 有文生图模型时走两步管道（先生图，再集成到代码）；否则降级为 CodeAgent
-    let is_image_then_code = matches!(decision.route, CapabilityRoute::ImageThenCode)
-        && state.image_model.is_some();
+    let is_image_then_code =
+        matches!(decision.route, CapabilityRoute::ImageThenCode) && state.image_model.is_some();
     let image_cli_only = !is_image_then_code
         && (matches!(
             decision.intent,

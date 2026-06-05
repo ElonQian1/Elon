@@ -268,9 +268,14 @@ impl AppState {
             tracing::warn!("未配置 IMAGE_API_KEY，文生图能力暂不可用");
         }
 
-        let owner_token = std::env::var("OWNER_TOKEN").ok().filter(|v| !v.trim().is_empty());
+        let owner_token = std::env::var("OWNER_TOKEN")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
         if let Some(ref tok) = owner_token {
-            tracing::info!("已启用本地 owner token（前8位: {}…），本机单用户模式", &tok[..tok.len().min(8)]);
+            tracing::info!(
+                "已启用本地 owner token（前8位: {}…），本机单用户模式",
+                &tok[..tok.len().min(8)]
+            );
         }
 
         Ok(Self {

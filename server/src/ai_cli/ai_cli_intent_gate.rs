@@ -8,11 +8,7 @@
 use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc};
 
-use crate::{
-    types::AppState,
-};
 use super::{
-    IntentGateResult, NativeSessionScope,
     ai_cli_chat::intent_gate_fallback_chat_result,
     ai_cli_native_session::should_retry_without_native_session,
     ai_cli_output::{extract_thread_id, parse_intent_gate_result},
@@ -22,7 +18,9 @@ use super::{
     },
     ai_cli_prompts::build_intent_gate_prompt,
     ai_cli_trace::{record_cli_retry, record_intent_gate_fallback, CliTraceContext},
+    IntentGateResult, NativeSessionScope,
 };
+use crate::types::AppState;
 
 const DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS: u64 = 30;
 

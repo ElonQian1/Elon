@@ -437,6 +437,9 @@ mod tests {
             .expect("suggestion should update");
 
         assert_eq!(updated.suggestion_status.as_deref(), Some("updated"));
-        assert_eq!(updated.suggestion_resolved_by.as_deref(), Some(owner.id.as_str()));
+        assert_eq!(
+            updated.suggestion_resolved_by.as_deref(),
+            Some(owner.id.as_str())
+        );
     }
 }

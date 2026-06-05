@@ -31,8 +31,8 @@ pub struct WhisperRestCandidate {
 impl WhisperRestCandidate {
     /// 从环境变量 + agents 配置中收集所有候选，调用方按序尝试。
     pub fn collect(agents_cfg: &AgentsConfig) -> Vec<Self> {
-        let lang = std::env::var("ELON_VOICE_TRANSCRIBE_LANGUAGE")
-            .unwrap_or_else(|_| "zh".to_string());
+        let lang =
+            std::env::var("ELON_VOICE_TRANSCRIBE_LANGUAGE").unwrap_or_else(|_| "zh".to_string());
         let mut candidates: Vec<Self> = Vec::new();
 
         // ── 1. OPENAI_API_KEY（官方端点，优先） ──

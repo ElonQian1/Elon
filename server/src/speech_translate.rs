@@ -75,13 +75,14 @@ pub async fn translate_user_speech(
         }),
     ];
 
-    let response = match call_chat_llm(&state, &agent, &messages, &user_id, "speech_translate").await {
-        Ok(response) => response,
-        Err(err) => {
-            tracing::warn!("语音翻译调用失败: {}", err);
-            return json_error(StatusCode::BAD_GATEWAY, "语音翻译失败");
-        }
-    };
+    let response =
+        match call_chat_llm(&state, &agent, &messages, &user_id, "speech_translate").await {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!("语音翻译调用失败: {}", err);
+                return json_error(StatusCode::BAD_GATEWAY, "语音翻译失败");
+            }
+        };
 
     let text = response["choices"][0]["message"]["content"]
         .as_str()

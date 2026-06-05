@@ -8,10 +8,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    project_auth::project_access,
-    project_chat::run_project_agent_with_scheduler,
-    project_execution_mode::ProjectExecutionMode,
-    types::AppState,
+    project_auth::project_access, project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode, types::AppState,
     voice_protocol::VOICE_TARGET_SOCIAL_AI_DIRECT,
 };
 

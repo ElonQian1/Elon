@@ -1,0 +1,131 @@
+# 女声情绪 TTS 部署说明
+
+本项目的生产级 TTS 分为两层：
+
+1. Rust 主服务：负责鉴权、角色/情绪/强度目录、台词改写、缓存和调用 Worker。
+2. Python/ONNX TTS Worker：实际加载 IndexTTS2、CosyVoice3 或 GPT-SoVITS。
+
+这样做的原因是模型依赖重、GPU 环境变化大，不应塞进 `elon-server` 主进程。
+
+## APK 运行链路
+
+```text
+APK 开启喇叭朗读
+→ POST /api/voice/tts
+→ Rust 校验登录、选择女声/情绪/强度
+→ 可选 LLM 台词改写
+→ 调用 TTS Worker /synthesize
+→ 服务端缓存音频
+→ APK 播放音频
+→ Worker 不可用时 APK 自动回退 Android 系统 TTS
+```
+
+## 服务器环境变量
+
+```bash
+# 必填：TTS Worker 地址。未设置时 /api/voice/tts 返回 503，APK 会自动回退系统 TTS。
+ELON_TTS_WORKER_URL=http://127.0.0.1:5010
+
+# 可选：auto/index_tts2/cosyvoice3/gpt_sovits。
+# auto 会把普通低强度路由给 CosyVoice3，把强情绪路由给 IndexTTS2。
+ELON_TTS_PROVIDER=auto
+
+# 可选：Worker 内部鉴权。
+ELON_TTS_WORKER_TOKEN=
+
+# 可选：合成超时与缓存。
+ELON_TTS_TIMEOUT_SECS=120
+ELON_TTS_CACHE_ENABLED=true
+
+# 可选：开启后先用当前默认 LLM 把普通回复改写成适合朗读的台词。
+# 不开也会做本地 Markdown 清理和轻量停顿改写。
+ELON_TTS_LLM_REWRITE_ENABLED=false
+```
+
+## Worker HTTP 合约
+
+Rust 主服务会请求：
+
+```http
+POST /synthesize
+Content-Type: application/json
+Authorization: Bearer <ELON_TTS_WORKER_TOKEN>
+```
+
+请求 JSON：
+
+```json
+{
+  "provider": "index_tts2",
+  "text": "你一直没有回我……其实我等了你好久……",
+  "originalText": "你一直没有回我。其实我等了很久。",
+  "voiceId": "female_warm",
+  "voiceLabel": "温柔姐姐",
+  "voicePrompt": "温柔、亲近、稳定，有陪伴感的年轻女声",
+  "voiceAudio": "voices/female_warm_neutral.wav",
+  "emotionId": "wronged_crying",
+  "emotionLabel": "委屈快哭",
+  "emotionAudio": "emotions/female_crying_broken.wav",
+  "textStyle": "短句，多停顿，省略号，轻微重复",
+  "pauseStyle": "broken",
+  "intensity": "immersive",
+  "emoAlpha": 0.72,
+  "speed": 0.9
+}
+```
+
+Worker 可以直接返回音频：
+
+```http
+200 OK
+Content-Type: audio/wav
+
+<wav bytes>
+```
+
+也可以返回 JSON：
+
+```json
+{
+  "audioBase64": "...",
+  "mime": "audio/wav"
+}
+```
+
+## 资产目录约定
+
+第一版建议准备：
+
+```text
+voices/female_warm_neutral.wav
+voices/female_bright_neutral.wav
+voices/female_mature_neutral.wav
+voices/female_cool_neutral.wav
+voices/female_sweet_neutral.wav
+
+emotions/female_neutral.wav
+emotions/female_gentle_comfort.wav
+emotions/female_crying_broken.wav
+emotions/female_happy_soft.wav
+emotions/female_happy_excited.wav
+emotions/female_angry_repressed.wav
+emotions/female_cool_detached.wav
+emotions/female_shy_nervous.wav
+emotions/female_sad_low.wav
+emotions/female_surprised.wav
+emotions/female_serious_encourage.wav
+emotions/female_whisper.wav
+```
+
+所有预设女声和情绪参考音频必须来自授权配音演员或明确可商用素材。不要使用明星、主播、声优或短视频博主声音做默认公开声线。
+
+## 本机检查
+
+Windows：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\check-tts-stack.ps1
+```
+
+它会检查 Python、conda、常见 TTS 包和 `ELON_TTS_WORKER_URL` 是否存在。
+

@@ -133,10 +133,8 @@ pub(crate) fn spawn_direct_friend_voice_reply(
             }
             Err(error) => {
                 warn!("direct social AI voice reply failed: {}", error);
-                let _ = ai_reply_tx.send(WsMessage::error(format!(
-                    "一龙AI 语音回复失败：{}",
-                    error
-                )).to_json());
+                let _ = ai_reply_tx
+                    .send(WsMessage::error(format!("一龙AI 语音回复失败：{}", error)).to_json());
             }
         }
     });

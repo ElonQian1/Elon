@@ -190,7 +190,10 @@ pub fn build_project(project_root: &Path, target: &str, user_id: &str) -> Result
     let output = loop {
         if start.elapsed().as_secs() > BUILD_TIMEOUT_SECS {
             let _ = child.kill();
-            return Err(anyhow!("构建超时（超过 {} 秒），已终止进程", BUILD_TIMEOUT_SECS));
+            return Err(anyhow!(
+                "构建超时（超过 {} 秒），已终止进程",
+                BUILD_TIMEOUT_SECS
+            ));
         }
         match child.try_wait()? {
             Some(_) => break child.wait_with_output()?,
@@ -424,8 +427,6 @@ pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
         .to_string())
 }
 
-
-
 /// 安全路径：确保路径不会逃出 project_root
 ///
 /// 修复以下攻击向量：
@@ -498,7 +499,7 @@ fn normalize_project_scripts_recursive(path: &Path) -> Result<()> {
             let entry = entry?;
             normalize_project_scripts_recursive(&entry.path())?;
         }
-        return Ok(())
+        return Ok(());
     }
 
     if is_script_file(path) {

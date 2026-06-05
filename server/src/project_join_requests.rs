@@ -118,10 +118,7 @@ pub async fn list_join_requests(
     }
 
     let only_pending = q.pending_only.unwrap_or(true);
-    match state
-        .store
-        .list_join_requests(&project_id, only_pending)
-    {
+    match state.store.list_join_requests(&project_id, only_pending) {
         Ok(requests) => Json(serde_json::json!({
             "requests": requests,
             "total": requests.len(),
@@ -194,10 +191,7 @@ pub async fn review_join_request(
 }
 
 /// GET /api/me/join-requests — 当前用户查看自己的申请
-pub async fn my_join_requests(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn my_join_requests(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),

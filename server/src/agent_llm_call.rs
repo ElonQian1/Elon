@@ -71,7 +71,15 @@ pub(crate) async fn call_llm(
     }
 
     let response: Value = resp.json().await?;
-    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);    Ok(response)
+    crate::token_usage_api::record_api_usage(
+        &state.store,
+        &response,
+        user_id,
+        feature,
+        &agent.model,
+    );
+    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);
+    Ok(response)
 }
 
 /// 调用 LLM API（普通对话，不带工具）
@@ -129,7 +137,13 @@ pub(crate) async fn call_chat_llm(
     }
 
     let response: Value = resp.json().await?;
-    crate::token_usage_api::record_api_usage(&state.store, &response, user_id, feature, &agent.model);
+    crate::token_usage_api::record_api_usage(
+        &state.store,
+        &response,
+        user_id,
+        feature,
+        &agent.model,
+    );
     crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);
     Ok(response)
 }
@@ -220,7 +234,9 @@ pub(crate) fn execute_tool(
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(10);
             if quota > 0 {
-                state.store.check_and_increment_build_quota(user_id, quota)?;
+                state
+                    .store
+                    .check_and_increment_build_quota(user_id, quota)?;
             }
             tools::build_project(workspace, target, user_id)
         }
@@ -243,12 +259,8 @@ pub(crate) async fn try_casual_chat_via_node(
     // 如果没有在线节点支持该模型，立即返回 None
     let node_id = state.node_registry.find_node_for_model(model).await?;
 
-    let dispatch = crate::node_router::dispatch_to_node(
-        state,
-        model,
-        messages.to_vec(),
-        Some(1024),
-    ).await;
+    let dispatch =
+        crate::node_router::dispatch_to_node(state, model, messages.to_vec(), Some(1024)).await;
 
     let (_req_id, actual_node_id, mut rx) = match dispatch {
         Ok(t) => t,
@@ -289,8 +301,16 @@ pub(crate) async fn try_casual_chat_via_node(
     }
 
     // 后台结算积分
-    let price = state.node_registry.get_node_model_price(&actual_node_id, model).await.unwrap_or(1.0);
-    let owner = state.node_registry.get_node_owner(&actual_node_id).await.unwrap_or_default();
+    let price = state
+        .node_registry
+        .get_node_model_price(&actual_node_id, model)
+        .await
+        .unwrap_or(1.0);
+    let owner = state
+        .node_registry
+        .get_node_owner(&actual_node_id)
+        .await
+        .unwrap_or_default();
     if !owner.is_empty() {
         crate::node_router::settle_after_stream(
             state,

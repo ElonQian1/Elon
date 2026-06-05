@@ -8,10 +8,10 @@ mod ai_cli_process;
 mod ai_cli_prompts;
 mod ai_cli_runner;
 mod ai_cli_streaming;
-mod ai_cli_trace;
-mod ai_cli_types;
 #[cfg(test)]
 mod ai_cli_tests;
+mod ai_cli_trace;
+mod ai_cli_types;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
@@ -21,23 +21,17 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
+pub use self::ai_cli_prewarm::prewarm_codex_session;
 pub(crate) use self::ai_cli_process::{
-    cap_option_timeout, configured_timeout_cap, run_cli_command_traced,
-    supports_codex_sessions, CliOutput,
+    cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
+    CliOutput,
 };
+pub(crate) use self::ai_cli_runner::codex_thread_uri;
 #[cfg(test)]
 pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
-pub(crate) use self::ai_cli_runner::codex_thread_uri;
-pub use self::ai_cli_prewarm::prewarm_codex_session;
 
-use crate::{
-    intent_router, tools,
-    types::{AppState, WsMessage},
-};
 use self::{
-    ai_cli_chat::{
-        chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message,
-    },
+    ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
     ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
     ai_cli_native_session::{
         append_native_session_continuity, native_session_continuity_note,
@@ -46,6 +40,10 @@ use self::{
     ai_cli_output::{extract_json_agent_message, extract_thread_id, format_cli_reply},
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
+};
+use crate::{
+    intent_router, tools,
+    types::{AppState, WsMessage},
 };
 
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
@@ -135,7 +133,6 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
-
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
     // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
@@ -146,7 +143,16 @@ async fn run_with_workspace_mode(
     if pc_relay_enabled {
         if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
-            match run_via_pc_agent(&agent_id, user_message, preflight_note, request_mode, state, tx).await {
+            match run_via_pc_agent(
+                &agent_id,
+                user_message,
+                preflight_note,
+                request_mode,
+                state,
+                tx,
+            )
+            .await
+            {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
@@ -184,24 +190,16 @@ async fn run_with_workspace_mode(
 
     let android_task = development_task && !planning_task && looks_like_android_task(user_message);
     if planning_task {
-        let _ = tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
+        let _ =
+            tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
     } else if development_task {
-        let _ = tx.send(
-            WsMessage::progress("正在准备项目工作区。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在准备项目工作区。").to_json());
         for note in environment_notes(user_message, &option) {
             let _ = tx.send(WsMessage::progress(note).to_json());
         }
-        let _ = tx.send(
-            WsMessage::progress("AI 助手正在处理你的请求。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("AI 助手正在处理你的请求。").to_json());
     } else {
-        let _ = tx.send(
-            WsMessage::progress("正在思考。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("正在思考。").to_json());
     }
 
     let workspace_key = workspace.display().to_string();
@@ -253,8 +251,7 @@ async fn run_with_workspace_mode(
     }
     if native_session_id.is_some() {
         let _ = tx.send(
-            WsMessage::progress("Restoring Codex CLI context for this conversation.")
-            .to_json(),
+            WsMessage::progress("Restoring Codex CLI context for this conversation.").to_json(),
         );
     }
 
@@ -325,7 +322,7 @@ async fn run_with_workspace_mode(
             );
             let _ = tx.send(
                 WsMessage::progress("旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。")
-                .to_json(),
+                    .to_json(),
             );
             native_session_id = None;
             prompt_bootstrapped = false;
@@ -410,10 +407,10 @@ async fn run_with_workspace_mode(
         );
         let _ = tx.send(
             WsMessage::progress(if lightweight_chat_task {
-                    "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
-                } else {
-                    "Codex CLI session expired; starting a fresh session."
-                })
+                "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
+            } else {
+                "Codex CLI session expired; starting a fresh session."
+            })
             .to_json(),
         );
         native_session_id = None;
@@ -575,16 +572,14 @@ async fn run_with_workspace_mode(
     );
 
     let apk_url = if android_task && output.success {
-        let _ = tx.send(
-            WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。")
-            .to_json(),
-        );
+        let _ = tx.send(WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。").to_json());
         let apk_url =
             tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
         if apk_url.is_none() {
             let _ = tx.send(
-                WsMessage::progress("未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。"
-                        )
+                WsMessage::progress(
+                    "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。",
+                )
                 .to_json(),
             );
         }
@@ -671,10 +666,7 @@ async fn run_via_pc_agent(
                     );
                     return Ok(());
                 } else {
-                    return Err(anyhow!(
-                        "PC CLI 执行失败: {}",
-                        error.unwrap_or_default()
-                    ));
+                    return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
                 }
             }
             _ => {}

@@ -14,8 +14,8 @@ use std::{
 
 use crate::{
     project_attachment_paths::{
-        content_type_for_file, percent_encode_path_segment,
-        safe_project_path_part, unique_project_attachment_name,
+        content_type_for_file, percent_encode_path_segment, safe_project_path_part,
+        unique_project_attachment_name,
     },
     project_auth::{auth_from_headers, json_error, project_access},
     project_mobile::ensure_mobile_project,

@@ -32,7 +32,11 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (14, "项目意见频道建议状态", migration_v14),
     (15, "用户长期记忆表", migration_v15),
     (16, "token 用量事件表 + 用户 token 配额表", migration_v16),
-    (17, "人民币预存计费：用户余额、充值记录、扣费明细、计费配置", migration_v17),
+    (
+        17,
+        "人民币预存计费：用户余额、充值记录、扣费明细、计费配置",
+        migration_v17,
+    ),
     (18, "微信支付订单表", migration_v18),
     (19, "项目加入申请表（approval 审批流程）", migration_v19),
 ];
@@ -551,7 +555,12 @@ fn migration_v10(conn: &Connection) -> Result<()> {
 // ── v11：项目构建缓存 ─────────────────────────────────────────────────────────
 
 fn migration_v11(conn: &Connection) -> Result<()> {
-    add_column_if_missing(conn, "projects", "last_build_sha", "last_build_sha     TEXT")?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "last_build_sha",
+        "last_build_sha     TEXT",
+    )?;
     add_column_if_missing(
         conn,
         "projects",

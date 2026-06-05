@@ -1,17 +1,11 @@
 use axum::{
-    extract::{
-        ws::{WebSocketUpgrade},
-        Path as AxumPath, Query, State,
-    },
+    extract::{ws::WebSocketUpgrade, Path as AxumPath, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
@@ -136,7 +130,13 @@ pub async fn register_external_project(
     }
     // 仅当请求方未声明 node_id（即项目应在服务器本机）时才校验路径存在；
     // PC 节点项目的路径在用户 PC 上，服务器看不到，跳过校验。
-    if req.node_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
+    if req
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .is_none()
+    {
         let pb = std::path::Path::new(workspace_path);
         if !pb.exists() {
             return json_error(
@@ -145,10 +145,7 @@ pub async fn register_external_project(
             );
         }
         if !pb.is_dir() {
-            return json_error(
-                StatusCode::BAD_REQUEST,
-                "workspace_path 必须指向一个目录",
-            );
+            return json_error(StatusCode::BAD_REQUEST, "workspace_path 必须指向一个目录");
         }
     }
 

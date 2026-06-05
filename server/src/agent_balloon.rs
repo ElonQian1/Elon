@@ -118,4 +118,3 @@ fn write_agents_md(workspace: &std::path::Path) -> anyhow::Result<()> {
     std::fs::write(workspace.join("AGENTS.md"), AGENTS_MD)?;
     Ok(())
 }
-

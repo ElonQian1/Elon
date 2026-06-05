@@ -283,7 +283,8 @@ async fn run_agent_session(
         _ => return Err(anyhow!("expected text register frame")),
     };
     let register: AgentToServer = serde_json::from_str(&text)?;
-    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id) = match register {
+    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id) = match register
+    {
         AgentToServer::Register {
             agent_id,
             version,
@@ -291,7 +292,14 @@ async fn run_agent_session(
             allowed_clis,
             allowed_cwds,
             owner_user_id,
-        } => (agent_id, version, allowed_clis, allowed_cwds, proto_version, owner_user_id),
+        } => (
+            agent_id,
+            version,
+            allowed_clis,
+            allowed_cwds,
+            proto_version,
+            owner_user_id,
+        ),
         _ => return Err(anyhow!("first frame must be register")),
     };
 
@@ -315,7 +323,11 @@ async fn run_agent_session(
     let resolved_owner_user_id = if owner_user_id.is_some() {
         owner_user_id.clone()
     } else if !secrets.contains_key(&agent_id) {
-        state.store.get_node_credential_owner(&agent_id).ok().flatten()
+        state
+            .store
+            .get_node_credential_owner(&agent_id)
+            .ok()
+            .flatten()
     } else {
         None
     };
@@ -349,12 +361,15 @@ async fn run_agent_session(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    state.node_registry.register(
-        agent_id.clone(),
-        resolved_owner_user_id.clone().unwrap_or_default(),
-        vec![],
-        connected_at,
-    ).await;
+    state
+        .node_registry
+        .register(
+            agent_id.clone(),
+            resolved_owner_user_id.clone().unwrap_or_default(),
+            vec![],
+            connected_at,
+        )
+        .await;
 
     // Writer: drain cmd_rx → ws_tx.
     let writer = tokio::spawn(async move {
@@ -410,7 +425,10 @@ async fn run_agent_session(
                             // Register/Pong without task_id — 处理节点专属消息
                             match &msg {
                                 AgentToServer::RegisterCapabilities { models } => {
-                                    state.node_registry.update_capabilities(&agent_id, models.clone()).await;
+                                    state
+                                        .node_registry
+                                        .update_capabilities(&agent_id, models.clone())
+                                        .await;
                                 }
                                 AgentToServer::Pong { .. } => {
                                     state.node_registry.touch(&agent_id).await;

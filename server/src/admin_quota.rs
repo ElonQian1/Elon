@@ -19,10 +19,7 @@ use std::sync::Arc;
 use crate::{admin::check_auth, project_auth::json_error, types::AppState};
 
 /// GET /api/admin/quotas
-pub async fn list_quotas(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn list_quotas(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     if !check_auth(&headers, &state.admin_token) {
         return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
     }

@@ -7,9 +7,6 @@ use std::{
 };
 use tokio::{io::AsyncWriteExt, process::Command, sync::mpsc::UnboundedSender};
 
-use crate::{
-    types::{AiCliOption, CliPromptMode},
-};
 use super::{
     ai_cli_streaming::{current_unix_millis, read_cli_stream, send_cli_heartbeat},
     ai_cli_trace::{
@@ -17,6 +14,7 @@ use super::{
         CliTraceContext,
     },
 };
+use crate::types::{AiCliOption, CliPromptMode};
 
 pub(crate) struct CliOutput {
     pub(crate) success: bool,
@@ -184,8 +182,7 @@ async fn run_cli_command(
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("default");
-        let gradle_home =
-            std::path::PathBuf::from("/opt/elon/gradle-homes").join(workspace_key);
+        let gradle_home = std::path::PathBuf::from("/opt/elon/gradle-homes").join(workspace_key);
         // 共享 Gradle 发行版目录：所有 worktree 复用已下载的 zip，节省带宽和时间
         #[cfg(unix)]
         {

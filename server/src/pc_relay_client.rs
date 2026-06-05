@@ -48,7 +48,12 @@ pub fn spawn_if_configured() {
         agent_id, cloud_url
     );
 
-    tokio::spawn(run_relay_loop(cloud_url, agent_id, agent_secret, local_port));
+    tokio::spawn(run_relay_loop(
+        cloud_url,
+        agent_id,
+        agent_secret,
+        local_port,
+    ));
 }
 
 async fn run_relay_loop(
@@ -61,12 +66,18 @@ async fn run_relay_loop(
     loop {
         match run_relay_session(&cloud_url, &agent_id, &agent_secret, local_port).await {
             Ok(()) => {
-                info!("[relay-client] 连接正常断开，{:.1}s 后重连", backoff.as_secs_f32());
+                info!(
+                    "[relay-client] 连接正常断开，{:.1}s 后重连",
+                    backoff.as_secs_f32()
+                );
                 // 正常断开后重置退避，快速重连
                 backoff = Duration::from_secs(2);
             }
             Err(e) => {
-                warn!("[relay-client] 连接错误: {e:#}，{:.1}s 后重连", backoff.as_secs_f32());
+                warn!(
+                    "[relay-client] 连接错误: {e:#}，{:.1}s 后重连",
+                    backoff.as_secs_f32()
+                );
             }
         }
         tokio::time::sleep(backoff).await;
@@ -82,10 +93,9 @@ async fn run_relay_session(
 ) -> Result<()> {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     let mut request = cloud_url.into_client_request()?;
-    request.headers_mut().insert(
-        "Authorization",
-        format!("Bearer {}", agent_secret).parse()?,
-    );
+    request
+        .headers_mut()
+        .insert("Authorization", format!("Bearer {}", agent_secret).parse()?);
 
     let (ws_stream, _) = connect_async(request).await?;
     info!("[relay-client] 已连接到云端 {}", cloud_url);
@@ -241,14 +251,14 @@ async fn handle_cli_prompt(
     out: mpsc::UnboundedSender<Message>,
 ) {
     info!("[relay-client] CliPrompt: cli={cli} req_id={req_id}");
-    let (exit_ok, error) =
-        match run_cli_and_stream(&req_id, &cli, &extra_args, &prompt, &out).await {
-            Ok(ok) => (ok, None),
-            Err(e) => {
-                warn!("[relay-client] CLI 执行失败: {e:#}");
-                (false, Some(e.to_string()))
-            }
-        };
+    let (exit_ok, error) = match run_cli_and_stream(&req_id, &cli, &extra_args, &prompt, &out).await
+    {
+        Ok(ok) => (ok, None),
+        Err(e) => {
+            warn!("[relay-client] CLI 执行失败: {e:#}");
+            (false, Some(e.to_string()))
+        }
+    };
     let done = AgentToServer::CliDone {
         req_id,
         exit_ok,
@@ -387,7 +397,9 @@ async fn handle_http_request(
         }
 
         if let Some(b64) = &body_b64 {
-            let body = B64.decode(b64).map_err(|e| anyhow!("body base64 decode: {e}"))?;
+            let body = B64
+                .decode(b64)
+                .map_err(|e| anyhow!("body base64 decode: {e}"))?;
             builder = builder.body(body);
         }
 

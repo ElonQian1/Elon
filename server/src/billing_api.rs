@@ -20,10 +20,7 @@ use crate::{
 
 // ── GET /api/me/balance ───────────────────────────────────────────────────────
 
-pub async fn get_my_balance(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn get_my_balance(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
         Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
@@ -49,10 +46,7 @@ pub async fn get_my_balance(
         }
     };
 
-    let month_cost = state
-        .store
-        .billing_get_month_cost(&user.id)
-        .unwrap_or(0);
+    let month_cost = state.store.billing_get_month_cost(&user.id).unwrap_or(0);
 
     Json(json!({
         "billing_enabled": true,
