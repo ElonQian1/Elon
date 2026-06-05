@@ -54,6 +54,9 @@ class SmartResponseGenerator(
     private val aiClient = AIClientFactory.create(context)
     private val appContext = context.applicationContext
 
+    /** 进度回调，由 [ConversationalVoiceAdapter] 注入，把 WS 实时推送展示到 UI */
+    var onProgress: ((String) -> Unit)? = null
+
     override suspend fun generate(intent: IntentAnalysisResult): Response {
         Log.d(TAG, "🎭 [响应生成开始] input=${intent.normalizedInput}, operation=${intent.isOperation}, complete=${intent.isComplete}")
 
@@ -145,6 +148,10 @@ class SmartResponseGenerator(
                 Message(role = "system", content = ASSISTANT_PERSONA),
                 Message(role = "user", content = intent.normalizedInput)
             )
+
+            // 如果底层是 ElonServerAIClient，把 onProgress 回调传入，这样 WS 实时推送能到 UI
+            (aiClient as? com.elon.app.agent.infrastructure.ai.ElonServerAIClient)
+                ?.let { it.onProgress = onProgress }
             
             val response = aiClient.chat(messages)
             val elapsed = System.currentTimeMillis() - startTime

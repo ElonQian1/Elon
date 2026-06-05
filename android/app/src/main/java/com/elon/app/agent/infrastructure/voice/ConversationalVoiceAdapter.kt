@@ -365,14 +365,23 @@ class ConversationalVoiceAdapter(
         Log.i(TAG, if (analyzer != null) "✅ 已设置智能意图分析器" else "⚠️ 未设置意图分析器，使用关键词匹配")
     }
     
+    /** 当前注册的响应生成器（供 Activity onDestroy 时释放 WS 等资源） */
+    val currentResponseGenerator: ResponseGenerator?
+        get() = conversationManager.responseGenerator
+
     /**
-     * 设置响应生成器（智能对话模式）
      *
      * 如果设置，会使用 AI 生成自然对话回复
      */
     fun setResponseGenerator(generator: ResponseGenerator?) {
         // CliResponseGenerator：注入 onProgress 回调，把服务器步骤提示转发给 UI
         if (generator is CliResponseGenerator) {
+            generator.onProgress = { step ->
+                mainHandler.post { listener?.onProgress(step) }
+            }
+        }
+        // SmartResponseGenerator：同样连接 onProgress，这样 WS 进度也能实时显示
+        if (generator is SmartResponseGenerator) {
             generator.onProgress = { step ->
                 mainHandler.post { listener?.onProgress(step) }
             }

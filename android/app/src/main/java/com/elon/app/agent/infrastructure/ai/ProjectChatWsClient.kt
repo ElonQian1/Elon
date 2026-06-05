@@ -6,10 +6,14 @@
 package com.elon.app.agent.infrastructure.ai
 
 import android.util.Log
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.*
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * 🔌 项目 WebSocket 对话客户端
@@ -113,6 +117,36 @@ class ProjectChatWsClient(
     }
 
     val isConnected: Boolean get() = connected.get()
+
+    /**
+     * suspend 版一轮对话：发消息，等待 done/error，返回最终文本。
+     * 全程 WS 全双工，progress/assistant_message 实时回调 [onProgress]。
+     *
+     * @throws Exception 连接失败 / 服务器返回 error / 被取消
+     */
+    suspend fun chat(
+        message: String,
+        conversationId: String? = null,
+        onProgress: ((String) -> Unit)? = null,
+    ): String = suspendCancellableCoroutine { cont: CancellableContinuation<String> ->
+        ensureConnected()
+        sendMessage(message, conversationId, object : Listener {
+            override fun onProgress(message: String) {
+                onProgress?.invoke(message)
+            }
+            override fun onAssistantMessage(text: String) {
+                // 实时流式文字，同样通过 onProgress 通道推给 UI
+                onProgress?.invoke(text)
+            }
+            override fun onDone(reply: String) {
+                if (cont.isActive) cont.resume(reply)
+            }
+            override fun onError(message: String) {
+                if (cont.isActive) cont.resumeWithException(Exception(message))
+            }
+        })
+        cont.invokeOnCancellation { /* WS 保持连接，不断开；让调用方决定是否 disconnect */ }
+    }
 
     // ─── 内部状态 ───────────────────────────────────────────
 

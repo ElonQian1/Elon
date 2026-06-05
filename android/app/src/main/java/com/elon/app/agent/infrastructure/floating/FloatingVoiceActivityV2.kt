@@ -654,6 +654,9 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
+        // 断开 WS 连接（如果底层是 ElonServerAIClient）
+        (voiceAdapter.currentResponseGenerator as? com.elon.app.agent.infrastructure.ai.ElonServerAIClient)
+            ?.releaseWs()
         voiceAdapter.destroy()
         ttsService?.destroy()
     }
