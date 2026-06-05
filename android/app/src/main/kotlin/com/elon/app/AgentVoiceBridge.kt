@@ -136,7 +136,6 @@ internal class AgentVoiceBridge(context: Context) {
         coldStartRetryOnSame = 0
         sessionConflictRetry = 0
         offlineFallbackTried = false
-        asr.preferOffline = true   // 每次会话默认优先离线（不依赖网络）
         main.post { startWithCurrentCandidate() }
     }
 
@@ -296,7 +295,6 @@ internal class AgentVoiceBridge(context: Context) {
         val retryable = isEngineFailure(code) && !sawAnyPartial && current != null
         if (!retryable) {
             isRunning = false
-            // 当前引擎确认失败：记录健康状态供 UI 显示
             if (current != null) {
                 EnginePreference.setHealth(appContext, current.key(), EngineHealth.FAILED, code, message)
             }
@@ -307,24 +305,6 @@ internal class AgentVoiceBridge(context: Context) {
                 onError(friendly)
                 onEnd()
             }
-            return
-        }
-
-        // 🔑 离线优先失败 → 回退在线重试同一引擎一次。
-        // 处理"设备没装离线语音包"的情况：离线起不来时用在线再试，
-        // 避免因强制离线反而完全识别不了。每个引擎只回退一次。
-        if (asr.preferOffline && !offlineFallbackTried && !sawAnyPartial && current != null) {
-            offlineFallbackTried = true
-            asr.preferOffline = false
-            Log.i(TAG, "离线模式失败(code=$code)，回退在线重试同引擎 ${current.label}")
-            val mySeq = ++transitionSeq
-            main.postDelayed({
-                if (isRunning && mySeq == transitionSeq) {
-                    asr.resetEngine()
-                    listeningStartedAt = System.currentTimeMillis()
-                    asr.startListening()
-                }
-            }, 150L)
             return
         }
 

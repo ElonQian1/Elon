@@ -68,6 +68,9 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     @Volatile
     private var isActivityResumed = false
 
+    /** 是否经历过至少一次 onPause（区分首次启动 vs 从后台回来）。*/
+    private var hasEverPaused = false
+
     // ==================== 权限请求 ====================
     
     private val requestPermissionLauncher = registerForActivityResult(
@@ -630,20 +633,21 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         isActivityResumed = true
-        // 从后台回到前台：如果对话已结束（IDLE）则重新开始监听。
-        // 这样就算 onPause 停了 ASR，回前台也能继续说话。
-        handler.postDelayed({
-            if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
-                voiceAdapter.restartListening()
-            }
-        }, 500)
+        // 只在「从后台回来」时才补重启，首次启动由 startConversation 负责，不在这里干预。
+        if (hasEverPaused) {
+            handler.postDelayed({
+                if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
+                    voiceAdapter.restartListening()
+                }
+            }, 500)
+        }
     }
 
     override fun onPause() {
         super.onPause()
         isActivityResumed = false
-        // 退到后台时停採收 ASR，避免后台空跑麦克风。
-        // 不再取消 handler callbacks：因为 onResume 已会重新处理 IDLE 状态。
+        hasEverPaused = true
+        // 退到后台时停采收 ASR，避免后台空跑麦克风。
         voiceAdapter.stop()
     }
 
