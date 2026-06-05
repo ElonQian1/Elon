@@ -32,7 +32,7 @@ class ConversationManager {
         
         // 默认超时配置
         private const val LISTENING_TIMEOUT_MS = 10_000L   // 听取超时
-        private const val THINKING_TIMEOUT_MS = 5_000L     // 思考超时
+        private const val THINKING_TIMEOUT_MS = 60_000L    // 思考超时（WS 需要时间，60s）
         private const val SPEAKING_TIMEOUT_MS = 30_000L    // 说话超时
     }
     

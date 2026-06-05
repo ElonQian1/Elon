@@ -71,6 +71,9 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     /** 是否经历过至少一次 onPause（区分首次启动 vs 从后台回来）。*/
     private var hasEverPaused = false
 
+    /** 防重入标志：确保任意时刻只有一个 restartListening 在队列里。*/
+    private var restartPending = false
+
     // ==================== 权限请求 ====================
     
     private val requestPermissionLauncher = registerForActivityResult(
@@ -318,17 +321,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             runOnUiThread {
                 statusText.text = "\uD83C\uDFA4 继续说\u2026"
                 voiceIndicator.text = "\uD83C\uDFA4"
-
-                // 回复后 0.8s 自动重启监听：用户说完一句、听到回复，再说下一句，中间不需要点击任何东西
-                handler.postDelayed({
-                    if (voiceAdapter.currentState.value == ConversationState.IDLE && !isFinishing) {
-                        Log.i(TAG, "\uD83D\uDD04 \u81ea\u52a8\u5f00\u59cb\u4e0b\u4e00\u8f6e\u5bf9\u8bdd")
-                        resultText.text = ""
-                        responseText.text = ""
-                        responseText.visibility = android.view.View.GONE
-                        voiceAdapter.restartListening()
-                    }
-                }, 800) // 从 3000ms 缩短到 800ms，回复后迅速重启等待用户继续说话
+                scheduleRestartListening(800L)
             }
         }
     }
@@ -406,7 +399,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                         resultText.text = ""
                         responseText.text = ""
                         responseText.visibility = android.view.View.GONE
-                        voiceAdapter.restartListening()
+                        scheduleRestartListening(0L)
                     }
                     ConversationState.SPEAKING -> {
                         // 正在说话时点击 = 打断
@@ -550,7 +543,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                     resultText.text = ""
                     responseText.text = ""
                     responseText.visibility = android.view.View.GONE
-                    voiceAdapter.restartListening()
+                    scheduleRestartListening(0L)
                 }
                 // 其他状态不做任何事，也不关闭窗口
             }
@@ -625,9 +618,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         statusText.text = "请说话..."
         voiceIndicator.text = "🔴"
         // 延迟到 onResume 之后再重启，确保窗口已在前台能拿到麦克风
-        handler.postDelayed({
-            if (!isFinishing) voiceAdapter.restartListening()
-        }, 300)
+        scheduleRestartListening(300L)
     }
 
     override fun onResume() {
@@ -635,11 +626,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         isActivityResumed = true
         // 只在「从后台回来」时才补重启，首次启动由 startConversation 负责，不在这里干预。
         if (hasEverPaused) {
-            handler.postDelayed({
-                if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
-                    voiceAdapter.restartListening()
-                }
-            }, 500)
+            scheduleRestartListening(500L)
         }
     }
 
@@ -654,7 +641,27 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacksAndMessages(null)
+        restartPending = false
         voiceAdapter.destroy()
         ttsService?.destroy()
+    }
+
+    /**
+     * 防重入的 restartListening 调度器。
+     * 确保任意时刻 handler 队列里只有一个延迟重启任务，避免多个触发第导致“重新开始聚听”连读三次。
+     */
+    private fun scheduleRestartListening(delayMs: Long) {
+        if (restartPending) return
+        restartPending = true
+        handler.postDelayed({
+            restartPending = false
+            if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
+                Log.i(TAG, "🔄 自动开始下一轮对话")
+                resultText.text = ""
+                responseText.text = ""
+                responseText.visibility = android.view.View.GONE
+                voiceAdapter.restartListening()
+            }
+        }, delayMs)
     }
 }

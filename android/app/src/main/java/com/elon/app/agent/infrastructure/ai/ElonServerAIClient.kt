@@ -120,14 +120,16 @@ class ElonServerAIClient(
         }
 
         // 2. HTTP CLI 兜底（WS 不可用时）
+        // 强制 chatOnly=true：悬浮球请求不应触发 Codex 代码开发工作流（会尝试创建 worktree 等），
+        // 只走闲聊/轻量 LLM 路径即可。手机控制脚本由 AGENTS.md + WS 生成，不需要 Codex 工作流。
         if (projectId != null) {
             try {
-                Log.d(TAG, "→ HTTP CLI project=$projectId  msg=${fullMsgForCli.take(60)}")
+                Log.d(TAG, "→ HTTP CLI project=$projectId  msg=${userMsg.take(40)}")
                 val (reply, newConvId) = server.chat(
                     projectId = projectId,
-                    message = fullMsgForCli,
+                    message = userMsg,
                     conversationId = cliConversationId,
-                    chatOnly = false
+                    chatOnly = true   // ← 悬浮球始终 chat_only，不走 Codex 工作流
                 )
                 if (newConvId != null) cliConversationId = newConvId
                 if (reply.isNotBlank() && reply != "（服务器未返回回复）") return reply
