@@ -16,7 +16,7 @@ use crate::{
     project_conversation_identity, project_deletion, project_downloads, project_git,
     project_join_requests, project_membership, project_space, project_store, release_claim,
     speech_translate, token_usage_api, user_api, user_memory_api, voice_asr_upload,
-    voice_ws_transcribe, voice_ws_virtual_mic, web, lm_chat, agent_balloon,
+    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web, lm_chat, agent_balloon,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -275,6 +275,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/ws/voice/transcribe",
             get(voice_ws_transcribe::ws_transcribe_handler),
+        )
+        // 方案 C：Android PCM ↔ OpenAI Realtime speech-to-speech，全双工一龙AI通话
+        .route(
+            "/ws/voice/realtime-chat",
+            get(voice_ws_realtime_chat::ws_realtime_chat_handler),
         )
         .route(
             "/api/user/:user_id/projects/:project_id",

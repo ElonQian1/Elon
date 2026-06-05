@@ -49,6 +49,16 @@ pub enum ServerEvent {
     VirtualMicFed { bytes: u64 },
     /// CLI 投递结果（方案 B 转写完成后）。
     CliDispatched { ok: bool, message: String },
+    /// Realtime Chat：检测到用户开始说话，客户端应立即清空未播放的 AI 音频。
+    RealtimeSpeechStarted,
+    /// Realtime Chat：检测到用户停止说话。
+    RealtimeSpeechStopped,
+    /// Realtime Chat：AI 回复字幕增量。
+    RealtimeAiTranscriptDelta { text: String },
+    /// Realtime Chat：AI 回复字幕完成。
+    RealtimeAiTranscriptDone { text: String },
+    /// Realtime Chat：一次模型回复完成。
+    RealtimeResponseDone,
     /// 通用错误。
     Error { code: &'static str, message: String },
 }

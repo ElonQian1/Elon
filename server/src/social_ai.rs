@@ -3,6 +3,7 @@
 //! 这里只做普通文本问答：不接工具、不修改代码、不触发构建。
 
 use anyhow::{anyhow, Result};
+use chrono::{SecondsFormat, Utc};
 use serde_json::json;
 use std::{
     collections::HashSet,
@@ -444,7 +445,39 @@ pub(crate) async fn resolve_social_agent(state: &Arc<AppState>) -> Result<AgentC
         .ok_or_else(|| anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"))
 }
 
-pub(crate) fn social_ai_prompt() -> &'static str {
+pub(crate) fn social_ai_prompt() -> String {
+    format!(
+        "{}\n\n{}",
+        social_ai_base_prompt(),
+        realtime_context_prompt(),
+    )
+}
+
+pub(crate) fn realtime_social_ai_prompt(history: &[SocialAiHistoryMessage]) -> String {
+    let history_block = if history.is_empty() {
+        "最近聊天：暂无历史消息。".to_string()
+    } else {
+        format!("最近聊天（从旧到新）：\n{}", format_history(history))
+    };
+    format!(
+        "{}\n\n{}\n\n{}\n\n这是实时语音通话。你会直接用声音回答用户，尽量用短句，自然停顿，像正在和熟人通电话。用户可能随时插话，被打断时先听用户新的意思，再继续回答。",
+        social_ai_base_prompt(),
+        realtime_context_prompt(),
+        history_block,
+    )
+}
+
+fn realtime_context_prompt() -> String {
+    let now_utc = Utc::now();
+    let now_cn = now_utc + chrono::Duration::hours(8);
+    format!(
+        "当前真实时间：{} UTC；北京时间：{}。回答涉及今天、现在、日期、时间、星期、节日或时效信息时，必须以这里的当前真实时间为准，不要使用模型训练截止时间，也不要回答成 2024 年。",
+        now_utc.to_rfc3339_opts(SecondsFormat::Secs, true),
+        now_cn.format("%Y年%-m月%-d日 %H:%M:%S"),
+    )
+}
+
+fn social_ai_base_prompt() -> &'static str {
     r#"你是「EL」，一龙好友聊天和群聊里的文本 AI 助手。
 
 你只做普通文本解答：可以解释、总结、建议、安慰、帮忙梳理想法，但不能写代码、不能修改项目、不能运行命令、不能构建或发布。

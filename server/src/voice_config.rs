@@ -85,3 +85,47 @@ impl RealtimeTranscribeConfig {
             .filter(|v| !v.is_empty())
     }
 }
+
+/// 方案 C（Realtime 全双工语音对话）配置。
+#[derive(Debug, Clone)]
+pub struct RealtimeChatConfig {
+    /// OpenAI Realtime WebSocket URL，可只填基础 URL，代码会自动追加 model 参数。
+    pub ws_url: String,
+    /// 语音到语音模型，例如 `gpt-realtime-2`。
+    pub model: String,
+    /// 输出音色。
+    pub voice: String,
+    /// API Key 环境变量名。
+    pub api_key_env: String,
+}
+
+impl RealtimeChatConfig {
+    pub fn from_env() -> Self {
+        Self {
+            ws_url: env::var("ELON_VOICE_REALTIME_CHAT_URL")
+                .unwrap_or_else(|_| "wss://api.openai.com/v1/realtime".to_string()),
+            model: env::var("ELON_VOICE_REALTIME_CHAT_MODEL")
+                .unwrap_or_else(|_| "gpt-realtime-2".to_string()),
+            voice: env::var("ELON_VOICE_REALTIME_CHAT_VOICE")
+                .unwrap_or_else(|_| "marin".to_string()),
+            api_key_env: env::var("ELON_VOICE_API_KEY_ENV")
+                .unwrap_or_else(|_| "OPENAI_API_KEY".to_string()),
+        }
+    }
+
+    pub fn websocket_url(&self) -> String {
+        if self.ws_url.contains("model=") {
+            self.ws_url.clone()
+        } else {
+            let separator = if self.ws_url.contains('?') { '&' } else { '?' };
+            format!("{}{}model={}", self.ws_url, separator, self.model)
+        }
+    }
+
+    pub fn read_api_key(&self) -> Option<String> {
+        env::var(&self.api_key_env)
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty())
+    }
+}
