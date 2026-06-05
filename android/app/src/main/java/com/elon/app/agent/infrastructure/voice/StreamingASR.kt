@@ -63,6 +63,14 @@ class StreamingASR(private val context: Context) {
     var language: String = "zh-CN"
 
     /**
+     * 是否优先离线识别（不依赖网络）。
+     * 默认 true：很多 ROM 的系统语音引擎默认走云端（useLocal=false），
+     * 一旦网络差（如打开某些 App 后占用带宽）就会"网络超时"导致识别失败。
+     * 请求离线优先可让识别在本机完成，不受网络影响。
+     */
+    var preferOffline: Boolean = true
+
+    /**
      * 指定使用的识别服务组件。
      *  - null：调用 [SpeechRecognizer.createSpeechRecognizer]（系统默认）；
      *  - 非 null：调用 [SpeechRecognizer.createSpeechRecognizer]（context, component）强制指定。
@@ -120,6 +128,11 @@ class StreamingASR(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)  // 关键：启用部分结果
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+
+            // 🔑 优先离线识别：避免系统语音引擎默认走云端、网络差时"网络超时"
+            if (preferOffline) {
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            }
 
             // 如果使用智能VAD，延长系统默认静音时间
             if (useSmartVAD) {

@@ -74,6 +74,8 @@ internal class AgentVoiceBridge(context: Context) {
     private var sessionConflictRetry: Int = 0
     /** 本次 startListening 的开始时间（毫秒），用于判定"冷启动瞬时失败" */
     private var listeningStartedAt: Long = 0L
+    /** 本次会话是否已经因离线模式失败回退过在线（每个引擎只回退一次）*/
+    private var offlineFallbackTried: Boolean = false
 
     init {
         asr.callback = object : StreamingASRCallback {
@@ -133,6 +135,8 @@ internal class AgentVoiceBridge(context: Context) {
         busyRetryOnSame = 0
         coldStartRetryOnSame = 0
         sessionConflictRetry = 0
+        offlineFallbackTried = false
+        asr.preferOffline = true   // 每次会话默认优先离线（不依赖网络）
         main.post { startWithCurrentCandidate() }
     }
 
@@ -306,6 +310,24 @@ internal class AgentVoiceBridge(context: Context) {
             return
         }
 
+        // 🔑 离线优先失败 → 回退在线重试同一引擎一次。
+        // 处理"设备没装离线语音包"的情况：离线起不来时用在线再试，
+        // 避免因强制离线反而完全识别不了。每个引擎只回退一次。
+        if (asr.preferOffline && !offlineFallbackTried && !sawAnyPartial && current != null) {
+            offlineFallbackTried = true
+            asr.preferOffline = false
+            Log.i(TAG, "离线模式失败(code=$code)，回退在线重试同引擎 ${current.label}")
+            val mySeq = ++transitionSeq
+            main.postDelayed({
+                if (isRunning && mySeq == transitionSeq) {
+                    asr.resetEngine()
+                    listeningStartedAt = System.currentTimeMillis()
+                    asr.startListening()
+                }
+            }, 150L)
+            return
+        }
+
         // 当前引擎放弃了，标记 FAILED，然后切下一个
         if (current != null) {
             EnginePreference.setHealth(appContext, current.key(), EngineHealth.FAILED, code, message)
@@ -313,6 +335,7 @@ internal class AgentVoiceBridge(context: Context) {
         candidateIndex += 1
         busyRetryOnSame = 0
         coldStartRetryOnSame = 0
+        offlineFallbackTried = false
         transitionSeq += 1
         val nextLabel = candidates.getOrNull(candidateIndex)?.label ?: "<无>"
         Log.i(TAG, "回退到下一个引擎: $nextLabel (上一个: ${current!!.label}, code=$code)")
