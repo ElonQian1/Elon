@@ -26,6 +26,7 @@ internal class MainInputActions(
     private val navigationController: () -> MainNavigationController,
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
+    private val isDirectSocialAiChatActive: () -> Boolean,
     private val isSocialAiChatActive: () -> Boolean,
     private val trySendFriendMessage: (String, List<PendingAttachment>) -> Boolean,
     private val forkForRunningInput: (String, String) -> ForkedConversation,
@@ -392,6 +393,7 @@ internal class MainInputActions(
             isVoiceMode = { voiceMode },
             setVoiceMode = { voiceMode = it },
             ttsSpeakerButton = { inputComposerViewsOrNull()?.ttsSpeakerButton },
+            isDirectSocialAiChatActive = isDirectSocialAiChatActive,
             collapseAttachmentPanel = { attachmentPanelActions.collapseAttachmentPanel() },
             collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             updateSendButtonVisual = ::updateSendButtonVisual,
@@ -436,6 +438,7 @@ internal class MainInputActions(
             setVoiceMode = { voiceMode = it },
             applyVoiceMode = { voiceModeActions.applyVoiceMode() },
             isFriendChatActive = isFriendChatActive,
+            isDirectSocialAiChatActive = isDirectSocialAiChatActive,
             isSocialAiChatActive = isSocialAiChatActive,
             sendTextDirect = { text ->
                 binding.inputEdit.setText(text)

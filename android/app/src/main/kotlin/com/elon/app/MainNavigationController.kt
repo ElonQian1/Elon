@@ -27,7 +27,10 @@ internal class MainNavigationController(
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
     private val showContactChatSettings: () -> Unit,
-    private val showAddFriendDialog: () -> Unit,
+    private val isDirectSocialAiChatActive: () -> Boolean,
+    private val openSocialAiVoiceCall: () -> Unit,
+    private val showFriendLocalSearch: () -> Unit,
+    private val exitFriendLocalSearch: () -> Boolean,
     private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
@@ -78,6 +81,7 @@ internal class MainNavigationController(
             binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.projectMembersButton.visibility = View.GONE
+            hideVoiceCallButton()
             binding.moreButton.visibility = View.GONE
             binding.addButton.setOnClickListener {
                 showHomeActionPopup(binding.addButton, tab)
@@ -109,8 +113,9 @@ internal class MainNavigationController(
             showConversationActions(0)
             true
         }
-        binding.searchButton.setOnClickListener { showAddFriendDialog() }
+        binding.searchButton.setOnClickListener { showFriendLocalSearch() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
+        binding.voiceCallButton.setOnClickListener { openSocialAiVoiceCall() }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
     }
@@ -166,6 +171,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "Agent 自动化"
@@ -182,6 +188,7 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
+        if (exitFriendLocalSearch()) return
         if (isMessageSelectionActive()) {
             clearMessageSelection()
             return
@@ -571,6 +578,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.moreButton.contentDescription = "聊天功能"
@@ -595,6 +603,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.VISIBLE
         binding.addButton.visibility = View.VISIBLE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabChat)
@@ -616,6 +625,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
+        updateFriendVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setOnClickListener { showContactChatSettings() }
         binding.moreButton.contentDescription = "聊天设置"
@@ -637,6 +647,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabProject)
@@ -660,6 +671,7 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "项目广场"
@@ -679,6 +691,7 @@ internal class MainNavigationController(
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.VISIBLE
         binding.projectMembersButton.setOnClickListener { showProjectMembers() }
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
@@ -697,11 +710,24 @@ internal class MainNavigationController(
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
+        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.quickActionStrip.visibility = View.GONE
         binding.stageHintText.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
+    }
+
+    private fun hideVoiceCallButton() {
+        binding.voiceCallButton.visibility = View.GONE
+    }
+
+    private fun updateFriendVoiceCallButton() {
+        binding.voiceCallButton.visibility = if (isDirectSocialAiChatActive()) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {
@@ -711,7 +737,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
-        val color = Color.parseColor(if (selected) "#F2F5FA" else "#A6AFBD")
+        val color = Color.parseColor(if (selected) "#58BE6A" else "#A6AFBD")
         tab.isSelected = selected
         tab.setTextColor(color)
         tab.textSize = 12f

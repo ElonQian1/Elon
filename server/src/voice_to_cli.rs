@@ -1,6 +1,6 @@
-//! 方案 B：转写完成后把文本投递到现有项目聊天 AI 链路。
+//! 方案 B：转写完成后把文本投递到项目聊天或一龙AI 私聊。
 //!
-//! 入参：user_id / project_id / conversation_id / transcript / ai_reply_tx
+//! 入参：user_id / voice_target / project_id / conversation_id / transcript / ai_reply_tx
 //! 出参：DispatchOutcome（立即返回，AI 回复通过 ai_reply_tx 异步流回）
 
 use anyhow::Result;
@@ -8,12 +8,16 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    project_auth::project_access, project_chat::run_project_agent_with_scheduler,
-    project_execution_mode::ProjectExecutionMode, types::AppState,
+    project_auth::project_access,
+    project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode,
+    types::AppState,
+    voice_protocol::VOICE_TARGET_SOCIAL_AI_DIRECT,
 };
 
 pub struct DispatchTarget {
     pub user_id: String,
+    pub voice_target: Option<String>,
     pub project_id: Option<String>,
     pub conversation_id: Option<String>,
 }
@@ -36,6 +40,10 @@ pub async fn dispatch_transcript(
     transcript: &str,
     ai_reply_tx: UnboundedSender<String>,
 ) -> Result<DispatchOutcome> {
+    if target.voice_target.as_deref() == Some(VOICE_TARGET_SOCIAL_AI_DIRECT) {
+        return dispatch_to_direct_social_ai(state, target, transcript, ai_reply_tx).await;
+    }
+
     let project_id = target
         .project_id
         .as_deref()
@@ -89,5 +97,38 @@ pub async fn dispatch_transcript(
     Ok(DispatchOutcome {
         ok: true,
         message: format!("语音指令已投递（{char_count} 字）"),
+    })
+}
+
+async fn dispatch_to_direct_social_ai(
+    state: &Arc<AppState>,
+    target: &DispatchTarget,
+    transcript: &str,
+    ai_reply_tx: UnboundedSender<String>,
+) -> Result<DispatchOutcome> {
+    let message = transcript.trim();
+    if message.is_empty() {
+        return Ok(DispatchOutcome {
+            ok: false,
+            message: "转写文本为空，已忽略".into(),
+        });
+    }
+
+    tracing::info!(
+        target: "voice",
+        user_id = %target.user_id,
+        chars = message.chars().count(),
+        "voice_to_cli: 投递转写文本到一龙AI私聊"
+    );
+
+    crate::social_ai::spawn_direct_friend_voice_reply(
+        state.clone(),
+        target.user_id.clone(),
+        message,
+        ai_reply_tx,
+    )?;
+    Ok(DispatchOutcome {
+        ok: true,
+        message: "一龙AI 正在回复".into(),
     })
 }

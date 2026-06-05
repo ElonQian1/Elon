@@ -25,6 +25,7 @@ internal class RealtimeVoiceWsClient(
     private val baseHttpUrl: String,
     private val mode: Mode,
     private val userId: String,
+    private val target: String? = null,
     private val projectId: String? = null,
     private val conversationId: String? = null,
     private val listener: Listener,
@@ -32,6 +33,10 @@ internal class RealtimeVoiceWsClient(
     enum class Mode(val path: String, val label: String) {
         VirtualMic("/ws/voice/virtual-mic", "virtual_mic"),
         Transcribe("/ws/voice/transcribe", "transcribe"),
+    }
+
+    object Target {
+        const val SocialAiDirect = "social_ai_direct"
     }
 
     interface Listener {
@@ -58,6 +63,9 @@ internal class RealtimeVoiceWsClient(
     private var ws: WebSocket? = null
 
     @Volatile
+    private var closeRequested: Boolean = false
+
+    @Volatile
     var isOpen: Boolean = false
         private set
 
@@ -67,12 +75,14 @@ internal class RealtimeVoiceWsClient(
             .replaceFirst(Regex("^https://"), "wss://")
             .trimEnd('/') + mode.path
         val req = Request.Builder().url(wsUrl).build()
+        closeRequested = false
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 isOpen = true
                 val hello = JSONObject().apply {
                     put("type", "hello")
                     put("user_id", userId)
+                    if (!target.isNullOrBlank()) put("target", target)
                     if (!projectId.isNullOrBlank()) put("project_id", projectId)
                     if (!conversationId.isNullOrBlank()) put("conversation_id", conversationId)
                     put("sample_rate", RealtimePcmRecorder.SAMPLE_RATE_HZ)
@@ -87,6 +97,7 @@ internal class RealtimeVoiceWsClient(
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 isOpen = false
+                closeRequested = true
                 webSocket.close(1000, null)
             }
 
@@ -100,7 +111,14 @@ internal class RealtimeVoiceWsClient(
                 isOpen = false
                 shutdownOkHttp()
                 Log.w("RealtimeVoiceWs", "ws failure", t)
-                listener.onServerError("ws_failure", t.message ?: "unknown")
+                if (closeRequested) {
+                    listener.onClosed()
+                    return
+                }
+                val detail = t.message
+                    ?: t.javaClass.simpleName.takeIf { it.isNotBlank() }
+                    ?: "连接异常"
+                listener.onServerError("ws_failure", detail)
                 listener.onClosed()
             }
         })
@@ -118,6 +136,7 @@ internal class RealtimeVoiceWsClient(
         val current = ws
         ws = null
         isOpen = false
+        closeRequested = true
         runCatching { current?.send("""{"type":"close"}""") }
         runCatching { current?.close(1000, "client close") }
         shutdownOkHttp()

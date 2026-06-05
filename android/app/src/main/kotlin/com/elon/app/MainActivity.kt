@@ -8,6 +8,7 @@ import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.widget.PopupWindow
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
@@ -158,6 +159,9 @@ class MainActivity : AppCompatActivity() {
             stageHintShimmer = { stageHintShimmer() },
             isFriendChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
+            },
+            isDirectSocialAiChatActive = {
+                friendChatActions.isDirectSocialAiActive()
             },
             isSocialAiChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive()
@@ -454,7 +458,10 @@ class MainActivity : AppCompatActivity() {
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
             showContactChatSettings = { showActiveContactChatSettings() },
-            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            isDirectSocialAiChatActive = { friendChatActions.isDirectSocialAiActive() },
+            openSocialAiVoiceCall = { openSocialAiVoiceCall() },
+            showFriendLocalSearch = { homeListActions.showFriendLocalSearch() },
+            exitFriendLocalSearch = { homeListActions.exitFriendLocalSearch() },
             refreshFriends = {
                 friendActions.loadFriends()
                 groupActions.loadGroups()
@@ -502,6 +509,14 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.currentFriend()?.let {
             chatSettingsActions.showFriendSettings(it)
         }
+    }
+
+    private fun openSocialAiVoiceCall() {
+        if (!friendChatActions.isDirectSocialAiActive()) {
+            Toast.makeText(this, "实时语音目前只支持一龙AI 私聊", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
     }
 
     private val marketplaceActions: MainMarketplaceActions by lazy {

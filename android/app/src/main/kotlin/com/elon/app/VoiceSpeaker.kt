@@ -39,6 +39,7 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     private val appContext: Context = context.applicationContext
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     private var ready = false
+    private var pendingText: String? = null
 
     /** 上一条 utterance 是否还在播放（用于打断判断）。 */
     val isSpeaking: Boolean get() = tts?.isSpeaking == true
@@ -63,6 +64,10 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
             override fun onError(utteranceId: String?) {}
         })
         ready = true
+        pendingText?.let { text ->
+            pendingText = null
+            speak(text)
+        }
         Log.d(TAG, "TTS 初始化成功")
     }
 
@@ -71,22 +76,28 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
      * 超长文本截断到 [MAX_SPEAK_CHARS] 字符，避免朗读时间过长。
      */
     fun speak(text: String) {
-        if (!ready) return
         if (!isTtsEnabled(appContext)) return
-        val engine = tts ?: return
         val content = text.trim().take(MAX_SPEAK_CHARS)
         if (content.isEmpty()) return
+        val engine = tts
+        if (!ready || engine == null) {
+            pendingText = content
+            return
+        }
+        pendingText = null
         val params = Bundle()
         engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
     }
 
     /** 立即停止当前朗读（用户开始新一轮语音输入时调用）。 */
     fun stop() {
+        pendingText = null
         if (tts?.isSpeaking == true) tts?.stop()
     }
 
     /** 释放资源（Activity onDestroy）。 */
     fun release() {
+        pendingText = null
         tts?.stop()
         tts?.shutdown()
         tts = null

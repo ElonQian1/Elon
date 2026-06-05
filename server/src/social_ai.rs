@@ -8,13 +8,14 @@ use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
 };
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
 use crate::{
     agent_llm_call::call_chat_llm,
     friend_events, intent_router,
     store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
-    types::{AgentConfig, AppState},
+    types::{AgentConfig, AppState, WsMessage},
 };
 
 static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
@@ -88,6 +89,57 @@ pub(crate) fn spawn_direct_friend_reply(
             );
         }
     });
+}
+
+pub(crate) fn spawn_direct_friend_voice_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    transcript: &str,
+    ai_reply_tx: UnboundedSender<String>,
+) -> Result<()> {
+    let content = transcript.trim();
+    if content.is_empty() {
+        let _ = ai_reply_tx.send(WsMessage::error("转写文本为空，已忽略").to_json());
+        return Ok(());
+    }
+    let message = state
+        .store
+        .send_friend_message(&user_id, SOCIAL_AI_USER_ID, content, None)?;
+    let trigger_message_id = message.id.clone();
+    friend_events::publish_friend_message(&message);
+    info!(
+        "direct social AI voice reply queued: user_id={} trigger_message_id={}",
+        user_id, trigger_message_id
+    );
+    tokio::spawn(async move {
+        let result = reply_to_direct_friend(state, user_id).await;
+        match result {
+            Ok(reply) => {
+                let _ = ai_reply_tx.send(
+                    WsMessage::Done {
+                        message: reply,
+                        apk_url: None,
+                        image_url: None,
+                        model_used: None,
+                        node_id: None,
+                    }
+                    .to_json(),
+                );
+                info!(
+                    "direct social AI voice reply stored: trigger_message_id={}",
+                    trigger_message_id
+                );
+            }
+            Err(error) => {
+                warn!("direct social AI voice reply failed: {}", error);
+                let _ = ai_reply_tx.send(WsMessage::error(format!(
+                    "一龙AI 语音回复失败：{}",
+                    error
+                )).to_json());
+            }
+        }
+    });
+    Ok(())
 }
 
 fn spawn_friend_pending_reply(
@@ -212,7 +264,7 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
     Ok(())
 }
 
-async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result<()> {
+async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result<String> {
     let history =
         state
             .store
@@ -222,7 +274,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
             .store
             .insert_direct_social_ai_reply(&user_id, DEVELOPMENT_REDIRECT_REPLY)?;
         friend_events::publish_friend_bridge_message(&message, &summary);
-        return Ok(());
+        return Ok(DEVELOPMENT_REDIRECT_REPLY.to_string());
     }
     let reply =
         social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history).await;
@@ -230,7 +282,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
         .store
         .insert_direct_social_ai_reply(&user_id, &reply)?;
     friend_events::publish_friend_message(&message);
-    Ok(())
+    Ok(reply)
 }
 
 async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String) -> Result<()> {
@@ -400,6 +452,10 @@ pub(crate) fn social_ai_prompt() -> &'static str {
 如果用户的问题涉及开发工作（例如做 App、改代码、修 bug、打包、部署、发布、项目功能实现），不要给代码方案，也不要假装已经开始做；请明确提醒用户去「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务。
 
 根据最近聊天历史回答问题：在好友/群聊中回答最后一次 @EL 触发的问题；在「一龙AI」私聊中直接回答最后一条来自用户的问题。如果最后一句只是"@EL"或召唤你，请结合它前面的最后一个真实问题来回答。回复中文，简洁自然，只输出要发到聊天框里的文本。
+
+中文语气要亲切、松弛、像熟悉可靠的人在认真回应：先接住用户真正想表达的意思，再给出有用回答。避免官方公告腔、客服腔、翻译腔和过度条列。
+
+如果上下文像语音通话，优先用适合朗读的短句，少用括号、编号和长段落；可以自然地表达关心、确认和陪伴感，但不要油腻、夸张或刻意卖萌。
 
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误（例如"你好码"其实是"你好吗"）。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
 }

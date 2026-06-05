@@ -79,7 +79,21 @@
                 android:visibility="gone"
                 app:tint="@color/elon_text_secondary" />
 
-            <TextView
+            <ImageButton
+                android:id="@+id/voiceCallButton"
+                android:layout_width="44dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="52dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="实时语音通话"
+                android:padding="9dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_top_phone"
+                android:visibility="gone"
+                app:tint="@color/elon_text_primary" />
+
+            <ImageButton
                 android:id="@+id/moreButton"
                 android:layout_width="44dp"
                 android:layout_height="match_parent"
@@ -87,11 +101,9 @@
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="更多功能"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="⋯"
-                android:textColor="@color/elon_text_primary"
-                android:textSize="25sp"
+                android:padding="8dp"
+                android:scaleType="center"
+                android:src="@drawable/ic_more_horizontal"
                 android:visibility="gone" />
         </FrameLayout>
     </androidx.appcompat.widget.Toolbar>

@@ -1,8 +1,16 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
+import android.view.inputmethod.InputMethodManager
+import android.view.animation.DecelerateInterpolator
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -28,15 +36,46 @@ internal class MainHomeListActions(
     private val openFriend: (AppFriend) -> Unit,
     private val openGroup: (AppGroup) -> Unit
 ) {
+    private var friendSearchActive = false
+    private var friendSearchQuery = ""
+    private var shouldFocusFriendSearch = false
+    private var animateFriendSearchEnter = false
+
+    fun showFriendLocalSearch() {
+        if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
+        friendSearchActive = true
+        friendSearchQuery = ""
+        shouldFocusFriendSearch = true
+        animateFriendSearchEnter = true
+        renderConversationList()
+    }
+
+    fun exitFriendLocalSearch(): Boolean {
+        if (!friendSearchActive) return false
+        clearFriendSearchState()
+        renderConversationList()
+        return true
+    }
+
     fun renderConversationList() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
             binding.chatPage.visibility != View.VISIBLE
+        if (!listVisible && friendSearchActive) {
+            clearFriendSearchState()
+        }
         if (listVisible) {
-            binding.topTitleText.text = "好友"
+            binding.topTitleText.text = if (friendSearchActive) "搜索" else "好友"
+            binding.searchButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
+            binding.addButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
         }
 
         homeRows().cancelHomeRowShimmer()
         binding.conversationPage.removeAllViews()
+        if (friendSearchActive) {
+            binding.conversationPage.addView(createFriendSearchHeader())
+            renderFriendSearchResults()
+            return
+        }
         val chatItems = buildHomeChatItems()
         if (chatItems.isEmpty()) {
             binding.conversationPage.addView(
@@ -46,6 +85,26 @@ internal class MainHomeListActions(
             )
             return
         }
+        renderHomeChatItems(chatItems)
+    }
+
+    private fun renderFriendSearchResults() {
+        val resultStartIndex = if (friendSearchActive) 1 else 0
+        while (binding.conversationPage.childCount > resultStartIndex) {
+            binding.conversationPage.removeViewAt(resultStartIndex)
+        }
+        val allChatItems = buildHomeChatItems()
+        val chatItems = filterHomeChatItems(allChatItems)
+        if (chatItems.isEmpty()) {
+            if (friendSearchActive) {
+                binding.conversationPage.addView(createFriendSearchEmptyRow())
+                return
+            }
+        }
+        renderHomeChatItems(chatItems)
+    }
+
+    private fun renderHomeChatItems(chatItems: List<HomeChatItem>) {
         chatItems.forEachIndexed { index, item ->
             if (index > 0) {
                 binding.conversationPage.addView(homeRows().createConversationDivider())
@@ -53,17 +112,183 @@ internal class MainHomeListActions(
             when (item) {
                 is HomeChatItem.FriendItem -> binding.conversationPage.addView(
                     homeRows().createFriendRow(item.friend) {
+                        clearFriendSearchState()
                         openFriend(item.friend)
                     }
                 )
                 is HomeChatItem.GroupItem -> binding.conversationPage.addView(
                     homeRows().createGroupRow(item.group) {
+                        clearFriendSearchState()
                         openGroup(item.group)
                     }
                 )
             }
         }
     }
+
+    private fun clearFriendSearchState() {
+        if (friendSearchActive) {
+            hideFriendSearchKeyboard()
+        }
+        friendSearchActive = false
+        friendSearchQuery = ""
+        shouldFocusFriendSearch = false
+        animateFriendSearchEnter = false
+    }
+
+    private fun hideFriendSearchKeyboard() {
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.conversationPage.windowToken, 0)
+    }
+
+    private fun filterHomeChatItems(items: List<HomeChatItem>): List<HomeChatItem> {
+        val query = normalizeSearch(friendSearchQuery)
+        if (!friendSearchActive || query.isBlank()) return items
+        return items.filter { item ->
+            when (item) {
+                is HomeChatItem.FriendItem -> matchesQuery(
+                    query,
+                    item.friend.name,
+                    item.friend.account,
+                    item.friend.phone,
+                    item.friend.lastMessage
+                )
+                is HomeChatItem.GroupItem -> matchesQuery(
+                    query,
+                    item.group.name,
+                    item.group.lastMessage,
+                    "${item.group.memberCount} 位成员",
+                    item.group.members.joinToString(" ") { member -> member.displayName }
+                )
+            }
+        }
+    }
+
+    private fun matchesQuery(query: String, vararg values: String?): Boolean {
+        return values.any { value -> normalizeSearch(value).contains(query) }
+    }
+
+    private fun normalizeSearch(value: String?): String {
+        return value.orEmpty().trim().lowercase()
+    }
+
+    private fun createFriendSearchHeader(): LinearLayout {
+        val targetHeight = dp(58)
+        val animateEnter = animateFriendSearchEnter
+        animateFriendSearchEnter = false
+        val root = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                if (animateEnter) 0 else targetHeight
+            )
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(8))
+            setBackgroundColor(Color.parseColor("#101010"))
+            alpha = if (animateEnter) 0f else 1f
+            translationY = if (animateEnter) -dp(8).toFloat() else 0f
+            clipToPadding = false
+        }
+        val input = EditText(activity).apply {
+            setText(friendSearchQuery)
+            setSingleLine(true)
+            textSize = 15f
+            hint = "搜索好友、群聊、最近消息"
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#6F7785"))
+            background = null
+            setPadding(dp(12), 0, dp(12), 0)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    val nextQuery = s?.toString()?.trim().orEmpty()
+                    if (nextQuery == friendSearchQuery) return
+                    friendSearchQuery = nextQuery
+                    renderFriendSearchResults()
+                }
+            })
+        }
+        val searchBox = LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            background = roundedRect("#181B20", 8, "#1E2126")
+            addView(TextView(activity).apply {
+                text = "⌕"
+                textSize = 18f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#A6AFBD"))
+            }, LinearLayout.LayoutParams(dp(30), LinearLayout.LayoutParams.MATCH_PARENT))
+            addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        }
+        val cancel = TextView(activity).apply {
+            text = "取消"
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#58BE6A"))
+            setOnClickListener { exitFriendLocalSearch() }
+        }
+        root.addView(searchBox)
+        root.addView(cancel, LinearLayout.LayoutParams(dp(54), LinearLayout.LayoutParams.MATCH_PARENT).apply {
+            marginStart = dp(10)
+        })
+        if (animateEnter) {
+            animateSearchHeaderIn(root, targetHeight)
+        }
+        if (shouldFocusFriendSearch) {
+            shouldFocusFriendSearch = false
+            input.postDelayed({
+                input.requestFocus()
+                input.setSelection(input.text?.length ?: 0)
+                val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+            }, if (animateEnter) 90L else 0L)
+        }
+        return root
+    }
+
+    private fun animateSearchHeaderIn(header: View, targetHeight: Int) {
+        header.post {
+            val params = header.layoutParams as LinearLayout.LayoutParams
+            ValueAnimator.ofInt(0, targetHeight).apply {
+                duration = 180L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { animator ->
+                    val progress = animator.animatedFraction
+                    params.height = animator.animatedValue as Int
+                    header.layoutParams = params
+                    header.alpha = progress
+                    header.translationY = -dp(8) * (1f - progress)
+                }
+                start()
+            }
+        }
+    }
+
+    private fun createFriendSearchEmptyRow(): View {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(92)
+            )
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#6F7785"))
+            textSize = 14f
+            text = if (friendSearchQuery.isBlank()) {
+                "输入关键词搜索本地好友内容"
+            } else {
+                "没有匹配的好友或群聊"
+            }
+        }
+    }
+
+    private fun roundedRect(fillColor: String, radiusDp: Int, strokeColor: String? = null): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(Color.parseColor(fillColor))
+            cornerRadius = dp(radiusDp).toFloat()
+            strokeColor?.let { setStroke(dp(1), Color.parseColor(it)) }
+        }
 
     private fun buildHomeChatItems(): List<HomeChatItem> {
         val friendItems = friends().map { friend ->

@@ -24,6 +24,7 @@ internal class MainVoiceModeActions(
     private val isVoiceMode: () -> Boolean,
     private val setVoiceMode: (Boolean) -> Unit,
     private val ttsSpeakerButton: () -> ImageButton?,
+    private val isDirectSocialAiChatActive: () -> Boolean = { false },
     private val collapseAttachmentPanel: () -> Unit,
     private val collapseEmojiPanel: () -> Unit,
     private val updateSendButtonVisual: () -> Unit,
@@ -53,9 +54,11 @@ internal class MainVoiceModeActions(
             binding.inputEdit.visibility = View.GONE
             modelButtonShell()?.visibility = View.GONE
             voiceButton.visibility = View.VISIBLE
-            // 语音朗读开关只在 CLOUD_REALTIME 模式下显示
+            // 云端实时语音与一龙AI 私聊都支持朗读回复。
             val speakerBtn = ttsSpeakerButton()
-            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.CLOUD_REALTIME) {
+            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.CLOUD_REALTIME ||
+                isDirectSocialAiChatActive()
+            ) {
                 speakerBtn?.setImageResource(
                     if (VoiceSpeaker.isTtsEnabled(activity)) R.drawable.ic_input_tts_on_circle
                     else R.drawable.ic_input_tts_off_circle

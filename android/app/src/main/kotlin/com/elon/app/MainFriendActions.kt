@@ -1,17 +1,22 @@
 package com.elon.app
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.text.InputType
-import android.view.inputmethod.InputMethodManager
 import android.content.Context
+import android.content.res.ColorStateList
+import android.view.Gravity
 import android.view.View
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
-import android.widget.Spinner
+import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
+import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.MediaType.Companion.toMediaType
@@ -88,101 +93,197 @@ internal class MainFriendActions(
             FriendSearchOption("account_id", "账号 ID", "usr_ 开头的账号 ID", InputType.TYPE_CLASS_TEXT),
             FriendSearchOption("nickname", "昵称", "好友昵称", InputType.TYPE_CLASS_TEXT)
         )
+        var selectedOption = searchOptions.first()
+        var searchTypePopup: PopupWindow? = null
+
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(8), dp(22), dp(2))
+            setPadding(dp(24), dp(24), dp(24), dp(22))
+            background = roundedRect("#262626", 12)
+        }
+        val title = TextView(activity).apply {
+            text = "添加好友"
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#F2F5FA"))
         }
         val hint = TextView(activity).apply {
             text = "选择搜索方式后输入关键词，只能搜索到已注册一龙账号的用户。"
             textSize = 14f
-            alpha = 0.72f
-        }
-        val searchTypeRow = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(10), 0, 0)
+            setTextColor(Color.parseColor("#A6AFBD"))
+            setLineSpacing(0f, 1.08f)
         }
         val searchTypeLabel = TextView(activity).apply {
             text = "搜索类型"
-            textSize = 15f
-            alpha = 0.82f
-            setPadding(0, 0, dp(12), 0)
+            textSize = 13f
+            setTextColor(Color.parseColor("#A6AFBD"))
         }
-        val searchTypeSpinner = Spinner(activity).apply {
-            adapter = ArrayAdapter(
-                activity,
-                android.R.layout.simple_spinner_dropdown_item,
-                searchOptions
-            )
+        val searchTypeValue = TextView(activity).apply {
+            text = selectedOption.label
+            textSize = 17f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#F2F5FA"))
+        }
+        val searchTypeHint = TextView(activity).apply {
+            text = selectedOption.hint
+            textSize = 12f
+            setTextColor(Color.parseColor("#6F7785"))
         }
         val input = EditText(activity).apply {
-            setHint(searchOptions.first().hint)
-            inputType = searchOptions.first().inputType
+            setHint(selectedOption.hint)
+            inputType = selectedOption.inputType
             setSingleLine(true)
-            textSize = 18f
+            textSize = 17f
             setSelectAllOnFocus(false)
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#6F7785"))
+            backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+            background = roundedRect("#181B20", 8, "#1E2126")
+            minimumHeight = dp(54)
+            setPadding(dp(16), 0, dp(16), 0)
         }
-        val result = TextView(activity).apply {
-            textSize = 14f
-            alpha = 0.82f
-            setPadding(0, dp(8), 0, 0)
-        }
-        container.addView(hint)
-        searchTypeRow.addView(searchTypeLabel)
-        searchTypeRow.addView(searchTypeSpinner)
-        container.addView(searchTypeRow)
-        container.addView(input)
-        container.addView(result)
-
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("添加好友")
-            .setView(container)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("搜索", null)
-            .create()
-
-        dialog.setOnShowListener {
-            searchTypeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                    val option = searchOptions.getOrElse(position) { searchOptions.first() }
+        val searchTypeRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+            background = roundedRect("#181B20", 8, "#1E2126")
+            minimumHeight = dp(58)
+            setPadding(dp(16), dp(9), dp(14), dp(9))
+            setOnClickListener {
+                searchTypePopup = showSearchTypePopup(
+                    anchor = this,
+                    previousPopup = searchTypePopup,
+                    options = searchOptions,
+                    selectedKey = selectedOption.key
+                ) { option ->
+                    selectedOption = option
+                    searchTypeValue.text = option.label
+                    searchTypeHint.text = option.hint
                     input.hint = option.hint
                     input.inputType = option.inputType
                     input.setSingleLine(true)
                 }
-
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             }
-            val searchButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            searchButton.setOnClickListener {
-                val selected = searchOptions.getOrElse(searchTypeSpinner.selectedItemPosition) { searchOptions.first() }
-                val keyword = input.text?.toString()?.trim().orEmpty()
-                if (keyword.isBlank()) {
-                    result.text = "请输入搜索内容"
-                    return@setOnClickListener
-                }
-                result.text = "正在搜索..."
-                searchButton.isEnabled = false
-                searchFriend(selected.key, keyword) { candidate, error ->
-                    searchButton.isEnabled = true
-                    when {
-                        error != null -> result.text = error
-                        candidate == null -> result.text = "没有找到对应的一龙账号"
-                        candidate.isSelf -> result.text = "这是你自己的账号，不能添加自己"
-                        candidate.alreadyFriend -> result.text = "已经是好友：${candidate.name}"
-                        else -> {
-                            result.text = "找到：${candidate.name}"
-                            showConfirmAddDialog(dialog, selected.key, keyword, candidate)
-                        }
+        }
+        val searchTypeTextBlock = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(searchTypeValue)
+            addView(searchTypeHint, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(2)
+            })
+        }
+        val arrow = TextView(activity).apply {
+            text = "▾"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#A6AFBD"))
+        }
+        val result = TextView(activity).apply {
+            textSize = 14f
+            minHeight = dp(24)
+            setTextColor(Color.parseColor("#A6AFBD"))
+        }
+        val cancelButton = dialogButton("取消", "#283140", "#DDE8FC")
+        val searchButton = dialogButton("搜索", "#58BE6A", "#07120A")
+        val actions = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            addView(cancelButton, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(searchButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                leftMargin = dp(12)
+            })
+        }
+
+        searchTypeRow.addView(searchTypeTextBlock, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        searchTypeRow.addView(arrow, LinearLayout.LayoutParams(dp(28), dp(28)))
+        container.addView(title)
+        container.addView(hint, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(10)
+        })
+        container.addView(searchTypeLabel, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(18)
+        })
+        container.addView(searchTypeRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(7)
+        })
+        container.addView(input, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(12)
+        })
+        container.addView(result, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(10)
+        })
+        container.addView(actions, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(18)
+        })
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(activity)
+            .setView(container)
+            .create()
+
+        fun setResult(text: String, color: String = "#A6AFBD") {
+            result.text = text
+            result.setTextColor(Color.parseColor(color))
+        }
+
+        cancelButton.setOnClickListener { dialog.dismiss() }
+        searchButton.setOnClickListener {
+            val keyword = input.text?.toString()?.trim().orEmpty()
+            if (keyword.isBlank()) {
+                setResult("请输入搜索内容", "#D97A7A")
+                return@setOnClickListener
+            }
+            setResult("正在搜索...")
+            searchButton.isEnabled = false
+            searchButton.alpha = 0.55f
+            searchFriend(selectedOption.key, keyword) { candidate, error ->
+                searchButton.isEnabled = true
+                searchButton.alpha = 1f
+                when {
+                    error != null -> setResult(error, "#D97A7A")
+                    candidate == null -> setResult("没有找到对应的一龙账号", "#D97A7A")
+                    candidate.isSelf -> setResult("这是你自己的账号，不能添加自己", "#D97A7A")
+                    candidate.alreadyFriend -> setResult("已经是好友：${candidate.name}")
+                    else -> {
+                        setResult("找到：${candidate.name}", "#58BE6A")
+                        showConfirmAddDialog(dialog, selectedOption.key, keyword, candidate)
                     }
                 }
             }
+        }
+
+        dialog.setOnShowListener {
             input.requestFocus()
             input.postDelayed({
                 val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
             }, 160)
         }
+        dialog.setOnDismissListener { searchTypePopup?.dismiss() }
 
-        dialog.show()
+        showStyledDialog(dialog)
     }
 
     private fun ensureLoggedIn(): Boolean {
@@ -204,33 +305,213 @@ internal class MainFriendActions(
         keyword: String,
         candidate: FriendCandidate
     ) {
-        val message = buildString {
-            append(candidate.name)
-            candidate.account.takeIf { it.isNotBlank() }?.let { append("\n账号：").append(it) }
-            candidate.phone?.takeIf { it.isNotBlank() }?.let { append("\n手机号：").append(it) }
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(24), dp(24), dp(22))
+            background = roundedRect("#262626", 12)
         }
-        AlertDialog.Builder(activity)
-            .setTitle("添加好友")
-            .setMessage(message)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("添加") { _, _ ->
-                addFriend(searchType, keyword) { addedName, alreadyFriend, error ->
-                    if (error != null) {
-                        Toast.makeText(activity, error, Toast.LENGTH_SHORT).show()
-                        return@addFriend
-                    }
-                    parentDialog.dismiss()
-                    loadFriends()
-                    val text = if (alreadyFriend) {
-                        "已经是好友：$addedName"
-                    } else {
-                        "已添加好友：$addedName"
-                    }
-                    Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
+        val title = TextView(activity).apply {
+            text = "确认添加"
+            textSize = 22f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#F2F5FA"))
+        }
+        val summary = TextView(activity).apply {
+            text = "将这位用户添加到你的好友列表"
+            textSize = 14f
+            setTextColor(Color.parseColor("#A6AFBD"))
+        }
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedRect("#181B20", 8, "#1E2126")
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        val name = TextView(activity).apply {
+            text = candidate.name
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#F2F5FA"))
+        }
+        card.addView(name)
+        candidate.account.takeIf { it.isNotBlank() }?.let {
+            card.addView(detailText("账号：$it"))
+        }
+        candidate.phone?.takeIf { it.isNotBlank() }?.let {
+            card.addView(detailText("手机号：$it"))
+        }
+        val cancelButton = dialogButton("取消", "#283140", "#DDE8FC")
+        val addButton = dialogButton("添加", "#58BE6A", "#07120A")
+        val actions = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            addView(cancelButton, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(addButton, LinearLayout.LayoutParams(0, dp(44), 1f).apply {
+                leftMargin = dp(12)
+            })
+        }
+
+        container.addView(title)
+        container.addView(summary, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(8)
+        })
+        container.addView(card, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(16)
+        })
+        container.addView(actions, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(18)
+        })
+
+        lateinit var dialog: AlertDialog
+        dialog = AlertDialog.Builder(activity)
+            .setView(container)
+            .create()
+        cancelButton.setOnClickListener { dialog.dismiss() }
+        addButton.setOnClickListener {
+            addButton.isEnabled = false
+            addButton.alpha = 0.55f
+            addFriend(searchType, keyword) { addedName, alreadyFriend, error ->
+                addButton.isEnabled = true
+                addButton.alpha = 1f
+                if (error != null) {
+                    Toast.makeText(activity, error, Toast.LENGTH_SHORT).show()
+                    return@addFriend
                 }
+                parentDialog.dismiss()
+                dialog.dismiss()
+                loadFriends()
+                val text = if (alreadyFriend) {
+                    "已经是好友：$addedName"
+                } else {
+                    "已添加好友：$addedName"
+                }
+                Toast.makeText(activity, text, Toast.LENGTH_SHORT).show()
             }
-            .show()
+        }
+        showStyledDialog(dialog)
     }
+
+    private fun showStyledDialog(dialog: AlertDialog) {
+        dialog.show()
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            decorView.setPadding(0, 0, 0, 0)
+            setDimAmount(0.72f)
+            val width = (activity.resources.displayMetrics.widthPixels - dp(48)).coerceAtMost(dp(386))
+            setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+    }
+
+    private fun showSearchTypePopup(
+        anchor: View,
+        previousPopup: PopupWindow?,
+        options: List<FriendSearchOption>,
+        selectedKey: String,
+        onSelected: (FriendSearchOption) -> Unit
+    ): PopupWindow {
+        previousPopup?.dismiss()
+        val panel = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            background = roundedRect("#262626", 10)
+            alpha = 0f
+            scaleY = 0.96f
+        }
+        lateinit var popup: PopupWindow
+        options.forEach { option ->
+            val selected = option.key == selectedKey
+            panel.addView(searchTypePopupRow(option, selected) {
+                onSelected(option)
+                popup.dismiss()
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52)
+            ))
+        }
+        val popupWidth = anchor.width.coerceAtLeast(dp(236)).coerceAtMost(
+            activity.resources.displayMetrics.widthPixels - dp(48)
+        )
+        popup = PopupWindow(panel, popupWidth, ViewGroup.LayoutParams.WRAP_CONTENT, true).apply {
+            isOutsideTouchable = true
+            elevation = dp(10).toFloat()
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            showAsDropDown(anchor, 0, dp(6))
+        }
+        panel.animate().alpha(1f).scaleY(1f).setDuration(120L).start()
+        return popup
+    }
+
+    private fun searchTypePopupRow(
+        option: FriendSearchOption,
+        selected: Boolean,
+        onClick: () -> Unit
+    ): LinearLayout {
+        val row = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(12), 0, dp(10), 0)
+            if (selected) background = roundedRect("#283140", 8)
+            setOnClickListener { onClick() }
+        }
+        val labelBlock = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        labelBlock.addView(TextView(activity).apply {
+            text = option.label
+            textSize = 15f
+            setTextColor(Color.parseColor("#F2F5FA"))
+        })
+        labelBlock.addView(TextView(activity).apply {
+            text = option.hint
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#6F7785"))
+        })
+        row.addView(labelBlock, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(TextView(activity).apply {
+            text = if (selected) "✓" else ""
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#58BE6A"))
+        }, LinearLayout.LayoutParams(dp(26), dp(26)))
+        return row
+    }
+
+    private fun detailText(textValue: String): TextView =
+        TextView(activity).apply {
+            text = textValue
+            textSize = 14f
+            setTextColor(Color.parseColor("#A6AFBD"))
+            setPadding(0, dp(6), 0, 0)
+        }
+
+    private fun dialogButton(label: String, bgColor: String, textColor: String): TextView =
+        TextView(activity).apply {
+            text = label
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            setTextColor(Color.parseColor(textColor))
+            background = roundedRect(bgColor, 8)
+        }
+
+    private fun roundedRect(fillColor: String, radiusDp: Int, strokeColor: String? = null): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(Color.parseColor(fillColor))
+            cornerRadius = dp(radiusDp).toFloat()
+            strokeColor?.let { setStroke(dp(1), Color.parseColor(it)) }
+        }
 
     private fun searchFriend(
         searchType: String,

@@ -34,8 +34,7 @@ use crate::{
     voice_openai_realtime::{RealtimeTranscriber, TranscriptEvent},
     voice_protocol::{ClientControl, ServerEvent},
     voice_to_cli::{dispatch_transcript, DispatchTarget},
-    voice_whisper_local,
-    voice_whisper_rest,
+    voice_whisper_local, voice_whisper_rest,
 };
 
 pub async fn ws_transcribe_handler(
@@ -60,6 +59,7 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
     };
     let Some(ClientControl::Hello {
         user_id,
+        target: voice_target,
         project_id,
         conversation_id,
         sample_rate,
@@ -94,11 +94,17 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
     if let Some(whisper_cfg) = voice_whisper_local::WhisperLocalConfig::from_env() {
         let target = DispatchTarget {
             user_id: user_id.clone(),
-            project_id,
-            conversation_id,
+            voice_target: voice_target.clone(),
+            project_id: project_id.clone(),
+            conversation_id: conversation_id.clone(),
         };
         let _ = sender
-            .send(Message::Text(ServerEvent::Ready { mode: "transcribe_local" }.to_json()))
+            .send(Message::Text(
+                ServerEvent::Ready {
+                    mode: "transcribe_local",
+                }
+                .to_json(),
+            ))
             .await;
         info!(target: "voice", user_id, "whisper-local 会话已建立");
         run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
@@ -106,7 +112,8 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             Box::pin(async move {
                 voice_whisper_local::transcribe_pcm(&cfg, &pcm, sample_rate, channels).await
             })
-        }).await;
+        })
+        .await;
         return Ok(());
     }
 
@@ -135,17 +142,34 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                 return Ok(());
             }
 
-            let target = DispatchTarget { user_id: user_id.clone(), project_id, conversation_id };
+            let target = DispatchTarget {
+                user_id: user_id.clone(),
+                voice_target: voice_target.clone(),
+                project_id: project_id.clone(),
+                conversation_id: conversation_id.clone(),
+            };
             let _ = sender
-                .send(Message::Text(ServerEvent::Ready { mode: "transcribe_rest" }.to_json()))
+                .send(Message::Text(
+                    ServerEvent::Ready {
+                        mode: "transcribe_rest",
+                    }
+                    .to_json(),
+                ))
                 .await;
             info!(target: "voice", user_id, "Tier 3 REST 转写会话已建立（{} 个候选）", candidates.len());
             run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
                 let cands = candidates.clone();
                 Box::pin(async move {
-                    voice_whisper_rest::transcribe_with_fallback(&cands, &pcm, sample_rate, channels).await
+                    voice_whisper_rest::transcribe_with_fallback(
+                        &cands,
+                        &pcm,
+                        sample_rate,
+                        channels,
+                    )
+                    .await
                 })
-            }).await;
+            })
+            .await;
             return Ok(());
         }
     };
@@ -159,6 +183,7 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
 
     let target = DispatchTarget {
         user_id: user_id.clone(),
+        voice_target,
         project_id,
         conversation_id,
     };
