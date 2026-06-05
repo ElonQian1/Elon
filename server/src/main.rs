@@ -28,6 +28,7 @@ mod codex_health;
 mod codex_stream;
 mod errors;
 mod friend_api;
+mod lm_chat;
 mod friend_events;
 mod global_ws;
 mod presence_events;

@@ -16,7 +16,7 @@ use crate::{
     project_conversation_identity, project_deletion, project_downloads, project_git,
     project_join_requests, project_membership, project_space, project_store, release_claim,
     speech_translate, token_usage_api, user_api, user_memory_api, voice_asr_upload,
-    voice_ws_transcribe, voice_ws_virtual_mic, web,
+    voice_ws_transcribe, voice_ws_virtual_mic, web, lm_chat,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -85,8 +85,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/nodes", get(node_api::list_nodes))
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
+        .route("/api/llm/chat", post(lm_chat::lm_chat_handler))
         .route("/api/me/nodes", get(node_api::my_nodes))
-        .route("/api/me/nodes/register", post(node_api::register_node))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
         // ───────────────────────────────────────────────────────────────────────

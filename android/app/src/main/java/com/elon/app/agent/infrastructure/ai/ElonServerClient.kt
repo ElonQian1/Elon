@@ -124,6 +124,68 @@ class ElonServerClient(
     }
 
     /**
+     * 通用 LLM 代理：完整转发 messages 给服务器 LLM，不覆盖 system prompt。
+     *
+     * 与 [chat] 的区别：
+     *  - [chat] 只发 user message，服务器会用闲聊 persona 覆盖 system prompt
+     *  - [lmChat] 把调用方传入的完整 messages（含 system）原样送到 LLM
+     *
+     * 适用于：
+     *  - 手机自动化脚本生成（system prompt 说明 JSON 格式）
+     *  - 意图分析（system prompt 说明分类要求）
+     *  - 闲聊（system prompt 可以带角色人设）
+     *
+     * 服务器端点：POST /api/llm/chat
+     */
+    suspend fun lmChat(
+        messages: List<com.elon.app.agent.application.Message>,
+        agentName: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        val token = getAuthToken()
+            ?: throw IllegalStateException("未登录，请先在 elon APP 中登录")
+
+        val messagesJson = org.json.JSONArray().apply {
+            for (m in messages) {
+                put(org.json.JSONObject().apply {
+                    put("role", m.role)
+                    put("content", m.content)
+                })
+            }
+        }
+        val body = org.json.JSONObject().apply {
+            put("messages", messagesJson)
+            if (agentName != null) put("agent", agentName)
+        }.toString()
+
+        val url = java.net.URL("$serverUrl/api/llm/chat")
+        Log.d(TAG, "→ POST /api/llm/chat  msgs=${messages.size}  last=${messages.lastOrNull()?.content?.take(40)}")
+
+        val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Authorization", "Bearer $token")
+            connectTimeout = TIMEOUT_MS
+            readTimeout = TIMEOUT_MS
+            doOutput = true
+        }
+
+        try {
+            java.io.OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body) }
+            val code = conn.responseCode
+            if (code != 200) {
+                val err = conn.errorStream?.bufferedReader()?.readText() ?: "HTTP $code"
+                Log.e(TAG, "/api/llm/chat 错误: $err")
+                throw RuntimeException("服务器返回 $code：$err")
+            }
+            val resp = conn.inputStream.bufferedReader().readText()
+            Log.d(TAG, "← /api/llm/chat reply=${resp.take(80)}")
+            org.json.JSONObject(resp).optString("reply").ifBlank { "（服务器未返回回复）" }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /**
      * SSE 流式聊天：服务器实时推送每一步进度，函数返回最终回复文本。
      *
      * @param onEvent(type, message) 在 IO 线程回调。
