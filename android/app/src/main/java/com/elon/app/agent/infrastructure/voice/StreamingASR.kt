@@ -49,6 +49,10 @@ class StreamingASR(private val context: Context) {
     private var silenceCheckRunnable: Runnable? = null
     /** onFinalResult 已经触发过一次，防止安全网和 onResults 双重回调 */
     private var finalDelivered: Boolean = false
+    /** 诊断：本次会话麦克风峰值音量（onRmsChanged 最大值），用于判断麦克风是否真的收到声音 */
+    private var maxRmsThisSession: Float = -100f
+    /** 诊断：本次会话小米/系统引擎是否检测到语音开始（onBeginningOfSpeech） */
+    private var sawBeginningOfSpeech: Boolean = false
     
     // ==================== 回调 ====================
     
@@ -148,13 +152,15 @@ class StreamingASR(private val context: Context) {
             lastResultTime = System.currentTimeMillis()
             currentPartialResult = ""
             finalDelivered = false
-            
+            maxRmsThisSession = -100f
+            sawBeginningOfSpeech = false
+
             // 启动静音检测
             if (useSmartVAD) {
                 startSilenceCheck()
             }
-            
-            Log.i(TAG, "🎤 开始流式识别 (smartVAD=$useSmartVAD)")
+
+            Log.i(TAG, "🎤 开始流式识别 (smartVAD=$useSmartVAD, preferOffline=$preferOffline)")
         } catch (e: Exception) {
             Log.e(TAG, "启动失败", e)
             callback?.onError("启动失败: ${e.message}")
@@ -206,13 +212,15 @@ class StreamingASR(private val context: Context) {
         }
         
         override fun onBeginningOfSpeech() {
-            Log.d(TAG, "🎤 检测到语音开始")
+            Log.i(TAG, "🎤 检测到语音开始")
+            sawBeginningOfSpeech = true
             lastResultTime = System.currentTimeMillis()
             callback?.onSpeechStart()
         }
         
         override fun onRmsChanged(rmsdB: Float) {
             // 音量变化，范围大约 -2 到 10
+            if (rmsdB > maxRmsThisSession) maxRmsThisSession = rmsdB
             val normalizedVolume = ((rmsdB + 2) / 12).coerceIn(0f, 1f)
             callback?.onVolumeChanged(normalizedVolume)
         }
@@ -248,7 +256,7 @@ class StreamingASR(private val context: Context) {
                 else -> "未知错误: $error"
             }
             
-            Log.e(TAG, "❌ 错误: $errorMsg (code=$error)")
+            Log.e(TAG, "❌ 错误: $errorMsg (code=$error) | 诊断: 峰值音量=${"%.1f".format(maxRmsThisSession)}dB, 检测到语音开始=$sawBeginningOfSpeech, 有部分结果=${currentPartialResult.isNotEmpty()}, preferOffline=$preferOffline")
 
             // NO_MATCH 不一定是错误，可能是用户还没说
             if (error != SpeechRecognizer.ERROR_NO_MATCH) {
