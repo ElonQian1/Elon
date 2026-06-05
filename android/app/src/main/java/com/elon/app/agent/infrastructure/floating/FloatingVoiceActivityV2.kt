@@ -132,16 +132,26 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             var activatedMode = AgentConfigActivity.VOICE_MODE_SIMPLE
             val skipped = mutableListOf<String>()
 
+            // 🔑 重构核心：API Key 模式和 CLI 模式共用同一条「智能管线」
+            //   意图分析：SmartIntentAnalyzerAdapter（本地规则 + AI 判断完整性/意图）
+            //   响应生成：SmartResponseGenerator（闲聊→AI对话；操作→生成脚本并执行）
+            // 二者唯一区别只是底层 AIClient 由 AIClientFactory 自动选：
+            //   有 Key → 用自带 Key；没 Key 但已登录选了项目 → 自动走服务器 CLI。
+            // 因此不再需要 CLI 专属的「透传 + 全发服务器」管线。
+            fun activateSmartPipeline() {
+                val intentAnalyzer = IntentAnalyzer(this@ConversationalVoiceActivity)
+                setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
+                setResponseGenerator(SmartResponseGenerator(this@ConversationalVoiceActivity))
+            }
+
             run cascade@{
                 for (mode in config.voiceModeOrder) {
                     when (mode) {
                         AgentConfigActivity.VOICE_MODE_APIKEY -> {
                             if (config.hunyuanApiKey.isNotEmpty() || config.openaiApiKey.isNotEmpty()) {
-                                val intentAnalyzer = IntentAnalyzer(this@ConversationalVoiceActivity)
-                                setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
-                                setResponseGenerator(SmartResponseGenerator(this@ConversationalVoiceActivity))
+                                activateSmartPipeline()
                                 activatedMode = mode
-                                Log.i(TAG, "✅ API Key 模式已激活（优先级 #${config.voiceModeOrder.indexOf(mode) + 1}）")
+                                Log.i(TAG, "✅ 智能管线已激活（自带 Key，优先级 #${config.voiceModeOrder.indexOf(mode) + 1}）")
                                 return@cascade
                             } else {
                                 skipped.add("混元/OpenAI API Key（未填写）")
@@ -149,20 +159,16 @@ class ConversationalVoiceActivity : AppCompatActivity() {
                             }
                         }
                         AgentConfigActivity.VOICE_MODE_CLI -> {
-                            // 重构后：优先读主 UI 当前项目，没有才退到 AgentConfig.cliProjectId
+                            // 优先读主 UI 当前项目，没有才退到 AgentConfig.cliProjectId
                             val effectiveProjectId = com.elon.app.agent.infrastructure.auth.MainAppBridge
                                 .effectiveCliProjectId(this@ConversationalVoiceActivity)
                                 ?: ""
                             if (effectiveProjectId.isNotEmpty()) {
-                                setIntentAnalyzer(PassthroughIntentAnalyzer())
-                                setResponseGenerator(CliResponseGenerator(
-                                    context   = this@ConversationalVoiceActivity,
-                                    projectId = effectiveProjectId,
-                                    serverUrl = com.elon.app.agent.infrastructure.auth.MainAppBridge
-                                        .serverUrl(this@ConversationalVoiceActivity)
-                                ))
+                                // 同一条智能管线：意图分析在本地/AI 做，闲聊与脚本都通过
+                                // AIClientFactory 自动走服务器 CLI（用户已登录且选了项目）。
+                                activateSmartPipeline()
                                 activatedMode = mode
-                                Log.i(TAG, "✅ CLI 模式已激活 project=$effectiveProjectId")
+                                Log.i(TAG, "✅ 智能管线已激活（服务器 CLI，project=$effectiveProjectId）")
                                 return@cascade
                             } else {
                                 skipped.add("服务器 CLI（未登录主 UI 或未选项目）")
@@ -182,8 +188,8 @@ class ConversationalVoiceActivity : AppCompatActivity() {
 
             // Toast 汇报激活的模式（+ 跳过了哪些）
             val modeLabel = when (activatedMode) {
-                AgentConfigActivity.VOICE_MODE_APIKEY -> "混元 AI 模式"
-                AgentConfigActivity.VOICE_MODE_CLI    -> "服务器 CLI 模式"
+                AgentConfigActivity.VOICE_MODE_APIKEY -> "智能模式（自带 AI Key）"
+                AgentConfigActivity.VOICE_MODE_CLI    -> "智能模式（服务器 AI）"
                 else                                  -> "简单模式（关键词匹配）"
             }
             val skippedDesc = skipped.joinToString("、")

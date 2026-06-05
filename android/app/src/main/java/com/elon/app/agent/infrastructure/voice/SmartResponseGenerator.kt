@@ -6,6 +6,7 @@ package com.elon.app.agent.infrastructure.voice
 
 import android.content.Context
 import android.util.Log
+import com.elon.app.agent.application.LocalChatResponder
 import com.elon.app.agent.application.Message
 import com.elon.app.agent.application.conversation.IntentAnalysisResult
 import com.elon.app.agent.application.conversation.ResponseGenerator
@@ -51,10 +52,24 @@ class SmartResponseGenerator(
     }
     
     private val aiClient = AIClientFactory.create(context)
-    
+    private val appContext = context.applicationContext
+
     override suspend fun generate(intent: IntentAnalysisResult): Response {
         Log.d(TAG, "🎭 [响应生成开始] input=${intent.normalizedInput}, operation=${intent.isOperation}, complete=${intent.isComplete}")
-        
+
+        // 💬 本地常识问答（今天几号 / 现在几点 / 星期几 / 电量）。
+        // 这类手机本地能答准，不必发 AI / 服务器。
+        if (!intent.isOperation) {
+            LocalChatResponder.tryAnswer(appContext, intent.normalizedInput)?.let { answer ->
+                Log.i(TAG, "💬 本地常识问答：$answer")
+                return Response(
+                    tier = ResponseTier.FAST,
+                    text = answer,
+                    emotion = Emotion.HELPFUL
+                )
+            }
+        }
+
         val response = when {
             // 操作请求 → 快速确认
             intent.isOperation -> {
