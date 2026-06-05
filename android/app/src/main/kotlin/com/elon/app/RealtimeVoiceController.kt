@@ -28,6 +28,7 @@ internal class RealtimeVoiceController(
     private val baseHttpUrl: String,
     private val userId: String,
     private val mode: RealtimeVoiceWsClient.Mode,
+    private val target: String? = null,
     private val projectId: String? = null,
     private val conversationId: String? = null,
     private val onTranscriptDelta: (String) -> Unit = {},
@@ -52,6 +53,7 @@ internal class RealtimeVoiceController(
             baseHttpUrl = baseHttpUrl,
             mode = mode,
             userId = userId,
+            target = target,
             projectId = projectId,
             conversationId = conversationId,
             listener = object : RealtimeVoiceWsClient.Listener {

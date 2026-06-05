@@ -47,6 +47,7 @@ internal class MainSpeechInputActions(
     private val setVoiceMode: (Boolean) -> Unit,
     private val applyVoiceMode: () -> Unit,
     private val isFriendChatActive: () -> Boolean = { false },
+    private val isDirectSocialAiChatActive: () -> Boolean = { false },
     private val isSocialAiChatActive: () -> Boolean = { false },
     private val sendTextDirect: ((String) -> Unit)? = null
 ) {
@@ -65,6 +66,7 @@ internal class MainSpeechInputActions(
     private var voiceMessageAsrAllFailed = false
     // 方案 B：实时语音 → 转写 → AI 投递
     private var realtimeController: RealtimeVoiceController? = null
+    private var realtimeVoiceSpeaker: VoiceSpeaker? = null
     // 端上 Agent 流式识别（默认主聊天语音管线，由 VoiceInputModeSettings 控制）
     private var agentBridge: AgentVoiceBridge? = null
     private var agentVoiceActive = false
@@ -90,7 +92,11 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
-        // 好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送
+        // 一龙AI 私聊：好友页里的实时语音通话入口。
+        if (isDirectSocialAiChatActive()) {
+            if (startRealtimeVoice()) return
+        }
+        // 普通好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送
         if (isFriendChatActive()) {
             if (startVoiceMessageRecording()) return
             return
@@ -183,6 +189,8 @@ internal class MainSpeechInputActions(
         isListeningForSpeech = false
         realtimeController?.shutdown()
         realtimeController = null
+        realtimeVoiceSpeaker?.release()
+        realtimeVoiceSpeaker = null
         agentBridge?.destroy()
         agentBridge = null
         agentVoiceActive = false
@@ -411,11 +419,23 @@ internal class MainSpeechInputActions(
 
     // ─── 方案 B：实时语音 → OpenAI 转写 → 投递 AI ────────────────────────────
 
-    /** 按下按钮时尝试启动 Realtime 语音。有 projectId 时返回 true 并接管流程。 */
+    /** 按下按钮时尝试启动 Realtime 语音：项目页投递 CLI，一龙AI 私聊投递社交 AI。 */
     private fun startRealtimeVoice(): Boolean {
-        val project = activeProject()
-        val projectId = project.id.takeIf { it.isNotBlank() } ?: return false
-        val conversation = activeConversation()
+        val directSocialAi = isDirectSocialAiChatActive()
+        val projectId: String?
+        val conversationId: String?
+        val target: String?
+        if (directSocialAi) {
+            projectId = null
+            conversationId = null
+            target = RealtimeVoiceWsClient.Target.SocialAiDirect
+            socialAiVoiceSpeaker().stop()
+        } else {
+            val project = activeProject()
+            projectId = project.id.takeIf { it.isNotBlank() } ?: return false
+            conversationId = activeConversation().id
+            target = null
+        }
 
         isHoldActive = true
         isSpeechCanceled = false
@@ -426,8 +446,9 @@ internal class MainSpeechInputActions(
             baseHttpUrl = serverUrl,
             userId = userId(),
             mode = RealtimeVoiceWsClient.Mode.Transcribe,
+            target = target,
             projectId = projectId,
-            conversationId = conversation.id,
+            conversationId = conversationId,
             onTranscriptDelta = { text ->
                 activity.runOnUiThread { voiceHoldButton().text = text.take(24) }
             },
@@ -436,7 +457,11 @@ internal class MainSpeechInputActions(
             },
             onCliDispatched = { ok, _ ->
                 activity.runOnUiThread {
-                    voiceHoldButton().text = if (ok) "AI 处理中…" else "按住 说话"
+                    voiceHoldButton().text = if (ok) {
+                        if (directSocialAi) "一龙AI 思考中…" else "AI 处理中…"
+                    } else {
+                        "按住 说话"
+                    }
                 }
             },
             onAiProgress = { text ->
@@ -445,7 +470,11 @@ internal class MainSpeechInputActions(
             onAiDone = { message, _ ->
                 activity.runOnUiThread {
                     voiceHoldButton().text = "按住 说话"
-                    Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
+                    if (directSocialAi) {
+                        socialAiVoiceSpeaker().speak(message)
+                    } else {
+                        Toast.makeText(activity, message.take(80), Toast.LENGTH_SHORT).show()
+                    }
                 }
                 realtimeController = null
             },
@@ -467,6 +496,12 @@ internal class MainSpeechInputActions(
         realtimeController = ctrl
         ctrl.start(activity.lifecycleScope)
         return true
+    }
+
+    private fun socialAiVoiceSpeaker(): VoiceSpeaker {
+        return realtimeVoiceSpeaker ?: VoiceSpeaker(activity).also {
+            realtimeVoiceSpeaker = it
+        }
     }
 
     /** 松开按钮：发 commit，等待转写完成。若不在 Realtime 模式返回 false。 */

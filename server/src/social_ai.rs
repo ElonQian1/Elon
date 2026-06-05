@@ -90,6 +90,18 @@ pub(crate) fn spawn_direct_friend_reply(
     });
 }
 
+pub(crate) async fn reply_to_direct_friend_voice(
+    state: Arc<AppState>,
+    user_id: String,
+    transcript: &str,
+) -> Result<String> {
+    let message = state
+        .store
+        .send_friend_message(&user_id, SOCIAL_AI_USER_ID, transcript, None)?;
+    friend_events::publish_friend_message(&message);
+    reply_to_direct_friend(state, user_id).await
+}
+
 fn spawn_friend_pending_reply(
     state: Arc<AppState>,
     user_id: String,
@@ -212,7 +224,7 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
     Ok(())
 }
 
-async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result<()> {
+async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result<String> {
     let history =
         state
             .store
@@ -222,7 +234,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
             .store
             .insert_direct_social_ai_reply(&user_id, DEVELOPMENT_REDIRECT_REPLY)?;
         friend_events::publish_friend_bridge_message(&message, &summary);
-        return Ok(());
+        return Ok(DEVELOPMENT_REDIRECT_REPLY.to_string());
     }
     let reply =
         social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history).await;
@@ -230,7 +242,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
         .store
         .insert_direct_social_ai_reply(&user_id, &reply)?;
     friend_events::publish_friend_message(&message);
-    Ok(())
+    Ok(reply)
 }
 
 async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String) -> Result<()> {

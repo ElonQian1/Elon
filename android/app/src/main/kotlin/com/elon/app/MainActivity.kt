@@ -159,6 +159,9 @@ class MainActivity : AppCompatActivity() {
             isFriendChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
             },
+            isDirectSocialAiChatActive = {
+                friendChatActions.isDirectSocialAiActive()
+            },
             isSocialAiChatActive = {
                 friendChatActions.isActive() || groupChatActions.isActive()
             },

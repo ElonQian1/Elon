@@ -105,6 +105,8 @@ internal class MainFriendChatActions(
 
     fun isActive(): Boolean = activeFriend != null
 
+    fun isDirectSocialAiActive(): Boolean = activeFriend?.id == SOCIAL_AI_USER_ID
+
     fun currentFriend(): AppFriend? = activeFriend
 
     fun clearCurrentMessages() {

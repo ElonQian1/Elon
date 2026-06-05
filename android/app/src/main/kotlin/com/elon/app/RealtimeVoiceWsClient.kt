@@ -25,6 +25,7 @@ internal class RealtimeVoiceWsClient(
     private val baseHttpUrl: String,
     private val mode: Mode,
     private val userId: String,
+    private val target: String? = null,
     private val projectId: String? = null,
     private val conversationId: String? = null,
     private val listener: Listener,
@@ -32,6 +33,10 @@ internal class RealtimeVoiceWsClient(
     enum class Mode(val path: String, val label: String) {
         VirtualMic("/ws/voice/virtual-mic", "virtual_mic"),
         Transcribe("/ws/voice/transcribe", "transcribe"),
+    }
+
+    object Target {
+        const val SocialAiDirect = "social_ai_direct"
     }
 
     interface Listener {
@@ -73,6 +78,7 @@ internal class RealtimeVoiceWsClient(
                 val hello = JSONObject().apply {
                     put("type", "hello")
                     put("user_id", userId)
+                    if (!target.isNullOrBlank()) put("target", target)
                     if (!projectId.isNullOrBlank()) put("project_id", projectId)
                     if (!conversationId.isNullOrBlank()) put("conversation_id", conversationId)
                     put("sample_rate", RealtimePcmRecorder.SAMPLE_RATE_HZ)
