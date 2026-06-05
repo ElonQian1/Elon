@@ -76,12 +76,13 @@ class ElonServerAIClient(
                 val userMsg = messages.lastOrNull { it.role == "user" }?.content
                     ?: messages.joinToString("\n") { "${it.role}: ${it.content}" }
                 Log.d(TAG, "-> CLI project=$projectId  msg=${userMsg.take(40)}")
-                val reply = server.chat(
+                val (reply, newConvId) = server.chat(
                     projectId = projectId,
                     message = userMsg,
                     conversationId = cliConversationId,
                     chatOnly = false
                 )
+                if (newConvId != null) cliConversationId = newConvId
                 if (reply.isNotBlank() && reply != "（服务器未返回回复）") return reply
                 Log.w(TAG, "CLI 返回空，降级到 LLM")
             } catch (e: Exception) {

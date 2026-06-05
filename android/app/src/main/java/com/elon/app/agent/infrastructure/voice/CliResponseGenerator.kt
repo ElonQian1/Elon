@@ -109,11 +109,12 @@ class CliResponseGenerator(
             Log.w(TAG, "SSE 请求失败，降级到同步 chat", e)
             // 降级：回退到普通 HTTP chat
             try {
-                val reply = serverClient.chat(
+                val (reply, retConvId) = serverClient.chat(
                     projectId = projectId,
                     message = intent.normalizedInput,
                     conversationId = currentConversationId
                 )
+                if (retConvId != null) currentConversationId = retConvId
                 Log.i(TAG, "🖥️ 降级回复: ${reply.take(60)}")
                 Response(tier = ResponseTier.NORMAL, text = reply, emotion = Emotion.HELPFUL)
             } catch (e2: Exception) {

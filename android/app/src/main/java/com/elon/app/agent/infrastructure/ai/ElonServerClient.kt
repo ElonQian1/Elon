@@ -63,7 +63,7 @@ class ElonServerClient(
         message: String,
         conversationId: String? = null,
         chatOnly: Boolean = false
-    ): String = withContext(Dispatchers.IO) {
+    ): Pair<String, String?> = withContext(Dispatchers.IO) {
         val token = getAuthToken()
             ?: throw IllegalStateException("未登录，请先在 elon APP 中登录")
 
@@ -99,7 +99,9 @@ class ElonServerClient(
             val resp = conn.inputStream.bufferedReader().readText()
             Log.d(TAG, "← $resp")
             val json = JSONObject(resp)
-            json.optString("reply").ifBlank { "（服务器未返回回复）" }
+            val reply = json.optString("reply").ifBlank { "（服务器未返回回复）" }
+            val retConvId = json.optString("conversation_id").ifBlank { null }
+            Pair(reply, retConvId)
         } finally {
             conn.disconnect()
         }
