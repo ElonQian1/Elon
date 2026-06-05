@@ -139,8 +139,9 @@ class ElonServerClient(
      */
     suspend fun lmChat(
         messages: List<com.elon.app.agent.application.Message>,
-        agentName: String? = null
-    ): String = withContext(Dispatchers.IO) {
+        agentName: String? = null,
+        conversationId: String? = null
+    ): Pair<String, String?> = withContext(Dispatchers.IO) {
         val token = getAuthToken()
             ?: throw IllegalStateException("未登录，请先在 elon APP 中登录")
 
@@ -155,10 +156,11 @@ class ElonServerClient(
         val body = org.json.JSONObject().apply {
             put("messages", messagesJson)
             if (agentName != null) put("agent", agentName)
+            if (conversationId != null) put("conversation_id", conversationId)
         }.toString()
 
         val url = java.net.URL("$serverUrl/api/llm/chat")
-        Log.d(TAG, "→ POST /api/llm/chat  msgs=${messages.size}  last=${messages.lastOrNull()?.content?.take(40)}")
+        Log.d(TAG, "→ POST /api/llm/chat  msgs=${messages.size}  conv=${conversationId ?: "<new>"}  last=${messages.lastOrNull()?.content?.take(40)}")
 
         val conn = (url.openConnection() as java.net.HttpURLConnection).apply {
             requestMethod = "POST"
@@ -179,7 +181,10 @@ class ElonServerClient(
             }
             val resp = conn.inputStream.bufferedReader().readText()
             Log.d(TAG, "← /api/llm/chat reply=${resp.take(80)}")
-            org.json.JSONObject(resp).optString("reply").ifBlank { "（服务器未返回回复）" }
+            val json = org.json.JSONObject(resp)
+            val reply = json.optString("reply").ifBlank { "（服务器未返回回复）" }
+            val newConvId = json.optString("conversation_id").ifBlank { null }
+            Pair(reply, newConvId)
         } finally {
             conn.disconnect()
         }
