@@ -1,6 +1,6 @@
 // infrastructure/floating/FloatingVoiceActivityV2.kt
-// module: infrastructure/floating | layer: infrastructure | role: voice-balloon-activity
-// summary: 悬浮球语音全双工 Activity - PCM 直流到服务器 Realtime，AI 返回 JSON 脚本则本地执行，返回文字则 TTS 播报
+// module: infrastructure/floating | layer: infrastructure | role: voice-input-activity-v2
+// summary: 语音输入透明Activity V2 - 使用 ConversationalVoiceAdapter 实现智能对话
 
 package com.elon.app.agent.infrastructure.floating
 
@@ -9,323 +9,652 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
-import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
-import android.widget.*
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.elon.app.AuthManager
-import com.elon.app.RealtimePcmPlayer
-import com.elon.app.RealtimeVoiceController
-import com.elon.app.RealtimeVoiceWsClient
-import com.elon.app.ServerUrlManager
-import com.elon.app.agent.AgentService
-import com.elon.app.agent.application.LocalBasicActionExecutor
-import com.elon.app.agent.infrastructure.voice.AndroidTTSService
+import com.elon.app.agent.AgentConfigActivity
+import com.elon.app.agent.application.IntentAnalyzer
+import com.elon.app.agent.domain.conversation.ConversationState
+import com.elon.app.agent.infrastructure.voice.*import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 
 /**
- * 🎤 悬浮球语音全双工 Activity
- *
- * 升级说明（旧版 → 新版）：
- *  旧版：手机 ASR（文字） → 服务器 Codex（文字） → TTS → 手机执行
- *  新版：手机 PCM 直流 → 服务器 OpenAI Realtime → PCM 音频回流 + AI 文字
- *
- * 新版优势：
- *  - 真正全双工：用户说话和 AI 回复同时进行
- *  - 支持打断：检测到用户说话立刻清空 AI 播放缓冲
- *  - 长时间持续对话：无 ASR 启停开销，连接保持直到用户关闭
- *  - AI 返回 JSON 脚本 → 本地 ScriptEngine 执行手机操控
- *  - AI 返回文字 → PCM 音频实时播放，无需 TTS 转换
+ * 🎤 语音输入透明Activity V2
+ * 
+ * 架构说明：
+ * - 使用 ConversationalVoiceAdapter 管理对话流程
+ * - 支持"边听边回应"的智能对话体验
+ * - 状态驱动 UI 更新
+ * - 接入 AI 实现智能意图分析和对话回复
+ * 
+ * 状态流转：
+ * IDLE → LISTENING → THINKING → SPEAKING/EXECUTING → IDLE
+ *                  ↖________↙ (被打断时)
  */
 class ConversationalVoiceActivity : AppCompatActivity() {
-
+    
     companion object {
         private const val TAG = "ConversationalVoice"
-
-        /** AI 回复是否为手机控制 JSON 脚本（有 steps 数组）。 */
-        private fun isScriptJson(text: String): Boolean {
-            val t = text.trim()
-            if (!t.startsWith("{")) return false
-            return try {
-                val obj = org.json.JSONObject(t)
-                obj.has("steps")
-            } catch (_: Exception) { false }
-        }
     }
-
-    // ── UI ──────────────────────────────────────────────────
+    
+    // ==================== UI 组件 ====================
+    
     private lateinit var statusText: TextView
-    private lateinit var userText: TextView
-    private lateinit var aiText: TextView
+    private lateinit var resultText: TextView
+    private lateinit var responseText: TextView
+    private lateinit var voiceIndicator: TextView
     private lateinit var cancelButton: Button
-
-    // ── 语音核心 ──────────────────────────────────────────────
-    private lateinit var player: RealtimePcmPlayer
-    private var controller: RealtimeVoiceController? = null
-
+    
+    // ==================== 对话核心 ====================
+    
+    private lateinit var voiceAdapter: ConversationalVoiceAdapter
+    private var ttsService: TextToSpeechService? = null
+    
     private val handler = Handler(Looper.getMainLooper())
 
-    private val requestPermission = registerForActivityResult(
+    /** Activity 是否处于前台（resumed）。后台时不自动重启 ASR，避免拿不到麦克风。 */
+    @Volatile
+    private var isActivityResumed = false
+
+    /** 是否经历过至少一次 onPause（区分首次启动 vs 从后台回来）。*/
+    private var hasEverPaused = false
+
+    // ==================== 权限请求 ====================
+    
+    private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) startRealtime()
-        else { Toast.makeText(this, "需要麦克风权限", Toast.LENGTH_SHORT).show(); finish() }
+    ) { isGranted ->
+        if (isGranted) {
+            startConversation()
+        } else {
+            Toast.makeText(this, "需要麦克风权限", Toast.LENGTH_SHORT).show()
+            finish()
+        }
     }
-
-    // ── 生命周期 ──────────────────────────────────────────────
-
+    
+    // ==================== 生命周期 ====================
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // 设置透明窗口
+        setupTransparentWindow()
+        
+        // 创建UI
+        createUI()
+        
+        // 初始化对话系统
+        initializeConversation()
+        
+        // 检查权限并开始
+        checkPermissionAndStart()
+    }
+    
+    /**
+     * 设置透明窗口属性
+     */
+    private fun setupTransparentWindow() {
         window.apply {
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setDimAmount(0.5f)
+            setDimAmount(0.6f)
         }
-        player = RealtimePcmPlayer()
-        createUI()
-        checkPermissionAndStart()
     }
+    
+    /**
+     * 初始化对话系统
+     */
+    private fun initializeConversation() {
+        val config = AgentConfigActivity.getAgentConfig(this)
+        val orderLog = config.voiceModeOrder.joinToString(" -> ")
+        Log.i(TAG, "📱 语音回退顺序：$orderLog")
 
-    override fun onNewIntent(intent: android.content.Intent?) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        Log.i(TAG, "🔁 onNewIntent - controller 已持续运行，无需重启")
-        // Realtime 全双工连接持续保持，用户再次点悬浮球不需要重启
-        userText.text = ""
-        aiText.text = ""
-        statusText.text = "在听，说吧"
-    }
+        // 初始化 TTS
+        ttsService = AndroidTTSService(this)
 
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
-        controller?.shutdown()
-        controller = null
-        player.release()
-    }
+        // 初始化对话适配器（传 serverUrl 以支持云端 ASR 兜底）
+        voiceAdapter = ConversationalVoiceAdapter(
+            this,
+            config.cliServerUrl.ifBlank { "http://43.139.149.158:8080" }
+        ).apply {
+            setTTSService(ttsService)
 
-    // ── 权限与启动 ────────────────────────────────────────────
+            // 按回退顺序依次尝试，使用第一个有配置的模式
+            var activatedMode = AgentConfigActivity.VOICE_MODE_SIMPLE
+            val skipped = mutableListOf<String>()
 
-    private fun checkPermissionAndStart() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED) startRealtime()
-        else requestPermission.launch(Manifest.permission.RECORD_AUDIO)
-    }
+            // 🔑 重构核心：API Key 模式和 CLI 模式共用同一条「智能管线」
+            //   意图分析：SmartIntentAnalyzerAdapter（本地规则 + AI 判断完整性/意图）
+            //   响应生成：SmartResponseGenerator（闲聊→AI对话；操作→生成脚本并执行）
+            // 二者唯一区别只是底层 AIClient 由 AIClientFactory 自动选：
+            //   有 Key → 用自带 Key；没 Key 但已登录选了项目 → 自动走服务器 CLI。
+            // 因此不再需要 CLI 专属的「透传 + 全发服务器」管线。
+            fun activateSmartPipeline() {
+                val intentAnalyzer = IntentAnalyzer(this@ConversationalVoiceActivity)
+                setIntentAnalyzer(SmartIntentAnalyzerAdapter(intentAnalyzer))
+                setResponseGenerator(SmartResponseGenerator(this@ConversationalVoiceActivity))
+            }
 
-    private fun startRealtime() {
-        if (controller != null) {
-            // 已有连接，只需恢复监听
-            controller?.resumeAutoListening()
-            statusText.text = "在听，说吧"
-            return
-        }
-
-        if (!player.start()) {
-            Toast.makeText(this, "无法启动音频播放", Toast.LENGTH_SHORT).show()
-        }
-        player.clear()
-
-        val serverUrl = ServerUrlManager.getActive(this)
-        val userId = AuthManager.effectiveUserId(this)
-
-        statusText.text = "连接中..."
-
-        controller = RealtimeVoiceController(
-            context = this,
-            baseHttpUrl = serverUrl,
-            userId = userId,
-            mode = RealtimeVoiceWsClient.Mode.RealtimeChat,
-            target = RealtimeVoiceWsClient.Target.PhoneControl,
-            continuousAutoCommit = true,    // 检测到静音自动提交，无需用户操作
-
-            onTranscriptDelta = { text ->
-                runOnUiThread { if (text.isNotBlank()) userText.text = text }
-            },
-            onTranscriptFinal = { text ->
-                runOnUiThread {
-                    if (text.isNotBlank()) userText.text = text
-                    statusText.text = "在想..."
-                }
-            },
-
-            // AI 回复字幕增量：实时展示
-            onAiProgress = { text ->
-                runOnUiThread {
-                    if (text.isNotBlank()) {
-                        aiText.text = text
-                        statusText.text = "AI 说"
+            run cascade@{
+                for (mode in config.voiceModeOrder) {
+                    when (mode) {
+                        AgentConfigActivity.VOICE_MODE_APIKEY -> {
+                            if (config.hunyuanApiKey.isNotEmpty() || config.openaiApiKey.isNotEmpty()) {
+                                activateSmartPipeline()
+                                activatedMode = mode
+                                Log.i(TAG, "✅ 智能管线已激活（自带 Key，优先级 #${config.voiceModeOrder.indexOf(mode) + 1}）")
+                                return@cascade
+                            } else {
+                                skipped.add("混元/OpenAI API Key（未填写）")
+                                Log.i(TAG, "⏭️ API Key 未配置，跳过")
+                            }
+                        }
+                        AgentConfigActivity.VOICE_MODE_CLI -> {
+                            // 优先读主 UI 当前项目，没有才退到 AgentConfig.cliProjectId
+                            val effectiveProjectId = com.elon.app.agent.infrastructure.auth.MainAppBridge
+                                .effectiveCliProjectId(this@ConversationalVoiceActivity)
+                                ?: ""
+                            if (effectiveProjectId.isNotEmpty()) {
+                                // 同一条智能管线：意图分析在本地/AI 做，闲聊与脚本都通过
+                                // AIClientFactory 自动走服务器 CLI（用户已登录且选了项目）。
+                                activateSmartPipeline()
+                                activatedMode = mode
+                                Log.i(TAG, "✅ 智能管线已激活（服务器 CLI，project=$effectiveProjectId）")
+                                return@cascade
+                            } else {
+                                skipped.add("服务器 CLI（未登录主 UI 或未选项目）")
+                                Log.i(TAG, "⏭️ CLI Project ID 未配置，跳过")
+                            }
+                        }
+                        AgentConfigActivity.VOICE_MODE_SIMPLE -> {
+                            activatedMode = mode
+                            Log.i(TAG, "ℹ️ 简单模式（关键词匹配）")
+                            return@cascade
+                        }
                     }
                 }
-            },
+                // voiceModeOrder 里没有 simple 时的兜底
+                Log.i(TAG, "ℹ️ 兜底：简单模式")
+            }
 
-            // AI 回复完成（对文字 fallback 路径）
-            onAiDone = { message, _ ->
-                runOnUiThread {
-                    val reply = message.trim()
-                    if (reply.isNotBlank()) aiText.text = reply
-                    maybeExecuteScript(reply)
-                    statusText.text = "在听，说吧"
-                }
-            },
+            // Toast 汇报激活的模式（+ 跳过了哪些）
+            val modeLabel = when (activatedMode) {
+                AgentConfigActivity.VOICE_MODE_APIKEY -> "智能模式（自带 AI Key）"
+                AgentConfigActivity.VOICE_MODE_CLI    -> "智能模式（服务器 AI）"
+                else                                  -> "简单模式（关键词匹配）"
+            }
+            val skippedDesc = skipped.joinToString("、")
+            val msg = if (skipped.isEmpty()) modeLabel else "$modeLabel\n（已跳过：$skippedDesc）"
+            Toast.makeText(this@ConversationalVoiceActivity, msg, Toast.LENGTH_SHORT).show()
 
-            // Realtime PCM 音频片段 → 直接播放
-            onRealtimeAudio = { chunk -> player.play(chunk) },
+            // 设置 UI 监听器
+            listener = createConversationListener()
 
-            // 用户开始说话 → 打断 AI，清空播放缓冲
-            onRealtimeSpeechStarted = {
-                runOnUiThread {
-                    player.clear()
-                    statusText.text = "在听..."
-                    aiText.text = ""
-                }
-            },
-            onRealtimeSpeechStopped = {
-                runOnUiThread { statusText.text = "在想..." }
-            },
-
-            // AI 这轮回复结束 → 解析文字，检查是否为脚本
-            onRealtimeResponseDone = {
-                runOnUiThread {
-                    val finalAiText = aiText.text.toString().trim()
-                    maybeExecuteScript(finalAiText)
-                    statusText.text = "在听，说吧"
-                }
-            },
-
-            onError = { message ->
-                runOnUiThread {
-                    Log.w(TAG, "语音错误: $message")
-                    statusText.text = "重试中..."
-                    // Realtime 模式下 controller 内部会自动恢复，不需要手动重启
-                }
-            },
-        )
-        controller?.start(lifecycleScope)
-        statusText.text = "在听，说吧"
+            // 设置任务执行回调
+            onTaskExecute = { goal ->
+                executeTask(goal)
+            }
+        }
+        
+        // 监听状态变化，更新 UI
+        lifecycleScope.launch {
+            voiceAdapter.currentState.collectLatest { state ->
+                updateUIForState(state)
+            }
+        }
     }
-
+    
     /**
-     * 检查 AI 回复文字是否为手机自动化 JSON 脚本：
-     *  - 是脚本 → AgentService.executeTask 执行
-     *  - 是文字 → 已经通过 PCM 音频播放，不做额外处理
+     * 创建对话监听器
      */
-    private fun maybeExecuteScript(text: String) {
-        if (!isScriptJson(text)) return
-
-        // 三层漏斗：先试本地直控（最快），失败才走 ScriptEngine
-        val agentService = AgentService.getInstance()
-        if (agentService != null) {
-            val localResult = LocalBasicActionExecutor.tryExecute(agentService, text)
-            if (localResult is LocalBasicActionExecutor.Result.Handled) {
-                Log.i(TAG, "⚡ 本地直控: ${localResult.message}")
-                runOnUiThread { aiText.text = localResult.message }
-                return
+    private fun createConversationListener() = object : VoiceConversationListener {
+        
+        override fun onListeningStarted() {
+            runOnUiThread {
+                statusText.text = "正在聆听..."
+                voiceIndicator.text = "🔴"
+            }
+        }
+        
+        override fun onUserSpeaking(text: String) {
+            runOnUiThread {
+                resultText.text = text
+            }
+        }
+        
+        override fun onUserInputComplete(text: String) {
+            runOnUiThread {
+                resultText.text = text
+            }
+        }
+        
+        override fun onThinking() {
+            runOnUiThread {
+                statusText.text = "思考中..."
+                voiceIndicator.text = "🧠"
             }
         }
 
-        // 交给 AgentService ScriptEngine 执行
-        Log.i(TAG, "📜 执行脚本: ${text.take(60)}")
-        runOnUiThread { statusText.text = "执行中..." }
-        AgentService.executeTask(text)
+        override fun onProgress(step: String) {
+            runOnUiThread {
+                // 在思考阶段实时展示 AI 处理步骤（截取前 30 字，避免截断 UI）
+                statusText.text = step.take(30)
+            }
+        }
+        
+        override fun onAssistantResponse(text: String) {
+            runOnUiThread {
+                responseText.text = text
+                responseText.visibility = android.view.View.VISIBLE
+            }
+        }
+        
+        override fun onAssistantSpeaking(text: String) {
+            runOnUiThread {
+                statusText.text = "正在回应..."
+                voiceIndicator.text = "🗣️"
+            }
+        }
+        
+        override fun onExecuting(goal: String) {
+            runOnUiThread {
+                statusText.text = "正在执行..."
+                voiceIndicator.text = "🚀"
+            }
+        }
+        
+        override fun onExecutionComplete(success: Boolean, result: String) {
+            runOnUiThread {
+                if (success) {
+                    Toast.makeText(this@ConversationalVoiceActivity, "✅ $result", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@ConversationalVoiceActivity, "❌ $result", Toast.LENGTH_SHORT).show()
+                }
+                handler.postDelayed({ finish() }, 500)
+            }
+        }
+        
+        override fun onError(error: String) {
+            runOnUiThread {
+                Log.w(TAG, "⚠️ 收到错误: $error")
+                
+                // 可恢复错误列表（不关闭窗口，等待用户重试）
+                val isRecoverableError = error.contains("客户端") || 
+                                         error.contains("client") ||
+                                         error.contains("重试") ||
+                                         error.contains("超时") ||  // 网络超时也是可恢复的
+                                         error.contains("timeout") ||
+                                         error.contains("网络")  // 网络问题
+                
+                if (isRecoverableError) {
+                    // 可恢复错误，显示提示并等待用户重新点击
+                    Log.i(TAG, "📍 可恢复错误，等待用户重试")
+                    statusText.text = "🎤 点击重试"
+                    voiceIndicator.text = "🎤"
+                    // 不关闭窗口，让用户可以点击重试
+                } else {
+                    // 严重错误（如权限问题），显示后关闭
+                    statusText.text = "错误: $error"
+                    voiceIndicator.text = "❌"
+                    handler.postDelayed({ finish() }, 2000)
+                }
+            }
+        }
+        
+        override fun onIdle() {
+            // 对话结束，自动开启下一轮监听
+            runOnUiThread {
+                statusText.text = "\uD83C\uDFA4 继续说\u2026"
+                voiceIndicator.text = "\uD83C\uDFA4"
+
+                // 回复后 0.8s 自动重启监听：用户说完一句、听到回复，再说下一句，中间不需要点击任何东西
+                handler.postDelayed({
+                    if (voiceAdapter.currentState.value == ConversationState.IDLE && !isFinishing) {
+                        Log.i(TAG, "\uD83D\uDD04 \u81ea\u52a8\u5f00\u59cb\u4e0b\u4e00\u8f6e\u5bf9\u8bdd")
+                        resultText.text = ""
+                        responseText.text = ""
+                        responseText.visibility = android.view.View.GONE
+                        voiceAdapter.restartListening()
+                    }
+                }, 800) // 从 3000ms 缩短到 800ms，回复后迅速重启等待用户继续说话
+            }
+        }
     }
-
-    // ── UI 构建 ───────────────────────────────────────────────
-
+    
+    /**
+     * 根据状态更新 UI
+     */
+    private fun updateUIForState(state: ConversationState) {
+        runOnUiThread {
+            when (state) {
+                ConversationState.IDLE -> {
+                    voiceIndicator.text = "🎤"
+                    statusText.text = "🎤 点击或等待自动开始"
+                }
+                ConversationState.LISTENING -> {
+                    voiceIndicator.text = "🔴"
+                    statusText.text = "正在聆听..."
+                }
+                ConversationState.THINKING -> {
+                    voiceIndicator.text = "🧠"
+                    statusText.text = "思考中..."
+                }
+                ConversationState.SPEAKING -> {
+                    voiceIndicator.text = "🗣️"
+                    statusText.text = "正在回应..."
+                }
+                ConversationState.EXECUTING -> {
+                    voiceIndicator.text = "🚀"
+                    statusText.text = "正在执行..."
+                }
+                ConversationState.INTERRUPTED -> {
+                    voiceIndicator.text = "⚡"
+                    statusText.text = "已打断"
+                }
+                ConversationState.AWAITING_MORE -> {
+                    voiceIndicator.text = "🟡"
+                    statusText.text = "继续说..."
+                }
+            }
+        }
+    }
+    
+    /**
+     * 创建 UI 布局
+     */
     private fun createUI() {
         val density = resources.displayMetrics.density
-        fun dp(v: Int) = (v * density).toInt()
-
-        val root = FrameLayout(this).apply {
+        
+        val rootLayout = FrameLayout(this).apply {
             setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { finish() }
+            setOnClickListener { cancelAndClose() }
         }
-
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        
+        // 中央卡片
+        val card = createCard(density)
+        
+        // 语音指示器 - 可点击重新开始
+        voiceIndicator = TextView(this).apply {
+            text = "🎤"
+            textSize = 56f
             gravity = Gravity.CENTER
-            setPadding(dp(28), dp(28), dp(28), dp(22))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#181B20"))
-                cornerRadius = dp(24).toFloat()
+            isClickable = true  // 确保可点击
+            isFocusable = true  // 确保可聚焦
+            // 👇 点击指示器重新开始对话
+            setOnClickListener { v ->
+                // 阻止事件继续传播
+                v.parent?.requestDisallowInterceptTouchEvent(true)
+                
+                val currentState = voiceAdapter.currentState.value
+                Log.i(TAG, "🔄 点击麦克风，当前状态: $currentState")
+                
+                when (currentState) {
+                    ConversationState.IDLE -> {
+                        Log.i(TAG, "🔄 用户点击重新开始对话")
+                        resultText.text = ""
+                        responseText.text = ""
+                        responseText.visibility = android.view.View.GONE
+                        voiceAdapter.restartListening()
+                    }
+                    ConversationState.SPEAKING -> {
+                        // 正在说话时点击 = 打断
+                        Log.i(TAG, "⚡ 用户点击打断")
+                        voiceAdapter.interrupt()
+                    }
+                    else -> {
+                        // 其他状态不处理，但也不关闭窗口
+                        Log.d(TAG, "📍 当前状态 $currentState，忽略点击")
+                    }
+                }
             }
-            elevation = dp(16).toFloat()
-            isClickable = true
-            isFocusable = true
         }
-
-        // 状态指示
+        card.addView(voiceIndicator, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = Gravity.CENTER })
+        
+        // 状态文字
         statusText = TextView(this).apply {
-            text = "连接中..."
+            text = "正在准备..."
             textSize = 16f
-            setTextColor(Color.parseColor("#58BE6A"))
+            setTextColor(Color.parseColor("#F2F5FA"))
             gravity = Gravity.CENTER
         }
-        card.addView(statusText)
-
-        // 用户说的
-        userText = TextView(this).apply {
+        card.addView(statusText, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+            topMargin = (12 * density).toInt()
+        })
+        
+        // 用户输入文字
+        resultText = TextView(this).apply {
             text = ""
-            textSize = 17f
+            textSize = 18f
             setTextColor(Color.parseColor("#6091CF"))
             gravity = Gravity.CENTER
-            maxLines = 4
-            setPadding(0, dp(12), 0, 0)
-        }
-        card.addView(userText, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-
-        // AI 说的
-        aiText = TextView(this).apply {
-            text = ""
-            textSize = 15f
-            setTextColor(Color.parseColor("#A6AFBD"))
-            gravity = Gravity.CENTER
             maxLines = 5
-            setPadding(0, dp(8), 0, 0)
+            minHeight = (60 * density).toInt()
         }
-        card.addView(aiText, LinearLayout.LayoutParams(
+        card.addView(resultText, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ))
-
+        ).apply {
+            gravity = Gravity.CENTER
+            topMargin = (16 * density).toInt()
+        })
+        
+        // 助手响应文字
+        responseText = TextView(this).apply {
+            text = ""
+            textSize = 14f
+            setTextColor(Color.parseColor("#58BE6A"))
+            gravity = Gravity.CENTER
+            maxLines = 3
+            visibility = android.view.View.GONE
+        }
+        card.addView(responseText, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+            topMargin = (8 * density).toInt()
+        })
+        
         // 取消按钮
         cancelButton = Button(this).apply {
-            text = "关闭"
+            text = "❌ 取消"
             textSize = 14f
             setTextColor(Color.parseColor("#F2F5FA"))
-            background = GradientDrawable().apply {
+            val bg = GradientDrawable().apply {
                 setColor(Color.parseColor("#283140"))
-                cornerRadius = dp(20).toFloat()
+                cornerRadius = 20 * density
             }
-            setPadding(dp(24), dp(8), dp(24), dp(8))
-            setOnClickListener { finish() }
+            background = bg
+            setPadding((24 * density).toInt(), (10 * density).toInt(), (24 * density).toInt(), (10 * density).toInt())
+            setOnClickListener { cancelAndClose() }
         }
         card.addView(cancelButton, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.CENTER
-            topMargin = dp(18)
+            topMargin = (20 * density).toInt()
         })
-
-        card.addView(TextView(this).apply {
-            text = "直接说话 · AI 实时回复"
+        
+        // 提示
+        val tipText = TextView(this).apply {
+            text = "说完会自动执行，点击空白处取消"
             textSize = 11f
             setTextColor(Color.parseColor("#6F7785"))
             gravity = Gravity.CENTER
-            setPadding(0, dp(10), 0, 0)
+        }
+        card.addView(tipText, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+            topMargin = (12 * density).toInt()
         })
+        
+        rootLayout.addView(card, FrameLayout.LayoutParams(
+            (320 * density).toInt(),
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = Gravity.CENTER })
+        
+        setContentView(rootLayout)
+    }
+    
+    /**
+     * 创建卡片容器
+     */
+    private fun createCard(density: Float): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(
+                (32 * density).toInt(),
+                (32 * density).toInt(),
+                (32 * density).toInt(),
+                (24 * density).toInt()
+            )
+            
+            val bg = GradientDrawable().apply {
+                setColor(Color.parseColor("#181B20"))
+                cornerRadius = 24 * density
+            }
+            background = bg
+            elevation = 16 * density
+            isClickable = true
+            isFocusable = true
+            // 点击卡片区域 = 重新开始对话（IDLE状态时）
+            setOnClickListener { 
+                val currentState = voiceAdapter.currentState.value
+                Log.d(TAG, "📍 点击卡片，当前状态: $currentState")
+                
+                if (currentState == ConversationState.IDLE) {
+                    Log.i(TAG, "🔄 用户点击卡片重新开始对话")
+                    resultText.text = ""
+                    responseText.text = ""
+                    responseText.visibility = android.view.View.GONE
+                    voiceAdapter.restartListening()
+                }
+                // 其他状态不做任何事，也不关闭窗口
+            }
+        }
+    }
+    
+    /**
+     * 检查权限并开始
+     */
+    private fun checkPermissionAndStart() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                startConversation()
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+    
+    /**
+     * 开始对话
+     */
+    private fun startConversation() {
+        statusText.text = "请说话..."
+        voiceIndicator.text = "🔴"
+        voiceAdapter.start()
+    }
+    
+    /**
+     * 执行任务
+     */
+    private fun executeTask(goal: String) {
+        if (!com.elon.app.agent.AgentService.isRunning()) {
+            Toast.makeText(this, "❌ 请先开启无障碍服务", Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        
+        com.elon.app.agent.AgentService.executeTask(goal)
+        Toast.makeText(this, "🚀 $goal", Toast.LENGTH_SHORT).show()
+        finish()
+    }
+    
+    /**
+     * 取消并关闭
+     */
+    private fun cancelAndClose() {
+        voiceAdapter.stop()
+        handler.removeCallbacksAndMessages(null)
+        finish()
+    }
+    
+    // ==================== 生命周期管理 ====================
 
-        root.addView(card, FrameLayout.LayoutParams(dp(300), FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        setContentView(root)
+    /**
+     * 🔁 再次点悬浮球时（singleInstance 实例已存在）走这里，而不是 onCreate。
+     *
+     * 修复：之前未重写 onNewIntent，导致完成一次语音命令（如打开微信）后
+     * 再点悬浮球，窗口出来了却不重启 ASR，表现为“听不到说话”。
+     */
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        Log.i(TAG, "🔁 onNewIntent：重新唤起语音对话，重启聚听")
+        // 清理上一轮文字，重新开始聚听
+        resultText.text = ""
+        responseText.text = ""
+        responseText.visibility = android.view.View.GONE
+        statusText.text = "请说话..."
+        voiceIndicator.text = "🔴"
+        // 延迟到 onResume 之后再重启，确保窗口已在前台能拿到麦克风
+        handler.postDelayed({
+            if (!isFinishing) voiceAdapter.restartListening()
+        }, 300)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isActivityResumed = true
+        // 只在「从后台回来」时才补重启，首次启动由 startConversation 负责，不在这里干预。
+        if (hasEverPaused) {
+            handler.postDelayed({
+                if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
+                    voiceAdapter.restartListening()
+                }
+            }, 500)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        isActivityResumed = false
+        hasEverPaused = true
+        // 退到后台时停采收 ASR，避免后台空跑麦克风。
+        voiceAdapter.stop()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacksAndMessages(null)
+        voiceAdapter.destroy()
+        ttsService?.destroy()
     }
 }
