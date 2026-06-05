@@ -28,6 +28,18 @@ object AIClientFactory {
     private const val TAG = "AIClientFactory"
 
     /**
+     * 悬浮球 ElonServerAIClient 单例缓存。
+     *
+     * 使用单例的原因：
+     *   - `cliConversationId` / `lmConversationId` / `balloonProjectId` 存在实例字段里
+     *   - ScriptEngine / IntentAnalyzer / SmartResponseGenerator 都调用 create()，
+     *     若每次 new 出不同实例，会话 ID 永远无法跨调用维护
+     *   - 单例保证整个进程共用同一个会话 ID，实现真正的会话连续（P2）
+     */
+    @Volatile
+    private var cachedElonServerClient: ElonServerAIClient? = null
+
+    /**
      * 根据当前配置和登录态构造 [AIClient]。
      * **永远不会抛异常**；如果什么都没配，返回的是 [UnconfiguredAIClient]，
      * 会在真正发起 chat 时给出可读的错误。
@@ -56,7 +68,9 @@ object AIClientFactory {
         val projectId = MainAppBridge.effectiveCliProjectId(ctx)
         if (!token.isNullOrBlank() && !projectId.isNullOrBlank()) {
             Log.i(TAG, "→ 选择 ElonServer CLI（project=$projectId）")
-            return ElonServerAIClient(ctx, projectId)
+            // 单例：所有调用方共享同一个实例和 conversationId
+            return cachedElonServerClient
+                ?: ElonServerAIClient(ctx, projectId).also { cachedElonServerClient = it }
         }
 
         // 都没有 → 返回 NoOp，让调用方在 chat 时收到友好错误
