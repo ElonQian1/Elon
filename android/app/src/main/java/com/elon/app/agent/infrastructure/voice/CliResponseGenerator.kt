@@ -6,6 +6,8 @@ package com.elon.app.agent.infrastructure.voice
 
 import android.content.Context
 import android.util.Log
+import com.elon.app.agent.AgentService
+import com.elon.app.agent.application.LocalBasicActionExecutor
 import com.elon.app.agent.application.conversation.IntentAnalysisResult
 import com.elon.app.agent.application.conversation.ResponseGenerator
 import com.elon.app.agent.application.conversation.StreamingIntentAnalyzer
@@ -45,6 +47,27 @@ class CliResponseGenerator(
     var onProgress: ((String) -> Unit)? = null
 
     override suspend fun generate(intent: IntentAnalysisResult): Response {
+        // ⚡ 基础动作本地直控：打开应用 / 返回 / 回桌面 / 最近任务
+        // 这类动作手机本地无障碍秒执行，绝不发服务器（避免服务器 CLI 异常拖垮基础体验）。
+        val service = AgentService.getInstance()
+        if (service != null) {
+            when (val r = LocalBasicActionExecutor.tryExecute(service, intent.normalizedInput)) {
+                is LocalBasicActionExecutor.Result.Handled -> {
+                    Log.i(TAG, "⚡ 本地直控：${r.message}")
+                    return Response(
+                        tier = ResponseTier.FAST,
+                        text = r.message,
+                        emotion = Emotion.HELPFUL
+                    )
+                }
+                LocalBasicActionExecutor.Result.NotHandled -> {
+                    // 不是纯基础动作，继续交服务器 CLI 处理
+                }
+            }
+        } else {
+            Log.w(TAG, "无障碍服务未开启，无法本地直控，转服务器处理")
+        }
+
         Log.d(TAG, "🖥️ CLI 流式请求: ${intent.normalizedInput.take(40)}")
         return try {
             val reply = serverClient.chatStream(
