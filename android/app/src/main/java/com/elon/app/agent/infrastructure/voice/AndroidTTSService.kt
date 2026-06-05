@@ -23,6 +23,10 @@ class AndroidTTSService(context: Context) : TextToSpeechService {
 
     private val speaker = VoiceSpeaker(context, respectUserToggle = false)
 
+    init {
+        Log.i(TAG, "悬浮球已接入 VoiceSpeaker 情绪 TTS")
+    }
+
     override val isSpeaking: Boolean
         get() = speaker.isSpeaking
 

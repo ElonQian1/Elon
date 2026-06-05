@@ -121,15 +121,20 @@ internal class VoiceSpeaker(
         if (tts?.isSpeaking == true) tts?.stop()
         val resolvedProfile = profile ?: VoiceTtsEmotion.profileFor(content)
         activeDone = onDone
+        Log.d(TAG, "尝试服务器情绪 TTS profile=${resolvedProfile.id}")
         if (serverTtsPlayer.trySpeak(
                 text = content,
                 profile = resolvedProfile,
                 onDone = { finishSpeakCallback() },
-                onFallback = { speakWithSystem(engine, content, resolvedProfile, onDone) }
+                onFallback = {
+                    Log.w(TAG, "服务器情绪 TTS 不可用，降级系统 TTS profile=${resolvedProfile.id}")
+                    speakWithSystem(engine, content, resolvedProfile, onDone)
+                }
             )
         ) {
             return
         }
+        Log.w(TAG, "服务器情绪 TTS 被跳过，降级系统 TTS profile=${resolvedProfile.id}")
         speakWithSystem(engine, content, resolvedProfile, onDone)
     }
 

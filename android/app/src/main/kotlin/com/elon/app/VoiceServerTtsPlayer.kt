@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 internal class VoiceServerTtsPlayer(context: Context) {
     companion object {
         private const val TAG = "VoiceServerTts"
-        private const val COOLDOWN_MS = 5 * 60 * 1000L
+        private const val COOLDOWN_MS = 30 * 1000L
 
         @Volatile
         private var unavailableUntilMs: Long = 0L
@@ -50,8 +50,19 @@ internal class VoiceServerTtsPlayer(context: Context) {
         onDone: () -> Unit,
         onFallback: () -> Unit
     ): Boolean {
-        if (System.currentTimeMillis() < unavailableUntilMs) return false
-        val request = buildRequest(text, profile) ?: return false
+        val now = System.currentTimeMillis()
+        if (now < unavailableUntilMs) {
+            Log.w(TAG, "server TTS still in cooldown: remainingMs=${unavailableUntilMs - now}")
+            return false
+        }
+        val request = buildRequest(text, profile) ?: run {
+            Log.w(TAG, "server TTS request build failed")
+            return false
+        }
+        Log.i(
+            TAG,
+            "request server TTS voice=${profile.serverVoiceId} emotion=${profile.serverEmotionId} intensity=${profile.serverIntensity}"
+        )
         val call = http.newCall(request)
         val requestGeneration = begin(call)
         call.enqueue(object : Callback {
@@ -85,6 +96,7 @@ internal class VoiceServerTtsPlayer(context: Context) {
                         return
                     }
                     val contentType = resp.header("Content-Type").orEmpty()
+                    Log.i(TAG, "server TTS audio ready contentType=$contentType bytes=${bytes.size}")
                     val file = writeTempAudio(bytes, contentType)
                     clearCall(requestGeneration)
                     mainHandler.post {
