@@ -27,6 +27,9 @@ if (-not (Test-Path (Join-Path $LocalWorkerDir "edge_tts_worker.py"))) {
 function Invoke-Remote {
     param([string]$Command)
     ssh @SshOpts $Server $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "Remote command failed with exit code $LASTEXITCODE"
+    }
 }
 
 Write-Host "Creating remote worker directory..."
@@ -37,6 +40,9 @@ scp @SshOpts `
     (Join-Path $LocalWorkerDir "edge_tts_worker.py") `
     (Join-Path $LocalWorkerDir "requirements.txt") `
     "${Server}:$RemoteWorkerDir/"
+if ($LASTEXITCODE -ne 0) {
+    throw "scp worker files failed with exit code $LASTEXITCODE"
+}
 
 $restartMain = if ($SkipMainServerRestart) { "0" } else { "1" }
 $remoteScript = @"
@@ -128,8 +134,13 @@ fi
 
 $tempScript = New-TemporaryFile
 try {
-    Set-Content -LiteralPath $tempScript -Value $remoteScript -Encoding UTF8
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    $remoteScriptLf = $remoteScript -replace "`r`n", "`n" -replace "`r", "`n"
+    [System.IO.File]::WriteAllText($tempScript.FullName, $remoteScriptLf, $utf8NoBom)
     scp @SshOpts $tempScript "${Server}:/tmp/deploy-elon-tts-worker.sh"
+    if ($LASTEXITCODE -ne 0) {
+        throw "scp deploy script failed with exit code $LASTEXITCODE"
+    }
     Invoke-Remote "bash /tmp/deploy-elon-tts-worker.sh"
 } finally {
     Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
