@@ -11,7 +11,7 @@ use crate::{
     project_auth::project_access,
     project_chat::run_project_agent_with_scheduler,
     project_execution_mode::ProjectExecutionMode,
-    types::{AppState, WsMessage},
+    types::AppState,
     voice_protocol::VOICE_TARGET_SOCIAL_AI_DIRECT,
 };
 
@@ -121,25 +121,14 @@ async fn dispatch_to_direct_social_ai(
         "voice_to_cli: 投递转写文本到一龙AI私聊"
     );
 
-    let reply = crate::social_ai::reply_to_direct_friend_voice(
+    crate::social_ai::spawn_direct_friend_voice_reply(
         state.clone(),
         target.user_id.clone(),
         message,
-    )
-    .await?;
-    let _ = ai_reply_tx.send(
-        WsMessage::Done {
-            message: reply.clone(),
-            apk_url: None,
-            image_url: None,
-            model_used: None,
-            node_id: None,
-        }
-        .to_json(),
-    );
-
+        ai_reply_tx,
+    )?;
     Ok(DispatchOutcome {
         ok: true,
-        message: format!("一龙AI 已回复（{} 字）", reply.chars().count()),
+        message: "一龙AI 正在回复".into(),
     })
 }

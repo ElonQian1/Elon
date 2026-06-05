@@ -106,7 +106,10 @@ internal class RealtimeVoiceWsClient(
                 isOpen = false
                 shutdownOkHttp()
                 Log.w("RealtimeVoiceWs", "ws failure", t)
-                listener.onServerError("ws_failure", t.message ?: "unknown")
+                val detail = t.message
+                    ?: t.javaClass.simpleName.takeIf { it.isNotBlank() }
+                    ?: "连接异常"
+                listener.onServerError("ws_failure", detail)
                 listener.onClosed()
             }
         })

@@ -8,13 +8,14 @@ use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
 };
+use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
 use crate::{
     agent_llm_call::call_chat_llm,
     friend_events, intent_router,
     store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
-    types::{AgentConfig, AppState},
+    types::{AgentConfig, AppState, WsMessage},
 };
 
 static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
@@ -90,16 +91,55 @@ pub(crate) fn spawn_direct_friend_reply(
     });
 }
 
-pub(crate) async fn reply_to_direct_friend_voice(
+pub(crate) fn spawn_direct_friend_voice_reply(
     state: Arc<AppState>,
     user_id: String,
     transcript: &str,
-) -> Result<String> {
+    ai_reply_tx: UnboundedSender<String>,
+) -> Result<()> {
+    let content = transcript.trim();
+    if content.is_empty() {
+        let _ = ai_reply_tx.send(WsMessage::error("转写文本为空，已忽略").to_json());
+        return Ok(());
+    }
     let message = state
         .store
-        .send_friend_message(&user_id, SOCIAL_AI_USER_ID, transcript, None)?;
+        .send_friend_message(&user_id, SOCIAL_AI_USER_ID, content, None)?;
+    let trigger_message_id = message.id.clone();
     friend_events::publish_friend_message(&message);
-    reply_to_direct_friend(state, user_id).await
+    info!(
+        "direct social AI voice reply queued: user_id={} trigger_message_id={}",
+        user_id, trigger_message_id
+    );
+    tokio::spawn(async move {
+        let result = reply_to_direct_friend(state, user_id).await;
+        match result {
+            Ok(reply) => {
+                let _ = ai_reply_tx.send(
+                    WsMessage::Done {
+                        message: reply,
+                        apk_url: None,
+                        image_url: None,
+                        model_used: None,
+                        node_id: None,
+                    }
+                    .to_json(),
+                );
+                info!(
+                    "direct social AI voice reply stored: trigger_message_id={}",
+                    trigger_message_id
+                );
+            }
+            Err(error) => {
+                warn!("direct social AI voice reply failed: {}", error);
+                let _ = ai_reply_tx.send(WsMessage::error(format!(
+                    "一龙AI 语音回复失败：{}",
+                    error
+                )).to_json());
+            }
+        }
+    });
+    Ok(())
 }
 
 fn spawn_friend_pending_reply(
