@@ -92,11 +92,8 @@ internal class MainSpeechInputActions(
             ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.RECORD_AUDIO), speechPermissionRequest)
             return
         }
-        // 一龙AI 私聊：好友页里的实时语音通话入口。
-        if (isDirectSocialAiChatActive()) {
-            if (startRealtimeVoice()) return
-        }
-        // 普通好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送
+        // 好友/群聊/频道：无论设置里选了哪种语音模式，一律以语音气泡发送。
+        // 一龙AI 私聊的实时语音通话由顶部电话按钮进入，底部恢复为按住说话。
         if (isFriendChatActive()) {
             if (startVoiceMessageRecording()) return
             return

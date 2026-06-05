@@ -54,10 +54,10 @@ internal class MainVoiceModeActions(
             binding.inputEdit.visibility = View.GONE
             modelButtonShell()?.visibility = View.GONE
             voiceButton.visibility = View.VISIBLE
-            // 云端实时语音与一龙AI 私聊都支持朗读回复。
+            // 普通聊天的语音按钮保持按住说话；一龙AI 实时通话由顶部电话入口处理。
             val speakerBtn = ttsSpeakerButton()
-            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.CLOUD_REALTIME ||
-                isDirectSocialAiChatActive()
+            if (VoiceInputModeSettings.get(activity) == VoiceInputMode.CLOUD_REALTIME &&
+                !isDirectSocialAiChatActive()
             ) {
                 speakerBtn?.setImageResource(
                     if (VoiceSpeaker.isTtsEnabled(activity)) R.drawable.ic_input_tts_on_circle
