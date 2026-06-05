@@ -6,6 +6,7 @@ package com.elon.app.agent.infrastructure.auth
 
 import android.content.Context
 import android.util.Log
+import com.elon.app.AuthManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -33,11 +34,9 @@ class AuthService(private val context: Context) {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     
     /**
-     * 获取服务器地址
+     * 获取服务器地址（统一使用主 UI 配置的 elon 服务器）
      */
-    fun getServerUrl(): String {
-        return prefs.getString("server_url", DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-    }
+    fun getServerUrl(): String = MainAppBridge.serverUrl(context)
     
     /**
      * 设置服务器地址
@@ -47,55 +46,33 @@ class AuthService(private val context: Context) {
     }
     
     /**
-     * 检查是否已登录
+     * 检查是否已登录（复用主 UI 登录态）
      */
-    fun isLoggedIn(): Boolean {
-        return getToken() != null
-    }
-    
+    fun isLoggedIn(): Boolean = AuthManager.isLoggedIn(context)
+
     /**
-     * 获取存储的 Token
+     * 获取存储的 Token（复用主 UI 登录态）
      */
-    fun getToken(): String? {
-        return prefs.getString(KEY_TOKEN, null)
-    }
-    
+    fun getToken(): String? = AuthManager.token(context)
+
     /**
-     * 获取当前用户信息
+     * 获取当前用户信息（来自主 UI AuthManager，agent 与主 UI 共享同一账号）
      */
     fun getCurrentUser(): UserInfo? {
-        val userId = prefs.getInt(KEY_USER_ID, -1)
-        if (userId == -1) return null
-        
+        val uid = AuthManager.userId(context) ?: return null
+        val name = AuthManager.account(context) ?: AuthManager.displayName(context)
         return UserInfo(
-            id = userId,
-            username = prefs.getString(KEY_USERNAME, "") ?: "",
-            nickname = prefs.getString(KEY_NICKNAME, null)
+            id = uid.toIntOrNull() ?: 0,
+            username = name,
+            nickname = AuthManager.nickname(context)
         )
     }
-    
+
     /**
-     * 保存登录状态
-     */
-    private fun saveLoginState(token: String, user: UserInfo) {
-        prefs.edit()
-            .putString(KEY_TOKEN, token)
-            .putInt(KEY_USER_ID, user.id)
-            .putString(KEY_USERNAME, user.username)
-            .putString(KEY_NICKNAME, user.nickname)
-            .apply()
-    }
-    
-    /**
-     * 清除登录状态（登出）
+     * 清除登录状态（登出）——统一清除主 UI 登录态
      */
     fun logout() {
-        prefs.edit()
-            .remove(KEY_TOKEN)
-            .remove(KEY_USER_ID)
-            .remove(KEY_USERNAME)
-            .remove(KEY_NICKNAME)
-            .apply()
+        AuthManager.clear(context)
         Log.i(TAG, "User logged out")
     }
     
@@ -177,31 +154,30 @@ class AuthService(private val context: Context) {
     }
     
     /**
-     * 解析认证响应
+     * 解析认证响应（兼容主服务器格式，成功后落到主 UI 登录态）
      */
     private fun parseAuthResponse(response: String): AuthResult {
         val json = JSONObject(response)
-        val success = json.optBoolean("success", false)
         val message = json.optString("message", null)
-        
-        if (success) {
-            val token = json.optString("token", null)
-            val userJson = json.optJSONObject("user")
-            
-            if (token != null && userJson != null) {
-                val user = UserInfo(
-                    id = userJson.optInt("id"),
-                    username = userJson.optString("username"),
-                    nickname = userJson.optString("nickname", null)
-                )
-                // 保存登录状态
-                saveLoginState(token, user)
-                Log.i(TAG, "Auth success: ${user.username}")
+
+        val token = json.optString("token", "").ifBlank { null }
+        val userJson = json.optJSONObject("user")
+        if (token != null && userJson != null) {
+            val uid = userJson.optString("id", "").trim()
+            val name = userJson.optString("account", "").ifBlank {
+                userJson.optString("username", "")
+            }
+            val nickname = userJson.optString("nickname", "").ifBlank { null }
+            if (uid.isNotBlank()) {
+                // 统一落到主 UI 登录态（"elon" prefs），与主账号共享
+                AuthManager.saveSession(context, token, uid, name.ifBlank { null }, nickname, null)
+                Log.i(TAG, "Auth success: $name")
+                val user = UserInfo(id = uid.toIntOrNull() ?: 0, username = name, nickname = nickname)
                 return AuthResult(success = true, message = message, token = token, user = user)
             }
         }
-        
-        return AuthResult(success = false, message = message)
+
+        return AuthResult(success = false, message = message ?: "登录失败")
     }
     
     // ============ HTTP 工具方法 ============

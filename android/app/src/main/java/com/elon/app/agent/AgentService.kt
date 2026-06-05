@@ -15,6 +15,7 @@ import android.view.accessibility.AccessibilityEvent
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import com.elon.app.agent.application.LocalBasicActionExecutor
 import com.elon.app.agent.application.ScriptEngine
 import com.elon.app.agent.infrastructure.NotificationActionReceiver
 import com.elon.app.agent.infrastructure.accessibility.*
@@ -474,7 +475,20 @@ class AgentService : AccessibilityService() {
      */
     private fun executeGoalIndependently(goal: String) {
         Log.i(TAG, "🎯 开始独立执行: $goal")
-        
+
+        // ⚡ 基础动作本地直控：打开应用 / 返回 / 回桌面 / 最近任务
+        // 这类动作无需 AI 生成脚本、也无需服务器，本地无障碍直接执行。
+        when (val r = LocalBasicActionExecutor.tryExecute(this, goal)) {
+            is LocalBasicActionExecutor.Result.Handled -> {
+                sendLogBroadcast("⚡ 本地直控：${r.message}")
+                sendCompleteBroadcast(true, r.message)
+                return
+            }
+            LocalBasicActionExecutor.Result.NotHandled -> {
+                // 不是纯基础动作，继续走 AI 脚本流程
+            }
+        }
+
         // 重构后：不再检查 apiKey。ScriptEngine 通过 AIClientFactory 选链路。
         if (scriptEngine == null) {
             scriptEngine = ScriptEngine(this)
