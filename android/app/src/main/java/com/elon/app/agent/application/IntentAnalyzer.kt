@@ -112,7 +112,14 @@ class IntentAnalyzer(context: Context) {
         if (incompleteEndings.any { normalized.endsWith(it) }) {
             return AnalysisResult(isComplete = false, goal = input)
         }
-        
+
+        // 情况6：既无操作词也无 APP 名 → 这是闲聊/问答，不是手机操作指令。
+        // 完整性判断只对"操作指令"有意义（要补全才能执行），闲聊本来就完整，
+        // 直接判定完整、不调 AI，避免"你好"这类闲聊误发服务器 CLI 判断而卡顿/报错。
+        if (!hasOperation && !hasApp) {
+            return AnalysisResult(isComplete = true, goal = input)
+        }
+
         // 无法确定，需要 AI
         return null
     }

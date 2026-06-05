@@ -120,10 +120,16 @@ object QuickResponseCache : QuickResponseProvider {
      */
     override fun tryGetQuickResponse(input: String): Response? {
         val normalized = input.trim().lowercase()
-        
-        // 1. 精确匹配问候语 (INSTANT)
+
+        // 1. 匹配问候语 (INSTANT)
+        //    既支持精确匹配，也支持"你好你好""你好你好你好"这类重复问候，
+        //    但带操作词的（如"你好帮我打开微信"）不当问候处理，交给后续意图分析。
         greetingResponses.forEach { (triggers, responses) ->
-            if (triggers.any { normalized == it || normalized == "${it}啊" || normalized == "${it}呀" }) {
+            val exact = triggers.any { normalized == it || normalized == "${'$'}{it}啊" || normalized == "${'$'}{it}呀" }
+            val looseGreeting = !hasOperationKeyword(normalized) &&
+                normalized.length <= 8 &&
+                triggers.any { normalized.contains(it) }
+            if (exact || looseGreeting) {
                 return Response(
                     tier = ResponseTier.INSTANT,
                     text = responses.random(),
