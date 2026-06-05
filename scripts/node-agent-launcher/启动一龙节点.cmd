@@ -1,8 +1,12 @@
 @echo off
-rem ─────────────────────────────────────────────────────────────
-rem  一龙 PC 节点 一键启动器（双击运行）
-rem  - 节点已在运行 → 直接打开/跳回管理页
-rem  - 节点未运行   → 读取 node-agent.env 启动后再打开管理页
-rem  控制台只是临时跳板，启动后自动关闭；节点进程在后台隐藏运行。
-rem ─────────────────────────────────────────────────────────────
-powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start-node-agent.ps1"
+chcp 65001 >nul
+rem One-click launcher for the elon PC node agent (double-click to run).
+rem  - If the node is already running, just open the admin page.
+rem  - Otherwise load node-agent.env, start the exe hidden, then open the admin page.
+rem This console window is only a launcher and closes itself; the agent runs hidden.
+where pwsh >nul 2>nul
+if %errorlevel%==0 (
+  pwsh -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start-node-agent.ps1"
+) else (
+  powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start-node-agent.ps1"
+)
