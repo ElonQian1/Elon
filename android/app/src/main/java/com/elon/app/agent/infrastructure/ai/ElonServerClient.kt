@@ -62,19 +62,20 @@ class ElonServerClient(
         projectId: String,
         message: String,
         conversationId: String? = null,
-        chatOnly: Boolean = false
+        chatOnly: Boolean = false,
+        executionMode: String? = null
     ): Pair<String, String?> = withContext(Dispatchers.IO) {
         val token = getAuthToken()
             ?: throw IllegalStateException("未登录，请先在 elon APP 中登录")
 
         val url = URL("$serverUrl/api/projects/$projectId/chat")
-        Log.d(TAG, "→ POST $url  message=${message.take(40)} chatOnly=$chatOnly")
+        Log.d(TAG, "→ POST $url  message=${message.take(40)} chatOnly=$chatOnly executionMode=$executionMode")
 
         val body = JSONObject().apply {
             put("message", message)
             if (conversationId != null) put("conversation_id", conversationId)
-            // 仅闲聊：让服务器走轻量 casual chat，不启动 Codex 项目工作流（避免超时）
             if (chatOnly) put("chat_only", true)
+            if (executionMode != null) put("execution_mode", executionMode)
         }.toString()
 
         val conn = (url.openConnection() as HttpURLConnection).apply {

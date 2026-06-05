@@ -226,15 +226,21 @@ pub async fn chat_project_stream(
     };
     let attachments = req.attachments.clone();
     let message = append_project_attachment_notes(
-        &state, &project, &conversation_id, message, req.attachments.as_deref(),
+        &state,
+        &project,
+        &conversation_id,
+        message,
+        req.attachments.as_deref(),
     );
     let trace_id = clean_trace_id(req.trace_id.as_deref());
-    let task_id = match state.store.create_task(
-        &project.id, &user.id, Some(&conversation_id), &message,
-    ) {
-        Ok(id) => id,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let task_id =
+        match state
+            .store
+            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
+        {
+            Ok(id) => id,
+            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     run_project_agent_with_scheduler(
         state.clone(),
@@ -265,20 +271,27 @@ pub async fn chat_project_stream(
                             Some("done") => {
                                 let reply = v["message"].as_str().unwrap_or("");
                                 let _ = state.store.finish_task(
-                                    &task_id, "done", Some(reply), None, None,
+                                    &task_id,
+                                    "done",
+                                    Some(reply),
+                                    None,
+                                    None,
                                 );
                             }
                             Some("error") => {
                                 let msg = v["message"].as_str().unwrap_or("error");
                                 let _ = state.store.finish_task(
-                                    &task_id, "failed", Some(msg), None, Some(msg),
+                                    &task_id,
+                                    "failed",
+                                    Some(msg),
+                                    None,
+                                    Some(msg),
                                 );
                             }
                             _ => {}
                         }
                     }
-                    let event =
-                        Ok::<Event, Infallible>(Event::default().data(raw));
+                    let event = Ok::<Event, Infallible>(Event::default().data(raw));
                     Some((event, (rx, state, task_id)))
                 }
             }
@@ -289,7 +302,6 @@ pub async fn chat_project_stream(
         .keep_alive(axum::response::sse::KeepAlive::default())
         .into_response()
 }
-
 
 pub(crate) async fn run_project_agent_with_scheduler(
     state: Arc<AppState>,
@@ -319,7 +331,10 @@ pub(crate) async fn run_project_agent_with_scheduler(
         );
     }
     let routing_decision = intent_router::classify(&message);
+    // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
+    // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
     let needs_project_workflow = execution_mode.is_plan()
+        || execution_mode.is_force_cli()
         || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
     let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
@@ -349,10 +364,12 @@ pub(crate) async fn run_project_agent_with_scheduler(
         );
         return;
     }
-    // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务（app_or_web_development=84、
-    // image_asset_for_app=86、standalone_image=90），跳过 codex 二次意图门控，
-    // 节省每请求 5-15 秒的冷启动+推理时间。confidence < 84 的模糊判定仍走门控防误判。
-    let skip_intent_gate = needs_project_workflow && routing_decision.confidence >= 84;
+    // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务跳过 codex 意图门控。
+    // force_cli 模式（悬浮球手机控制）强制走意图门控，让 Codex 自己判断是闲聊还是生成脚本，
+    // 不能跳过（否则 Codex 不读 AGENTS.md，无法生成手机控制 JSON）。
+    let skip_intent_gate = needs_project_workflow
+        && !execution_mode.is_force_cli()
+        && routing_decision.confidence >= 84;
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,

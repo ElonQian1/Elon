@@ -5,16 +5,61 @@ import java.util.Locale
 internal data class VoiceTtsProfile(
     val id: String,
     val speechRate: Float,
-    val pitch: Float
+    val pitch: Float,
+    val serverVoiceId: String,
+    val serverEmotionId: String,
+    val serverIntensity: String
 )
 
 internal object VoiceTtsEmotion {
-    private val neutral = VoiceTtsProfile("warm_neutral", speechRate = 1.02f, pitch = 1.04f)
-    private val gentle = VoiceTtsProfile("gentle_comfort", speechRate = 0.94f, pitch = 1.03f)
-    private val bright = VoiceTtsProfile("bright_happy", speechRate = 1.08f, pitch = 1.10f)
-    private val softSad = VoiceTtsProfile("soft_low", speechRate = 0.90f, pitch = 0.96f)
-    private val calmSerious = VoiceTtsProfile("calm_serious", speechRate = 0.98f, pitch = 0.99f)
-    private val whisper = VoiceTtsProfile("low_whisper", speechRate = 0.88f, pitch = 0.94f)
+    private val neutral = VoiceTtsProfile(
+        "warm_neutral",
+        speechRate = 1.02f,
+        pitch = 1.04f,
+        serverVoiceId = "female_warm",
+        serverEmotionId = "normal",
+        serverIntensity = "normal"
+    )
+    private val gentle = VoiceTtsProfile(
+        "gentle_comfort",
+        speechRate = 0.94f,
+        pitch = 1.03f,
+        serverVoiceId = "female_warm",
+        serverEmotionId = "gentle_comfort",
+        serverIntensity = "immersive"
+    )
+    private val bright = VoiceTtsProfile(
+        "bright_happy",
+        speechRate = 1.08f,
+        pitch = 1.10f,
+        serverVoiceId = "female_bright",
+        serverEmotionId = "happy_sweet",
+        serverIntensity = "immersive"
+    )
+    private val softSad = VoiceTtsProfile(
+        "soft_low",
+        speechRate = 0.90f,
+        pitch = 0.96f,
+        serverVoiceId = "female_warm",
+        serverEmotionId = "wronged_crying",
+        serverIntensity = "immersive"
+    )
+    private val calmSerious = VoiceTtsProfile(
+        "calm_serious",
+        speechRate = 0.98f,
+        pitch = 0.99f,
+        serverVoiceId = "female_mature",
+        serverEmotionId = "serious_encourage",
+        serverIntensity = "normal"
+    )
+    private val whisper = VoiceTtsProfile(
+        "low_whisper",
+        speechRate = 0.88f,
+        pitch = 0.94f,
+        serverVoiceId = "female_warm",
+        serverEmotionId = "whisper_low",
+        serverIntensity = "immersive"
+    )
 
     fun profileFor(text: String): VoiceTtsProfile {
         val content = text.trim()

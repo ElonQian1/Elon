@@ -9,14 +9,13 @@ use tower_http::services::ServeFile;
 
 use crate::types::AppState;
 use crate::{
-    admin, admin_quota, admin_token_stats, api, app_update, auth_api, billing_admin,
-    billing_api, billing_pay, chat_attachments,
-    friend_api, global_ws, lan_peer,
-    node_api, peer_relay, project_api, project_attachments, project_chat,
-    project_conversation_identity, project_deletion, project_downloads, project_git,
-    project_join_requests, project_membership, project_space, project_store, release_claim,
-    speech_translate, token_usage_api, user_api, user_memory_api, voice_asr_upload,
-    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web, lm_chat, agent_balloon,
+    admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
+    billing_api, billing_pay, chat_attachments, friend_api, global_ws, lan_peer, lm_chat, node_api,
+    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
+    project_deletion, project_downloads, project_git, project_join_requests, project_membership,
+    project_space, project_store, release_claim, speech_translate, token_usage_api, user_api,
+    user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -430,6 +429,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/voice/asr",
             post(voice_asr_upload::asr_upload_handler),
+        )
+        .route(
+            "/api/voice/tts/catalog",
+            get(voice_tts_api::catalog_handler),
+        )
+        .route(
+            "/api/voice/tts",
+            post(voice_tts_api::synthesize_handler),
         )
         // ── 用户头像（公开查看 / 登录后上传）─────────────────────────────────
         .route("/api/users/:user_id/avatar", get(user_api::get_user_avatar))

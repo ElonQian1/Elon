@@ -46,9 +46,10 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     private var pendingDone: (() -> Unit)? = null
     private var activeDone: (() -> Unit)? = null
     private var preferredVoiceApplied = false
+    private val serverTtsPlayer = VoiceServerTtsPlayer(appContext)
 
     /** 上一条 utterance 是否还在播放（用于打断判断）。 */
-    val isSpeaking: Boolean get() = tts?.isSpeaking == true
+    val isSpeaking: Boolean get() = tts?.isSpeaking == true || serverTtsPlayer.isSpeaking
 
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) {
@@ -113,8 +114,30 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         pendingText = null
         pendingProfile = null
         pendingDone = null
+        serverTtsPlayer.stop()
+        if (tts?.isSpeaking == true) tts?.stop()
+        val resolvedProfile = profile ?: VoiceTtsEmotion.profileFor(content)
         activeDone = onDone
-        applyProfile(engine, profile ?: VoiceTtsEmotion.profileFor(content))
+        if (serverTtsPlayer.trySpeak(
+                text = content,
+                profile = resolvedProfile,
+                onDone = { finishSpeakCallback() },
+                onFallback = { speakWithSystem(engine, content, resolvedProfile, onDone) }
+            )
+        ) {
+            return
+        }
+        speakWithSystem(engine, content, resolvedProfile, onDone)
+    }
+
+    private fun speakWithSystem(
+        engine: TextToSpeech,
+        content: String,
+        profile: VoiceTtsProfile,
+        onDone: (() -> Unit)?
+    ) {
+        activeDone = onDone
+        applyProfile(engine, profile)
         val params = Bundle()
         val result = engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
         if (result == TextToSpeech.ERROR) finishSpeakCallback()
@@ -126,6 +149,7 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         pendingProfile = null
         pendingDone = null
         activeDone = null
+        serverTtsPlayer.stop()
         if (tts?.isSpeaking == true) tts?.stop()
     }
 
@@ -135,6 +159,7 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         pendingProfile = null
         pendingDone = null
         activeDone = null
+        serverTtsPlayer.release()
         tts?.stop()
         tts?.shutdown()
         tts = null

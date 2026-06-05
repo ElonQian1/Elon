@@ -102,6 +102,9 @@ class ProjectChatWsClient(
         val payload = JSONObject().apply {
             put("message", message)
             if (conversationId != null) put("conversation_id", conversationId)
+            // 悬浮球手机控制专用：绕过服务器本地 intent_router，
+            // 直接进 Codex CLI 意图闸判断（闲聊或手机脚本 JSON）。
+            put("execution_mode", "force_cli")
         }.toString()
         Log.d(TAG, "→ send: ${message.take(40)}")
         ws?.send(payload)

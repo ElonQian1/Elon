@@ -1,0 +1,206 @@
+//! 服务器 TTS API。
+//!
+//! - `GET /api/voice/tts/catalog`：返回女声、情绪、强度和 Worker 状态。
+//! - `POST /api/voice/tts`：鉴权后合成音频；Worker 未配置时明确返回 503。
+
+use axum::{
+    body::Body,
+    extract::State,
+    http::{
+        header::{CACHE_CONTROL, CONTENT_TYPE},
+        HeaderMap, HeaderValue, StatusCode,
+    },
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::sync::Arc;
+use tracing::warn;
+
+use crate::{
+    agent_api_loop::resolve_agent,
+    agent_llm_call::call_chat_llm,
+    project_auth::{auth_from_headers, json_error},
+    types::AppState,
+    voice_tts_catalog::{self, ResolvedTtsStyle, TtsProvider},
+    voice_tts_rewrite::{
+        clean_llm_rewrite, prepare_text_for_speech, take_chars, MAX_TTS_TEXT_CHARS,
+    },
+    voice_tts_worker::{self, TtsWorkerConfig},
+};
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TtsRequest {
+    pub text: String,
+    pub voice_id: Option<String>,
+    pub emotion_id: Option<String>,
+    pub intensity: Option<String>,
+    pub provider: Option<TtsProvider>,
+    pub rewrite: Option<bool>,
+    pub agent_name: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TtsCatalogResponse {
+    worker_configured: bool,
+    worker_url: Option<String>,
+    default_provider: String,
+    llm_rewrite_enabled: bool,
+    voices: Vec<voice_tts_catalog::TtsVoicePreset>,
+    emotions: Vec<voice_tts_catalog::TtsEmotionPreset>,
+    intensities: Vec<voice_tts_catalog::TtsIntensityPreset>,
+}
+
+pub async fn catalog_handler() -> Json<TtsCatalogResponse> {
+    let worker = TtsWorkerConfig::from_env();
+    Json(TtsCatalogResponse {
+        worker_configured: worker.is_some(),
+        worker_url: worker.as_ref().map(|cfg| cfg.base_url.clone()),
+        default_provider: worker
+            .as_ref()
+            .map(|cfg| cfg.default_provider.as_worker_id().to_string())
+            .unwrap_or_else(|| "auto".to_string()),
+        llm_rewrite_enabled: llm_rewrite_enabled(),
+        voices: voice_tts_catalog::voices(),
+        emotions: voice_tts_catalog::emotions(),
+        intensities: voice_tts_catalog::intensities(),
+    })
+}
+
+pub async fn synthesize_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<TtsRequest>,
+) -> Response {
+    let caller = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    let worker = match TtsWorkerConfig::from_env() {
+        Some(cfg) => cfg,
+        None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器 TTS Worker 未配置"),
+    };
+
+    let original_text = req.text.trim();
+    if original_text.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "TTS 文本不能为空");
+    }
+    if original_text.chars().count() > MAX_TTS_TEXT_CHARS {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            format!("TTS 文本过长，请控制在 {MAX_TTS_TEXT_CHARS} 字以内"),
+        );
+    }
+
+    let style = voice_tts_catalog::resolve_style(
+        req.voice_id.as_deref(),
+        req.emotion_id.as_deref(),
+        req.intensity.as_deref(),
+        req.provider,
+        original_text,
+    );
+    let mut spoken_text = prepare_text_for_speech(original_text, &style);
+    if req.rewrite.unwrap_or(true) && llm_rewrite_enabled() {
+        spoken_text = rewrite_with_llm(&state, &caller.id, &req, &style, &spoken_text).await;
+    }
+
+    match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
+        Ok(audio) => audio_response(audio, &style),
+        Err(err) => {
+            warn!(target: "voice_tts", "TTS 合成失败: {err:#}");
+            json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("语音合成服务暂不可用：{err}"),
+            )
+        }
+    }
+}
+
+async fn rewrite_with_llm(
+    state: &Arc<AppState>,
+    user_id: &str,
+    req: &TtsRequest,
+    style: &ResolvedTtsStyle,
+    fallback_text: &str,
+) -> String {
+    let agent_name = req
+        .agent_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let workspace = state.get_user_workspace(user_id);
+    let agent = match resolve_agent(state, &workspace, agent_name).await {
+        Ok(agent) => agent,
+        Err(err) => {
+            warn!(target: "voice_tts", "TTS LLM 改写没有可用代理: {err}");
+            return fallback_text.to_string();
+        }
+    };
+
+    let messages = vec![
+        json!({
+            "role": "system",
+            "content": format!(
+                "你是中文 TTS 台词改写器。把输入改成适合朗读的短台词，只输出改写文本。保持事实和含义，不新增承诺，不解释，不加引号。声音角色：{}。目标情绪：{}。文本风格：{}。最长 220 个汉字。",
+                style.voice.label, style.emotion.label, style.emotion.text_style
+            )
+        }),
+        json!({
+            "role": "user",
+            "content": fallback_text
+        }),
+    ];
+    let response = match call_chat_llm(state, &agent, &messages, user_id, "voice_tts_rewrite").await
+    {
+        Ok(response) => response,
+        Err(err) => {
+            warn!(target: "voice_tts", "TTS LLM 改写失败: {err}");
+            return fallback_text.to_string();
+        }
+    };
+    let rewritten = response["choices"][0]["message"]["content"]
+        .as_str()
+        .map(|value| clean_llm_rewrite(value, fallback_text))
+        .unwrap_or_else(|| fallback_text.to_string());
+    take_chars(&rewritten, 220)
+}
+
+fn audio_response(audio: voice_tts_worker::TtsAudio, style: &ResolvedTtsStyle) -> Response {
+    let mut response = Body::from(audio.bytes).into_response();
+    *response.status_mut() = StatusCode::OK;
+    let headers = response.headers_mut();
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_str(&audio.content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("audio/wav")),
+    );
+    headers.insert(
+        CACHE_CONTROL,
+        HeaderValue::from_static("private, max-age=3600"),
+    );
+    insert_header(
+        headers,
+        "x-elon-tts-provider",
+        style.provider.as_worker_id(),
+    );
+    insert_header(headers, "x-elon-tts-voice", style.voice.id);
+    insert_header(headers, "x-elon-tts-emotion", style.emotion.id);
+    insert_header(headers, "x-elon-tts-intensity", style.intensity.id);
+    insert_header(headers, "x-elon-tts-cache", audio.cache_status);
+    response
+}
+
+fn insert_header(headers: &mut HeaderMap, name: &'static str, value: &str) {
+    if let Ok(value) = HeaderValue::from_str(value) {
+        headers.insert(name, value);
+    }
+}
+
+fn llm_rewrite_enabled() -> bool {
+    std::env::var("ELON_TTS_LLM_REWRITE_ENABLED")
+        .map(|value| matches!(value.trim().to_lowercase().as_str(), "1" | "true" | "on"))
+        .unwrap_or(false)
+}
