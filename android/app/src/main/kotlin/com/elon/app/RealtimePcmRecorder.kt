@@ -4,6 +4,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -95,8 +96,15 @@ internal class RealtimePcmRecorder(
                     }
                 }
             } catch (t: Throwable) {
+                if (t is CancellationException || !isRecording) {
+                    Log.d(TAG, "采集循环已停止")
+                    return@launch
+                }
                 Log.w(TAG, "采集循环异常", t)
-                onError("采集异常：${t.message}")
+                val detail = t.message
+                    ?: t.javaClass.simpleName.takeIf { it.isNotBlank() }
+                    ?: "未知异常"
+                onError("采集异常：$detail")
             }
         }
         return true
