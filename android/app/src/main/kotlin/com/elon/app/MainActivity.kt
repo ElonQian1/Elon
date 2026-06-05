@@ -454,7 +454,8 @@ class MainActivity : AppCompatActivity() {
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
             showContactChatSettings = { showActiveContactChatSettings() },
-            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            showFriendLocalSearch = { homeListActions.showFriendLocalSearch() },
+            exitFriendLocalSearch = { homeListActions.exitFriendLocalSearch() },
             refreshFriends = {
                 friendActions.loadFriends()
                 groupActions.loadGroups()

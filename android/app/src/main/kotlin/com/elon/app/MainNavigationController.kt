@@ -27,7 +27,8 @@ internal class MainNavigationController(
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
     private val showContactChatSettings: () -> Unit,
-    private val showAddFriendDialog: () -> Unit,
+    private val showFriendLocalSearch: () -> Unit,
+    private val exitFriendLocalSearch: () -> Boolean,
     private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
@@ -109,7 +110,7 @@ internal class MainNavigationController(
             showConversationActions(0)
             true
         }
-        binding.searchButton.setOnClickListener { showAddFriendDialog() }
+        binding.searchButton.setOnClickListener { showFriendLocalSearch() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
@@ -182,6 +183,7 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
+        if (exitFriendLocalSearch()) return
         if (isMessageSelectionActive()) {
             clearMessageSelection()
             return

@@ -951,7 +951,7 @@
     <div id="chatPage" class="page active">
       <!-- 列表状态 -->
       <div id="searchBar" class="search-bar hidden">
-        <input id="searchInput" type="search" placeholder="搜索项目名称…" />
+        <input id="searchInput" type="search" placeholder="搜索本页内容…" />
       </div>
       <div id="conversationList" class="conversation-list"></div>
       <!-- 项目内聊天视图 -->
@@ -1533,7 +1533,7 @@
       : projects;
     if (!filtered.length) {
       conversationList.innerHTML = searchQuery
-        ? '<div class="empty-tip">没有匹配的项目</div>'
+        ? '<div class="empty-tip">没有匹配的内容</div>'
         : '<div class="empty-tip">还没有项目<br/>点击右上角 ＋ 新建你的第一个 App'
           + '<br/><button id="emptyCreateBtn">新建项目</button></div>';
       if (!searchQuery) {
