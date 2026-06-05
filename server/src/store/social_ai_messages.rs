@@ -5,6 +5,9 @@ use super::{new_id, now, FriendChatMessage, FriendGroupMessage, Store};
 
 pub(crate) const SOCIAL_AI_USER_ID: &str = "usr_elon_ai";
 pub(crate) const SOCIAL_AI_DISPLAY_NAME: &str = "EL";
+pub(crate) const SOCIAL_AI_FRIEND_NAME: &str = "一龙AI";
+pub(crate) const SOCIAL_AI_FRIEND_ACCOUNT: &str = "ai-agent";
+pub(crate) const SOCIAL_AI_FRIEND_PREVIEW: &str = "单独问一龙AI，适合隐私问题和日常解答";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SocialAiHistoryMessage {
@@ -21,6 +24,10 @@ impl Store {
         limit: i64,
     ) -> Result<Vec<SocialAiHistoryMessage>> {
         let conn = self.conn()?;
+        if friend_id == SOCIAL_AI_USER_ID {
+            ensure_direct_social_ai_pair(&conn, user_id)?;
+            return list_recent_direct_social_ai_messages(&conn, user_id, limit);
+        }
         ensure_friend_pair_for_social_ai(&conn, user_id, friend_id)?;
         let mut stmt = conn.prepare(
             "SELECT m.sender_user_id,
@@ -57,6 +64,38 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         messages.reverse();
         Ok(messages)
+    }
+
+    pub fn insert_direct_social_ai_reply(
+        &self,
+        user_id: &str,
+        content: &str,
+    ) -> Result<FriendChatMessage> {
+        let content = normalize_reply_content(content)?;
+        let conn = self.conn()?;
+        ensure_direct_social_ai_pair(&conn, user_id)?;
+
+        let id = new_id("fai");
+        let created_at = now();
+        conn.execute(
+            "INSERT INTO friend_messages (
+                id, sender_user_id, receiver_user_id, context_user_id, content, created_at
+             )
+             VALUES (?1, ?2, ?3, NULL, ?4, ?5)",
+            params![id, SOCIAL_AI_USER_ID, user_id, content, created_at],
+        )?;
+
+        Ok(FriendChatMessage {
+            id,
+            sender_user_id: SOCIAL_AI_USER_ID.to_string(),
+            receiver_user_id: user_id.to_string(),
+            sender_name: Some(SOCIAL_AI_DISPLAY_NAME.to_string()),
+            content,
+            attachments: Vec::new(),
+            created_at,
+            context_user_id: None,
+            outgoing: false,
+        })
     }
 
     pub(crate) fn list_recent_group_messages_for_social_ai(
@@ -222,7 +261,7 @@ fn social_ai_friend_message(
     }
 }
 
-fn ensure_social_ai_user(conn: &Connection) -> Result<()> {
+pub(super) fn ensure_social_ai_user(conn: &Connection) -> Result<()> {
     let now = now();
     conn.execute(
         "INSERT OR IGNORE INTO users (
@@ -242,6 +281,13 @@ fn ensure_social_ai_user(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn ensure_direct_social_ai_pair(conn: &Connection, user_id: &str) -> Result<()> {
+    if user_id == SOCIAL_AI_USER_ID {
+        return Err(anyhow!("不能和自己聊天"));
+    }
+    ensure_social_ai_user(conn)
+}
+
 fn ensure_friend_pair_for_social_ai(
     conn: &Connection,
     user_id: &str,
@@ -249,6 +295,9 @@ fn ensure_friend_pair_for_social_ai(
 ) -> Result<()> {
     if user_id == friend_id {
         return Err(anyhow!("不能和自己聊天"));
+    }
+    if friend_id == SOCIAL_AI_USER_ID {
+        return ensure_direct_social_ai_pair(conn, user_id);
     }
     let exists = conn
         .query_row(
@@ -266,6 +315,51 @@ fn ensure_friend_pair_for_social_ai(
     } else {
         Err(anyhow!("只能和已添加的好友聊天"))
     }
+}
+
+fn list_recent_direct_social_ai_messages(
+    conn: &Connection,
+    user_id: &str,
+    limit: i64,
+) -> Result<Vec<SocialAiHistoryMessage>> {
+    let mut stmt = conn.prepare(
+        "SELECT m.sender_user_id,
+                COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
+                m.content
+         FROM friend_messages m
+         LEFT JOIN users u ON u.id = m.sender_user_id
+         WHERE (
+             (
+                 m.sender_user_id = ?1
+                 AND m.receiver_user_id = ?2
+                 AND m.context_user_id IS NULL
+             )
+             OR (
+                 m.sender_user_id = ?2
+                 AND m.receiver_user_id = ?1
+                 AND m.context_user_id IS NULL
+             )
+         )
+         ORDER BY m.created_at DESC
+         LIMIT ?3",
+    )?;
+    let mut messages = stmt
+        .query_map(
+            params![user_id, SOCIAL_AI_USER_ID, limit.clamp(1, 30)],
+            |row| {
+                let sender_user_id: String = row.get(0)?;
+                let sender_name: String = row.get(1)?;
+                Ok(history_message_from_row(
+                    user_id,
+                    &sender_user_id,
+                    &sender_name,
+                    row.get::<_, String>(2)?,
+                ))
+            },
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    messages.reverse();
+    Ok(messages)
 }
 
 fn ensure_group_member_for_social_ai(
@@ -367,6 +461,70 @@ mod tests {
         let bob_ai = bob_messages.last().expect("bob sees ai reply");
         assert_eq!(bob_ai.sender_user_id, SOCIAL_AI_USER_ID);
         assert_eq!(bob_ai.context_user_id.as_deref(), Some(alice.id.as_str()));
+    }
+
+    #[test]
+    fn direct_social_ai_friend_is_listed_and_keeps_private_history() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "direct-social-ai-alice@example.com",
+                "secret1",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+
+        let friends = store.list_friends(&alice.id).expect("friends should load");
+        let ai_friend = friends
+            .iter()
+            .find(|friend| friend.id == SOCIAL_AI_USER_ID)
+            .expect("direct social AI friend should be listed");
+        assert_eq!(ai_friend.nickname.as_deref(), Some(SOCIAL_AI_FRIEND_NAME));
+        assert_eq!(
+            ai_friend.last_message.as_deref(),
+            Some(SOCIAL_AI_FRIEND_PREVIEW)
+        );
+
+        store
+            .send_friend_message(&alice.id, SOCIAL_AI_USER_ID, "我有一个隐私问题", None)
+            .expect("user can send direct message to social AI");
+        store
+            .insert_direct_social_ai_reply(&alice.id, "可以单独说。")
+            .expect("direct social AI reply should be stored");
+
+        let bob = store
+            .create_user(
+                "direct-social-ai-bob@example.com",
+                "secret1",
+                Some("Bob"),
+                None,
+            )
+            .expect("bob should be created");
+        store
+            .add_friend(&alice.id, Some("email"), "direct-social-ai-bob@example.com")
+            .expect("alice can add bob");
+        store
+            .send_friend_message(&alice.id, &bob.id, "@EL 这句普通好友消息怎么理解？", None)
+            .expect("context trigger should be stored");
+        store
+            .insert_friend_social_ai_reply(&alice.id, &bob.id, "普通好友上下文回复")
+            .expect("context AI reply should be stored");
+
+        let direct_messages = store
+            .list_friend_messages(&alice.id, SOCIAL_AI_USER_ID, None, 20)
+            .expect("direct social AI messages should load");
+        let direct_contents = direct_messages
+            .iter()
+            .map(|message| message.content.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(direct_messages.len(), 2);
+        assert!(direct_contents.contains(&"我有一个隐私问题"));
+        assert!(direct_contents.contains(&"可以单独说。"));
+        assert!(!direct_contents.contains(&"普通好友上下文回复"));
+        assert!(direct_messages
+            .iter()
+            .all(|message| message.context_user_id.is_none()));
     }
 
     #[test]

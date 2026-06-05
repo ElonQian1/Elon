@@ -20,6 +20,7 @@ use std::sync::Arc;
 use crate::{
     project_auth::{auth_from_headers, json_error},
     project_ws_protocol::ProjectAttachmentRef,
+    store::SOCIAL_AI_USER_ID,
     types::AppState,
 };
 
@@ -81,7 +82,7 @@ pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap
         Ok(mut friends) => {
             let online = state.online_users.read().await;
             for f in &mut friends {
-                f.is_online = online.contains(&f.id);
+                f.is_online = f.id == SOCIAL_AI_USER_ID || online.contains(&f.id);
             }
             Json(serde_json::json!({ "friends": friends })).into_response()
         }
@@ -217,11 +218,13 @@ pub async fn list_friend_messages(
         query.limit.unwrap_or(80),
     ) {
         Ok(messages) => {
-            crate::social_ai::spawn_friend_reply_if_needed(
-                state.clone(),
-                user.id.clone(),
-                friend_id.clone(),
-            );
+            if friend_id != SOCIAL_AI_USER_ID {
+                crate::social_ai::spawn_friend_reply_if_needed(
+                    state.clone(),
+                    user.id.clone(),
+                    friend_id.clone(),
+                );
+            }
             Json(serde_json::json!({ "messages": messages })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -246,12 +249,20 @@ pub async fn send_friend_message(
     ) {
         Ok(message) => {
             crate::friend_events::publish_friend_message(&message);
-            crate::social_ai::spawn_friend_reply(
-                state.clone(),
-                user.id.clone(),
-                friend_id.clone(),
-                req.content.clone(),
-            );
+            if friend_id == SOCIAL_AI_USER_ID {
+                crate::social_ai::spawn_direct_friend_reply(
+                    state.clone(),
+                    user.id.clone(),
+                    message.id.clone(),
+                );
+            } else {
+                crate::social_ai::spawn_friend_reply(
+                    state.clone(),
+                    user.id.clone(),
+                    friend_id.clone(),
+                    req.content.clone(),
+                );
+            }
             Json(serde_json::json!({ "message": message })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),

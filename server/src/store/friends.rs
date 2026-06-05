@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
     normalize_account, now, AddFriendResult, FriendProfile, FriendSearchResult, Store,
-    SOCIAL_AI_USER_ID,
+    SOCIAL_AI_FRIEND_ACCOUNT, SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 
 impl Store {
@@ -127,10 +127,10 @@ impl Store {
                  ORDER BY latest.created_at DESC
                  LIMIT 1
                )
-             WHERE f.user_id = ?1 AND u.status = 'active'
+             WHERE f.user_id = ?1 AND u.status = 'active' AND u.id != ?2
              ORDER BY COALESCE(lm.created_at, f.created_at) DESC",
         )?;
-        let friends = stmt
+        let mut friends = stmt
             .query_map(params![user_id, SOCIAL_AI_USER_ID], |row| {
                 let id: String = row.get(0)?;
                 let phone: Option<String> = row.get(1)?;
@@ -150,8 +150,100 @@ impl Store {
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        friends.push(social_ai_friend_profile(&conn, user_id)?);
+        sort_friend_profiles(&mut friends);
         Ok(friends)
     }
+}
+
+fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendProfile> {
+    let latest = latest_direct_social_ai_message(conn, user_id)?;
+    let unread_count = direct_social_ai_unread_count(conn, user_id)?;
+    Ok(FriendProfile {
+        id: SOCIAL_AI_USER_ID.to_string(),
+        account: SOCIAL_AI_FRIEND_ACCOUNT.to_string(),
+        nickname: Some(SOCIAL_AI_FRIEND_NAME.to_string()),
+        phone: None,
+        avatar_data_url: None,
+        friend_since: None,
+        last_message: latest
+            .as_ref()
+            .map(|(content, _)| content.clone())
+            .or_else(|| Some(SOCIAL_AI_FRIEND_PREVIEW.to_string())),
+        last_message_at: latest.map(|(_, created_at)| created_at),
+        unread_count,
+        is_online: true,
+    })
+}
+
+fn latest_direct_social_ai_message(
+    conn: &Connection,
+    user_id: &str,
+) -> Result<Option<(String, String)>> {
+    conn.query_row(
+        "SELECT content, created_at
+         FROM friend_messages
+         WHERE (
+             sender_user_id = ?1
+             AND receiver_user_id = ?2
+             AND context_user_id IS NULL
+         )
+         OR (
+             sender_user_id = ?2
+             AND receiver_user_id = ?1
+             AND context_user_id IS NULL
+         )
+         ORDER BY created_at DESC
+         LIMIT 1",
+        params![user_id, SOCIAL_AI_USER_ID],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn direct_social_ai_unread_count(conn: &Connection, user_id: &str) -> Result<i64> {
+    conn.query_row(
+        "SELECT COUNT(*)
+         FROM friend_messages unread
+         LEFT JOIN friend_read_states read_state
+           ON read_state.user_id = ?1
+          AND read_state.friend_user_id = ?2
+         WHERE unread.sender_user_id = ?2
+           AND unread.receiver_user_id = ?1
+           AND unread.context_user_id IS NULL
+           AND (
+               read_state.last_read_at IS NULL
+               OR unread.created_at > read_state.last_read_at
+           )",
+        params![user_id, SOCIAL_AI_USER_ID],
+        |row| row.get(0),
+    )
+    .map_err(Into::into)
+}
+
+fn sort_friend_profiles(friends: &mut [FriendProfile]) {
+    friends.sort_by(|a, b| {
+        friend_profile_sort_time(b)
+            .cmp(friend_profile_sort_time(a))
+            .then_with(|| friend_profile_name(a).cmp(friend_profile_name(b)))
+    });
+}
+
+fn friend_profile_sort_time(friend: &FriendProfile) -> &str {
+    friend
+        .last_message_at
+        .as_deref()
+        .or(friend.friend_since.as_deref())
+        .unwrap_or("")
+}
+
+fn friend_profile_name(friend: &FriendProfile) -> &str {
+    friend
+        .nickname
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .unwrap_or(friend.account.as_str())
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

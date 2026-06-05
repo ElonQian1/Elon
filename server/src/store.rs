@@ -44,7 +44,8 @@ pub use admin_stats::{
 };
 pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
 pub(crate) use social_ai_messages::{
-    SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID,
+    SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_FRIEND_ACCOUNT,
+    SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 pub(crate) use social_ai_pending::SocialAiPendingMention;
 pub use store_types::*;

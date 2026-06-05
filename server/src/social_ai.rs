@@ -13,11 +13,12 @@ use tracing::{info, warn};
 use crate::{
     agent_llm_call::call_chat_llm,
     friend_events, intent_router,
-    store::{SocialAiHistoryMessage, SocialAiPendingMention},
+    store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
     types::{AgentConfig, AppState},
 };
 
 static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+const DIRECT_SOCIAL_AI_SCENE: &str = "一龙AI私聊";
 
 pub(crate) const DEVELOPMENT_REDIRECT_REPLY: &str =
     "这个需求已经涉及项目开发，我在好友/群聊里不能直接写代码、改项目或打包。请到「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务；在那里我可以按完整开发流程帮你实现。";
@@ -60,6 +61,33 @@ pub(crate) fn spawn_friend_reply_if_needed(
         return;
     };
     spawn_friend_pending_reply(state, user_id, friend_id, pending);
+}
+
+pub(crate) fn spawn_direct_friend_reply(
+    state: Arc<AppState>,
+    user_id: String,
+    trigger_message_id: String,
+) {
+    let key = format!("direct:{user_id}:{trigger_message_id}");
+    if !mark_in_flight(&key) {
+        return;
+    }
+    info!(
+        "direct social AI reply queued: user_id={} trigger_message_id={}",
+        user_id, trigger_message_id
+    );
+    tokio::spawn(async move {
+        let result = reply_to_direct_friend(state, user_id).await;
+        clear_in_flight(&key);
+        if let Err(error) = result {
+            warn!("direct social AI reply failed: {}", error);
+        } else {
+            info!(
+                "direct social AI reply stored: trigger_message_id={}",
+                trigger_message_id
+            );
+        }
+    });
 }
 
 fn spawn_friend_pending_reply(
@@ -164,9 +192,11 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
         .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
     // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接卡片
     if let Some(summary) = is_development_intent(&history) {
-        let messages = state
-            .store
-            .insert_friend_social_ai_reply(&user_id, &friend_id, DEVELOPMENT_REDIRECT_REPLY)?;
+        let messages = state.store.insert_friend_social_ai_reply(
+            &user_id,
+            &friend_id,
+            DEVELOPMENT_REDIRECT_REPLY,
+        )?;
         for message in messages {
             friend_events::publish_friend_bridge_message(&message, &summary);
         }
@@ -179,6 +209,27 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
     for message in messages {
         friend_events::publish_friend_message(&message);
     }
+    Ok(())
+}
+
+async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result<()> {
+    let history =
+        state
+            .store
+            .list_recent_friend_messages_for_social_ai(&user_id, SOCIAL_AI_USER_ID, 18)?;
+    if let Some(summary) = is_development_intent(&history) {
+        let message = state
+            .store
+            .insert_direct_social_ai_reply(&user_id, DEVELOPMENT_REDIRECT_REPLY)?;
+        friend_events::publish_friend_bridge_message(&message, &summary);
+        return Ok(());
+    }
+    let reply =
+        social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history).await;
+    let message = state
+        .store
+        .insert_direct_social_ai_reply(&user_id, &reply)?;
+    friend_events::publish_friend_message(&message);
     Ok(())
 }
 
@@ -209,8 +260,12 @@ async fn social_ai_reply_or_fallback(
     match build_reply(state, user_id, scene, history).await {
         Ok(reply) => reply,
         Err(error) => {
-            warn!("{scene} @EL 生成失败: {}", error);
-            "EL 暂时没能连上 AI。你可以稍后再 @EL 一次，或联系管理员检查 AI 代理配置。".into()
+            warn!("{scene} AI 生成失败: {}", error);
+            if scene == DIRECT_SOCIAL_AI_SCENE {
+                "一龙AI 暂时没能连上 AI。你可以稍后再发一次，或联系管理员检查 AI 代理配置。".into()
+            } else {
+                "EL 暂时没能连上 AI。你可以稍后再 @EL 一次，或联系管理员检查 AI 代理配置。".into()
+            }
         }
     }
 }
@@ -222,13 +277,22 @@ async fn build_reply(
     history: &[SocialAiHistoryMessage],
 ) -> Result<String> {
     if history.is_empty() {
-        return Ok("我在。你可以把想问的问题发出来，再带上 @EL。".into());
+        return Ok(if scene == DIRECT_SOCIAL_AI_SCENE {
+            "我在。你可以直接把想问的问题发出来。".into()
+        } else {
+            "我在。你可以把想问的问题发出来，再带上 @EL。".into()
+        });
     }
     // 注意：开发意图已在 reply_to_friend/group 层拦截；此处不需重复判断。
 
+    let answer_instruction = if scene == DIRECT_SOCIAL_AI_SCENE {
+        "请回答最后一条来自“我”的消息；这是用户和一龙AI的私聊，不需要 @EL。"
+    } else {
+        "请回答最后一次 @EL 触发的问题。"
+    };
     let prompt_text = format!(
-        "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n请回答最后一次 @EL 触发的问题。",
-        format_history(history)
+        "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n{answer_instruction}",
+        format_history(history),
     );
 
     match resolve_social_agent(state).await {
@@ -246,10 +310,18 @@ async fn build_reply(
             .await?;
             let reply = response["choices"][0]["message"]["content"]
                 .as_str()
-                .unwrap_or("我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。")
+                .unwrap_or(if scene == DIRECT_SOCIAL_AI_SCENE {
+                    "我在，但刚才没组织好回复。你可以换个说法再发一次。"
+                } else {
+                    "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。"
+                })
                 .trim();
             Ok(if reply.is_empty() {
-                "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。".into()
+                if scene == DIRECT_SOCIAL_AI_SCENE {
+                    "我在，但刚才没组织好回复。你可以换个说法再发一次。".into()
+                } else {
+                    "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。".into()
+                }
             } else {
                 reply.chars().take(1400).collect()
             })
@@ -327,7 +399,7 @@ pub(crate) fn social_ai_prompt() -> &'static str {
 
 如果用户的问题涉及开发工作（例如做 App、改代码、修 bug、打包、部署、发布、项目功能实现），不要给代码方案，也不要假装已经开始做；请明确提醒用户去「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务。
 
-根据最近聊天历史回答最后一次 @EL 触发的问题。如果最后一句只是"@EL"或召唤你，请结合它前面的最后一个真实问题来回答。回复中文，简洁自然，只输出要发到聊天框里的文本。
+根据最近聊天历史回答问题：在好友/群聊中回答最后一次 @EL 触发的问题；在「一龙AI」私聊中直接回答最后一条来自用户的问题。如果最后一句只是"@EL"或召唤你，请结合它前面的最后一个真实问题来回答。回复中文，简洁自然，只输出要发到聊天框里的文本。
 
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误（例如"你好码"其实是"你好吗"）。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
 }
