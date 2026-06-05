@@ -219,7 +219,13 @@ class ConversationalVoiceAdapter(
      */
     fun start() {
         Log.i(TAG, "▶️ 开始语音对话 (cloud=$useCloudAsr)")
-        if (useCloudAsr) startCloudAsr() else agentVoiceBridge.start()
+        if (useCloudAsr) {
+            // 云端模式：先强制 cancel 确保 isRecording=false，再 start
+            cloudAsrFallback?.cancel()
+            startCloudAsr()
+        } else {
+            agentVoiceBridge.start()
+        }
     }
     
     /**
@@ -250,9 +256,12 @@ class ConversationalVoiceAdapter(
         conversationManager.reset()
 
         if (useCloudAsr) {
-            // 云端模式：直接启动新一轮录音
+            // 云端模式：先强制 cancel（重置 isRecording），再启动新一轮录音
+            // 不能直接 start，CloudAsrFallback.start() 有防重入保护，
+            // 若 isRecording=true 会静默返回，导致永远听不到说话。
+            cloudAsrFallback?.cancel()
             scope.launch {
-                delay(300)
+                delay(200)
                 startCloudAsr()
             }
         } else {
