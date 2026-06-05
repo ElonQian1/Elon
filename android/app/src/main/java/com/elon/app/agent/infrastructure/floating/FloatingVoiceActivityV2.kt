@@ -311,21 +311,21 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         }
         
         override fun onIdle() {
-            // 对话结束，提示用户可以继续
+            // 对话结束，自动开启下一轮监听
             runOnUiThread {
-                statusText.text = "🎤 点击继续对话"
-                voiceIndicator.text = "🎤"
-                
-                // 🔄 自动开启持续对话模式：3秒后自动重新开始寻听
+                statusText.text = "\uD83C\uDFA4 继续说\u2026"
+                voiceIndicator.text = "\uD83C\uDFA4"
+
+                // 回复后 0.8s 自动重启监听：用户说完一句、听到回复，再说下一句，中间不需要点击任何东西
                 handler.postDelayed({
                     if (voiceAdapter.currentState.value == ConversationState.IDLE && !isFinishing) {
-                        Log.i(TAG, "🔄 自动开始下一轮对话")
+                        Log.i(TAG, "\uD83D\uDD04 \u81ea\u52a8\u5f00\u59cb\u4e0b\u4e00\u8f6e\u5bf9\u8bdd")
                         resultText.text = ""
                         responseText.text = ""
                         responseText.visibility = android.view.View.GONE
                         voiceAdapter.restartListening()
                     }
-                }, 3000) // 3秒后自动继续
+                }, 800) // 从 3000ms 缩短到 800ms，回复后迅速重启等待用户继续说话
             }
         }
     }
@@ -630,14 +630,21 @@ class ConversationalVoiceActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         isActivityResumed = true
+        // 从后台回到前台：如果对话已结束（IDLE）则重新开始监听。
+        // 这样就算 onPause 停了 ASR，回前台也能继续说话。
+        handler.postDelayed({
+            if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
+                voiceAdapter.restartListening()
+            }
+        }, 500)
     }
 
     override fun onPause() {
         super.onPause()
         isActivityResumed = false
-        // 退到后台（如被微信覆盖）时停掉聚听，避免后台空跑 ASR；下次回前台由 onNewIntent 重启。
+        // 退到后台时停採收 ASR，避免后台空跑麦克风。
+        // 不再取消 handler callbacks：因为 onResume 已会重新处理 IDLE 状态。
         voiceAdapter.stop()
-        handler.removeCallbacksAndMessages(null)
     }
 
     override fun onDestroy() {
