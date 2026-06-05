@@ -79,7 +79,6 @@ pub async fn lm_chat_handler(
         let memory_note = format!(
             "\n\n=== 关于这位用户的长期记忆（仅供参考，勿对用户提及）===\n{memory_block}"
         );
-        // 注入到第一条 system 消息，没有则在最前面插入
         let has_system = messages.first().and_then(|m| m["role"].as_str()) == Some("system");
         if has_system {
             if let Some(sys) = messages.first_mut() {
@@ -91,7 +90,29 @@ pub async fn lm_chat_handler(
         }
     }
 
-    // ── 3. 调用 LLM ──────────────────────────────────────────────────────────
+    // ── 3. 注入近期会话历史（短期记忆，最近 6 条）────────────────────────────
+    // 只在最后一条用户消息前面插入历史，让 LLM 有上下文。
+    // 意图分析 / 脚本生成的调用通常只有一条 user 消息，历史注入对它们无害。
+    let history = state
+        .store
+        .list_recent_conversation_messages(AGENT_BALLOON_PROJECT_ID, Some(&conversation_id), 6)
+        .unwrap_or_default();
+    if !history.is_empty() {
+        // 找到第一条 user/assistant 消息的插入位置（system prompt 之后）
+        let insert_at = messages
+            .iter()
+            .position(|m| m["role"].as_str() != Some("system"))
+            .unwrap_or(messages.len());
+        for (i, h) in history.iter().enumerate() {
+            messages.insert(
+                insert_at + i,
+                json!({"role": h.role, "content": h.content}),
+            );
+        }
+    }
+
+    // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
+    // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
     let agent = match resolve_agent(&state, std::path::Path::new(""), req.agent.as_deref()).await {
         Ok(a) => a,
         Err(e) => {
@@ -118,7 +139,7 @@ pub async fn lm_chat_handler(
         .trim()
         .to_string();
 
-    // ── 4. 保存消息到会话记录 ────────────────────────────────────────────────
+    // ── 5. 保存消息到会话记录 ────────────────────────────────────────────────
     let user_msg = req
         .messages
         .iter()
@@ -145,7 +166,7 @@ pub async fn lm_chat_handler(
         &reply,
     );
 
-    // ── 5. 异步提取长期记忆 ──────────────────────────────────────────────────
+    // ── 6. 异步提取长期记忆 ──────────────────────────────────────────────────
     if !user_msg.is_empty() && !reply.is_empty() {
         let state2 = state.clone();
         let uid = user.id.clone();

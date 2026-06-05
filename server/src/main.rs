@@ -9,6 +9,7 @@ mod admin_quota;
 mod admin_token_stats;
 mod agent;
 mod agent_api_loop;
+mod agent_balloon;
 mod agent_intent;
 mod agent_llm_call;
 mod agent_prompts;

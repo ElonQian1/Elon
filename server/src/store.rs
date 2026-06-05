@@ -73,6 +73,56 @@ impl Store {
         })
     }
 
+    /// 为用户确保"手机控制"项目空间存在（幂等）。
+    /// 该项目是悬浮球会话/脚本历史的存储容器，source_type='agent_balloon'。
+    /// 返回 (project_id, created)。
+    pub fn ensure_balloon_project_for_user(
+        &self,
+        user_id: &str,
+        name: &str,
+    ) -> anyhow::Result<(String, bool)> {
+        use rusqlite::params;
+        let conn = self.conn()?;
+
+        // 先查找同名同 owner 的 agent_balloon 项目
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT p.id FROM projects p
+                 JOIN project_members pm ON pm.project_id = p.id
+                 WHERE pm.user_id = ?1 AND pm.role = 'owner'
+                   AND p.name = ?2 AND p.source_type = 'agent_balloon'
+                   AND p.status = 'active'
+                 LIMIT 1",
+                params![user_id, name],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        if let Some(id) = existing {
+            return Ok((id, false));
+        }
+
+        let id = new_id("prj");
+        let now_str = now();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO projects (
+                id, name, description, workspace_key, template, source_type,
+                status, created_by, created_at, updated_at
+             )
+             VALUES (?1, ?2, '悬浮球语音助手的会话和脚本历史', ?1, 'agent_balloon',
+                     'agent_balloon', 'active', ?3, ?4, ?4)",
+            params![id, name, user_id, now_str],
+        )?;
+        tx.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, 'owner', ?3)",
+            params![id, user_id, now_str],
+        )?;
+        tx.commit()?;
+        Ok((id, true))
+    }
+
     pub fn create_project(
         &self,
         user_id: &str,
