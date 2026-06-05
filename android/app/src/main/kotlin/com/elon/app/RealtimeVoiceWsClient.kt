@@ -39,6 +39,8 @@ internal class RealtimeVoiceWsClient(
 
     object Target {
         const val SocialAiDirect = "social_ai_direct"
+        /** 悬浮球手机控制：AI 回复 JSON 脚本或口语闲聊 */
+        const val PhoneControl = "phone_control"
     }
 
     interface Listener {

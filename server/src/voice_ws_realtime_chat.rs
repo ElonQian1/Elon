@@ -19,7 +19,7 @@ use crate::{
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
     voice_config::{RealtimeChatConfig, MAX_BUFFERED_BYTES},
     voice_openai_realtime_chat::{RealtimeChatEvent, RealtimeChatSession},
-    voice_protocol::{ClientControl, ServerEvent, VOICE_TARGET_SOCIAL_AI_DIRECT},
+    voice_protocol::{ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL, VOICE_TARGET_SOCIAL_AI_DIRECT},
 };
 
 pub async fn ws_realtime_chat_handler(
@@ -58,12 +58,14 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             .await;
         return Ok(());
     };
-    if target.as_deref() != Some(VOICE_TARGET_SOCIAL_AI_DIRECT) {
+    if target.as_deref() != Some(VOICE_TARGET_SOCIAL_AI_DIRECT)
+        && target.as_deref() != Some(VOICE_TARGET_PHONE_CONTROL)
+    {
         let _ = sender
             .send(Message::Text(
                 ServerEvent::Error {
                     code: "unsupported_target",
-                    message: "全双工实时通话暂只支持一龙AI私聊".into(),
+                    message: "全双工实时通话支持 social_ai_direct 或 phone_control".into(),
                 }
                 .to_json(),
             ))
@@ -87,7 +89,11 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
         .store
         .list_recent_friend_messages_for_social_ai(&user_id, SOCIAL_AI_USER_ID, 12)
         .unwrap_or_default();
-    let instructions = realtime_social_ai_prompt(&history);
+    let instructions = if target.as_deref() == Some(VOICE_TARGET_PHONE_CONTROL) {
+        phone_control_realtime_prompt()
+    } else {
+        realtime_social_ai_prompt(&history)
+    };
     let cfg = RealtimeChatConfig::from_env();
     let mut session = match RealtimeChatSession::connect(&cfg, instructions).await {
         Ok(session) => session,
@@ -226,4 +232,46 @@ fn store_ai_voice_message(state: &Arc<AppState>, user_id: &str, text: &str) {
             "保存一龙AI实时语音回复失败: {err:#}"
         ),
     }
+}
+
+/// 悬浮球手机控制专属 system prompt。
+///
+/// AI 的职责：
+///  - 聊天类请求 → 简短口语回答（≤30字，适合 TTS 朗读）
+///  - 手机控制类请求 → 返回纯 JSON 自动化脚本（无任何多余文字）
+///
+/// 脚本格式必须严格 JSON，客户端 ScriptEngine 会解析并执行。
+fn phone_control_realtime_prompt() -> String {
+    r#"你是一个手机语音助手，名字叫小龙。用户通过语音和你交流。
+
+## 核心职责
+1. 闲聊和问答 → 简短口语回答（30字以内，语气自然，像朋友聊天）
+2. 手机控制指令（打开应用、搜索、点击、发消息等）→ 立即回复纯 JSON 脚本
+
+## 手机控制脚本格式（必须严格遵守）
+遇到操控手机的指令，不要说任何多余的话，只输出如下 JSON：
+{"steps":[{"type":"LAUNCH_APP","params":{"package":"com.tencent.mm"}},{"type":"FIND_AND_TAP","params":{"text":"搜索"}},{"type":"INPUT_TEXT","params":{"text":"奶茶店"}}]}
+
+## 常用步骤类型
+- LAUNCH_APP: {"package":"包名"}
+- FIND_AND_TAP: {"text":"界面文字"}
+- INPUT_TEXT: {"text":"要输入的内容"}
+- GLOBAL_ACTION: {"action":"BACK|HOME|RECENTS"}
+- WAIT: {"ms":1000}
+
+## 常用包名
+- 微信: com.tencent.mm
+- QQ: com.tencent.mobileqq
+- 小红书: com.xingin.xhs
+- 抖音: com.ss.android.ugc.aweme
+- 淘宝: com.taobao.taobao
+- 京东: com.jingdong.app.mall
+- 支付宝: com.eg.android.AlipayGphone
+- 设置: com.android.settings
+
+## 重要规则
+- 操控指令：只输出 JSON，一个字都不要多
+- 闲聊：30字内，口语化，不要列条目
+- 分不清是聊天还是控制时，优先当闲聊处理，等用户说更具体
+"#.to_string()
 }

@@ -9,6 +9,9 @@
 use serde::{Deserialize, Serialize};
 
 pub const VOICE_TARGET_SOCIAL_AI_DIRECT: &str = "social_ai_direct";
+/// 悬浮球手机控制 target：语音识别后由 OpenAI Realtime 处理，
+/// AI 回复手机自动化 JSON 脚本或闲聊文本。
+pub const VOICE_TARGET_PHONE_CONTROL: &str = "phone_control";
 
 /// 客户端（Android）发给服务器的控制消息。
 ///
