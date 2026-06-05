@@ -2,6 +2,9 @@ package com.elon.app
 
 import android.content.Context
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 协调 [RealtimePcmRecorder] 和 [RealtimeVoiceWsClient]，
@@ -31,6 +34,7 @@ internal class RealtimeVoiceController(
     private val target: String? = null,
     private val projectId: String? = null,
     private val conversationId: String? = null,
+    private val continuousAutoCommit: Boolean = false,
     private val onTranscriptDelta: (String) -> Unit = {},
     private val onTranscriptFinal: (String) -> Unit = {},
     private val onVirtualMicFed: (Long) -> Unit = {},
@@ -41,14 +45,26 @@ internal class RealtimeVoiceController(
     private val onError: (String) -> Unit = {},
 ) {
     private val recorder = RealtimePcmRecorder(
-        onChunk = { chunk -> ws?.sendPcm(chunk) },
+        onChunk = { chunk -> handlePcmChunk(chunk) },
         onError = { msg -> onError(msg) },
     )
 
     private var ws: RealtimeVoiceWsClient? = null
+    private var autoScope: CoroutineScope? = null
+    private var autoResumeJob: Job? = null
+    private var autoHasSpeech = false
+    private var autoSpeechMs = 0
+    private var autoSilenceMs = 0
+    private var autoTurnMs = 0
+
+    @Volatile
+    private var autoPaused = false
 
     fun start(scope: CoroutineScope) {
         if (ws != null) return
+        autoScope = scope
+        resetAutoTurn()
+        autoPaused = false
         val client = RealtimeVoiceWsClient(
             baseHttpUrl = baseHttpUrl,
             mode = mode,
@@ -70,16 +86,23 @@ internal class RealtimeVoiceController(
                 override fun onVirtualMicFed(bytes: Long): Unit =
                     this@RealtimeVoiceController.onVirtualMicFed(bytes)
                 override fun onCliDispatched(ok: Boolean, message: String): Unit =
-                    this@RealtimeVoiceController.onCliDispatched(ok, message)
+                    this@RealtimeVoiceController.onCliDispatched(ok, message).also {
+                        if (!ok) resumeAutoListening()
+                    }
                 override fun onAiProgress(text: String): Unit =
                     this@RealtimeVoiceController.onAiProgress(text)
-                override fun onAiDone(message: String, apkUrl: String?): Unit =
+                override fun onAiDone(message: String, apkUrl: String?): Unit {
+                    cancelAutoResumeFallback()
                     this@RealtimeVoiceController.onAiDone(message, apkUrl)
+                }
                 override fun onAiError(message: String): Unit =
-                    this@RealtimeVoiceController.onAiError(message)
+                    this@RealtimeVoiceController.onAiError(message).also {
+                        resumeAutoListening()
+                    }
 
                 override fun onServerError(code: String, message: String) {
                     onError("[$code] $message")
+                    resumeAutoListening()
                 }
 
                 override fun onClosed() {
@@ -93,11 +116,26 @@ internal class RealtimeVoiceController(
 
     /** 一句话结束 → 触发 commit（转写完成 / 静音补尾）。 */
     fun commitUtterance() {
+        if (continuousAutoCommit) {
+            commitAutoTurn()
+            return
+        }
         recorder.stop()
         ws?.commit()
     }
 
+    fun resumeAutoListening() {
+        if (!continuousAutoCommit) return
+        autoResumeJob?.cancel()
+        autoResumeJob = null
+        resetAutoTurn()
+        autoPaused = false
+    }
+
     fun shutdown() {
+        autoResumeJob?.cancel()
+        autoResumeJob = null
+        autoScope = null
         recorder.stop()
         ws?.close()
         ws = null
@@ -105,4 +143,87 @@ internal class RealtimeVoiceController(
 
     /** 暴露给外部探查的状态。 */
     val isRecording: Boolean get() = recorder.isRecording
+
+    private fun handlePcmChunk(chunk: ByteArray) {
+        if (!continuousAutoCommit) {
+            ws?.sendPcm(chunk)
+            return
+        }
+        handleContinuousPcmChunk(chunk)
+    }
+
+    private fun handleContinuousPcmChunk(chunk: ByteArray) {
+        if (autoPaused) return
+        val isSpeech = pcmRms(chunk) >= AUTO_SPEECH_RMS
+        if (!autoHasSpeech && !isSpeech) return
+
+        if (isSpeech) {
+            autoHasSpeech = true
+            autoSpeechMs += RealtimePcmRecorder.FRAME_MS
+            autoSilenceMs = 0
+        } else if (autoHasSpeech) {
+            autoSilenceMs += RealtimePcmRecorder.FRAME_MS
+        }
+        autoTurnMs += RealtimePcmRecorder.FRAME_MS
+        ws?.sendPcm(chunk)
+
+        val enoughSpeech = autoSpeechMs >= AUTO_MIN_SPEECH_MS
+        val silenceEnded = enoughSpeech && autoSilenceMs >= AUTO_END_SILENCE_MS
+        val tooLong = enoughSpeech && autoTurnMs >= AUTO_MAX_TURN_MS
+        if (silenceEnded || tooLong) commitAutoTurn()
+    }
+
+    private fun commitAutoTurn() {
+        if (!continuousAutoCommit || autoPaused || !autoHasSpeech) return
+        autoPaused = true
+        resetAutoTurn()
+        ws?.commit()
+        scheduleAutoResumeFallback()
+    }
+
+    private fun scheduleAutoResumeFallback() {
+        cancelAutoResumeFallback()
+        autoResumeJob = autoScope?.launch {
+            delay(AUTO_RESUME_FALLBACK_MS)
+            resumeAutoListening()
+        }
+    }
+
+    private fun cancelAutoResumeFallback() {
+        autoResumeJob?.cancel()
+        autoResumeJob = null
+    }
+
+    private fun resetAutoTurn() {
+        autoHasSpeech = false
+        autoSpeechMs = 0
+        autoSilenceMs = 0
+        autoTurnMs = 0
+    }
+
+    private fun pcmRms(chunk: ByteArray): Double {
+        if (chunk.size < 2) return 0.0
+        var sumSquares = 0.0
+        var samples = 0
+        var i = 0
+        while (i + 1 < chunk.size) {
+            val lo = chunk[i].toInt() and 0xff
+            val hi = chunk[i + 1].toInt()
+            val sample = (hi shl 8) or lo
+            val normalized = sample / 32768.0
+            sumSquares += normalized * normalized
+            samples += 1
+            i += 2
+        }
+        if (samples == 0) return 0.0
+        return kotlin.math.sqrt(sumSquares / samples)
+    }
+
+    companion object {
+        private const val AUTO_SPEECH_RMS = 0.020
+        private const val AUTO_MIN_SPEECH_MS = 240
+        private const val AUTO_END_SILENCE_MS = 880
+        private const val AUTO_MAX_TURN_MS = 12_000
+        private const val AUTO_RESUME_FALLBACK_MS = 20_000L
+    }
 }

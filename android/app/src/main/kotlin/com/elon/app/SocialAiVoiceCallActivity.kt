@@ -93,6 +93,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
         setContentView(buildContentView())
         setCallState(CallState.Idle)
         updateSpeakerButton()
+        window.decorView.post { ensurePermissionAndStart() }
     }
 
     override fun onDestroy() {
@@ -325,7 +326,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private fun handleMicTap() {
         when (callState) {
             CallState.Idle -> ensurePermissionAndStart()
-            CallState.Listening -> commitCurrentUtterance()
+            CallState.Listening -> Toast.makeText(this, "我一直听着，直接说就好", Toast.LENGTH_SHORT).show()
             CallState.Processing -> Toast.makeText(this, "我正在想，等我一下", Toast.LENGTH_SHORT).show()
         }
     }
@@ -341,8 +342,13 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     }
 
     private fun startListening() {
+        controller?.let {
+            it.resumeAutoListening()
+            setCallState(CallState.Listening)
+            statusText.text = "我在听，继续说"
+            return
+        }
         speaker.stop()
-        controller?.shutdown()
         userTranscript.text = "正在听你说"
         aiTranscript.text = "我在听"
         setCallState(CallState.Listening)
@@ -352,6 +358,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             userId = userId,
             mode = RealtimeVoiceWsClient.Mode.Transcribe,
             target = RealtimeVoiceWsClient.Target.SocialAiDirect,
+            continuousAutoCommit = true,
             onTranscriptDelta = { text ->
                 runOnUiThread {
                     if (text.isNotBlank()) userTranscript.text = text
@@ -383,24 +390,30 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                     val reply = message.trim().ifBlank { "我在呢。" }
                     lastAiMessage = reply
                     aiTranscript.text = reply
-                    speaker.speak(reply)
-                    finishTurn("还想聊就继续说")
+                    setCallState(CallState.Processing)
+                    statusText.text = "一龙AI 正在说"
+                    speaker.speak(reply) {
+                        runOnUiThread {
+                            controller?.resumeAutoListening()
+                            setCallState(CallState.Listening)
+                            statusText.text = "我在听，继续说"
+                        }
+                    }
                 }
             },
             onAiError = { message ->
-                runOnUiThread { showFailure("一龙AI 出错：${message.take(60)}") }
+                runOnUiThread {
+                    aiTranscript.text = "一龙AI 出错：${message.take(60)}"
+                    controller?.resumeAutoListening()
+                    setCallState(CallState.Listening)
+                    statusText.text = "我在听，继续说"
+                }
             },
             onError = { message ->
                 runOnUiThread { showFailure("语音失败：${message.take(60)}") }
             },
         )
         controller?.start(lifecycleScope)
-    }
-
-    private fun commitCurrentUtterance() {
-        val active = controller ?: return
-        active.commitUtterance()
-        setCallState(CallState.Processing)
     }
 
     private fun finishTurn(nextStatus: String) {
@@ -444,16 +457,16 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                 setPulse(false)
             }
             CallState.Listening -> {
-                statusText.text = "正在听你说"
-                micButton.text = "说完了"
-                micButton.isEnabled = true
+                statusText.text = "我在听，继续说"
+                micButton.text = "畅聊中"
+                micButton.isEnabled = false
                 micButton.background = rounded(primaryActionColor, 22)
                 micButton.setTextColor(primaryActionTextColor)
                 setPulse(true)
             }
             CallState.Processing -> {
                 statusText.text = "我在想"
-                micButton.text = "一龙AI 思考中"
+                micButton.text = "一龙AI 处理中"
                 micButton.isEnabled = false
                 micButton.background = rounded(infoBadgeColor, 22)
                 micButton.setTextColor(infoTextColor)

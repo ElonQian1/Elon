@@ -40,6 +40,8 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = TextToSpeech(appContext, this)
     private var ready = false
     private var pendingText: String? = null
+    private var pendingDone: (() -> Unit)? = null
+    private var activeDone: (() -> Unit)? = null
 
     /** 上一条 utterance 是否还在播放（用于打断判断）。 */
     val isSpeaking: Boolean get() = tts?.isSpeaking == true
@@ -59,14 +61,20 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
         engine.setPitch(1.0f)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {}
-            override fun onDone(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                finishSpeakCallback()
+            }
             @Deprecated("Deprecated in API 21", ReplaceWith("onError(utteranceId, errorCode)"))
-            override fun onError(utteranceId: String?) {}
+            override fun onError(utteranceId: String?) {
+                finishSpeakCallback()
+            }
         })
         ready = true
         pendingText?.let { text ->
+            val done = pendingDone
             pendingText = null
-            speak(text)
+            pendingDone = null
+            speak(text, done)
         }
         Log.d(TAG, "TTS 初始化成功")
     }
@@ -75,32 +83,52 @@ internal class VoiceSpeaker(context: Context) : TextToSpeech.OnInitListener {
      * 朗读文本。若上一条还在朗读，立即打断并播放新内容（QUEUE_FLUSH）。
      * 超长文本截断到 [MAX_SPEAK_CHARS] 字符，避免朗读时间过长。
      */
-    fun speak(text: String) {
-        if (!isTtsEnabled(appContext)) return
+    fun speak(text: String, onDone: (() -> Unit)? = null) {
+        if (!isTtsEnabled(appContext)) {
+            onDone?.invoke()
+            return
+        }
         val content = text.trim().take(MAX_SPEAK_CHARS)
-        if (content.isEmpty()) return
+        if (content.isEmpty()) {
+            onDone?.invoke()
+            return
+        }
         val engine = tts
         if (!ready || engine == null) {
             pendingText = content
+            pendingDone = onDone
             return
         }
         pendingText = null
+        pendingDone = null
+        activeDone = onDone
         val params = Bundle()
-        engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
+        val result = engine.speak(content, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
+        if (result == TextToSpeech.ERROR) finishSpeakCallback()
     }
 
     /** 立即停止当前朗读（用户开始新一轮语音输入时调用）。 */
     fun stop() {
         pendingText = null
+        pendingDone = null
+        activeDone = null
         if (tts?.isSpeaking == true) tts?.stop()
     }
 
     /** 释放资源（Activity onDestroy）。 */
     fun release() {
         pendingText = null
+        pendingDone = null
+        activeDone = null
         tts?.stop()
         tts?.shutdown()
         tts = null
         ready = false
+    }
+
+    private fun finishSpeakCallback() {
+        val callback = activeDone
+        activeDone = null
+        callback?.invoke()
     }
 }
