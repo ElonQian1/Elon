@@ -136,7 +136,23 @@
 
     /* ===== 会话页 ===== */
     .conversation-list { flex: 0 0 auto; }
-    .search-bar { flex: 0 0 auto; padding: 8px 14px; background: var(--panel-2); }
+    .search-bar {
+      flex: 0 0 auto;
+      max-height: 0;
+      padding: 0 14px;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(-8px);
+      background: var(--panel-2);
+      transition: max-height 180ms ease, padding 180ms ease, opacity 160ms ease, transform 180ms ease;
+    }
+    .search-bar.active {
+      max-height: 56px;
+      padding-top: 8px;
+      padding-bottom: 8px;
+      opacity: 1;
+      transform: translateY(0);
+    }
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
     .search-bar input::placeholder { color: var(--ink-soft); }
     .conversation-item {
@@ -1337,6 +1353,7 @@
   let busy = false;
   let progressLog = [];
   let searchQuery = '';
+  let searchBarCloseTimer = null;
   let selectedAgent = '';
   let agentOptions = [];
   let agentSelectionInitialized = false;
@@ -1571,9 +1588,7 @@
   }
 
   function selectProject(project) {
-    searchBar.classList.add('hidden');
-    searchQuery = '';
-    searchInput.value = '';
+    hideSearchBarImmediately();
     currentProject = project;
     progressLog = [];
     conversationList.classList.add('hidden');
@@ -2628,17 +2643,50 @@
   });
 
   // ====== 搜索 ======
+  function hideSearchBarImmediately() {
+    if (searchBarCloseTimer) {
+      clearTimeout(searchBarCloseTimer);
+      searchBarCloseTimer = null;
+    }
+    searchBar.classList.remove('active');
+    searchBar.classList.add('hidden');
+    searchQuery = '';
+    searchInput.value = '';
+  }
+
+  function openSearchBar() {
+    if (currentProject) return;
+    if (searchBarCloseTimer) {
+      clearTimeout(searchBarCloseTimer);
+      searchBarCloseTimer = null;
+    }
+    searchQuery = '';
+    searchInput.value = '';
+    searchBar.classList.remove('hidden');
+    void searchBar.offsetHeight;
+    searchBar.classList.add('active');
+    renderConversationList();
+    requestAnimationFrame(() => searchInput.focus());
+  }
+
+  function closeSearchBar() {
+    if (searchBarCloseTimer) clearTimeout(searchBarCloseTimer);
+    searchBar.classList.remove('active');
+    searchQuery = '';
+    searchInput.value = '';
+    renderConversationList();
+    searchBarCloseTimer = setTimeout(() => {
+      searchBar.classList.add('hidden');
+      searchBarCloseTimer = null;
+    }, 190);
+  }
+
   searchBtn.addEventListener('click', () => {
     if (currentProject) return;
-    const nowHidden = searchBar.classList.toggle('hidden');
-    if (!nowHidden) {
-      searchQuery = '';
-      searchInput.value = '';
-      renderConversationList();
-      searchInput.focus();
+    if (searchBar.classList.contains('hidden') || !searchBar.classList.contains('active')) {
+      openSearchBar();
     } else {
-      searchQuery = '';
-      renderConversationList();
+      closeSearchBar();
     }
   });
   searchInput.addEventListener('input', () => {
@@ -2647,10 +2695,7 @@
   });
   searchInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      searchBar.classList.add('hidden');
-      searchQuery = '';
-      searchInput.value = '';
-      renderConversationList();
+      closeSearchBar();
     }
   });
   projectContinueBtn.addEventListener('click', () => {

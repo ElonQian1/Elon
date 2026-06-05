@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -8,6 +9,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -37,12 +39,14 @@ internal class MainHomeListActions(
     private var friendSearchActive = false
     private var friendSearchQuery = ""
     private var shouldFocusFriendSearch = false
+    private var animateFriendSearchEnter = false
 
     fun showFriendLocalSearch() {
         if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
         friendSearchActive = true
         friendSearchQuery = ""
         shouldFocusFriendSearch = true
+        animateFriendSearchEnter = true
         renderConversationList()
     }
 
@@ -69,6 +73,25 @@ internal class MainHomeListActions(
         binding.conversationPage.removeAllViews()
         if (friendSearchActive) {
             binding.conversationPage.addView(createFriendSearchHeader())
+            renderFriendSearchResults()
+            return
+        }
+        val chatItems = buildHomeChatItems()
+        if (chatItems.isEmpty()) {
+            binding.conversationPage.addView(
+                homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
+                    showAddFriendDialog()
+                }
+            )
+            return
+        }
+        renderHomeChatItems(chatItems)
+    }
+
+    private fun renderFriendSearchResults() {
+        val resultStartIndex = if (friendSearchActive) 1 else 0
+        while (binding.conversationPage.childCount > resultStartIndex) {
+            binding.conversationPage.removeViewAt(resultStartIndex)
         }
         val allChatItems = buildHomeChatItems()
         val chatItems = filterHomeChatItems(allChatItems)
@@ -77,13 +100,11 @@ internal class MainHomeListActions(
                 binding.conversationPage.addView(createFriendSearchEmptyRow())
                 return
             }
-            binding.conversationPage.addView(
-                homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
-                    showAddFriendDialog()
-                }
-            )
-            return
         }
+        renderHomeChatItems(chatItems)
+    }
+
+    private fun renderHomeChatItems(chatItems: List<HomeChatItem>) {
         chatItems.forEachIndexed { index, item ->
             if (index > 0) {
                 binding.conversationPage.addView(homeRows().createConversationDivider())
@@ -106,9 +127,18 @@ internal class MainHomeListActions(
     }
 
     private fun clearFriendSearchState() {
+        if (friendSearchActive) {
+            hideFriendSearchKeyboard()
+        }
         friendSearchActive = false
         friendSearchQuery = ""
         shouldFocusFriendSearch = false
+        animateFriendSearchEnter = false
+    }
+
+    private fun hideFriendSearchKeyboard() {
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(binding.conversationPage.windowToken, 0)
     }
 
     private fun filterHomeChatItems(items: List<HomeChatItem>): List<HomeChatItem> {
@@ -143,15 +173,21 @@ internal class MainHomeListActions(
     }
 
     private fun createFriendSearchHeader(): LinearLayout {
+        val targetHeight = dp(58)
+        val animateEnter = animateFriendSearchEnter
+        animateFriendSearchEnter = false
         val root = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(58)
+                if (animateEnter) 0 else targetHeight
             )
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(8), dp(14), dp(8))
             setBackgroundColor(Color.parseColor("#101010"))
+            alpha = if (animateEnter) 0f else 1f
+            translationY = if (animateEnter) -dp(8).toFloat() else 0f
+            clipToPadding = false
         }
         val input = EditText(activity).apply {
             setText(friendSearchQuery)
@@ -169,10 +205,7 @@ internal class MainHomeListActions(
                     val nextQuery = s?.toString()?.trim().orEmpty()
                     if (nextQuery == friendSearchQuery) return
                     friendSearchQuery = nextQuery
-                    shouldFocusFriendSearch = true
-                    binding.conversationPage.post {
-                        if (friendSearchActive) renderConversationList()
-                    }
+                    renderFriendSearchResults()
                 }
             })
         }
@@ -200,16 +233,37 @@ internal class MainHomeListActions(
         root.addView(cancel, LinearLayout.LayoutParams(dp(54), LinearLayout.LayoutParams.MATCH_PARENT).apply {
             marginStart = dp(10)
         })
+        if (animateEnter) {
+            animateSearchHeaderIn(root, targetHeight)
+        }
         if (shouldFocusFriendSearch) {
             shouldFocusFriendSearch = false
-            input.post {
+            input.postDelayed({
                 input.requestFocus()
                 input.setSelection(input.text?.length ?: 0)
                 val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
-            }
+            }, if (animateEnter) 90L else 0L)
         }
         return root
+    }
+
+    private fun animateSearchHeaderIn(header: View, targetHeight: Int) {
+        header.post {
+            val params = header.layoutParams as LinearLayout.LayoutParams
+            ValueAnimator.ofInt(0, targetHeight).apply {
+                duration = 180L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { animator ->
+                    val progress = animator.animatedFraction
+                    params.height = animator.animatedValue as Int
+                    header.layoutParams = params
+                    header.alpha = progress
+                    header.translationY = -dp(8) * (1f - progress)
+                }
+                start()
+            }
+        }
     }
 
     private fun createFriendSearchEmptyRow(): View {
