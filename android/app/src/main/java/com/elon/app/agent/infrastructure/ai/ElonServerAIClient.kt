@@ -89,21 +89,20 @@ class ElonServerAIClient(
     override suspend fun chat(messages: List<Message>): String {
         val projectId = ensureBalloonProject()
 
-        // system prompt 拼接工具函数：把 system 内容前置给 Codex，
-        // 让脚本生成 prompt、意图分析 prompt 等完整传达。
-        val systemCtx = messages.filter { it.role == "system" }
-            .joinToString("\n") { it.content }
+        // 只取用户的实际输入，不拼 system prompt。
+        // 气球项目 workspace 里的 AGENTS.md 已经告知服务器上下文和脚本格式，
+        // 不需要客户端再把 ASSISTANT_PERSONA 等 system prompt 发过去——
+        // 发过去反而会被 intent_router 误判为"代码开发请求"，触发 Codex worktree。
         val userMsg = messages.lastOrNull { it.role == "user" }?.content
-            ?: messages.joinToString("\n") { "${it.role}: ${it.content}" }
-        val fullMsgForCli = if (systemCtx.isNotBlank()) "$systemCtx\n\n---\n$userMsg" else userMsg
+            ?: messages.joinToString("\n") { it.content }
 
         // 1. WebSocket 全双工（优先，支持流式进度）
         val ws = wsClient
         if (ws != null && projectId != null) {
             try {
-                Log.d(TAG, "→ WS project=$projectId  msg=${fullMsgForCli.take(60)}")
+                Log.d(TAG, "→ WS project=$projectId  msg=${userMsg.take(60)}")
                 val reply = ws.chat(
-                    message = fullMsgForCli,
+                    message = userMsg,
                     conversationId = cliConversationId,
                     onProgress = { step -> onProgress?.invoke(step) }
                 )
@@ -113,30 +112,29 @@ class ElonServerAIClient(
                 }
                 Log.w(TAG, "WS 返回空，降级 HTTP CLI")
             } catch (e: Exception) {
-                Log.w(TAG, "WS 失败（${e.message}），降级 HTTP CLI")
+                Log.w(TAG, "WS 失败（${e.message}），降级 HTTP")
                 wsClient = null
                 ensureDone.set(false)
             }
         }
 
-        // 2. HTTP CLI 兜底（WS 不可用时）
-        // force_cli 模式：服务器维持 Codex CLI 来处理，
-        // 闲聊和手机脚本生成都由 Codex 自己判断并执行（读 AGENTS.md）。
+        // 2. HTTP 兜底（WS 不可用时）
+        // chatOnly=true：告知服务器走轻量闲聊路径，不启动 Codex 代码开发工作流。
+        // 悬浮球项目的复杂手机脚本由 WS + AGENTS.md 处理；HTTP 路径只做简单问答兜底。
         if (projectId != null) {
             try {
-                Log.d(TAG, "→ HTTP CLI project=$projectId  msg=${userMsg.take(40)}")
+                Log.d(TAG, "→ HTTP project=$projectId  msg=${userMsg.take(40)}")
                 val (reply, newConvId) = server.chat(
                     projectId = projectId,
-                    message = fullMsgForCli,
+                    message = userMsg,
                     conversationId = cliConversationId,
-                    chatOnly = false,
-                    executionMode = "force_cli"
+                    chatOnly = true    // 不走 Codex worktree
                 )
                 if (newConvId != null) cliConversationId = newConvId
                 if (reply.isNotBlank() && reply != "（服务器未返回回复）") return reply
-                Log.w(TAG, "HTTP CLI 返回空，降级 LLM")
+                Log.w(TAG, "HTTP 返回空，降级 LLM")
             } catch (e: Exception) {
-                Log.w(TAG, "HTTP CLI 失败（${e.message}），降级 LLM")
+                Log.w(TAG, "HTTP 失败（${e.message}），降级 LLM")
             }
         }
 
