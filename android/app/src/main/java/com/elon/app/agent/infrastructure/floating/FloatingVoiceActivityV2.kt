@@ -200,7 +200,10 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             }
             val skippedDesc = skipped.joinToString("、")
             val msg = if (skipped.isEmpty()) modeLabel else "$modeLabel\n（已跳过：$skippedDesc）"
-            Toast.makeText(this@ConversationalVoiceActivity, msg, Toast.LENGTH_SHORT).show()
+            // Toast 异步展示，不阻塞 initializeConversation 返回。
+            handler.post {
+                Toast.makeText(this@ConversationalVoiceActivity, msg, Toast.LENGTH_SHORT).show()
+            }
 
             // 设置 UI 监听器
             listener = createConversationListener()

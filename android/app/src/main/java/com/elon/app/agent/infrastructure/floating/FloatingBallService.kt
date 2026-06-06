@@ -195,6 +195,15 @@ class FloatingBallService : Service() {
                 showTextInputDialog()
             }
         }
+
+        // 悬浮球显示后延迟预热 ASR 服务绑定，让用户单击时绑定已经完成。
+        // 小米语音引擎有 50~300ms 的期定绑定延迟，预热可消除首次鸭声延迟。
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            try {
+                com.elon.app.AgentVoiceBridge(applicationContext).prewarm()
+                Log.i(TAG, "🔬 ASR 预热完成")
+            } catch (_: Exception) {}
+        }, 600L)
         
         // 悬浮窗参数
         val layoutParams = WindowManager.LayoutParams().apply {
