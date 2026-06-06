@@ -1,5 +1,10 @@
 param(
+    [string]$AssetRoot = "",
+    [string]$ModelRoot = "D:\models",
+    [string]$IndexTts2ProjectDir = "",
+    [string]$CosyVoicePythonExe = "",
     [string[]]$SearchRoots = @(
+        "D:\models",
         "D:\rust",
         "$env:USERPROFILE\Downloads",
         "$env:USERPROFILE\Documents",
@@ -10,6 +15,19 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
+
+if ($ModelRoot -and (Test-Path -LiteralPath $ModelRoot)) {
+    $SearchRoots = @($ModelRoot) + $SearchRoots
+}
+$SearchRoots = $SearchRoots | Where-Object { $_ -and $_.Trim() } | Select-Object -Unique
+
+if (-not $IndexTts2ProjectDir -and $ModelRoot) {
+    $IndexTts2ProjectDir = Join-Path $ModelRoot "IndexTTS2\index-tts"
+}
+
+if (-not $CosyVoicePythonExe -and $ModelRoot) {
+    $CosyVoicePythonExe = Join-Path $ModelRoot "CosyVoice\.venv\Scripts\python.exe"
+}
 
 function Write-ItemStatus {
     param(
@@ -96,6 +114,31 @@ if ($python) {
 }
 
 Write-Output ""
+Write-Output "== Model runtimes =="
+Write-ItemStatus "IndexTTS2 project" ((Test-Path -LiteralPath $IndexTts2ProjectDir)) $IndexTts2ProjectDir
+if (Test-Path -LiteralPath $IndexTts2ProjectDir) {
+    Push-Location $IndexTts2ProjectDir
+    try {
+        $indexStatus = if (Get-Command uv -ErrorAction SilentlyContinue) {
+            & uv run python -c "import torch, indextts.infer_v2; print('torch=' + torch.__version__ + ';cuda=' + str(torch.cuda.is_available()))" 2>&1
+        } elseif ($python) {
+            & python -m uv run python -c "import torch, indextts.infer_v2; print('torch=' + torch.__version__ + ';cuda=' + str(torch.cuda.is_available()))" 2>&1
+        } else {
+            @()
+        }
+        Write-ItemStatus "IndexTTS2 import" ($LASTEXITCODE -eq 0 -and [bool]$indexStatus) $(($indexStatus | Select-Object -First 1) -join "")
+    } finally {
+        Pop-Location
+    }
+}
+
+Write-ItemStatus "CosyVoice python" ((Test-Path -LiteralPath $CosyVoicePythonExe)) $CosyVoicePythonExe
+if (Test-Path -LiteralPath $CosyVoicePythonExe) {
+    $cosyStatus = & $CosyVoicePythonExe -c "import importlib.util; print(importlib.util.find_spec('cosyvoice.cli.cosyvoice') is not None)" 2>&1
+    Write-ItemStatus "CosyVoice import" ($LASTEXITCODE -eq 0 -and (($cosyStatus | Select-Object -First 1) -eq "True")) $(($cosyStatus | Select-Object -First 1) -join "")
+}
+
+Write-Output ""
 Write-Output "== Source directories =="
 $pattern = "index.?tts|cosyvoice|gpt.?sovits|so-vits|sovits|kokoro|sherpa"
 foreach ($root in $SearchRoots) {
@@ -123,7 +166,9 @@ if ($docker) {
 Write-Output ""
 Write-Output "== TTS assets =="
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel 2>$null
-if ($env:ELON_TTS_ASSET_ROOT) {
+if ($AssetRoot) {
+    $assetRoot = $AssetRoot
+} elseif ($env:ELON_TTS_ASSET_ROOT) {
     $assetRoot = $env:ELON_TTS_ASSET_ROOT
 } elseif ($repoRoot) {
     $assetRoot = Join-Path $repoRoot.Trim() "server\assets\tts"
