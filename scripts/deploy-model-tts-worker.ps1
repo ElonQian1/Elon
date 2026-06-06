@@ -33,7 +33,14 @@ if (-not $RemoteAssetRoot) {
     $RemoteAssetRoot = "$RemoteRoot/server/assets/tts"
 }
 
-foreach ($file in @("model_tts_worker.py", "requirements-model.txt")) {
+$WorkerFiles = @(
+    "model_tts_worker.py",
+    "model_tts_common.py",
+    "model_tts_engines.py",
+    "requirements-model.txt"
+)
+
+foreach ($file in $WorkerFiles) {
     if (-not (Test-Path (Join-Path $LocalWorkerDir $file))) {
         Write-Error "Missing local worker file: $file"
     }
@@ -74,10 +81,9 @@ Write-Host "Creating remote worker directory..."
 Invoke-Remote "mkdir -p '$RemoteWorkerDir'"
 
 Write-Host "Uploading model worker files..."
-scp @SshOpts `
-    (Join-Path $LocalWorkerDir "model_tts_worker.py") `
-    (Join-Path $LocalWorkerDir "requirements-model.txt") `
-    "${Server}:$RemoteWorkerDir/"
+$scpSources = $WorkerFiles | ForEach-Object { Join-Path $LocalWorkerDir $_ }
+$scpArgs = @($SshOpts) + $scpSources + @("${Server}:$RemoteWorkerDir/")
+scp @scpArgs
 if ($LASTEXITCODE -ne 0) {
     throw "scp worker files failed with exit code $LASTEXITCODE"
 }

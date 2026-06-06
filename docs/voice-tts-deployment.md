@@ -145,7 +145,7 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy-model-tts-worker.ps1 `
 
 脚本会：
 
-1. 上传 `model_tts_worker.py` 和 `requirements-model.txt`
+1. 上传 `model_tts_worker.py`、`model_tts_common.py`、`model_tts_engines.py` 和 `requirements-model.txt`
 2. 创建 Python venv
 3. 创建并启动 `elon-model-tts-worker.service`
 4. 写入主服务 `.env`：`ELON_TTS_WORKER_URL=http://127.0.0.1:5011`
