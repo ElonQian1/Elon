@@ -49,6 +49,27 @@ Write-ItemStatus "pip" ($null -ne $pip) $(if ($pip) { $pip.Source } else { "" })
 $conda = Get-Command conda -ErrorAction SilentlyContinue
 Write-ItemStatus "conda" ($null -ne $conda) $(if ($conda) { $conda.Source } else { "" })
 
+$uv = Get-Command uv -ErrorAction SilentlyContinue
+Write-ItemStatus "uv" ($null -ne $uv) $(if ($uv) { $uv.Source } else { "" })
+if (-not $uv -and $python) {
+    $uvModule = & python -m uv --version 2>$null
+    Write-ItemStatus "python -m uv" ([bool]$uvModule) $(if ($uvModule) { $uvModule } else { "" })
+}
+
+$git = Get-Command git -ErrorAction SilentlyContinue
+Write-ItemStatus "git" ($null -ne $git) $(if ($git) { $git.Source } else { "" })
+if ($git) {
+    $gitLfs = & git lfs version 2>$null
+    Write-ItemStatus "git-lfs" ([bool]$gitLfs) $(if ($gitLfs) { $gitLfs } else { "" })
+}
+
+$nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+Write-ItemStatus "nvidia-smi" ($null -ne $nvidiaSmi) $(if ($nvidiaSmi) { $nvidiaSmi.Source } else { "" })
+if ($nvidiaSmi) {
+    & nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>$null |
+        ForEach-Object { Write-ItemStatus "gpu" $true $_ }
+}
+
 Write-Output ""
 Write-Output "== Python packages =="
 $packages = @(

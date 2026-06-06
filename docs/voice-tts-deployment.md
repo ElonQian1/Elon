@@ -94,15 +94,57 @@ https://github.com/FunAudioLLM/CosyVoice/blob/main/example.py
 
 ### 本机启动模型 Worker
 
-先准备模型源码、权重和授权音频素材，然后运行：
+先创建资产目录骨架：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\new-tts-asset-pack.ps1 -AssetRoot "D:\tts-assets"
+```
+
+然后把授权参考音频放进去：
+
+```text
+D:\tts-assets\voices\female_warm_neutral.wav
+D:\tts-assets\voices\female_bright_neutral.wav
+D:\tts-assets\voices\female_mature_neutral.wav
+D:\tts-assets\voices\female_cool_neutral.wav
+D:\tts-assets\voices\female_sweet_neutral.wav
+
+D:\tts-assets\emotions\female_neutral.wav
+D:\tts-assets\emotions\female_gentle_comfort.wav
+D:\tts-assets\emotions\female_crying_broken.wav
+...
+```
+
+#### 安装 IndexTTS2
+
+IndexTTS2 官方要求用 `uv` 管理依赖环境，并通过 HuggingFace 或 ModelScope 下载 `IndexTeam/IndexTTS-2` 权重。仓库脚本封装了这些步骤：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-indextts2-runtime.ps1 `
+  -InstallRoot "D:\models\IndexTTS2" `
+  -DownloadFrom huggingface
+```
+
+脚本默认用 `GIT_LFS_SKIP_SMUDGE=1` clone 官方仓库，只拉源码，不拉 GitHub LFS 示例音频。原因是官方仓库 LFS 额度可能临时耗尽；示例音频不是本项目运行必需项。只有确认官方 LFS 可用时才加 `-PullLfsExamples`。
+
+国内网络下载 HuggingFace 慢时可以改用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-indextts2-runtime.ps1 `
+  -InstallRoot "D:\models\IndexTTS2" `
+  -DownloadFrom modelscope
+```
+
+安装完成后，使用 IndexTTS2 的 `uv` 项目环境启动 Worker：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps1 `
   -Provider index_tts2 `
   -AssetRoot "D:\tts-assets" `
-  -ModelPythonPath "D:\models\index-tts" `
-  -IndexTts2ModelDir "D:\models\index-tts\checkpoints" `
-  -IndexTts2CfgPath "D:\models\index-tts\checkpoints\config.yaml"
+  -UvProjectDir "D:\models\IndexTTS2\index-tts" `
+  -ModelPythonPath "D:\models\IndexTTS2\index-tts" `
+  -IndexTts2ModelDir "D:\models\IndexTTS2\index-tts\checkpoints" `
+  -IndexTts2CfgPath "D:\models\IndexTTS2\index-tts\checkpoints\config.yaml"
 ```
 
 本机 worker 启动后检查：
@@ -111,15 +153,29 @@ powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps
 curl.exe http://127.0.0.1:5011/health
 ```
 
-如果要用 CosyVoice3：
+注意：IndexTTS2 当前 PyTorch 依赖使用 CUDA 12.8 wheels。Windows 上如果合成时报 CUDA/driver 错误，需要升级 NVIDIA 驱动或 CUDA Toolkit；也可以先用 CPU 验证链路，但速度会明显慢。
+
+#### 安装 CosyVoice3
+
+CosyVoice 官方建议 Python 3.10 / conda 环境，并下载 `FunAudioLLM/Fun-CosyVoice3-0.5B-2512`。仓库脚本可先按当前 Python 环境安装：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup-cosyvoice-runtime.ps1 `
+  -InstallRoot "D:\models\CosyVoice" `
+  -DownloadFrom modelscope
+```
+
+如果你有单独 conda 环境，可以把环境里的 `python.exe` 传给 `-PythonExe`。
+
+启动 CosyVoice3 Worker：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps1 `
   -Provider cosyvoice3 `
   -AssetRoot "D:\tts-assets" `
-  -ModelPythonPath "D:\models\CosyVoice" `
-  -CosyVoiceRepoDir "D:\models\CosyVoice" `
-  -CosyVoiceModelDir "D:\models\CosyVoice\pretrained_models\Fun-CosyVoice3-0.5B"
+  -ModelPythonPath "D:\models\CosyVoice\CosyVoice" `
+  -CosyVoiceRepoDir "D:\models\CosyVoice\CosyVoice" `
+  -CosyVoiceModelDir "D:\models\CosyVoice\CosyVoice\pretrained_models\Fun-CosyVoice3-0.5B"
 ```
 
 CosyVoice 的 prompt 音频需要对应文本。每个声线 wav 旁边放同名 JSON，或在声线目录放 `profile.json`：
@@ -129,6 +185,19 @@ CosyVoice 的 prompt 音频需要对应文本。每个声线 wav 旁边放同名
   "promptText": "你好呀，我是你的 AI 助手，今天也会认真陪你聊天。"
 }
 ```
+
+#### 本机 5 声线联调
+
+Worker 启动后用同一句话测试 5 个 voiceId：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-model-tts-worker.ps1 `
+  -WorkerUrl "http://127.0.0.1:5011" `
+  -Provider index_tts2 `
+  -OutputDir ".runtime\tts-model-tests"
+```
+
+输出的 5 个 wav 必须听起来是不同女孩的音色；如果只是音高、语速或情绪不同，说明 `voices/*.wav` 不是 5 个真正不同的授权声线。
 
 ### 服务器部署模型 Worker
 
