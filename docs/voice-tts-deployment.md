@@ -125,6 +125,8 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-indextts2-runtime.ps1 `
   -DownloadFrom huggingface
 ```
 
+脚本默认把 `UV_CACHE_DIR` 放到 `D:\models\IndexTTS2\.uv-cache`，避免 PyTorch / CUDA wheel 缓存占满 C 盘。
+
 脚本默认用 `GIT_LFS_SKIP_SMUDGE=1` clone 官方仓库，只拉源码，不拉 GitHub LFS 示例音频。原因是官方仓库 LFS 额度可能临时耗尽；示例音频不是本项目运行必需项。只有确认官方 LFS 可用时才加 `-PullLfsExamples`。
 
 国内网络下载 HuggingFace 慢时可以改用：

@@ -3,6 +3,7 @@ param(
     [ValidateSet("huggingface", "modelscope")]
     [string]$DownloadFrom = "huggingface",
     [string]$PypiMirror = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple",
+    [string]$UvCacheDir = "",
     [switch]$SkipDependencyInstall,
     [switch]$SkipModelDownload,
     [switch]$PullLfsExamples,
@@ -45,6 +46,11 @@ function Invoke-Uv {
 
 $RepoDir = Join-Path $InstallRoot "index-tts"
 $CheckpointDir = Join-Path $RepoDir "checkpoints"
+if (-not $UvCacheDir) {
+    $UvCacheDir = Join-Path $InstallRoot ".uv-cache"
+}
+New-Item -ItemType Directory -Force -Path $UvCacheDir | Out-Null
+$env:UV_CACHE_DIR = $UvCacheDir
 
 Invoke-Step "Prerequisites" {
     Require-Command git "Install Git first." | Out-Null
@@ -131,6 +137,7 @@ Write-Host "IndexTTS2 runtime prepared."
 Write-Host "Repo:       $RepoDir"
 Write-Host "Checkpoints:$CheckpointDir"
 Write-Host "Config:     $cfgPath"
+Write-Host "UV cache:   $UvCacheDir"
 Write-Host ""
 Write-Host "Start worker with:"
 $fp16Flag = if ($UseFp16) { " `$`n  `$env:ELON_INDEXTTS2_USE_FP16='1';" } else { "" }

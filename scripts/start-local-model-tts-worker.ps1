@@ -9,6 +9,7 @@ param(
     [string]$CosyVoiceModelDir = "",
     [string]$ModelFallbackUrl = "",
     [string]$UvProjectDir = "",
+    [string]$UvCacheDir = "",
     [string]$PythonExe = "",
     [switch]$SkipInstall
 )
@@ -37,6 +38,11 @@ if ($UvProjectDir) {
     if (-not (Test-Path -LiteralPath $UvProjectDir)) {
         throw "UvProjectDir not found: $UvProjectDir"
     }
+    if (-not $UvCacheDir) {
+        $UvCacheDir = Join-Path (Split-Path -Parent $UvProjectDir) ".uv-cache"
+    }
+    New-Item -ItemType Directory -Force -Path $UvCacheDir | Out-Null
+    $env:UV_CACHE_DIR = $UvCacheDir
 } elseif ($PythonExe) {
     if (-not (Test-Path -LiteralPath $PythonExe)) {
         throw "PythonExe not found: $PythonExe"
@@ -81,6 +87,7 @@ Write-Host "  URL:       http://127.0.0.1:$Port"
 Write-Host "  Provider:  $Provider"
 Write-Host "  AssetRoot: $AssetRoot"
 if ($UvProjectDir) { Write-Host "  UV project: $UvProjectDir" }
+if ($UvCacheDir) { Write-Host "  UV cache:   $UvCacheDir" }
 if ($PythonExe) { Write-Host "  PythonExe:  $PythonExe" }
 Write-Host ""
 Write-Host "Press Ctrl+C to stop."
