@@ -88,9 +88,17 @@ class ConversationalVoiceAdapter(
     val currentState: StateFlow<ConversationState>
         get() = conversationManager.currentState
     
-    /** 是否正在运行 */
+    /** 是否正在运行（对话状态机非空闲）*/
     val isRunning: Boolean
         get() = conversationManager.currentState.value != ConversationState.IDLE
+
+    /**
+     * ASR 是否正在监听（包含「已启动 ASR 但用户尚未开口」的等待阶段）。
+     * 比 [isRunning] 更宽——ConversationManager 只有检测到声音后才切到 LISTENING，
+     * 而 ASR 引擎在等待说话期间管理器仍在 IDLE，此属性可区分这两种情况。
+     */
+    val isListening: Boolean
+        get() = agentVoiceBridge.isRunning || (useCloudAsr && cloudAsrFallback?.isRecording == true)
     
     // ==================== 初始化 ====================
     
@@ -191,10 +199,19 @@ class ConversationalVoiceAdapter(
         agentVoiceBridge.onPartial = { text -> conversationManager.onPartialResult(text, 1.0f) }
         agentVoiceBridge.onFinal = { text -> conversationManager.onSpeechEnd(text) }
         agentVoiceBridge.onEnd = {
-            // AgentVoiceBridge 对空结果不会触发 onFinal，直接触发 onEnd；
-            // 若 conversationManager 仍在监听中（未拿到文字），通知其以空结果结束，避免 UI 卡住。
-            if (conversationManager.currentState.value == com.elon.app.agent.domain.conversation.ConversationState.LISTENING) {
-                conversationManager.onSpeechEnd("")
+            when (conversationManager.currentState.value) {
+                com.elon.app.agent.domain.conversation.ConversationState.LISTENING -> {
+                    // AgentVoiceBridge 空结果不触发 onFinal，此处兜底通知管理器结束。
+                    conversationManager.onSpeechEnd("")
+                }
+                com.elon.app.agent.domain.conversation.ConversationState.IDLE -> {
+                    // ASR 在等待说话期间超时自然结束（用户没说话）。
+                    // 触发 onIdle() 让 UI 层重新调度监听，维持全双工持续倾听。
+                    // 注意：restartListening() 内部调用 stop() 也会走到这里，
+                    // 但 scheduleRestartListening 有 isListening 检查会拦截重复重启。
+                    mainHandler.post { listener?.onIdle() }
+                }
+                else -> { /* THINKING/SPEAKING/EXECUTING：不干预 */ }
             }
         }
         agentVoiceBridge.onError = { error ->

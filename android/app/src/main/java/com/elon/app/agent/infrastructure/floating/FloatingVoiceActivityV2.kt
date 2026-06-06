@@ -658,7 +658,11 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         restartPending = true
         handler.postDelayed({
             restartPending = false
-            if (!isFinishing && voiceAdapter.currentState.value == ConversationState.IDLE) {
+            // isListening：ASR 引擎正在运行（含"已启动但用户尚未开口"的等待阶段）。
+            // 若为 true，说明上一轮重启已经生效，无需再次重启，防止死循环杀掉 ASR。
+            if (!isFinishing
+                && !voiceAdapter.isListening
+                && voiceAdapter.currentState.value == ConversationState.IDLE) {
                 Log.i(TAG, "🔄 自动开始下一轮对话")
                 resultText.text = ""
                 responseText.text = ""
