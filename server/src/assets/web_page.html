@@ -305,6 +305,16 @@
     .stage-line.done { color: #58be6a; }
     .stage-line.active::after { content: '⋯'; animation: dots 1.2s infinite; }
     @keyframes dots { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .project-workflow {
+      background: var(--panel);
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.65;
+      min-height: 112px;
+      padding: 18px 22px;
+      margin-top: 10px !important;
+      white-space: pre-wrap;
+    }
     .project-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -624,6 +634,83 @@
       padding: 20px 0 32px;
     }
 
+    /* ===== Agent 自动化页（网页版同步 APK 入口，不模拟原生权限） ===== */
+    .agent-center-page {
+      padding: 20px;
+      gap: 12px;
+    }
+    .agent-center-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .agent-center-subtitle {
+      margin: 0 0 8px;
+      color: var(--ink-faint);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .agent-step-card {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .agent-step-head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .agent-step-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      border: 1px solid var(--ink-faint);
+      color: var(--ink-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 24px;
+      font-size: 14px;
+    }
+    .agent-step-title {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .agent-step-status {
+      color: var(--ink-faint);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+    .agent-step-note {
+      color: var(--ink-faint);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 8px;
+    }
+    .agent-step-action {
+      width: 100%;
+      height: 42px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--secondary-btn);
+      color: var(--link);
+      cursor: pointer;
+    }
+    .agent-step-action.primary {
+      height: 48px;
+      background: var(--badge-info-bg);
+      font-weight: 700;
+    }
+    .agent-center-footer {
+      color: var(--ink-faint);
+      font-size: 12px;
+      line-height: 1.65;
+      margin: 10px 0 0;
+    }
+
     /* ===== 我的页 APK 推广块 ===== */
     .apk-promo {
       background: var(--panel-2);
@@ -777,6 +864,19 @@
     .modal .btn-confirm { background: var(--brand); color: var(--brand-ink); }
     .modal .btn-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
     .modal .error-text { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+    .modal-pre {
+      background: var(--bg-hint);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.65;
+      max-height: 50vh;
+      overflow: auto;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .agent-list {
       display: grid;
       gap: 8px;
@@ -949,13 +1049,72 @@
         <div class="stage-line" id="stageBuildText">3. 编译打包：等待</div>
         <div class="stage-line" id="stageDeliverText">4. 交付下载：等待</div>
       </div>
+      <div class="project-workflow" id="projectWorkflowText">通用项目工作流
+1. 项目准备
+2. 读取文档
+3. 执行任务
+4. 验证保存
+5. 共享动作
+
+当前阶段：待提交需求
+Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <div class="project-grid">
         <button id="projectContinueBtn">继续开发</button>
         <button id="projectBuildBtn">生成 APK</button>
         <button id="projectRecordBtn">进度记录</button>
+        <button id="projectGitBtn">Git 仓库</button>
         <button id="projectSettingsBtn">模型设置</button>
       </div>
       <div class="project-history" id="projectHistoryText">暂无进度记录</div>
+    </div>
+
+    <!-- Agent 自动化页 -->
+    <div id="agentPage" class="page agent-center-page">
+      <h2 class="agent-center-title">Agent 自动化</h2>
+      <p class="agent-center-subtitle">APK 可以在任意 App 唤起悬浮球，让 AI 自动操作手机完成任务。网页版保留镜像入口和状态说明，不模拟 Android 原生权限。</p>
+      <div class="agent-step-card">
+        <div class="agent-step-head">
+          <span class="agent-step-dot">○</span>
+          <div>
+            <div class="agent-step-title">步骤 1：悬浮窗权限</div>
+            <div class="agent-step-status">网页不可授权，请在 Android APK 中开启。</div>
+          </div>
+        </div>
+        <button class="agent-step-action" type="button" data-native-note="悬浮窗权限只能在 Android 系统设置中授权。">前往授权悬浮窗</button>
+      </div>
+      <div class="agent-step-card">
+        <div class="agent-step-head">
+          <span class="agent-step-dot">○</span>
+          <div>
+            <div class="agent-step-title">步骤 2：无障碍服务</div>
+            <div class="agent-step-status">网页不可开启，请在 Android APK 中进入系统设置。</div>
+          </div>
+        </div>
+        <div class="agent-step-note">开启路径：设置 -> 无障碍 -> 已下载的应用 -> Elon Speed -> 开启</div>
+        <button class="agent-step-action" type="button" data-native-note="无障碍服务是 Android 原生能力，网页端不能代开。">前往无障碍设置</button>
+      </div>
+      <div class="agent-step-card">
+        <div class="agent-step-head">
+          <span class="agent-step-dot">○</span>
+          <div>
+            <div class="agent-step-title">步骤 3：悬浮球</div>
+            <div class="agent-step-status">请在 Android APK 中启动或关闭。</div>
+          </div>
+        </div>
+        <button class="agent-step-action primary" type="button" data-native-note="悬浮球悬停、单击语音输入、双击文字输入都属于 APK 原生交互。">启动悬浮球</button>
+      </div>
+      <div class="agent-step-card">
+        <div class="agent-step-head">
+          <span class="agent-step-dot">○</span>
+          <div>
+            <div class="agent-step-title">步骤 4：AI 链路（可选）</div>
+            <div class="agent-step-status">默认走服务器 CLI；高级配置请使用 APK。</div>
+          </div>
+        </div>
+        <div class="agent-step-note">如需自定义 AI（混元 / 通义 / DeepSeek / OpenAI）或备用服务器，进入 APK 的 Agent 高级配置。</div>
+        <button class="agent-step-action" type="button" id="agentOpenSettingsBtn">打开 AI 代理设置</button>
+      </div>
+      <p class="agent-center-footer">悬浮球悬停在屏幕上，单击语音输入任务，双击文字输入。返回本页可随时关闭。</p>
     </div>
 
     <!-- 我的页 -->
@@ -1072,6 +1231,9 @@
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
+      <button class="profile-row" id="agentAutomationRow">
+        <span>Agent 自动化</span><span class="arrow">›</span>
+      </button>
       <button class="profile-row" id="ttsVoiceRow">
         <span>AI 回复语音</span><span class="arrow">APK 中切换</span>
       </button>
@@ -1080,6 +1242,12 @@
       </button>
       <button class="profile-row" id="projectPlazaRow">
         <span>项目广场</span><span class="arrow">›</span>
+      </button>
+      <button class="profile-row" id="sharePromotionRow">
+        <span>分享推广</span><span class="arrow">复制链接</span>
+      </button>
+      <button class="profile-row" id="importGuestRow">
+        <span>导入游客记录</span><span class="arrow">APK 中处理</span>
       </button>
       <button class="profile-row" id="checkUpdateRow">
         <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
@@ -1101,7 +1269,7 @@
   <nav class="tabs-bar">
     <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="会话区" style="position:relative">
       <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
-      <span>会话</span>
+      <span>好友</span>
       <span id="tabChatBadge" style="display:none;position:absolute;top:4px;right:calc(50% - 22px);background:#E53935;color:#fff;font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;line-height:16px;text-align:center;padding:0 3px;"></span>
     </button>
     <button class="tab" data-tab="projectPage" data-title="项目">
@@ -1193,6 +1361,28 @@
   </div>
 </div>
 
+<!-- ============ Git 仓库对话框 ============ -->
+<div class="modal-mask" id="projectGitMask">
+  <div class="modal" style="max-height:76vh;display:flex;flex-direction:column;gap:12px">
+    <h2>Git 仓库</h2>
+    <div class="modal-pre" id="projectGitContent">加载中...</div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="closeProjectGitBtn">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 网页原生能力提示 ============ -->
+<div class="modal-mask" id="nativeOnlyMask">
+  <div class="modal">
+    <h2>需要 Android APK</h2>
+    <p id="nativeOnlyText" style="color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0">这个能力需要在 Android APK 中使用。</p>
+    <div class="actions">
+      <button type="button" class="btn-confirm" id="nativeOnlyCloseBtn">知道了</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ AI 代理设置对话框 ============ -->
 <div class="modal-mask" id="agentMask">
   <form class="modal" id="agentForm">
@@ -1257,9 +1447,11 @@
   const stageBuildText = $('stageBuildText');
   const stageDeliverText = $('stageDeliverText');
   const projectHistoryText = $('projectHistoryText');
+  const projectWorkflowText = $('projectWorkflowText');
   const projectContinueBtn = $('projectContinueBtn');
   const projectBuildBtn = $('projectBuildBtn');
   const projectRecordBtn = $('projectRecordBtn');
+  const projectGitBtn = $('projectGitBtn');
   const projectSettingsBtn = $('projectSettingsBtn');
 
   const profileAvatar = $('profileAvatar');
@@ -1274,6 +1466,10 @@
   const ttsVoiceRow = $('ttsVoiceRow');
   const ttsVoiceMask = $('ttsVoiceMask');
   const ttsVoiceCloseBtn = $('ttsVoiceCloseBtn');
+  const agentAutomationRow = $('agentAutomationRow');
+  const agentOpenSettingsBtn = $('agentOpenSettingsBtn');
+  const sharePromotionRow = $('sharePromotionRow');
+  const importGuestRow = $('importGuestRow');
   const cancelDeleteBtn = $('cancelDeleteBtn');
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
@@ -1323,6 +1519,12 @@
   const progressLogMask = $('progressLogMask');
   const progressLogContent = $('progressLogContent');
   const closeProgressLogBtn = $('closeProgressLogBtn');
+  const projectGitMask = $('projectGitMask');
+  const projectGitContent = $('projectGitContent');
+  const closeProjectGitBtn = $('closeProjectGitBtn');
+  const nativeOnlyMask = $('nativeOnlyMask');
+  const nativeOnlyText = $('nativeOnlyText');
+  const nativeOnlyCloseBtn = $('nativeOnlyCloseBtn');
 
   const downloadApkBtn = $('downloadApkBtn');
   const copyLinkBtn = $('copyLinkBtn');
@@ -1373,6 +1575,51 @@
     busy = !!value;
     sendBtn.disabled = busy || !currentProject;
     if (!busy) stageHint.textContent = '点击输入需求，开发进度会自动记录到项目页。';
+  }
+  function showNativeOnly(message) {
+    nativeOnlyText.textContent = message || '这个能力需要在 Android APK 中使用。';
+    nativeOnlyMask.classList.add('active');
+  }
+  function defaultWorkflowText(stage) {
+    return [
+      '通用项目工作流',
+      '1. 项目准备',
+      '2. 读取文档',
+      '3. 执行任务',
+      '4. 验证保存',
+      '5. 共享动作',
+      '',
+      '当前阶段：' + (stage || '待提交需求'),
+      'Codex 每次任务都会重新读取项目文档，不靠记忆猜。'
+    ].join('\n');
+  }
+  function formatProjectGitStatus(data) {
+    const git = data.git || {};
+    const deploy = data.deploy_key || {};
+    const remote = git.remote_check || {};
+    const workflow = data.workflow || {};
+    const steps = Array.isArray(workflow.steps) && workflow.steps.length
+      ? workflow.steps
+      : ['项目准备：确认项目路径、Git 仓库、远端和写权限。', '读取文档：优先读取项目说明文档。', '执行任务：按项目技术栈修改代码。', '验证保存：运行检查、commit，并在可用时 push。', '共享动作：合并、版本号和发布必须串行。'];
+    const lines = [
+      '项目 ID：' + (data.project_id || (currentProject && currentProject.id) || ''),
+      '来源：' + (data.source_type || ''),
+      '工作区：' + (data.workspace || ''),
+      '',
+      'Git：' + (git.has_git ? '已初始化' : '未初始化'),
+      '远端：' + (git.origin || '未配置'),
+      '分支：' + (git.branch || '未知'),
+      '远端检查：' + (remote.message || (remote.ok === true ? '可访问' : remote.ok === false ? '不可访问' : '未检查')),
+      'Deploy Key：' + (deploy.exists ? '已生成' : '未生成'),
+      deploy.github_deploy_keys_url ? 'GitHub Deploy Keys：' + deploy.github_deploy_keys_url : '',
+      '',
+      workflow.title || '通用项目工作流',
+      ...(steps.map((step, index) => (index + 1) + '. ' + step)),
+      '',
+      'Codex CLI 规则',
+      workflow.codex_memory || '服务器每次任务都会注入通用流程，并要求读取当前项目文档。'
+    ];
+    return lines.filter((line) => line !== '').join('\n');
   }
   function formatTime(iso) {
     if (!iso) return '';
@@ -1516,6 +1763,10 @@
   tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
   backBtn.addEventListener('click', () => {
+    if ($('agentPage') && $('agentPage').classList.contains('active')) {
+      switchTab('profilePage');
+      return;
+    }
     // 退出当前项目，回到会话列表
     if (socket) { try { socket.close(); } catch {} socket = null; }
     currentProject = null;
@@ -1549,6 +1800,38 @@
   });
   ttsVoiceMask.addEventListener('click', (e) => {
     if (e.target === ttsVoiceMask) ttsVoiceMask.classList.remove('active');
+  });
+  nativeOnlyCloseBtn.addEventListener('click', () => nativeOnlyMask.classList.remove('active'));
+  nativeOnlyMask.addEventListener('click', (e) => {
+    if (e.target === nativeOnlyMask) nativeOnlyMask.classList.remove('active');
+  });
+  document.querySelectorAll('[data-native-note]').forEach((button) => {
+    button.addEventListener('click', () => showNativeOnly(button.dataset.nativeNote));
+  });
+  function showAgentCenter() {
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'profilePage'));
+    pages.forEach((p) => p.classList.toggle('active', p.id === 'agentPage'));
+    currentTab = 'profilePage';
+    inputBar.classList.remove('active');
+    backBtn.style.display = '';
+    voiceCallBtn.style.display = 'none';
+    addBtn.style.display = 'none';
+    searchBtn.style.display = 'none';
+    topTitle.textContent = 'Agent 自动化';
+  }
+  agentAutomationRow.addEventListener('click', showAgentCenter);
+  agentOpenSettingsBtn.addEventListener('click', openAgentDialog);
+  sharePromotionRow.addEventListener('click', async () => {
+    const url = apkUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      showNativeOnly('APK 下载链接已复制，可以发给其他人安装：' + url);
+    } catch {
+      showNativeOnly('复制失败，请在“一龙 APK”卡片中手动复制下载链接：' + url);
+    }
+  });
+  importGuestRow.addEventListener('click', () => {
+    showNativeOnly('导入游客记录需要读取本机 APK 游客数据，请在 Android APK 的“我的”页处理。');
   });
 
   // ====== 会话/项目列表 ======
@@ -1641,6 +1924,7 @@
   function resetProjectPage() {
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
+    projectWorkflowText.textContent = defaultWorkflowText('待提交需求');
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';
       el.textContent = STAGE_NAMES[i] + '：等待';
@@ -1662,6 +1946,7 @@
       '更新：' + (p.updated_at || '')
     ].filter(Boolean).join('\n');
     projectOverviewText.textContent = overview;
+    projectWorkflowText.textContent = defaultWorkflowText(currentStageText.textContent);
   }
 
   // ====== 聊天气泡 ======
@@ -2712,6 +2997,36 @@
   });
   closeProgressLogBtn.addEventListener('click', () => progressLogMask.classList.remove('active'));
   progressLogMask.addEventListener('click', (e) => { if (e.target === progressLogMask) progressLogMask.classList.remove('active'); });
+  closeProjectGitBtn.addEventListener('click', () => projectGitMask.classList.remove('active'));
+  projectGitMask.addEventListener('click', (e) => { if (e.target === projectGitMask) projectGitMask.classList.remove('active'); });
+  projectGitBtn.addEventListener('click', async () => {
+    if (!currentProject || !currentUser) {
+      showNativeOnly('请先进入一个项目，再查看 Git 仓库。');
+      return;
+    }
+    projectGitContent.textContent = '加载中...';
+    projectGitMask.classList.add('active');
+    try {
+      const url = '/api/user/' + encodeURIComponent(currentUser.id)
+        + '/projects/' + encodeURIComponent(currentProject.id)
+        + '/git/status?title=' + encodeURIComponent(currentProject.name || '');
+      const res = await api(url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      projectGitContent.textContent = formatProjectGitStatus(data);
+      if (data.workflow && Array.isArray(data.workflow.steps)) {
+        projectWorkflowText.textContent = [
+          data.workflow.title || '通用项目工作流',
+          ...data.workflow.steps.map((step, index) => (index + 1) + '. ' + String(step).split('：')[0]),
+          '',
+          '当前阶段：' + (currentStageText.textContent || '准备就绪'),
+          'Codex 每次任务都会重新读取项目文档，不靠记忆猜。'
+        ].join('\n');
+      }
+    } catch (err) {
+      projectGitContent.textContent = '读取 Git 状态失败：' + ((err && err.message) ? err.message : '请稍后重试');
+    }
+  });
   projectSettingsBtn.addEventListener('click', openAgentDialog);
 
   // ====== 启动 ======
