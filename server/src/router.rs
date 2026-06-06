@@ -86,9 +86,13 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/nodes", get(node_api::list_nodes))
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
-        .route("/api/agent-balloon/ensure", post(agent_balloon::ensure_balloon_project))
+        .route(
+            "/api/agent-balloon/ensure",
+            post(agent_balloon::ensure_balloon_project),
+        )
         .route("/api/llm/chat", post(lm_chat::lm_chat_handler))
         .route("/api/me/nodes", get(node_api::my_nodes))
+        .route("/api/me/nodes/register", post(node_api::register_node))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
         // ───────────────────────────────────────────────────────────────────────
@@ -436,10 +440,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/voice/tts/catalog",
             get(voice_tts_api::catalog_handler),
         )
-        .route(
-            "/api/voice/tts",
-            post(voice_tts_api::synthesize_handler),
-        )
+        .route("/api/voice/tts", post(voice_tts_api::synthesize_handler))
         // ── 用户头像（公开查看 / 登录后上传）─────────────────────────────────
         .route("/api/users/:user_id/avatar", get(user_api::get_user_avatar))
         .route(
