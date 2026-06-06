@@ -11,6 +11,7 @@
   <meta name="apple-mobile-web-app-title" content="一龙" />
   <link rel="apple-touch-icon" href="data:image/png;base64,__BRAND_PNG_B64__" />
   <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/assets/project_plaza.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -1125,12 +1126,9 @@
       <button class="profile-row" id="nodeMarketRow">
         <span>节点算力市场</span><span class="arrow">›</span>
       </button>
-      <!-- 项目广场入口（网页端暂未实现广场列表 UI，仅 APK 端可用，因此先隐藏避免误用） -->
-      <!--
       <button class="profile-row" id="projectPlazaRow">
         <span>项目广场</span><span class="arrow">›</span>
       </button>
-      -->
       <button class="profile-row" id="checkUpdateRow">
         <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
       </button>
@@ -1328,7 +1326,7 @@
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
   const nodeMarketRow = $('nodeMarketRow');
-  const projectPlazaRow = $('projectPlazaRow'); // 隐藏入口，元素可能不存在
+  const projectPlazaRow = $('projectPlazaRow');
   const usagePeriodText = $('usagePeriodText');
   const usageRemainingText = $('usageRemainingText');
   const usageRemainingCaption = $('usageRemainingCaption');
@@ -2475,12 +2473,18 @@
   aiSettingsRow.addEventListener('click', openAgentDialog);
   modelBtn.addEventListener('click', openAgentDialog);
   if (nodeMarketRow) nodeMarketRow.addEventListener('click', openNodeMarketDialog);
-  if (projectPlazaRow) {
-    projectPlazaRow.addEventListener('click', () => {
-      // 网页侧同步提供项目广场入口；审批管理以 APK 体验为主。
-      window.open('/api/store/projects?limit=30', '_blank', 'noopener');
-    });
-  }
+  window.ElonWebApp = {
+    api,
+    escapeHtml,
+    getToken: () => token,
+    getCurrentUser: () => currentUser,
+    getProjects: () => projects.slice(),
+    reloadProjects: loadProjects,
+    openProject: (project) => {
+      switchTab('chatPage');
+      selectProject(project);
+    }
+  };
 
   // ====== AI 记忆列表 ======
   const CATEGORY_COLORS = { preference: '#81B3D9', profile: '#58BE6A', goal: '#FCD34D', fact: '#6F7785' };
@@ -2833,6 +2837,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<script src="/assets/project_plaza.js"></script>
 </body>
 </html>
 
