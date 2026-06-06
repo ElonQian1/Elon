@@ -15,6 +15,8 @@ use crate::{
     voice_tts_catalog::{ResolvedTtsStyle, TtsProvider},
 };
 
+const TTS_CACHE_VERSION: &str = "distinct_voice_v2";
+
 #[derive(Debug, Clone)]
 pub struct TtsWorkerConfig {
     pub base_url: String,
@@ -60,11 +62,16 @@ pub struct TtsAudio {
     pub bytes: Vec<u8>,
     pub content_type: String,
     pub cache_status: &'static str,
+    pub worker: Option<String>,
+    pub worker_voice: Option<String>,
+    pub worker_requested_voice: Option<String>,
+    pub worker_fallback: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkerRequest<'a> {
+    cache_version: &'a str,
     provider: &'a str,
     text: &'a str,
     original_text: &'a str,
@@ -89,6 +96,15 @@ struct WorkerJsonResponse {
     mime: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CachedAudioMeta {
+    worker: Option<String>,
+    worker_voice: Option<String>,
+    worker_requested_voice: Option<String>,
+    worker_fallback: Option<bool>,
+}
+
 pub async fn synthesize(
     state: &Arc<AppState>,
     cfg: &TtsWorkerConfig,
@@ -98,6 +114,7 @@ pub async fn synthesize(
 ) -> Result<TtsAudio> {
     let provider = effective_provider(cfg, style).as_worker_id();
     let worker_req = WorkerRequest {
+        cache_version: TTS_CACHE_VERSION,
         provider,
         text: spoken_text,
         original_text,
@@ -166,6 +183,7 @@ async fn call_worker(
         .to_string();
 
     if content_type.starts_with("application/json") {
+        let meta = audio_meta_from_headers(response.headers());
         let parsed: WorkerJsonResponse = response
             .json()
             .await
@@ -177,9 +195,14 @@ async fn call_worker(
             bytes,
             content_type: parsed.mime.unwrap_or_else(|| "audio/wav".to_string()),
             cache_status: "miss",
+            worker: meta.worker,
+            worker_voice: meta.worker_voice,
+            worker_requested_voice: meta.worker_requested_voice,
+            worker_fallback: meta.worker_fallback,
         });
     }
 
+    let meta = audio_meta_from_headers(response.headers());
     let bytes = response
         .bytes()
         .await
@@ -189,7 +212,30 @@ async fn call_worker(
         bytes,
         content_type,
         cache_status: "miss",
+        worker: meta.worker,
+        worker_voice: meta.worker_voice,
+        worker_requested_voice: meta.worker_requested_voice,
+        worker_fallback: meta.worker_fallback,
     })
+}
+
+fn audio_meta_from_headers(headers: &reqwest::header::HeaderMap) -> CachedAudioMeta {
+    CachedAudioMeta {
+        worker: header_string(headers, "x-elon-tts-worker"),
+        worker_voice: header_string(headers, "x-elon-tts-worker-voice"),
+        worker_requested_voice: header_string(headers, "x-elon-tts-worker-requested-voice"),
+        worker_fallback: header_string(headers, "x-elon-tts-worker-fallback")
+            .map(|value| value.eq_ignore_ascii_case("true")),
+    }
+}
+
+fn header_string(headers: &reqwest::header::HeaderMap, name: &'static str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn cache_key(worker_req: &WorkerRequest<'_>) -> Result<String> {
@@ -210,10 +256,15 @@ async fn read_cache(state: &Arc<AppState>, key: &str) -> Result<Option<TtsAudio>
         let path = dir.join(name);
         if fs::metadata(&path).await.is_ok() {
             let bytes = fs::read(path).await.context("读取 TTS 缓存失败")?;
+            let meta = read_cache_meta(&dir).await.unwrap_or_default();
             return Ok(Some(TtsAudio {
                 bytes,
                 content_type: content_type.to_string(),
                 cache_status: "hit",
+                worker: meta.worker,
+                worker_voice: meta.worker_voice,
+                worker_requested_voice: meta.worker_requested_voice,
+                worker_fallback: meta.worker_fallback,
             }));
         }
     }
@@ -229,7 +280,26 @@ async fn write_cache(state: &Arc<AppState>, key: &str, audio: &TtsAudio) -> Resu
     fs::write(path, &audio.bytes)
         .await
         .context("写入 TTS 缓存失败")?;
+    let meta = CachedAudioMeta {
+        worker: audio.worker.clone(),
+        worker_voice: audio.worker_voice.clone(),
+        worker_requested_voice: audio.worker_requested_voice.clone(),
+        worker_fallback: audio.worker_fallback,
+    };
+    let meta_bytes = serde_json::to_vec(&meta).context("序列化 TTS 缓存元数据失败")?;
+    fs::write(dir.join("meta.json"), meta_bytes)
+        .await
+        .context("写入 TTS 缓存元数据失败")?;
     Ok(())
+}
+
+async fn read_cache_meta(dir: &std::path::Path) -> Result<CachedAudioMeta> {
+    let path = dir.join("meta.json");
+    if fs::metadata(&path).await.is_err() {
+        return Ok(CachedAudioMeta::default());
+    }
+    let bytes = fs::read(path).await.context("读取 TTS 缓存元数据失败")?;
+    serde_json::from_slice(&bytes).context("解析 TTS 缓存元数据失败")
 }
 
 fn cache_dir(state: &Arc<AppState>, key: &str) -> PathBuf {

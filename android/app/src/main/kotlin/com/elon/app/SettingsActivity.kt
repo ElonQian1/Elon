@@ -106,10 +106,11 @@ class SettingsActivity : AppCompatActivity() {
     private fun setupTtsVoiceSection() {
         refreshTtsVoiceSummary()
         findViewById<Button>(R.id.ttsVoiceButton).setOnClickListener {
-            VoiceTtsVoicePicker.show(this) { selected ->
-                refreshTtsVoiceSummary()
-                previewTtsVoice(selected)
-            }
+            VoiceTtsVoicePicker.show(
+                context = this,
+                onVoiceChanged = { refreshTtsVoiceSummary() },
+                onPreviewVoice = { selected -> previewTtsVoice(selected) }
+            )
         }
     }
 
@@ -123,7 +124,11 @@ class SettingsActivity : AppCompatActivity() {
         val speaker = voicePreviewSpeaker ?: VoiceSpeaker(this, respectUserToggle = false).also {
             voicePreviewSpeaker = it
         }
-        speaker.speak(selected.previewText)
+        speaker.speak(
+            text = selected.previewText,
+            profile = VoiceTtsEmotion.profileFor(""),
+            voiceIdOverride = selected.id
+        )
     }
 
     // ── 语音输入模式切换 ──────────────────────

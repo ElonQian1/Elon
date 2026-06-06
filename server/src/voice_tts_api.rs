@@ -190,6 +190,26 @@ fn audio_response(audio: voice_tts_worker::TtsAudio, style: &ResolvedTtsStyle) -
     insert_header(headers, "x-elon-tts-emotion", style.emotion.id);
     insert_header(headers, "x-elon-tts-intensity", style.intensity.id);
     insert_header(headers, "x-elon-tts-cache", audio.cache_status);
+    if let Some(worker) = audio.worker.as_deref() {
+        insert_header(headers, "x-elon-tts-worker", worker);
+    }
+    if let Some(worker_voice) = audio.worker_voice.as_deref() {
+        insert_header(headers, "x-elon-tts-worker-voice", worker_voice);
+    }
+    if let Some(requested_voice) = audio.worker_requested_voice.as_deref() {
+        insert_header(
+            headers,
+            "x-elon-tts-worker-requested-voice",
+            requested_voice,
+        );
+    }
+    if let Some(fallback) = audio.worker_fallback {
+        insert_header(
+            headers,
+            "x-elon-tts-worker-fallback",
+            if fallback { "true" } else { "false" },
+        );
+    }
     response
 }
 

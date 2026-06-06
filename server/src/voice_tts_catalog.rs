@@ -403,6 +403,19 @@ mod tests {
     }
 
     #[test]
+    fn voice_catalog_uses_distinct_speaker_prompts() {
+        let voices = voices();
+        let mut prompts = std::collections::HashSet::new();
+        for voice in voices {
+            assert!(
+                prompts.insert(voice.prompt_audio),
+                "duplicate prompt_audio for voice {}",
+                voice.id
+            );
+        }
+    }
+
+    #[test]
     fn strong_emotions_route_to_index_by_default() {
         let style = resolve_style(None, Some("wronged_crying"), Some("immersive"), None, "");
         assert_eq!(style.provider, TtsProvider::IndexTts2);
