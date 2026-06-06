@@ -346,7 +346,7 @@ impl Store {
         let conn = self.conn()?;
         let (target, role) = conn
             .query_row(
-                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, pm.role
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, p.node_id, pm.role
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -359,8 +359,9 @@ impl Store {
                             workspace_key: row.get(2)?,
                             source_type: row.get(3)?,
                             workspace_path: row.get(4)?,
+                            node_id: row.get(5)?,
                         },
-                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
                     ))
                 },
             )

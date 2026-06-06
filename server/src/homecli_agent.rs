@@ -72,6 +72,19 @@ impl AgentManager {
         extra_args: Vec<String>,
         prompt: String,
     ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        self.dispatch_cli_prompt_in_cwd(agent_id, cli, extra_args, None, prompt)
+            .await
+    }
+
+    /// 把 AI 提示发给 PC agent，并可指定 PC 侧工作目录。
+    pub async fn dispatch_cli_prompt_in_cwd(
+        &self,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        cwd: Option<String>,
+        prompt: String,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
         let agent = agents
@@ -85,6 +98,7 @@ impl AgentManager {
                 req_id: req_id.clone(),
                 cli,
                 extra_args,
+                cwd,
                 prompt,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;

@@ -198,6 +198,7 @@ impl Store {
                 repo_url: None,
                 branch: None,
                 workspace_path: None,
+                node_id: None,
                 status: "active".into(),
                 role: "owner".into(),
                 last_task_status: None,
@@ -217,6 +218,7 @@ impl Store {
         name: &str,
         description: Option<&str>,
         workspace_path: &str,
+        node_id: Option<&str>,
     ) -> Result<CreateProjectResult> {
         let name = name.trim();
         if name.is_empty() {
@@ -228,11 +230,27 @@ impl Store {
         }
         let template = "local";
         let source_type = "local_path";
+        let node_id = clean_optional(node_id);
 
         let now = now();
         let conn = self.conn()?;
 
-        if let Some(project) = find_owner_project_by_name(&conn, user_id, name)? {
+        if let Some(mut project) = find_owner_project_by_name(&conn, user_id, name)? {
+            conn.execute(
+                "UPDATE projects
+                 SET template = 'local',
+                     source_type = 'local_path',
+                     workspace_path = ?2,
+                     node_id = ?3,
+                     updated_at = ?4
+                 WHERE id = ?1",
+                params![&project.id, workspace_path, node_id, now],
+            )?;
+            project.template = "local".into();
+            project.source_type = "local_path".into();
+            project.workspace_path = Some(workspace_path.to_string());
+            project.node_id = node_id.map(ToOwned::to_owned);
+            project.updated_at = now;
             return Ok(CreateProjectResult {
                 project,
                 reused_existing: true,
@@ -245,10 +263,10 @@ impl Store {
         let tx = conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO projects (
-                id, name, description, workspace_key, template, source_type, workspace_path,
+                id, name, description, workspace_key, template, source_type, workspace_path, node_id,
                 status, created_by, created_at, updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', ?8, ?9, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?10, ?10)",
             params![
                 id,
                 name,
@@ -257,6 +275,7 @@ impl Store {
                 template,
                 source_type,
                 workspace_path,
+                node_id,
                 user_id,
                 now
             ],
@@ -276,6 +295,7 @@ impl Store {
                 serde_json::json!({
                     "name": name,
                     "workspace_path": workspace_path,
+                    "node_id": node_id,
                 }).to_string(),
                 now
             ],
@@ -293,6 +313,7 @@ impl Store {
                 repo_url: None,
                 branch: None,
                 workspace_path: Some(workspace_path.to_string()),
+                node_id: node_id.map(ToOwned::to_owned),
                 status: "active".into(),
                 role: "owner".into(),
                 last_task_status: None,
@@ -452,7 +473,7 @@ impl Store {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
-                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.status,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     pm.role,
                     (
                         SELECT t.status FROM tasks t
@@ -483,7 +504,7 @@ impl Store {
     pub fn get_project_access(&self, user_id: &str, project_id: &str) -> Result<ProjectAccess> {
         self.conn()?
             .query_row(
-                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, pm.role, p.status
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, p.node_id, pm.role, p.status
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -495,8 +516,9 @@ impl Store {
                         workspace_key: row.get(2)?,
                         source_type: row.get(3)?,
                         workspace_path: row.get(4)?,
-                        role: row.get(5)?,
-                        status: row.get(6)?,
+                        node_id: row.get(5)?,
+                        role: row.get(6)?,
+                        status: row.get(7)?,
                     })
                 },
             )
@@ -616,11 +638,12 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         repo_url: row.get(6)?,
         branch: row.get(7)?,
         workspace_path: row.get(8)?,
-        status: row.get(9)?,
-        role: row.get(10)?,
-        last_task_status: row.get(11)?,
-        last_apk_url: row.get(12)?,
-        updated_at: row.get(13)?,
+        node_id: row.get(9)?,
+        status: row.get(10)?,
+        role: row.get(11)?,
+        last_task_status: row.get(12)?,
+        last_apk_url: row.get(13)?,
+        updated_at: row.get(14)?,
     })
 }
 
@@ -632,7 +655,7 @@ fn find_owner_project_by_name(
     Ok(conn
         .query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
-                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.status,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     COALESCE(pm.role, 'owner') AS role,
                     (
                         SELECT t.status FROM tasks t
@@ -656,4 +679,60 @@ fn find_owner_project_by_name(
             project_summary_from_row,
         )
         .optional()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn temp_store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon_store_external_project_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn register_external_project_persists_and_updates_node_binding() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-owner@example.com", "secret1", None, None)
+            .expect("user should be created");
+
+        let first = store
+            .register_external_project(
+                &user.id,
+                "PC Project",
+                Some("from pc"),
+                r"D:\rust\active-projects\one",
+                Some("node-a"),
+            )
+            .expect("external project should register");
+        assert!(!first.reused_existing);
+        assert_eq!(first.project.source_type, "local_path");
+        assert_eq!(first.project.node_id.as_deref(), Some("node-a"));
+
+        let second = store
+            .register_external_project(
+                &user.id,
+                "PC Project",
+                Some("from pc"),
+                r"D:\rust\active-projects\two",
+                Some("node-b"),
+            )
+            .expect("same external project should update");
+        assert!(second.reused_existing);
+        assert_eq!(
+            second.project.workspace_path.as_deref(),
+            Some(r"D:\rust\active-projects\two")
+        );
+        assert_eq!(second.project.node_id.as_deref(), Some("node-b"));
+
+        let access = store
+            .get_project_access(&user.id, &second.project.id)
+            .expect("project access should include node binding");
+        assert_eq!(access.node_id.as_deref(), Some("node-b"));
+    }
 }

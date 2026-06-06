@@ -341,6 +341,7 @@ pub async fn list_projects(State(state): State<Arc<AppState>>, headers: HeaderMa
                         "name": p.name,
                         "workspace_key": p.workspace_key,
                         "workspace_dir": workspace_dir,
+                        "node_id": p.node_id,
                         "source_type": p.source_type,
                         "template": p.template,
                         "status": p.status,

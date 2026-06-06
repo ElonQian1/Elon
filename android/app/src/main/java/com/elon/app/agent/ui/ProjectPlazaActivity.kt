@@ -783,12 +783,29 @@ class ProjectPlazaActivity : Activity() {
             setHintTextColor(Color.parseColor(TEXT_TERTIARY))
             maxLines = 3
         }
+        val publishCheck = CheckBox(this).apply {
+            text = "发布到项目广场"
+            textSize = 14f
+            isChecked = true
+            setTextColor(Color.parseColor(TEXT_PRIMARY))
+        }
+        val joinModeSpinner = Spinner(this).apply {
+            val labels = arrayOf("只读体验", "直接加入", "申请加入")
+            adapter = ArrayAdapter(
+                this@ProjectPlazaActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                labels,
+            )
+            setSelection(0)
+        }
         container.addView(nameInput)
         container.addView(pathInput)
         container.addView(descInput)
+        container.addView(publishCheck)
+        container.addView(joinModeSpinner)
         AlertDialog.Builder(this)
             .setTitle("注册本地项目")
-            .setMessage("把已存在的本机目录登记为云端项目。注册后该项目 owner=你，可通过『成员管理』邀请/审批其他用户加入。注意：路径必须存在于服务器/PC 节点上。")
+            .setMessage("把已存在的本机目录登记为云端项目。路径必须存在于服务器或在线 PC 节点上。")
             .setView(container)
             .setPositiveButton("注册") { _, _ ->
                 val n = nameInput.text.toString().trim()
@@ -798,18 +815,31 @@ class ProjectPlazaActivity : Activity() {
                     Toast.makeText(this, "名称和路径都不能为空", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                doRegisterExternal(n, p, d.ifEmpty { null })
+                val joinMode = when (joinModeSpinner.selectedItemPosition) {
+                    1 -> "open"
+                    2 -> "approval"
+                    else -> "readonly"
+                }
+                doRegisterExternal(n, p, d.ifEmpty { null }, publishCheck.isChecked, joinMode)
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun doRegisterExternal(name: String, path: String, description: String?) {
+    private fun doRegisterExternal(
+        name: String,
+        path: String,
+        description: String?,
+        isPublic: Boolean,
+        joinMode: String,
+    ) {
         scope.launch {
             val body = JSONObject().apply {
                 put("name", name)
                 put("workspace_path", path)
                 if (description != null) put("description", description)
+                put("is_public", isPublic)
+                put("join_mode", joinMode)
             }
             val result = withContext(Dispatchers.IO) {
                 postJson("${authService.getServerUrl()}/api/projects/external", body)

@@ -201,10 +201,11 @@ async fn run_relay_session(
                 req_id,
                 cli,
                 extra_args,
+                cwd,
                 prompt,
             } => {
                 let tx = out_tx.clone();
-                tokio::spawn(handle_cli_prompt(req_id, cli, extra_args, prompt, tx));
+                tokio::spawn(handle_cli_prompt(req_id, cli, extra_args, cwd, prompt, tx));
             }
 
             ServerToAgent::Ping { nonce } => {
@@ -247,18 +248,24 @@ async fn handle_cli_prompt(
     req_id: String,
     cli: String,
     extra_args: Vec<String>,
+    cwd: Option<String>,
     prompt: String,
     out: mpsc::UnboundedSender<Message>,
 ) {
-    info!("[relay-client] CliPrompt: cli={cli} req_id={req_id}");
-    let (exit_ok, error) = match run_cli_and_stream(&req_id, &cli, &extra_args, &prompt, &out).await
-    {
-        Ok(ok) => (ok, None),
-        Err(e) => {
-            warn!("[relay-client] CLI 执行失败: {e:#}");
-            (false, Some(e.to_string()))
-        }
-    };
+    info!(
+        "[relay-client] CliPrompt: cli={} cwd={} req_id={}",
+        cli,
+        cwd.as_deref().unwrap_or("<default>"),
+        req_id
+    );
+    let (exit_ok, error) =
+        match run_cli_and_stream(&req_id, &cli, &extra_args, cwd.as_deref(), &prompt, &out).await {
+            Ok(ok) => (ok, None),
+            Err(e) => {
+                warn!("[relay-client] CLI 执行失败: {e:#}");
+                (false, Some(e.to_string()))
+            }
+        };
     let done = AgentToServer::CliDone {
         req_id,
         exit_ok,
@@ -305,6 +312,7 @@ async fn run_cli_and_stream(
     req_id: &str,
     cli: &str,
     extra_args: &[String],
+    cwd: Option<&str>,
     prompt: &str,
     out: &mpsc::UnboundedSender<Message>,
 ) -> Result<bool> {
@@ -334,6 +342,9 @@ async fn run_cli_and_stream(
     };
     for arg in extra_args {
         cmd.arg(arg);
+    }
+    if let Some(cwd) = cwd.filter(|value| !value.trim().is_empty()) {
+        cmd.current_dir(cwd);
     }
     cmd.arg("-p").arg(prompt);
     cmd.stdout(std::process::Stdio::piped());

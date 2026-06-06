@@ -236,7 +236,7 @@ impl Store {
     pub fn list_all_projects_admin(&self) -> Result<Vec<AdminProjectDetail>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT p.id, p.name, p.workspace_key, p.workspace_path,
+            "SELECT p.id, p.name, p.workspace_key, p.workspace_path, p.node_id,
                     p.source_type, p.template, p.status,
                     u.id AS created_by_id,
                     COALESCE(u.email, u.phone, u.id) AS created_by_account,
@@ -274,16 +274,17 @@ impl Store {
                     workspace_key: row.get(2)?,
                     workspace_dir: String::new(), // handler 层填充
                     workspace_path: row.get(3)?,
-                    source_type: row.get(4)?,
-                    template: row.get(5)?,
-                    status: row.get(6)?,
-                    created_by_id: row.get(7)?,
-                    created_by_account: row.get(8)?,
-                    last_task_status: row.get(9)?,
-                    last_apk_url: row.get(10)?,
-                    updated_at: row.get(11)?,
-                    last_device_name: row.get(12)?,
-                    last_apk_version: row.get(13)?,
+                    node_id: row.get(4)?,
+                    source_type: row.get(5)?,
+                    template: row.get(6)?,
+                    status: row.get(7)?,
+                    created_by_id: row.get(8)?,
+                    created_by_account: row.get(9)?,
+                    last_task_status: row.get(10)?,
+                    last_apk_url: row.get(11)?,
+                    updated_at: row.get(12)?,
+                    last_device_name: row.get(13)?,
+                    last_apk_version: row.get(14)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

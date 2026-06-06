@@ -145,6 +145,7 @@ async fn run_with_workspace_mode(
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
             match run_via_pc_agent(
                 &agent_id,
+                None,
                 user_message,
                 preflight_note,
                 request_mode,
@@ -604,10 +605,32 @@ async fn run_with_workspace_mode(
 
 // ── PC agent 委托辅助函数 ─────────────────────────────────────────────────────
 
+pub async fn run_with_pc_agent_workspace(
+    agent_id: &str,
+    workspace_path: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    request_mode: AiCliRequestMode,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    run_via_pc_agent(
+        agent_id,
+        Some(workspace_path),
+        user_message,
+        preflight_note,
+        request_mode,
+        state,
+        tx,
+    )
+    .await
+}
+
 /// 把 AI 请求委托给通过 WS 连接的 PC agent（elon-pc-1），在 PC 上执行 Copilot CLI。
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
     agent_id: &str,
+    cwd: Option<&str>,
     user_message: &str,
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
@@ -640,7 +663,13 @@ async fn run_via_pc_agent(
 
     let (_, mut rx) = state
         .agent_manager
-        .dispatch_cli_prompt(agent_id, "copilot".into(), vec![], prompt)
+        .dispatch_cli_prompt_in_cwd(
+            agent_id,
+            "copilot".into(),
+            vec![],
+            cwd.map(ToOwned::to_owned),
+            prompt,
+        )
         .await?;
 
     let mut full_text = String::new();

@@ -55,6 +55,9 @@ pub enum ServerToAgent {
         /// 额外参数（在 -p/prompt 之前），可为空
         #[serde(default)]
         extra_args: Vec<String>,
+        /// 可选工作目录；为空时由 PC relay 使用自身默认工作目录
+        #[serde(default)]
+        cwd: Option<String>,
         /// 完整的提示内容
         prompt: String,
     },

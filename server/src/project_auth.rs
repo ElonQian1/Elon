@@ -116,6 +116,7 @@ pub fn project_access(
             workspace_key: project_id.to_string(),
             source_type: "local".to_string(),
             workspace_path: None,
+            node_id: None,
             role: "owner".to_string(),
             status: "active".to_string(),
         });

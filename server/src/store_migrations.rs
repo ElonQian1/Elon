@@ -39,6 +39,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     ),
     (18, "微信支付订单表", migration_v18),
     (19, "项目加入申请表（approval 审批流程）", migration_v19),
+    (20, "PC 本地项目绑定节点 ID", migration_v20),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -819,6 +820,20 @@ fn migration_v19(conn: &Connection) -> Result<()> {
             ON project_join_requests(project_id, status, created_at);
         CREATE INDEX IF NOT EXISTS idx_join_requests_user
             ON project_join_requests(user_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v20：PC 本地项目绑定节点 ID ────────────────────────────────────────────────
+
+fn migration_v20(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "projects", "node_id", "node_id TEXT")?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_projects_node_id
+          ON projects(node_id)
+          WHERE node_id IS NOT NULL;
         "#,
     )?;
     Ok(())

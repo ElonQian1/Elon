@@ -132,6 +132,8 @@ pub struct AdminProjectDetail {
     pub workspace_dir: String,
     /// local_path 类型项目在 DB 里记录的自定义路径
     pub workspace_path: Option<String>,
+    /// PC 本地项目绑定的节点 ID；为空表示服务器本机工作区
+    pub node_id: Option<String>,
     pub source_type: String,
     pub template: String,
     pub status: String,
@@ -311,6 +313,7 @@ pub struct ProjectSummary {
     pub repo_url: Option<String>,
     pub branch: Option<String>,
     pub workspace_path: Option<String>,
+    pub node_id: Option<String>,
     pub status: String,
     pub role: String,
     pub last_task_status: Option<String>,
@@ -325,6 +328,7 @@ pub struct ProjectAccess {
     pub workspace_key: String,
     pub source_type: String,
     pub workspace_path: Option<String>,
+    pub node_id: Option<String>,
     pub role: String,
     pub status: String,
 }
@@ -336,6 +340,7 @@ pub struct ProjectDeletionTarget {
     pub workspace_key: String,
     pub source_type: String,
     pub workspace_path: Option<String>,
+    pub node_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]

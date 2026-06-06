@@ -68,6 +68,28 @@ pub async fn run_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
+    if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+        let note = pc_project_note(pc_workspace, false);
+        let _ = tx.send(
+            WsMessage::progress(format!("正在连接 PC 节点 {} 处理本地项目。", agent_id)).to_json(),
+        );
+        if let Err(e) = ai_cli::run_with_pc_agent_workspace(
+            agent_id,
+            pc_workspace,
+            user_message,
+            Some(&note),
+            ai_cli::AiCliRequestMode::Execute,
+            state,
+            &tx,
+        )
+        .await
+        {
+            error!("PC 本地项目代理运行出错: {}", e);
+            let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+        }
+        return;
+    }
+
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
     let decision = intent_router::classify(user_message);
@@ -149,6 +171,28 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
+    if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+        let note = pc_project_note(pc_workspace, true);
+        let _ = tx.send(
+            WsMessage::progress(format!("正在连接 PC 节点 {} 规划本地项目。", agent_id)).to_json(),
+        );
+        if let Err(e) = ai_cli::run_with_pc_agent_workspace(
+            agent_id,
+            pc_workspace,
+            user_message,
+            Some(&note),
+            ai_cli::AiCliRequestMode::Plan,
+            state,
+            &tx,
+        )
+        .await
+        {
+            error!("PC 本地项目规划运行出错: {}", e);
+            let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+        }
+        return;
+    }
+
     let user_config_workspace = state.get_user_workspace(user_id);
     if let Err(e) = run_backend_with_workspace(
         user_id,
@@ -176,6 +220,30 @@ pub async fn plan_for_project_in_workspace(
         error!("项目级 AI 规划运行出错: {}", e);
         let _ = tx.send(WsMessage::error(e.to_string()).to_json());
     }
+}
+
+fn pc_project_binding(project: &ProjectAccess) -> Option<(&str, &str)> {
+    match (
+        project.node_id.as_deref(),
+        project.workspace_path.as_deref(),
+    ) {
+        (Some(agent_id), Some(workspace)) if !agent_id.is_empty() && !workspace.is_empty() => {
+            Some((agent_id, workspace))
+        }
+        _ => None,
+    }
+}
+
+fn pc_project_note(workspace: &str, planning: bool) -> String {
+    let mode = if planning {
+        "当前是 Plan 模式，只生成计划，不改文件、不运行发布。"
+    } else {
+        "当前是执行模式，可以按项目规则修改、验证、提交和发布。"
+    };
+    format!(
+        "当前项目绑定在 PC 节点本地工作区：{}。CLI 已以该目录作为当前工作目录启动；不要改到其他仓库。{}",
+        workspace, mode
+    )
 }
 
 async fn run_dispatch_with_workspace(
