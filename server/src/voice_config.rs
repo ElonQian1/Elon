@@ -99,11 +99,12 @@ pub struct RealtimeChatConfig {
 
 impl RealtimeChatConfig {
     pub fn from_env() -> Self {
+        let model = env::var("ELON_VOICE_REALTIME_CHAT_MODEL")
+            .unwrap_or_else(|_| "gpt-realtime".to_string());
         Self {
             ws_url: env::var("ELON_VOICE_REALTIME_CHAT_URL")
                 .unwrap_or_else(|_| "wss://api.openai.com/v1/realtime".to_string()),
-            model: env::var("ELON_VOICE_REALTIME_CHAT_MODEL")
-                .unwrap_or_else(|_| "gpt-realtime-2".to_string()),
+            model: normalize_realtime_chat_model(&model).to_string(),
             voice: env::var("ELON_VOICE_REALTIME_CHAT_VOICE")
                 .unwrap_or_else(|_| "marin".to_string()),
             api_key_env: env::var("ELON_VOICE_API_KEY_ENV")
@@ -125,5 +126,35 @@ impl RealtimeChatConfig {
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty())
+    }
+}
+
+fn normalize_realtime_chat_model(model: &str) -> &str {
+    match model.trim() {
+        // 早期内部配置误写为 gpt-realtime-2；官方 GA Realtime WebSocket
+        // 模型名是 gpt-realtime，继续传旧值会在建连阶段失败。
+        "gpt-realtime-2" => "gpt-realtime",
+        trimmed => trimmed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_realtime_chat_model;
+
+    #[test]
+    fn realtime_chat_model_uses_ga_default_name() {
+        assert_eq!(
+            normalize_realtime_chat_model("gpt-realtime"),
+            "gpt-realtime"
+        );
+    }
+
+    #[test]
+    fn realtime_chat_model_maps_legacy_invalid_alias() {
+        assert_eq!(
+            normalize_realtime_chat_model("gpt-realtime-2"),
+            "gpt-realtime"
+        );
     }
 }
