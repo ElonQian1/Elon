@@ -26,18 +26,12 @@ internal class VoiceSpeaker(
     companion object {
         private const val TAG = "VoiceSpeaker"
         private const val MAX_SPEAK_CHARS = 200
-        private const val PREFS_NAME = "elon"
-        private const val KEY_TTS_ENABLED = "tts_speak_enabled"
 
         fun isTtsEnabled(context: Context): Boolean =
-            context.applicationContext
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getBoolean(KEY_TTS_ENABLED, false)
+            VoiceTtsPreferences.isSpeakEnabled(context)
 
         fun setTtsEnabled(context: Context, enabled: Boolean) {
-            context.applicationContext
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putBoolean(KEY_TTS_ENABLED, enabled).apply()
+            VoiceTtsPreferences.setSpeakEnabled(context, enabled)
         }
     }
 

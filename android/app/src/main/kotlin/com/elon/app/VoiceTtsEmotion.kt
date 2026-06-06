@@ -6,6 +6,7 @@ internal data class VoiceTtsProfile(
     val id: String,
     val speechRate: Float,
     val pitch: Float,
+    // Final server voice is overridden by the user's VoiceTtsPreferences choice.
     val serverVoiceId: String,
     val serverEmotionId: String,
     val serverIntensity: String

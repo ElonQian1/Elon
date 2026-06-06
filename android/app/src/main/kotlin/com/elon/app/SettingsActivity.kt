@@ -35,6 +35,7 @@ class SettingsActivity : AppCompatActivity() {
     private data class AgentOption(val name: String, val label: String)
     private var availableAgents: List<AgentOption> = emptyList()
     private var codexCliOnly = true
+    private var voicePreviewSpeaker: VoiceSpeaker? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +51,7 @@ class SettingsActivity : AppCompatActivity() {
 
         setupModeToggle()
         setupVoiceModeToggle()
+        setupTtsVoiceSection()
         setupAsrChainSection()
         loadCurrentConfig()
 
@@ -98,6 +100,30 @@ class SettingsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshAsrChainSummary()
+    }
+
+    // ── AI 回复女声 ──────────────────────
+    private fun setupTtsVoiceSection() {
+        refreshTtsVoiceSummary()
+        findViewById<Button>(R.id.ttsVoiceButton).setOnClickListener {
+            VoiceTtsVoicePicker.show(this) { selected ->
+                refreshTtsVoiceSummary()
+                previewTtsVoice(selected)
+            }
+        }
+    }
+
+    private fun refreshTtsVoiceSummary() {
+        val selected = VoiceTtsVoiceCatalog.findById(VoiceTtsPreferences.getSelectedVoiceId(this))
+        findViewById<TextView>(R.id.ttsVoiceSummary).text =
+            "${selected.displayName} · ${selected.description}"
+    }
+
+    private fun previewTtsVoice(selected: VoiceTtsVoiceOption) {
+        val speaker = voicePreviewSpeaker ?: VoiceSpeaker(this, respectUserToggle = false).also {
+            voicePreviewSpeaker = it
+        }
+        speaker.speak(selected.previewText)
     }
 
     // ── 语音输入模式切换 ──────────────────────
@@ -343,6 +369,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        voicePreviewSpeaker?.release()
+        voicePreviewSpeaker = null
         scope.cancel()
     }
 }

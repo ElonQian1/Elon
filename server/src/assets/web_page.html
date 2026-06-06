@@ -1119,6 +1119,9 @@
       <button class="profile-row" id="aiSettingsRow">
         <span>AI 代理设置</span><span class="arrow">›</span>
       </button>
+      <button class="profile-row" id="ttsVoiceRow">
+        <span>AI 回复女声</span><span class="arrow">APK 中切换</span>
+      </button>
       <button class="profile-row" id="nodeMarketRow">
         <span>节点算力市场</span><span class="arrow">›</span>
       </button>
@@ -1218,6 +1221,17 @@
   </div>
 </div>
 
+<!-- ============ AI 回复女声提示 ============ -->
+<div class="modal-mask" id="ttsVoiceMask">
+  <div class="modal">
+    <h2>AI 回复女声</h2>
+    <p style="color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0">APK 已支持在设置里切换 5 个情感女声。网页端不模拟系统朗读和悬浮球播放，请在 Android APK 中选择并试听。</p>
+    <div class="actions">
+      <button type="button" class="btn-confirm" id="ttsVoiceCloseBtn">知道了</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ 进度记录对话框 ============ -->
 <div class="modal-mask" id="progressLogMask">
   <div class="modal" style="max-height:72vh;display:flex;flex-direction:column;gap:12px">
@@ -1307,6 +1321,9 @@
   const deleteConfirmError = $('deleteConfirmError');
   const voiceCallMask = $('voiceCallMask');
   const voiceCallCloseBtn = $('voiceCallCloseBtn');
+  const ttsVoiceRow = $('ttsVoiceRow');
+  const ttsVoiceMask = $('ttsVoiceMask');
+  const ttsVoiceCloseBtn = $('ttsVoiceCloseBtn');
   const cancelDeleteBtn = $('cancelDeleteBtn');
   const confirmDeleteBtn = $('confirmDeleteBtn');
   const aiSettingsRow = $('aiSettingsRow');
@@ -1574,6 +1591,15 @@
   });
   voiceCallMask.addEventListener('click', (e) => {
     if (e.target === voiceCallMask) voiceCallMask.classList.remove('active');
+  });
+  ttsVoiceRow.addEventListener('click', () => {
+    ttsVoiceMask.classList.add('active');
+  });
+  ttsVoiceCloseBtn.addEventListener('click', () => {
+    ttsVoiceMask.classList.remove('active');
+  });
+  ttsVoiceMask.addEventListener('click', (e) => {
+    if (e.target === ttsVoiceMask) ttsVoiceMask.classList.remove('active');
   });
 
   // ====== 会话/项目列表 ======

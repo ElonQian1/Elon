@@ -185,6 +185,37 @@
             android:textColorHint="@color/elon_text_tertiary"
             android:textSize="14sp" />
 
+        <!-- ── AI 回复女声 ── -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            android:text="AI 回复女声"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/ttsVoiceSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@color/elon_surface_subtle"
+            android:padding="10dp"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/ttsVoiceButton"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginBottom="20dp"
+            android:backgroundTint="@color/elon_button_secondary_bg"
+            android:text="切换女声"
+            android:textColor="@color/elon_button_secondary_text"
+            android:textSize="13sp" />
+
         <!-- ── 语音输入模式 ── -->
         <TextView
             android:layout_width="wrap_content"

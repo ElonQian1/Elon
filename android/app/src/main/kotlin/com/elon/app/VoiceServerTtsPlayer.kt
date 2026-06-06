@@ -55,13 +55,14 @@ internal class VoiceServerTtsPlayer(context: Context) {
             Log.w(TAG, "server TTS still in cooldown: remainingMs=${unavailableUntilMs - now}")
             return false
         }
-        val request = buildRequest(text, profile) ?: run {
+        val selectedVoiceId = VoiceTtsPreferences.getSelectedVoiceId(appContext)
+        val request = buildRequest(text, profile, selectedVoiceId) ?: run {
             Log.w(TAG, "server TTS request build failed")
             return false
         }
         Log.i(
             TAG,
-            "request server TTS voice=${profile.serverVoiceId} emotion=${profile.serverEmotionId} intensity=${profile.serverIntensity}"
+            "request server TTS voice=$selectedVoiceId emotion=${profile.serverEmotionId} intensity=${profile.serverIntensity} profileVoice=${profile.serverVoiceId}"
         )
         val call = http.newCall(request)
         val requestGeneration = begin(call)
@@ -126,11 +127,11 @@ internal class VoiceServerTtsPlayer(context: Context) {
         runCatching { http.connectionPool.evictAll() }
     }
 
-    private fun buildRequest(text: String, profile: VoiceTtsProfile): Request? {
+    private fun buildRequest(text: String, profile: VoiceTtsProfile, voiceId: String): Request? {
         val url = ServerUrlManager.getActive(appContext).trimEnd('/') + "/api/voice/tts"
         val json = JSONObject().apply {
             put("text", text)
-            put("voiceId", profile.serverVoiceId)
+            put("voiceId", voiceId)
             put("emotionId", profile.serverEmotionId)
             put("intensity", profile.serverIntensity)
             put("rewrite", true)
