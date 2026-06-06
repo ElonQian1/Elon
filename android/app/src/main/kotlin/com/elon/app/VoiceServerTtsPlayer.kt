@@ -47,6 +47,7 @@ internal class VoiceServerTtsPlayer(context: Context) {
     fun trySpeak(
         text: String,
         profile: VoiceTtsProfile,
+        voiceIdOverride: String? = null,
         onDone: () -> Unit,
         onFallback: () -> Unit
     ): Boolean {
@@ -55,7 +56,14 @@ internal class VoiceServerTtsPlayer(context: Context) {
             Log.w(TAG, "server TTS still in cooldown: remainingMs=${unavailableUntilMs - now}")
             return false
         }
-        val selectedVoiceId = VoiceTtsPreferences.getSelectedVoiceId(appContext)
+        val selectedVoiceId = voiceIdOverride
+            ?.trim()
+            ?.takeIf(VoiceTtsVoiceCatalog::isKnownVoiceId)
+            ?: VoiceTtsPreferences.getSelectedVoiceId(appContext)
+        if (VoiceTtsVoiceCatalog.isSystemVoiceId(selectedVoiceId)) {
+            Log.i(TAG, "skip server TTS because Android system TTS is selected")
+            return false
+        }
         val request = buildRequest(text, profile, selectedVoiceId) ?: run {
             Log.w(TAG, "server TTS request build failed")
             return false
@@ -97,7 +105,17 @@ internal class VoiceServerTtsPlayer(context: Context) {
                         return
                     }
                     val contentType = resp.header("Content-Type").orEmpty()
-                    Log.i(TAG, "server TTS audio ready contentType=$contentType bytes=${bytes.size}")
+                    val worker = resp.header("x-elon-tts-worker").orEmpty()
+                    val workerVoice = resp.header("x-elon-tts-worker-voice").orEmpty()
+                    val workerFallback = resp.header("x-elon-tts-worker-fallback")
+                        ?.equals("true", ignoreCase = true) == true
+                    Log.i(
+                        TAG,
+                        "server TTS audio ready contentType=$contentType bytes=${bytes.size} requestedVoice=$selectedVoiceId worker=$worker workerVoice=$workerVoice fallback=$workerFallback"
+                    )
+                    if (workerFallback) {
+                        Log.w(TAG, "server TTS used fallback worker voice for requestedVoice=$selectedVoiceId actualVoice=$workerVoice")
+                    }
                     val file = writeTempAudio(bytes, contentType)
                     clearCall(requestGeneration)
                     mainHandler.post {

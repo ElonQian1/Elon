@@ -12,13 +12,25 @@ app = FastAPI(title="Elon TTS Worker", version="0.1.0")
 WORKER_TOKEN = os.getenv("ELON_TTS_WORKER_TOKEN", "").strip()
 MAX_TEXT_CHARS = int(os.getenv("ELON_TTS_WORKER_MAX_TEXT_CHARS", "600"))
 DEFAULT_VOICE = os.getenv("ELON_TTS_EDGE_DEFAULT_VOICE", "zh-CN-XiaoxiaoNeural")
+ALLOW_CROSS_VOICE_FALLBACK = (
+    os.getenv("ELON_TTS_EDGE_ALLOW_CROSS_VOICE_FALLBACK", "").strip().lower()
+    in {"1", "true", "on", "yes"}
+)
 
-VOICE_CANDIDATES = {
-    "female_warm": ["zh-CN-XiaoxiaoNeural", "zh-CN-XiaoyiNeural"],
-    "female_bright": ["zh-CN-XiaoyiNeural", "zh-CN-XiaoxiaoNeural"],
-    "female_mature": ["zh-CN-XiaoxuanNeural", "zh-CN-XiaoxiaoNeural"],
-    "female_cool": ["zh-CN-XiaomoNeural", "zh-CN-XiaoxiaoNeural"],
-    "female_sweet": ["zh-CN-XiaoshuangNeural", "zh-CN-XiaoyiNeural", "zh-CN-XiaoxiaoNeural"],
+PRIMARY_VOICES = {
+    "female_warm": "zh-CN-XiaoxiaoNeural",
+    "female_bright": "zh-CN-XiaoyiNeural",
+    "female_mature": "zh-CN-XiaoxuanNeural",
+    "female_cool": "zh-CN-shaanxi-XiaoniNeural",
+    "female_sweet": "zh-CN-liaoning-XiaobeiNeural",
+}
+
+VOICE_FALLBACKS = {
+    "female_warm": ["zh-CN-XiaoyiNeural"],
+    "female_bright": ["zh-CN-XiaoxiaoNeural"],
+    "female_mature": ["zh-CN-XiaoxiaoNeural"],
+    "female_cool": ["zh-CN-XiaoxuanNeural", "zh-CN-XiaoxiaoNeural"],
+    "female_sweet": ["zh-CN-XiaoyiNeural", "zh-CN-XiaoxiaoNeural"],
 }
 
 EMOTION_TUNING = {
@@ -44,6 +56,8 @@ async def health() -> dict[str, Any]:
         "ok": True,
         "engine": "edge-tts",
         "defaultVoice": DEFAULT_VOICE,
+        "allowCrossVoiceFallback": ALLOW_CROSS_VOICE_FALLBACK,
+        "primaryVoices": PRIMARY_VOICES,
         "maxTextChars": MAX_TEXT_CHARS,
     }
 
@@ -61,6 +75,7 @@ async def synthesize(request: Request) -> Response:
     voice_id = str(payload.get("voiceId") or "female_warm").strip()
     emotion_id = str(payload.get("emotionId") or "normal").strip()
     speed = parse_float(payload.get("speed"), 1.0)
+    primary_voice = primary_voice_for(voice_id)
     candidates = voice_candidates(voice_id)
     rate, pitch, volume = prosody(emotion_id, speed)
 
@@ -73,7 +88,10 @@ async def synthesize(request: Request) -> Response:
                 media_type="audio/mpeg",
                 headers={
                     "x-elon-tts-worker": "edge-tts",
+                    "x-elon-tts-worker-requested-voice": voice_id,
                     "x-elon-tts-worker-voice": voice,
+                    "x-elon-tts-worker-primary-voice": primary_voice,
+                    "x-elon-tts-worker-fallback": str(voice != primary_voice).lower(),
                     "x-elon-tts-worker-emotion": emotion_id,
                 },
             )
@@ -98,10 +116,27 @@ def assert_authorized(request: Request) -> None:
 
 
 def voice_candidates(voice_id: str) -> list[str]:
-    candidates = list(VOICE_CANDIDATES.get(voice_id, []))
-    if DEFAULT_VOICE not in candidates:
-        candidates.append(DEFAULT_VOICE)
-    return candidates
+    candidates = [primary_voice_for(voice_id)]
+    if ALLOW_CROSS_VOICE_FALLBACK:
+        candidates.extend(VOICE_FALLBACKS.get(voice_id, []))
+        if DEFAULT_VOICE not in candidates:
+            candidates.append(DEFAULT_VOICE)
+    return dedupe(candidates)
+
+
+def primary_voice_for(voice_id: str) -> str:
+    return PRIMARY_VOICES.get(voice_id, DEFAULT_VOICE)
+
+
+def dedupe(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
 
 
 def prosody(emotion_id: str, speed: float) -> tuple[str, str, str]:

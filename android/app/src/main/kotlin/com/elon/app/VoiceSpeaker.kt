@@ -41,6 +41,7 @@ internal class VoiceSpeaker(
     private var pendingText: String? = null
     private var pendingProfile: VoiceTtsProfile? = null
     private var pendingDone: (() -> Unit)? = null
+    private var pendingVoiceIdOverride: String? = null
     private var activeDone: (() -> Unit)? = null
     private var preferredVoiceApplied = false
     private val serverTtsPlayer = VoiceServerTtsPlayer(appContext)
@@ -75,10 +76,12 @@ internal class VoiceSpeaker(
         pendingText?.let { text ->
             val profile = pendingProfile
             val done = pendingDone
+            val voiceIdOverride = pendingVoiceIdOverride
             pendingText = null
             pendingProfile = null
             pendingDone = null
-            speak(text, profile, done)
+            pendingVoiceIdOverride = null
+            speak(text, profile, done, voiceIdOverride)
         }
         Log.d(TAG, "TTS 初始化成功")
     }
@@ -90,7 +93,8 @@ internal class VoiceSpeaker(
     fun speak(
         text: String,
         profile: VoiceTtsProfile? = null,
-        onDone: (() -> Unit)? = null
+        onDone: (() -> Unit)? = null,
+        voiceIdOverride: String? = null
     ) {
         if (respectUserToggle && !isTtsEnabled(appContext)) {
             onDone?.invoke()
@@ -106,19 +110,28 @@ internal class VoiceSpeaker(
             pendingText = content
             pendingProfile = profile
             pendingDone = onDone
+            pendingVoiceIdOverride = voiceIdOverride
             return
         }
         pendingText = null
         pendingProfile = null
         pendingDone = null
+        pendingVoiceIdOverride = null
         serverTtsPlayer.stop()
         if (tts?.isSpeaking == true) tts?.stop()
         val resolvedProfile = profile ?: VoiceTtsEmotion.profileFor(content)
+        val effectiveVoiceId = resolveVoiceId(voiceIdOverride)
         activeDone = onDone
+        if (VoiceTtsVoiceCatalog.isSystemVoiceId(effectiveVoiceId)) {
+            Log.d(TAG, "使用手机系统 TTS profile=${resolvedProfile.id}")
+            speakWithSystem(engine, content, resolvedProfile, onDone)
+            return
+        }
         Log.d(TAG, "尝试服务器情绪 TTS profile=${resolvedProfile.id}")
         if (serverTtsPlayer.trySpeak(
                 text = content,
                 profile = resolvedProfile,
+                voiceIdOverride = effectiveVoiceId,
                 onDone = { finishSpeakCallback() },
                 onFallback = {
                     Log.w(TAG, "服务器情绪 TTS 不可用，降级系统 TTS profile=${resolvedProfile.id}")
@@ -131,6 +144,12 @@ internal class VoiceSpeaker(
         Log.w(TAG, "服务器情绪 TTS 被跳过，降级系统 TTS profile=${resolvedProfile.id}")
         speakWithSystem(engine, content, resolvedProfile, onDone)
     }
+
+    private fun resolveVoiceId(voiceIdOverride: String?): String =
+        voiceIdOverride
+            ?.trim()
+            ?.takeIf(VoiceTtsVoiceCatalog::isKnownVoiceId)
+            ?: VoiceTtsPreferences.getSelectedVoiceId(appContext)
 
     private fun speakWithSystem(
         engine: TextToSpeech,
@@ -150,6 +169,7 @@ internal class VoiceSpeaker(
         pendingText = null
         pendingProfile = null
         pendingDone = null
+        pendingVoiceIdOverride = null
         activeDone = null
         serverTtsPlayer.stop()
         if (tts?.isSpeaking == true) tts?.stop()
@@ -160,6 +180,7 @@ internal class VoiceSpeaker(
         pendingText = null
         pendingProfile = null
         pendingDone = null
+        pendingVoiceIdOverride = null
         activeDone = null
         serverTtsPlayer.release()
         tts?.stop()
