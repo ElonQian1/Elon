@@ -113,7 +113,7 @@ internal class RealtimeVoiceController(
                     this@RealtimeVoiceController.onRealtimeResponseDone()
 
                 override fun onServerError(code: String, message: String) {
-                    onError("[$code] $message")
+                    onError(friendlyServerError(code, message))
                     resumeAutoListening()
                 }
 
@@ -219,6 +219,20 @@ internal class RealtimeVoiceController(
         autoSpeechMs = 0
         autoSilenceMs = 0
         autoTurnMs = 0
+    }
+
+    private fun friendlyServerError(code: String, message: String): String {
+        if (code == "realtime_chat_connect" &&
+            (message.contains("API Key", ignoreCase = true) ||
+                message.contains("环境变量") ||
+                message.contains("未配置"))
+        ) {
+            return "服务器实时通话密钥未配置，请稍后重试"
+        }
+        if (code == "ws_failure" && message.contains("EOF", ignoreCase = true)) {
+            return "实时通话连接已断开，请重新进入通话"
+        }
+        return "[$code] $message"
     }
 
     private fun pcmRms(chunk: ByteArray): Double {

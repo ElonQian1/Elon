@@ -45,11 +45,11 @@ enum UplinkCommand {
 }
 
 impl RealtimeChatSession {
-    pub async fn connect(cfg: &RealtimeChatConfig, instructions: String) -> Result<Self> {
-        let api_key = cfg
-            .read_api_key()
-            .ok_or_else(|| anyhow!("缺少环境变量 {}", cfg.api_key_env))?;
-
+    pub async fn connect(
+        cfg: &RealtimeChatConfig,
+        instructions: String,
+        api_key: String,
+    ) -> Result<Self> {
         let mut request = cfg
             .websocket_url()
             .as_str()

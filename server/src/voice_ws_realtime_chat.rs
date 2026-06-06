@@ -97,7 +97,23 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
         realtime_social_ai_prompt(&history)
     };
     let cfg = RealtimeChatConfig::from_env();
-    let mut session = match RealtimeChatSession::connect(&cfg, instructions).await {
+    let api_key = {
+        let agents_cfg = state.agents_config.read().await;
+        cfg.read_api_key_from_agents(&agents_cfg)
+    };
+    let Some(api_key) = api_key else {
+        let _ = sender
+            .send(Message::Text(
+                ServerEvent::Error {
+                    code: "realtime_chat_connect",
+                    message: cfg.missing_key_message(),
+                }
+                .to_json(),
+            ))
+            .await;
+        return Ok(());
+    };
+    let mut session = match RealtimeChatSession::connect(&cfg, instructions, api_key).await {
         Ok(session) => session,
         Err(err) => {
             let _ = sender

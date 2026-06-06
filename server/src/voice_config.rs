@@ -7,6 +7,8 @@
 
 use std::env;
 
+use crate::agent_config::AgentsConfig;
+
 /// 实时音频采样率（Hz）。
 /// OpenAI Realtime Transcription `audio/pcm` 要求 24kHz。
 pub const REALTIME_SAMPLE_RATE_HZ: u32 = 24_000;
@@ -121,12 +123,39 @@ impl RealtimeChatConfig {
         }
     }
 
-    pub fn read_api_key(&self) -> Option<String> {
-        env::var(&self.api_key_env)
-            .ok()
-            .map(|v| v.trim().to_string())
-            .filter(|v| !v.is_empty())
+    pub fn read_api_key_from_agents(&self, agents_cfg: &AgentsConfig) -> Option<String> {
+        read_trimmed_env(&self.api_key_env)
+            .or_else(|| read_trimmed_env("OPENAI_API_KEY"))
+            .or_else(|| read_trimmed_env("AGENT_OPENAI_KEY"))
+            .or_else(|| {
+                agents_cfg
+                    .agents
+                    .values()
+                    .filter(|agent| agent.api_base.contains("openai.com"))
+                    .map(|agent| agent.api_key.trim().to_string())
+                    .find(|key| !key.is_empty())
+            })
     }
+
+    pub fn missing_key_message(&self) -> String {
+        let mut envs = vec![
+            self.api_key_env.as_str(),
+            "OPENAI_API_KEY",
+            "AGENT_OPENAI_KEY",
+        ];
+        envs.dedup();
+        format!(
+            "服务器未配置 OpenAI Realtime API Key，请设置 {}，或在 agents.json 中配置 api_base 为 openai.com 的 OpenAI 代理",
+            envs.join(" / ")
+        )
+    }
+}
+
+fn read_trimmed_env(name: &str) -> Option<String> {
+    env::var(name)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 fn normalize_realtime_chat_model(model: &str) -> &str {
