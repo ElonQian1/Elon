@@ -102,7 +102,7 @@ class SettingsActivity : AppCompatActivity() {
         refreshAsrChainSummary()
     }
 
-    // ── AI 回复女声 ──────────────────────
+    // ── AI 回复语音 ──────────────────────
     private fun setupTtsVoiceSection() {
         refreshTtsVoiceSummary()
         findViewById<Button>(R.id.ttsVoiceButton).setOnClickListener {

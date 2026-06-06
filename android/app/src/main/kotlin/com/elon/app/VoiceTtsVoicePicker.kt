@@ -17,7 +17,7 @@ internal object VoiceTtsVoicePicker {
         onVoiceChanged: ((VoiceTtsVoiceOption) -> Unit)? = null,
         onPreviewVoice: ((VoiceTtsVoiceOption) -> Unit)? = null
     ) {
-        val voices = VoiceTtsVoiceCatalog.presetVoices
+        val voices = VoiceTtsVoiceCatalog.allVoices
         var selectedVoiceId = VoiceTtsPreferences.getSelectedVoiceId(context)
         val radios = mutableMapOf<String, RadioButton>()
         val selectButtons = mutableMapOf<String, Button>()
@@ -27,7 +27,7 @@ internal object VoiceTtsVoicePicker {
             setPadding(dp(context, 20), dp(context, 8), dp(context, 20), 0)
         }
         list.addView(TextView(context).apply {
-            text = "用同一句话逐个试听，先比较声音底子，再设为默认。"
+            text = "可选择手机系统 TTS，也可试听服务器女声预设后设为默认。"
             textSize = 13f
             alpha = 0.72f
             setPadding(0, 0, 0, dp(context, 10))
@@ -118,7 +118,7 @@ internal object VoiceTtsVoicePicker {
 
         refreshRows()
         AlertDialog.Builder(context)
-            .setTitle("选择 AI 女声")
+            .setTitle("选择 AI 回复语音")
             .setView(ScrollView(context).apply { addView(list) })
             .setNegativeButton("关闭", null)
             .show()

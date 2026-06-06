@@ -60,6 +60,10 @@ internal class VoiceServerTtsPlayer(context: Context) {
             ?.trim()
             ?.takeIf(VoiceTtsVoiceCatalog::isKnownVoiceId)
             ?: VoiceTtsPreferences.getSelectedVoiceId(appContext)
+        if (VoiceTtsVoiceCatalog.isSystemVoiceId(selectedVoiceId)) {
+            Log.i(TAG, "skip server TTS because Android system TTS is selected")
+            return false
+        }
         val request = buildRequest(text, profile, selectedVoiceId) ?: run {
             Log.w(TAG, "server TTS request build failed")
             return false

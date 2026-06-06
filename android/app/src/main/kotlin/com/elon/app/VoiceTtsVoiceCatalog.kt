@@ -6,11 +6,20 @@ internal data class VoiceTtsVoiceOption(
     val id: String,
     val displayName: String,
     val description: String,
-    val previewText: String = VOICE_TTS_COMPARISON_PREVIEW_TEXT
+    val previewText: String = VOICE_TTS_COMPARISON_PREVIEW_TEXT,
+    val usesServerTts: Boolean = true
 )
 
 internal object VoiceTtsVoiceCatalog {
     const val COMPARISON_PREVIEW_TEXT = VOICE_TTS_COMPARISON_PREVIEW_TEXT
+    const val SYSTEM_TTS_VOICE_ID = "android_system"
+
+    val systemVoice: VoiceTtsVoiceOption = VoiceTtsVoiceOption(
+        id = SYSTEM_TTS_VOICE_ID,
+        displayName = "手机系统 TTS",
+        description = "使用这台 Android 手机自带的语音引擎，离线/低延迟，声线由系统决定。",
+        usesServerTts = false
+    )
 
     val presetVoices: List<VoiceTtsVoiceOption> = listOf(
         VoiceTtsVoiceOption(
@@ -40,10 +49,15 @@ internal object VoiceTtsVoiceCatalog {
         )
     )
 
+    val allVoices: List<VoiceTtsVoiceOption> = listOf(systemVoice) + presetVoices
+
+    fun isSystemVoiceId(voiceId: String): Boolean =
+        voiceId == SYSTEM_TTS_VOICE_ID
+
     fun isKnownVoiceId(voiceId: String): Boolean =
-        presetVoices.any { it.id == voiceId }
+        allVoices.any { it.id == voiceId }
 
     fun findById(voiceId: String): VoiceTtsVoiceOption =
-        presetVoices.firstOrNull { it.id == voiceId }
-            ?: presetVoices.first { it.id == VoiceTtsPreferences.DEFAULT_VOICE_ID }
+        allVoices.firstOrNull { it.id == voiceId }
+            ?: allVoices.first { it.id == VoiceTtsPreferences.DEFAULT_VOICE_ID }
 }
