@@ -45,9 +45,12 @@ $RepoDir = Join-Path $InstallRoot "CosyVoice"
 $ModelDir = Join-Path $RepoDir "pretrained_models\Fun-CosyVoice3-0.5B"
 $script:VenvDir = Join-Path $InstallRoot ".venv"
 $PipCacheDir = Join-Path $InstallRoot ".pip-cache"
+$ModelScopeCacheDir = Join-Path $InstallRoot ".modelscope-cache"
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $PipCacheDir | Out-Null
+New-Item -ItemType Directory -Force -Path $ModelScopeCacheDir | Out-Null
 $env:PIP_CACHE_DIR = $PipCacheDir
+$env:MODELSCOPE_CACHE = $ModelScopeCacheDir
 $Py = Resolve-Python
 
 Invoke-Step "Clone CosyVoice" {
@@ -77,7 +80,11 @@ if (-not $SkipDependencyInstall) {
     Invoke-Step "Install CosyVoice dependencies" {
         Push-Location $RepoDir
         try {
-            & $Py -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+            & $Py -m pip install --upgrade "pip<26" "setuptools<70" wheel cython "numpy==1.26.4" -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+            if ($LASTEXITCODE -ne 0) {
+                throw "pip install CosyVoice build dependencies failed with exit code $LASTEXITCODE"
+            }
+            & $Py -m pip install --no-build-isolation -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
             if ($LASTEXITCODE -ne 0) {
                 throw "pip install CosyVoice requirements failed with exit code $LASTEXITCODE"
             }
@@ -119,8 +126,9 @@ Write-Host ""
 Write-Host "CosyVoice runtime prepared."
 Write-Host "Repo:  $RepoDir"
 Write-Host "Model: $ModelDir"
-Write-Host "Python:$Py"
+Write-Host "Python: $Py"
 Write-Host "Pip cache: $PipCacheDir"
+Write-Host "ModelScope cache: $ModelScopeCacheDir"
 Write-Host ""
 Write-Host "Start worker with:"
 Write-Host "powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps1 ``"

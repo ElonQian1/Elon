@@ -100,7 +100,19 @@ https://github.com/FunAudioLLM/CosyVoice/blob/main/example.py
 powershell -ExecutionPolicy Bypass -File scripts\new-tts-asset-pack.ps1 -AssetRoot "D:\tts-assets"
 ```
 
-然后把授权参考音频放进去：
+然后把授权参考音频放进去，或从素材目录导入：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\import-tts-asset-pack.ps1 `
+  -AssetRoot "D:\tts-assets" `
+  -SourceDir "D:\authorized-tts-samples" `
+  -FailOnMissing
+```
+
+导入脚本会匹配 `female_warm_neutral.wav`、`female_warm\speaker.wav`、`warm.wav`
+这类常见命名；非 wav 文件需要本机有 `ffmpeg`，脚本会转换成 24kHz mono wav。
+
+最终目录必须至少有：
 
 ```text
 D:\tts-assets\voices\female_warm_neutral.wav
@@ -113,6 +125,15 @@ D:\tts-assets\emotions\female_neutral.wav
 D:\tts-assets\emotions\female_gentle_comfort.wav
 D:\tts-assets\emotions\female_crying_broken.wav
 ...
+```
+
+只检查资产完整性：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\import-tts-asset-pack.ps1 `
+  -AssetRoot "D:\tts-assets" `
+  -ValidateOnly `
+  -FailOnMissing
 ```
 
 #### 安装 IndexTTS2
@@ -168,6 +189,9 @@ powershell -ExecutionPolicy Bypass -File scripts\setup-cosyvoice-runtime.ps1 `
 ```
 
 如果你有单独 conda 环境，可以把环境里的 `python.exe` 传给 `-PythonExe`。
+
+脚本默认会在 `D:\models\CosyVoice\.venv` 创建隔离 Python 环境，并把 `PIP_CACHE_DIR`、
+`MODELSCOPE_CACHE` 放到 `D:\models\CosyVoice` 下，避免依赖和模型缓存占满 C 盘。
 
 启动 CosyVoice3 Worker：
 

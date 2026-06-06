@@ -2,6 +2,9 @@ param(
     [string]$AssetRoot = "",
     [string]$ModelRoot = "D:\models",
     [string]$IndexTts2ProjectDir = "",
+    [string]$IndexTts2ModelDir = "",
+    [string]$CosyVoiceRepoDir = "",
+    [string]$CosyVoiceModelDir = "",
     [string]$CosyVoicePythonExe = "",
     [string[]]$SearchRoots = @(
         "D:\models",
@@ -25,8 +28,20 @@ if (-not $IndexTts2ProjectDir -and $ModelRoot) {
     $IndexTts2ProjectDir = Join-Path $ModelRoot "IndexTTS2\index-tts"
 }
 
+if (-not $IndexTts2ModelDir -and $IndexTts2ProjectDir) {
+    $IndexTts2ModelDir = Join-Path $IndexTts2ProjectDir "checkpoints"
+}
+
 if (-not $CosyVoicePythonExe -and $ModelRoot) {
     $CosyVoicePythonExe = Join-Path $ModelRoot "CosyVoice\.venv\Scripts\python.exe"
+}
+
+if (-not $CosyVoiceRepoDir -and $ModelRoot) {
+    $CosyVoiceRepoDir = Join-Path $ModelRoot "CosyVoice\CosyVoice"
+}
+
+if (-not $CosyVoiceModelDir -and $CosyVoiceRepoDir) {
+    $CosyVoiceModelDir = Join-Path $CosyVoiceRepoDir "pretrained_models\Fun-CosyVoice3-0.5B"
 }
 
 function Write-ItemStatus {
@@ -116,26 +131,56 @@ if ($python) {
 Write-Output ""
 Write-Output "== Model runtimes =="
 Write-ItemStatus "IndexTTS2 project" ((Test-Path -LiteralPath $IndexTts2ProjectDir)) $IndexTts2ProjectDir
+Write-ItemStatus "IndexTTS2 checkpoints" ((Test-Path -LiteralPath (Join-Path $IndexTts2ModelDir "config.yaml")) -and (Test-Path -LiteralPath (Join-Path $IndexTts2ModelDir "gpt.pth"))) $IndexTts2ModelDir
 if (Test-Path -LiteralPath $IndexTts2ProjectDir) {
     Push-Location $IndexTts2ProjectDir
     try {
+        $indexCode = "import sys; " +
+            "import torch, indextts.infer_v2; " +
+            "print('torch=' + torch.__version__ + ';cuda=' + str(torch.cuda.is_available()))"
         $indexStatus = if (Get-Command uv -ErrorAction SilentlyContinue) {
-            & uv run python -c "import torch, indextts.infer_v2; print('torch=' + torch.__version__ + ';cuda=' + str(torch.cuda.is_available()))" 2>&1
+            & uv run python -c $indexCode 2>&1
         } elseif ($python) {
-            & python -m uv run python -c "import torch, indextts.infer_v2; print('torch=' + torch.__version__ + ';cuda=' + str(torch.cuda.is_available()))" 2>&1
+            & python -m uv run python -c $indexCode 2>&1
         } else {
             @()
         }
-        Write-ItemStatus "IndexTTS2 import" ($LASTEXITCODE -eq 0 -and [bool]$indexStatus) $(($indexStatus | Select-Object -First 1) -join "")
+        $indexDetail = ($indexStatus | Select-Object -Last 1) -join ""
+        Write-ItemStatus "IndexTTS2 import" ($LASTEXITCODE -eq 0 -and [bool]$indexStatus) $indexDetail
     } finally {
         Pop-Location
     }
 }
 
 Write-ItemStatus "CosyVoice python" ((Test-Path -LiteralPath $CosyVoicePythonExe)) $CosyVoicePythonExe
+Write-ItemStatus "CosyVoice repo" ((Test-Path -LiteralPath $CosyVoiceRepoDir)) $CosyVoiceRepoDir
+Write-ItemStatus "CosyVoice model" ((Test-Path -LiteralPath (Join-Path $CosyVoiceModelDir "cosyvoice3.yaml")) -and (Test-Path -LiteralPath (Join-Path $CosyVoiceModelDir "llm.pt"))) $CosyVoiceModelDir
 if (Test-Path -LiteralPath $CosyVoicePythonExe) {
-    $cosyStatus = & $CosyVoicePythonExe -c "import importlib.util; print(importlib.util.find_spec('cosyvoice.cli.cosyvoice') is not None)" 2>&1
-    Write-ItemStatus "CosyVoice import" ($LASTEXITCODE -eq 0 -and (($cosyStatus | Select-Object -First 1) -eq "True")) $(($cosyStatus | Select-Object -First 1) -join "")
+    $cosyCode = "try:" +
+        "`n import cosyvoice.cli.cosyvoice" +
+        "`n print('importable=True')" +
+        "`nexcept Exception as error:" +
+        "`n print('importable=False;error=' + type(error).__name__ + ':' + str(error)[:240])" +
+        "`n raise SystemExit(1)"
+    $oldPythonPath = $env:PYTHONPATH
+    if (Test-Path -LiteralPath $CosyVoiceRepoDir) {
+        $pathParts = @($CosyVoiceRepoDir)
+        $matchaDir = Join-Path $CosyVoiceRepoDir "third_party\Matcha-TTS"
+        if (Test-Path -LiteralPath $matchaDir) {
+            $pathParts += $matchaDir
+        }
+        if ($oldPythonPath) {
+            $pathParts += $oldPythonPath.Split([System.IO.Path]::PathSeparator)
+        }
+        $env:PYTHONPATH = ($pathParts | Where-Object { $_ -and $_.Trim() } | Select-Object -Unique) -join [System.IO.Path]::PathSeparator
+    }
+    try {
+        $cosyStatus = & $CosyVoicePythonExe -c $cosyCode 2>&1
+        $cosyDetail = ($cosyStatus | Select-Object -Last 1) -join ""
+        Write-ItemStatus "CosyVoice import" ($LASTEXITCODE -eq 0 -and ($cosyDetail -eq "importable=True")) $cosyDetail
+    } finally {
+        $env:PYTHONPATH = $oldPythonPath
+    }
 }
 
 Write-Output ""
