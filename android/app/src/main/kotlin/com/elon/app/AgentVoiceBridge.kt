@@ -163,24 +163,28 @@ internal class AgentVoiceBridge(context: Context) {
      * 服务绑定。Android 文档：createSpeechRecognizer 是异步绑定，第一次 startListening 前
      * 若绑定未完成会返回 ERROR_SERVER_DISCONNECTED(11)。
      * 幂等，可多次调用；不会打断进行中的识别。
+     *
+     * ⚠️ 华为/荣耀手机跳过预热：
+     * 这两家 ROM 的自家 RecognitionService 对第三方 APK 不开放（无 RECORD_AUDIO 授权），
+     * 强行预热会绑定系统默认引擎并触发超时重试，导致 CPU/发热问题。
+     * 这些手机上首次 startListening 会有一次冷启动延迟，属于平台限制，无法规避。
      */
     fun prewarm() {
+        // 华为/荣耀：不做预热，避免绑定失败导致发热
+        val manufacturer = android.os.Build.MANUFACTURER.lowercase()
+        if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
+            Log.i(TAG, "预热跳过：华为/荣耀设备不支持第三方 ASR 预热")
+            return
+        }
         if (isRunning) return
         main.post {
-            // 若 start() 已在队列里（init{} 后立即按键），跳过预热不影响正确性：
-            // startWithCurrentCandidate 会自己检测 engineChanged 并 resetEngine+initialize。
             if (isRunning) return@post
             val engines = RecognitionEngineSelector.listForUse(appContext)
             val first = engines.firstOrNull() ?: return@post
             if (asr.isInitialized && asr.engineComponent == first.component) return@post
             asr.engineComponent = first.component
-            // Bug fix：engineComponent 切换时必须销毁旧 recognizer。
-            // 否则 initialize() 因 speechRecognizer != null 直接 return，
-            // 导致 engineComponent=Google 但 recognizer 仍是上次失败的引擎（如 MagicVoice），
-            // 下次 startWithCurrentCandidate 看到 engineChanged=false 不 reset，
-            // 调旧 recognizer 的 startListening → ERROR_CLIENT "already in session"。
-            asr.resetEngine()  // 销毁旧引擎 recognizer（noop 若未初始化），确保 initialize() 创建正确引擎
-            asr.initialize()   // 创建 SpeechRecognizer，开始服务绑定，不 startListening
+            asr.resetEngine()
+            asr.initialize()
             Log.i(TAG, "预热: 已为 ${first.label}(${first.packageName}) 启动服务绑定")
         }
     }
