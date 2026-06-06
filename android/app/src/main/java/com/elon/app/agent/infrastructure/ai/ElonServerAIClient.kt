@@ -41,9 +41,22 @@ class ElonServerAIClient(
 
     @Volatile private var balloonProjectId: String? = null
     @Volatile private var wsClient: ProjectChatWsClient? = null
-    @Volatile private var cliConversationId: String? = null
-    @Volatile private var lmConversationId: String? = null
     private val ensureDone = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * 按天切割会话 ID：当天内的对话共享同一个上下文（AI 记得今天说过什么），
+     * 跨天自动开新会话（避免上下文过长拖慢 Codex）。
+     * 格式： voice-YYYY-MM-DD，如 voice-2026-06-06
+     */
+    private val cliConversationId: String
+        get() = "voice-" + java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            .format(java.util.Date())
+
+    /**
+     * LLM 尾底会话 ID（同样按天切割）。
+     */
+    private val lmConversationId: String
+        get() = cliConversationId
 
     // ── 初始化"手机控制"项目空间 ─────────────────────────────
 
@@ -124,13 +137,12 @@ class ElonServerAIClient(
         if (projectId != null) {
             try {
                 Log.d(TAG, "→ HTTP project=$projectId  msg=${userMsg.take(40)}")
-                val (reply, newConvId) = server.chat(
+                val (reply, _) = server.chat(
                     projectId = projectId,
                     message = userMsg,
                     conversationId = cliConversationId,
                     chatOnly = true    // 不走 Codex worktree
                 )
-                if (newConvId != null) cliConversationId = newConvId
                 if (reply.isNotBlank() && reply != "（服务器未返回回复）") return reply
                 Log.w(TAG, "HTTP 返回空，降级 LLM")
             } catch (e: Exception) {
@@ -139,16 +151,9 @@ class ElonServerAIClient(
         }
 
         // 3. HTTP LLM 最终兜底（混元，带长期记忆+会话历史注入）
-        Log.d(TAG, "→ LLM msgs=${messages.size}  conv=${lmConversationId ?: "<new>"}")
-        val (reply, newConvId) = server.lmChat(messages, conversationId = lmConversationId)
-        if (newConvId != null) lmConversationId = newConvId
+        Log.d(TAG, "→ LLM msgs=${messages.size}  conv=${lmConversationId}")
+        val (reply, _) = server.lmChat(messages, conversationId = lmConversationId)
         return reply
-    }
-
-    /** 重置会话（新一轮语音对话开始时调用） */
-    fun resetConversation() {
-        cliConversationId = null
-        lmConversationId = null
     }
 
     /** 释放 WS 连接（Activity onDestroy 时调用） */

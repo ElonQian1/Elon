@@ -87,6 +87,10 @@ pub async fn chat_project(
         }),
     );
 
+    // 提前保存 project_id 和原始消息，因为后面 project / message 会被 move 进调度器。
+    let project_id_for_history = project.id.clone();
+    let original_user_message = message.clone();
+
     let task_id =
         match state
             .store
@@ -161,6 +165,39 @@ pub async fn chat_project(
         apk_url.as_deref(),
         error.as_deref(),
     );
+
+    // 把本轮对话写入 messages 表，供历史记录和记忆提取使用。
+    // 仅在有实质回复时写入，避免记录错误/空响应污染历史。
+    if !reply.is_empty() && error.is_none() {
+        if !original_user_message.trim().is_empty() {
+            let _ = state.store.add_message(
+                &project_id_for_history,
+                Some(&conversation_id),
+                Some(&task_id),
+                Some(&user.id),
+                "user",
+                original_user_message.trim(),
+            );
+            let _ = state.store.add_message(
+                &project_id_for_history,
+                Some(&conversation_id),
+                Some(&task_id),
+                None,
+                "assistant",
+                &reply,
+            );
+            // 异步提取长期记忆（不阻塞响应）
+            {
+                let state2 = state.clone();
+                let uid = user.id.clone();
+                let umsg = original_user_message.clone();
+                let rep = reply.clone();
+                tokio::spawn(async move {
+                    crate::user_memory_extract::extract_and_save_memories(state2, uid, umsg, rep).await;
+                });
+            }
+        }
+    }
     state.server_traces.record(
         &trace_id,
         if error.is_some() {
