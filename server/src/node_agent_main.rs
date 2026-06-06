@@ -511,6 +511,157 @@ fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
 }
 
+// ── CLI 执行（CliPrompt / Exec）────────────────────────────────────────────────
+
+/// 检测本机有哪些 CLI 可用。
+fn detect_available_clis() -> Vec<String> {
+    let candidates = ["copilot", "codex", "gh"];
+    candidates
+        .iter()
+        .filter(|name| {
+            // 优先从 PATH 找；Windows 还额外加 .exe 后缀
+            let found = std::process::Command::new(if cfg!(windows) {
+                "where"
+            } else {
+                "which"
+            })
+            .arg(name)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+            found
+        })
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
+async fn run_cli_prompt(
+    req_id: String,
+    cli: &str,
+    extra_args: Vec<String>,
+    cwd: Option<String>,
+    prompt: String,
+    out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
+) {
+    use tokio::io::AsyncBufReadExt;
+
+    // 构建命令：copilot -p "<prompt>" 或 codex -p "<prompt>"
+    let mut cmd = tokio::process::Command::new(cli);
+    for a in &extra_args {
+        cmd.arg(a);
+    }
+    // 常见 CLI 的 prompt 标志
+    if cli == "codex" {
+        cmd.arg("-p").arg(&prompt);
+    } else if cli == "copilot" {
+        cmd.args(["-p", &prompt]);
+    } else {
+        cmd.arg(&prompt);
+    }
+    if let Some(dir) = &cwd {
+        cmd.current_dir(dir);
+    }
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null());
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+                req_id,
+                exit_ok: false,
+                error: Some(format!("无法启动 {} : {}", cli, e)),
+            }));
+            return;
+        }
+    };
+
+    let stdout = child.stdout.take().expect("stdout");
+    let stderr = child.stderr.take().expect("stderr");
+    let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
+    let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+
+    loop {
+        tokio::select! {
+            line = stdout_lines.next_line() => match line {
+                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" })); }
+                Ok(None) => break,
+                Err(e) => { warn!("stdout 读取错误: {e}"); break; }
+            },
+            line = stderr_lines.next_line() => match line {
+                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" })); }
+                Ok(None) => {}
+                Err(_) => {}
+            },
+        }
+    }
+
+    let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
+    let _ = out_tx.send(ws_text(&AgentToServer::CliDone { req_id, exit_ok, error: None }));
+}
+
+/// 执行 Exec：运行任意命令，流式返回 TaskStdout/TaskStderr/TaskExit。
+async fn run_exec(
+    task_id: String,
+    cli: String,
+    args: Vec<String>,
+    cwd: String,
+    env_vars: Vec<(String, String)>,
+    out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
+) {
+    use tokio::io::AsyncBufReadExt;
+
+    let mut cmd = tokio::process::Command::new(&cli);
+    cmd.args(&args).current_dir(&cwd);
+    for (k, v) in &env_vars {
+        cmd.env(k, v);
+    }
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null());
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
+                task_id,
+                message: format!("无法启动 {}: {}", cli, e),
+            }));
+            return;
+        }
+    };
+
+    let pid = child.id().unwrap_or(0);
+    let _ = out_tx.send(ws_text(&AgentToServer::TaskStarted { task_id: task_id.clone(), pid }));
+
+    let stdout = child.stdout.take().expect("stdout");
+    let stderr = child.stderr.take().expect("stderr");
+    let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
+    let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
+
+    while !stdout_done || !stderr_done {
+        tokio::select! {
+            line = stdout_lines.next_line(), if !stdout_done => match line {
+                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStdout { task_id: task_id.clone(), data: l + "\n" })); }
+                Ok(None) => { stdout_done = true; }
+                Err(e) => { warn!("stdout err: {e}"); stdout_done = true; }
+            },
+            line = stderr_lines.next_line(), if !stderr_done => match line {
+                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStderr { task_id: task_id.clone(), data: l + "\n" })); }
+                Ok(None) => { stderr_done = true; }
+                Err(e) => { warn!("stderr err: {e}"); stderr_done = true; }
+            },
+        }
+    }
+
+    let code = child.wait().await.ok().and_then(|s| s.code());
+    let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
+}
+
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
 async fn run_session(
@@ -553,12 +704,18 @@ async fn run_session(
         );
     }
 
+    // 检测本机可用的 CLI（copilot / codex）
+    let available_clis = detect_available_clis();
+    if !available_clis.is_empty() {
+        info!("🛠  检测到本地 CLI: {}", available_clis.join(", "));
+    }
+
     // 发送 Register
     out_tx.send(ws_text(&AgentToServer::Register {
         agent_id: creds.agent_id.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: PROTO_VERSION,
-        allowed_clis: vec![],
+        allowed_clis: available_clis,
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
     }))?;
@@ -622,8 +779,22 @@ async fn run_session(
                         ServerToAgent::Ping { nonce } => {
                             let _ = out_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
                         }
+                        ServerToAgent::CliPrompt { req_id, cli, extra_args, cwd, prompt } => {
+                            info!("📝 CliPrompt: {} cli={}", req_id, cli);
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                run_cli_prompt(req_id, &cli, extra_args, cwd, prompt, tx_c).await;
+                            });
+                        }
+                        ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
+                            info!("⚙️  Exec: {} {}", cli, args.join(" "));
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                run_exec(task_id, cli, args, cwd, env, tx_c).await;
+                            });
+                        }
                         _ => {
-                            // HttpRequest / CliPrompt / Exec — node-agent 不处理这些
+                            // 其他消息类型暂不处理
                         }
                     }
                 }
