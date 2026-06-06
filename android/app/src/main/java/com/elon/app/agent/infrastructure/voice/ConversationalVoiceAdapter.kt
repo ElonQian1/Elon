@@ -97,7 +97,11 @@ class ConversationalVoiceAdapter(
     init {
         setupConversationManager()
         setupASR()
-        Log.i(TAG, "✅ ConversationalVoiceAdapter 初始化完成")
+        // 与主聊天区保持一致：adapter 创建时立刻预热 ASR 引擎服务绑定，
+        // 让 mibrain/小米语音在用户开口前完成绑定（约 70~300ms）。
+        // 这样 start() 被调用时 SpeechRecognizer 已就绪，0 等待。
+        agentVoiceBridge.prewarm()
+        Log.i(TAG, "✅ ConversationalVoiceAdapter 初始化完成（ASR 预热已启动）")
     }
     
     /**
