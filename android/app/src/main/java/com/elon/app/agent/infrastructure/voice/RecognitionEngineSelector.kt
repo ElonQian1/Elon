@@ -43,12 +43,12 @@ object RecognitionEngineSelector {
 
     /** 已知优先级越大越优先；只用来做稳定排序。 */
     private val PACKAGE_PRIORITY: Map<String, Int> = mapOf(
+        "com.xiaomi.aiasst.vision" to 200,                    // 小米 mibrain — 本地最快，最高优先
+        "com.miui.voiceassist" to 190,                        // 小米语音助手备选
         "com.google.android.googlequicksearchbox" to 100,    // Google App / Now
         "com.google.android.tts" to 90,                       // Google TTS（也提供识别）
         "com.huawei.hiai" to 70,                              // 华为 HiAI
         "com.hihonor.magicvoice" to 65,                       // 荣耀 MagicVoice
-        "com.xiaomi.aiasst.vision" to 60,                     // 小米
-        "com.miui.voiceassist" to 55,
         "com.iflytek.speechcloud" to 40,
         "com.baidu.input" to 35,
     )
@@ -130,10 +130,16 @@ object RecognitionEngineSelector {
     fun listForUse(context: Context): List<RecognitionEngine> {
         val base = list(context)
         val preferredKey = EnginePreference.getPreferredKey(context)
+        // 系统默认引擎（list() 第一个，通常是 mibrain/系统最优）的 key，
+        // 不受历史 FAILED 状态影响——避免冷启动失败把最优引擎永久降到最末。
+        val topKey = base.firstOrNull()?.key()
         return base.sortedWith(compareBy(
-            { e -> if (e.key() == preferredKey) 0 else 1 }, // 偏好优先
+            { e -> if (e.key() == preferredKey) 0 else 1 }, // 用户明确偏好最优先
             { e ->
-                when (EnginePreference.getHealth(context, e.key())) {
+                val health = EnginePreference.getHealth(context, e.key())
+                // top 引擎：FAILED 视同 UNKNOWN，始终保持高位
+                if (e.key() == topKey && health == EngineHealth.FAILED) 1
+                else when (health) {
                     EngineHealth.OK -> 0
                     EngineHealth.UNKNOWN, EngineHealth.PROBING -> 1
                     EngineHealth.FAILED -> 2
