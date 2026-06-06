@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.animation.ValueAnimator
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -8,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -17,7 +15,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
 import java.util.Date
-import kotlin.math.sin
 
 internal class MainHomeRows(
     private val activity: AppCompatActivity,
@@ -30,16 +27,7 @@ internal class MainHomeRows(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
-    private var conversationHomeRowAnimator: ValueAnimator? = null
-    private var conversationHomeRowTarget: View? = null
-    private val conversationHomeRowDetachListener = object : View.OnAttachStateChangeListener {
-        override fun onViewAttachedToWindow(v: View) = Unit
-        override fun onViewDetachedFromWindow(v: View) {
-            if (conversationHomeRowTarget === v) {
-                cancelHomeRowShimmer()
-            }
-        }
-    }
+    private val conversationRowShimmer = WorkingRowShimmer()
 
     fun createFriendRow(friend: AppFriend, onClick: () -> Unit): View {
         val row = LinearLayout(activity).apply {
@@ -412,60 +400,21 @@ internal class MainHomeRows(
     }
 
     fun cancelHomeRowShimmer() {
-        conversationHomeRowAnimator?.cancel()
-        conversationHomeRowAnimator = null
-        conversationHomeRowTarget?.removeOnAttachStateChangeListener(conversationHomeRowDetachListener)
-        conversationHomeRowTarget = null
+        conversationRowShimmer.cancelAll()
     }
 
     private fun startConversationRowShimmer(row: View, homeRow: Boolean) {
-        if (
-            homeRow &&
-            conversationHomeRowTarget === row &&
-            conversationHomeRowAnimator?.isRunning == true
-        ) {
-            return
-        }
         if (homeRow) {
             cancelHomeRowShimmer()
         }
-
-        val baseColor = Color.parseColor("#181B20")
-        val highlightColor = Color.parseColor("#283140")
-        row.setBackgroundColor(baseColor)
-
-        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1350L
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            interpolator = LinearInterpolator()
-            addUpdateListener { valueAnimator ->
-                val fraction = valueAnimator.animatedFraction
-                val pulse = sin(Math.PI * fraction).toFloat()
-                row.setBackgroundColor(blendColor(baseColor, highlightColor, pulse))
-            }
-        }
-
-        if (homeRow) {
-            conversationHomeRowAnimator = animator
-            conversationHomeRowTarget = row
-            row.addOnAttachStateChangeListener(conversationHomeRowDetachListener)
-        } else {
-            row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) = Unit
-                override fun onViewDetachedFromWindow(v: View) {
-                    animator.cancel()
-                }
-            })
-        }
-        animator.start()
+        conversationRowShimmer.start(row)
     }
 
     private fun stopConversationRowShimmer(row: View, homeRow: Boolean) {
         if (homeRow) {
             cancelHomeRowShimmer()
         }
-        row.setBackgroundColor(Color.parseColor("#181B20"))
+        conversationRowShimmer.stop(row)
     }
 
     private fun createAvatarView(

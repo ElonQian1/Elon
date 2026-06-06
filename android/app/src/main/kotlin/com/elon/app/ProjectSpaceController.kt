@@ -28,6 +28,7 @@ internal class ProjectSpaceController(
     private val collapseInputComposer: () -> Unit,
     private val personalConversations: () -> List<AppConversation>,
     private val activePersonalConversationIndex: () -> Int,
+    private val isPersonalConversationWorking: (Int, AppConversation) -> Boolean,
     private val openPersonalAiChat: (Int) -> Unit,
     private val showPersonalConversationActions: (Int) -> Unit,
     private val showCreatePersonalConversation: () -> Unit,
@@ -42,6 +43,7 @@ internal class ProjectSpaceController(
     private var activeChannel: ProjectChannel? = null
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private val personalConversationRowShimmer = WorkingRowShimmer()
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -431,10 +433,17 @@ internal class ProjectSpaceController(
                 showPersonalConversationActions(index)
                 true
             }
+            val working = isPersonalConversationWorking(index, conversation)
+            if (working) {
+                personalConversationRowShimmer.start(this)
+            } else {
+                personalConversationRowShimmer.stop(this, Color.parseColor(if (active) "#283140" else "#181B20"))
+            }
             addView(TextView(activity).apply {
                 text = buildString {
                     append(conversation.title.ifBlank { "个人会话 ${index + 1}" })
                     if (active) append("  ·  当前")
+                    if (working) append("  ·  工作中")
                     if (conversation.ended) append("  ·  已结束")
                 }
                 textSize = 16f

@@ -557,6 +557,11 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             personalConversations = { projectStateActions.conversations },
             activePersonalConversationIndex = { projectStateActions.activeConversationIndex },
+            isPersonalConversationWorking = { index, conversation ->
+                index in projectStateActions.conversations.indices &&
+                    !conversation.ended &&
+                    homeListActions.isConversationWorking(index)
+            },
             openPersonalAiChat = { conversationIndex ->
                 val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
