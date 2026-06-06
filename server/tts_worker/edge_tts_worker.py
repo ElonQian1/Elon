@@ -21,15 +21,15 @@ PRIMARY_VOICES = {
     "female_warm": "zh-CN-XiaoxiaoNeural",
     "female_bright": "zh-CN-XiaoyiNeural",
     "female_mature": "zh-CN-XiaoxuanNeural",
-    "female_cool": "zh-CN-XiaomoNeural",
-    "female_sweet": "zh-CN-XiaoshuangNeural",
+    "female_cool": "zh-CN-shaanxi-XiaoniNeural",
+    "female_sweet": "zh-CN-liaoning-XiaobeiNeural",
 }
 
 VOICE_FALLBACKS = {
     "female_warm": ["zh-CN-XiaoyiNeural"],
     "female_bright": ["zh-CN-XiaoxiaoNeural"],
     "female_mature": ["zh-CN-XiaoxiaoNeural"],
-    "female_cool": ["zh-CN-XiaoxiaoNeural"],
+    "female_cool": ["zh-CN-XiaoxuanNeural", "zh-CN-XiaoxiaoNeural"],
     "female_sweet": ["zh-CN-XiaoyiNeural", "zh-CN-XiaoxiaoNeural"],
 }
 
