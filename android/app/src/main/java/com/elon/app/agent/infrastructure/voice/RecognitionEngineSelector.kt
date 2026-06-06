@@ -146,12 +146,18 @@ object RecognitionEngineSelector {
     /**
      * 引擎是否真的可用：
      *  - 包必须 enabled；
-     *  - 包必须已被授予 RECORD_AUDIO（很多预装但未被用过的 RecognitionService 没有授权）。
+     *  - 系统应用（FLAG_SYSTEM）无条件认为有权限——MIUI/ColorOS 等系统服务的
+     *    RECORD_AUDIO 是系统级授权，PackageManager.checkPermission() 对第三方查询
+     *    会返回 PERMISSION_DENIED，但实际运行时完全可用（小米 mibrain 就是如此）；
+     *  - 非系统应用才检查 RECORD_AUDIO manifest 授权。
      */
     private fun isUsable(pm: PackageManager, pkg: String): Boolean {
         return try {
             val ai = pm.getApplicationInfo(pkg, 0)
             if (!ai.enabled) return false
+            // 系统签名包（FLAG_SYSTEM）直接放行
+            val isSystemApp = (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+            if (isSystemApp) return true
             pm.checkPermission(android.Manifest.permission.RECORD_AUDIO, pkg) == PackageManager.PERMISSION_GRANTED
         } catch (_: Throwable) {
             false
