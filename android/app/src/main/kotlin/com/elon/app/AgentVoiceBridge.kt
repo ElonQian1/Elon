@@ -164,18 +164,11 @@ internal class AgentVoiceBridge(context: Context) {
      * 若绑定未完成会返回 ERROR_SERVER_DISCONNECTED(11)。
      * 幂等，可多次调用；不会打断进行中的识别。
      *
-     * ⚠️ 华为/荣耀手机跳过预热：
-     * 这两家 ROM 的自家 RecognitionService 对第三方 APK 不开放（无 RECORD_AUDIO 授权），
-     * 强行预热会绑定系统默认引擎并触发超时重试，导致 CPU/发热问题。
-     * 这些手机上首次 startListening 会有一次冷启动延迟，属于平台限制，无法规避。
+     * 内置 2.5 秒看门狗：若绑定超时（如荣耀/华为第三方引擎不可用时）自动释放 recognizer，
+     * 不会残留僵尸连接导致 CPU 占用/发热。好的设备会在 onReady 之前取消看门狗。
+     * 这样所有厂商都走同一套逻辑，不需要硬编码厂商名单。
      */
     fun prewarm() {
-        // 华为/荣耀：不做预热，避免绑定失败导致发热
-        val manufacturer = android.os.Build.MANUFACTURER.lowercase()
-        if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
-            Log.i(TAG, "预热跳过：华为/荣耀设备不支持第三方 ASR 预热")
-            return
-        }
         if (isRunning) return
         main.post {
             if (isRunning) return@post
@@ -186,6 +179,14 @@ internal class AgentVoiceBridge(context: Context) {
             asr.resetEngine()
             asr.initialize()
             Log.i(TAG, "预热: 已为 ${first.label}(${first.packageName}) 启动服务绑定")
+
+            // 看门狗：2.5 秒内未收到 onReady（绑定失败/超时）则自动释放，防止发热
+            main.postDelayed({
+                if (!isRunning && asr.isInitialized) {
+                    Log.i(TAG, "预热看门狗：2.5s 内未收到 onReady，自动释放 recognizer")
+                    asr.resetEngine()
+                }
+            }, 2500L)
         }
     }
 

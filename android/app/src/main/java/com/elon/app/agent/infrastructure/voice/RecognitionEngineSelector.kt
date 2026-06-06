@@ -105,12 +105,14 @@ object RecognitionEngineSelector {
                 result += picked.copy(label = "${picked.label}(系统默认)")
                 result += enginesMut
             } else {
-                val label = try { pm.getApplicationLabel(pm.getApplicationInfo(systemDefault.packageName, 0)).toString() } catch (_: Throwable) { systemDefault.packageName }
-                result += RecognitionEngine(systemDefault, systemDefault.packageName, "$label(系统默认)")
+                // 系统默认不在过滤后的列表里（即 isUsable() 判定不可用）。
+                // 不把它加回去！这就是荣耀/华为机型预热发热的根本原因：
+                // 它们的系统默认（MagicVoice/HiAI）没有授予第三方应用 RECORD_AUDIO，
+                // 强行绑定会超时并进入重试循环，导致 CPU 发熴。
+                // 就用过滤后的引擎列表即可（通常是 Google 或空列表等云端尾底）。
                 result += enginesMut
             }
         } else {
-            // 完全没解析到，把 null 兜底放最前
             result += RecognitionEngine(null, "<system-default>", "系统默认")
             result += enginesMut
         }
