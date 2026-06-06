@@ -1,0 +1,7 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Heavy model dependencies are installed from the official model repos.
+# Configure them with ELON_TTS_MODEL_PYTHONPATH / ELON_INDEXTTS2_MODEL_DIR /
+# ELON_COSYVOICE_MODEL_DIR instead of forcing every lightweight deployment to
+# download GPU packages.

@@ -71,6 +71,113 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy-tts-worker.ps1
 5. 重启 `elon-server.service`
 6. 验证 `/health` 和 `/api/voice/tts/catalog`
 
+## 真实模型 Worker：IndexTTS2 / CosyVoice
+
+Edge Worker 只适合验证链路。要满足“不同女孩声线 + 情绪参考”的产品目标，必须部署模型 Worker：
+
+```text
+server/tts_worker/model_tts_worker.py
+```
+
+它和 Edge Worker 使用同一个 `/synthesize` 合约，但行为不同：
+
+1. `index_tts2` 使用 `voiceAudio` 作为 `spk_audio_prompt`，使用 `emotionAudio` 作为 `emo_audio_prompt`，使用 `emoAlpha` 控制情绪参考强度。
+2. `cosyvoice3` 使用 `voiceAudio` 作为 zero-shot / instruct2 prompt 音频，需要 prompt 音频对应的文字转写。
+3. 缺模型、缺权重、缺参考音频时返回 503 诊断，不会静默切到 Edge。
+4. 只有显式配置 `ELON_TTS_MODEL_FALLBACK_URL` 时才会回退到另一个 Worker，响应头会带 `x-elon-tts-worker-fallback: true`。
+
+IndexTTS2 官方 Python 示例使用 `spk_audio_prompt`、`emo_audio_prompt`、`emo_alpha` 组合控制说话人和情绪：
+https://github.com/index-tts/index-tts
+
+CosyVoice 官方示例使用 `inference_zero_shot` / `inference_instruct2` 和 prompt 音频：
+https://github.com/FunAudioLLM/CosyVoice/blob/main/example.py
+
+### 本机启动模型 Worker
+
+先准备模型源码、权重和授权音频素材，然后运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps1 `
+  -Provider index_tts2 `
+  -AssetRoot "D:\tts-assets" `
+  -ModelPythonPath "D:\models\index-tts" `
+  -IndexTts2ModelDir "D:\models\index-tts\checkpoints" `
+  -IndexTts2CfgPath "D:\models\index-tts\checkpoints\config.yaml"
+```
+
+本机 worker 启动后检查：
+
+```powershell
+curl.exe http://127.0.0.1:5011/health
+```
+
+如果要用 CosyVoice3：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-local-model-tts-worker.ps1 `
+  -Provider cosyvoice3 `
+  -AssetRoot "D:\tts-assets" `
+  -ModelPythonPath "D:\models\CosyVoice" `
+  -CosyVoiceRepoDir "D:\models\CosyVoice" `
+  -CosyVoiceModelDir "D:\models\CosyVoice\pretrained_models\Fun-CosyVoice3-0.5B"
+```
+
+CosyVoice 的 prompt 音频需要对应文本。每个声线 wav 旁边放同名 JSON，或在声线目录放 `profile.json`：
+
+```json
+{
+  "promptText": "你好呀，我是你的 AI 助手，今天也会认真陪你聊天。"
+}
+```
+
+### 服务器部署模型 Worker
+
+服务器已有模型源码、权重和资产时：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\deploy-model-tts-worker.ps1 `
+  -Provider index_tts2 `
+  -RemoteAssetRoot "/root/Elon/server/assets/tts" `
+  -ModelPythonPath "/root/models/index-tts" `
+  -IndexTts2ModelDir "/root/models/index-tts/checkpoints" `
+  -IndexTts2CfgPath "/root/models/index-tts/checkpoints/config.yaml"
+```
+
+脚本会：
+
+1. 上传 `model_tts_worker.py` 和 `requirements-model.txt`
+2. 创建 Python venv
+3. 创建并启动 `elon-model-tts-worker.service`
+4. 写入主服务 `.env`：`ELON_TTS_WORKER_URL=http://127.0.0.1:5011`
+5. 写入主服务 `.env`：`ELON_TTS_PROVIDER=<Provider>`
+6. 重启 `elon-server.service`
+7. 验证模型 Worker `/health` 和主服务 `/api/voice/tts/catalog`
+
+如果服务器没有 GPU，可以先不要把主服务切到模型 Worker。当前生产机没有 GPU 时，继续用 Edge Worker 保持可用；真正模型可放在有 GPU 的本机或另一台机器，再通过内网、隧道或 PC relay 让主服务访问。
+
+### 验证 5 个声线是否真不同
+
+用同一句话、同一个情绪，只改 `voiceId`：
+
+```powershell
+$voices = "female_warm","female_bright","female_mature","female_cool","female_sweet"
+foreach ($voice in $voices) {
+  $body = @{
+    text = "你好呀，我是你的 AI 助手，很高兴今天能陪你聊天。"
+    voiceId = $voice
+    emotionId = "normal"
+    intensity = "normal"
+    provider = "index_tts2"
+    rewrite = $false
+  } | ConvertTo-Json
+  curl.exe -H "Content-Type: application/json" -H "Authorization: Bearer <token>" `
+    -d $body "http://43.139.149.158:8080/api/voice/tts" `
+    --output "$voice.wav"
+}
+```
+
+如果 5 个文件听起来只是同一个人的语气变化，说明 `voices/*.wav` 不是 5 个独立女声参考；需要更换授权素材，而不是继续改 APK。
+
 ## Worker HTTP 合约
 
 Rust 主服务会请求：
