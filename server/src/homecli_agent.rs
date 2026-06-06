@@ -385,6 +385,30 @@ async fn run_agent_session(
         )
         .await;
 
+    // 服务端 → 节点 ping 定时器：每 30s 发一次 ServerToAgent::Ping，
+    // 节点收到后回 Pong，服务端 touch() 刷新 TTL（防止 90s 后被标为离线）。
+    {
+        let ping_tx = cmd_tx.clone();
+        let registry = state.node_registry.clone();
+        let aid = agent_id.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            let mut nonce: u64 = 0;
+            loop {
+                interval.tick().await;
+                nonce += 1;
+                if ping_tx
+                    .send(ServerToAgent::Ping { nonce: Some(nonce.to_string()) })
+                    .is_err()
+                {
+                    break; // 连接已断开
+                }
+                // 发出 ping 时也顺手 touch，防止节点 pong 漏到
+                registry.touch(&aid).await;
+            }
+        });
+    }
+
     // Writer: drain cmd_rx → ws_tx.
     let writer = tokio::spawn(async move {
         while let Some(msg) = cmd_rx.recv().await {
