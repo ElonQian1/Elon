@@ -153,6 +153,12 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy-model-tts-worker.ps1 `
 6. 重启 `elon-server.service`
 7. 验证模型 Worker `/health` 和主服务 `/api/voice/tts/catalog`
 
+只想先把模型 Worker 放到服务器上检查 `/health`，但暂时不让 APK 流量切过去时，加：
+
+```powershell
+-SkipMainServerUpdate
+```
+
 如果服务器没有 GPU，可以先不要把主服务切到模型 Worker。当前生产机没有 GPU 时，继续用 Edge Worker 保持可用；真正模型可放在有 GPU 的本机或另一台机器，再通过内网、隧道或 PC relay 让主服务访问。
 
 ### 验证 5 个声线是否真不同

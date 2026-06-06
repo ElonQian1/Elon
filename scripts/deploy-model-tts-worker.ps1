@@ -10,6 +10,7 @@ param(
     [string]$CosyVoiceRepoDir = "",
     [string]$CosyVoiceModelDir = "",
     [string]$ModelFallbackUrl = "",
+    [switch]$SkipMainServerUpdate,
     [switch]$SkipMainServerRestart
 )
 
@@ -81,6 +82,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "scp worker files failed with exit code $LASTEXITCODE"
 }
 
+$updateMain = if ($SkipMainServerUpdate) { "0" } else { "1" }
 $restartMain = if ($SkipMainServerRestart) { "0" } else { "1" }
 $remoteScript = @"
 set -euo pipefail
@@ -90,6 +92,7 @@ WORKER_DIR='$RemoteWorkerDir'
 VENV_DIR='$RemoteVenvDir'
 PORT='$Port'
 PROVIDER='$Provider'
+UPDATE_MAIN='$updateMain'
 RESTART_MAIN='$restartMain'
 
 cd "`$WORKER_DIR"
@@ -123,7 +126,14 @@ StandardError=append:/root/elon-model-tts-worker.log
 WantedBy=multi-user.target
 UNIT
 
-python3 - <<PY
+systemctl daemon-reload
+systemctl enable --now elon-model-tts-worker.service
+systemctl restart elon-model-tts-worker.service
+sleep 2
+curl -fsS "http://127.0.0.1:$Port/health"
+
+if [ "`$UPDATE_MAIN" = "1" ]; then
+    python3 - <<PY
 from pathlib import Path
 
 env_path = Path("$RemoteRoot/server/.env")
@@ -161,16 +171,11 @@ if updates.keys() - seen:
 env_path.write_text("\\n".join(out) + "\\n", encoding="utf-8")
 PY
 
-systemctl daemon-reload
-systemctl enable --now elon-model-tts-worker.service
-systemctl restart elon-model-tts-worker.service
-sleep 2
-curl -fsS "http://127.0.0.1:$Port/health"
-
-if [ "`$RESTART_MAIN" = "1" ]; then
-    systemctl restart elon-server.service
-    sleep 2
-    curl -fsS "http://127.0.0.1:8080/api/voice/tts/catalog"
+    if [ "`$RESTART_MAIN" = "1" ]; then
+        systemctl restart elon-server.service
+        sleep 2
+        curl -fsS "http://127.0.0.1:8080/api/voice/tts/catalog"
+    fi
 fi
 "@
 
