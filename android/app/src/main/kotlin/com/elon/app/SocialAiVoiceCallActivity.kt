@@ -67,11 +67,13 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private lateinit var speakerButton: ImageButton
     private lateinit var endButton: ImageButton
     private lateinit var pulseBars: List<View>
+    private lateinit var ttsSpeaker: VoiceSpeaker
 
     private var controller: RealtimeVoiceController? = null
     private var callState = CallState.Idle
     private var lastAiMessage = ""
     private var audioOutputEnabled = true
+    private var usingTranscribeFallback = false
 
     private val recordAudioPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -90,6 +92,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
         userId = intent.getStringExtra(EXTRA_USER_ID)?.takeIf { it.isNotBlank() }
             ?: AuthManager.effectiveUserId(this)
         player = RealtimePcmPlayer().also { it.outputEnabled = audioOutputEnabled }
+        ttsSpeaker = VoiceSpeaker(this, respectUserToggle = false)
         applySystemBars()
         setContentView(buildContentView())
         setCallState(CallState.Idle)
@@ -101,6 +104,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
         controller?.shutdown()
         controller = null
         player.release()
+        ttsSpeaker.release()
         super.onDestroy()
     }
 
@@ -353,15 +357,22 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             Toast.makeText(this, "无法启动通话音频播放", Toast.LENGTH_SHORT).show()
         }
         player.clear()
+        ttsSpeaker.stop()
         userTranscript.text = "正在听你说"
         aiTranscript.text = "我在这儿"
         setCallState(CallState.Listening)
+        usingTranscribeFallback = false
+        startVoiceSession(RealtimeVoiceWsClient.Mode.RealtimeChat)
+    }
+
+    private fun startVoiceSession(mode: RealtimeVoiceWsClient.Mode) {
         controller = RealtimeVoiceController(
             context = this,
             baseHttpUrl = serverUrl,
             userId = userId,
-            mode = RealtimeVoiceWsClient.Mode.RealtimeChat,
+            mode = mode,
             target = RealtimeVoiceWsClient.Target.SocialAiDirect,
+            continuousAutoCommit = mode == RealtimeVoiceWsClient.Mode.Transcribe,
             onTranscriptDelta = { text ->
                 runOnUiThread {
                     if (text.isNotBlank()) userTranscript.text = text
@@ -385,8 +396,12 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                     val reply = message.trim().ifBlank { "我在呢。" }
                     lastAiMessage = reply
                     aiTranscript.text = reply
-                    setCallState(CallState.Listening)
-                    statusText.text = "我在听，继续说"
+                    if (usingTranscribeFallback) {
+                        playFallbackReply(reply)
+                    } else {
+                        setCallState(CallState.Listening)
+                        statusText.text = "我在听，继续说"
+                    }
                 }
             },
             onAiError = { message ->
@@ -403,6 +418,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
             onRealtimeSpeechStarted = {
                 runOnUiThread {
                     player.clear()
+                    ttsSpeaker.stop()
                     setCallState(CallState.Listening)
                     statusText.text = "我在听，你说"
                 }
@@ -419,16 +435,59 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
                 }
             },
             onError = { message ->
-                runOnUiThread { showFailure("语音失败：${message.take(60)}") }
+                runOnUiThread {
+                    if (shouldFallbackToTranscribe(message)) {
+                        switchToTranscribeFallback()
+                    } else {
+                        showFailure("语音失败：${message.take(60)}")
+                    }
+                }
             },
         )
         controller?.start(lifecycleScope)
+    }
+
+    private fun shouldFallbackToTranscribe(message: String): Boolean =
+        !usingTranscribeFallback &&
+            (message.contains("Realtime API Key", ignoreCase = true) ||
+                message.contains("实时通话密钥") ||
+                message.contains("未配置 OpenAI Realtime", ignoreCase = true))
+
+    private fun switchToTranscribeFallback() {
+        controller?.shutdown()
+        controller = null
+        player.clear()
+        usingTranscribeFallback = true
+        userTranscript.text = "正在听你说"
+        aiTranscript.text = "实时语音直连暂不可用，已切到语音转写通话"
+        setCallState(CallState.Listening)
+        statusText.text = "我在听，继续说"
+        startVoiceSession(RealtimeVoiceWsClient.Mode.Transcribe)
+    }
+
+    private fun playFallbackReply(reply: String) {
+        setCallState(CallState.Processing)
+        statusText.text = "一龙AI 正在说"
+        if (!audioOutputEnabled) {
+            controller?.resumeAutoListening()
+            setCallState(CallState.Listening)
+            statusText.text = "我在听，继续说"
+            return
+        }
+        ttsSpeaker.speak(reply, onDone = {
+            runOnUiThread {
+                controller?.resumeAutoListening()
+                setCallState(CallState.Listening)
+                statusText.text = "我在听，继续说"
+            }
+        })
     }
 
     private fun finishTurn(nextStatus: String) {
         controller?.shutdown()
         controller = null
         player.clear()
+        ttsSpeaker.stop()
         setCallState(CallState.Idle)
         statusText.text = nextStatus
     }
@@ -442,7 +501,10 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private fun toggleSpeaker() {
         audioOutputEnabled = !audioOutputEnabled
         player.outputEnabled = audioOutputEnabled
-        if (!audioOutputEnabled) player.clear()
+        if (!audioOutputEnabled) {
+            player.clear()
+            ttsSpeaker.stop()
+        }
         updateSpeakerButton()
     }
 
