@@ -106,7 +106,7 @@ internal class MainWorkflowActions(
             incrementServerResponseToken = incrementServerResponseToken,
             appendMessage = messageAppendActions::appendMessage,
             streamAppendChunk = { sid, chunk ->
-                activity.runOnUiThread { chatAdapter.streamAppendChunk(sid, chunk) }
+                activity.runOnUiThread { chatAdapter().streamAppendChunk(sid, chunk) }
             }
         )
     }
