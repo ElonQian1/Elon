@@ -297,6 +297,18 @@ class TaskWorkService : Service() {
     private fun scheduleReconnect(task: RunningTask) {
         if (!task.waitingForReply || activeTasks[task.traceId] == null) return
         task.reconnectAttempts += 1
+        // 超过 20 次重连（约 2 分钟）仍未收到 done/error，认为任务已在服务端结束但消息丢失，强制清除
+        if (task.reconnectAttempts > 20) {
+            DebugTraceStore.record(
+                "task_reconnect_max_exceeded_force_cleanup",
+                mapOf("trace_id" to task.traceId, "attempts" to task.reconnectAttempts)
+            )
+            val fakeError = org.json.JSONObject()
+                .put("type", "error")
+                .put("message", "连接超时，任务可能已在服务器完成，请重新发送消息确认状态。")
+            finishWork(task.traceId, fakeError, success = false)
+            return
+        }
         val delay = (900L * task.reconnectAttempts).coerceAtMost(6_000L)
         DebugTraceStore.record(
             "task_reconnect_scheduled",
