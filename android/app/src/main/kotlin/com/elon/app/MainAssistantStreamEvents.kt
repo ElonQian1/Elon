@@ -69,6 +69,7 @@ internal class MainAssistantStreamEvents(
             addProjectEvent("AI 说明：${summarize(text, 36)}")
         }
         val modelUsed = jsonStringOrNull(json, "model_used")
-        return ChatMessage("ai-intent", text, modelUsed = modelUsed)
+        val streamId = jsonStringOrNull(json, "stream_id")
+        return ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId)
     }
 }

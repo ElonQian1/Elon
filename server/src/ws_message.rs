@@ -28,6 +28,15 @@ pub enum WsMessage {
         /// 本条消息使用的模型名（可选，让用户感知每轮切换）
         #[serde(skip_serializing_if = "Option::is_none")]
         model_used: Option<String>,
+        /// 流式气泡 ID：有此字段时 APK 以此 ID 创建气泡，后续 AssistantChunk 追加到同一气泡
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stream_id: Option<String>,
+    },
+    /// 流式追加到已有气泡（需配合 AssistantMessage 的 stream_id 使用）。
+    /// APK 找到对应 stream_id 的气泡并追加 text，实现打字机效果。
+    AssistantChunk {
+        stream_id: String,
+        text: String,
     },
     /// AI 正在执行的工具
     ToolCall {

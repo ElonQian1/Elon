@@ -43,7 +43,9 @@ data class ChatMessage(
     /** 回答本条消息的模型 ID，如 "gpt-4o-mini"、"qwen2:7b" */
     var modelUsed: String? = null,
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
-    var nodeId: String? = null
+    var nodeId: String? = null,
+    /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
+    var streamId: String? = null
 )
 
 class ChatAdapter(
@@ -337,6 +339,18 @@ class ChatAdapter(
 
         messages.add(msg)
         notifyItemInserted(messages.size - 1)
+    }
+
+    /**
+     * 流式追加：找到具有相同 streamId 的最后一条消息，把 [chunk] 追加到它的 content，
+     * 然后 notifyItemChanged 触发气泡原地刷新（打字机效果）。
+     * 若找不到对应气泡则忽略（容错：可能先到 chunk 后到 AssistantMessage）。
+     */
+    fun streamAppendChunk(streamId: String, chunk: String) {
+        val idx = messages.indexOfLast { it.streamId == streamId }
+        if (idx < 0) return
+        messages[idx].content += chunk
+        notifyItemChanged(idx)
     }
 
     private fun bindTimelineLabel(label: TextView?, position: Int) {

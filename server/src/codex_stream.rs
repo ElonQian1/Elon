@@ -129,6 +129,7 @@ where
                         WsMessage::AssistantMessage {
                             text: display.to_string(),
                             model_used: model_used.map(|s| s.to_string()),
+                            stream_id: None,
                         }
                         .to_json(),
                     );

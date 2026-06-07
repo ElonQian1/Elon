@@ -18,6 +18,7 @@ pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionSc
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
+use uuid::Uuid;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
@@ -673,32 +674,53 @@ async fn run_via_pc_agent(
         .await?;
 
     let mut full_text = String::new();
+    let stream_id = Uuid::new_v4().to_string();
+    let mut stream_started = false;
+
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
-                // 只积累，不逐行推流——每行推流会导致每行变成单独气泡
+                if text.trim().is_empty() {
+                    full_text.push_str(&text);
+                    continue;
+                }
+                if !stream_started {
+                    // 第一个非空块：创建气泡（AssistantMessage 带 stream_id）
+                    stream_started = true;
+                    let _ = tx.send(WsMessage::AssistantMessage {
+                        text: text.clone(),
+                        model_used: Some(agent_id.to_string()),
+                        stream_id: Some(stream_id.clone()),
+                    }.to_json());
+                } else {
+                    // 后续块：追加到同一气泡（AssistantChunk）
+                    let _ = tx.send(WsMessage::AssistantChunk {
+                        stream_id: stream_id.clone(),
+                        text: text.clone(),
+                    }.to_json());
+                }
                 full_text.push_str(&text);
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    // 全部收到后，把完整回复作为一条 AssistantMessage + 一条 Done 发出
-                    let reply = full_text.trim().to_string();
-                    if !reply.is_empty() {
-                        let _ = tx.send(WsMessage::AssistantMessage {
-                            text: reply.clone(),
-                            model_used: Some(agent_id.to_string()),
-                        }.to_json());
-                    }
-                    let _ = tx.send(
-                        WsMessage::Done {
-                            message: String::new(),
-                            apk_url: None,
-                            image_url: None,
-                            model_used: Some(agent_id.to_string()),
-                            node_id: None,
+                    // 若什么都没发（空回复），补一条消息
+                    if !stream_started {
+                        let reply = full_text.trim().to_string();
+                        if !reply.is_empty() {
+                            let _ = tx.send(WsMessage::AssistantMessage {
+                                text: reply,
+                                model_used: Some(agent_id.to_string()),
+                                stream_id: None,
+                            }.to_json());
                         }
-                        .to_json(),
-                    );
+                    }
+                    let _ = tx.send(WsMessage::Done {
+                        message: String::new(),
+                        apk_url: None,
+                        image_url: None,
+                        model_used: Some(agent_id.to_string()),
+                        node_id: None,
+                    }.to_json());
                     return Ok(());
                 } else {
                     return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));

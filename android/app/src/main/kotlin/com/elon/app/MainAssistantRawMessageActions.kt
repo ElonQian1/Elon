@@ -9,7 +9,9 @@ internal class MainAssistantRawMessageActions(
     private val assistantStreamEvents: () -> MainAssistantStreamEvents,
     private val assistantTerminalActions: () -> MainAssistantTerminalActions,
     private val incrementServerResponseToken: () -> Unit,
-    private val appendMessage: (ChatMessage) -> Unit
+    private val appendMessage: (ChatMessage) -> Unit,
+    /** 流式追加块到已有气泡（打字机效果），找不到 streamId 对应气泡时忽略 */
+    private val streamAppendChunk: (streamId: String, chunk: String) -> Unit = { _, _ -> }
 ) {
     // 追踪当前 turn 是否已通过流式 assistant_message 推送过 AI 回复。
     // 若是，done 事件里的 message 字段是相同内容的冗余副本，传 "" 给 handleDone 避免重复气泡。
@@ -43,6 +45,13 @@ internal class MainAssistantRawMessageActions(
                 "assistant_message" -> {
                     receivedStreamingReplyThisTurn = true
                     assistantStreamEvents().assistantMessage(json) ?: return
+                }
+                "assistant_chunk" -> {
+                    // 流式追加到已有气泡（打字机效果），不创建新消息
+                    val sid = jsonStringOrNull(json, "stream_id") ?: return
+                    val chunk = jsonStringOrNull(json, "text") ?: return
+                    streamAppendChunk(sid, chunk)
+                    return
                 }
                 "done" -> {
                     val rawContent = jsonStringOrNull(json, "message") ?: ""
