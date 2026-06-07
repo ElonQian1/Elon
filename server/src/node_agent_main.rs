@@ -627,6 +627,54 @@ fn detect_available_clis() -> Vec<(String, String)> {
     }).collect()
 }
 
+/// 把 extra_args 里的 `--attachment http://...` 替换为本地临时文件路径。
+/// 使用 user_token 作为 Bearer auth 下载图片。
+async fn resolve_attachment_urls(args: Vec<String>, user_token: Option<&str>) -> Vec<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_default();
+    let mut result = Vec::with_capacity(args.len());
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--attachment" {
+            if let Some(url) = args.get(i + 1) {
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    // 下载到临时目录
+                    let ext = url.rsplit('.').next()
+                        .filter(|e| e.len() <= 5 && e.chars().all(|c| c.is_alphanumeric()))
+                        .unwrap_or("bin");
+                    let tmp_path = std::env::temp_dir()
+                        .join(format!("elon_attach_{}.{}", uuid::Uuid::new_v4(), ext));
+                    let mut req = client.get(url.as_str());
+                    if let Some(tok) = user_token {
+                        req = req.bearer_auth(tok);
+                    }
+                    match req.send().await {
+                        Ok(resp) if resp.status().is_success() => {
+                            if let Ok(bytes) = resp.bytes().await {
+                                if tokio::fs::write(&tmp_path, &bytes).await.is_ok() {
+                                    result.push("--attachment".to_string());
+                                    result.push(tmp_path.to_string_lossy().to_string());
+                                    i += 2;
+                                    continue;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    // 下载失败：跳过这对参数（不传给 Copilot）
+                    i += 2;
+                    continue;
+                }
+            }
+        }
+        result.push(args[i].clone());
+        i += 1;
+    }
+    result
+}
+
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
 /// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
 async fn run_cli_prompt(
@@ -894,7 +942,16 @@ async fn run_session(
                             let rt_c = runtime.clone();
                             tokio::spawn(async move {
                                 let full_path = rt_c.resolve_cli(&cli).await;
-                                run_cli_prompt(req_id, &full_path, &cli, extra_args, cwd, prompt, tx_c).await;
+                                // 对 Copilot，把 --attachment URL 替换为本地下载文件
+                                let resolved_args = if cli == "copilot" {
+                                    let user_token = rt_c.creds.read().await
+                                        .as_ref()
+                                        .and_then(|c| c.user_token.clone());
+                                    resolve_attachment_urls(extra_args, user_token.as_deref()).await
+                                } else {
+                                    extra_args
+                                };
+                                run_cli_prompt(req_id, &full_path, &cli, resolved_args, cwd, prompt, tx_c).await;
                             });
                         }
                         ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
