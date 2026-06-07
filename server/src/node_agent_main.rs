@@ -527,12 +527,22 @@ fn detect_available_clis() -> Vec<(String, String)> {
                 .output()
                 .ok()?;
             if !out.status.success() { return None; }
-            let full = String::from_utf8_lossy(&out.stdout)
+            let all_paths: Vec<String> = String::from_utf8_lossy(&out.stdout)
                 .lines()
-                .next()
                 .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())?;
-            Some((name.to_string(), full))
+                .filter(|l| !l.is_empty())
+                .collect();
+            // Windows: 优先选 .cmd（npm 安装的），跳过 VS Code 内置路径
+            // VS Code 内置路径通常含 "globalStorage" 或 "copilotCli" 路径段
+            let best = if cfg!(windows) {
+                all_paths.iter()
+                    .find(|p| p.ends_with(".cmd") && !p.to_lowercase().contains("globalstorage"))
+                    .or_else(|| all_paths.iter().find(|p| !p.to_lowercase().contains("globalstorage")))
+                    .or_else(|| all_paths.first())
+            } else {
+                all_paths.first()
+            };
+            best.cloned().map(|p| (name.to_string(), p))
         })
         .collect()
 }
@@ -550,8 +560,18 @@ async fn run_cli_prompt(
 ) {
     use tokio::io::AsyncBufReadExt;
 
+    // Windows 上 .cmd 文件必须通过 cmd /c 启动，否则 tokio::process::Command 无法直接执行
+    let (actual_bin, actual_args_prefix): (&str, Vec<&str>) = if cfg!(windows) && bin.to_lowercase().ends_with(".cmd") {
+        ("cmd", vec!["/c", bin])
+    } else {
+        (bin, vec![])
+    };
+
     // 构建命令：copilot -p "<prompt>" 或 codex -p "<prompt>"
-    let mut cmd = tokio::process::Command::new(bin);
+    let mut cmd = tokio::process::Command::new(actual_bin);
+    for a in &actual_args_prefix {
+        cmd.arg(a);
+    }
     for a in &extra_args {
         cmd.arg(a);
     }
