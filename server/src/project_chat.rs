@@ -420,7 +420,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
             }),
         );
     }
-    let prepared_execution_workspace = if needs_project_workflow && !execution_mode.is_plan() {
+    // PC 节点项目（有 node_id）的路径在用户 PC 上，不在服务器本地。
+    // 服务器上不应创建 worktree——直接透传给 agent 层，由 pc_project_binding 接管。
+    let is_pc_node_project = project.node_id.as_deref()
+        .map(|n| !n.is_empty())
+        .unwrap_or(false);
+
+    let prepared_execution_workspace = if needs_project_workflow && !execution_mode.is_plan() && !is_pc_node_project {
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),
             Err(error) => {
