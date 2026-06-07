@@ -662,32 +662,45 @@ async fn run_via_pc_agent(
         }
     };
 
+    // PC 节点项目：从 prompt 里提取图片 URL，作为 --attachment 传给 Copilot
+    // 注意：--attachment 只对 initial prompt（无 --continue）有效
+    // 所以有图片时强制开新会话，不续接，确保 Copilot 能看到图片
+    let mut attachment_urls: Vec<String> = Vec::new();
+    for line in prompt.lines() {
+        let line = line.trim();
+        if let Some(url) = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')')) {
+            if url.starts_with("http") {
+                attachment_urls.push(url.to_string());
+            }
+        }
+    }
+    let has_attachments = !attachment_urls.is_empty();
+
     // 查找该会话是否已有 native session（用于 Copilot --continue 续接上下文）
-    let existing_session = native_session_scope.as_ref().and_then(|scope| {
-        state.store.latest_native_agent_session_for_conversation(
-            &scope.project_id,
-            &scope.user_id,
-            &scope.conversation_id,
-            "copilot",
-        ).ok().flatten()
-    });
+    // 有图片附件时不用 --continue，避免 --attachment 在续接会话里失效
+    let existing_session = if has_attachments {
+        None // 强制开新会话
+    } else {
+        native_session_scope.as_ref().and_then(|scope| {
+            state.store.latest_native_agent_session_for_conversation(
+                &scope.project_id,
+                &scope.user_id,
+                &scope.conversation_id,
+                "copilot",
+            ).ok().flatten()
+        })
+    };
+
     let mut extra_args: Vec<String> = if existing_session.is_some() {
         vec!["--continue".into()]
     } else {
         vec![]
     };
 
-    // PC 节点项目：从 prompt 里提取图片 URL 并通过 --attachment 传给 Copilot
-    // 这样 Copilot 能直接下载并分析图片内容，不依赖本地路径
-    for line in prompt.lines() {
-        let line = line.trim();
-        // 匹配 "url: http://..." 格式（由 append_project_attachment_notes 生成）
-        if let Some(url) = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')')) {
-            if url.starts_with("http") {
-                extra_args.push("--attachment".into());
-                extra_args.push(url.to_string());
-            }
-        }
+    // 把图片 URL 加入 --attachment 参数（节点端会下载到本地再传给 Copilot）
+    for url in attachment_urls {
+        extra_args.push("--attachment".into());
+        extra_args.push(url);
     }
 
     // dispatch 时节点可能刚好掉线重连：
