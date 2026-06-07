@@ -448,10 +448,10 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     }
 
     private fun shouldFallbackToTranscribe(message: String): Boolean =
-        !usingTranscribeFallback &&
-            (message.contains("Realtime API Key", ignoreCase = true) ||
-                message.contains("实时通话密钥") ||
-                message.contains("未配置 OpenAI Realtime", ignoreCase = true))
+        SocialAiVoiceFallbackPolicy.shouldFallbackToTranscribe(
+            message = message,
+            alreadyUsingFallback = usingTranscribeFallback
+        )
 
     private fun switchToTranscribeFallback() {
         controller?.shutdown()
@@ -459,7 +459,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
         player.clear()
         usingTranscribeFallback = true
         userTranscript.text = "正在听你说"
-        aiTranscript.text = "实时语音直连暂不可用，已切到语音转写通话"
+        aiTranscript.text = "实时通话已自动切到稳定语音模式"
         setCallState(CallState.Listening)
         statusText.text = "我在听，继续说"
         startVoiceSession(RealtimeVoiceWsClient.Mode.Transcribe)
