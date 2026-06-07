@@ -150,6 +150,7 @@ async fn run_with_workspace_mode(
                 user_message,
                 preflight_note,
                 request_mode,
+                None,
                 state,
                 tx,
             )
@@ -612,6 +613,7 @@ pub async fn run_with_pc_agent_workspace(
     user_message: &str,
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
+    native_session_scope: Option<NativeSessionScope>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -621,6 +623,7 @@ pub async fn run_with_pc_agent_workspace(
         user_message,
         preflight_note,
         request_mode,
+        native_session_scope,
         state,
         tx,
     )
@@ -635,6 +638,7 @@ async fn run_via_pc_agent(
     user_message: &str,
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
+    native_session_scope: Option<NativeSessionScope>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -658,6 +662,21 @@ async fn run_via_pc_agent(
         }
     };
 
+    // 查找该会话是否已有 native session（用于 Copilot --continue 续接上下文）
+    let existing_session = native_session_scope.as_ref().and_then(|scope| {
+        state.store.latest_native_agent_session_for_conversation(
+            &scope.project_id,
+            &scope.user_id,
+            &scope.conversation_id,
+            "copilot",
+        ).ok().flatten()
+    });
+    let extra_args: Vec<String> = if existing_session.is_some() {
+        vec!["--continue".into()]
+    } else {
+        vec![]
+    };
+
     // dispatch 时节点可能刚好掉线重连：
     // 仅对 "agent not connected" 进行较长等待重试（最多约 75 秒），
     // 避免手机端刚发起任务就撞上节点瞬断。
@@ -669,7 +688,7 @@ async fn run_via_pc_agent(
             match state.agent_manager.dispatch_cli_prompt_in_cwd(
                 agent_id,
                 "copilot".into(),
-                vec![],
+                extra_args.clone(),
                 cwd.map(ToOwned::to_owned),
                 prompt.clone(),
             ).await {
@@ -726,6 +745,20 @@ async fn run_via_pc_agent(
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
+                    // 成功后保存 native session sentinel，下次带 --continue 续接上下文
+                    if let Some(scope) = &native_session_scope {
+                        let sentinel = format!("conv-{}", scope.conversation_id);
+                        let workspace = cwd.unwrap_or("");
+                        let _ = state.store.upsert_native_agent_session(
+                            &scope.project_id,
+                            &scope.user_id,
+                            Some(&scope.conversation_id),
+                            "copilot",
+                            agent_id,
+                            workspace,
+                            &sentinel,
+                        );
+                    }
                     // 若什么都没发（空回复），补一条消息
                     if !stream_started {
                         let reply = full_text.trim().to_string();

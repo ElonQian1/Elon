@@ -69,16 +69,21 @@ pub async fn run_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let note = pc_project_note(pc_workspace, false);
         let _ = tx.send(
             WsMessage::progress(format!("正在连接 PC 节点 {} 处理本地项目。", agent_id)).to_json(),
         );
+        let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+            project_id: project.id.clone(),
+            user_id: user_id.to_string(),
+            conversation_id: cid.to_string(),
+        });
         if let Err(e) = ai_cli::run_with_pc_agent_workspace(
             agent_id,
             pc_workspace,
             user_message,
-            Some(&note),
+            None,
             ai_cli::AiCliRequestMode::Execute,
+            session_scope,
             state,
             &tx,
         )
@@ -172,7 +177,6 @@ pub async fn plan_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let note = pc_project_note(pc_workspace, true);
         let _ = tx.send(
             WsMessage::progress(format!("正在连接 PC 节点 {} 规划本地项目。", agent_id)).to_json(),
         );
@@ -180,8 +184,13 @@ pub async fn plan_for_project_in_workspace(
             agent_id,
             pc_workspace,
             user_message,
-            Some(&note),
+            None,
             ai_cli::AiCliRequestMode::Plan,
+            conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                project_id: project.id.clone(),
+                user_id: user_id.to_string(),
+                conversation_id: cid.to_string(),
+            }),
             state,
             &tx,
         )
