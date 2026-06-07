@@ -57,6 +57,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/sw.js", get(web::service_worker))
         .route("/assets/project_plaza.css", get(web::project_plaza_css))
         .route("/assets/project_plaza.js", get(web::project_plaza_js))
+        .route("/assets/project_home.css", get(web::project_home_css))
+        .route("/assets/project_home.js", get(web::project_home_js))
         .route("/health", get(api::health))
         .route("/healthz", get(api::health))
         .route("/readyz", get(api::readyz))

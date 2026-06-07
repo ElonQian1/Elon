@@ -19,6 +19,8 @@ const TAB_CHAT_PNG_B64: &str = include_str!("assets/ic_tab_chat_edit.b64");
 const TAB_PROJECT_PNG_B64: &str = include_str!("assets/ic_tab_project_stack.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
+const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
+const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 
 pub async fn web_page() -> impl IntoResponse {
     static HTML: OnceLock<String> = OnceLock::new();
@@ -126,5 +128,28 @@ pub async fn project_plaza_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_PLAZA_JS,
+    )
+}
+
+pub async fn project_home_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PROJECT_HOME_CSS,
+    )
+}
+
+pub async fn project_home_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PROJECT_HOME_JS,
     )
 }
