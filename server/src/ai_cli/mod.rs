@@ -641,24 +641,20 @@ async fn run_via_pc_agent(
     let prompt = if request_mode.is_plan() {
         match preflight_note {
             Some(note) => format!(
-                "你是一龙开发助手。当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n注意：{}\n\n用户请求：{}\n\n请先读取项目的关键文件（如 package.json/Cargo.toml/build.gradle 等）了解技术栈，再输出目标理解、推荐方案、涉及模块、实施步骤、验证发布方式和待确认问题，并提醒用户确认后发送「按这个计划开始实现」。",
+                "当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n注意：{}\n\n{}",
                 note, user_message
             ),
             None => format!(
-                "你是一龙开发助手。当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n用户请求：{}\n\n请先读取项目的关键文件了解技术栈，再输出目标理解、推荐方案、涉及模块、实施步骤、验证发布方式和待确认问题，并提醒用户确认后发送「按这个计划开始实现」。",
+                "当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n{}",
                 user_message
             ),
         }
     } else {
         match preflight_note {
             Some(note) => format!(
-                "【重要】直接处理用户请求，禁止输出任何打招呼、自我介绍或项目概述，禁止询问用户要什么帮助。\n\n注意：{}\n\n用户请求（立即执行）：{}",
-                note, user_message
+                "注意：{}\n\n{}", note, user_message
             ),
-            None => format!(
-                "【重要】直接处理用户请求，禁止输出任何打招呼、自我介绍或项目概述，禁止询问用户要什么帮助。\n\n用户请求（立即执行）：{}",
-                user_message
-            ),
+            None => user_message.to_string(),
         }
     };
 

@@ -69,30 +69,25 @@ pub async fn run_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let routing = intent_router::classify(user_message);
-        if routing.needs_code_change {
-            // 代码修改任务 → PC 节点 Copilot CLI
-            let note = pc_project_note(pc_workspace, false);
-            let _ = tx.send(
-                WsMessage::progress(format!("正在连接 PC 节点 {} 处理本地项目。", agent_id)).to_json(),
-            );
-            if let Err(e) = ai_cli::run_with_pc_agent_workspace(
-                agent_id,
-                pc_workspace,
-                user_message,
-                Some(&note),
-                ai_cli::AiCliRequestMode::Execute,
-                state,
-                &tx,
-            )
-            .await
-            {
-                error!("PC 本地项目代理运行出错: {}", e);
-                let _ = tx.send(WsMessage::error(e.to_string()).to_json());
-            }
-            return;
+        let note = pc_project_note(pc_workspace, false);
+        let _ = tx.send(
+            WsMessage::progress(format!("正在连接 PC 节点 {} 处理本地项目。", agent_id)).to_json(),
+        );
+        if let Err(e) = ai_cli::run_with_pc_agent_workspace(
+            agent_id,
+            pc_workspace,
+            user_message,
+            Some(&note),
+            ai_cli::AiCliRequestMode::Execute,
+            state,
+            &tx,
+        )
+        .await
+        {
+            error!("PC 本地项目代理运行出错: {}", e);
+            let _ = tx.send(WsMessage::error(e.to_string()).to_json());
         }
-        // 解释/问答类请求 → 不走 Copilot CLI，直接走下方常规 LLM 回答
+        return;
     }
 
     let user_config_workspace = state.get_user_workspace(user_id);
