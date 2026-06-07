@@ -180,7 +180,10 @@ class ChatAdapter(
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
             val isAiRole = message.role in setOf("ai", "ai-intent", "ai-working", "ai-progress", "ai-cli-log")
-            if (isAiRole && message.content.isNotBlank()) {
+            // Copilot CLI（model_used 以 node- 开头）的回复使用 Markdown 渲染；
+            // Codex CLI 和其他模型保持纯文本（Codex 输出不含 MD 格式）
+            val isCopilotReply = message.modelUsed?.startsWith("node-") == true
+            if (isAiRole && isCopilotReply && message.content.isNotBlank()) {
                 renderMarkdown(holder.text, message.content)
             } else {
                 holder.text.text = message.content
@@ -373,11 +376,13 @@ class ChatAdapter(
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
         val msg = messages[idx]
-        // 判断 chunk 是否是 Copilot 工具调用输出行（● 命令、│ 代码、└ 结果等）
+        // 只有 Copilot CLI（model_used 以 node- 开头）才有 ●/│/└ 格式的工具调用输出
+        val isCopilotMsg = msg.modelUsed?.startsWith("node-") == true
         val trimmed = chunk.trimStart()
-        val isCopilotToolLine = trimmed.startsWith("● ") || trimmed.startsWith("│ ") ||
+        val isCopilotToolLine = isCopilotMsg && (
+            trimmed.startsWith("● ") || trimmed.startsWith("│ ") ||
             trimmed.startsWith("└ ") || trimmed.startsWith("  │ ") ||
-            trimmed.startsWith("  └ ")
+            trimmed.startsWith("  └ "))
         if (isCopilotToolLine) {
             // 追加到折叠区域
             val prev = msg.evidenceDetails ?: ""
