@@ -1,5 +1,6 @@
 (function () {
   const PAGE_LIMIT = 50;
+  const MAX_PROJECTS = 200;
   const state = {
     loaded: false,
     loading: false,
@@ -9,7 +10,8 @@
     selectedId: '',
     busyId: '',
     status: '',
-    error: false
+    error: false,
+    fullyLoaded: true
   };
 
   function bridge() {
@@ -203,14 +205,10 @@
     state.loaded = true;
     state.status = '';
     state.error = false;
+    state.fullyLoaded = true;
     render();
     try {
-      const params = new URLSearchParams({ limit: String(PAGE_LIMIT), offset: '0' });
-      if (state.query) params.set('q', state.query);
-      const res = await fetch('/api/store/projects?' + params.toString(), { cache: 'no-store' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || '加载失败');
-      state.projects = data.projects || [];
+      state.projects = await fetchAllProjects();
       await loadJoinedIds();
       if (!state.projects.some((p) => p.id === state.selectedId)) {
         state.selectedId = state.projects[0] ? state.projects[0].id : '';
@@ -224,6 +222,27 @@
     }
   }
 
+  async function fetchAllProjects() {
+    const projects = [];
+    let offset = 0;
+    while (projects.length < MAX_PROJECTS) {
+      const params = new URLSearchParams({ limit: String(PAGE_LIMIT), offset: String(offset) });
+      if (state.query) params.set('q', state.query);
+      const res = await fetch('/api/store/projects?' + params.toString(), { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '加载失败');
+      const page = Array.isArray(data.projects) ? data.projects : [];
+      projects.push(...page);
+      if (page.length < PAGE_LIMIT) {
+        state.fullyLoaded = true;
+        break;
+      }
+      offset += page.length;
+    }
+    if (projects.length >= MAX_PROJECTS) state.fullyLoaded = false;
+    return projects.slice(0, MAX_PROJECTS);
+  }
+
   function render() {
     const count = document.getElementById('projectPlazaCount');
     const list = document.getElementById('projectPlazaList');
@@ -231,7 +250,7 @@
     if (!count || !list || !detail) return;
     count.textContent = state.loading
       ? '正在加载公开项目'
-      : `公开项目 ${state.projects.length} 个`;
+      : `公开项目 ${state.projects.length}${state.fullyLoaded ? '' : '+'} 个`;
     list.innerHTML = renderList();
     detail.innerHTML = renderDetail();
     setStatus(state.status, state.error);

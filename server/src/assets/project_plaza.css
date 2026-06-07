@@ -376,11 +376,13 @@
 
   .project-plaza-body {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    overflow: hidden;
   }
 
   .project-plaza-detail {
     border-left: 0;
     border-top: 1px solid #1e2126;
-    max-height: 44vh;
+    max-height: 34vh;
   }
 }
