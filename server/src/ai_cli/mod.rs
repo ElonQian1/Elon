@@ -699,9 +699,11 @@ async fn run_via_pc_agent(
             use sha2::Digest;
             let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
             let hash = sha2::Sha256::digest(seed.as_bytes());
-            // 取前 16 字节格式化成 UUID v4 形式
+            // UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+            // 第3组必须是 4 位：'4' + 3 个十六进制位（1 nibble + 1 byte）
+            // 用 {:x} 而非 {:02x} 确保 hash[6]&0x0f（0~15）只输出 1 位
             format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                 hash[0], hash[1], hash[2], hash[3],
                 hash[4], hash[5],
                 hash[6] & 0x0f, hash[7],
