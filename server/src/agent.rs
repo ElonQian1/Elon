@@ -69,8 +69,16 @@ pub async fn run_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+        // 从 agent_name 解析用户选择的 CLI：
+        // copilot（默认）/ codex / 包含 "codex" 关键字的 option_id
+        let pc_cli = agent_name
+            .map(|name| {
+                let lower = name.to_lowercase();
+                if lower.contains("codex") { "codex" } else { "copilot" }
+            })
+            .unwrap_or("copilot");
         let _ = tx.send(
-            WsMessage::progress(format!("正在连接 PC 节点 {} 处理本地项目。", agent_id)).to_json(),
+            WsMessage::progress(format!("正在连接 PC 节点 {} 使用 {} 处理本地项目。", agent_id, pc_cli)).to_json(),
         );
         let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
             project_id: project.id.clone(),
@@ -84,6 +92,7 @@ pub async fn run_for_project_in_workspace(
             None,
             ai_cli::AiCliRequestMode::Execute,
             session_scope,
+            Some(pc_cli),
             state,
             &tx,
         )
@@ -177,8 +186,14 @@ pub async fn plan_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+        let pc_cli = agent_name
+            .map(|name| {
+                let lower = name.to_lowercase();
+                if lower.contains("codex") { "codex" } else { "copilot" }
+            })
+            .unwrap_or("copilot");
         let _ = tx.send(
-            WsMessage::progress(format!("正在连接 PC 节点 {} 规划本地项目。", agent_id)).to_json(),
+            WsMessage::progress(format!("正在连接 PC 节点 {} 使用 {} 规划本地项目。", agent_id, pc_cli)).to_json(),
         );
         if let Err(e) = ai_cli::run_with_pc_agent_workspace(
             agent_id,
@@ -191,6 +206,7 @@ pub async fn plan_for_project_in_workspace(
                 user_id: user_id.to_string(),
                 conversation_id: cid.to_string(),
             }),
+            Some(pc_cli),
             state,
             &tx,
         )

@@ -151,6 +151,7 @@ async fn run_with_workspace_mode(
                 preflight_note,
                 request_mode,
                 None,
+                "copilot",
                 state,
                 tx,
             )
@@ -614,6 +615,8 @@ pub async fn run_with_pc_agent_workspace(
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
     native_session_scope: Option<NativeSessionScope>,
+    // cli_name: 用户选择的 CLI 名称（"copilot" / "codex" / None=默认copilot）
+    cli_name: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -624,13 +627,14 @@ pub async fn run_with_pc_agent_workspace(
         preflight_note,
         request_mode,
         native_session_scope,
+        cli_name.unwrap_or("copilot"),
         state,
         tx,
     )
     .await
 }
 
-/// 把 AI 请求委托给通过 WS 连接的 PC agent（elon-pc-1），在 PC 上执行 Copilot CLI。
+/// 把 AI 请求委托给通过 WS 连接的 PC agent，在 PC 上执行指定 CLI（copilot 或 codex）。
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
     agent_id: &str,
@@ -639,6 +643,8 @@ async fn run_via_pc_agent(
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
     native_session_scope: Option<NativeSessionScope>,
+    // cli_name: 要使用的 CLI："copilot" 或 "codex"
+    cli_name: &str,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -663,12 +669,17 @@ async fn run_via_pc_agent(
     };
 
     // PC 节点项目：从 prompt 里提取图片 URL，作为 --attachment 传给 Copilot
+    // 图片行格式：`- name.jpg [image; ...] -> D:/...path (url: http://...)`
+    // URL 在行中间，需要查找子串 `(url: ...)`，不能用 strip_prefix
     let mut attachment_urls: Vec<String> = Vec::new();
     for line in prompt.lines() {
-        let line = line.trim();
-        if let Some(url) = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')')) {
-            if url.starts_with("http") {
-                attachment_urls.push(url.to_string());
+        if let Some(start) = line.find("(url: ") {
+            let rest = &line[start + "(url: ".len()..];
+            if let Some(end) = rest.find(')') {
+                let url = rest[..end].trim();
+                if url.starts_with("http") {
+                    attachment_urls.push(url.to_string());
+                }
             }
         }
     }
@@ -700,17 +711,32 @@ async fn run_via_pc_agent(
         })
     };
 
-    let mut extra_args: Vec<String> = if let Some(ref sid) = copilot_session_uuid {
-        vec![format!("--session-id={}", sid)]
+    // 根据 cli_name 决定额外参数：
+    // - copilot: 用 --session-id 保证用户隔离+上下文复用，支持 --attachment 看图
+    // - codex: 用 -i 传图片（Codex CLI 的图片参数），会话管理由 Codex 原生处理
+    let mut extra_args: Vec<String> = if cli_name == "codex" {
+        // Codex CLI：用 -i 传图片
+        let mut args = Vec::new();
+        for url in &attachment_urls {
+            args.push("-i".to_string());
+            args.push(url.clone());
+        }
+        args
     } else {
-        vec![]
+        // Copilot CLI：用 --session-id 保证用户隔离，用 --attachment 传图片
+        let mut args = if let Some(ref sid) = copilot_session_uuid {
+            vec![format!("--session-id={}", sid)]
+        } else {
+            vec![]
+        };
+        for url in &attachment_urls {
+            args.push("--attachment".into());
+            args.push(url.clone());
+        }
+        args
     };
-
-    // 把图片 URL 加入 --attachment 参数（节点端会下载到本地再传给 Copilot）
-    for url in attachment_urls {
-        extra_args.push("--attachment".into());
-        extra_args.push(url);
-    }
+    // attachment_urls 已通过 extra_args 处理，清空避免重复
+    let _ = attachment_urls;
 
     // dispatch 时节点可能刚好掉线重连：
     // 仅对 "agent not connected" 进行较长等待重试（最多约 75 秒），
@@ -722,7 +748,7 @@ async fn run_via_pc_agent(
         for attempt in 0..MAX_ATTEMPTS {
             match state.agent_manager.dispatch_cli_prompt_in_cwd(
                 agent_id,
-                "copilot".into(),
+                cli_name.to_string(),
                 extra_args.clone(),
                 cwd.map(ToOwned::to_owned),
                 prompt.clone(),
@@ -780,7 +806,7 @@ async fn run_via_pc_agent(
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    // 成功后保存 native session sentinel，下次带 --continue 续接上下文
+                    // 成功后保存 native session sentinel
                     if let Some(scope) = &native_session_scope {
                         let sentinel = format!("conv-{}", scope.conversation_id);
                         let workspace = cwd.unwrap_or("");
@@ -788,7 +814,7 @@ async fn run_via_pc_agent(
                             &scope.project_id,
                             &scope.user_id,
                             Some(&scope.conversation_id),
-                            "copilot",
+                            cli_name,
                             agent_id,
                             workspace,
                             &sentinel,
