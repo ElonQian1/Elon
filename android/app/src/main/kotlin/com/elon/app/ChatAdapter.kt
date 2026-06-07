@@ -392,12 +392,19 @@ class ChatAdapter(
         }
 
         // ── 状态机：正确分离叙述文本 vs 工具块 ──────────────────────────
-        // 工具块以 ●/✗/✓/⚠ 开头的行为起点，以 └ 开头的行为终点（含终点行自身）
+        // 工具块结构：
+        //   ● 操作名称 (tool)\n  ← 起始行（只有 ● 开头才是工具块起始，✗/✓ 在正文里也出现）
+        //   │ 代码/参数\n        ← 块内行
+        //   └ 结果\n             ← 结束行
+        // ✗/✓/✅/⚠ 单独出现在正文里时不触发工具块
         val trimmed = chunk.trimStart()
-        val isToolBlockStart = trimmed.startsWith("● ") || trimmed.startsWith("✗ ") ||
-            trimmed.startsWith("✓ ") || trimmed.startsWith("⚠ ") ||
-            trimmed.startsWith("✔ ")
+        // 工具块起始：● 后跟空格，是 Copilot 工具调用的唯一可靠标记
+        val isToolBlockStart = trimmed.startsWith("● ")
+        // 工具块结束行
         val isToolBlockEnd = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
+        // Copilot 统计尾行（始终折叠，不显示在主气泡）
+        val isStatsLine = trimmed.startsWith("Changes ") || trimmed.startsWith("Requests ") ||
+            trimmed.startsWith("Tokens ")
 
         when {
             isToolBlockStart -> {
@@ -418,8 +425,8 @@ class ChatAdapter(
             }
         }
 
-        if (msg.copilotInToolBlock || isToolBlockStart) {
-            // 工具块内容（包含起始行和块内所有行）→ 折叠区域
+        if (msg.copilotInToolBlock || isToolBlockStart || isStatsLine) {
+            // 工具块内容 / 统计行 → 折叠区域（不显示在主气泡）
             val prev = msg.evidenceDetails ?: ""
             msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
             if (msg.evidenceTitle.isNullOrBlank()) {
