@@ -88,6 +88,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/nodes", get(node_api::list_nodes))
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
+        .route("/api/node-agent/version", get(node_api::node_agent_version))
+        .route("/api/node-agent/download/windows", get(node_api::download_node_agent_windows))
         .route(
             "/api/agent-balloon/ensure",
             post(agent_balloon::ensure_balloon_project),
