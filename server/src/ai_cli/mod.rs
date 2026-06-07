@@ -674,28 +674,12 @@ async fn run_via_pc_agent(
             }
         }
     }
-    let has_attachments = !attachment_urls.is_empty();
 
-    // 查找该会话是否已有 native session（用于 Copilot --continue 续接上下文）
-    // 有图片附件时不用 --continue，避免 --attachment 在续接会话里失效
-    let existing_session = if has_attachments {
-        None // 强制开新会话
-    } else {
-        native_session_scope.as_ref().and_then(|scope| {
-            state.store.latest_native_agent_session_for_conversation(
-                &scope.project_id,
-                &scope.user_id,
-                &scope.conversation_id,
-                "copilot",
-            ).ok().flatten()
-        })
-    };
-
-    let mut extra_args: Vec<String> = if existing_session.is_some() {
-        vec!["--continue".into()]
-    } else {
-        vec![]
-    };
+    // PC 节点项目不使用 --continue：
+    // Copilot CLI 的 --continue 是机器级别的（继续本机最近一次会话），
+    // 多用户共用同一台 PC 时会导致不同用户的对话互相串台。
+    // 每次都开新会话，保证用户隔离。
+    let mut extra_args: Vec<String> = vec![];
 
     // 把图片 URL 加入 --attachment 参数（节点端会下载到本地再传给 Copilot）
     for url in attachment_urls {
