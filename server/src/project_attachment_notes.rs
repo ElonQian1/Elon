@@ -80,7 +80,7 @@ pub(crate) fn append_project_attachment_notes(
                 note.push_str(&format!("\n  image_dimensions: {}", dimensions));
             }
             note.push_str(
-                "\n  Image context: this is an actual uploaded chat image. Open/view the local file path above when answering image questions; do not answer from the file name alone.",
+                "\n  Image context: this image has been passed via --attachment; Copilot can view it directly. Do NOT try to open the local path above (it may not exist); use the image content that was already loaded.",
             );
         } else if mime_type.starts_with("audio/") || attachment.kind.as_deref() == Some("audio") {
             note.push_str(

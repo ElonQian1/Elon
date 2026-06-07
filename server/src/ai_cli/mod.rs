@@ -671,11 +671,24 @@ async fn run_via_pc_agent(
             "copilot",
         ).ok().flatten()
     });
-    let extra_args: Vec<String> = if existing_session.is_some() {
+    let mut extra_args: Vec<String> = if existing_session.is_some() {
         vec!["--continue".into()]
     } else {
         vec![]
     };
+
+    // PC 节点项目：从 prompt 里提取图片 URL 并通过 --attachment 传给 Copilot
+    // 这样 Copilot 能直接下载并分析图片内容，不依赖本地路径
+    for line in prompt.lines() {
+        let line = line.trim();
+        // 匹配 "url: http://..." 格式（由 append_project_attachment_notes 生成）
+        if let Some(url) = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')')) {
+            if url.starts_with("http") {
+                extra_args.push("--attachment".into());
+                extra_args.push(url.to_string());
+            }
+        }
+    }
 
     // dispatch 时节点可能刚好掉线重连：
     // 仅对 "agent not connected" 进行较长等待重试（最多约 75 秒），
