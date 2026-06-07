@@ -663,8 +663,6 @@ async fn run_via_pc_agent(
     };
 
     // PC 节点项目：从 prompt 里提取图片 URL，作为 --attachment 传给 Copilot
-    // 注意：--attachment 只对 initial prompt（无 --continue）有效
-    // 所以有图片时强制开新会话，不续接，确保 Copilot 能看到图片
     let mut attachment_urls: Vec<String> = Vec::new();
     for line in prompt.lines() {
         let line = line.trim();
@@ -674,12 +672,39 @@ async fn run_via_pc_agent(
             }
         }
     }
+    let has_attachments = !attachment_urls.is_empty();
 
-    // PC 节点项目不使用 --continue：
-    // Copilot CLI 的 --continue 是机器级别的（继续本机最近一次会话），
-    // 多用户共用同一台 PC 时会导致不同用户的对话互相串台。
-    // 每次都开新会话，保证用户隔离。
-    let mut extra_args: Vec<String> = vec![];
+    // PC 节点项目用 --session-id 保证用户隔离 + 上下文复用：
+    // - 不用 --continue（机器级别，多用户会串台）
+    // - 用 user_id + conversation_id 派生一个确定性 UUID 作为 session-id
+    //   同一用户同一会话每次都用相同 UUID → Copilot 自动续接上下文
+    //   不同用户 → 不同 UUID → 完全隔离
+    // - 有图片附件时开新 session（带 --attachment 的 initial prompt 才能看到图片）
+    let copilot_session_uuid = if has_attachments {
+        None // 有图片时开全新会话，确保 --attachment 生效
+    } else {
+        native_session_scope.as_ref().map(|scope| {
+            // 用 sha256(project_id + user_id + conversation_id) 派生确定性 UUID
+            use sha2::Digest;
+            let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
+            let hash = sha2::Sha256::digest(seed.as_bytes());
+            // 取前 16 字节格式化成 UUID v4 形式
+            format!(
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                hash[0], hash[1], hash[2], hash[3],
+                hash[4], hash[5],
+                hash[6] & 0x0f, hash[7],
+                (hash[8] & 0x3f) | 0x80, hash[9],
+                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+            )
+        })
+    };
+
+    let mut extra_args: Vec<String> = if let Some(ref sid) = copilot_session_uuid {
+        vec![format!("--session-id={}", sid)]
+    } else {
+        vec![]
+    };
 
     // 把图片 URL 加入 --attachment 参数（节点端会下载到本地再传给 Copilot）
     for url in attachment_urls {
