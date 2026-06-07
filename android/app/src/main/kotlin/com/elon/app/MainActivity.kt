@@ -563,7 +563,7 @@ class MainActivity : AppCompatActivity() {
                         projectStateActions.activeProject().id,
                         conversation.id
                     )
-                    s.runningConversationTasks.containsKey(key)
+                    !conversation.ended && s.runningConversationTasks.containsKey(key)
                 } ?: false
             },
             openPersonalAiChat = { conversationIndex ->
