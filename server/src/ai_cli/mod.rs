@@ -662,11 +662,14 @@ async fn run_via_pc_agent(
         }
     };
 
-    // dispatch 时节点可能刚好重连，重试最多 5 次（每次等 3 秒）
+    // dispatch 时节点可能刚好掉线重连：
+    // 仅对 "agent not connected" 进行较长等待重试（最多约 75 秒），
+    // 避免手机端刚发起任务就撞上节点瞬断。
     let (_, mut rx) = {
         let mut last_err = anyhow::anyhow!("dispatch failed");
         let mut result = Err(last_err);
-        for attempt in 0..5u32 {
+        const MAX_ATTEMPTS: u32 = 25;
+        for attempt in 0..MAX_ATTEMPTS {
             match state.agent_manager.dispatch_cli_prompt_in_cwd(
                 agent_id,
                 "copilot".into(),
@@ -677,12 +680,19 @@ async fn run_via_pc_agent(
                 Ok(r) => { result = Ok(r); break; }
                 Err(e) => {
                     last_err = e;
-                    if attempt < 4 {
-                        let wait = format!("PC 节点短暂离线，等待重连（{}/5）…", attempt + 1);
+                    let msg = last_err.to_string();
+                    let is_offline = msg.contains("agent not connected");
+                    if is_offline && attempt + 1 < MAX_ATTEMPTS {
+                        let wait = format!(
+                            "PC 节点短暂离线，等待重连（{}/{}）…",
+                            attempt + 1,
+                            MAX_ATTEMPTS
+                        );
                         let _ = tx.send(WsMessage::progress(wait).to_json());
                         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     } else {
                         result = Err(last_err);
+                        break;
                     }
                 }
             }
