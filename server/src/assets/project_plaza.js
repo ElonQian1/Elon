@@ -443,6 +443,11 @@
     if (row) row.addEventListener('click', openPlaza);
   }
 
+  window.ElonProjectPlaza = {
+    open: openPlaza,
+    close: closePlaza
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once: true });
   } else {
