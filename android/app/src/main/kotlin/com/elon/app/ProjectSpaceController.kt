@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -7,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -14,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
+import kotlin.math.sin
 
 internal class ProjectSpaceController(
     private val activity: AppCompatActivity,
@@ -28,6 +31,7 @@ internal class ProjectSpaceController(
     private val collapseInputComposer: () -> Unit,
     private val personalConversations: () -> List<AppConversation>,
     private val activePersonalConversationIndex: () -> Int,
+    private val isPersonalConversationWorking: (Int) -> Boolean,
     private val openPersonalAiChat: (Int) -> Unit,
     private val showPersonalConversationActions: (Int) -> Unit,
     private val showCreatePersonalConversation: () -> Unit,
@@ -409,7 +413,14 @@ internal class ProjectSpaceController(
         } else {
             val activeIndex = activePersonalConversationIndex()
             conversations.forEachIndexed { index, conversation ->
-                container.addView(personalConversationRow(index, conversation, index == activeIndex))
+                container.addView(
+                    personalConversationRow(
+                        index = index,
+                        conversation = conversation,
+                        active = index == activeIndex,
+                        working = isPersonalConversationWorking(index)
+                    )
+                )
             }
         }
         container.addView(createPersonalConversationRow())
@@ -418,7 +429,8 @@ internal class ProjectSpaceController(
     private fun personalConversationRow(
         index: Int,
         conversation: AppConversation,
-        active: Boolean
+        active: Boolean,
+        working: Boolean
     ): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -450,7 +462,32 @@ internal class ProjectSpaceController(
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
+            if (working) startPersonalConversationShimmer(this)
         }
+    }
+
+    private fun startPersonalConversationShimmer(row: View) {
+        val baseColor = Color.parseColor("#181B20")
+        val highlightColor = Color.parseColor("#283140")
+        val background = panelBackground("#181B20")
+        row.background = background
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1350L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            interpolator = LinearInterpolator()
+            addUpdateListener { valueAnimator ->
+                val pulse = sin(Math.PI * valueAnimator.animatedFraction).toFloat()
+                background.setColor(blendColor(baseColor, highlightColor, pulse))
+            }
+        }
+        row.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                animator.cancel()
+            }
+        })
+        animator.start()
     }
 
     private fun createPersonalConversationRow(): TextView {
@@ -616,6 +653,15 @@ internal class ProjectSpaceController(
             setColor(Color.parseColor(color))
             cornerRadius = dp(0).toFloat()
         }
+    }
+
+    private fun blendColor(from: Int, to: Int, ratio: Float): Int {
+        val clamped = ratio.coerceIn(0f, 1f)
+        val a = Color.alpha(from) + ((Color.alpha(to) - Color.alpha(from)) * clamped).toInt()
+        val r = Color.red(from) + ((Color.red(to) - Color.red(from)) * clamped).toInt()
+        val g = Color.green(from) + ((Color.green(to) - Color.green(from)) * clamped).toInt()
+        val b = Color.blue(from) + ((Color.blue(to) - Color.blue(from)) * clamped).toInt()
+        return Color.argb(a, r, g, b)
     }
 
     private companion object {

@@ -156,6 +156,13 @@
     }
     .conversation-item:hover { background: #283140; }
     .conversation-item.active { background: #283140; }
+    .conversation-item.working {
+      animation: working-row-pulse 1.35s linear infinite;
+    }
+    @keyframes working-row-pulse {
+      0%, 100% { background: #181B20; }
+      50% { background: #283140; }
+    }
     .conversation-item .brand {
       width: 44px; height: 44px;
       flex: 0 0 44px;
@@ -1633,6 +1640,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       return (d.getMonth() + 1) + '/' + d.getDate();
     } catch { return ''; }
   }
+  function isWorkingStatus(status) {
+    const normalized = String(status || '').toLowerCase();
+    return normalized === 'running'
+      || normalized === 'working'
+      || normalized === 'in_progress'
+      || normalized.includes('正在')
+      || normalized.includes('处理中')
+      || normalized.includes('工作中');
+  }
   function formatChatTimelineLabel(ms) {
     if (!ms) return '';
     const d = new Date(ms);
@@ -1856,6 +1872,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       item.className = 'conversation-item' + (currentProject && currentProject.id === p.id ? ' active' : '');
       item.style.cssText = 'cursor:pointer';
       const status = p.last_task_status || p.status || '准备就绪';
+      if (isWorkingStatus(status)) item.classList.add('working');
       item.innerHTML =
         '<span class="brand"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" /></span>'
         + '<span class="text">'
@@ -3078,4 +3095,3 @@ if ('serviceWorker' in navigator) {
 <script src="/assets/project_plaza.js"></script>
 </body>
 </html>
-

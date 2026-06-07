@@ -557,6 +557,15 @@ class MainActivity : AppCompatActivity() {
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             personalConversations = { projectStateActions.conversations },
             activePersonalConversationIndex = { projectStateActions.activeConversationIndex },
+            isPersonalConversationWorking = { conversationIndex ->
+                projectStateActions.conversations.getOrNull(conversationIndex)?.let { conversation ->
+                    val key = conversationTaskRegistryActions.conversationTaskKey(
+                        projectStateActions.activeProject().id,
+                        conversation.id
+                    )
+                    s.runningConversationTasks.containsKey(key)
+                } ?: false
+            },
             openPersonalAiChat = { conversationIndex ->
                 val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
