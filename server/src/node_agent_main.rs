@@ -515,36 +515,116 @@ fn ws_text(msg: &AgentToServer) -> Message {
 
 /// 检测本机有哪些 CLI 可用。
 /// 检测本机可用的 CLI，返回 (cli名称, 完整路径) 对。
-/// 使用完整路径启动，避免节点进程 PATH 不完整导致 program not found。
+///
+/// 两路并行扫描，取最优路径：
+///   1. `where`/`which` 从 PATH 查（快，但受启动时 PATH 限制）
+///   2. 直接扫描常见安装目录（健壮，不依赖 PATH 是否完整）
+///
+/// 路径优先级（Windows）：
+///   a. 常见目录里找到的 .cmd（最可靠）
+///   b. PATH 里找到的 .cmd 且不含 VS Code globalStorage
+///   c. 其他非 globalStorage 路径
+///   d. 兜底：任何找到的路径
 fn detect_available_clis() -> Vec<(String, String)> {
     let candidates = ["copilot", "codex", "gh"];
-    candidates
-        .iter()
-        .filter_map(|name| {
-            let which_cmd = if cfg!(windows) { "where" } else { "which" };
-            let out = std::process::Command::new(which_cmd)
-                .arg(name)
-                .output()
-                .ok()?;
-            if !out.status.success() { return None; }
-            let all_paths: Vec<String> = String::from_utf8_lossy(&out.stdout)
-                .lines()
-                .map(|l| l.trim().to_string())
-                .filter(|l| !l.is_empty())
-                .collect();
-            // Windows: 优先选 .cmd（npm 安装的），跳过 VS Code 内置路径
-            // VS Code 内置路径通常含 "globalStorage" 或 "copilotCli" 路径段
-            let best = if cfg!(windows) {
-                all_paths.iter()
-                    .find(|p| p.ends_with(".cmd") && !p.to_lowercase().contains("globalstorage"))
-                    .or_else(|| all_paths.iter().find(|p| !p.to_lowercase().contains("globalstorage")))
-                    .or_else(|| all_paths.first())
-            } else {
-                all_paths.first()
-            };
-            best.cloned().map(|p| (name.to_string(), p))
-        })
-        .collect()
+    candidates.iter().filter_map(|name| {
+        let mut candidates_paths: Vec<String> = Vec::new();
+
+        // ── 1. where/which ────────────────────────────────────────────────
+        let which_cmd = if cfg!(windows) { "where" } else { "which" };
+        if let Ok(out) = std::process::Command::new(which_cmd).arg(name).output() {
+            if out.status.success() {
+                let from_path: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                    .lines().map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty()).collect();
+                candidates_paths.extend(from_path);
+            }
+        }
+
+        // ── 2. 直接扫描常见安装目录（不依赖 PATH）────────────────────────
+        #[cfg(windows)]
+        {
+            let appdata = std::env::var("APPDATA").unwrap_or_default();
+            let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+            let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
+            let common_dirs = [
+                // npm global（最常见）
+                format!("{}\\npm", appdata),
+                // yarn global
+                format!("{}\\Yarn\\bin", localappdata),
+                // pnpm global
+                format!("{}\\pnpm", appdata),
+                // volta 管理的
+                format!("{}\\.volta\\bin", userprofile),
+                // nvm 管理的（n-v-m for Windows）
+                format!("{}\\nvm", appdata),
+                // GitHub CLI
+                "C:\\Program Files\\GitHub CLI".to_string(),
+                "C:\\Program Files (x86)\\GitHub CLI".to_string(),
+                // Scoop
+                format!("{}\\scoop\\shims", userprofile),
+                // winget/直接装在 ProgramFiles
+                "C:\\Program Files\\GitHub CLI".to_string(),
+            ];
+            for dir in &common_dirs {
+                // 尝试 name.cmd / name.exe / name
+                for ext in &[".cmd", ".exe", ""] {
+                    let p = format!("{}\\{}{}", dir, name, ext);
+                    if std::path::Path::new(&p).exists() {
+                        if !candidates_paths.contains(&p) {
+                            candidates_paths.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let home = std::env::var("HOME").unwrap_or_default();
+            let common_dirs = [
+                "/usr/local/bin".to_string(),
+                "/usr/bin".to_string(),
+                format!("{}/.npm-global/bin", home),
+                format!("{}/.local/bin", home),
+                format!("{}/.yarn/bin", home),
+                format!("{}/.volta/bin", home),
+            ];
+            for dir in &common_dirs {
+                let p = format!("{}/{}", dir, name);
+                if std::path::Path::new(&p).exists() {
+                    if !candidates_paths.contains(&p) {
+                        candidates_paths.push(p);
+                    }
+                }
+            }
+        }
+
+        if candidates_paths.is_empty() { return None; }
+
+        // ── 3. 选最优路径 ────────────────────────────────────────────────
+        // 过滤掉 VS Code 内置路径（无法独立运行）
+        let not_vscode = |p: &&String| {
+            let lower = p.to_lowercase();
+            !lower.contains("globalstorage") && !lower.contains("copilotcli\\copilot")
+        };
+
+        #[cfg(windows)]
+        let best = candidates_paths.iter()
+            // a. 常见目录里的 .cmd（最可靠）
+            .find(|p| p.to_lowercase().ends_with(".cmd") && not_vscode(p))
+            // b. PATH 里的非 VS Code .cmd
+            .or_else(|| candidates_paths.iter().find(|p| p.to_lowercase().ends_with(".cmd")))
+            // c. 任何非 VS Code 路径
+            .or_else(|| candidates_paths.iter().find(not_vscode))
+            // d. 兜底
+            .or_else(|| candidates_paths.first());
+
+        #[cfg(not(windows))]
+        let best = candidates_paths.iter().find(not_vscode)
+            .or_else(|| candidates_paths.first());
+
+        best.cloned().map(|p| (name.to_string(), p))
+    }).collect()
 }
 
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
