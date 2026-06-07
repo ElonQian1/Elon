@@ -676,19 +676,25 @@ async fn run_via_pc_agent(
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
+                // 只积累，不逐行推流——每行推流会导致每行变成单独气泡
                 full_text.push_str(&text);
-                // 流式进度发给 APK，让用户实时看到输出
-                let _ = tx.send(WsMessage::AssistantMessage { text, model_used: Some(agent_id.to_string()) }.to_json());
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    // 发送最终完成消息
+                    // 全部收到后，把完整回复作为一条 AssistantMessage + 一条 Done 发出
+                    let reply = full_text.trim().to_string();
+                    if !reply.is_empty() {
+                        let _ = tx.send(WsMessage::AssistantMessage {
+                            text: reply.clone(),
+                            model_used: Some(agent_id.to_string()),
+                        }.to_json());
+                    }
                     let _ = tx.send(
                         WsMessage::Done {
-                            message: String::new(), // AssistantMessage 已流式发过了
+                            message: String::new(),
                             apk_url: None,
                             image_url: None,
-                            model_used: None,
+                            model_used: Some(agent_id.to_string()),
                             node_id: None,
                         }
                         .to_json(),
