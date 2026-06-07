@@ -678,7 +678,7 @@ async fn run_via_pc_agent(
             AgentToServer::CliChunk { text, .. } => {
                 full_text.push_str(&text);
                 // 流式进度发给 APK，让用户实时看到输出
-                let _ = tx.send(WsMessage::AssistantMessage { text }.to_json());
+                let _ = tx.send(WsMessage::AssistantMessage { text, model_used: Some(agent_id.to_string()) }.to_json());
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {

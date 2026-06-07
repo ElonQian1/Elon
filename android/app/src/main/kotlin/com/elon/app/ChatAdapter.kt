@@ -549,7 +549,7 @@ class ChatAdapter(
     private fun bindModelAttribution(holder: VH, message: ChatMessage) {
         val tv = holder.modelAttribution ?: return
         val model = message.modelUsed
-        if (model.isNullOrBlank() || message.role !in setOf("ai", "assistant")) {
+        if (model.isNullOrBlank() || message.role !in setOf("ai", "assistant", "ai-intent")) {
             tv.visibility = View.GONE
             return
         }

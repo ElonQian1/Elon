@@ -64,6 +64,7 @@ pub(crate) async fn read_cli_stream<R>(
     reader: R,
     last_activity_ms: Option<Arc<AtomicU64>>,
     progress_tx: Option<UnboundedSender<String>>,
+    model_used: Option<String>,
 ) -> String
 where
     R: AsyncRead + Unpin,
@@ -76,7 +77,7 @@ where
             ts.store(current_unix_millis(), Ordering::Relaxed);
         }
         if let Some(tx) = progress_tx.as_ref() {
-            for message in crate::codex_stream::stream_event_to_ws_messages(&line) {
+            for message in crate::codex_stream::stream_event_to_ws_messages(&line, model_used.as_deref()) {
                 let _ = tx.send(message);
             }
         }

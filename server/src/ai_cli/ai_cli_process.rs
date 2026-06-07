@@ -235,10 +235,12 @@ async fn run_cli_command(
         stdout,
         Some(last_activity_ms.clone()),
         Some(tx.clone()),
+        option.model.clone(),
     ));
     let stderr_task = tokio::spawn(read_cli_stream(
         stderr,
         Some(last_activity_ms.clone()),
+        None,
         None,
     ));
     let heartbeat_task = tokio::spawn(send_cli_heartbeat(tx.clone(), last_activity_ms.clone()));

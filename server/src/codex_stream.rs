@@ -1,4 +1,4 @@
-//! Codex CLI `--json` 流式事件解析。
+﻿//! Codex CLI `--json` 流式事件解析。
 //!
 //! 单一职责：把 codex CLI 输出的一行 JSON 翻译成 0~N 条 WebSocket 消息
 //! （`tool_call` / `tool_result` / `usage` / `progress`）。
@@ -16,10 +16,8 @@ use crate::types::WsMessage;
 
 /// 将一行 codex --json 事件翻译成 0~N 条 WS 消息（已序列化的 JSON 字符串）。
 ///
-/// 同一个事件可能同时输出 `tool_call`/`tool_result`/`usage` 结构化事件，
-/// 以及对应的人类可读 `progress` 文本——前者用于结构化时间线展示，
-/// 后者保留给只关心文本进度的旧客户端。
-pub(crate) fn stream_event_to_ws_messages(line: &str) -> Vec<String> {
+/// `model_used`：当前轮次使用的模型名，附加到 AssistantMessage 让用户感知。
+pub(crate) fn stream_event_to_ws_messages(line: &str, model_used: Option<&str>) -> Vec<String> {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return Vec::new();
@@ -31,13 +29,14 @@ pub(crate) fn stream_event_to_ws_messages(line: &str) -> Vec<String> {
         return Vec::new();
     };
     let mut out: Vec<String> = Vec::new();
+    let model_used_owned = model_used.map(|s| s.to_string());
     let push_progress = |out: &mut Vec<String>, message: String| {
         out.push(WsMessage::progress(message).to_json());
     };
 
     match event_type {
         "item.started" => handle_item_started(&value, &mut out, push_progress),
-        "item.completed" => handle_item_completed(&value, &mut out, push_progress),
+        "item.completed" => handle_item_completed(&value, &mut out, push_progress, model_used_owned.as_deref()),
         // codex --json 在每次 turn 完成时会发出 token_count 事件，
         // 或在 turn.completed 里携带 usage 字段。两种格式都尝试解析。
         "token_count" | "turn.completed" => handle_usage_event(&value, &mut out),
@@ -110,7 +109,7 @@ where
     }
 }
 
-fn handle_item_completed<F>(value: &Value, out: &mut Vec<String>, push_progress: F)
+fn handle_item_completed<F>(value: &Value, out: &mut Vec<String>, push_progress: F, model_used: Option<&str>)
 where
     F: Fn(&mut Vec<String>, String),
 {
@@ -129,6 +128,7 @@ where
                     out.push(
                         WsMessage::AssistantMessage {
                             text: display.to_string(),
+                            model_used: model_used.map(|s| s.to_string()),
                         }
                         .to_json(),
                     );
@@ -259,7 +259,7 @@ mod tests {
     #[test]
     fn stream_event_emits_tool_call_and_progress_for_command_started() {
         let line = r#"{"type":"item.started","item":{"id":"call_1","type":"command_execution","command":"cargo check"}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 2);
         let tool: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(tool["type"], "tool_call");
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn stream_event_emits_tool_result_for_command_completed() {
         let line = r#"{"type":"item.completed","item":{"id":"call_1","type":"command_execution","command":"cargo check","exit_code":0,"aggregated_output":"Compiling foo\nFinished","status":"completed"}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 2);
         let tool: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(tool["type"], "tool_result");
@@ -290,14 +290,14 @@ mod tests {
     fn stream_event_emits_tool_call_and_result_for_file_change() {
         let started = r#"{"type":"item.started","item":{"id":"fc_1","type":"file_change","changes":[{"path":"src/main.rs","kind":"modify"}]}}"#;
         let completed = r#"{"type":"item.completed","item":{"id":"fc_1","type":"file_change","status":"applied","summary":"1 file changed"}}"#;
-        let s = stream_event_to_ws_messages(started);
+        let s = stream_event_to_ws_messages(started, None);
         assert_eq!(s.len(), 2);
         let tool: Value = serde_json::from_str(&s[0]).unwrap();
         assert_eq!(tool["type"], "tool_call");
         assert_eq!(tool["tool"], "file_change");
         assert!(tool["args"]["changes"].is_array());
 
-        let c = stream_event_to_ws_messages(completed);
+        let c = stream_event_to_ws_messages(completed, None);
         let result: Value = serde_json::from_str(&c[0]).unwrap();
         assert_eq!(result["type"], "tool_result");
         assert_eq!(result["tool"], "file_change");
@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn stream_event_emits_usage_event_for_token_count() {
         let line = r#"{"type":"token_count","model":"gpt-5-codex","usage":{"input_tokens":1200,"output_tokens":350,"total_tokens":1550,"cached_input_tokens":800,"total_cost_usd":0.0123}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 1);
         let usage: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(usage["type"], "usage");
@@ -322,7 +322,7 @@ mod tests {
     #[test]
     fn stream_event_emits_usage_event_for_turn_completed_with_usage() {
         let line = r#"{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":20}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 1);
         let usage: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(usage["type"], "usage");
@@ -332,15 +332,15 @@ mod tests {
 
     #[test]
     fn stream_event_ignores_blank_and_unknown_events() {
-        assert!(stream_event_to_ws_messages("").is_empty());
-        assert!(stream_event_to_ws_messages("not json").is_empty());
-        assert!(stream_event_to_ws_messages(r#"{"type":"unknown_event"}"#).is_empty());
+        assert!(stream_event_to_ws_messages("", None).is_empty());
+        assert!(stream_event_to_ws_messages("not json", None).is_empty());
+        assert!(stream_event_to_ws_messages_RAW_REPLACED(r#"{"type":"unknown_event"}"#).is_empty());
     }
 
     #[test]
     fn stream_event_emits_assistant_message_for_agent_message_completed() {
         let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"  我已经读完了 main.rs，准备开始改造。  "}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 1);
         let value: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(value["type"], "assistant_message");
@@ -350,7 +350,7 @@ mod tests {
     #[test]
     fn stream_event_strips_yonghu_kejian_prefix() {
         let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：正在读取 main.rs，马上修改。"}}"#;
-        let msgs = stream_event_to_ws_messages(line);
+        let msgs = stream_event_to_ws_messages(line, None);
         assert_eq!(msgs.len(), 1);
         let value: Value = serde_json::from_str(&msgs[0]).unwrap();
         assert_eq!(value["type"], "assistant_message");
@@ -361,12 +361,12 @@ mod tests {
     fn stream_event_skips_blank_after_prefix_strip() {
         let line =
             r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：   "}}"#;
-        assert!(stream_event_to_ws_messages(line).is_empty());
+        assert!(stream_event_to_ws_messages(line, None).is_empty());
     }
 
     #[test]
     fn stream_event_skips_blank_agent_message() {
         let line = r#"{"type":"item.completed","item":{"type":"agent_message","text":"   "}}"#;
-        assert!(stream_event_to_ws_messages(line).is_empty());
+        assert!(stream_event_to_ws_messages(line, None).is_empty());
     }
 }

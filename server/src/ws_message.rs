@@ -23,7 +23,12 @@ pub enum WsMessage {
     /// AI 给用户的中间发言（来自 Codex CLI 的 agent_message item）。
     /// 与最终 `done.message` 不同，本类型支持任务过程中多次出现，
     /// APK 端会渲染为白底主气泡，让用户感受到"AI 正在说话"。
-    AssistantMessage { text: String },
+    AssistantMessage {
+        text: String,
+        /// 本条消息使用的模型名（可选，让用户感知每轮切换）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model_used: Option<String>,
+    },
     /// AI 正在执行的工具
     ToolCall {
         tool: String,
