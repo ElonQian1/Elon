@@ -295,6 +295,27 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             delete(project_deletion::delete_user_project),
         )
         .route(
+            "/api/user/:user_id/projects/:project_id/space",
+            get(project_space::get_user_project_space),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/messages",
+            get(project_space::list_user_project_channel_messages)
+                .post(project_space::send_user_project_channel_message),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion",
+            axum::routing::patch(project_space::mark_user_project_suggestion_updated),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks",
+            post(project_space::start_user_project_channel_ai_task),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/summaries",
+            post(project_space::summarize_user_project_channel_selection),
+        )
+        .route(
             "/api/user/:user_id/projects/:project_id/git/status",
             get(project_git::user_project_git_status),
         )

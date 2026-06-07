@@ -16,7 +16,7 @@ internal class MainProjectActions(
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val openProject: (Int) -> Unit,
-    private val openProjectSpace: (String, String) -> Unit,
+    private val openProjectSpace: (AppProject) -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val http: OkHttpClient,
     private val serverUrl: String,
@@ -83,8 +83,8 @@ internal class MainProjectActions(
 
         val actions = buildList {
             add("编辑项目名称")
+            add("打开项目空间")
             if (!isJoint) add("邀请好友协作")
-            if (isJoint) add("打开项目空间")
             if (isJoint) add("恢复为个人项目")
             if (isJoint) add("发布到项目商城")
             add("Git 仓库")
@@ -98,7 +98,11 @@ internal class MainProjectActions(
                 when (actions[which]) {
                     "编辑项目名称" -> showRenameProjectDialog(index)
                     "邀请好友协作" -> confirmUpgradeToJoint(index)
-                    "打开项目空间" -> openProjectSpace(project.projectSpaceId(), project.title)
+                    "打开项目空间" -> {
+                        setActiveProjectIndex(index)
+                        saveProjects()
+                        openProjectSpace(project)
+                    }
                     "恢复为个人项目" -> confirmRestorePersonalProject(project)
                     "发布到项目商城" -> confirmPublishToMarketplace(project)
                     "Git 仓库" -> {
@@ -145,9 +149,12 @@ internal class MainProjectActions(
                 setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 activity.runOnUiThread {
                     project.markJointDevelopment(created.id, "invite")
+                    projects.indexOfFirst { it.id == project.id }
+                        .takeIf { it >= 0 }
+                        ?.let { setActiveProjectIndex(it) }
                     saveProjects()
                     renderProjectList()
-                    openProjectSpace(created.id, project.title)
+                    openProjectSpace(project)
                     Toast.makeText(activity, "已创建邀请协作项目", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
@@ -359,7 +366,7 @@ internal class MainProjectActions(
                     setActiveConversationIndex(0)
                     saveProjects()
                     renderProjectList()
-                    openProjectSpace(created.id, created.name)
+                    openProjectSpace(projects[index])
                     Toast.makeText(activity, "联合项目已创建", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {

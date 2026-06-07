@@ -41,6 +41,7 @@ internal class ProjectSpaceController(
     private var activeProjectId: String? = null
     private var activeProjectTitle: String = "项目空间"
     private var activeChannel: ProjectChannel? = null
+    private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
 
@@ -53,16 +54,30 @@ internal class ProjectSpaceController(
     }
 
     fun openProjectSpace(projectId: String, title: String, animate: Boolean) {
+        openProjectSpace(projectId, title, animate, ProjectSpaceRoute())
+    }
+
+    fun openPersonalProjectSpace(project: AppProject, userId: String, animate: Boolean) {
+        openProjectSpace(
+            projectId = project.id,
+            title = project.title,
+            animate = animate,
+            route = ProjectSpaceRoute(userId = userId, projectTitle = project.title)
+        )
+    }
+
+    private fun openProjectSpace(projectId: String, title: String, animate: Boolean, route: ProjectSpaceRoute) {
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
         activeSpace = null
         activeChannel = null
+        activeRoute = route
         activeAdapter = null
         stopPolling()
         showProjectSpace(activeProjectTitle, animate)
         renderLoading()
         thread {
-            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId) }
+            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
             activity.runOnUiThread {
                 result.onSuccess {
                     activeSpace = it
@@ -107,6 +122,10 @@ internal class ProjectSpaceController(
             Toast.makeText(activity, "成员列表加载中", Toast.LENGTH_SHORT).show()
             return
         }
+        if (activeRoute.isUserProject) {
+            Toast.makeText(activity, "个人项目成员列表暂不展开", Toast.LENGTH_SHORT).show()
+            return
+        }
         ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp) { member ->
             ProjectMemberConversationDialog.show(
                 activity = activity,
@@ -146,6 +165,7 @@ internal class ProjectSpaceController(
         if (text.isBlank()) return true
 
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val route = activeRoute
         val pending = ChatMessage("user", text, sendStatus = SENDING_STATUS)
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
@@ -156,9 +176,9 @@ internal class ProjectSpaceController(
         thread {
             val result = runCatching {
                 if (channel.kind == AI_CHANNEL_KIND) {
-                    startProjectChannelAiTask(http, serverUrl, activity, channel.projectId, channel.id, text)
+                    startProjectChannelAiTask(http, serverUrl, activity, channel.projectId, channel.id, text, route)
                 } else {
-                    sendProjectChannelMessage(http, serverUrl, activity, channel.projectId, channel.id, text)
+                    sendProjectChannelMessage(http, serverUrl, activity, channel.projectId, channel.id, text, route)
                 }
             }
             activity.runOnUiThread {
@@ -183,6 +203,7 @@ internal class ProjectSpaceController(
     fun summarizeSelectedDiscussion(summary: SelectedDiscussionSummary): Boolean {
         val channel = activeChannel ?: return false
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val route = activeRoute
         val pending = ChatMessage("user", summary.channelPost, sendStatus = SENDING_STATUS)
         messages.add(pending)
         activeAdapter?.notifyItemInserted(messages.lastIndex)
@@ -198,7 +219,8 @@ internal class ProjectSpaceController(
                     projectId = channel.projectId,
                     channelId = channel.id,
                     postContent = summary.channelPost,
-                    summaryPrompt = summary.channelPrompt
+                    summaryPrompt = summary.channelPrompt,
+                    route = route
                 )
             }
             activity.runOnUiThread {
@@ -263,9 +285,10 @@ internal class ProjectSpaceController(
     ) {
         val currentMessages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
         if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
+        val route = activeRoute
         thread {
             val result = runCatching {
-                fetchProjectChannelMessages(http, serverUrl, activity, channel.projectId, channel.id)
+                fetchProjectChannelMessages(http, serverUrl, activity, channel.projectId, channel.id, route = route)
                     .map { it.toChatMessage() }
             }
             activity.runOnUiThread {
@@ -529,6 +552,7 @@ internal class ProjectSpaceController(
         message.canResolveSuggestion = false
         activeAdapter?.notifyMessageUpdated(messagesByChannel[channel.id]?.indexOf(message) ?: -1)
         thread {
+            val route = activeRoute
             val result = runCatching {
                 markProjectSuggestionUpdated(
                     http = http,
@@ -536,7 +560,8 @@ internal class ProjectSpaceController(
                     context = activity,
                     projectId = channel.projectId,
                     channelId = channel.id,
-                    messageId = messageId
+                    messageId = messageId,
+                    route = route
                 )
             }
             activity.runOnUiThread {

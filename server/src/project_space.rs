@@ -9,7 +9,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
@@ -17,6 +17,8 @@ use crate::{
     project_chat::run_project_agent_with_scheduler,
     project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
+    project_mobile::ensure_mobile_project,
+    store::{ProjectAccess, PublicUser},
     tools,
     types::AppState,
 };
@@ -51,6 +53,25 @@ pub struct SummarizeChannelSelectionRequest {
     pub trace_id: Option<String>,
 }
 
+pub async fn get_user_project_space(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    project_space_response(state, user, project)
+}
+
 pub async fn get_project_space(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -60,26 +81,33 @@ pub async fn get_project_space(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    let project = match state.store.project_space_summary(&user.id, &project_id) {
-        Ok(project) => project,
-        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
-    };
     let access = match project_access(&state, &user.id, &project_id) {
         Ok(access) => access,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
+    project_space_response(state, user, access)
+}
+
+fn project_space_response(
+    state: Arc<AppState>,
+    user: PublicUser,
+    access: ProjectAccess,
+) -> Response {
+    let project = match state.store.project_space_summary(&user.id, &access.id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
     let channels = match state
         .store
-        .list_project_space_channels(&user.id, &project_id)
+        .list_project_space_channels(&user.id, &access.id)
     {
         Ok(channels) => channels,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let members = match state.store.list_project_members(&project_id) {
+    let members = match state.store.list_project_members(&access.id) {
         Ok(members) => members,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-
     Json(serde_json::json!({
         "project": project,
         "channels": channels,
@@ -87,6 +115,31 @@ pub async fn get_project_space(
         "latest_apk_url": latest_project_apk_url(&state, &access),
     }))
     .into_response()
+}
+
+pub async fn list_user_project_channel_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    list_channel_messages_response(
+        state,
+        user.id,
+        project.id,
+        channel_id,
+        query_limit(&query, 120),
+    )
 }
 
 pub async fn list_member_conversations(
@@ -164,6 +217,42 @@ pub async fn list_channel_messages(
     }
 }
 
+fn list_channel_messages_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project_id: String,
+    channel_id: String,
+    limit: i64,
+) -> Response {
+    match state
+        .store
+        .list_project_channel_messages(&user_id, &project_id, &channel_id, limit)
+    {
+        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn send_user_project_channel_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<SendChannelMessageRequest>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    send_channel_message_response(state, user.id, project.id, channel_id, req)
+}
+
 pub async fn send_channel_message(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -177,6 +266,16 @@ pub async fn send_channel_message(
     if let Err(e) = project_access(&state, &user.id, &project_id) {
         return json_error(StatusCode::FORBIDDEN, e.to_string());
     }
+    send_channel_message_response(state, user.id, project_id, channel_id, req)
+}
+
+fn send_channel_message_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project_id: String,
+    channel_id: String,
+    req: SendChannelMessageRequest,
+) -> Response {
     let channel_kind = match state
         .store
         .get_project_channel_kind(&project_id, &channel_id)
@@ -192,7 +291,7 @@ pub async fn send_channel_message(
     match state.store.insert_project_channel_message(
         &project_id,
         &channel_id,
-        Some(&user.id),
+        Some(&user_id),
         message_kind,
         &req.content,
         None,
@@ -200,6 +299,25 @@ pub async fn send_channel_message(
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
+}
+
+pub async fn mark_user_project_suggestion_updated(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id, message_id)): Path<(String, String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    mark_suggestion_updated_response(state, user.id, project, channel_id, message_id)
 }
 
 pub async fn mark_suggestion_updated(
@@ -215,18 +333,48 @@ pub async fn mark_suggestion_updated(
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
+    mark_suggestion_updated_response(state, user.id, project, channel_id, message_id)
+}
+
+fn mark_suggestion_updated_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    channel_id: String,
+    message_id: String,
+) -> Response {
     if !can_mark_suggestion_updated(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能标记建议已更新");
     }
     match state.store.mark_project_suggestion_updated(
-        &user.id,
-        &project_id,
+        &user_id,
+        &project.id,
         &channel_id,
         &message_id,
     ) {
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
+}
+
+pub async fn start_user_project_channel_ai_task(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<StartChannelAiTaskRequest>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    start_channel_ai_task_response(state, user.id, project, channel_id, req, true)
 }
 
 pub async fn start_channel_ai_task(
@@ -246,6 +394,21 @@ pub async fn start_channel_ai_task(
     if !can_start_channel_ai(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能发起项目 AI 开发");
     }
+    start_channel_ai_task_response(state, user.id, project, channel_id, req, false)
+}
+
+fn start_channel_ai_task_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    channel_id: String,
+    req: StartChannelAiTaskRequest,
+    use_user_download_route: bool,
+) -> Response {
+    if !can_start_channel_ai(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能发起项目 AI 开发");
+    }
+    let project_id = project.id.clone();
     let channel_kind = match state
         .store
         .get_project_channel_kind(&project_id, &channel_id)
@@ -268,7 +431,7 @@ pub async fn start_channel_ai_task(
     let conversation_title = format!("项目频道 {}", channel_id);
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
-        &user.id,
+        &user_id,
         Some(&conversation_id),
         Some(&conversation_title),
     ) {
@@ -278,16 +441,24 @@ pub async fn start_channel_ai_task(
     let task_id =
         match state
             .store
-            .create_task(&project.id, &user.id, Some(&conversation_id), &content)
+            .create_task(&project.id, &user_id, Some(&conversation_id), &content)
         {
             Ok(id) => id,
             Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
     let trace_id = clean_trace_id(req.trace_id.as_deref());
+    let download_base = if use_user_download_route {
+        format!(
+            "{}/api/user/{}/projects/{}/download",
+            state.public_url, user_id, project.id
+        )
+    } else {
+        format!("{}/api/projects/{}/download", state.public_url, project.id)
+    };
     let task_message = match state.store.insert_project_channel_message(
         &project_id,
         &channel_id,
-        Some(&user.id),
+        Some(&user_id),
         "ai_task",
         &format!("发起 AI 开发任务：{}", content),
         Some(&task_id),
@@ -298,12 +469,13 @@ pub async fn start_channel_ai_task(
 
     spawn_channel_ai_task(ChannelAiTask {
         state: state.clone(),
-        user_id: user.id,
+        user_id,
         project,
         project_id,
         channel_id,
         conversation_id,
         task_id: task_id.clone(),
+        download_base,
         content,
         agent: req.agent,
         trace_id: trace_id.clone(),
@@ -315,6 +487,26 @@ pub async fn start_channel_ai_task(
         "message": task_message,
     }))
     .into_response()
+}
+
+pub async fn summarize_user_project_channel_selection(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id)): Path<(String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<SummarizeChannelSelectionRequest>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    summarize_channel_selection_response(state, user.id, project, channel_id, req)
 }
 
 pub async fn summarize_channel_selection(
@@ -331,6 +523,17 @@ pub async fn summarize_channel_selection(
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
+    summarize_channel_selection_response(state, user.id, project, channel_id, req)
+}
+
+fn summarize_channel_selection_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    channel_id: String,
+    req: SummarizeChannelSelectionRequest,
+) -> Response {
+    let project_id = project.id.clone();
     let post_content = req.post_content.trim().to_string();
     let summary_prompt = req.summary_prompt.trim().to_string();
     if post_content.is_empty() || summary_prompt.is_empty() {
@@ -340,7 +543,7 @@ pub async fn summarize_channel_selection(
     let post_message = match state.store.insert_project_channel_message(
         &project_id,
         &channel_id,
-        Some(&user.id),
+        Some(&user_id),
         "text",
         &post_content,
         None,
@@ -351,7 +554,7 @@ pub async fn summarize_channel_selection(
     let trace_id = clean_trace_id(req.trace_id.as_deref());
     spawn_channel_summary(ChannelSummaryTask {
         state: state.clone(),
-        user_id: user.id,
+        user_id,
         project,
         project_id,
         channel_id,
@@ -367,6 +570,37 @@ pub async fn summarize_channel_selection(
     .into_response()
 }
 
+fn query_limit(query: &HashMap<String, String>, fallback: i64) -> i64 {
+    query
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(fallback)
+}
+
+fn ensure_user_project_for_space(
+    state: &AppState,
+    headers: &HeaderMap,
+    user_id: &str,
+    project_id: &str,
+    project_title: Option<&str>,
+) -> Result<(PublicUser, ProjectAccess), Response> {
+    let effective_user_id = if state.require_login {
+        match auth_from_headers(state, headers) {
+            Ok(user) => user.id,
+            Err(e) => {
+                return Err(json_error(
+                    StatusCode::UNAUTHORIZED,
+                    format!("请先登录后再使用（{}）", e),
+                ));
+            }
+        }
+    } else {
+        user_id.to_string()
+    };
+    ensure_mobile_project(state, &effective_user_id, project_id, project_title)
+        .map_err(|e| json_error(StatusCode::BAD_REQUEST, e.to_string()))
+}
+
 struct ChannelAiTask {
     state: Arc<AppState>,
     user_id: String,
@@ -375,6 +609,7 @@ struct ChannelAiTask {
     channel_id: String,
     conversation_id: String,
     task_id: String,
+    download_base: String,
     content: String,
     agent: Option<String>,
     trace_id: String,
@@ -390,10 +625,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let run_content = task.content.clone();
         let run_agent = task.agent.clone();
         let run_trace_id = task.trace_id.clone();
-        let download_base = format!(
-            "{}/api/projects/{}/download",
-            task.state.public_url, task.project.id
-        );
+        let download_base = task.download_base.clone();
         let runner = tokio::spawn(async move {
             run_project_agent_with_scheduler(
                 run_state,

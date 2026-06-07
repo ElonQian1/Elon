@@ -592,15 +592,10 @@ class MainActivity : AppCompatActivity() {
             projects = { s.projects },
             activeProjectIndex = { s.activeProjectIndex },
             openPersonalProject = { index ->
-                conversationOpenActions.openProject(index)
+                openProjectSpaceForProject(index, true)
             },
             openJointProject = { index ->
-                if (index in s.projects.indices) {
-                    s.activeProjectIndex = index
-                    projectStateActions.saveProjects()
-                    val project = s.projects[index]
-                    projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, true)
-                }
+                openProjectSpaceForProject(index, true)
             },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
             showCreateJointProjectDialog = { projectActions.showCreateJointProjectDialog() },
@@ -834,14 +829,7 @@ class MainActivity : AppCompatActivity() {
             timeFormatter = s.timeFormatter,
             activeProjectIndexProvider = { s.activeProjectIndex },
             openProject = { index ->
-                if (index in s.projects.indices && s.projects[index].isJointDevelopmentProject()) {
-                    val project = s.projects[index]
-                    s.activeProjectIndex = index
-                    projectStateActions.saveProjects()
-                    projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, true)
-                } else {
-                    conversationOpenActions.openProject(index)
-                }
+                openProjectSpaceForProject(index, true)
             },
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
@@ -849,6 +837,25 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         ).also { homeRows = it }
+    }
+
+    private fun openProjectSpaceForProject(index: Int, animate: Boolean) {
+        if (index !in s.projects.indices) return
+        s.activeProjectIndex = index
+        projectStateActions.saveProjects()
+        openProjectSpaceForProject(s.projects[index], animate)
+    }
+
+    private fun openProjectSpaceForProject(project: AppProject, animate: Boolean) {
+        if (project.isJointDevelopmentProject()) {
+            projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, animate)
+        } else {
+            projectSpaceController.openPersonalProjectSpace(
+                project,
+                AuthManager.effectiveUserId(this),
+                animate
+            )
+        }
     }
 
     private val projectActions: MainProjectActions by lazy {
@@ -862,7 +869,7 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
-            openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
+            openProjectSpace = { project -> openProjectSpaceForProject(project, true) },
             showGitProjectDialog = ::showGitProjectDialog,
             http = s.http,
             serverUrl = serverUrl,

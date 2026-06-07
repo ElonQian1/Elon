@@ -9,16 +9,25 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 
+internal data class ProjectSpaceRoute(
+    val userId: String? = null,
+    val projectTitle: String? = null
+) {
+    val isUserProject: Boolean
+        get() = !userId.isNullOrBlank()
+}
+
 internal fun fetchProjectSpace(
     http: OkHttpClient,
     serverUrl: String,
     context: Context,
-    projectId: String
+    projectId: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectSpace {
     val request = AuthManager.applyAuth(
         context,
         Request.Builder()
-            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/space")
+            .url(projectSpaceUrl(serverUrl, projectId, route, "space"))
             .get()
     ).build()
     http.newCall(request).execute().use { response ->
@@ -34,12 +43,13 @@ internal fun fetchProjectChannelMessages(
     context: Context,
     projectId: String,
     channelId: String,
-    limit: Int = 120
+    limit: Int = 120,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): List<ProjectChannelMessage> {
     val request = AuthManager.applyAuth(
         context,
         Request.Builder()
-            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/channels/${projectSpaceUrlPart(channelId)}/messages?limit=$limit")
+            .url(projectSpaceUrl(serverUrl, projectId, route, "channels/${projectSpaceUrlPart(channelId)}/messages", "limit=$limit"))
             .get()
     ).build()
     http.newCall(request).execute().use { response ->
@@ -103,7 +113,8 @@ internal fun sendProjectChannelMessage(
     context: Context,
     projectId: String,
     channelId: String,
-    content: String
+    content: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     return postProjectChannelPayload(
         http = http,
@@ -112,7 +123,8 @@ internal fun sendProjectChannelMessage(
         projectId = projectId,
         channelId = channelId,
         suffix = "messages",
-        payload = JSONObject().put("content", content)
+        payload = JSONObject().put("content", content),
+        route = route
     )
 }
 
@@ -122,7 +134,8 @@ internal fun startProjectChannelAiTask(
     context: Context,
     projectId: String,
     channelId: String,
-    content: String
+    content: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     return postProjectChannelPayload(
         http = http,
@@ -131,7 +144,8 @@ internal fun startProjectChannelAiTask(
         projectId = projectId,
         channelId = channelId,
         suffix = "ai-tasks",
-        payload = JSONObject().put("content", content)
+        payload = JSONObject().put("content", content),
+        route = route
     )
 }
 
@@ -142,7 +156,8 @@ internal fun summarizeProjectChannelMessages(
     projectId: String,
     channelId: String,
     postContent: String,
-    summaryPrompt: String
+    summaryPrompt: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     return postProjectChannelPayload(
         http = http,
@@ -153,7 +168,8 @@ internal fun summarizeProjectChannelMessages(
         suffix = "summaries",
         payload = JSONObject()
             .put("post_content", postContent)
-            .put("summary_prompt", summaryPrompt)
+            .put("summary_prompt", summaryPrompt),
+        route = route
     )
 }
 
@@ -163,16 +179,18 @@ internal fun markProjectSuggestionUpdated(
     context: Context,
     projectId: String,
     channelId: String,
-    messageId: String
+    messageId: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     val request = AuthManager.applyAuth(
         context,
         Request.Builder()
-            .url(
-                "$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}" +
-                    "/channels/${projectSpaceUrlPart(channelId)}" +
-                    "/messages/${projectSpaceUrlPart(messageId)}/suggestion"
-            )
+            .url(projectSpaceUrl(
+                serverUrl,
+                projectId,
+                route,
+                "channels/${projectSpaceUrlPart(channelId)}/messages/${projectSpaceUrlPart(messageId)}/suggestion"
+            ))
             .method("PATCH", "{}".toRequestBody("application/json".toMediaType()))
     ).build()
     http.newCall(request).execute().use { response ->
@@ -189,12 +207,13 @@ private fun postProjectChannelPayload(
     projectId: String,
     channelId: String,
     suffix: String,
-    payload: JSONObject
+    payload: JSONObject,
+    route: ProjectSpaceRoute
 ): ProjectChannelMessage {
     val request = AuthManager.applyAuth(
         context,
         Request.Builder()
-            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/channels/${projectSpaceUrlPart(channelId)}/$suffix")
+            .url(projectSpaceUrl(serverUrl, projectId, route, "channels/${projectSpaceUrlPart(channelId)}/$suffix"))
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
     ).build()
     http.newCall(request).execute().use { response ->
@@ -295,3 +314,29 @@ private fun readProjectSpaceError(body: String, fallback: String): String {
 }
 
 private fun projectSpaceUrlPart(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
+
+private fun projectSpaceUrl(
+    serverUrl: String,
+    projectId: String,
+    route: ProjectSpaceRoute,
+    suffix: String,
+    extraQuery: String? = null
+): String {
+    val base = route.userId?.takeIf { it.isNotBlank() }?.let { userId ->
+        "$serverUrl/api/user/${projectSpaceUrlPart(userId)}/projects/${projectSpaceUrlPart(projectId)}"
+    } ?: "$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}"
+    val query = buildList {
+        if (route.isUserProject) {
+            route.projectTitle?.trim()?.takeIf { it.isNotBlank() }?.let {
+                add("title=${projectSpaceUrlPart(it)}")
+            }
+        }
+        extraQuery?.takeIf { it.isNotBlank() }?.let { add(it) }
+    }
+    return buildString {
+        append(base)
+        append("/")
+        append(suffix.trimStart('/'))
+        if (query.isNotEmpty()) append("?").append(query.joinToString("&"))
+    }
+}
