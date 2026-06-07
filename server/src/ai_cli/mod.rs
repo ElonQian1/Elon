@@ -652,11 +652,11 @@ async fn run_via_pc_agent(
     } else {
         match preflight_note {
             Some(note) => format!(
-                "你是一龙开发助手，帮助用户开发移动端 App。\n\n注意：{}\n\n请先读取当前工作目录的项目结构（package.json/Cargo.toml/build.gradle/README.md 等），了解技术栈后再完成以下任务：\n\n{}",
+                "【重要】直接处理用户请求，禁止输出任何打招呼、自我介绍或项目概述，禁止询问用户要什么帮助。\n\n注意：{}\n\n用户请求（立即执行）：{}",
                 note, user_message
             ),
             None => format!(
-                "你是一龙开发助手，帮助用户开发移动端 App。\n\n请先读取当前工作目录的项目结构了解技术栈后，完成以下任务：\n\n{}",
+                "【重要】直接处理用户请求，禁止输出任何打招呼、自我介绍或项目概述，禁止询问用户要什么帮助。\n\n用户请求（立即执行）：{}",
                 user_message
             ),
         }
