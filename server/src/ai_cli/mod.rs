@@ -662,16 +662,33 @@ async fn run_via_pc_agent(
         }
     };
 
-    let (_, mut rx) = state
-        .agent_manager
-        .dispatch_cli_prompt_in_cwd(
-            agent_id,
-            "copilot".into(),
-            vec![],
-            cwd.map(ToOwned::to_owned),
-            prompt,
-        )
-        .await?;
+    // dispatch 时节点可能刚好重连，重试最多 5 次（每次等 3 秒）
+    let (_, mut rx) = {
+        let mut last_err = anyhow::anyhow!("dispatch failed");
+        let mut result = Err(last_err);
+        for attempt in 0..5u32 {
+            match state.agent_manager.dispatch_cli_prompt_in_cwd(
+                agent_id,
+                "copilot".into(),
+                vec![],
+                cwd.map(ToOwned::to_owned),
+                prompt.clone(),
+            ).await {
+                Ok(r) => { result = Ok(r); break; }
+                Err(e) => {
+                    last_err = e;
+                    if attempt < 4 {
+                        let wait = format!("PC 节点短暂离线，等待重连（{}/5）…", attempt + 1);
+                        let _ = tx.send(WsMessage::progress(wait).to_json());
+                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                    } else {
+                        result = Err(last_err);
+                    }
+                }
+            }
+        }
+        result?
+    };
 
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
