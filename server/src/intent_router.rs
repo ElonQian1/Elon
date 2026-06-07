@@ -208,6 +208,21 @@ const MODEL_CONFIG_ACTION_TERMS: &[&str] = &[
     "为什么不是",
 ];
 
+const EXPLANATION_QUERY_TERMS: &[&str] = &[
+    "什么意思",
+    "是什么",
+    "是什么原因",
+    "为什么",
+    "怎么理解",
+    "解释一下",
+    "解释下",
+    "含义",
+    "啥意思",
+    "what does it mean",
+    "what is",
+    "why",
+];
+
 pub fn classify(message: &str) -> RoutingDecision {
     let normalized = normalize(message);
     if normalized.is_empty() {
@@ -226,6 +241,7 @@ pub fn classify(message: &str) -> RoutingDecision {
     let has_asset_integration = contains_any(&normalized, ASSET_INTEGRATION_TERMS);
     let has_model_config = contains_any(&normalized, MODEL_CONFIG_TERMS)
         && contains_any(&normalized, MODEL_CONFIG_ACTION_TERMS);
+    let asks_for_explanation = contains_any(&normalized, EXPLANATION_QUERY_TERMS);
 
     // 明确要生成新图片并集成到应用（两步：文生图 + 代码集成）
     if has_image_object && has_image_action && has_app_context && has_asset_integration {
@@ -264,6 +280,16 @@ pub fn classify(message: &str) -> RoutingDecision {
             CapabilityRoute::ChatAgent,
             82,
             "model_config_request",
+        );
+    }
+
+    // 解释/澄清类问题应优先走聊天路径，避免误触发代码工作流。
+    if asks_for_explanation && !has_app_action {
+        return RoutingDecision::new(
+            UserIntent::NormalChat,
+            CapabilityRoute::ChatAgent,
+            88,
+            "explanation_query",
         );
     }
 
@@ -427,6 +453,15 @@ mod tests {
     #[test]
     fn routes_normal_chat() {
         let decision = classify("今天我们先聊一下产品方向");
+        assert_eq!(decision.intent, UserIntent::NormalChat);
+        assert_eq!(decision.route, CapabilityRoute::ChatAgent);
+    }
+
+    #[test]
+    fn routes_explanation_question_to_chat_agent() {
+        let decision = classify(
+            "这个项目，用户说选了4场比赛，同时选择2串1，3串1，4串1，后台只显示4串1，这是什么意思？",
+        );
         assert_eq!(decision.intent, UserIntent::NormalChat);
         assert_eq!(decision.route, CapabilityRoute::ChatAgent);
     }
