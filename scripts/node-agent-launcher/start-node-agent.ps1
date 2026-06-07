@@ -51,8 +51,14 @@ $port = $env:NODE_ADMIN_PORT
 if (-not $port) { $port = '7799' }
 $adminUrl = "http://127.0.0.1:$port/"
 
-# ── 已在运行 → 直接打开管理页 ────────────────────────────────────────────────
-if (Test-PortOpen $port) {
+# ── 单实例保护：先按进程名检查，避免多开 ────────────────────────────────────
+$existing = Get-Process -Name "elon-node-agent" -ErrorAction SilentlyContinue
+if ($existing) {
+    # 进程已在 → 等端口就绪（最多 5 秒）再打开管理页
+    for ($i = 0; $i -lt 10; $i++) {
+        if (Test-PortOpen $port) { break }
+        Start-Sleep -Milliseconds 500
+    }
     Start-Process $adminUrl
     return
 }
