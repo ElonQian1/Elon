@@ -1085,6 +1085,9 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
         let app = axum::Router::new()
             .route("/", axum::routing::get(admin_index))
             .route("/api/status", axum::routing::get(admin_status))
+            .route("/api/env-check", axum::routing::get(admin_env_check))
+            .route("/api/install-env", axum::routing::post(admin_install_env))
+            .route("/api/save-openai-key", axum::routing::post(admin_save_openai_key))
             .route("/api/login", axum::routing::post(admin_login))
             .route("/api/logout", axum::routing::post(admin_logout))
             .route("/api/register-project", axum::routing::post(admin_register_project))
@@ -1303,4 +1306,268 @@ async fn admin_register_project(
             })),
         ),
     }
+}
+
+// ── AI 编码工具 & Android 环境检查 / 安装 ────────────────────────────────────
+
+/// 安装向导脚本（嵌入二进制，管理页触发时写到临时目录执行）
+const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
+
+/// 检查单个命令行工具是否可用（PATH + 常见安装目录双路扫描）。
+fn tool_available(bin: &str) -> bool {
+    let which_cmd = if cfg!(windows) { "where" } else { "which" };
+    if std::process::Command::new(which_cmd)
+        .arg(bin)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+    {
+        return true;
+    }
+    // PATH 未命中时扫描常见安装目录
+    #[cfg(windows)]
+    {
+        let appdata = std::env::var("APPDATA").unwrap_or_default();
+        let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+        let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
+        let dirs = [
+            format!("{}\\npm", appdata),
+            format!("{}\\Yarn\\bin", localappdata),
+            format!("{}\\pnpm", appdata),
+            format!("{}\\.volta\\bin", userprofile),
+            "C:\\Program Files\\Git\\cmd".to_string(),
+            "C:\\Program Files\\Git\\bin".to_string(),
+            "C:\\Program Files\\nodejs".to_string(),
+            "C:\\Program Files\\Ollama".to_string(),
+            // JDK 常见路径
+            "C:\\Program Files\\Eclipse Adoptium".to_string(),
+            "C:\\Program Files\\Microsoft\\jdk-17.0.0.35-hotspot\\bin".to_string(),
+        ];
+        for dir in &dirs {
+            for ext in &[".cmd", ".exe", ""] {
+                let p = std::path::PathBuf::from(dir).join(format!("{}{}", bin, ext));
+                if p.exists() { return true; }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        for dir in &[
+            "/usr/local/bin".to_string(),
+            "/usr/bin".to_string(),
+            format!("{}/.npm-global/bin", home),
+            format!("{}/.local/bin", home),
+            format!("{}/.volta/bin", home),
+        ] {
+            if std::path::Path::new(&format!("{}/{}", dir, bin)).exists() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// 检查 Android SDK 是否配置好（platforms/android-34 + build-tools/34.0.0）。
+fn android_sdk_ready() -> bool {
+    let candidates: Vec<String> = [
+        std::env::var("ANDROID_HOME").ok(),
+        std::env::var("ANDROID_SDK_ROOT").ok(),
+        // Windows 默认路径
+        #[cfg(windows)]
+        std::env::var("LOCALAPPDATA")
+            .ok()
+            .map(|p| format!("{}\\Android\\Sdk", p)),
+        #[cfg(not(windows))]
+        Some(format!(
+            "{}/android-sdk",
+            std::env::var("HOME").unwrap_or_default()
+        )),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    candidates.iter().any(|base| {
+        std::path::Path::new(base)
+            .join("platforms")
+            .join("android-34")
+            .exists()
+    })
+}
+
+/// 检查 Gradle 阿里云镜像是否已配置。
+fn gradle_mirror_ok() -> bool {
+    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .unwrap_or_default();
+    let init = std::path::PathBuf::from(&home)
+        .join(".gradle")
+        .join("init.gradle");
+    if !init.exists() { return false; }
+    std::fs::read_to_string(&init)
+        .map(|s| s.contains("maven.aliyun.com"))
+        .unwrap_or(false)
+}
+
+/// GET /api/env-check — 返回各工具安装状态。
+async fn admin_env_check(
+    axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let result = tokio::task::spawn_blocking(|| {
+        serde_json::json!({
+            "git":          tool_available("git"),
+            "java":         tool_available("java"),
+            "node":         tool_available("node"),
+            "npm":          tool_available("npm"),
+            "codex":        tool_available("codex"),
+            "android_sdk":  android_sdk_ready(),
+            "gradle_mirror": gradle_mirror_ok(),
+            "ollama":       tool_available("ollama"),
+            "openai_key":   std::env::var("OPENAI_API_KEY")
+                                .map(|k| k.starts_with("sk-"))
+                                .unwrap_or(false),
+        })
+    })
+    .await
+    .unwrap_or_else(|_| serde_json::json!({}));
+    axum::Json(result)
+}
+
+/// POST /api/install-env — Windows 上弹出安装向导窗口。
+async fn admin_install_env(
+    axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    #[cfg(windows)]
+    {
+        let tmp = std::env::temp_dir().join("elon-setup-node-env.ps1");
+        if let Err(e) = std::fs::write(&tmp, SETUP_ENV_SCRIPT) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": format!("写入临时脚本失败: {e}")
+                })),
+            );
+        }
+        // 优先使用 exe 同目录的脚本（可能是更新版）
+        let script_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("setup-node-env.ps1")))
+            .filter(|p| p.exists())
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| tmp.to_string_lossy().to_string());
+
+        match std::process::Command::new("powershell")
+            .args(["-ExecutionPolicy", "Bypass", "-File", &script_path])
+            .spawn()
+        {
+            Ok(_) => (
+                StatusCode::OK,
+                axum::Json(serde_json::json!({
+                    "ok": true,
+                    "msg": "安装脚本已在新窗口启动，按提示操作完成后刷新本页查看结果"
+                })),
+            ),
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": format!("启动脚本失败: {e}")
+                })),
+            ),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        (
+            axum::http::StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": "自动安装向导仅限 Windows。Linux 用户请手动执行：\nbash scripts/setup-node-env.sh\n（或参照文档手动安装 git / jdk17 / node / codex / android-sdk）"
+            })),
+        )
+    }
+}
+
+#[derive(Deserialize)]
+struct SaveOpenAiKeyReq {
+    api_key: String,
+}
+
+/// POST /api/save-openai-key — 保存 OPENAI_API_KEY 到进程环境变量及 node-agent.env。
+async fn admin_save_openai_key(
+    axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<SaveOpenAiKeyReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    let key = req.api_key.trim().to_string();
+    if key.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({ "ok": false, "error": "API Key 不能为空" })),
+        );
+    }
+    if !key.starts_with("sk-") {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": "API Key 格式不正确，需以 sk- 开头"
+            })),
+        );
+    }
+
+    // 当前进程立即生效（Codex CLI 子进程会继承）
+    std::env::set_var("OPENAI_API_KEY", &key);
+
+    // 持久化到 exe 同目录的 node-agent.env
+    if let Some(env_file) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("node-agent.env")))
+    {
+        upsert_env_file(&env_file, "OPENAI_API_KEY", &key);
+    }
+
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "ok": true,
+            "msg": "OPENAI_API_KEY 已保存，Codex CLI 立即可用"
+        })),
+    )
+}
+
+/// 更新或追加 key=value 到 .env 文件（注释行也会被激活）。
+fn upsert_env_file(path: &std::path::Path, key: &str, value: &str) {
+    let existing = std::fs::read_to_string(path).unwrap_or_default();
+    let prefix = format!("{}=", key);
+    let mut found = false;
+    let new_lines: Vec<String> = existing
+        .lines()
+        .map(|line| {
+            let stripped = line.trim_start_matches('#').trim_start();
+            if stripped.starts_with(&prefix) {
+                found = true;
+                format!("{}={}", key, value)
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+
+    let mut content = new_lines.join("\n");
+    if !found {
+        if !content.is_empty() && !content.ends_with('\n') {
+            content.push('\n');
+        }
+        content.push_str(&format!("{}={}\n", key, value));
+    } else if !content.ends_with('\n') {
+        content.push('\n');
+    }
+    let _ = std::fs::write(path, content);
 }
