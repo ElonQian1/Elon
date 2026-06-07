@@ -280,7 +280,79 @@ async function registerProject() {
   }
 }
 
+// ── AI 编码工具环境检查 ─────────────────────────────────────────────────────
+async function loadEnvCheck() {
+  const r = await fetch('/api/env-check').then(r => r.json()).catch(() => null);
+  const grid = document.getElementById('envCheckGrid');
+  if (!r) {
+    grid.innerHTML = '<div class="label" style="color:#f85149">检查失败</div><div></div>';
+    return;
+  }
+  const items = [
+    { name: 'Git',           key: 'git',        note: '代码操作必需',     required: true },
+    { name: 'Node.js',       key: 'node',       note: 'Codex 运行时',    required: true },
+    { name: 'npm',           key: 'npm',        note: 'Node 包管理器',   required: true },
+    { name: 'Codex CLI',     key: 'codex',      note: 'AI 编码代理',     required: true },
+    { name: 'Ollama',        key: 'ollama',     note: '本地 LLM（可选）', required: false },
+    { name: 'OPENAI_API_KEY',key: 'openai_key', note: 'Codex 鉴权',      required: true },
+  ];
+  grid.innerHTML = items.map(i => {
+    const ok  = r[i.key];
+    const sym = ok ? '✅' : (i.required ? '❌' : '⬜');
+    return `<div class="label">${i.name}</div><div>${sym} <span style="color:#8b949e;font-size:12px">${i.note}</span></div>`;
+  }).join('');
+}
+
+async function installEnv(btn) {
+  btn.disabled = true;
+  const prev = btn.textContent;
+  btn.textContent = '启动中…';
+  const out = document.getElementById('installResult');
+  out.innerHTML = '';
+  try {
+    const resp = await fetch('/api/install-env', { method: 'POST' });
+    const j = await resp.json();
+    if (j.ok) {
+      out.innerHTML = `<div class="ok-toast" style="margin-top:8px">✅ ${j.msg}</div>`;
+      // 安装完成大约需要几分钟，8 秒后自动刷新一次状态
+      setTimeout(loadEnvCheck, 8000);
+    } else {
+      out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ ${j.error}</div>`;
+    }
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ 请求失败: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prev;
+  }
+}
+
+async function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  const out = document.getElementById('apiKeyResult');
+  out.innerHTML = '';
+  if (!key) { out.innerHTML = '<div class="err-toast" style="margin-top:8px">请输入 API Key</div>'; return; }
+  try {
+    const resp = await fetch('/api/save-openai-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key }),
+    });
+    const j = await resp.json();
+    if (j.ok) {
+      out.innerHTML = '<div class="ok-toast" style="margin-top:8px">✅ API Key 已保存，Codex CLI 立即可用</div>';
+      document.getElementById('apiKeyInput').value = '';
+      loadEnvCheck();
+    } else {
+      out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ ${j.error}</div>`;
+    }
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ 请求失败: ${e}</div>`;
+  }
+}
+
 load();
+loadEnvCheck();
 setInterval(load, 5000);
 </script>
 </body>
