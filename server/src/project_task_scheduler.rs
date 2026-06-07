@@ -93,10 +93,28 @@ impl ProjectTaskScheduler {
             },
             Err(_) => {
                 on_queued();
-                let guard = lock.lock_owned().await;
-                ProjectTaskPermit {
-                    was_queued: true,
-                    _guard: guard,
+                // 排队等待，最多等待 30 分钟；超时则强制获取（前一个任务可能已经异常卡死）
+                match tokio::time::timeout(
+                    Duration::from_secs(30 * 60),
+                    lock.lock_owned(),
+                )
+                .await
+                {
+                    Ok(guard) => ProjectTaskPermit {
+                        was_queued: true,
+                        _guard: guard,
+                    },
+                    Err(_) => {
+                        // 超时：说明前一个任务已超 30 分钟，强行创建新锁获取权限
+                        tracing::warn!(key = %project_id, "project lock wait timeout (30m), forcing new slot");
+                        let fresh_lock = Arc::new(AsyncMutex::new(()));
+                        self.locks.lock().await.insert(project_id.to_string(), fresh_lock.clone());
+                        let guard = fresh_lock.lock_owned().await;
+                        ProjectTaskPermit {
+                            was_queued: true,
+                            _guard: guard,
+                        }
+                    }
                 }
             }
         }

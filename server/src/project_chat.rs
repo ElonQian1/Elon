@@ -618,7 +618,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let execution_workspace = prepared_execution_workspace
         .unwrap_or_else(|| ProjectConversationWorkspace::shared(base_workspace.clone()));
 
-    let shared_project_permit = if execution_mode.is_plan() || execution_workspace.is_isolated() {
+    let shared_project_permit = if execution_mode.is_plan() || execution_workspace.is_isolated() || is_pc_node_project {
+        // PC 节点项目：代码在用户 PC 上执行，服务端不持有项目共享锁
+        // 否则 Copilot 长时间运行期间会阻塞该项目的所有其他任务
         None
     } else {
         let queued_tx = tx.clone();
