@@ -345,11 +345,29 @@ class ChatAdapter(
      * 流式追加：找到具有相同 streamId 的最后一条消息，把 [chunk] 追加到它的 content，
      * 然后 notifyItemChanged 触发气泡原地刷新（打字机效果）。
      * 若找不到对应气泡则忽略（容错：可能先到 chunk 后到 AssistantMessage）。
+     *
+     * Copilot CLI 的工具调用输出（以 ●、│、└ 开头的行）路由到 evidenceDetails 折叠区域，
+     * 普通文字内容追加到主内容区域。
      */
     fun streamAppendChunk(streamId: String, chunk: String) {
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
-        messages[idx].content += chunk
+        val msg = messages[idx]
+        // 判断 chunk 是否是 Copilot 工具调用输出行（● 命令、│ 代码、└ 结果等）
+        val trimmed = chunk.trimStart()
+        val isCopilotToolLine = trimmed.startsWith("● ") || trimmed.startsWith("│ ") ||
+            trimmed.startsWith("└ ") || trimmed.startsWith("  │ ") ||
+            trimmed.startsWith("  └ ")
+        if (isCopilotToolLine) {
+            // 追加到折叠区域
+            val prev = msg.evidenceDetails ?: ""
+            msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
+            if (msg.evidenceTitle.isNullOrBlank()) {
+                msg.evidenceTitle = "执行详情"
+            }
+        } else {
+            msg.content += chunk
+        }
         notifyItemChanged(idx)
     }
 
