@@ -1,0 +1,202 @@
+﻿# tray-launcher.ps1 — 一龙 PC 节点托盘启动器
+#
+# 功能：
+#   - 系统托盘图标实时显示节点状态（绿=已连接 橙=运行中 红=已停止）
+#   - 双击图标 → 打开 http://127.0.0.1:7799/ 管理页
+#   - 右键菜单：打开管理页 / 重启节点 / 开机自启（开关）/ 退出
+#   - 启动时自动拉起节点进程（如未运行）
+#   - 单实例保护：已有托盘进程时直接打开管理页并退出
+#
+# 用法：双击「启动一龙节点.cmd」即可（不要直接双击本 .ps1）
+
+# ── 单实例保护（命名 Mutex）──────────────────────────────────────────────────
+Add-Type -TypeDefinition @"
+using System.Threading;
+public static class ElonTrayMutex {
+    public static readonly Mutex M = new Mutex(false, "Global\\ElonNodeAgentTray");
+    public static bool TryAcquire() { return M.WaitOne(0, false); }
+}
+"@ -Language CSharp -ErrorAction SilentlyContinue
+
+if (-not [ElonTrayMutex]::TryAcquire()) {
+    Start-Process "http://127.0.0.1:7799/"
+    exit 0
+}
+
+# ── 基础组件 ──────────────────────────────────────────────────────────────────
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$adminUrl = "http://127.0.0.1:7799/"
+$taskName = "ElonNodeAgentTray"
+$port = if ($env:NODE_ADMIN_PORT) { $env:NODE_ADMIN_PORT } else { "7799" }
+
+# ── 图标创建 ──────────────────────────────────────────────────────────────────
+function New-StatusIcon([int]$r, [int]$g, [int]$b) {
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $gr  = [System.Drawing.Graphics]::FromImage($bmp)
+    $gr.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    # 白色外环
+    $gr.FillEllipse(
+        (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220, 220, 220))),
+        0, 0, 15, 15)
+    # 彩色内圆
+    $gr.FillEllipse(
+        (New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb($r, $g, $b))),
+        2, 2, 11, 11)
+    $gr.Dispose()
+    $icon = [System.Drawing.Icon]::FromHandle($bmp.GetHicon())
+    $bmp.Dispose()
+    return $icon
+}
+
+$script:icGreen  = New-StatusIcon 46  160 67     # 已连接（绿）
+$script:icOrange = New-StatusIcon 210 153 34     # 运行中未连（橙）
+$script:icRed    = New-StatusIcon 200  55 55     # 已停止（红）
+
+# ── 节点管理 ──────────────────────────────────────────────────────────────────
+function Get-ExePath {
+    $p = $env:NODE_AGENT_EXE
+    if ($p -and (Test-Path $p)) { return $p }
+    return Join-Path $here "elon-node-agent.exe"
+}
+
+function Start-NodeIfNeeded {
+    $proc = Get-Process -Name "elon-node-agent" -ErrorAction SilentlyContinue
+    if ($proc) { return }
+    $exe = Get-ExePath
+    if (Test-Path $exe) {
+        Start-Process $exe -WorkingDirectory $here -WindowStyle Hidden
+    }
+}
+
+function Restart-Node {
+    Stop-Process -Name "elon-node-agent" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 1000
+    Start-NodeIfNeeded
+}
+
+function Get-NodeStatus {
+    try {
+        $wc = New-Object System.Net.WebClient
+        $wc.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
+        $wc.Headers.Add("Accept", "application/json")
+        return $wc.DownloadString("http://127.0.0.1:$port/api/status") | ConvertFrom-Json
+    } catch { return $null }
+}
+
+# ── 开机自启 ──────────────────────────────────────────────────────────────────
+function Test-AutoStartEnabled {
+    $t = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    return ($t -ne $null -and $t.State -ne "Disabled")
+}
+
+function Toggle-AutoStart {
+    if (Test-AutoStartEnabled) {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    } else {
+        $pwshCmd = Get-Command "pwsh" -ErrorAction SilentlyContinue
+        $pwshBin = if ($pwshCmd) { $pwshCmd.Source } else { "powershell" }
+        $thisScript = Join-Path $here "tray-launcher.ps1"
+        $act = New-ScheduledTaskAction -Execute $pwshBin `
+            -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$thisScript`""
+        $tri = New-ScheduledTaskTrigger -AtLogon -User $env:USERNAME
+        $set = New-ScheduledTaskSettingsSet `
+            -ExecutionTimeLimit ([TimeSpan]::Zero) `
+            -RestartCount 3 `
+            -RestartInterval ([TimeSpan]::FromMinutes(1))
+        Register-ScheduledTask -TaskName $taskName `
+            -Action $act -Trigger $tri -Settings $set `
+            -RunLevel Limited -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+}
+
+# ── 托盘图标 ──────────────────────────────────────────────────────────────────
+$tray = New-Object System.Windows.Forms.NotifyIcon
+$tray.Icon = $script:icOrange
+$tray.Text = "一龙节点 — 启动中…"
+$tray.Visible = $true
+
+# ── 右键菜单 ──────────────────────────────────────────────────────────────────
+$cm = New-Object System.Windows.Forms.ContextMenuStrip
+
+$miStatus = New-Object System.Windows.Forms.ToolStripMenuItem("正在检查…")
+$miStatus.Enabled = $false
+$cm.Items.Add($miStatus) | Out-Null
+$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+$miOpen = New-Object System.Windows.Forms.ToolStripMenuItem("🌐  打开管理页")
+$miOpen.add_Click({ Start-Process $adminUrl })
+$cm.Items.Add($miOpen) | Out-Null
+
+$miRestart = New-Object System.Windows.Forms.ToolStripMenuItem("🔄  重启节点")
+$miRestart.add_Click({ Restart-Node; Start-Sleep -Milliseconds 2000; Update-TrayStatus })
+$cm.Items.Add($miRestart) | Out-Null
+
+$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+$miAutoStart = New-Object System.Windows.Forms.ToolStripMenuItem("⚡  开机自启")
+$miAutoStart.Checked = Test-AutoStartEnabled
+$miAutoStart.add_Click({ Toggle-AutoStart; $miAutoStart.Checked = Test-AutoStartEnabled })
+$cm.Items.Add($miAutoStart) | Out-Null
+
+$cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+$miExit = New-Object System.Windows.Forms.ToolStripMenuItem("✖  退出（同时停止节点）")
+$miExit.add_Click({
+    Stop-Process -Name "elon-node-agent" -Force -ErrorAction SilentlyContinue
+    $tray.Visible = $false
+    [System.Windows.Forms.Application]::Exit()
+})
+$cm.Items.Add($miExit) | Out-Null
+
+$tray.ContextMenuStrip = $cm
+
+# 双击打开管理页
+$tray.add_DoubleClick({ Start-Process $adminUrl })
+
+# ── 状态刷新 ──────────────────────────────────────────────────────────────────
+function Update-TrayStatus {
+    $proc = Get-Process -Name "elon-node-agent" -ErrorAction SilentlyContinue
+    if (-not $proc) {
+        $tray.Icon = $script:icRed
+        $tray.Text = "一龙节点 ✗ 已停止"
+        $miStatus.Text = "❌ 节点未运行，右键→重启"
+        return
+    }
+    $st = Get-NodeStatus
+    if ($st -and $st.connected -and $st.logged_in) {
+        $tray.Icon = $script:icGreen
+        $tray.Text = "一龙节点 ✓ 已连接"
+        $agentShort = if ($st.agent_id) { " · $($st.agent_id)" } else { "" }
+        $miStatus.Text = "✅ 已连接$agentShort"
+    } elseif ($st -and $st.logged_in) {
+        $tray.Icon = $script:icOrange
+        $tray.Text = "一龙节点 ○ 连接中…"
+        $miStatus.Text = "⏳ $($st.last_event)"
+    } elseif ($st) {
+        $tray.Icon = $script:icOrange
+        $tray.Text = "一龙节点 ○ 未登录"
+        $miStatus.Text = "⚠️  未登录，双击打开管理页登录"
+    } else {
+        $tray.Icon = $script:icOrange
+        $tray.Text = "一龙节点 ○ 管理页启动中…"
+        $miStatus.Text = "⏳ 等待节点就绪…"
+    }
+}
+
+# 定时刷新（每 8 秒）
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 8000
+$timer.add_Tick({ Update-TrayStatus })
+$timer.Start()
+
+# ── 启动 ──────────────────────────────────────────────────────────────────────
+Start-NodeIfNeeded
+Start-Process $adminUrl          # 首次启动时自动打开管理页
+Start-Sleep -Milliseconds 2500
+Update-TrayStatus
+
+# ── 消息循环 ──────────────────────────────────────────────────────────────────
+[System.Windows.Forms.Application]::Run()
