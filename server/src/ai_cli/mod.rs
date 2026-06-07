@@ -702,28 +702,25 @@ async fn run_via_pc_agent(
     // - 用 user_id + conversation_id 派生一个确定性 UUID 作为 session-id
     //   同一用户同一会话每次都用相同 UUID → Copilot 自动续接上下文
     //   不同用户 → 不同 UUID → 完全隔离
-    // - 有图片附件时开新 session（带 --attachment 的 initial prompt 才能看到图片）
-    let copilot_session_uuid = if has_attachments {
-        None // 有图片时开全新会话，确保 --attachment 生效
-    } else {
-        native_session_scope.as_ref().map(|scope| {
-            // 用 sha256(project_id + user_id + conversation_id) 派生确定性 UUID
-            use sha2::Digest;
-            let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
-            let hash = sha2::Sha256::digest(seed.as_bytes());
-            // UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-            // 第3组必须是 4 位：'4' + 3 个十六进制位（1 nibble + 1 byte）
-            // 用 {:x} 而非 {:02x} 确保 hash[6]&0x0f（0~15）只输出 1 位
-            format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-                hash[0], hash[1], hash[2], hash[3],
-                hash[4], hash[5],
-                hash[6] & 0x0f, hash[7],
-                (hash[8] & 0x3f) | 0x80, hash[9],
-                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
-            )
-        })
-    };
+    // - 有图片时同时传 --session-id + --attachment：两者可以共存
+    //   （--attachment 是 initial prompt 选项，--session-id 控制会话归属）
+    let copilot_session_uuid = native_session_scope.as_ref().map(|scope| {
+        // 用 sha256(project_id + user_id + conversation_id) 派生确定性 UUID
+        use sha2::Digest;
+        let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
+        let hash = sha2::Sha256::digest(seed.as_bytes());
+        // UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+        // 第3组必须是 4 位：'4' + 3 个十六进制位（1 nibble + 1 byte）
+        // 用 {:x} 而非 {:02x} 确保 hash[6]&0x0f（0~15）只输出 1 位
+        format!(
+            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+            hash[0], hash[1], hash[2], hash[3],
+            hash[4], hash[5],
+            hash[6] & 0x0f, hash[7],
+            (hash[8] & 0x3f) | 0x80, hash[9],
+            hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+        )
+    });
 
     // 根据 cli_name 决定额外参数：
     // - copilot: 用 --session-id 保证用户隔离+上下文复用，支持 --attachment 看图，支持 --model 指定模型
