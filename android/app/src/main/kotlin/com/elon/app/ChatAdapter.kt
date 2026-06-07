@@ -382,7 +382,10 @@ class ChatAdapter(
         val isCopilotToolLine = isCopilotMsg && (
             trimmed.startsWith("● ") || trimmed.startsWith("│ ") ||
             trimmed.startsWith("└ ") || trimmed.startsWith("  │ ") ||
-            trimmed.startsWith("  └ "))
+            trimmed.startsWith("  └ ") ||
+            trimmed.startsWith("✗ ") || trimmed.startsWith("✓ ") ||
+            trimmed.startsWith("⚠ ") || trimmed.startsWith("! ") ||
+            trimmed.startsWith("  ✗ ") || trimmed.startsWith("  ✓ "))
         if (isCopilotToolLine) {
             // 追加到折叠区域
             val prev = msg.evidenceDetails ?: ""

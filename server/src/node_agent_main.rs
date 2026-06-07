@@ -659,7 +659,9 @@ async fn run_cli_prompt(
     if cli_name == "codex" {
         cmd.arg("-p").arg(&prompt);
     } else if cli_name == "copilot" {
-        cmd.args(["-p", &prompt]);
+        // --allow-all: 非交互模式下自动确认所有工具调用，无需 stdin 确认
+        // 等价于环境变量 COPILOT_ALLOW_ALL=1
+        cmd.args(["--allow-all", "-p", &prompt]);
     } else {
         cmd.arg(&prompt);
     }
