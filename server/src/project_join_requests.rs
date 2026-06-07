@@ -1,12 +1,10 @@
 /// project_join_requests.rs — 项目加入申请审批 API
 ///
 /// 路由（均需登录）：
-///   POST   /api/projects/:id/request-join          提交加入申请（join_mode=approval）
-///   GET    /api/projects/:id/join-requests         owner 查看项目申请列表
-///   PATCH  /api/projects/:id/join-requests/:req_id owner 审批（approve/reject）
-///   GET    /api/me/join-requests                   用户查看自己的申请状态
-///   DELETE /api/me/join-requests/:req_id           撤销自己的申请（仅 pending）
-///   GET    /api/me/owned-projects/pending-counts   owner 名下所有项目及其待审批数
+///   POST  /api/projects/:id/request-join          提交加入申请（join_mode=approval）
+///   GET   /api/projects/:id/join-requests         owner 查看项目申请列表
+///   PATCH /api/projects/:id/join-requests/:req_id owner 审批（approve/reject）
+///   GET   /api/me/join-requests                   用户查看自己的申请状态
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -118,7 +116,10 @@ pub async fn list_join_requests(
     }
 
     let only_pending = q.pending_only.unwrap_or(true);
-    match state.store.list_join_requests(&project_id, only_pending) {
+    match state
+        .store
+        .list_join_requests(&project_id, only_pending)
+    {
         Ok(requests) => Json(serde_json::json!({
             "requests": requests,
             "total": requests.len(),
@@ -191,7 +192,10 @@ pub async fn review_join_request(
 }
 
 /// GET /api/me/join-requests — 当前用户查看自己的申请
-pub async fn my_join_requests(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub async fn my_join_requests(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
@@ -207,7 +211,7 @@ pub async fn my_join_requests(State(state): State<Arc<AppState>>, headers: Heade
     }
 }
 
-/// DELETE /api/me/join-requests/:req_id — 撤销自己的 pending 申请
+/// DELETE /api/me/join-requests/:req_id — 用户取消自己的加入申请
 pub async fn cancel_my_join_request(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -217,32 +221,14 @@ pub async fn cancel_my_join_request(
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
+
     match state.store.cancel_my_join_request(&req_id, &user.id) {
-        Ok(()) => Json(serde_json::json!({
-            "ok": true,
-            "message": "申请已撤销",
-        }))
-        .into_response(),
-        Err(e) => {
-            let msg = e.to_string();
-            let status = if msg.contains("不存在") {
-                StatusCode::NOT_FOUND
-            } else if msg.contains("仅可撤销自己") {
-                StatusCode::FORBIDDEN
-            } else if msg.contains("已处理") {
-                StatusCode::CONFLICT
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            json_error(status, msg)
-        }
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
 
-/// GET /api/me/owned-projects/pending-counts — owner 名下所有项目及其待审批数
-///
-/// 用于设置/我的页面展示"审批中心"的红点 badge。
-/// 返回 `{ "projects": [{ "project_id": "...", "project_name": "...", "pending_count": 3 }, ...], "total_pending": 7 }`
+/// GET /api/me/owned-projects/pending-counts — 查看我拥有的项目中各项目的待审批数量
 pub async fn owned_projects_pending_counts(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -251,28 +237,9 @@ pub async fn owned_projects_pending_counts(
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state
-        .store
-        .list_owned_projects_with_pending_counts(&user.id)
-    {
-        Ok(rows) => {
-            let total: i64 = rows.iter().map(|(_, _, c)| *c).sum();
-            let projects: Vec<_> = rows
-                .into_iter()
-                .map(|(id, name, count)| {
-                    serde_json::json!({
-                        "project_id": id,
-                        "project_name": name,
-                        "pending_count": count,
-                    })
-                })
-                .collect();
-            Json(serde_json::json!({
-                "projects": projects,
-                "total_pending": total,
-            }))
-            .into_response()
-        }
+
+    match state.store.list_owned_projects_with_pending_counts(&user.id) {
+        Ok(rows) => Json(serde_json::json!({ "projects": rows })).into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }
