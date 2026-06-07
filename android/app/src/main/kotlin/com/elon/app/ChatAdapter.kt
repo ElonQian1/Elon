@@ -49,7 +49,14 @@ data class ChatMessage(
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
     var nodeId: String? = null,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
-    var streamId: String? = null
+    var streamId: String? = null,
+    /**
+     * Copilot CLI 工具块状态机：true 表示当前正在接收工具块内容（● 到 └ 之间）。
+     * 工具块内所有行（含空行）全部路由到 evidenceDetails。
+     */
+    var copilotInToolBlock: Boolean = false,
+    /** 已完成的工具调用数量，用于生成折叠标题 */
+    var copilotToolCallCount: Int = 0
 )
 
 class ChatAdapter(
@@ -376,25 +383,54 @@ class ChatAdapter(
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
         val msg = messages[idx]
-        // 只有 Copilot CLI（model_used 以 node- 开头）才有 ●/│/└ 格式的工具调用输出
+        // 只有 Copilot CLI（model_used 以 node- 开头）才需要工具块状态机
         val isCopilotMsg = msg.modelUsed?.startsWith("node-") == true
+        if (!isCopilotMsg) {
+            msg.content += chunk
+            notifyItemChanged(idx)
+            return
+        }
+
+        // ── 状态机：正确分离叙述文本 vs 工具块 ──────────────────────────
+        // 工具块以 ●/✗/✓/⚠ 开头的行为起点，以 └ 开头的行为终点（含终点行自身）
         val trimmed = chunk.trimStart()
-        val isCopilotToolLine = isCopilotMsg && (
-            trimmed.startsWith("● ") || trimmed.startsWith("│ ") ||
-            trimmed.startsWith("└ ") || trimmed.startsWith("  │ ") ||
-            trimmed.startsWith("  └ ") ||
-            trimmed.startsWith("✗ ") || trimmed.startsWith("✓ ") ||
-            trimmed.startsWith("⚠ ") || trimmed.startsWith("! ") ||
-            trimmed.startsWith("  ✗ ") || trimmed.startsWith("  ✓ "))
-        if (isCopilotToolLine) {
-            // 追加到折叠区域
+        val isToolBlockStart = trimmed.startsWith("● ") || trimmed.startsWith("✗ ") ||
+            trimmed.startsWith("✓ ") || trimmed.startsWith("⚠ ") ||
+            trimmed.startsWith("✔ ")
+        val isToolBlockEnd = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
+
+        when {
+            isToolBlockStart -> {
+                // 进入新工具块
+                msg.copilotInToolBlock = true
+                msg.copilotToolCallCount += 1
+            }
+            isToolBlockEnd -> {
+                // 工具块结束行自身也折叠，结束后退出块
+                val prev = msg.evidenceDetails ?: ""
+                msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
+                msg.copilotInToolBlock = false
+                msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
+                    "已执行 ${msg.copilotToolCallCount} 个操作"
+                else "执行详情"
+                notifyItemChanged(idx)
+                return
+            }
+        }
+
+        if (msg.copilotInToolBlock || isToolBlockStart) {
+            // 工具块内容（包含起始行和块内所有行）→ 折叠区域
             val prev = msg.evidenceDetails ?: ""
             msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
             if (msg.evidenceTitle.isNullOrBlank()) {
                 msg.evidenceTitle = "执行详情"
             }
         } else {
-            msg.content += chunk
+            // 叙述文字 → 主气泡内容
+            // 跳过空白行（工具块之间的间隔行不加入主内容）
+            if (chunk.isNotBlank()) {
+                msg.content += chunk
+            }
         }
         notifyItemChanged(idx)
     }
