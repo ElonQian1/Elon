@@ -116,6 +116,11 @@ dependencies {
     // 微信 App 支付 SDK
     implementation 'com.tencent.mm.opensdk:wechat-sdk-android:6.8.28'
 
+    // ===== Markdown 渲染（AI 回复内容格式化展示） =====
+    implementation 'io.noties.markwon:core:4.6.2'
+    implementation 'io.noties.markwon:ext-strikethrough:4.6.2'
+    implementation 'io.noties.markwon:ext-tables:4.6.2'
+
     // ===== Agent 子系统（来自 android-agent 一体化合并） =====
     // LiveData（Agent 状态/进度）
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'

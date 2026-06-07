@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -18,6 +19,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
+import io.noties.markwon.Markwon
+import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
+import io.noties.markwon.ext.tables.TablePlugin
 import kotlin.math.sin
 
 data class ChatMessage(
@@ -56,6 +60,18 @@ class ChatAdapter(
     private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
     private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
+    private var markwon: Markwon? = null
+
+    private fun getMarkwon(context: Context): Markwon {
+        return markwon ?: Markwon.builder(context)
+            .usePlugin(StrikethroughPlugin.create())
+            .usePlugin(TablePlugin.create(context))
+            .build().also { markwon = it }
+    }
+
+    private fun renderMarkdown(textView: TextView, content: String) {
+        getMarkwon(textView.context).setMarkdown(textView, content)
+    }
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
     var onSuggestionResolve: ((ChatMessage) -> Unit)? = null
@@ -163,14 +179,18 @@ class ChatAdapter(
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
-            holder.text.text = message.content
+            val isAiRole = message.role in setOf("ai", "ai-intent", "ai-working", "ai-progress", "ai-cli-log")
+            if (isAiRole && message.content.isNotBlank()) {
+                renderMarkdown(holder.text, message.content)
+            } else {
+                holder.text.text = message.content
+            }
             holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
                 View.GONE
             } else {
                 View.VISIBLE
             }
             holder.text.setTextColor(messageTextColor(message.role))
-            Linkify.addLinks(holder.text, Linkify.WEB_URLS)
             holder.text.movementMethod = LinkMovementMethod.getInstance()
         }
         bindSendStatus(holder, message)
