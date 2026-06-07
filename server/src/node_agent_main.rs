@@ -514,31 +514,35 @@ fn ws_text(msg: &AgentToServer) -> Message {
 // ── CLI 执行（CliPrompt / Exec）────────────────────────────────────────────────
 
 /// 检测本机有哪些 CLI 可用。
-fn detect_available_clis() -> Vec<String> {
+/// 检测本机可用的 CLI，返回 (cli名称, 完整路径) 对。
+/// 使用完整路径启动，避免节点进程 PATH 不完整导致 program not found。
+fn detect_available_clis() -> Vec<(String, String)> {
     let candidates = ["copilot", "codex", "gh"];
     candidates
         .iter()
-        .filter(|name| {
-            // 优先从 PATH 找；Windows 还额外加 .exe 后缀
-            let found = std::process::Command::new(if cfg!(windows) {
-                "where"
-            } else {
-                "which"
-            })
-            .arg(name)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-            found
+        .filter_map(|name| {
+            let which_cmd = if cfg!(windows) { "where" } else { "which" };
+            let out = std::process::Command::new(which_cmd)
+                .arg(name)
+                .output()
+                .ok()?;
+            if !out.status.success() { return None; }
+            let full = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .next()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())?;
+            Some((name.to_string(), full))
         })
-        .map(|s| s.to_string())
         .collect()
 }
 
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
+/// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
 async fn run_cli_prompt(
     req_id: String,
-    cli: &str,
+    bin: &str,
+    cli_name: &str,
     extra_args: Vec<String>,
     cwd: Option<String>,
     prompt: String,
@@ -547,14 +551,14 @@ async fn run_cli_prompt(
     use tokio::io::AsyncBufReadExt;
 
     // 构建命令：copilot -p "<prompt>" 或 codex -p "<prompt>"
-    let mut cmd = tokio::process::Command::new(cli);
+    let mut cmd = tokio::process::Command::new(bin);
     for a in &extra_args {
         cmd.arg(a);
     }
     // 常见 CLI 的 prompt 标志
-    if cli == "codex" {
+    if cli_name == "codex" {
         cmd.arg("-p").arg(&prompt);
-    } else if cli == "copilot" {
+    } else if cli_name == "copilot" {
         cmd.args(["-p", &prompt]);
     } else {
         cmd.arg(&prompt);
@@ -572,7 +576,7 @@ async fn run_cli_prompt(
             let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
                 req_id,
                 exit_ok: false,
-                error: Some(format!("无法启动 {} : {}", cli, e)),
+                error: Some(format!("无法启动 {} : {}", bin, e)),
             }));
             return;
         }
@@ -704,11 +708,14 @@ async fn run_session(
         );
     }
 
-    // 检测本机可用的 CLI（copilot / codex）
-    let available_clis = detect_available_clis();
+    // 检测本机可用的 CLI（返回 (cli名, 完整路径)）
+    let cli_pairs = detect_available_clis();
+    let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
     if !available_clis.is_empty() {
-        info!("🛠  检测到本地 CLI: {}", available_clis.join(", "));
+        info!("🛠  检测到本地 CLI: {}", cli_pairs.iter().map(|(n, p)| format!("{} ({})", n, p)).collect::<Vec<_>>().join(", "));
     }
+    // 将完整路径存到 runtime，供 run_cli_prompt 使用
+    runtime.set_cli_paths(cli_pairs.clone()).await;
 
     // 发送 Register
     out_tx.send(ws_text(&AgentToServer::Register {
@@ -782,8 +789,10 @@ async fn run_session(
                         ServerToAgent::CliPrompt { req_id, cli, extra_args, cwd, prompt } => {
                             info!("📝 CliPrompt: {} cli={}", req_id, cli);
                             let tx_c = out_tx_r.clone();
+                            let rt_c = runtime.clone();
                             tokio::spawn(async move {
-                                run_cli_prompt(req_id, &cli, extra_args, cwd, prompt, tx_c).await;
+                                let full_path = rt_c.resolve_cli(&cli).await;
+                                run_cli_prompt(req_id, &full_path, &cli, extra_args, cwd, prompt, tx_c).await;
                             });
                         }
                         ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
@@ -911,6 +920,8 @@ struct NodeRuntime {
     cfg: NodeConfig,
     creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
+    /// CLI 名称 → 完整路径映射（启动时检测，避免 PATH 不完整导致 program not found）
+    cli_paths: RwLock<Vec<(String, String)>>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
 }
@@ -921,12 +932,26 @@ impl NodeRuntime {
             cfg,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),
+            cli_paths: RwLock::new(Vec::new()),
             wake: Notify::new(),
         }
     }
 
     async fn creds(&self) -> Option<Credentials> {
         self.creds.read().await.clone()
+    }
+
+    async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
+        *self.cli_paths.write().await = paths;
+    }
+
+    /// CLI 名称 → 完整路径（找不到就返回原名称作备用）
+    async fn resolve_cli(&self, name: &str) -> String {
+        self.cli_paths.read().await
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, p)| p.clone())
+            .unwrap_or_else(|| name.to_string())
     }
 
     /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
