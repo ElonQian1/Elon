@@ -132,32 +132,81 @@
   box-shadow: 0 0 0 1px rgba(88, 190, 106, 0.16);
 }
 
-.project-plaza-banner {
-  height: 54px;
+.project-plaza-accent {
+  height: 6px;
   background: linear-gradient(135deg, hsl(var(--plaza-hue), 54%, 38%), hsl(calc(var(--plaza-hue) + 32), 45%, 25%));
 }
 
 .project-plaza-card-main {
-  padding: 13px 14px 14px;
+  padding: 14px 14px 16px;
   display: grid;
-  gap: 9px;
+  gap: 12px;
 }
 
 .project-plaza-card-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.project-plaza-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #283140;
+  background: linear-gradient(135deg, hsl(var(--plaza-hue), 54%, 38%), hsl(calc(var(--plaza-hue) + 32), 45%, 25%));
+  color: #f2f5fa;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.project-plaza-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-plaza-avatar span {
+  position: relative;
+  z-index: 1;
+}
+
+.project-plaza-title-stack {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .project-plaza-name {
-  flex: 1;
   min-width: 0;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 900;
   color: #f2f5fa;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.project-plaza-subtitle {
+  min-width: 0;
+  color: #a6afbd;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .project-plaza-badge {
@@ -173,6 +222,32 @@
 .project-plaza-badge.joined {
   background: rgba(88, 190, 106, 0.16);
   color: #58be6a;
+}
+
+.project-plaza-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-plaza-pill {
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #283140;
+  color: #dde8fc;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.project-plaza-pill.members {
+  background: #13251a;
+  color: #58be6a;
+}
+
+.project-plaza-pill.mode {
+  background: #152c3e;
+  color: #81b3d9;
 }
 
 .project-plaza-desc,
@@ -191,20 +266,23 @@
 .project-plaza-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 10px;
 }
 
 .project-plaza-btn {
-  min-height: 36px;
+  flex: 1 1 132px;
+  min-height: 42px;
   border: 0;
   border-radius: 8px;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 0 14px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
   background: #283140;
   color: #dde8fc;
+  display: inline-grid;
+  place-items: center;
+  text-align: center;
 }
 
 .project-plaza-btn.primary {
@@ -220,7 +298,15 @@
 .project-plaza-detail h3 {
   margin: 0 0 8px;
   color: #f2f5fa;
-  font-size: 20px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.project-plaza-detail-subtitle {
+  color: #a6afbd;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: -2px 0 12px;
 }
 
 .project-plaza-detail-section {

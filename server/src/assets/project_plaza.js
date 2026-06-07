@@ -96,8 +96,34 @@
     return '加入项目';
   }
 
-  function descriptionOf(project) {
-    return project.description || '这个项目暂时没有填写说明。';
+  function looksLikeCodeName(value) {
+    const text = String(value || '').trim();
+    return /^[A-Za-z0-9._-]{3,24}$/.test(text) && /[A-Za-z]/.test(text);
+  }
+
+  function projectIdentity(project) {
+    const name = String(project.name || '').trim() || '未命名项目';
+    const description = String(project.description || '').trim();
+    if (description && looksLikeCodeName(name) && Array.from(description).length <= 24) {
+      return {
+        title: description,
+        subtitle: '项目代号：' + name
+      };
+    }
+    return {
+      title: name,
+      subtitle: description
+    };
+  }
+
+  function projectInitial(title) {
+    const chars = Array.from(String(title || '').trim());
+    return (chars[0] || 'P').toUpperCase();
+  }
+
+  function avatarUrl(project) {
+    const ownerId = String(project.owner_id || '').trim();
+    return ownerId ? '/api/users/' + encodeURIComponent(ownerId) + '/avatar' : '';
   }
 
   function ensureModal() {
@@ -226,16 +252,28 @@
     const active = project.id === state.selectedId;
     const disabled = state.busyId === project.id || project.join_mode === 'invite';
     const action = joined ? 'open' : project.join_mode === 'approval' ? 'select-apply' : 'join';
+    const identity = projectIdentity(project);
+    const avatar = avatarUrl(project);
     return `
       <button class="project-plaza-card${active ? ' active' : ''}" type="button" data-plaza-action="select" data-id="${escapeHtml(project.id)}">
-        <div class="project-plaza-banner" style="--plaza-hue:${hueFor(project.id)}"></div>
-        <div class="project-plaza-card-main">
+        <div class="project-plaza-accent" style="--plaza-hue:${hueFor(project.id)}"></div>
+        <div class="project-plaza-card-main" style="--plaza-hue:${hueFor(project.id)}">
           <div class="project-plaza-card-title">
-            <span class="project-plaza-name">${escapeHtml(project.name || '未命名项目')}</span>
-            <span class="project-plaza-badge${joined ? ' joined' : ''}">${joined ? '已加入' : joinModeLabel(project.join_mode)}</span>
+            <span class="project-plaza-avatar" aria-hidden="true">
+              <span>${escapeHtml(projectInitial(identity.title))}</span>
+              ${avatar ? `<img src="${escapeHtml(avatar)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+            </span>
+            <span class="project-plaza-title-stack">
+              <span class="project-plaza-name">${escapeHtml(identity.title)}</span>
+              ${identity.subtitle ? `<span class="project-plaza-subtitle">${escapeHtml(identity.subtitle)}</span>` : ''}
+            </span>
           </div>
-          <div class="project-plaza-desc">${escapeHtml(descriptionOf(project))}</div>
-          <div class="project-plaza-meta">${escapeHtml(project.owner_account || '未知 owner')} · ${Number(project.member_count || 0)} 位成员 · ${escapeHtml(project.last_task_status || '准备就绪')}</div>
+          <div class="project-plaza-pill-row">
+            <span class="project-plaza-pill members">● ${Number(project.member_count || 0)} 位成员</span>
+            <span class="project-plaza-pill mode">${joined ? '已加入' : joinModeLabel(project.join_mode)}</span>
+            ${project.latest_apk_url ? '<span class="project-plaza-pill">可安装 APK</span>' : ''}
+          </div>
+          <div class="project-plaza-meta">创建者：${escapeHtml(project.owner_account || '未知')} · ${escapeHtml(project.last_task_status || '准备就绪')}</div>
           <div class="project-plaza-actions">
             <span class="project-plaza-btn primary" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}" data-stop="true" aria-disabled="${disabled ? 'true' : 'false'}">${state.busyId === project.id ? '处理中...' : roleActionLabel(project)}</span>
             ${project.latest_apk_url ? `<span class="project-plaza-btn" data-plaza-action="download" data-id="${escapeHtml(project.id)}" data-stop="true">下载 APK</span>` : ''}
@@ -257,9 +295,10 @@
     const joined = state.joinedIds.has(project.id);
     const canApply = !joined && project.join_mode === 'approval';
     const canJoin = !joined && project.join_mode !== 'approval' && project.join_mode !== 'invite';
+    const identity = projectIdentity(project);
     return `
-      <h3>${escapeHtml(project.name || '未命名项目')}</h3>
-      <div class="project-plaza-desc">${escapeHtml(descriptionOf(project))}</div>
+      <h3>${escapeHtml(identity.title)}</h3>
+      ${identity.subtitle ? `<div class="project-plaza-detail-subtitle">${escapeHtml(identity.subtitle)}</div>` : ''}
       <div class="project-plaza-detail-section">
         <div class="project-plaza-detail-row"><span>加入方式</span><strong>${joinModeLabel(project.join_mode)}</strong></div>
         <div class="project-plaza-detail-row"><span>成员</span><strong>${Number(project.member_count || 0)} 人</strong></div>

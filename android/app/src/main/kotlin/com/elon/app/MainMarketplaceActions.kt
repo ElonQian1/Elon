@@ -1,13 +1,8 @@
 package com.elon.app
 
-import android.content.res.ColorStateList
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.ShapeDrawable
-import android.graphics.drawable.shapes.OvalShape
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -34,7 +29,12 @@ internal class MainMarketplaceActions(
     private val joinedIds = mutableSetOf<String>()
     private val avatarCache = HashMap<String, android.graphics.Bitmap>()
 
-    // 根据字符串生成固定色相的深色渐变（用作卡片横幅背景）
+    private data class ProjectCardIdentity(
+        val title: String,
+        val subtitle: String?
+    )
+
+    // 根据字符串生成固定色相的深色渐变（用作卡片顶部识别色带）
     private val BANNER_PALETTES = arrayOf(
         intArrayOf(0xFF3B4F8A.toInt(), 0xFF2A3A73.toInt()),  // 深蓝紫
         intArrayOf(0xFF5A3070.toInt(), 0xFF3E1F5A.toInt()),  // 深紫
@@ -49,6 +49,63 @@ internal class MainMarketplaceActions(
     private fun paletteFor(key: String): IntArray {
         val hash = key.fold(0) { acc, c -> acc * 31 + c.code }
         return BANNER_PALETTES[Math.abs(hash) % BANNER_PALETTES.size]
+    }
+
+    private fun identityFor(project: StoreProject): ProjectCardIdentity {
+        val name = project.name.trim().ifBlank { "未命名项目" }
+        val description = project.description?.trim()?.takeIf { it.isNotBlank() }
+        return if (description != null && looksLikeCodeName(name) && description.length <= 24) {
+            ProjectCardIdentity(description, "项目代号：$name")
+        } else {
+            ProjectCardIdentity(name, description)
+        }
+    }
+
+    private fun looksLikeCodeName(value: String): Boolean {
+        if (value.length !in 3..24) return false
+        return value.any { it.isLetter() } && value.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }
+    }
+
+    private fun roundedRect(
+        color: String,
+        radiusDp: Int = 8,
+        strokeColor: String? = null
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            cornerRadius = dp(radiusDp).toFloat()
+            setColor(Color.parseColor(color))
+            if (strokeColor != null) setStroke(dp(1), Color.parseColor(strokeColor))
+        }
+    }
+
+    private fun pill(text: String, textColor: String, bgColor: String): TextView {
+        return TextView(activity).apply {
+            this.text = text
+            textSize = 12f
+            setTextColor(Color.parseColor(textColor))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            background = roundedRect(bgColor, 999)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { rightMargin = dp(8) }
+        }
+    }
+
+    private fun actionButton(text: String, bgColor: String, textColor: String): TextView {
+        return TextView(activity).apply {
+            this.text = text
+            textSize = 16f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor(textColor))
+            background = roundedRect(bgColor, 8)
+            isEnabled = true
+            isClickable = true
+            foreground = selectableForeground()
+        }
     }
 
     // ─── 加载公开项目列表 ─────────────────────────────────────────────────────
@@ -236,62 +293,80 @@ internal class MainMarketplaceActions(
     private fun buildProjectCard(project: StoreProject): LinearLayout {
         val alreadyJoined = joinedIds.contains(project.id)
         val palette = paletteFor(project.id)
+        val identity = identityFor(project)
 
         // 外层卡片容器（圆角 + 深色背景）
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(Color.parseColor("#181B20"))
-            }
+            background = roundedRect("#181B20", 8, "#1E2126")
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.setMargins(dp(12), dp(12), dp(12), dp(4))
+            lp.setMargins(dp(12), dp(12), dp(12), dp(6))
             layoutParams = lp
             clipToOutline = true
         }
 
-        // ── 顶部彩色横幅 ──────────────────────────────────────────────────────
-        val bannerHeight = dp(80)
-        val banner = FrameLayout(activity).apply {
+        // 顶部识别色带只负责区分卡片，不再抢占项目信息的主视觉。
+        card.addView(FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, bannerHeight
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(6)
             )
             background = GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
+                GradientDrawable.Orientation.LEFT_RIGHT,
                 palette
-            ).apply { cornerRadii = floatArrayOf(dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), dp(12).toFloat(), 0f, 0f, 0f, 0f) }
+            )
+        })
+
+        // ── 卡片内容区 ────────────────────────────────────────────────────────
+        val body = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(16))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val headerRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
         // 圆形头像容器：文字头像 + 真实头像图层叠加
-        val avatarSize = dp(52)
+        val avatarSize = dp(54)
         val avatarFrame = FrameLayout(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
-                leftMargin = dp(16)
-                topMargin = dp(16)
+            layoutParams = LinearLayout.LayoutParams(avatarSize, avatarSize).apply {
+                rightMargin = dp(12)
             }
         }
-        // 底层：文字首字母头像
         val avatarText = TextView(activity).apply {
-            text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
-            textSize = 22f
+            text = identity.title.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+            textSize = 21f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
             setTextColor(Color.parseColor("#F2F5FA"))
             gravity = Gravity.CENTER
-            background = object : ShapeDrawable(OvalShape()) {
-                init { paint.color = Color.parseColor("#00000066") }
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                palette
+            ).apply {
+                shape = GradientDrawable.OVAL
+                setStroke(dp(1), Color.parseColor("#283140"))
             }
             layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
         }
         avatarFrame.addView(avatarText)
-        // 上层：真实头像图（异步加载）
         val avatarImg = ImageView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
             scaleType = ImageView.ScaleType.CENTER_CROP
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                cornerRadius = avatarSize / 2f
+                setColor(Color.TRANSPARENT)
             }
             clipToOutline = true
             visibility = android.view.View.GONE
@@ -300,72 +375,64 @@ internal class MainMarketplaceActions(
         if (project.ownerUserId.isNotBlank()) {
             loadAvatarAsync(project.ownerUserId, avatarImg)
         }
-        banner.addView(avatarFrame)
-        card.addView(banner)
+        headerRow.addView(avatarFrame)
 
-        // ── 卡片内容区 ────────────────────────────────────────────────────────
-        val body = LinearLayout(activity).apply {
+        val titleColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(14))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
-
-        // 项目名
-        body.addView(TextView(activity).apply {
-            text = project.name
-            textSize = 17f
-            setTextColor(Color.parseColor("#07120A"))
+        titleColumn.addView(TextView(activity).apply {
+            text = identity.title
+            textSize = 21f
+            setTextColor(Color.parseColor("#F2F5FA"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-            maxLines = 1
+            maxLines = 2
+            setLineSpacing(dp(1).toFloat(), 1.0f)
             ellipsize = android.text.TextUtils.TruncateAt.END
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         })
+        identity.subtitle?.let { subtitle ->
+            titleColumn.addView(TextView(activity).apply {
+                text = subtitle
+                textSize = 13f
+                setTextColor(Color.parseColor("#A6AFBD"))
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(4) }
+            })
+        }
+        headerRow.addView(titleColumn)
+        body.addView(headerRow)
 
         // 在线人数 & 作者行
-        val metaRow = LinearLayout(activity).apply {
+        val pillRow = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(5) }
+            ).apply { topMargin = dp(12) }
         }
-
-        // 绿点 + 成员数
-        metaRow.addView(TextView(activity).apply {
-            val dot = "\u25CF"  // ●
-            text = "$dot  ${project.memberCount} 位成员"
-            textSize = 12f
-            setTextColor(Color.parseColor("#58BE6A"))  // Discord 绿
-        })
+        pillRow.addView(pill("\u25CF  ${project.memberCount} 位成员", "#58BE6A", "#13251A"))
+        pillRow.addView(pill(projectJoinModeSummary(project.joinMode), "#81B3D9", "#152C3E"))
+        if (!project.latestApkUrl.isNullOrBlank()) {
+            pillRow.addView(pill("可安装 APK", "#DDE8FC", "#283140"))
+        }
+        body.addView(pillRow)
 
         // 作者
         val owner = project.ownerAccount.takeIf { it != "?" && it.isNotBlank() }
         if (owner != null) {
-            metaRow.addView(TextView(activity).apply {
-                text = "  ·  创建者: $owner"
+            body.addView(TextView(activity).apply {
+                text = "创建者：$owner"
                 textSize = 12f
                 setTextColor(Color.parseColor("#6F7785"))
                 maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-        }
-        body.addView(metaRow)
-
-        // 描述
-        val desc = project.description?.takeIf { it.isNotBlank() }
-        if (desc != null) {
-            body.addView(TextView(activity).apply {
-                text = desc
-                textSize = 13f
-                setTextColor(Color.parseColor("#6F7785"))
-                maxLines = 3
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -375,19 +442,14 @@ internal class MainMarketplaceActions(
         }
 
         // ── 加入按钮（全宽，Discord 绿色）─────────────────────────────────────
-        val joinBtn = TextView(activity).apply {
-            text = projectJoinActionLabel(project.joinMode, alreadyJoined)
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#F2F5FA"))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor("#58BE6A"))
-            }
-            isEnabled = true
+        val joinBtn = actionButton(
+            projectJoinActionLabel(project.joinMode, alreadyJoined),
+            "#58BE6A",
+            "#07120A"
+        ).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(42)
-            ).apply { topMargin = dp(12) }
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46)
+            ).apply { topMargin = dp(16) }
         }
 
         if (alreadyJoined) {
@@ -400,27 +462,16 @@ internal class MainMarketplaceActions(
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(42)
-                ).apply { topMargin = dp(12) }
+                    dp(46)
+                ).apply { topMargin = dp(16) }
             }
             joinBtn.layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1f
-            ).apply { rightMargin = dp(8) }
+            ).apply { rightMargin = dp(10) }
 
-            val installBtn = TextView(activity).apply {
-                text = "直接安装"
-                textSize = 15f
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#F2F5FA"))
-                background = GradientDrawable().apply {
-                    cornerRadius = dp(6).toFloat()
-                    setColor(Color.parseColor("#5865F2"))
-                }
-                isEnabled = true
-                isClickable = true
-                foreground = selectableForeground()
+            val installBtn = actionButton("直接安装", "#6091CF", "#F2F5FA").apply {
                 setOnClickListener { tryInstallProject(project, this, joinBtn) }
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             }
