@@ -80,20 +80,6 @@ ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
 scp -o ProxyCommand=none $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 
-# 获取版本号并生成 node-agent-version.json（供节点自动更新用）
-$Version = & cargo.exe metadata --manifest-path (Join-Path $PSScriptRoot "..\server\Cargo.toml") --no-deps --format-version 1 2>$null |
-    ConvertFrom-Json |
-    Select-Object -ExpandProperty packages |
-    Where-Object { $_.name -eq "elon-server" } |
-    Select-Object -ExpandProperty version
-if (-not $Version) { $Version = "0.0.0" }
-$VersionJson = @{ version = $Version; updated_at = (Get-Date -Format "o") } | ConvertTo-Json
-$TmpVersionFile = [System.IO.Path]::GetTempFileName() + ".json"
-$VersionJson | Set-Content $TmpVersionFile -Encoding UTF8
-scp -o ProxyCommand=none $TmpVersionFile "${Server}:${RemoteDir}/node-agent-version.json"
-Remove-Item $TmpVersionFile -ErrorAction SilentlyContinue
-Write-Host "  版本: $Version → node-agent-version.json 已更新" -ForegroundColor Green
-
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/4] 验证下载地址..." -ForegroundColor Yellow
 $BaseUrl = "http://43.139.149.158:8080"

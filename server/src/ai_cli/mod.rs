@@ -617,11 +617,8 @@ pub async fn run_with_pc_agent_workspace(
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
     native_session_scope: Option<NativeSessionScope>,
-    // cli_name: 用户选择的 CLI 名称（"copilot" / "codex" / None=默认copilot）
     cli_name: Option<&str>,
-    // copilot_model: Copilot CLI 的 --model 参数（如 "gpt-4o"）
     copilot_model: Option<&str>,
-    // model_label: 用户可见的模型标签（用于气泡属指）
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
@@ -651,15 +648,13 @@ async fn run_via_pc_agent(
     preflight_note: Option<&str>,
     request_mode: AiCliRequestMode,
     native_session_scope: Option<NativeSessionScope>,
-    // cli_name: 要使用的 CLI："copilot" 或 "codex"
     cli_name: &str,
-    // copilot_model: Copilot CLI 的 --model 参数
     copilot_model: Option<&str>,
-    // model_label: 用户可见的模型标签，用于 model_used 属指
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    // prompt 构造
     let prompt = if request_mode.is_plan() {
         match preflight_note {
             Some(note) => format!(
@@ -673,91 +668,49 @@ async fn run_via_pc_agent(
         }
     } else {
         match preflight_note {
-            Some(note) => format!(
-                "注意：{}\n\n{}", note, user_message
-            ),
+            Some(note) => format!("注意：{}\n\n{}", note, user_message),
             None => user_message.to_string(),
         }
     };
 
-    // PC 节点项目：从 prompt 里提取图片 URL，作为 --attachment 传给 Copilot
-    // 图片行格式：`- name.jpg [image; ...] -> D:/...path (url: http://...)`
-    // URL 在行中间，需要查找子串 `(url: ...)`，不能用 strip_prefix
-    let mut attachment_urls: Vec<String> = Vec::new();
-    for line in prompt.lines() {
-        if let Some(start) = line.find("(url: ") {
-            let rest = &line[start + "(url: ".len()..];
-            if let Some(end) = rest.find(')') {
-                let url = rest[..end].trim();
-                if url.starts_with("http") {
-                    attachment_urls.push(url.to_string());
-                }
-            }
-        }
-    }
-    let has_attachments = !attachment_urls.is_empty();
-
-    // PC 节点项目用 --session-id 保证用户隔离 + 上下文复用：
-    // - 不用 --continue（机器级别，多用户会串台）
-    // - 用 user_id + conversation_id 派生一个确定性 UUID 作为 session-id
-    //   同一用户同一会话每次都用相同 UUID → Copilot 自动续接上下文
-    //   不同用户 → 不同 UUID → 完全隔离
-    // - 有图片时同时传 --session-id + --attachment：两者可以共存
-    //   （--attachment 是 initial prompt 选项，--session-id 控制会话归属）
-    let copilot_session_uuid = native_session_scope.as_ref().map(|scope| {
-        // 用 sha256(project_id + user_id + conversation_id) 派生确定性 UUID
-        use sha2::Digest;
-        let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
-        let hash = sha2::Sha256::digest(seed.as_bytes());
-        // UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-        // 第3组必须是 4 位：'4' + 3 个十六进制位（1 nibble + 1 byte）
-        // 用 {:x} 而非 {:02x} 确保 hash[6]&0x0f（0~15）只输出 1 位
-        format!(
-            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            hash[0], hash[1], hash[2], hash[3],
-            hash[4], hash[5],
-            hash[6] & 0x0f, hash[7],
-            (hash[8] & 0x3f) | 0x80, hash[9],
-            hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
-        )
-    });
-
-    // 根据 cli_name 决定额外参数：
-    // - copilot: 用 --session-id 保证用户隔离+上下文复用，支持 --attachment 看图，支持 --model 指定模型
-    // - codex: 用 -i 传图片（Codex CLI 的图片参数）
-    let extra_args: Vec<String> = if cli_name == "codex" {
-        // Codex CLI：用 -i 传图片
-        let mut args = Vec::new();
-        for url in &attachment_urls {
-            args.push("-i".to_string());
-            args.push(url.clone());
-        }
-        args
+    // Copilot CLI 专用：--session-id 保证用户隔离+上下文复用
+    let copilot_session_uuid = if cli_name != "copilot" {
+        None
     } else {
-        // Copilot CLI：用 --session-id 保证用户隔离，用 --attachment 传图片，用 --model 指定模型
+        native_session_scope.as_ref().map(|scope| {
+            use sha2::Digest;
+            let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
+            let hash = sha2::Sha256::digest(seed.as_bytes());
+            format!(
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                hash[0], hash[1], hash[2], hash[3],
+                hash[4], hash[5],
+                hash[6] & 0x0f, hash[7],
+                (hash[8] & 0x3f) | 0x80, hash[9],
+                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+            )
+        })
+    };
+
+    // extra_args：Copilot 用 --session-id + --model，Codex 不需要额外的（exec 子命令已传）
+    let extra_args: Vec<String> = if cli_name == "copilot" {
         let mut args = if let Some(ref sid) = copilot_session_uuid {
             vec![format!("--session-id={}", sid)]
         } else {
             vec![]
         };
-        // 如果用户选择了具体模型，传给 Copilot CLI
         if let Some(model) = copilot_model {
             if !model.is_empty() && model != "auto" {
                 args.push("--model".into());
                 args.push(model.to_string());
             }
         }
-        for url in &attachment_urls {
-            args.push("--attachment".into());
-            args.push(url.clone());
-        }
         args
+    } else {
+        vec![]
     };
-    let _ = attachment_urls;
 
-    // dispatch 时节点可能刚好掉线重连：
-    // 仅对 "agent not connected" 进行较长等待重试（最多约 75 秒），
-    // 避免手机端刚发起任务就撞上节点瞬断。
+    // dispatch 时节点可能刚好掉线重连
     let (_, mut rx) = {
         let mut last_err = anyhow::anyhow!("dispatch failed");
         let mut result = Err(last_err);
@@ -796,6 +749,10 @@ async fn run_via_pc_agent(
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
     let mut stream_started = false;
+    let display_model = model_label
+        .or(copilot_model)
+        .map(String::from)
+        .unwrap_or_else(|| agent_id.to_string());
 
     while let Some(event) = rx.recv().await {
         match event {
@@ -805,20 +762,13 @@ async fn run_via_pc_agent(
                     continue;
                 }
                 if !stream_started {
-                    // 第一个非空块：创建气泡（AssistantMessage 带 stream_id）
-                    // model_used 优先用用户选择的标签，没有则用节点 ID
-                    let display_model = model_label
-                        .or(copilot_model)
-                        .map(String::from)
-                        .unwrap_or_else(|| agent_id.to_string());
                     stream_started = true;
                     let _ = tx.send(WsMessage::AssistantMessage {
                         text: text.clone(),
-                        model_used: Some(display_model),
+                        model_used: Some(display_model.clone()),
                         stream_id: Some(stream_id.clone()),
                     }.to_json());
                 } else {
-                    // 后续块：追加到同一气泡（AssistantChunk）
                     let _ = tx.send(WsMessage::AssistantChunk {
                         stream_id: stream_id.clone(),
                         text: text.clone(),
@@ -828,44 +778,21 @@ async fn run_via_pc_agent(
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    // 成功后保存 native session sentinel
-                    if let Some(scope) = &native_session_scope {
-                        let sentinel = format!("conv-{}", scope.conversation_id);
-                        let workspace = cwd.unwrap_or("");
-                        let _ = state.store.upsert_native_agent_session(
-                            &scope.project_id,
-                            &scope.user_id,
-                            Some(&scope.conversation_id),
-                            cli_name,
-                            agent_id,
-                            workspace,
-                            &sentinel,
-                        );
-                    }
-                    // 若什么都没发（空回复），补一条消息
                     if !stream_started {
                         let reply = full_text.trim().to_string();
                         if !reply.is_empty() {
-                            let display_model = model_label
-                                .or(copilot_model)
-                                .map(String::from)
-                                .unwrap_or_else(|| agent_id.to_string());
                             let _ = tx.send(WsMessage::AssistantMessage {
                                 text: reply,
-                                model_used: Some(display_model),
+                                model_used: Some(display_model.clone()),
                                 stream_id: None,
                             }.to_json());
                         }
                     }
-                    let done_model = model_label
-                        .or(copilot_model)
-                        .map(String::from)
-                        .unwrap_or_else(|| agent_id.to_string());
                     let _ = tx.send(WsMessage::Done {
                         message: String::new(),
                         apk_url: None,
                         image_url: None,
-                        model_used: Some(done_model),
+                        model_used: Some(display_model.clone()),
                         node_id: Some(agent_id.to_string()),
                     }.to_json());
                     return Ok(());

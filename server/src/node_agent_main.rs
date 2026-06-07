@@ -627,60 +627,6 @@ fn detect_available_clis() -> Vec<(String, String)> {
     }).collect()
 }
 
-/// 把 extra_args 里的 `--attachment http://...` 替换为本地临时文件路径。
-/// 使用 user_token 作为 Bearer auth 下载图片。
-async fn resolve_attachment_urls(args: Vec<String>, user_token: Option<&str>) -> Vec<String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_default();
-    let mut result = Vec::with_capacity(args.len());
-    let mut i = 0;
-    while i < args.len() {
-        if args[i] == "--attachment" {
-            if let Some(url) = args.get(i + 1) {
-                if url.starts_with("http://") || url.starts_with("https://") {
-                    // 下载到临时目录
-                    let ext = url.rsplit('.').next()
-                        .filter(|e| e.len() <= 5 && e.chars().all(|c| c.is_alphanumeric()))
-                        .unwrap_or("bin");
-                    let tmp_path = std::env::temp_dir()
-                        .join(format!("elon_attach_{}.{}", uuid::Uuid::new_v4(), ext));
-                    let mut req = client.get(url.as_str());
-                    if let Some(tok) = user_token {
-                        req = req.bearer_auth(tok);
-                    }
-                    match req.send().await {
-                        Ok(resp) if resp.status().is_success() => {
-                            if let Ok(bytes) = resp.bytes().await {
-                                if tokio::fs::write(&tmp_path, &bytes).await.is_ok() {
-                                    info!("📎 attachment downloaded: {} → {} ({} bytes)", url, tmp_path.display(), bytes.len());
-                                    result.push("--attachment".to_string());
-                                    result.push(tmp_path.to_string_lossy().to_string());
-                                    i += 2;
-                                    continue;
-                                }
-                            }
-                        }
-                        Ok(resp) => {
-                            warn!("📎 attachment download failed: {} status={}", url, resp.status());
-                        }
-                        Err(e) => {
-                            warn!("📎 attachment download error: {} err={}", url, e);
-                        }
-                    }
-                    // 下载失败：跳过这对参数（不传给 Copilot）
-                    i += 2;
-                    continue;
-                }
-            }
-        }
-        result.push(args[i].clone());
-        i += 1;
-    }
-    result
-}
-
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
 /// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
 async fn run_cli_prompt(
@@ -701,21 +647,30 @@ async fn run_cli_prompt(
         (bin, vec![])
     };
 
-    // 构建命令：copilot -p "<prompt>" 或 codex -p "<prompt>"
+    // 构建命令
+    // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
+    // Codex:   codex exec --dangerously-bypass-approvals-and-sandbox [extra_args] "<prompt>"
     let mut cmd = tokio::process::Command::new(actual_bin);
     for a in &actual_args_prefix {
         cmd.arg(a);
     }
+    if cli_name == "codex" {
+        // Codex 用 exec 子命令，prompt 是位置参数
+        cmd.arg("exec");
+        cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+    } else if cli_name == "copilot" {
+        // Copilot 用 --allow-all 非交互确认
+        cmd.arg("--allow-all");
+    }
     for a in &extra_args {
         cmd.arg(a);
     }
-    // 常见 CLI 的 prompt 标志
+    // prompt 传递方式
     if cli_name == "codex" {
-        cmd.arg("-p").arg(&prompt);
+        // Codex: prompt 是位置参数（-p 是 --profile，不是 prompt）
+        cmd.arg(&prompt);
     } else if cli_name == "copilot" {
-        // --allow-all: 非交互模式下自动确认所有工具调用，无需 stdin 确认
-        // 等价于环境变量 COPILOT_ALLOW_ALL=1
-        cmd.args(["--allow-all", "-p", &prompt]);
+        cmd.args(["-p", &prompt]);
     } else {
         cmd.arg(&prompt);
     }
@@ -948,18 +903,7 @@ async fn run_session(
                             let rt_c = runtime.clone();
                             tokio::spawn(async move {
                                 let full_path = rt_c.resolve_cli(&cli).await;
-                                // 对 Copilot，把 --attachment URL 替换为本地下载文件
-                                let resolved_args = if cli == "copilot" {
-                                    let user_token = rt_c.creds.read().await
-                                        .as_ref()
-                                        .and_then(|c| c.user_token.clone());
-                                    resolve_attachment_urls(extra_args, user_token.as_deref()).await
-                                } else {
-                                    extra_args
-                                };
-                                rt_c.active_cli_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                                run_cli_prompt(req_id, &full_path, &cli, resolved_args, cwd, prompt, tx_c).await;
-                                rt_c.active_cli_count.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                                run_cli_prompt(req_id, &full_path, &cli, extra_args, cwd, prompt, tx_c).await;
                             });
                         }
                         ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
@@ -1018,80 +962,6 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
     }
 }
 
-// ── 自动更新 ──────────────────────────────────────────────────────────────────
-
-/// 检查服务端是否有更新，有则下载新 exe 并重启自身（仅 Windows 支持）。
-/// 策略：每 5 分钟轮询一次；空闲时立即更新；有任务时等任务结束后再更新。
-async fn auto_update_loop(cfg: NodeConfig, runtime: Arc<NodeRuntime>) {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .unwrap_or_default();
-    let current_version = env!("CARGO_PKG_VERSION");
-    let check_url = format!("{}/api/node-agent/version", cfg.cloud_http_url);
-    let download_url = format!("{}/api/node-agent/download/windows", cfg.cloud_http_url);
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
-    interval.tick().await; // 跳过第一次立即触发
-
-    loop {
-        interval.tick().await;
-        // 查询服务端版本
-        let remote_version = match client.get(&check_url).send().await {
-            Ok(r) if r.status().is_success() => {
-                match r.json::<serde_json::Value>().await {
-                    Ok(j) => j.get("version").and_then(|v| v.as_str()).map(str::to_string),
-                    _ => None,
-                }
-            }
-            _ => None,
-        };
-        let Some(remote) = remote_version else { continue };
-        if remote == current_version { continue }
-        info!("🔄 发现新版本: {} → {}，准备自动更新…", current_version, remote);
-
-        // 下载新 exe
-        let exe_bytes = match client.get(&download_url).send().await {
-            Ok(r) if r.status().is_success() => match r.bytes().await {
-                Ok(b) => b,
-                Err(_) => continue,
-            },
-            _ => continue,
-        };
-
-        // 写到临时路径（自身路径 + .new）
-        let current_exe = match std::env::current_exe() {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-        let new_exe = current_exe.with_extension("exe.new");
-        if tokio::fs::write(&new_exe, &exe_bytes).await.is_err() { continue }
-
-        info!("✅ 新版本已下载到 {}，等待当前任务空闲后重启…", new_exe.display());
-        runtime.set_connected(true, &format!("有新版本 {}，空闲后将自动重启", remote)).await;
-
-        // 等待空闲（active_cli_count == 0，最多等 10 分钟）
-        for _ in 0..600 {
-            if runtime.active_cli_count.load(std::sync::atomic::Ordering::Relaxed) == 0 {
-                break;
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        }
-
-        // 将 .exe.new 替换为当前 exe，然后用新进程重启
-        let backup = current_exe.with_extension("exe.old");
-        let _ = std::fs::rename(&current_exe, &backup);
-        if std::fs::rename(&new_exe, &current_exe).is_ok() {
-            info!("🚀 正在用新版本重启…");
-            let _ = std::process::Command::new(&current_exe).spawn();
-            std::process::exit(0);
-        } else {
-            // 回滚
-            let _ = std::fs::rename(&backup, &current_exe);
-            warn!("⚠️  替换 exe 失败，回滚并继续运行旧版本");
-        }
-    }
-}
-
 // ── 入口 ─────────────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -1141,12 +1011,8 @@ async fn main() -> Result<()> {
     info!("   Ollama: {}", cfg.ollama_url);
     info!("   积分价格: {} credits/1k tokens", cfg.price_per_1k);
 
-    let runtime = Arc::new(NodeRuntime::new(cfg.clone(), creds));
+    let runtime = Arc::new(NodeRuntime::new(cfg, creds));
     spawn_admin_server(runtime.clone());
-
-    // 后台自动更新（每 5 分钟检查一次，空闲时静默热重启）
-    #[cfg(windows)]
-    tokio::spawn(auto_update_loop(cfg, runtime.clone()));
 
     run_loop(runtime).await;
     Ok(())
@@ -1169,8 +1035,6 @@ struct NodeRuntime {
     cli_paths: RwLock<Vec<(String, String)>>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
-    /// 当前正在执行的 CLI 任务数（用于自动更新空闲检测）
-    active_cli_count: std::sync::Arc<std::sync::atomic::AtomicI32>,
 }
 
 impl NodeRuntime {
@@ -1181,7 +1045,6 @@ impl NodeRuntime {
             status: RwLock::new(NodeStatus::default()),
             cli_paths: RwLock::new(Vec::new()),
             wake: Notify::new(),
-            active_cli_count: std::sync::Arc::new(std::sync::atomic::AtomicI32::new(0)),
         }
     }
 

@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -19,9 +18,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
-import io.noties.markwon.Markwon
-import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
-import io.noties.markwon.ext.tables.TablePlugin
 import kotlin.math.sin
 
 data class ChatMessage(
@@ -49,14 +45,7 @@ data class ChatMessage(
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
     var nodeId: String? = null,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
-    var streamId: String? = null,
-    /**
-     * Copilot CLI 工具块状态机：true 表示当前正在接收工具块内容（● 到 └ 之间）。
-     * 工具块内所有行（含空行）全部路由到 evidenceDetails。
-     */
-    var copilotInToolBlock: Boolean = false,
-    /** 已完成的工具调用数量，用于生成折叠标题 */
-    var copilotToolCallCount: Int = 0
+    var streamId: String? = null
 )
 
 class ChatAdapter(
@@ -67,18 +56,6 @@ class ChatAdapter(
     private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
     private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
-    private var markwon: Markwon? = null
-
-    private fun getMarkwon(context: Context): Markwon {
-        return markwon ?: Markwon.builder(context)
-            .usePlugin(StrikethroughPlugin.create())
-            .usePlugin(TablePlugin.create(context))
-            .build().also { markwon = it }
-    }
-
-    private fun renderMarkdown(textView: TextView, content: String) {
-        getMarkwon(textView.context).setMarkdown(textView, content)
-    }
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
     var onSuggestionResolve: ((ChatMessage) -> Unit)? = null
@@ -186,21 +163,14 @@ class ChatAdapter(
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
-            val isAiRole = message.role in setOf("ai", "ai-intent", "ai-working", "ai-progress", "ai-cli-log")
-            // Copilot CLI（model_used 以 node- 开头）的回复使用 Markdown 渲染；
-            // Codex CLI 和其他模型保持纯文本（Codex 输出不含 MD 格式）
-            val isCopilotReply = message.modelUsed?.startsWith("node-") == true
-            if (isAiRole && isCopilotReply && message.content.isNotBlank()) {
-                renderMarkdown(holder.text, message.content)
-            } else {
-                holder.text.text = message.content
-            }
+            holder.text.text = message.content
             holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
                 View.GONE
             } else {
                 View.VISIBLE
             }
             holder.text.setTextColor(messageTextColor(message.role))
+            Linkify.addLinks(holder.text, Linkify.WEB_URLS)
             holder.text.movementMethod = LinkMovementMethod.getInstance()
         }
         bindSendStatus(holder, message)
@@ -375,70 +345,11 @@ class ChatAdapter(
      * 流式追加：找到具有相同 streamId 的最后一条消息，把 [chunk] 追加到它的 content，
      * 然后 notifyItemChanged 触发气泡原地刷新（打字机效果）。
      * 若找不到对应气泡则忽略（容错：可能先到 chunk 后到 AssistantMessage）。
-     *
-     * Copilot CLI 的工具调用输出（以 ●、│、└ 开头的行）路由到 evidenceDetails 折叠区域，
-     * 普通文字内容追加到主内容区域。
      */
     fun streamAppendChunk(streamId: String, chunk: String) {
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
-        val msg = messages[idx]
-        // 只有 Copilot CLI（model_used 以 node- 开头）才需要工具块状态机
-        val isCopilotMsg = msg.modelUsed?.startsWith("node-") == true
-        if (!isCopilotMsg) {
-            msg.content += chunk
-            notifyItemChanged(idx)
-            return
-        }
-
-        // ── 状态机：正确分离叙述文本 vs 工具块 ──────────────────────────
-        // 工具块结构：
-        //   ● 操作名称 (tool)\n  ← 起始行（只有 ● 开头才是工具块起始，✗/✓ 在正文里也出现）
-        //   │ 代码/参数\n        ← 块内行
-        //   └ 结果\n             ← 结束行
-        // ✗/✓/✅/⚠ 单独出现在正文里时不触发工具块
-        val trimmed = chunk.trimStart()
-        // 工具块起始：● 后跟空格，是 Copilot 工具调用的唯一可靠标记
-        val isToolBlockStart = trimmed.startsWith("● ")
-        // 工具块结束行
-        val isToolBlockEnd = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
-        // Copilot 统计尾行（始终折叠，不显示在主气泡）
-        val isStatsLine = trimmed.startsWith("Changes ") || trimmed.startsWith("Requests ") ||
-            trimmed.startsWith("Tokens ")
-
-        when {
-            isToolBlockStart -> {
-                // 进入新工具块
-                msg.copilotInToolBlock = true
-                msg.copilotToolCallCount += 1
-            }
-            isToolBlockEnd -> {
-                // 工具块结束行自身也折叠，结束后退出块
-                val prev = msg.evidenceDetails ?: ""
-                msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-                msg.copilotInToolBlock = false
-                msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
-                    "已执行 ${msg.copilotToolCallCount} 个操作"
-                else "执行详情"
-                notifyItemChanged(idx)
-                return
-            }
-        }
-
-        if (msg.copilotInToolBlock || isToolBlockStart || isStatsLine) {
-            // 工具块内容 / 统计行 → 折叠区域（不显示在主气泡）
-            val prev = msg.evidenceDetails ?: ""
-            msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-            if (msg.evidenceTitle.isNullOrBlank()) {
-                msg.evidenceTitle = "执行详情"
-            }
-        } else {
-            // 叙述文字 → 主气泡内容
-            // 跳过空白行（工具块之间的间隔行不加入主内容）
-            if (chunk.isNotBlank()) {
-                msg.content += chunk
-            }
-        }
+        messages[idx].content += chunk
         notifyItemChanged(idx)
     }
 

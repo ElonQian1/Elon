@@ -404,13 +404,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
     // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务跳过 codex 意图门控。
     // force_cli 模式（悬浮球手机控制）强制走意图门控，让 Codex 自己判断是闲聊还是生成脚本，
     // 不能跳过（否则 Codex 不读 AGENTS.md，无法生成手机控制 JSON）。
-    // PC 节点项目直接跳过意图门控：它走 Copilot CLI，不支持 Codex 门控，且逻辑由 pc_project_binding 处理。
-    let is_pc_node_project_for_gate = project.node_id.as_deref()
-        .map(|n| !n.is_empty())
-        .unwrap_or(false);
     let skip_intent_gate = needs_project_workflow
         && !execution_mode.is_force_cli()
-        && (routing_decision.confidence >= 84 || is_pc_node_project_for_gate);
+        && routing_decision.confidence >= 84;
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,
@@ -481,10 +477,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     if execution_mode.is_plan() {
         let _ =
             tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
-    } else if skip_intent_gate || is_pc_node_project {
-        if is_pc_node_project {
-            tracing::info!("PC 节点项目跳过意图门控，由 Copilot CLI 自行判断");
-        }
+    } else if skip_intent_gate {
         if let Some(trace_id) = trace_id.as_deref() {
             state.server_traces.record(
                 trace_id,
@@ -618,9 +611,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let execution_workspace = prepared_execution_workspace
         .unwrap_or_else(|| ProjectConversationWorkspace::shared(base_workspace.clone()));
 
-    let shared_project_permit = if execution_mode.is_plan() || execution_workspace.is_isolated() || is_pc_node_project {
-        // PC 节点项目：代码在用户 PC 上执行，服务端不持有项目共享锁
-        // 否则 Copilot 长时间运行期间会阻塞该项目的所有其他任务
+    let shared_project_permit = if execution_mode.is_plan() || execution_workspace.is_isolated() {
         None
     } else {
         let queued_tx = tx.clone();

@@ -70,21 +70,6 @@ internal class MainAssistantStreamEvents(
         }
         val modelUsed = jsonStringOrNull(json, "model_used")
         val streamId = jsonStringOrNull(json, "stream_id")
-        // Copilot 有时会把工具块作为第一条 assistant_message 发出
-        // 如果 text 以 ● 开头，直接放进 evidenceDetails，不显示在主气泡
-        val isCopilotMsg = modelUsed?.startsWith("node-") == true
-        val isCopilotToolBlock = isCopilotMsg && text.startsWith("● ")
-        return if (isCopilotToolBlock) {
-            ChatMessage(
-                "ai-intent",
-                content = "",
-                modelUsed = modelUsed,
-                streamId = streamId,
-                evidenceTitle = "执行详情",
-                evidenceDetails = text
-            )
-        } else {
-            ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId)
-        }
+        return ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId)
     }
 }
