@@ -769,6 +769,8 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showProjectPlaza = { navigationController.showProjectPlaza() },
+            openProject = { index -> openProjectSpaceForProject(index, true) },
+            showProjectActions = { index -> projectActions.showProjectActions(index) },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
                 groupChatActions.closeGroupChat()

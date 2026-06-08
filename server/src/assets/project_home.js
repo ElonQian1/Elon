@@ -24,26 +24,11 @@
   function formatTime(value) {
     const app = bridge();
     if (typeof app.formatTime === 'function') return app.formatTime(value);
-    return value ? String(value).replace('T', ' ').slice(0, 16) : '';
-  }
-
-  function isWorkingStatus(status) {
-    const app = bridge();
-    if (typeof app.isWorkingStatus === 'function') return app.isWorkingStatus(status);
-    const normalized = String(status || '').toLowerCase();
-    return ['running', 'working', 'pending', 'queued'].includes(normalized);
+    return value ? String(value).replace('T', ' ').slice(0, 16) : '时间';
   }
 
   function titleOf(project) {
     return project.name || project.title || '未命名项目';
-  }
-
-  function subtitleOf(project, joint) {
-    const description = String(project.description || project.subtitle || '').trim();
-    if (description) return description;
-    if (project.workspace_path) return 'PC 本地项目';
-    if (project.source_type === 'github') return 'GitHub 项目';
-    return joint ? '联合开发项目' : '个人独立项目';
   }
 
   function roleOf(project) {
@@ -61,79 +46,82 @@
     );
   }
 
-  function roleLabel(project, joint) {
-    const role = roleOf(project);
-    if (role === 'owner') return '个人';
-    if (role === 'editor') return '协作';
-    if (role === 'observer' || role === 'viewer') return '只读';
-    return joint ? '联合' : '个人';
+  function stageOf(project) {
+    return project.last_task_status || project.status || project.stage || '待提交需求';
   }
 
-  function statusLabel(project) {
-    return project.last_task_status || project.status || '准备就绪';
+  function conversationCount(project) {
+    if (Array.isArray(project.conversations)) return project.conversations.length || 1;
+    return project.conversation_count || project.conversationCount || project.chat_count || 1;
   }
 
-  function initialFor(project) {
-    const chars = Array.from(String(titleOf(project)).trim());
-    return (chars[0] || 'P').toUpperCase();
+  function projectTime(project) {
+    return formatTime(project.updated_at || project.updatedAt || project.updated_at_ms) || '时间';
   }
 
-  function renderHeader(all, personal, joint) {
+  function renderPlazaTiles() {
+    const tiles = [];
+    for (let row = 0; row < 6; row += 1) {
+      for (let col = 0; col < 10; col += 1) {
+        const left = (col * 12) - 8 + (row % 2 ? 6 : 0);
+        const top = (row * 30) - 16;
+        tiles.push(`<span class="project-plaza-tile" style="left:${left}%;top:${top}%"></span>`);
+      }
+    }
+    return tiles.join('');
+  }
+
+  function renderPlazaBanner() {
     return `
-      <div class="project-home-actions">
-        <button class="project-home-action" type="button" data-project-home-action="create">＋ 新建项目</button>
-        <button class="project-home-action" type="button" data-project-home-action="plaza">项目广场</button>
-      </div>
-      <div class="project-home-summary" aria-label="项目统计">
-        <div class="project-home-stat">
-          <div class="project-home-stat-value">${all.length}</div>
-          <div class="project-home-stat-label">全部项目</div>
-        </div>
-        <div class="project-home-stat">
-          <div class="project-home-stat-value">${personal.length}</div>
-          <div class="project-home-stat-label">个人独立项目</div>
-        </div>
-        <div class="project-home-stat">
-          <div class="project-home-stat-value">${joint.length}</div>
-          <div class="project-home-stat-label">联合开发项目</div>
-        </div>
-      </div>
+      <button class="project-plaza-banner" type="button" data-project-home-action="plaza" aria-label="进入项目广场">
+        <span class="project-plaza-pattern" aria-hidden="true">${renderPlazaTiles()}</span>
+        <span class="project-plaza-title">项目广场</span>
+        <span class="project-plaza-search" aria-hidden="true"></span>
+      </button>
     `;
   }
 
-  function renderSection(title, items, emptyText) {
+  function renderSection(title, items, emptyAction) {
+    const cells = items.slice();
+    if (!cells.length) {
+      cells.push(null, null);
+    } else if (cells.length % 2) {
+      cells.push(null);
+    }
     return `
-      <div class="project-home-section-title">${escapeHtml(title)}</div>
-      <div class="project-home-list">
-        ${items.length ? items.map(renderCard).join('') : `<div class="project-home-empty">${escapeHtml(emptyText)}</div>`}
+      <div class="project-home-section-head">
+        <div class="project-home-section-title">${escapeHtml(title)}</div>
+        <div class="project-home-section-arrow">›</div>
+      </div>
+      <div class="project-home-grid">
+        ${cells.map((project) => project ? renderCard(project) : renderEmptyCard(emptyAction)).join('')}
       </div>
     `;
   }
 
   function renderCard(project) {
     const joint = isJointProject(project);
-    const status = statusLabel(project);
-    const working = isWorkingStatus(status);
-    const updated = formatTime(project.updated_at || project.updatedAt);
-    const meta = [
-      `<span class="project-home-status ${working ? 'working' : ''}">${escapeHtml(status)}</span>`,
-      updated ? `<span>${escapeHtml(updated)}</span>` : '',
-      project.node_id ? '<span>PC 节点</span>' : ''
-    ].filter(Boolean).join('');
+    const kind = joint ? '联合开发' : '个人独立';
+    const meta = `${kind} · ${conversationCount(project)}个会话 · ${stageOf(project)}`;
+    const app = bridge();
+    const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     return `
-      <div class="project-home-card" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}">
-        <div class="project-home-icon ${joint ? 'joint' : ''}">${escapeHtml(initialFor(project))}</div>
-        <div class="project-home-main">
-          <div class="project-home-title-row">
-            <div class="project-home-name">${escapeHtml(titleOf(project))}</div>
-            <span class="project-home-badge ${joint ? '' : 'personal'}">${escapeHtml(roleLabel(project, joint))}</span>
-          </div>
-          <div class="project-home-subtitle">${escapeHtml(subtitleOf(project, joint))}</div>
-          <div class="project-home-meta">${meta}</div>
-        </div>
-        <div class="project-home-arrow">›</div>
-      </div>
+      <button class="project-home-card ${active ? 'active' : ''}" type="button" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}">
+        <span class="project-home-thumb" aria-hidden="true"></span>
+        <span class="project-home-info">
+          <span class="project-home-title-row">
+            <span class="project-home-name">${escapeHtml(titleOf(project))}</span>
+            <span class="project-home-time">${escapeHtml(projectTime(project))}</span>
+          </span>
+          <span class="project-home-meta">${escapeHtml(meta)}</span>
+        </span>
+      </button>
     `;
+  }
+
+  function renderEmptyCard(action) {
+    const attr = action ? ` data-project-home-action="${action}" tabindex="0"` : ' tabindex="-1"';
+    return `<button class="project-home-empty-card" type="button"${attr} aria-label="空项目位"></button>`;
   }
 
   function render() {
@@ -144,9 +132,9 @@
     const personal = all.filter((project) => !isJointProject(project));
     const joint = all.filter(isJointProject);
     root.innerHTML = [
-      renderHeader(all, personal, joint),
-      renderSection('个人独立项目', personal, '暂无个人独立项目'),
-      renderSection('联合开发项目', joint, '暂无联合开发项目')
+      renderPlazaBanner(),
+      renderSection('个人项目', personal, 'create'),
+      renderSection('联合项目', joint, null)
     ].join('');
   }
 

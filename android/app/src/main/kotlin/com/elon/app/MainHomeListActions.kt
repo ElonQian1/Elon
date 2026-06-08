@@ -32,6 +32,8 @@ internal class MainHomeListActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
+    private val openProject: (Int) -> Unit,
+    private val showProjectActions: (Int) -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
     private val openGroup: (AppGroup) -> Unit
@@ -318,28 +320,19 @@ internal class MainHomeListActions(
     }
 
     fun renderProjectList() {
-        val container = binding.projectContentLayout
-        container.removeAllViews()
-        container.addView(createProjectHeaderRow())
-        val indexedProjects = projects().mapIndexed { index, project -> index to project }
-        val personalProjects = indexedProjects.filter { (_, project) -> !project.isJointDevelopmentProject() }
-        val jointProjects = indexedProjects.filter { (_, project) -> project.isJointDevelopmentProject() }
-
-        container.addView(createProjectSectionTitle("个人独立项目"))
-        if (personalProjects.isEmpty()) {
-            container.addView(createEmptyProjectRow("暂无个人独立项目"))
-        }
-        personalProjects.forEach { (index, project) ->
-            container.addView(homeRows().createProjectRow(index, project))
-        }
-
-        container.addView(createProjectSectionTitle("联合开发项目"))
-        if (jointProjects.isEmpty()) {
-            container.addView(createEmptyProjectRow("暂无联合开发项目"))
-        }
-        jointProjects.forEach { (index, project) ->
-            container.addView(homeRows().createProjectRow(index, project))
-        }
+        ProjectManagementHomeView(
+            activity = activity,
+            container = binding.projectContentLayout,
+            projects = projects,
+            activeProjectIndex = { activeProject().let { active -> projects().indexOfFirst { it.id == active.id } } },
+            formatTime = formatTime,
+            openProject = openProject,
+            showProjectActions = showProjectActions,
+            showCreateProjectDialog = showCreateProjectDialog,
+            showProjectPlaza = showProjectPlaza,
+            dp = dp,
+            selectableForeground = selectableForeground
+        ).render()
     }
 
     fun isConversationWorking(index: Int): Boolean {
@@ -348,81 +341,4 @@ internal class MainHomeListActions(
         return isTaskRunning(activeProject().id, conversations[index].id)
     }
 
-    private fun createProjectHeaderRow(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(64)
-            ).apply {
-                bottomMargin = dp(8)
-            }
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#181B20"))
-            addView(
-                createProjectHeaderButton("＋ 新建项目") {
-                    showCreateProjectDialog()
-                }
-            )
-            addView(View(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(1), LinearLayout.LayoutParams.MATCH_PARENT).apply {
-                    topMargin = dp(12)
-                    bottomMargin = dp(12)
-                }
-                setBackgroundColor(Color.parseColor("#283140"))
-            })
-            addView(
-                createProjectHeaderButton("项目广场") {
-                    showProjectPlaza()
-                }
-            )
-        }
-    }
-
-    private fun createProjectHeaderButton(label: String, onClick: () -> Unit): TextView {
-        return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                1f
-            )
-            gravity = Gravity.CENTER
-            text = label
-            setTextColor(Color.parseColor("#F2F5FA"))
-            textSize = 16f
-            setPadding(dp(20), 0, dp(20), 0)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { onClick() }
-        }
-    }
-
-    private fun createProjectSectionTitle(title: String): TextView {
-        return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(38)
-            ).apply {
-                topMargin = dp(10)
-            }
-            gravity = Gravity.CENTER_VERTICAL
-            text = title
-            setTextColor(Color.parseColor("#6F7785"))
-            textSize = 13f
-            setPadding(dp(20), 0, dp(20), 0)
-        }
-    }
-
-    private fun createEmptyProjectRow(textValue: String): TextView {
-        return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            text = textValue
-            setTextColor(Color.parseColor("#6F7785"))
-            textSize = 14f
-            setPadding(dp(20), 0, dp(20), 0)
-        }
-    }
 }
