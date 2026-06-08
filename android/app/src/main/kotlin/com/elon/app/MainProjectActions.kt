@@ -44,19 +44,12 @@ internal class MainProjectActions(
         val title: String,
         val subtitle: String,
         val iconRes: Int,
-        val tone: ProjectMenuTone = ProjectMenuTone.Neutral,
         val action: () -> Unit
     )
 
-    private enum class ProjectMenuTone(
-        val iconColor: String,
-        val iconBackground: String,
-        val titleColor: String = "#F2F5FA"
-    ) {
-        Primary("#58BE6A", "#17351E"),
-        Info("#81B3D9", "#152C3E"),
-        Neutral("#DDE8FC", "#283140"),
-        Danger("#FF6B6B", "#3A1F24", "#FF9A9A")
+    private companion object {
+        const val MENU_ICON_COLOR = "#DDE8FC"
+        const val MENU_ICON_BACKGROUND = "#283140"
     }
 
     fun showCreateProjectDialog() {
@@ -145,16 +138,14 @@ internal class MainProjectActions(
                 ProjectMenuAction(
                     title = "编辑项目名称",
                     subtitle = "调整项目列表里的显示名称",
-                    iconRes = R.drawable.ic_project_action_rename,
-                    tone = ProjectMenuTone.Neutral
+                    iconRes = R.drawable.ic_project_action_rename
                 ) { showRenameProjectDialog(index) }
             )
             add(
                 ProjectMenuAction(
                     title = "打开项目空间",
                     subtitle = if (isJoint) "进入联合协作空间" else "进入项目开发会话",
-                    iconRes = R.drawable.ic_project_action_space,
-                    tone = ProjectMenuTone.Primary
+                    iconRes = R.drawable.ic_project_action_space
                 ) {
                     setActiveProjectIndex(index)
                     saveProjects()
@@ -166,8 +157,7 @@ internal class MainProjectActions(
                     ProjectMenuAction(
                         title = "邀请好友协作",
                         subtitle = "生成项目卡片并开启协作",
-                        iconRes = R.drawable.ic_project_action_invite,
-                        tone = ProjectMenuTone.Info
+                        iconRes = R.drawable.ic_project_action_invite
                     ) { confirmUpgradeToJoint(index) }
                 )
             }
@@ -176,16 +166,14 @@ internal class MainProjectActions(
                     ProjectMenuAction(
                         title = "恢复为个人项目",
                         subtitle = "撤回协作状态与分享卡片",
-                        iconRes = R.drawable.ic_project_action_restore,
-                        tone = ProjectMenuTone.Neutral
+                        iconRes = R.drawable.ic_project_action_restore
                     ) { confirmRestorePersonalProject(project) }
                 )
                 add(
                     ProjectMenuAction(
                         title = "发布到项目商城",
                         subtitle = "让其他用户可见并加入",
-                        iconRes = R.drawable.ic_project_action_publish,
-                        tone = ProjectMenuTone.Primary
+                        iconRes = R.drawable.ic_project_action_publish
                     ) { confirmPublishToMarketplace(project) }
                 )
             }
@@ -193,8 +181,7 @@ internal class MainProjectActions(
                 ProjectMenuAction(
                     title = "Git 仓库",
                     subtitle = "查看或配置项目远端",
-                    iconRes = R.drawable.ic_project_action_git,
-                    tone = ProjectMenuTone.Info
+                    iconRes = R.drawable.ic_project_action_git
                 ) {
                     openProject(index)
                     showGitProjectDialog()
@@ -204,8 +191,7 @@ internal class MainProjectActions(
                 ProjectMenuAction(
                     title = "协作权限 / 商城公开",
                     subtitle = "管理加入方式和可见范围",
-                    iconRes = R.drawable.ic_project_action_visibility,
-                    tone = ProjectMenuTone.Info
+                    iconRes = R.drawable.ic_project_action_visibility
                 ) { showVisibilityDialog(project) }
             )
             if (projects.size > 1 && project.id != ELON_SELF_PROJECT_ID) {
@@ -213,8 +199,7 @@ internal class MainProjectActions(
                     ProjectMenuAction(
                         title = "删除项目",
                         subtitle = "从服务器和本机移除",
-                        iconRes = R.drawable.ic_project_action_delete,
-                        tone = ProjectMenuTone.Danger
+                        iconRes = R.drawable.ic_project_action_delete
                     ) { confirmDeleteProject(index) }
                 )
             }
@@ -267,14 +252,11 @@ internal class MainProjectActions(
             addView(FrameLayout(activity).apply {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor(if (isJoint) "#17351E" else "#152C3E"))
-                    setStroke(dp(1), Color.parseColor(if (isJoint) "#2B6F3A" else "#254761"))
+                    setColor(Color.parseColor(MENU_ICON_BACKGROUND))
                 }
                 addView(ImageView(activity).apply {
                     setImageResource(R.drawable.ic_popup_project)
-                    imageTintList = ColorStateList.valueOf(
-                        Color.parseColor(if (isJoint) "#58BE6A" else "#81B3D9")
-                    )
+                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
                 }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
 
@@ -326,11 +308,11 @@ internal class MainProjectActions(
             addView(FrameLayout(activity).apply {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor(action.tone.iconBackground))
+                    setColor(Color.parseColor(MENU_ICON_BACKGROUND))
                 }
                 addView(ImageView(activity).apply {
                     setImageResource(action.iconRes)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor(action.tone.iconColor))
+                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
                 }, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
             }, LinearLayout.LayoutParams(dp(40), dp(40)))
 
@@ -340,7 +322,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = action.title
-                    setTextColor(Color.parseColor(action.tone.titleColor))
+                    setTextColor(Color.parseColor("#F2F5FA"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
