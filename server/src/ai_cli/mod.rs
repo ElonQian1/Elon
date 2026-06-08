@@ -773,6 +773,22 @@ async fn run_via_pc_agent(
         .unwrap_or_else(|| agent_id.to_string());
     let is_codex = cli_name == "codex";
 
+    // Codex 处理期间无 CliChunk，用户会看到长时间无响应。
+    // 用后台定时器每 15s 发一次进度消息，告知用户正在处理。
+    let progress_tx = tx.clone();
+    let cli_label = if is_codex { "Codex" } else { "Copilot" };
+    let progress_handle = tokio::spawn(async move {
+        let mut elapsed: u64 = 0;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+            elapsed += 15;
+            let _ = progress_tx.send(
+                WsMessage::progress(format!("{} 正在处理中，请稍候（已等待 {}s）…", cli_label, elapsed))
+                    .to_json(),
+            );
+        }
+    });
+
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
@@ -802,6 +818,7 @@ async fn run_via_pc_agent(
                 full_text.push_str(&text);
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
+                progress_handle.abort(); // 停止进度定时器
                 if exit_ok {
                     // Codex 输出需要特殊解析：提取第一段 AI 回复（codex\n 后 tokens used 前）
                     let reply = if is_codex {
@@ -834,6 +851,7 @@ async fn run_via_pc_agent(
         }
     }
 
+    progress_handle.abort();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }
 
