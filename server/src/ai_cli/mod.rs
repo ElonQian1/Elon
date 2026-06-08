@@ -496,7 +496,7 @@ async fn run_with_workspace_mode(
                             message: String::new(),
                             apk_url: None,
                             image_url: None,
-                            model_used: None,
+                            model_used: Some(option.attribution_label()),
                             node_id: None,
                         }
                         .to_json(),
@@ -599,7 +599,7 @@ async fn run_with_workspace_mode(
             message: reply,
             apk_url,
             image_url: None,
-            model_used: None,
+            model_used: Some(option.attribution_label()),
             node_id: None,
         }
         .to_json(),
