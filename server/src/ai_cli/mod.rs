@@ -826,8 +826,11 @@ async fn run_via_pc_agent(
                             node_id: Some(agent_id.to_string()),
                         }.to_json());
                     }
+                    // Done.message 不携带内容：APK 已通过 AssistantMessage/AssistantChunk 收到回复，
+                    // 再在 Done 里携带会导致 Codex 回复出现两个气泡。
+                    // 断线重连恢复由 backlog replay（project_ws_session）负责，不依赖 Done.message。
                     let _ = tx.send(WsMessage::Done {
-                        message: reply,  // 携带完整内容：断线重连时 APK 可从 Done 恢复
+                        message: String::new(),
                         apk_url: None,
                         image_url: None,
                         model_used: Some(display_model.clone()),
