@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.app.Dialog
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -14,6 +15,7 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
@@ -58,9 +60,9 @@ internal class MainProjectActions(
     )
 
     private companion object {
-        private const val PROJECT_DIALOG_ENTER_MS = 260L
-        private const val PROJECT_DIALOG_EXIT_MS = 210L
-        private const val PROJECT_DIALOG_START_SCALE = 0.18f
+        private const val PROJECT_DIALOG_ENTER_MS = 220L
+        private const val PROJECT_DIALOG_EXIT_MS = 170L
+        private const val PROJECT_DIALOG_START_SCALE = 0.22f
         const val MENU_ICON_COLOR = "#DDE8FC"
         const val MENU_ICON_BACKGROUND = "#283140"
     }
@@ -123,14 +125,21 @@ internal class MainProjectActions(
         val isJoint = project.isJointDevelopmentProject()
 
         val actions = buildProjectMenuActions(index, project, isJoint)
-        val dialog = AlertDialog.Builder(activity).create()
+        val dialog = Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar).apply {
+            requestWindowFeature(Window.FEATURE_NO_TITLE)
+        }
         val origin = projectDialogOriginFrom(sourceView)
+        val scrim = View(activity).apply {
+            setBackgroundColor(Color.BLACK)
+            alpha = 0f
+        }
+        lateinit var panel: View
         var isClosing = false
 
         fun dismissWithAnimation(afterDismiss: () -> Unit = {}) {
             if (isClosing) return
             isClosing = true
-            animateProjectActionsDialogOut(dialog, origin) {
+            animateProjectActionsDialogOut(panel, scrim, origin) {
                 dialog.setOnKeyListener(null)
                 dialog.dismiss()
                 afterDismiss()
@@ -140,8 +149,23 @@ internal class MainProjectActions(
         val content = createProjectActionsDialogView(project, isJoint, actions) { afterDismiss ->
             dismissWithAnimation(afterDismiss)
         }
-        @Suppress("DEPRECATION")
-        dialog.setView(content, 0, 0, 0, 0)
+        panel = content
+        prepareProjectActionsDialogForEnter(panel)
+        val root = FrameLayout(activity).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(scrim, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            addView(panel, FrameLayout.LayoutParams(
+                minOf(activity.resources.displayMetrics.widthPixels - dp(48), dp(360)),
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            ))
+        }
+        scrim.setOnClickListener { dismissWithAnimation() }
+        dialog.setContentView(root)
         dialog.setCanceledOnTouchOutside(false)
         dialog.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_BACK) {
@@ -156,18 +180,14 @@ internal class MainProjectActions(
         dialog.setOnShowListener {
             val window = dialog.window ?: return@setOnShowListener
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            window.setDimAmount(0.62f)
+            window.setDimAmount(0f)
+            window.setWindowAnimations(0)
             window.attributes = window.attributes.apply {
                 windowAnimations = 0
             }
-            val width = minOf(
-                activity.resources.displayMetrics.widthPixels - dp(48),
-                dp(360)
-            )
-            window.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
-            val decor = window.decorView
-            prepareProjectActionsDialogForEnter(decor)
-            decor.post { animateProjectActionsDialogIn(decor, origin) }
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            prepareProjectActionsDialogForEnter(panel)
+            panel.post { animateProjectActionsDialogIn(panel, scrim, origin) }
         }
         dialog.show()
     }
@@ -183,69 +203,81 @@ internal class MainProjectActions(
         )
     }
 
-    private fun prepareProjectActionsDialogForEnter(decor: View) {
-        decor.animate().cancel()
-        decor.alpha = 0f
-        decor.scaleX = PROJECT_DIALOG_START_SCALE
-        decor.scaleY = PROJECT_DIALOG_START_SCALE
-        decor.translationX = 0f
-        decor.translationY = 0f
+    private fun prepareProjectActionsDialogForEnter(panel: View) {
+        panel.animate().setListener(null)
+        panel.animate().cancel()
+        panel.alpha = 0f
+        panel.scaleX = PROJECT_DIALOG_START_SCALE
+        panel.scaleY = PROJECT_DIALOG_START_SCALE
+        panel.translationX = 0f
+        panel.translationY = 0f
     }
 
-    private fun animateProjectActionsDialogIn(decor: View, origin: ProjectDialogOrigin?) {
-        val (startX, startY) = dialogOffsetFromOrigin(decor, origin)
-        decor.pivotX = decor.width / 2f
-        decor.pivotY = decor.height / 2f
-        decor.translationX = startX
-        decor.translationY = startY
-        decor.animate()
+    private fun animateProjectActionsDialogIn(panel: View, scrim: View, origin: ProjectDialogOrigin?) {
+        val (startX, startY) = panelOffsetFromOrigin(panel, origin)
+        panel.pivotX = panel.width / 2f
+        panel.pivotY = panel.height / 2f
+        panel.translationX = startX
+        panel.translationY = startY
+        scrim.animate()
+            .alpha(0.62f)
+            .setDuration(PROJECT_DIALOG_ENTER_MS)
+            .setInterpolator(DecelerateInterpolator(1.2f))
+            .start()
+        panel.animate()
             .translationX(0f)
             .translationY(0f)
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
             .setDuration(PROJECT_DIALOG_ENTER_MS)
-            .setInterpolator(DecelerateInterpolator(1.75f))
+            .setInterpolator(DecelerateInterpolator(1.35f))
             .start()
     }
 
     private fun animateProjectActionsDialogOut(
-        dialog: AlertDialog,
+        panel: View,
+        scrim: View,
         origin: ProjectDialogOrigin?,
         afterEnd: () -> Unit
     ) {
-        val decor = dialog.window?.decorView
-        if (decor == null || decor.width <= 0 || decor.height <= 0) {
+        if (panel.width <= 0 || panel.height <= 0) {
             afterEnd()
             return
         }
-        val (endX, endY) = dialogOffsetFromOrigin(decor, origin)
-        decor.animate().cancel()
-        decor.pivotX = decor.width / 2f
-        decor.pivotY = decor.height / 2f
-        decor.animate()
+        val (endX, endY) = panelOffsetFromOrigin(panel, origin)
+        panel.animate().cancel()
+        scrim.animate().cancel()
+        panel.pivotX = panel.width / 2f
+        panel.pivotY = panel.height / 2f
+        scrim.animate()
+            .alpha(0f)
+            .setDuration(PROJECT_DIALOG_EXIT_MS)
+            .setInterpolator(AccelerateInterpolator(1.05f))
+            .start()
+        panel.animate()
             .translationX(endX)
             .translationY(endY)
             .scaleX(PROJECT_DIALOG_START_SCALE)
             .scaleY(PROJECT_DIALOG_START_SCALE)
             .alpha(0f)
             .setDuration(PROJECT_DIALOG_EXIT_MS)
-            .setInterpolator(AccelerateInterpolator(1.2f))
+            .setInterpolator(AccelerateInterpolator(1.08f))
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    decor.animate().setListener(null)
+                    panel.animate().setListener(null)
                     afterEnd()
                 }
             })
             .start()
     }
 
-    private fun dialogOffsetFromOrigin(decor: View, origin: ProjectDialogOrigin?): Pair<Float, Float> {
-        if (origin == null || decor.width <= 0 || decor.height <= 0) return 0f to 0f
+    private fun panelOffsetFromOrigin(panel: View, origin: ProjectDialogOrigin?): Pair<Float, Float> {
+        if (origin == null || panel.width <= 0 || panel.height <= 0) return 0f to 0f
         val location = IntArray(2)
-        decor.getLocationOnScreen(location)
-        val centerX = location[0] + decor.width / 2f
-        val centerY = location[1] + decor.height / 2f
+        panel.getLocationOnScreen(location)
+        val centerX = location[0] + panel.width / 2f
+        val centerY = location[1] + panel.height / 2f
         return (origin.centerX - centerX) to (origin.centerY - centerY)
     }
 
