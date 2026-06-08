@@ -70,6 +70,7 @@ internal class MainAssistantStreamEvents(
         }
         val modelUsed = jsonStringOrNull(json, "model_used")
         val streamId = jsonStringOrNull(json, "stream_id")
-        return ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId)
+        val nodeId = jsonStringOrNull(json, "node_id")
+        return ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId, nodeId = nodeId)
     }
 }
