@@ -620,6 +620,23 @@ impl Store {
         Ok(n)
     }
 
+    /// 定期清理：将 running 超过指定秒数的任务标记为 failed。
+    /// 用于防止 PC 节点断线但任务因异常未收到 CliDone 而永久卡住。
+    pub fn mark_stale_running_tasks(&self, older_than_secs: u64) -> Result<usize> {
+        use chrono::{Duration, Utc};
+        let cutoff = (Utc::now() - Duration::seconds(older_than_secs as i64)).to_rfc3339();
+        let n = self.conn()?.execute(
+            "UPDATE tasks
+             SET status = 'failed',
+                 error = COALESCE(error, 'PC节点断线或任务超时自动终止'),
+                 updated_at = ?1
+             WHERE status = 'running'
+               AND created_at < ?2",
+            params![now(), cutoff],
+        )?;
+        Ok(n)
+    }
+
     fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }

@@ -147,6 +147,26 @@ async fn main() -> Result<()> {
         );
     }
 
+    // 定期清理：running 超过 10 分钟的任务自动标记为 failed
+    // 防止 PC 节点断线但任务因异常未收到 CliDone 而永久卡住
+    {
+        let state_cleanup = state.clone();
+        tokio::spawn(async move {
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(120));
+            loop {
+                interval.tick().await;
+                match state_cleanup.store.mark_stale_running_tasks(10 * 60) {
+                    Ok(n) if n > 0 => {
+                        info!("{n} 个超时 running 任务已自动标记为 failed")
+                    }
+                    Ok(_) => {}
+                    Err(e) => tracing::warn!("stale task cleanup error: {e}"),
+                }
+            }
+        });
+    }
+
     let app = router::build_app(state);
 
     let addr: SocketAddr = std::env::var("LISTEN_ADDR")

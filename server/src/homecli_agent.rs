@@ -485,9 +485,26 @@ async fn run_agent_session(
     }
     .await;
 
-    // Clean up.
+    // Clean up: 先移除 agent，再通知挂起请求失败，避免断线后调用方永久阻塞
     state.agent_manager.agents.write().await.remove(&agent_id);
     state.node_registry.unregister(&agent_id).await;
+
+    // 节点断线时，向所有还在等待响应的 CLI 请求发送 CliDone(exit_ok=false)，
+    // 让 run_via_pc_agent 的 while rx.recv() 立即收到错误并返回，
+    // 而不是永远阻塞到 HTTP 请求超时。
+    {
+        let mut p = pending.lock().await;
+        let stale: Vec<(String, mpsc::UnboundedSender<AgentToServer>)> = p.drain().collect();
+        drop(p);
+        for (req_id, sender) in stale {
+            let _ = sender.send(AgentToServer::CliDone {
+                req_id,
+                exit_ok: false,
+                error: Some("PC节点已断线，请重试".to_string()),
+            });
+        }
+    }
+
     drop(cmd_tx);
     let _ = writer.await;
     tracing::info!(%agent_id, "agent disconnected");
