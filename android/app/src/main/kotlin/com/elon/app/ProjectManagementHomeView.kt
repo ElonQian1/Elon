@@ -46,21 +46,21 @@ internal class ProjectManagementHomeView(
         val personal = indexed.filter { !it.project.isJointDevelopmentProject() }
         val joint = indexed.filter { it.project.isJointDevelopmentProject() }
 
-        addSection("个人项目", personal, topMargin = 12, emptyAction = showCreateProjectDialog)
-        addSection("联合项目", joint, topMargin = 12, emptyAction = null)
+        addSection("个人项目", personal, topMargin = 4, emptyAction = showCreateProjectDialog)
+        addSection("联合项目", joint, topMargin = 4, emptyAction = null)
         container.addView(bottomSpacer())
     }
 
     private fun createPlazaBanner(): View {
-        val contentWidth = activity.resources.displayMetrics.widthPixels - dp(20)
+        val contentWidth = activity.resources.displayMetrics.widthPixels - dp(16)
         val bannerHeight = (contentWidth * 0.36f).toInt().coerceIn(dp(124), dp(158))
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 bannerHeight
             ).apply {
-                marginStart = dp(10)
-                marginEnd = dp(10)
+                marginStart = dp(8)
+                marginEnd = dp(8)
                 topMargin = dp(12)
             }
             clipToPadding = false
@@ -84,8 +84,8 @@ internal class ProjectManagementHomeView(
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.START or Gravity.TOP
-                leftMargin = dp(14)
-                topMargin = dp(19)
+                leftMargin = 0
+                topMargin = dp(10)
             })
 
             addView(ImageView(activity).apply {
@@ -107,10 +107,10 @@ internal class ProjectManagementHomeView(
     ) {
         container.addView(createSectionHeader(title), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(46)
+            dp(42)
         ).apply {
-            marginStart = dp(10)
-            marginEnd = dp(10)
+            marginStart = dp(8)
+            marginEnd = dp(8)
             this.topMargin = dp(topMargin)
         })
         addProjectGrid(items, emptyAction)
@@ -153,17 +153,17 @@ internal class ProjectManagementHomeView(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         1f
                     ).apply {
-                        if (cellIndex == 0) marginEnd = dp(5)
-                        else marginStart = dp(5)
+                        if (cellIndex == 0) marginEnd = dp(4)
+                        else marginStart = dp(4)
                     })
                 }
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(10)
-                marginEnd = dp(10)
-                topMargin = if (rowIndex == 0) dp(8) else dp(16)
+                marginStart = dp(8)
+                marginEnd = dp(8)
+                topMargin = if (rowIndex == 0) dp(6) else dp(14)
             })
         }
     }

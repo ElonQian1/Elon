@@ -2,7 +2,7 @@
   min-height: 100%;
   background: #101010;
   color: #f2f5fa;
-  padding: 12px 10px 34px;
+  padding: 12px 8px 34px;
 }
 
 .project-plaza-banner {
@@ -48,8 +48,8 @@
 
 .project-plaza-title {
   position: absolute;
-  left: 14px;
-  top: 19px;
+  left: 0;
+  top: 10px;
   z-index: 2;
   font-size: 16px;
   line-height: 1;
@@ -92,15 +92,15 @@
 }
 
 .project-home-section-head {
-  height: 46px;
-  margin-top: 12px;
+  height: 42px;
+  margin-top: 4px;
   display: flex;
   align-items: center;
   color: #f2f5fa;
 }
 
 .project-home-section-head + .project-home-grid {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .project-home-section-title {
@@ -124,7 +124,7 @@
 .project-home-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .project-home-card,
@@ -242,12 +242,12 @@
 
 @media (max-width: 390px) {
   .project-home-root {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   .project-home-grid {
-    gap: 10px;
+    gap: 8px;
   }
 
   .project-home-section-title {
