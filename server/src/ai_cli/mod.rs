@@ -18,8 +18,8 @@ pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionSc
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
-use uuid::Uuid;
 use tokio::sync::mpsc::UnboundedSender;
+use uuid::Uuid;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
@@ -496,7 +496,7 @@ async fn run_with_workspace_mode(
                             message: String::new(),
                             apk_url: None,
                             image_url: None,
-                            model_used: None,
+                            model_used: Some(option.attribution_label()),
                             node_id: None,
                         }
                         .to_json(),
@@ -599,7 +599,7 @@ async fn run_with_workspace_mode(
             message: reply,
             apk_url,
             image_url: None,
-            model_used: None,
+            model_used: Some(option.attribution_label()),
             node_id: None,
         }
         .to_json(),
@@ -674,10 +674,12 @@ async fn run_via_pc_agent(
     };
 
     // 从 prompt 里提取图片 URL（由 append_project_attachment_notes 生成的 "(url: http://...)" 格式）
-    let attachment_urls: Vec<String> = prompt.lines()
+    let attachment_urls: Vec<String> = prompt
+        .lines()
         .filter_map(|line| {
             let line = line.trim();
-            line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')'))
+            line.strip_prefix("(url: ")
+                .and_then(|s| s.strip_suffix(')'))
                 .filter(|url| url.starts_with("http"))
                 .map(str::to_owned)
         })
@@ -734,14 +736,21 @@ async fn run_via_pc_agent(
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
         for attempt in 0..MAX_ATTEMPTS {
-            match state.agent_manager.dispatch_cli_prompt_in_cwd(
-                agent_id,
-                cli_name.to_string(),
-                extra_args.clone(),
-                cwd.map(ToOwned::to_owned),
-                prompt.clone(),
-            ).await {
-                Ok(r) => { result = Ok(r); break; }
+            match state
+                .agent_manager
+                .dispatch_cli_prompt_in_cwd(
+                    agent_id,
+                    cli_name.to_string(),
+                    extra_args.clone(),
+                    cwd.map(ToOwned::to_owned),
+                    prompt.clone(),
+                )
+                .await
+            {
+                Ok(r) => {
+                    result = Ok(r);
+                    break;
+                }
                 Err(e) => {
                     last_err = e;
                     let msg = last_err.to_string();
@@ -783,12 +792,19 @@ async fn run_via_pc_agent(
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
             elapsed += 15;
             let _ = progress_tx.send(
-                WsMessage::progress(format!("{} 正在处理中，请稍候（已等待 {}s）…", cli_label, elapsed))
-                    .to_json(),
+                WsMessage::progress(format!(
+                    "{} 正在处理中，请稍候（已等待 {}s）…",
+                    cli_label, elapsed
+                ))
+                .to_json(),
             );
         }
     });
 
+    // Codex 断线后等待重连的截止时间（2分钟）
+    let reconnect_deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+
+    'recv: loop {
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
@@ -804,22 +820,28 @@ async fn run_via_pc_agent(
                 }
                 if !stream_started {
                     stream_started = true;
-                    let _ = tx.send(WsMessage::AssistantMessage {
-                        text: text.clone(),
-                        model_used: Some(display_model.clone()),
-                        stream_id: Some(stream_id.clone()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantMessage {
+                            text: text.clone(),
+                            model_used: Some(display_model.clone()),
+                            stream_id: Some(stream_id.clone()),
+                        }
+                        .to_json(),
+                    );
                 } else {
-                    let _ = tx.send(WsMessage::AssistantChunk {
-                        stream_id: stream_id.clone(),
-                        text: text.clone(),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantChunk {
+                            stream_id: stream_id.clone(),
+                            text: text.clone(),
+                        }
+                        .to_json(),
+                    );
                 }
                 full_text.push_str(&text);
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
-                progress_handle.abort(); // 停止进度定时器
                 if exit_ok {
+                    progress_handle.abort(); // 停止进度定时器
                     // Codex 输出需要特殊解析：提取第一段 AI 回复（codex\n 后 tokens used 前）
                     let reply = if is_codex {
                         extract_codex_reply(&full_text)
@@ -829,27 +851,88 @@ async fn run_via_pc_agent(
                         full_text.trim().to_string()
                     };
                     if !reply.is_empty() {
-                        let _ = tx.send(WsMessage::AssistantMessage {
-                            text: reply,
-                            model_used: Some(display_model.clone()),
-                            stream_id: None,
-                        }.to_json());
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: reply,
+                                model_used: Some(display_model.clone()),
+                                stream_id: None,
+                            }
+                            .to_json(),
+                        );
                     }
-                    let _ = tx.send(WsMessage::Done {
-                        message: String::new(),
-                        apk_url: None,
-                        image_url: None,
-                        model_used: Some(display_model.clone()),
-                        node_id: Some(agent_id.to_string()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                            model_used: Some(display_model.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
                     return Ok(());
-                } else {
-                    return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
                 }
+
+                // 检查是否是节点断线导致的失败（而非真实的 CLI 错误）
+                let is_disconnect_err = error.as_deref()
+                    .map(|e| e.contains("断线"))
+                    .unwrap_or(false);
+
+                // Codex 有 session 持久化，断线后可以 exec resume 续接；
+                // Copilot 流式内容已发出，重试会重复，故不自动重试
+                if is_disconnect_err && is_codex && std::time::Instant::now() < reconnect_deadline {
+                    let _ = tx.send(WsMessage::progress(
+                        "PC节点短暂断线，等待重连（最多2分钟）…".to_string()
+                    ).to_json());
+
+                    // 轮询等待同一节点重连（每3秒检查一次）
+                    let reconnected = loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        if std::time::Instant::now() >= reconnect_deadline {
+                            break false;
+                        }
+                        if let Some(aid) = state.agent_manager.any_connected_agent_id().await {
+                            if aid == agent_id {
+                                break true;
+                            }
+                        }
+                    };
+
+                    if reconnected {
+                        let _ = tx.send(WsMessage::progress(
+                            "PC节点已重连，继续处理中…".to_string()
+                        ).to_json());
+                        full_text.clear(); // 丢弃断线前的不完整输出
+                        // 重新派发同一请求，node-agent 会用 codex exec resume 续接同一会话
+                        match state.agent_manager.dispatch_cli_prompt_in_cwd(
+                            agent_id,
+                            cli_name.to_string(),
+                            extra_args.clone(),
+                            cwd.map(ToOwned::to_owned),
+                            prompt.clone(),
+                        ).await {
+                            Ok((_, new_rx)) => {
+                                rx = new_rx;
+                                continue 'recv; // 用新 rx 重新进入接收循环
+                            }
+                            Err(e) => {
+                                progress_handle.abort();
+                                return Err(e);
+                            }
+                        }
+                    }
+                    progress_handle.abort();
+                    return Err(anyhow!("等待PC节点重连超时（2分钟），请稍后重试"));
+                }
+
+                progress_handle.abort();
+                return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
             }
             _ => {}
         }
     }
+    break; // rx 正常关闭
+    } // end 'recv
 
     progress_handle.abort();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
