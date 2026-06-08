@@ -40,7 +40,7 @@
                 android:includeFontPadding="false"
                 android:text="会话区"
                 android:textColor="@color/elon_text_primary"
-                android:textSize="17sp" />
+                android:textSize="16sp" />
 
             <ImageButton
                 android:id="@+id/searchButton"
