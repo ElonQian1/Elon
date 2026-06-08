@@ -673,44 +673,59 @@ async fn run_via_pc_agent(
         }
     };
 
-    // 为 Copilot 和 Codex 分别派生确定性 session UUID（保证用户隔离+上下文复用）
-    let session_uuid = native_session_scope.as_ref().map(|scope| {
-        use sha2::Digest;
-        let seed = format!("{}-session/{}/{}/{}", cli_name, scope.project_id, scope.user_id, scope.conversation_id);
-        let hash = sha2::Sha256::digest(seed.as_bytes());
-        format!(
-            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            hash[0], hash[1], hash[2], hash[3],
-            hash[4], hash[5],
-            hash[6] & 0x0f, hash[7],
-            (hash[8] & 0x3f) | 0x80, hash[9],
-            hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
-        )
-    });
+    // 从 prompt 里提取图片 URL（由 append_project_attachment_notes 生成的 "(url: http://...)" 格式）
+    let attachment_urls: Vec<String> = prompt.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')'))
+                .filter(|url| url.starts_with("http"))
+                .map(str::to_owned)
+        })
+        .collect();
+    let has_attachments = !attachment_urls.is_empty();
 
-    // extra_args：session-id 对 Copilot 和 Codex 都有效（node-agent 里分别处理）
-    let extra_args: Vec<String> = if cli_name == "copilot" {
-        let mut args = if let Some(ref sid) = session_uuid {
-            vec![format!("--session-id={}", sid)]
-        } else {
-            vec![]
-        };
-        if let Some(model) = copilot_model {
-            if !model.is_empty() && model != "auto" {
-                args.push("--model".into());
-                args.push(model.to_string());
+    // 为 Copilot 和 Codex 分别派生确定性 session UUID（保证用户隔离+上下文复用）
+    // 有图片时 Copilot 开新会话（--attachment 只对 initial prompt 有效）
+    let session_uuid = if has_attachments && cli_name == "copilot" {
+        None // 有图时开新 Copilot 会话
+    } else {
+        native_session_scope.as_ref().map(|scope| {
+            use sha2::Digest;
+            let seed = format!("{}-session/{}/{}/{}", cli_name, scope.project_id, scope.user_id, scope.conversation_id);
+            let hash = sha2::Sha256::digest(seed.as_bytes());
+            format!(
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                hash[0], hash[1], hash[2], hash[3],
+                hash[4], hash[5],
+                hash[6] & 0x0f, hash[7],
+                (hash[8] & 0x3f) | 0x80, hash[9],
+                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+            )
+        })
+    };
+
+    // extra_args：session-id + 图片附件（node-agent 里根据 cli_name 分别处理下载和参数格式）
+    let extra_args: Vec<String> = {
+        let mut args = vec![];
+        // session-id（两种 CLI 都支持，node-agent 内部处理）
+        if let Some(ref sid) = session_uuid {
+            args.push(format!("--session-id={}", sid));
+        }
+        // Copilot 专用：--model 参数
+        if cli_name == "copilot" {
+            if let Some(model) = copilot_model {
+                if !model.is_empty() && model != "auto" {
+                    args.push("--model".into());
+                    args.push(model.to_string());
+                }
             }
         }
-        args
-    } else if cli_name == "codex" {
-        // Codex: 通过 --session-id 让 node-agent 决定用 exec 还是 exec resume
-        if let Some(ref sid) = session_uuid {
-            vec![format!("--session-id={}", sid)]
-        } else {
-            vec![]
+        // 图片附件（node-agent 里下载后转 Copilot --attachment 或 Codex -i）
+        for url in &attachment_urls {
+            args.push("--attachment".into());
+            args.push(url.clone());
         }
-    } else {
-        vec![]
+        args
     };
 
     // dispatch 时节点可能刚好掉线重连

@@ -627,6 +627,64 @@ fn detect_available_clis() -> Vec<(String, String)> {
     }).collect()
 }
 
+/// 处理 extra_args 中的 `--attachment <url>` 参数：
+/// 下载图片到本地临时文件，然后根据 CLI 类型转换参数格式：
+/// - Copilot: `--attachment <url>` → `--attachment <local_path>`
+/// - Codex:   `--attachment <url>` → `-i <local_path>`
+async fn resolve_attachment_args(args: Vec<String>, cli_name: &str, user_token: Option<&str>) -> Vec<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .unwrap_or_default();
+    let mut result = Vec::with_capacity(args.len());
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--attachment" {
+            if let Some(url) = args.get(i + 1) {
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    let ext = url.rsplit('.').next()
+                        .filter(|e| e.len() <= 5 && e.chars().all(|c| c.is_alphanumeric()))
+                        .unwrap_or("jpg");
+                    let tmp_path = std::env::temp_dir()
+                        .join(format!("elon_attach_{}.{}", uuid::Uuid::new_v4(), ext));
+                    let mut req = client.get(url.as_str());
+                    if let Some(tok) = user_token {
+                        req = req.bearer_auth(tok);
+                    }
+                    match req.send().await {
+                        Ok(resp) if resp.status().is_success() => {
+                            if let Ok(bytes) = resp.bytes().await {
+                                if tokio::fs::write(&tmp_path, &bytes).await.is_ok() {
+                                    let local = tmp_path.to_string_lossy().to_string();
+                                    if cli_name == "codex" {
+                                        // Codex 用 -i 传图片
+                                        result.push("-i".to_string());
+                                        result.push(local);
+                                    } else {
+                                        // Copilot 用 --attachment
+                                        result.push("--attachment".to_string());
+                                        result.push(local);
+                                    }
+                                    i += 2;
+                                    continue;
+                                }
+                            }
+                        }
+                        Ok(resp) => { warn!("📎 attachment download failed: status={}", resp.status()); }
+                        Err(e) => { warn!("📎 attachment download error: {}", e); }
+                    }
+                    // 下载失败：跳过
+                    i += 2;
+                    continue;
+                }
+            }
+        }
+        result.push(args[i].clone());
+        i += 1;
+    }
+    result
+}
+
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
 /// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
 async fn run_cli_prompt(
@@ -969,7 +1027,13 @@ async fn run_session(
                             let rt_c = runtime.clone();
                             tokio::spawn(async move {
                                 let full_path = rt_c.resolve_cli(&cli).await;
-                                run_cli_prompt(req_id, &full_path, &cli, extra_args, cwd, prompt, tx_c).await;
+                                // 处理 --attachment URL：下载图片到本地临时文件
+                                // Copilot: --attachment <url> → 下载后 --attachment <local_path>
+                                // Codex:   --attachment <url> → 下载后 -i <local_path>
+                                let resolved_args = resolve_attachment_args(extra_args, &cli,
+                                    rt_c.creds.read().await.as_ref().and_then(|c| c.user_token.clone()).as_deref()
+                                ).await;
+                                run_cli_prompt(req_id, &full_path, &cli, resolved_args, cwd, prompt, tx_c).await;
                             });
                         }
                         ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
