@@ -706,7 +706,14 @@ async fn run_cli_prompt(
                 Err(e) => { warn!("stdout 读取错误: {e}"); break; }
             },
             line = stderr_lines.next_line() => match line {
-                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" })); }
+                Ok(Some(l)) => {
+                    // Codex exec 的 stderr 只含启动信息/错误日志，不应发给用户
+                    // Copilot 的 stderr 也通常不含用户有意义的内容
+                    // 只在非 codex 时发送 stderr（保留原有兼容性）
+                    if cli_name != "codex" {
+                        let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
+                    }
+                }
                 Ok(None) => {}
                 Err(_) => {}
             },
