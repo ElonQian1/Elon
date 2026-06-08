@@ -80,6 +80,8 @@ pub async fn run_for_project_in_workspace(
             .unwrap_or("copilot");
         // Copilot CLI 的 model ID（用于 --model 参数）
         let copilot_model = option.as_ref().and_then(|o| o.model.as_deref()).map(String::from);
+        // Codex 的 reasoning_effort（用于 -c model_reasoning_effort="..." 参数）
+        let codex_reasoning_effort = option.as_ref().and_then(|o| o.reasoning_effort.as_deref()).map(String::from);
         // 用户可见的模型标签（用于气泡属指）
         let model_label = option.as_ref()
             .map(|o| o.label.clone())
@@ -101,6 +103,7 @@ pub async fn run_for_project_in_workspace(
             session_scope,
             Some(pc_cli),
             copilot_model.as_deref(),
+            codex_reasoning_effort.as_deref(),
             model_label.as_deref(),
             state,
             &tx,
@@ -201,6 +204,7 @@ pub async fn plan_for_project_in_workspace(
             .or_else(|| agent_name.map(|name| if name.to_lowercase().contains("codex") { "codex" } else { "copilot" }))
             .unwrap_or("copilot");
         let copilot_model = option.as_ref().and_then(|o| o.model.as_deref()).map(String::from);
+        let codex_reasoning_effort = option.as_ref().and_then(|o| o.reasoning_effort.as_deref()).map(String::from);
         let model_label = option.as_ref().map(|o| o.label.clone()).or_else(|| agent_name.map(String::from));
         let _ = tx.send(
             WsMessage::progress(format!("正在连接 PC 节点 {} 使用 {} 规划本地项目。", agent_id, model_label.as_deref().unwrap_or(pc_cli))).to_json(),
@@ -218,6 +222,7 @@ pub async fn plan_for_project_in_workspace(
             }),
             Some(pc_cli),
             copilot_model.as_deref(),
+            codex_reasoning_effort.as_deref(),
             model_label.as_deref(),
             state,
             &tx,

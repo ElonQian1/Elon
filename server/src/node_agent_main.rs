@@ -714,6 +714,17 @@ async fn run_cli_prompt(
         cmd.arg(a);
     }
     if cli_name == "codex" {
+        // 从 extra_args 提取 --codex-model=xxx 和 --codex-effort=yyy，在 exec 前插入
+        // 例如：codex -m gpt-5.4-mini -c model_reasoning_effort="medium" exec ...
+        for a in &extra_args {
+            if let Some(model) = a.strip_prefix("--codex-model=") {
+                cmd.arg("-m");
+                cmd.arg(model);
+            } else if let Some(effort) = a.strip_prefix("--codex-effort=") {
+                cmd.arg("-c");
+                cmd.arg(format!("model_reasoning_effort=\"{}\"", effort));
+            }
+        }
         cmd.arg("exec");
         // 检查本地是否有已保存的真实 Codex session id
         let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
@@ -734,9 +745,12 @@ async fn run_cli_prompt(
             // 首次执行：全权限，Codex 会自动创建 session id
             cmd.arg("--dangerously-bypass-approvals-and-sandbox");
         }
-        // 其余 extra_args（如 --model），跳过 --session-id（已内部处理）
+        // 其余 extra_args，跳过已处理的 --session-id / --codex-model / --codex-effort
         for a in &extra_args {
-            if !a.starts_with("--session-id=") {
+            if !a.starts_with("--session-id=")
+                && !a.starts_with("--codex-model=")
+                && !a.starts_with("--codex-effort=")
+            {
                 cmd.arg(a);
             }
         }
@@ -827,7 +841,13 @@ async fn run_cli_prompt(
             },
             line = stderr_lines.next_line() => match line {
                 Ok(Some(l)) => {
-                    if cli_name != "codex" {
+                    if cli_name == "codex" {
+                        // Codex stderr 有"Reading additional input from stdin..."等噪音，不发给用户
+                        // 但记录到日志方便诊断
+                        if !l.trim().is_empty() {
+                            info!("[codex stderr] {}", l);
+                        }
+                    } else {
                         let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
                     }
                 }

@@ -154,6 +154,7 @@ async fn run_with_workspace_mode(
                 "copilot",
                 None,
                 None,
+                None,
                 state,
                 tx,
             )
@@ -619,6 +620,7 @@ pub async fn run_with_pc_agent_workspace(
     native_session_scope: Option<NativeSessionScope>,
     cli_name: Option<&str>,
     copilot_model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
@@ -632,6 +634,7 @@ pub async fn run_with_pc_agent_workspace(
         native_session_scope,
         cli_name.unwrap_or("copilot"),
         copilot_model,
+        codex_reasoning_effort,
         model_label,
         state,
         tx,
@@ -650,6 +653,7 @@ async fn run_via_pc_agent(
     native_session_scope: Option<NativeSessionScope>,
     cli_name: &str,
     copilot_model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
@@ -692,7 +696,8 @@ async fn run_via_pc_agent(
         })
     };
 
-    // extra_args：Copilot 用 --session-id + --model + --attachment（图片），Codex 不需要额外的
+    // extra_args：Copilot 用 --session-id + --model + --attachment（图片）
+    // Codex 用 --codex-model + --codex-effort + --attachment，node-agent 负责在 exec 前插入 -m/-c
     // ⚠️  图片逻辑由 extract_attachment_urls / append_attachment_args 处理（有单元测试）
     //    重构本函数时必须保留这两行调用，否则图片传递失效！
     let attachment_urls = extract_attachment_urls(&prompt);
@@ -712,7 +717,18 @@ async fn run_via_pc_agent(
         append_attachment_args(&mut args, &attachment_urls);
         args
     } else {
+        // Codex：传模型和 reasoning effort，node-agent 会在 `exec` 前插入 `-m`/`-c`
         let mut args = vec![];
+        if let Some(model) = copilot_model {
+            if !model.is_empty() && model != "auto" {
+                args.push(format!("--codex-model={}", model));
+            }
+        }
+        if let Some(effort) = codex_reasoning_effort {
+            if !effort.is_empty() {
+                args.push(format!("--codex-effort={}", effort));
+            }
+        }
         append_attachment_args(&mut args, &attachment_urls);
         args
     };
@@ -792,23 +808,24 @@ async fn run_via_pc_agent(
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    // Codex 输出需要特殊解析：提取第一段 AI 回复（codex\n 后 tokens used 前）
+                    // Codex：提取回复段；Copilot：始终携带完整内容（断线重连时 APK 可从 Done 恢复）
                     let reply = if is_codex {
                         extract_codex_reply(&full_text)
-                    } else if stream_started {
-                        String::new() // 已流式发送完毕
                     } else {
                         full_text.trim().to_string()
                     };
-                    if !reply.is_empty() {
+                    // AssistantMessage 只在"内容未被流式发送过"时补发：
+                    //   Codex 从不流式发送，始终通过 AssistantMessage 给 APK；
+                    //   Copilot 若 stream_started=true，流式已建立气泡，CliDone 不再重复发送。
+                    if !reply.is_empty() && (!stream_started || is_codex) {
                         let _ = tx.send(WsMessage::AssistantMessage {
-                            text: reply,
+                            text: reply.clone(),
                             model_used: Some(display_model.clone()),
                             stream_id: None,
                         }.to_json());
                     }
                     let _ = tx.send(WsMessage::Done {
-                        message: String::new(),
+                        message: reply,  // 携带完整内容：断线重连时 APK 可从 Done 恢复
                         apk_url: None,
                         image_url: None,
                         model_used: Some(display_model.clone()),
