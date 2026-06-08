@@ -871,8 +871,9 @@ async fn run_via_pc_agent(
                         usage,
                     );
                 }
-                if exit_ok {
+                if exit_ok || (is_codex && !full_text.trim().is_empty() && error.as_deref().map(|e| !e.contains("断线") && !e.contains("超时")).unwrap_or(true)) {
                     // Codex：提取回复段；Copilot：始终携带完整内容（断线重连时 APK 可从 Done 恢复）
+                    // Codex 在"聊天"类任务时会以 exit code 1 退出，但仍产生了有效输出，需要正常显示。
                     let reply = if is_codex {
                         extract_codex_reply(&full_text)
                     } else {
