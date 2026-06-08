@@ -18,8 +18,8 @@ pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionSc
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
-use uuid::Uuid;
 use tokio::sync::mpsc::UnboundedSender;
+use uuid::Uuid;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
@@ -43,6 +43,7 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
 };
 use crate::{
+    cli_usage::{parse_cli_usage, usage_from_optional_parts},
     intent_router, tools,
     types::{AppState, WsMessage},
 };
@@ -134,6 +135,10 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!("{}", msg));
+    }
+
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
     // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
@@ -146,6 +151,7 @@ async fn run_with_workspace_mode(
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
             match run_via_pc_agent(
                 &agent_id,
+                user_id,
                 None,
                 user_message,
                 preflight_note,
@@ -554,7 +560,7 @@ async fn run_with_workspace_mode(
             );
         }
     }
-    // 从 Codex CLI stdout 解析 token 用量并写入数据库
+    // 从 Codex CLI stdout/stderr 解析 token 用量并写入数据库。
     let cli_feature = if planning_task {
         "codex_cli_plan"
     } else if development_task {
@@ -562,12 +568,13 @@ async fn run_with_workspace_mode(
     } else {
         "codex_cli_chat"
     };
+    let combined_cli_output = format!("{}\n{}", output.stdout, output.stderr);
     crate::token_usage_api::record_codex_usage_from_stdout(
         &state.store,
         user_id,
         cli_feature,
-        Some(option.id.as_str()),
-        &output.stdout,
+        option.model.as_deref().or(Some(option.id.as_str())),
+        &combined_cli_output,
     );
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
@@ -613,6 +620,7 @@ async fn run_with_workspace_mode(
 
 pub async fn run_with_pc_agent_workspace(
     agent_id: &str,
+    user_id: &str,
     workspace_path: &str,
     user_message: &str,
     preflight_note: Option<&str>,
@@ -627,6 +635,7 @@ pub async fn run_with_pc_agent_workspace(
 ) -> Result<()> {
     run_via_pc_agent(
         agent_id,
+        user_id,
         Some(workspace_path),
         user_message,
         preflight_note,
@@ -646,6 +655,7 @@ pub async fn run_with_pc_agent_workspace(
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
     agent_id: &str,
+    user_id: &str,
     cwd: Option<&str>,
     user_message: &str,
     preflight_note: Option<&str>,
@@ -658,6 +668,10 @@ async fn run_via_pc_agent(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!("{}", msg));
+    }
+
     // prompt 构造
     let prompt = if request_mode.is_plan() {
         match preflight_note {
@@ -739,14 +753,21 @@ async fn run_via_pc_agent(
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
         for attempt in 0..MAX_ATTEMPTS {
-            match state.agent_manager.dispatch_cli_prompt_in_cwd(
-                agent_id,
-                cli_name.to_string(),
-                extra_args.clone(),
-                cwd.map(ToOwned::to_owned),
-                prompt.clone(),
-            ).await {
-                Ok(r) => { result = Ok(r); break; }
+            match state
+                .agent_manager
+                .dispatch_cli_prompt_in_cwd(
+                    agent_id,
+                    cli_name.to_string(),
+                    extra_args.clone(),
+                    cwd.map(ToOwned::to_owned),
+                    prompt.clone(),
+                )
+                .await
+            {
+                Ok(r) => {
+                    result = Ok(r);
+                    break;
+                }
                 Err(e) => {
                     last_err = e;
                     let msg = last_err.to_string();
@@ -793,21 +814,63 @@ async fn run_via_pc_agent(
                 }
                 if !stream_started {
                     stream_started = true;
-                    let _ = tx.send(WsMessage::AssistantMessage {
-                        text: text.clone(),
-                        model_used: Some(display_model.clone()),
-                        stream_id: Some(stream_id.clone()),
-                        node_id: Some(agent_id.to_string()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantMessage {
+                            text: text.clone(),
+                            model_used: Some(display_model.clone()),
+                            stream_id: Some(stream_id.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
                 } else {
-                    let _ = tx.send(WsMessage::AssistantChunk {
-                        stream_id: stream_id.clone(),
-                        text: text.clone(),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantChunk {
+                            stream_id: stream_id.clone(),
+                            text: text.clone(),
+                        }
+                        .to_json(),
+                    );
                 }
                 full_text.push_str(&text);
             }
-            AgentToServer::CliDone { exit_ok, error, .. } => {
+            AgentToServer::CliDone {
+                exit_ok,
+                error,
+                prompt_tokens,
+                cached_input_tokens,
+                completion_tokens,
+                reasoning_tokens,
+                total_tokens,
+                model,
+                ..
+            } => {
+                let usage = usage_from_optional_parts(
+                    prompt_tokens,
+                    cached_input_tokens,
+                    completion_tokens,
+                    reasoning_tokens,
+                    total_tokens,
+                    model.clone(),
+                )
+                .or_else(|| parse_cli_usage(&full_text));
+                if let Some(usage) = usage.as_ref() {
+                    let feature = if request_mode.is_plan() {
+                        "pc_cli_plan"
+                    } else if cwd.is_some() {
+                        "pc_cli_dev"
+                    } else {
+                        "pc_cli_chat"
+                    };
+                    crate::token_usage_api::record_trusted_usage(
+                        &state.store,
+                        user_id,
+                        feature,
+                        "pc_agent_cli",
+                        model.as_deref().or(Some(display_model.as_str())),
+                        usage,
+                    );
+                }
                 if exit_ok {
                     // Codex：提取回复段；Copilot：始终携带完整内容（断线重连时 APK 可从 Done 恢复）
                     let reply = if is_codex {
@@ -819,23 +882,29 @@ async fn run_via_pc_agent(
                     //   Codex 从不流式发送，始终通过 AssistantMessage 给 APK；
                     //   Copilot 若 stream_started=true，流式已建立气泡，CliDone 不再重复发送。
                     if !reply.is_empty() && (!stream_started || is_codex) {
-                        let _ = tx.send(WsMessage::AssistantMessage {
-                            text: reply.clone(),
-                            model_used: Some(display_model.clone()),
-                            stream_id: None,
-                            node_id: Some(agent_id.to_string()),
-                        }.to_json());
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: reply.clone(),
+                                model_used: Some(display_model.clone()),
+                                stream_id: None,
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
                     }
                     // Done.message 不携带内容：APK 已通过 AssistantMessage/AssistantChunk 收到回复，
                     // 再在 Done 里携带会导致 Codex 回复出现两个气泡。
                     // 断线重连恢复由 backlog replay（project_ws_session）负责，不依赖 Done.message。
-                    let _ = tx.send(WsMessage::Done {
-                        message: String::new(),
-                        apk_url: None,
-                        image_url: None,
-                        model_used: Some(display_model.clone()),
-                        node_id: Some(agent_id.to_string()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                            model_used: Some(display_model.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
                     return Ok(());
                 } else {
                     return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
@@ -880,7 +949,8 @@ fn extract_codex_reply(output: &str) -> String {
 
     // 新版 Codex 0.133+：直接输出 AI 回复，过滤掉启动信息行（包含 "codex" 字符的标题行）
     // 启动信息特征：含 "OpenAI Codex"、"Model:" 等
-    let clean: Vec<&str> = lines.iter()
+    let clean: Vec<&str> = lines
+        .iter()
         .map(|l| *l)
         .skip_while(|l| {
             let t = l.trim();
@@ -973,9 +1043,14 @@ mod tests {
         let mut args: Vec<String> = vec!["--model".into(), "gpt-4o".into()];
         let urls = vec!["https://example.com/img.png".to_string()];
         append_attachment_args(&mut args, &urls);
-        assert_eq!(args, vec![
-            "--model", "gpt-4o",
-            "--attachment", "https://example.com/img.png",
-        ]);
+        assert_eq!(
+            args,
+            vec![
+                "--model",
+                "gpt-4o",
+                "--attachment",
+                "https://example.com/img.png",
+            ]
+        );
     }
 }

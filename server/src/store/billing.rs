@@ -63,7 +63,7 @@ impl Store {
     }
 
     /// 原子扣费：
-    /// 1. 检查余额 >= amount_fen（不足则返回 Err）
+    /// 1. 按实际用量扣减余额（允许本次扣成负数，下一次调用前会被余额检查拦截）
     /// 2. 更新 user_balance
     /// 3. 插入 billing_events 明细
     ///
@@ -89,13 +89,6 @@ impl Store {
             )
             .ok();
         let balance = balance.unwrap_or(0);
-        if balance < amount_fen {
-            return Err(anyhow::anyhow!(
-                "余额不足：当前 {} 分，需要 {} 分",
-                balance,
-                amount_fen
-            ));
-        }
         let new_balance = balance - amount_fen;
         let ts = now();
         tx.execute(

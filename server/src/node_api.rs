@@ -285,6 +285,13 @@ pub async fn chat_with_node(
         )
             .into_response();
     }
+    if let Err(msg) = crate::billing::check_can_call(&state.store, &user.id) {
+        return (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(serde_json::json!({"error": msg})),
+        )
+            .into_response();
+    }
 
     // 找节点、发起请求
     let (_req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node(
@@ -346,18 +353,16 @@ pub async fn chat_with_node(
         .get_node_owner(&node_id)
         .await
         .unwrap_or_default();
-    if !owner.is_empty() {
-        crate::node_router::settle_after_stream(
-            &state,
-            &user.id,
-            &owner,
-            &node_id,
-            &req.model_id,
-            prompt_tokens,
-            completion_tokens,
-            price,
-        );
-    }
+    crate::node_router::settle_after_stream(
+        &state,
+        &user.id,
+        Some(&owner),
+        &node_id,
+        &req.model_id,
+        prompt_tokens,
+        completion_tokens,
+        price,
+    );
 
     Json(NodeChatResponse {
         content,
@@ -374,7 +379,10 @@ pub async fn chat_with_node(
 /// GET /api/node-agent/version — 返回最新 node-agent Windows exe 的版本信息
 /// 不需要登录（node-agent 启动时就需要查询）
 pub async fn node_agent_version(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let version_file = state.data_dir.join("downloads").join("node-agent-version.json");
+    let version_file = state
+        .data_dir
+        .join("downloads")
+        .join("node-agent-version.json");
     match tokio::fs::read(&version_file).await {
         Ok(bytes) => axum::response::Response::builder()
             .status(StatusCode::OK)

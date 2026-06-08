@@ -33,12 +33,12 @@ pub async fn dispatch_to_node(
     Ok((req_id, node_id, rx))
 }
 
-/// 推理完成后，根据 `LlmStreamEnd` 中的 token 统计执行积分结算。
-/// `provider_user_id` 是节点属主的用户 ID（从 NodeRegistry 查到）。
+/// 推理完成后，根据 `LlmStreamEnd` 中的 token 统计执行消费扣费和节点积分结算。
+/// `provider_user_id` 是节点属主的用户 ID（从 NodeRegistry 查到）；为空时仍记录消费者用量。
 pub fn settle_after_stream(
     state: &Arc<AppState>,
     consumer_user_id: &str,
-    provider_user_id: &str,
+    provider_user_id: Option<&str>,
     node_id: &str,
     model_id: &str,
     prompt_tokens: u32,
@@ -48,11 +48,41 @@ pub fn settle_after_stream(
     // 在后台线程结算，不阻塞 WS 响应
     let state = state.clone();
     let consumer = consumer_user_id.to_string();
-    let provider = provider_user_id.to_string();
+    let provider = provider_user_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
     let node = node_id.to_string();
     let model = model_id.to_string();
 
     tokio::spawn(async move {
+        let usage = crate::cli_usage::CliTokenUsage {
+            input_tokens: prompt_tokens as i64,
+            cached_input_tokens: 0,
+            output_tokens: completion_tokens as i64,
+            reasoning_tokens: 0,
+            total_tokens: (prompt_tokens + completion_tokens) as i64,
+            model: Some(model.clone()),
+        };
+        crate::token_usage_api::record_trusted_usage(
+            &state.store,
+            &consumer,
+            "node_llm",
+            "server_node_llm",
+            Some(&model),
+            &usage,
+        );
+
+        let Some(provider) = provider else {
+            tracing::warn!(
+                consumer,
+                node,
+                model,
+                "节点推理已记录消费者 token 用量，但缺少 provider owner，跳过节点积分结算"
+            );
+            return;
+        };
+
         let params = crate::store::SettleParams {
             consumer_user_id: &consumer,
             provider_user_id: &provider,

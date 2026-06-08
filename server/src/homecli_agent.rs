@@ -379,6 +379,12 @@ async fn run_agent_session(
                     req_id,
                     exit_ok: false,
                     error: Some("节点重新注册，旧连接已关闭".to_string()),
+                    prompt_tokens: None,
+                    cached_input_tokens: None,
+                    completion_tokens: None,
+                    reasoning_tokens: None,
+                    total_tokens: None,
+                    model: None,
                 });
             }
             // 发 Close 让旧连接的 writer 关闭 WebSocket
@@ -416,7 +422,9 @@ async fn run_agent_session(
                 interval.tick().await;
                 nonce += 1;
                 if ping_tx
-                    .send(ServerToAgent::Ping { nonce: Some(nonce.to_string()) })
+                    .send(ServerToAgent::Ping {
+                        nonce: Some(nonce.to_string()),
+                    })
                     .is_err()
                 {
                     break; // 连接已断开
@@ -519,6 +527,12 @@ async fn run_agent_session(
                 req_id,
                 exit_ok: false,
                 error: Some("PC节点已断线，请重试".to_string()),
+                prompt_tokens: None,
+                cached_input_tokens: None,
+                completion_tokens: None,
+                reasoning_tokens: None,
+                total_tokens: None,
+                model: None,
             });
         }
     }

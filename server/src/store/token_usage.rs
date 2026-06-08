@@ -5,6 +5,7 @@
 //! - `get_usage_stats`     按用户返回聚合统计（供 APK 展示用量概览）
 
 use anyhow::Result;
+use chrono::Datelike;
 use rusqlite::params;
 use serde::Serialize;
 
@@ -20,7 +21,9 @@ pub struct TokenUsageRecord<'a> {
     /// 来源模式：
     /// - `server_api_key`   服务器 API Key（强可信）
     /// - `server_codex_cli` 服务器 Codex CLI（强可信）
-    /// - `client_reported`  APK 直连上报（仅供参考）
+    /// - `pc_agent_cli`     PC 节点 CLI 回传（强可信）
+    /// - `server_node_llm`  分布式节点 LLM 结算（强可信）
+    /// - `client_reported`  APK 直连上报（仅供参考，不扣余额/额度）
     pub usage_mode: &'a str,
     pub model: Option<&'a str>,
     pub input_tokens: i64,
@@ -68,6 +71,16 @@ pub struct UsageDayRow {
     pub call_count: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct UsageQuota {
+    pub limit_tokens: Option<i64>,
+    pub used_tokens: i64,
+    pub remaining_tokens: Option<i64>,
+    pub is_blocked: bool,
+    pub block_reason: Option<String>,
+    pub reset_at: String,
+}
+
 /// 汇总统计，直接序列化返回给 APK。
 #[derive(Debug, Clone, Serialize)]
 pub struct UsageStats {
@@ -80,6 +93,8 @@ pub struct UsageStats {
     pub by_feature: Vec<UsageFeatureRow>,
     /// 按自然日分组，最近 30 天
     pub by_day: Vec<UsageDayRow>,
+    /// 当前自然月配额与剩余额度。未配置上限时 `limit_tokens` / `remaining_tokens` 为 null。
+    pub quota: UsageQuota,
 }
 
 // ── Store 方法 ────────────────────────────────────────────────────────────────
@@ -116,6 +131,7 @@ impl Store {
     pub fn get_usage_stats(&self, user_id: &str, days: i64) -> Result<UsageStats> {
         let conn = self.conn()?;
         let since = format!("-{} days", days);
+        let month_start = chrono::Utc::now().format("%Y-%m-01T00:00:00Z").to_string();
 
         // ── 总量 ──────────────────────────────────────────────────────────
         let total: UsageTotals = conn.query_row(
@@ -218,6 +234,54 @@ impl Store {
             rows
         };
 
+        let quota = {
+            let row = conn
+                .query_row(
+                    "SELECT monthly_token_limit, is_blocked, block_reason
+                     FROM user_token_quota WHERE user_id = ?1",
+                    params![user_id],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<i64>>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    },
+                )
+                .ok();
+            let month_used: i64 = conn.query_row(
+                "SELECT COALESCE(SUM(total_tokens),0)
+                 FROM token_usage_events
+                 WHERE user_id=?1
+                   AND usage_mode != 'client_reported'
+                   AND created_at >= ?2",
+                params![user_id, month_start],
+                |row| row.get(0),
+            )?;
+            let (limit_tokens, blocked, block_reason) = row.unwrap_or((None, 0, None));
+            let remaining_tokens = limit_tokens.map(|limit| (limit - month_used).max(0));
+            let now = chrono::Utc::now();
+            let first_next_month = if now.month() == 12 {
+                chrono::NaiveDate::from_ymd_opt(now.year() + 1, 1, 1)
+            } else {
+                chrono::NaiveDate::from_ymd_opt(now.year(), now.month() + 1, 1)
+            }
+            .and_then(|date| date.and_hms_opt(0, 0, 0))
+            .map(|dt| {
+                chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc)
+                    .to_rfc3339()
+            })
+            .unwrap_or_else(|| now.to_rfc3339());
+            UsageQuota {
+                limit_tokens,
+                used_tokens: month_used,
+                remaining_tokens,
+                is_blocked: blocked != 0,
+                block_reason,
+                reset_at: first_next_month,
+            }
+        };
+
         Ok(UsageStats {
             user_id: user_id.to_string(),
             period_days: days,
@@ -225,6 +289,7 @@ impl Store {
             by_mode,
             by_feature,
             by_day,
+            quota,
         })
     }
 }

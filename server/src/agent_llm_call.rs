@@ -78,7 +78,6 @@ pub(crate) async fn call_llm(
         feature,
         &agent.model,
     );
-    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);
     Ok(response)
 }
 
@@ -144,7 +143,6 @@ pub(crate) async fn call_chat_llm(
         feature,
         &agent.model,
     );
-    crate::billing::deduct_from_response(&state.store, user_id, &agent.model, &response);
     Ok(response)
 }
 
@@ -256,6 +254,11 @@ pub(crate) async fn try_casual_chat_via_node(
     messages: &[Value],
     user_id: &str,
 ) -> Option<(String, String, String)> {
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        tracing::warn!(user_id, model, "节点推理被余额/配额拦截: {}", msg);
+        return None;
+    }
+
     // 如果没有在线节点支持该模型，立即返回 None
     let node_id = state.node_registry.find_node_for_model(model).await?;
 
@@ -311,18 +314,16 @@ pub(crate) async fn try_casual_chat_via_node(
         .get_node_owner(&actual_node_id)
         .await
         .unwrap_or_default();
-    if !owner.is_empty() {
-        crate::node_router::settle_after_stream(
-            state,
-            user_id,
-            &owner,
-            &actual_node_id,
-            model,
-            prompt_tokens,
-            completion_tokens,
-            price,
-        );
-    }
+    crate::node_router::settle_after_stream(
+        state,
+        user_id,
+        Some(&owner),
+        &actual_node_id,
+        model,
+        prompt_tokens,
+        completion_tokens,
+        price,
+    );
 
     let _ = node_id; // used above for find check
     Some((content, actual_node_id, model.to_string()))

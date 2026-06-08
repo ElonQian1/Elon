@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
+    cli_usage::{parse_cli_usage, usage_from_value, CliTokenUsage},
     project_auth::{auth_from_headers, json_error},
     store::{Store, TokenUsageRecord},
     types::AppState,
@@ -126,38 +127,64 @@ pub(crate) fn record_api_usage(
     feature: &str,
     model: &str,
 ) {
-    let usage = &response["usage"];
-    if usage.is_null() {
+    let Some(usage) = usage_from_value(response) else {
         return;
-    }
+    };
+    record_trusted_usage(
+        store,
+        user_id,
+        feature,
+        "server_api_key",
+        Some(model),
+        &usage,
+    );
+}
 
-    let input = usage["prompt_tokens"].as_i64().unwrap_or(0);
-    let cached = usage["prompt_tokens_details"]["cached_tokens"]
-        .as_i64()
-        .unwrap_or(0);
-    let output = usage["completion_tokens"].as_i64().unwrap_or(0);
-    let reasoning = usage["completion_tokens_details"]["reasoning_tokens"]
-        .as_i64()
-        .unwrap_or(0);
-    let total = usage["total_tokens"].as_i64().unwrap_or(input + output);
-
-    if total == 0 {
+/// 记录服务器可信 token 用量，并同步执行预存余额扣费。
+///
+/// `client_reported` 不走这里；只有服务器 API key、服务器/PC CLI、节点 LLM 等
+/// 服务端可验证来源才允许扣余额。
+pub(crate) fn record_trusted_usage(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    usage: &CliTokenUsage,
+) {
+    let Some(usage) = usage.clone().normalized() else {
         return;
-    }
-
+    };
+    let model = model.or(usage.model.as_deref());
     let record = TokenUsageRecord {
         user_id,
         feature,
-        usage_mode: "server_api_key",
-        model: Some(model),
-        input_tokens: input,
-        cached_input_tokens: cached,
-        output_tokens: output,
-        reasoning_tokens: reasoning,
-        total_tokens: total,
+        usage_mode,
+        model,
+        input_tokens: usage.input_tokens,
+        cached_input_tokens: usage.cached_input_tokens,
+        output_tokens: usage.output_tokens,
+        reasoning_tokens: usage.reasoning_tokens,
+        total_tokens: usage.total_tokens,
     };
     if let Err(e) = store.record_token_usage(&record) {
-        tracing::debug!("record_api_usage: {}", e);
+        tracing::warn!("record_trusted_usage 写入失败: {}", e);
+    }
+    if let Err(e) = crate::billing::deduct_usage(
+        store,
+        user_id,
+        model,
+        usage.input_tokens,
+        usage.cached_input_tokens,
+        usage.output_tokens,
+    ) {
+        tracing::warn!(
+            user_id,
+            feature,
+            usage_mode,
+            "record_trusted_usage 扣费失败: {}",
+            e
+        );
     }
 }
 
@@ -175,105 +202,7 @@ pub(crate) fn record_codex_usage_from_stdout(
     model: Option<&str>,
     stdout: &str,
 ) {
-    /// 从对象中按多个备选 key 取 i64，取第一个非零值。
-    fn pick(obj: &Value, keys: &[&str]) -> i64 {
-        for k in keys {
-            if let Some(n) = obj.get(*k).and_then(Value::as_i64) {
-                if n > 0 {
-                    return n;
-                }
-            }
-        }
-        0
-    }
-
-    let mut input: i64 = 0;
-    let mut cached: i64 = 0;
-    let mut output: i64 = 0;
-    let mut reasoning: i64 = 0;
-    let mut found = false;
-
-    for line in stdout.lines() {
-        let line = line.trim();
-        // 快速过滤：只解析含 "token" 的行
-        if !line.contains("token") && !line.contains("turn.completed") {
-            continue;
-        }
-        let Ok(v): Result<Value, _> = serde_json::from_str(line) else {
-            continue;
-        };
-        let ty = v["type"].as_str().unwrap_or("");
-
-        match ty {
-            "token_count" => {
-                // camelCase (旧 Codex) 或 snake_case (新 Codex) 都兼容
-                input += pick(
-                    &v,
-                    &["inputTokens", "input_tokens", "prompt_tokens", "input"],
-                );
-                cached += pick(
-                    &v,
-                    &[
-                        "cachedInputTokens",
-                        "cached_input_tokens",
-                        "cache_read_input_tokens",
-                    ],
-                );
-                output += pick(
-                    &v,
-                    &[
-                        "outputTokens",
-                        "output_tokens",
-                        "completion_tokens",
-                        "output",
-                    ],
-                );
-                reasoning += pick(
-                    &v,
-                    &[
-                        "reasoningTokens",
-                        "reasoning_tokens",
-                        "reasoning_output_tokens",
-                    ],
-                );
-                found = true;
-            }
-            "turn.completed" => {
-                // usage 可能在 v["usage"] 或直接在 v 里
-                let u = if !v["usage"].is_null() {
-                    &v["usage"]
-                } else {
-                    &v
-                };
-                let i = pick(u, &["input_tokens", "inputTokens", "prompt_tokens"]);
-                let o = pick(u, &["output_tokens", "outputTokens", "completion_tokens"]);
-                if i > 0 || o > 0 {
-                    input += i;
-                    cached += pick(
-                        u,
-                        &[
-                            "cached_input_tokens",
-                            "cachedInputTokens",
-                            "cache_read_input_tokens",
-                        ],
-                    );
-                    output += o;
-                    reasoning += pick(
-                        u,
-                        &[
-                            "reasoning_output_tokens",
-                            "reasoningTokens",
-                            "reasoning_tokens",
-                        ],
-                    );
-                    found = true;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    if !found || (input + output) == 0 {
+    let Some(usage) = parse_cli_usage(stdout) else {
         tracing::debug!(
             user_id,
             feature,
@@ -281,31 +210,16 @@ pub(crate) fn record_codex_usage_from_stdout(
             stdout.len()
         );
         return;
-    }
-
-    let total = input + output;
+    };
     tracing::info!(
         user_id,
         feature,
-        input,
-        output,
-        total,
+        input = usage.input_tokens,
+        output = usage.output_tokens,
+        total = usage.total_tokens,
         "记录 Codex CLI token 用量"
     );
-    let record = TokenUsageRecord {
-        user_id,
-        feature,
-        usage_mode: "server_codex_cli",
-        model,
-        input_tokens: input,
-        cached_input_tokens: cached,
-        output_tokens: output,
-        reasoning_tokens: reasoning,
-        total_tokens: total,
-    };
-    if let Err(e) = store.record_token_usage(&record) {
-        tracing::warn!("record_codex_usage_from_stdout 写入失败: {}", e);
-    }
+    record_trusted_usage(store, user_id, feature, "server_codex_cli", model, &usage);
 }
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────

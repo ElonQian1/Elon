@@ -270,6 +270,12 @@ async fn handle_cli_prompt(
         req_id,
         exit_ok,
         error,
+        prompt_tokens: None,
+        cached_input_tokens: None,
+        completion_tokens: None,
+        reasoning_tokens: None,
+        total_tokens: None,
+        model: None,
     };
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
 }

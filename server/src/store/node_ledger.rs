@@ -1,6 +1,6 @@
 //! 节点积分账本：积分余额查询、扣费、结算；节点凭证管理。
 //!
-//! 三张表（由 migration_v18 创建）：
+//! 三张表（由 migration_v21 创建）：
 //! - `node_balances`      每用户的提供者积分余额
 //! - `node_transactions`  每次 LLM 推理完成后的完整流水记录
 //! - `node_credentials`   用户注册的 PC 节点凭证（存 SHA-256 hash）
@@ -92,7 +92,8 @@ impl Store {
     /// 2. 写入 node_transactions 流水
     /// 3. 更新 node_balances 提供者余额
     ///
-    /// 注意：当前版本不追踪消费者余额（消费者余额由付费系统单独管理，此处只记录账单）。
+    /// 注意：消费者 RMB 余额由 `node_router` 的统一 token 结算入口扣减；
+    /// 本函数只负责节点积分流水和提供者收益。
     pub fn settle_node_inference(&self, p: SettleParams<'_>) -> Result<NodeTransaction> {
         let total_tokens = p.prompt_tokens + p.completion_tokens;
         let charged = (total_tokens as f64 / 1000.0) * p.price_per_1k_credits;

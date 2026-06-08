@@ -48,7 +48,8 @@ pub(crate) use social_ai_pending::SocialAiPendingMention;
 pub use store_types::JoinRequestRecord;
 pub use store_types::*;
 pub use token_usage::{
-    TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageStats, UsageTotals,
+    TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats,
+    UsageTotals,
 };
 pub use user_memories::UserMemory;
 

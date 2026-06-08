@@ -134,6 +134,18 @@ pub enum AgentToServer {
         exit_ok: bool,
         #[serde(default)]
         error: Option<String>,
+        #[serde(default)]
+        prompt_tokens: Option<u64>,
+        #[serde(default)]
+        cached_input_tokens: Option<u64>,
+        #[serde(default)]
+        completion_tokens: Option<u64>,
+        #[serde(default)]
+        reasoning_tokens: Option<u64>,
+        #[serde(default)]
+        total_tokens: Option<u64>,
+        #[serde(default)]
+        model: Option<String>,
     },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {

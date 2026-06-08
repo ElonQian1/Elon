@@ -35,6 +35,8 @@ use tokio::sync::{mpsc, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
+mod cli_usage;
+
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
 
 /// 静态运行配置（云端地址、本地模型地址、价格），均有合理默认值，普通用户无需配置。
@@ -100,7 +102,11 @@ fn state_path() -> PathBuf {
         std::env::var("XDG_CONFIG_HOME")
             .ok()
             .map(PathBuf::from)
-            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".config")))
+            .or_else(|| {
+                std::env::var("HOME")
+                    .ok()
+                    .map(|h| PathBuf::from(h).join(".config"))
+            })
     };
     base.unwrap_or_else(|| PathBuf::from("."))
         .join("elon-node-agent")
@@ -140,17 +146,26 @@ impl PersistedState {
 fn initial_credentials(persisted: &PersistedState) -> Option<Credentials> {
     let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
     let agent_id = env_nonempty("NODE_AGENT_ID").or_else(|| persisted.agent_id.clone())?;
-    let agent_secret = env_nonempty("NODE_AGENT_SECRET").or_else(|| persisted.agent_secret.clone())?;
+    let agent_secret =
+        env_nonempty("NODE_AGENT_SECRET").or_else(|| persisted.agent_secret.clone())?;
     let owner_user_id = env_nonempty("NODE_OWNER_USER_ID")
         .or_else(|| persisted.owner_user_id.clone())
         .unwrap_or_default();
     let user_token = env_nonempty("NODE_USER_TOKEN").or_else(|| persisted.user_token.clone());
-    Some(Credentials { agent_id, agent_secret, owner_user_id, user_token })
+    Some(Credentials {
+        agent_id,
+        agent_secret,
+        owner_user_id,
+        user_token,
+    })
 }
 
 /// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
 async fn provision_node(cfg: &NodeConfig, token: &str) -> Result<Credentials> {
-    let url = format!("{}/api/me/nodes/register", cfg.cloud_http_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/me/nodes/register",
+        cfg.cloud_http_url.trim_end_matches('/')
+    );
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
@@ -192,7 +207,10 @@ async fn provision_node(cfg: &NodeConfig, token: &str) -> Result<Credentials> {
 
 /// 账号 + 密码登录云端，换取 token。
 async fn cloud_login(cfg: &NodeConfig, account: &str, password: &str) -> Result<String> {
-    let url = format!("{}/api/auth/login", cfg.cloud_http_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/auth/login",
+        cfg.cloud_http_url.trim_end_matches('/')
+    );
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
@@ -222,12 +240,16 @@ impl NodeConfig {
     fn from_env() -> Result<Self> {
         let cloud_url = std::env::var("NODE_CLOUD_URL")
             .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".into());
-        let cloud_http_url = std::env::var("NODE_CLOUD_HTTP_URL")
-            .unwrap_or_else(|_| derive_http_url(&cloud_url));
-        let ollama_url = std::env::var("NODE_OLLAMA_URL")
-            .unwrap_or_else(|_| "http://localhost:11434".into());
-        let lm_studio_url = std::env::var("NODE_LM_STUDIO_URL").ok().filter(|v| !v.is_empty());
-        let custom_url = std::env::var("NODE_CUSTOM_LLM_URL").ok().filter(|v| !v.is_empty());
+        let cloud_http_url =
+            std::env::var("NODE_CLOUD_HTTP_URL").unwrap_or_else(|_| derive_http_url(&cloud_url));
+        let ollama_url =
+            std::env::var("NODE_OLLAMA_URL").unwrap_or_else(|_| "http://localhost:11434".into());
+        let lm_studio_url = std::env::var("NODE_LM_STUDIO_URL")
+            .ok()
+            .filter(|v| !v.is_empty());
+        let custom_url = std::env::var("NODE_CUSTOM_LLM_URL")
+            .ok()
+            .filter(|v| !v.is_empty());
         let price_per_1k = std::env::var("NODE_PRICE_PER_1K")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -453,9 +475,7 @@ async fn run_llm_inference(
                         }
                     }
                     // Ollama message.content
-                    if let Some(content) = val
-                        .pointer("/message/content")
-                        .and_then(|v| v.as_str())
+                    if let Some(content) = val.pointer("/message/content").and_then(|v| v.as_str())
                     {
                         if !content.is_empty() {
                             completion_tokens += 1;
@@ -466,7 +486,10 @@ async fn run_llm_inference(
                         }
                     }
                     // 完成信号
-                    if let Some(r) = val.pointer("/choices/0/finish_reason").and_then(|v| v.as_str()) {
+                    if let Some(r) = val
+                        .pointer("/choices/0/finish_reason")
+                        .and_then(|v| v.as_str())
+                    {
                         if !r.is_empty() && r != "null" {
                             finish_reason = r.to_string();
                         }
@@ -479,18 +502,21 @@ async fn run_llm_inference(
                         completion_tokens = val
                             .pointer("/eval_count")
                             .and_then(|v| v.as_u64())
-                            .unwrap_or(completion_tokens as u64) as u32;
+                            .unwrap_or(completion_tokens as u64)
+                            as u32;
                     }
                     // token usage from OpenAI response
                     if let Some(usage) = val.get("usage") {
                         prompt_tokens = usage
                             .get("prompt_tokens")
                             .and_then(|v| v.as_u64())
-                            .unwrap_or(prompt_tokens as u64) as u32;
+                            .unwrap_or(prompt_tokens as u64)
+                            as u32;
                         completion_tokens = usage
                             .get("completion_tokens")
                             .and_then(|v| v.as_u64())
-                            .unwrap_or(completion_tokens as u64) as u32;
+                            .unwrap_or(completion_tokens as u64)
+                            as u32;
                     }
                 }
             } else {
@@ -556,49 +582,74 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 ///   d. 兜底：任何找到的路径
 fn detect_available_clis() -> Vec<(String, String)> {
     let candidates = ["copilot", "codex", "gh"];
-    candidates.iter().filter_map(|name| {
-        let mut candidates_paths: Vec<String> = Vec::new();
+    candidates
+        .iter()
+        .filter_map(|name| {
+            let mut candidates_paths: Vec<String> = Vec::new();
 
-        // ── 1. where/which ────────────────────────────────────────────────
-        let which_cmd = if cfg!(windows) { "where" } else { "which" };
-        if let Ok(out) = std::process::Command::new(which_cmd).arg(name).output() {
-            if out.status.success() {
-                let from_path: Vec<String> = String::from_utf8_lossy(&out.stdout)
-                    .lines().map(|l| l.trim().to_string())
-                    .filter(|l| !l.is_empty()).collect();
-                candidates_paths.extend(from_path);
+            // ── 1. where/which ────────────────────────────────────────────────
+            let which_cmd = if cfg!(windows) { "where" } else { "which" };
+            if let Ok(out) = std::process::Command::new(which_cmd).arg(name).output() {
+                if out.status.success() {
+                    let from_path: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                        .lines()
+                        .map(|l| l.trim().to_string())
+                        .filter(|l| !l.is_empty())
+                        .collect();
+                    candidates_paths.extend(from_path);
+                }
             }
-        }
 
-        // ── 2. 直接扫描常见安装目录（不依赖 PATH）────────────────────────
-        #[cfg(windows)]
-        {
-            let appdata = std::env::var("APPDATA").unwrap_or_default();
-            let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-            let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
-            let common_dirs = [
-                // npm global（最常见）
-                format!("{}\\npm", appdata),
-                // yarn global
-                format!("{}\\Yarn\\bin", localappdata),
-                // pnpm global
-                format!("{}\\pnpm", appdata),
-                // volta 管理的
-                format!("{}\\.volta\\bin", userprofile),
-                // nvm 管理的（n-v-m for Windows）
-                format!("{}\\nvm", appdata),
-                // GitHub CLI
-                "C:\\Program Files\\GitHub CLI".to_string(),
-                "C:\\Program Files (x86)\\GitHub CLI".to_string(),
-                // Scoop
-                format!("{}\\scoop\\shims", userprofile),
-                // winget/直接装在 ProgramFiles
-                "C:\\Program Files\\GitHub CLI".to_string(),
-            ];
-            for dir in &common_dirs {
-                // 尝试 name.cmd / name.exe / name
-                for ext in &[".cmd", ".exe", ""] {
-                    let p = format!("{}\\{}{}", dir, name, ext);
+            // ── 2. 直接扫描常见安装目录（不依赖 PATH）────────────────────────
+            #[cfg(windows)]
+            {
+                let appdata = std::env::var("APPDATA").unwrap_or_default();
+                let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
+                let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
+                let common_dirs = [
+                    // npm global（最常见）
+                    format!("{}\\npm", appdata),
+                    // yarn global
+                    format!("{}\\Yarn\\bin", localappdata),
+                    // pnpm global
+                    format!("{}\\pnpm", appdata),
+                    // volta 管理的
+                    format!("{}\\.volta\\bin", userprofile),
+                    // nvm 管理的（n-v-m for Windows）
+                    format!("{}\\nvm", appdata),
+                    // GitHub CLI
+                    "C:\\Program Files\\GitHub CLI".to_string(),
+                    "C:\\Program Files (x86)\\GitHub CLI".to_string(),
+                    // Scoop
+                    format!("{}\\scoop\\shims", userprofile),
+                    // winget/直接装在 ProgramFiles
+                    "C:\\Program Files\\GitHub CLI".to_string(),
+                ];
+                for dir in &common_dirs {
+                    // 尝试 name.cmd / name.exe / name
+                    for ext in &[".cmd", ".exe", ""] {
+                        let p = format!("{}\\{}{}", dir, name, ext);
+                        if std::path::Path::new(&p).exists() {
+                            if !candidates_paths.contains(&p) {
+                                candidates_paths.push(p);
+                            }
+                        }
+                    }
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                let home = std::env::var("HOME").unwrap_or_default();
+                let common_dirs = [
+                    "/usr/local/bin".to_string(),
+                    "/usr/bin".to_string(),
+                    format!("{}/.npm-global/bin", home),
+                    format!("{}/.local/bin", home),
+                    format!("{}/.yarn/bin", home),
+                    format!("{}/.volta/bin", home),
+                ];
+                for dir in &common_dirs {
+                    let p = format!("{}/{}", dir, name);
                     if std::path::Path::new(&p).exists() {
                         if !candidates_paths.contains(&p) {
                             candidates_paths.push(p);
@@ -606,61 +657,54 @@ fn detect_available_clis() -> Vec<(String, String)> {
                     }
                 }
             }
-        }
-        #[cfg(not(windows))]
-        {
-            let home = std::env::var("HOME").unwrap_or_default();
-            let common_dirs = [
-                "/usr/local/bin".to_string(),
-                "/usr/bin".to_string(),
-                format!("{}/.npm-global/bin", home),
-                format!("{}/.local/bin", home),
-                format!("{}/.yarn/bin", home),
-                format!("{}/.volta/bin", home),
-            ];
-            for dir in &common_dirs {
-                let p = format!("{}/{}", dir, name);
-                if std::path::Path::new(&p).exists() {
-                    if !candidates_paths.contains(&p) {
-                        candidates_paths.push(p);
-                    }
-                }
+
+            if candidates_paths.is_empty() {
+                return None;
             }
-        }
 
-        if candidates_paths.is_empty() { return None; }
+            // ── 3. 选最优路径 ────────────────────────────────────────────────
+            // 过滤掉 VS Code 内置路径（无法独立运行）
+            let not_vscode = |p: &&String| {
+                let lower = p.to_lowercase();
+                !lower.contains("globalstorage") && !lower.contains("copilotcli\\copilot")
+            };
 
-        // ── 3. 选最优路径 ────────────────────────────────────────────────
-        // 过滤掉 VS Code 内置路径（无法独立运行）
-        let not_vscode = |p: &&String| {
-            let lower = p.to_lowercase();
-            !lower.contains("globalstorage") && !lower.contains("copilotcli\\copilot")
-        };
+            #[cfg(windows)]
+            let best = candidates_paths
+                .iter()
+                // a. 常见目录里的 .cmd（最可靠）
+                .find(|p| p.to_lowercase().ends_with(".cmd") && not_vscode(p))
+                // b. PATH 里的非 VS Code .cmd
+                .or_else(|| {
+                    candidates_paths
+                        .iter()
+                        .find(|p| p.to_lowercase().ends_with(".cmd"))
+                })
+                // c. 任何非 VS Code 路径
+                .or_else(|| candidates_paths.iter().find(not_vscode))
+                // d. 兜底
+                .or_else(|| candidates_paths.first());
 
-        #[cfg(windows)]
-        let best = candidates_paths.iter()
-            // a. 常见目录里的 .cmd（最可靠）
-            .find(|p| p.to_lowercase().ends_with(".cmd") && not_vscode(p))
-            // b. PATH 里的非 VS Code .cmd
-            .or_else(|| candidates_paths.iter().find(|p| p.to_lowercase().ends_with(".cmd")))
-            // c. 任何非 VS Code 路径
-            .or_else(|| candidates_paths.iter().find(not_vscode))
-            // d. 兜底
-            .or_else(|| candidates_paths.first());
+            #[cfg(not(windows))]
+            let best = candidates_paths
+                .iter()
+                .find(not_vscode)
+                .or_else(|| candidates_paths.first());
 
-        #[cfg(not(windows))]
-        let best = candidates_paths.iter().find(not_vscode)
-            .or_else(|| candidates_paths.first());
-
-        best.cloned().map(|p| (name.to_string(), p))
-    }).collect()
+            best.cloned().map(|p| (name.to_string(), p))
+        })
+        .collect()
 }
 
 /// 处理 extra_args 中的 `--attachment <url>` 参数：
 /// 下载图片到本地临时文件，然后根据 CLI 类型转换参数格式：
 /// - Copilot: `--attachment <url>` → `--attachment <local_path>`
 /// - Codex:   `--attachment <url>` → `-i <local_path>`
-async fn resolve_attachment_args(args: Vec<String>, cli_name: &str, user_token: Option<&str>) -> Vec<String> {
+async fn resolve_attachment_args(
+    args: Vec<String>,
+    cli_name: &str,
+    user_token: Option<&str>,
+) -> Vec<String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -671,11 +715,16 @@ async fn resolve_attachment_args(args: Vec<String>, cli_name: &str, user_token: 
         if args[i] == "--attachment" {
             if let Some(url) = args.get(i + 1) {
                 if url.starts_with("http://") || url.starts_with("https://") {
-                    let ext = url.rsplit('.').next()
+                    let ext = url
+                        .rsplit('.')
+                        .next()
                         .filter(|e| e.len() <= 5 && e.chars().all(|c| c.is_alphanumeric()))
                         .unwrap_or("jpg");
-                    let tmp_path = std::env::temp_dir()
-                        .join(format!("elon_attach_{}.{}", uuid::Uuid::new_v4(), ext));
+                    let tmp_path = std::env::temp_dir().join(format!(
+                        "elon_attach_{}.{}",
+                        uuid::Uuid::new_v4(),
+                        ext
+                    ));
                     let mut req = client.get(url.as_str());
                     if let Some(tok) = user_token {
                         req = req.bearer_auth(tok);
@@ -699,8 +748,12 @@ async fn resolve_attachment_args(args: Vec<String>, cli_name: &str, user_token: 
                                 }
                             }
                         }
-                        Ok(resp) => { warn!("📎 attachment download failed: status={}", resp.status()); }
-                        Err(e) => { warn!("📎 attachment download error: {}", e); }
+                        Ok(resp) => {
+                            warn!("📎 attachment download failed: status={}", resp.status());
+                        }
+                        Err(e) => {
+                            warn!("📎 attachment download error: {}", e);
+                        }
                     }
                     // 下载失败：跳过
                     i += 2;
@@ -728,11 +781,12 @@ async fn run_cli_prompt(
     use tokio::io::AsyncBufReadExt;
 
     // Windows 上 .cmd 文件必须通过 cmd /c 启动，否则 tokio::process::Command 无法直接执行
-    let (actual_bin, actual_args_prefix): (&str, Vec<&str>) = if cfg!(windows) && bin.to_lowercase().ends_with(".cmd") {
-        ("cmd", vec!["/c", bin])
-    } else {
-        (bin, vec![])
-    };
+    let (actual_bin, actual_args_prefix): (&str, Vec<&str>) =
+        if cfg!(windows) && bin.to_lowercase().ends_with(".cmd") {
+            ("cmd", vec!["/c", bin])
+        } else {
+            (bin, vec![])
+        };
 
     // 构建命令
     // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
@@ -757,13 +811,17 @@ async fn run_cli_prompt(
         cmd.arg("exec");
         // 检查本地是否有已保存的真实 Codex session id
         let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
-        let our_key = extra_args.iter()
+        let our_key = extra_args
+            .iter()
             .find(|a| a.starts_with("--session-id="))
             .and_then(|a| a.strip_prefix("--session-id="))
             .map(str::to_owned);
         let real_codex_session_id = our_key.as_ref().and_then(|key| {
-            std::fs::read_to_string(&codex_sessions_file).ok()
-                .and_then(|s| serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s).ok())
+            std::fs::read_to_string(&codex_sessions_file)
+                .ok()
+                .and_then(|s| {
+                    serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s).ok()
+                })
                 .and_then(|map| map.get(key).and_then(|v| v.as_str()).map(str::to_owned))
         });
         if let Some(ref real_sid) = real_codex_session_id {
@@ -816,6 +874,12 @@ async fn run_cli_prompt(
                 req_id,
                 exit_ok: false,
                 error: Some(format!("无法启动 {} : {}", bin, e)),
+                prompt_tokens: None,
+                cached_input_tokens: None,
+                completion_tokens: None,
+                reasoning_tokens: None,
+                total_tokens: None,
+                model: None,
             }));
             return;
         }
@@ -833,7 +897,8 @@ async fn run_cli_prompt(
     // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
     // 并持久化到本地，以便下次用 exec resume <real_id> 续接
     let codex_key = if cli_name == "codex" {
-        extra_args.iter()
+        extra_args
+            .iter()
             .find(|a| a.starts_with("--session-id="))
             .and_then(|a| a.strip_prefix("--session-id="))
             .map(str::to_owned)
@@ -914,6 +979,12 @@ async fn run_cli_prompt(
                     exit_ok: false,
                     error: Some(format!("{} 执行超时（超过{}分钟），已强制终止",
                         cli_name, if cli_name == "codex" { 5 } else { 3 })),
+                    prompt_tokens: None,
+                    cached_input_tokens: None,
+                    completion_tokens: None,
+                    reasoning_tokens: None,
+                    total_tokens: None,
+                    model: None,
                 }));
                 return;
             },
@@ -937,7 +1008,63 @@ async fn run_cli_prompt(
     } else {
         Some(cli_done_error(cli_name, &stdout_text, &stderr_text))
     };
-    let _ = out_tx.send(ws_text(&AgentToServer::CliDone { req_id, exit_ok, error }));
+    let combined_usage_text = format!("{}\n{}", stdout_text, stderr_text);
+    let usage = cli_usage::parse_cli_usage(&combined_usage_text);
+    let model = usage
+        .as_ref()
+        .and_then(|u| u.model.clone())
+        .or_else(|| cli_model_from_args(cli_name, &extra_args));
+    let _ = out_tx.send(ws_text(&cli_done_message(
+        req_id, exit_ok, error, usage, model,
+    )));
+}
+
+fn cli_done_message(
+    req_id: String,
+    exit_ok: bool,
+    error: Option<String>,
+    usage: Option<cli_usage::CliTokenUsage>,
+    model: Option<String>,
+) -> AgentToServer {
+    let usage = usage.and_then(cli_usage::CliTokenUsage::normalized);
+    AgentToServer::CliDone {
+        req_id,
+        exit_ok,
+        error,
+        prompt_tokens: usage.as_ref().map(|u| u.input_tokens.max(0) as u64),
+        cached_input_tokens: usage.as_ref().map(|u| u.cached_input_tokens.max(0) as u64),
+        completion_tokens: usage.as_ref().map(|u| u.output_tokens.max(0) as u64),
+        reasoning_tokens: usage.as_ref().map(|u| u.reasoning_tokens.max(0) as u64),
+        total_tokens: usage.as_ref().map(|u| u.total_tokens.max(0) as u64),
+        model,
+    }
+}
+
+fn cli_model_from_args(cli_name: &str, args: &[String]) -> Option<String> {
+    if cli_name.eq_ignore_ascii_case("codex") {
+        return args.iter().find_map(|arg| {
+            arg.strip_prefix("--codex-model=")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        });
+    }
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix("--model=") {
+            let value = value.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+        if arg == "--model" {
+            if let Some(value) = iter.next().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// 执行 Exec：运行任意命令，流式返回 TaskStdout/TaskStderr/TaskExit。
@@ -972,7 +1099,10 @@ async fn run_exec(
     };
 
     let pid = child.id().unwrap_or(0);
-    let _ = out_tx.send(ws_text(&AgentToServer::TaskStarted { task_id: task_id.clone(), pid }));
+    let _ = out_tx.send(ws_text(&AgentToServer::TaskStarted {
+        task_id: task_id.clone(),
+        pid,
+    }));
 
     let stdout = child.stdout.take().expect("stdout");
     let stderr = child.stderr.take().expect("stderr");
@@ -1009,9 +1139,10 @@ async fn run_session(
 ) -> Result<()> {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     let mut request = cfg.cloud_url.as_str().into_client_request()?;
-    request
-        .headers_mut()
-        .insert("Authorization", format!("Bearer {}", creds.agent_secret).parse()?);
+    request.headers_mut().insert(
+        "Authorization",
+        format!("Bearer {}", creds.agent_secret).parse()?,
+    );
 
     let (ws_stream, _) = connect_async(request).await?;
     info!("✅ 已连接到云端: {}", cfg.cloud_url);
@@ -1038,7 +1169,11 @@ async fn run_session(
         info!(
             "🧠 发现 {} 个本地模型: {}",
             models.len(),
-            models.iter().map(|m| m.model_id.as_str()).collect::<Vec<_>>().join(", ")
+            models
+                .iter()
+                .map(|m| m.model_id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         );
     }
 
@@ -1046,7 +1181,14 @@ async fn run_session(
     let cli_pairs = detect_available_clis();
     let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
     if !available_clis.is_empty() {
-        info!("🛠  检测到本地 CLI: {}", cli_pairs.iter().map(|(n, p)| format!("{} ({})", n, p)).collect::<Vec<_>>().join(", "));
+        info!(
+            "🛠  检测到本地 CLI: {}",
+            cli_pairs
+                .iter()
+                .map(|(n, p)| format!("{} ({})", n, p))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
@@ -1114,13 +1256,22 @@ async fn run_session(
                             let cfg_c = cfg_r.clone();
                             let tx_c = out_tx_r.clone();
                             tokio::spawn(async move {
-                                run_llm_inference(&cfg_c, req_id, &model, messages, max_tokens, tx_c).await;
+                                run_llm_inference(
+                                    &cfg_c, req_id, &model, messages, max_tokens, tx_c,
+                                )
+                                .await;
                             });
                         }
                         ServerToAgent::Ping { nonce } => {
                             let _ = out_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
                         }
-                        ServerToAgent::CliPrompt { req_id, cli, extra_args, cwd, prompt } => {
+                        ServerToAgent::CliPrompt {
+                            req_id,
+                            cli,
+                            extra_args,
+                            cwd,
+                            prompt,
+                        } => {
                             info!("📝 CliPrompt: {} cli={}", req_id, cli);
                             let tx_c = out_tx_r.clone();
                             let rt_c = runtime.clone();
@@ -1129,13 +1280,36 @@ async fn run_session(
                                 // 处理 --attachment URL：下载图片到本地临时文件
                                 // Copilot: --attachment <url> → 下载后 --attachment <local_path>
                                 // Codex:   --attachment <url> → 下载后 -i <local_path>
-                                let resolved_args = resolve_attachment_args(extra_args, &cli,
-                                    rt_c.creds.read().await.as_ref().and_then(|c| c.user_token.clone()).as_deref()
-                                ).await;
-                                run_cli_prompt(req_id, &full_path, &cli, resolved_args, cwd, prompt, tx_c).await;
+                                let resolved_args = resolve_attachment_args(
+                                    extra_args,
+                                    &cli,
+                                    rt_c.creds
+                                        .read()
+                                        .await
+                                        .as_ref()
+                                        .and_then(|c| c.user_token.clone())
+                                        .as_deref(),
+                                )
+                                .await;
+                                run_cli_prompt(
+                                    req_id,
+                                    &full_path,
+                                    &cli,
+                                    resolved_args,
+                                    cwd,
+                                    prompt,
+                                    tx_c,
+                                )
+                                .await;
                             });
                         }
-                        ServerToAgent::Exec { task_id, cli, args, cwd, env } => {
+                        ServerToAgent::Exec {
+                            task_id,
+                            cli,
+                            args,
+                            cwd,
+                            env,
+                        } => {
                             info!("⚙️  Exec: {} {}", cli, args.join(" "));
                             let tx_c = out_tx_r.clone();
                             tokio::spawn(async move {
@@ -1197,9 +1371,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
-        )
+        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
         .init();
 
     let cfg = NodeConfig::from_env()?;
@@ -1287,7 +1459,9 @@ impl NodeRuntime {
 
     /// CLI 名称 → 完整路径（找不到就返回原名称作备用）
     async fn resolve_cli(&self, name: &str) -> String {
-        self.cli_paths.read().await
+        self.cli_paths
+            .read()
+            .await
             .iter()
             .find(|(n, _)| n == name)
             .map(|(_, p)| p.clone())
@@ -1327,10 +1501,16 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
             .route("/api/status", axum::routing::get(admin_status))
             .route("/api/env-check", axum::routing::get(admin_env_check))
             .route("/api/install-env", axum::routing::post(admin_install_env))
-            .route("/api/save-openai-key", axum::routing::post(admin_save_openai_key))
+            .route(
+                "/api/save-openai-key",
+                axum::routing::post(admin_save_openai_key),
+            )
             .route("/api/login", axum::routing::post(admin_login))
             .route("/api/logout", axum::routing::post(admin_logout))
-            .route("/api/register-project", axum::routing::post(admin_register_project))
+            .route(
+                "/api/register-project",
+                axum::routing::post(admin_register_project),
+            )
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -1391,7 +1571,12 @@ async fn admin_login(
     use axum::http::StatusCode;
 
     // 1) 取得 token：优先直接粘贴的 token，否则账号+密码登录
-    let token = if let Some(t) = req.token.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+    let token = if let Some(t) = req
+        .token
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+    {
         t
     } else {
         let account = req.account.unwrap_or_default();
@@ -1400,7 +1585,9 @@ async fn admin_login(
         if account.is_empty() || password.is_empty() {
             return (
                 StatusCode::BAD_REQUEST,
-                axum::Json(serde_json::json!({ "ok": false, "error": "请填写账号和密码，或直接粘贴 token" })),
+                axum::Json(
+                    serde_json::json!({ "ok": false, "error": "请填写账号和密码，或直接粘贴 token" }),
+                ),
             );
         }
         match cloud_login(&rt.cfg, account, &password).await {
@@ -1408,7 +1595,9 @@ async fn admin_login(
             Err(e) => {
                 return (
                     StatusCode::UNAUTHORIZED,
-                    axum::Json(serde_json::json!({ "ok": false, "error": format!("登录失败: {e}") })),
+                    axum::Json(
+                        serde_json::json!({ "ok": false, "error": format!("登录失败: {e}") }),
+                    ),
                 );
             }
         }
@@ -1436,7 +1625,10 @@ async fn admin_logout(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     rt.set_creds(None).await;
-    (axum::http::StatusCode::OK, axum::Json(serde_json::json!({ "ok": true })))
+    (
+        axum::http::StatusCode::OK,
+        axum::Json(serde_json::json!({ "ok": true })),
+    )
 }
 
 #[derive(Deserialize)]
@@ -1462,7 +1654,9 @@ async fn admin_register_project(
     if name.is_empty() || path.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({ "ok": false, "error": "name 和 workspace_path 不能为空" })),
+            axum::Json(
+                serde_json::json!({ "ok": false, "error": "name 和 workspace_path 不能为空" }),
+            ),
         );
     }
 
@@ -1511,7 +1705,10 @@ async fn admin_register_project(
     };
 
     // 3) 转发到云端
-    let url = format!("{}/api/projects/external", rt.cfg.cloud_http_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/projects/external",
+        rt.cfg.cloud_http_url.trim_end_matches('/')
+    );
     let body = serde_json::json!({
         "project_id": req.project_id.as_deref().map(str::trim).filter(|value| !value.is_empty()),
         "name": name,
@@ -1523,21 +1720,32 @@ async fn admin_register_project(
         .timeout(Duration::from_secs(15))
         .build()
         .unwrap_or_default();
-    match client.post(&url).bearer_auth(&token).json(&body).send().await {
+    match client
+        .post(&url)
+        .bearer_auth(&token)
+        .json(&body)
+        .send()
+        .await
+    {
         Ok(resp) => {
             let status = resp.status();
             let json: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
             if status.is_success() {
-                (StatusCode::OK, axum::Json(serde_json::json!({
-                    "ok": true,
-                    "cloud": json,
-                })))
+                (
+                    StatusCode::OK,
+                    axum::Json(serde_json::json!({
+                        "ok": true,
+                        "cloud": json,
+                    })),
+                )
             } else {
-                (StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
-                 axum::Json(serde_json::json!({
-                    "ok": false,
-                    "error": format!("云端返回 {}: {}", status, json),
-                })))
+                (
+                    StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::BAD_GATEWAY),
+                    axum::Json(serde_json::json!({
+                        "ok": false,
+                        "error": format!("云端返回 {}: {}", status, json),
+                    })),
+                )
             }
         }
         Err(e) => (
@@ -1590,7 +1798,9 @@ fn tool_available(bin: &str) -> bool {
         for dir in &dirs {
             for ext in &[".cmd", ".exe", ""] {
                 let p = std::path::PathBuf::from(dir).join(format!("{}{}", bin, ext));
-                if p.exists() { return true; }
+                if p.exists() {
+                    return true;
+                }
             }
         }
     }
@@ -1642,12 +1852,14 @@ fn android_sdk_ready() -> bool {
 
 /// 检查 Gradle 阿里云镜像是否已配置。
 fn gradle_mirror_ok() -> bool {
-    let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .unwrap_or_default();
+    let home =
+        std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap_or_default();
     let init = std::path::PathBuf::from(&home)
         .join(".gradle")
         .join("init.gradle");
-    if !init.exists() { return false; }
+    if !init.exists() {
+        return false;
+    }
     std::fs::read_to_string(&init)
         .map(|s| s.contains("maven.aliyun.com"))
         .unwrap_or(false)

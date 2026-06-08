@@ -71,23 +71,48 @@ pub async fn run_for_project_in_workspace(
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
         // 从 agent_name 查 AiCliOption 获取 CLI 类型、Copilot model ID 和显示标签
         let option = agent_name.and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
-        let pc_cli = option.as_ref()
-            .map(|o| if o.provider == "codex" || o.id.to_lowercase().contains("codex") { "codex" } else { "copilot" })
-            .or_else(|| agent_name.map(|name| {
-                let lower = name.to_lowercase();
-                if lower.contains("codex") { "codex" } else { "copilot" }
-            }))
+        let pc_cli = option
+            .as_ref()
+            .map(|o| {
+                if o.provider == "codex" || o.id.to_lowercase().contains("codex") {
+                    "codex"
+                } else {
+                    "copilot"
+                }
+            })
+            .or_else(|| {
+                agent_name.map(|name| {
+                    let lower = name.to_lowercase();
+                    if lower.contains("codex") {
+                        "codex"
+                    } else {
+                        "copilot"
+                    }
+                })
+            })
             .unwrap_or("copilot");
         // Copilot CLI 的 model ID（用于 --model 参数）
-        let copilot_model = option.as_ref().and_then(|o| o.model.as_deref()).map(String::from);
+        let copilot_model = option
+            .as_ref()
+            .and_then(|o| o.model.as_deref())
+            .map(String::from);
         // Codex 的 reasoning_effort（用于 -c model_reasoning_effort="..." 参数）
-        let codex_reasoning_effort = option.as_ref().and_then(|o| o.reasoning_effort.as_deref()).map(String::from);
+        let codex_reasoning_effort = option
+            .as_ref()
+            .and_then(|o| o.reasoning_effort.as_deref())
+            .map(String::from);
         // 用户可见的模型标签（用于气泡属指）
-        let model_label = option.as_ref()
+        let model_label = option
+            .as_ref()
             .map(|o| o.label.clone())
             .or_else(|| agent_name.map(String::from));
         let _ = tx.send(
-            WsMessage::progress(format!("正在连接 PC 节点 {} 使用 {} 处理本地项目。", agent_id, model_label.as_deref().unwrap_or(pc_cli))).to_json(),
+            WsMessage::progress(format!(
+                "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
+                agent_id,
+                model_label.as_deref().unwrap_or(pc_cli)
+            ))
+            .to_json(),
         );
         let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
             project_id: project.id.clone(),
@@ -96,6 +121,7 @@ pub async fn run_for_project_in_workspace(
         });
         if let Err(e) = ai_cli::run_with_pc_agent_workspace(
             agent_id,
+            user_id,
             pc_workspace,
             user_message,
             None,
@@ -199,18 +225,48 @@ pub async fn plan_for_project_in_workspace(
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
         let option = agent_name.and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
-        let pc_cli = option.as_ref()
-            .map(|o| if o.provider == "codex" || o.id.to_lowercase().contains("codex") { "codex" } else { "copilot" })
-            .or_else(|| agent_name.map(|name| if name.to_lowercase().contains("codex") { "codex" } else { "copilot" }))
+        let pc_cli = option
+            .as_ref()
+            .map(|o| {
+                if o.provider == "codex" || o.id.to_lowercase().contains("codex") {
+                    "codex"
+                } else {
+                    "copilot"
+                }
+            })
+            .or_else(|| {
+                agent_name.map(|name| {
+                    if name.to_lowercase().contains("codex") {
+                        "codex"
+                    } else {
+                        "copilot"
+                    }
+                })
+            })
             .unwrap_or("copilot");
-        let copilot_model = option.as_ref().and_then(|o| o.model.as_deref()).map(String::from);
-        let codex_reasoning_effort = option.as_ref().and_then(|o| o.reasoning_effort.as_deref()).map(String::from);
-        let model_label = option.as_ref().map(|o| o.label.clone()).or_else(|| agent_name.map(String::from));
+        let copilot_model = option
+            .as_ref()
+            .and_then(|o| o.model.as_deref())
+            .map(String::from);
+        let codex_reasoning_effort = option
+            .as_ref()
+            .and_then(|o| o.reasoning_effort.as_deref())
+            .map(String::from);
+        let model_label = option
+            .as_ref()
+            .map(|o| o.label.clone())
+            .or_else(|| agent_name.map(String::from));
         let _ = tx.send(
-            WsMessage::progress(format!("正在连接 PC 节点 {} 使用 {} 规划本地项目。", agent_id, model_label.as_deref().unwrap_or(pc_cli))).to_json(),
+            WsMessage::progress(format!(
+                "正在连接 PC 节点 {} 使用 {} 规划本地项目。",
+                agent_id,
+                model_label.as_deref().unwrap_or(pc_cli)
+            ))
+            .to_json(),
         );
         if let Err(e) = ai_cli::run_with_pc_agent_workspace(
             agent_id,
+            user_id,
             pc_workspace,
             user_message,
             None,

@@ -26,6 +26,7 @@ mod billing_events;
 mod billing_pay;
 mod chat_attachments;
 mod cli_config;
+mod cli_usage;
 mod codex_health;
 mod codex_stream;
 mod errors;
@@ -152,8 +153,7 @@ async fn main() -> Result<()> {
     {
         let state_cleanup = state.clone();
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(std::time::Duration::from_secs(120));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
             loop {
                 interval.tick().await;
                 match state_cleanup.store.mark_stale_running_tasks(10 * 60) {

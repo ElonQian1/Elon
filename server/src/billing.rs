@@ -2,7 +2,8 @@
 //!
 //! 对外提供两个关键钩子：
 //! - `check_can_call(store, user_id)` —— LLM 调用前调用，余额不足时返回错误
-//! - `deduct_from_response(store, user_id, model, response)` —— LLM 返回后调用，静默扣费
+//! - `deduct_usage(store, user_id, model, input, cached, output)` —— 可信用量落库后扣费
+//! - `deduct_from_response(store, user_id, model, response)` —— 兼容旧调用点，静默扣费
 //!
 //! 向后兼容：若用户在 user_balance 表中没有记录，视为"未开通计费"，全部放行。
 
@@ -76,6 +77,14 @@ pub fn calc_cost_fen(
 /// - 有行且 balance_fen > 0 → 放行
 /// - 有行且 balance_fen <= 0 → 返回 Err（错误消息直接展示给用户）
 pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
+    if let Err(e) = store.check_user_quota(user_id) {
+        let msg = e.to_string();
+        if msg.contains("用户已被封禁") || msg.contains("token 用量已达上限") {
+            return Err(msg);
+        }
+        warn!("billing quota check db error for {}: {}", user_id, e);
+    }
+
     match store.billing_get_balance(user_id) {
         Ok(None) => Ok(()), // 未开通计费，放行
         Ok(Some(fen)) if fen > 0 => Ok(()),
@@ -89,6 +98,62 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
             Ok(())
         }
     }
+}
+
+/// LLM 调用后：用已解析出的 token 用量执行扣费。
+///
+/// 用户没有 `user_balance` 行表示未开通预存计费，只记录 token 用量、不扣 RMB。
+pub fn deduct_usage(
+    store: &Store,
+    user_id: &str,
+    model: Option<&str>,
+    input_tokens: i64,
+    cached_input_tokens: i64,
+    output_tokens: i64,
+) -> anyhow::Result<Option<i64>> {
+    let Some(_) = store.billing_get_balance(user_id)? else {
+        return Ok(None);
+    };
+    if input_tokens <= 0 && output_tokens <= 0 {
+        return Ok(None);
+    }
+
+    let (rate, markup) = store.billing_get_rate_and_markup();
+    let model = model.unwrap_or("unknown");
+    let cost_fen = calc_cost_fen(
+        model,
+        input_tokens.max(0),
+        cached_input_tokens.max(0),
+        output_tokens.max(0),
+        rate,
+        markup,
+    );
+    if cost_fen == 0 {
+        return Ok(None);
+    }
+
+    let new_balance = store.billing_deduct(
+        user_id,
+        cost_fen,
+        Some(model),
+        input_tokens.max(0),
+        cached_input_tokens.max(0),
+        output_tokens.max(0),
+        rate,
+        markup,
+    )?;
+
+    let threshold = store
+        .billing_get_config("low_balance_threshold_fen")
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(100);
+    if new_balance <= threshold {
+        crate::billing_events::publish_low_balance(user_id.to_string(), new_balance);
+    }
+
+    Ok(Some(new_balance))
 }
 
 /// LLM 调用后：从响应 JSON 中提取 token 用量并扣费（静默，不向上层传播错误）。
@@ -132,34 +197,8 @@ pub fn deduct_from_response(store: &Store, user_id: &str, model: &str, response:
         return;
     }
 
-    let (rate, markup) = store.billing_get_rate_and_markup();
-    let cost_fen = calc_cost_fen(model, input, cached, output, rate, markup);
-    if cost_fen == 0 {
-        return;
-    }
-
-    match store.billing_deduct(
-        user_id,
-        cost_fen,
-        Some(model),
-        input,
-        cached,
-        output,
-        rate,
-        markup,
-    ) {
-        Ok(new_balance) => {
-            // 低余额警告（低于阈值推送 WS 通知）
-            let threshold = store
-                .billing_get_config("low_balance_threshold_fen")
-                .ok()
-                .flatten()
-                .and_then(|s| s.parse::<i64>().ok())
-                .unwrap_or(100);
-            if new_balance <= threshold {
-                crate::billing_events::publish_low_balance(user_id.to_string(), new_balance);
-            }
-        }
+    match deduct_usage(store, user_id, Some(model), input, cached, output) {
+        Ok(_) => {}
         Err(e) => {
             // 扣费失败（不应发生，因为 check_can_call 已经验证过）
             warn!("billing deduct failed for {}: {}", user_id, e);
