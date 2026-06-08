@@ -657,19 +657,26 @@ async fn run_cli_prompt(
     }
     if cli_name == "codex" {
         cmd.arg("exec");
-        // extra_args 中如果有 session-id，用 resume 子命令续接会话
-        let codex_session_id = extra_args.iter()
+        // 检查本地是否有已保存的真实 Codex session id
+        let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
+        let our_key = extra_args.iter()
             .find(|a| a.starts_with("--session-id="))
             .and_then(|a| a.strip_prefix("--session-id="))
             .map(str::to_owned);
-        if let Some(ref sid) = codex_session_id {
+        let real_codex_session_id = our_key.as_ref().and_then(|key| {
+            std::fs::read_to_string(&codex_sessions_file).ok()
+                .and_then(|s| serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s).ok())
+                .and_then(|map| map.get(key).and_then(|v| v.as_str()).map(str::to_owned))
+        });
+        if let Some(ref real_sid) = real_codex_session_id {
+            // 续接已有会话
             cmd.arg("resume");
-            cmd.arg(sid);
+            cmd.arg(real_sid);
         } else {
+            // 首次执行：全权限，Codex 会自动创建 session id
             cmd.arg("--dangerously-bypass-approvals-and-sandbox");
-            // 首次执行时也传 --dangerously... 以便写文件、跑命令
         }
-        // 其余 extra_args（如 --model 等），跳过 --session-id（已处理）
+        // 其余 extra_args（如 --model），跳过 --session-id（已内部处理）
         for a in &extra_args {
             if !a.starts_with("--session-id=") {
                 cmd.arg(a);
@@ -718,18 +725,50 @@ async fn run_cli_prompt(
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
     let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
 
+    // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
+    // 并持久化到本地，以便下次用 exec resume <real_id> 续接
+    let codex_key = if cli_name == "codex" {
+        extra_args.iter()
+            .find(|a| a.starts_with("--session-id="))
+            .and_then(|a| a.strip_prefix("--session-id="))
+            .map(str::to_owned)
+    } else {
+        None
+    };
+    let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
+
     loop {
         tokio::select! {
             line = stdout_lines.next_line() => match line {
-                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" })); }
+                Ok(Some(l)) => {
+                    // 提取 Codex 真实 session id 并持久化
+                    if cli_name == "codex" {
+                        if let Some(real_id) = l.strip_prefix("session id: ").map(str::trim) {
+                            if let Some(ref key) = codex_key {
+                                // 持久化 key→real_id 映射
+                                let mut map: serde_json::Map<String, serde_json::Value> =
+                                    tokio::fs::read_to_string(&codex_sessions_file).await
+                                        .ok()
+                                        .and_then(|s| serde_json::from_str(&s).ok())
+                                        .unwrap_or_default();
+                                map.insert(key.clone(), serde_json::json!(real_id));
+                                let _ = tokio::fs::write(
+                                    &codex_sessions_file,
+                                    serde_json::to_string(&map).unwrap_or_default(),
+                                ).await;
+                                info!("🔖 Codex session saved: {} → {}", key, real_id);
+                            }
+                            // session id 行本身不发给用户
+                            continue;
+                        }
+                    }
+                    let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
+                }
                 Ok(None) => break,
                 Err(e) => { warn!("stdout 读取错误: {e}"); break; }
             },
             line = stderr_lines.next_line() => match line {
                 Ok(Some(l)) => {
-                    // Codex exec 的 stderr 只含启动信息/错误日志，不应发给用户
-                    // Copilot 的 stderr 也通常不含用户有意义的内容
-                    // 只在非 codex 时发送 stderr（保留原有兼容性）
                     if cli_name != "codex" {
                         let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
                     }
