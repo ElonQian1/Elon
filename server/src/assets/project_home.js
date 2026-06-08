@@ -28,22 +28,28 @@
   };
 
   const plazaBannerSlots = [
-    { x: -8, y: 10, size: 50 },
-    { x: 20, y: 10, size: 50 },
-    { x: 48, y: 10, size: 50 },
-    { x: 76, y: 10, size: 50 },
-    { x: 104, y: 10, size: 50 },
-    { x: 6, y: 58, size: 50 },
-    { x: 34, y: 58, size: 50 },
-    { x: 88, y: 58, size: 50 },
-    { x: 116, y: 58, size: 50 },
-    { x: -8, y: 106, size: 50 },
-    { x: 20, y: 106, size: 50 },
-    { x: 48, y: 106, size: 50 },
-    { x: 76, y: 106, size: 50 },
-    { x: 104, y: 106, size: 50 }
+    { x: -6, y: 15, size: 50 },
+    { x: 13, y: 15, size: 50 },
+    { x: 32, y: 15, size: 50 },
+    { x: 51, y: 15, size: 50 },
+    { x: 70, y: 15, size: 50 },
+    { x: 89, y: 15, size: 50 },
+    { x: 108, y: 15, size: 50 },
+    { x: 4, y: 53, size: 50 },
+    { x: 23, y: 53, size: 50 },
+    { x: 42, y: 53, size: 50 },
+    { x: 78, y: 53, size: 50 },
+    { x: 97, y: 53, size: 50 },
+    { x: 116, y: 53, size: 50 },
+    { x: -6, y: 91, size: 50 },
+    { x: 13, y: 91, size: 50 },
+    { x: 32, y: 91, size: 50 },
+    { x: 51, y: 91, size: 50 },
+    { x: 70, y: 91, size: 50 },
+    { x: 89, y: 91, size: 50 },
+    { x: 108, y: 91, size: 50 }
   ];
-  const plazaBannerFocusSlot = { x: 62, y: 58, size: 50 };
+  const plazaBannerFocusSlot = { x: 60, y: 43, size: 72 };
 
   function memberCountOf(project) {
     return Number(project.member_count || project.memberCount || project.members || 0) || 0;

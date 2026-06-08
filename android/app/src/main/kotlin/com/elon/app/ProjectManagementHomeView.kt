@@ -394,18 +394,17 @@ private class ProjectPlazaPatternView(
 
     private fun drawProjectIcons(canvas: Canvas) {
         val slots = buildBannerSlots()
-        val focusIndex = findFocusSlot(slots)
-        val assignments = assignProjects(slots, focusIndex)
+        val assignments = assignProjects(slots)
 
         canvas.save()
         canvas.rotate(bannerRotation, width / 2f, height / 2f)
         slots.forEachIndexed { index, slot ->
-            if (index != focusIndex) {
+            if (index != FOCUS_SLOT_INDEX) {
                 drawProjectIcon(canvas, assignments[index], slot)
             }
         }
-        if (focusIndex in slots.indices) {
-            drawProjectIcon(canvas, assignments[focusIndex], slots[focusIndex])
+        if (slots.isNotEmpty()) {
+            drawProjectIcon(canvas, assignments[FOCUS_SLOT_INDEX], slots[FOCUS_SLOT_INDEX])
         }
         canvas.restore()
     }
@@ -425,51 +424,46 @@ private class ProjectPlazaPatternView(
 
     private fun buildBannerSlots(): List<BannerSlot> {
         val tileSize = dp(50).toFloat()
-        val gapX = dp(96).toFloat()
-        val gapY = dp(84).toFloat()
+        val focusSize = dp(72).toFloat()
+        val gapX = dp(76).toFloat()
+        val gapY = dp(66).toFloat()
+        val focusCenter = inverseRotatedPoint(width * 0.60f, height * 0.43f)
         val slots = mutableListOf<BannerSlot>()
-        var row = 0
-        var y = -height.toFloat()
-        while (y < height * 2f) {
-            var x = -width.toFloat() + if (row % 2 == 0) 0f else gapX / 2f
-            while (x < width * 2f) {
-                slots += BannerSlot(x, y, tileSize)
-                x += gapX
+        slots += BannerSlot(
+            focusCenter.x - focusSize / 2f,
+            focusCenter.y - focusSize / 2f,
+            focusSize
+        )
+        for (row in -3..3) {
+            for (column in -5..5) {
+                if (row == 0 && column == 0) continue
+                val offsetX = if (row % 2 == 0) 0f else gapX / 2f
+                val cx = focusCenter.x + column * gapX + offsetX
+                val cy = focusCenter.y + row * gapY
+                val slot = BannerSlot(cx - tileSize / 2f, cy - tileSize / 2f, tileSize)
+                if (isVisibleSlot(slot)) {
+                    slots += slot
+                }
             }
-            row += 1
-            y += gapY
         }
         return slots
     }
 
-    private fun assignProjects(slots: List<BannerSlot>, focusIndex: Int): Map<Int, StoreProject> {
+    private fun assignProjects(slots: List<BannerSlot>): Map<Int, StoreProject> {
         if (sortedProjects.isEmpty()) return emptyMap()
         val assignments = mutableMapOf<Int, StoreProject>()
-        if (focusIndex in slots.indices) {
-            assignments[focusIndex] = sortedProjects.first()
+        if (slots.isNotEmpty()) {
+            assignments[FOCUS_SLOT_INDEX] = sortedProjects.first()
         }
         val restProjects = sortedProjects.drop(1)
         val orderedSlots = slots.indices
-            .filter { it != focusIndex && isVisibleSlot(slots[it]) }
+            .filter { it != FOCUS_SLOT_INDEX }
             .sortedWith(compareBy({ rotatedCenter(slots[it]).y }, { rotatedCenter(slots[it]).x }))
         restProjects.forEachIndexed { index, project ->
             val slotIndex = orderedSlots.getOrNull(index) ?: return@forEachIndexed
             assignments[slotIndex] = project
         }
         return assignments
-    }
-
-    private fun findFocusSlot(slots: List<BannerSlot>): Int {
-        val lensX = width * 0.60f
-        val lensY = height * 0.43f
-        return slots.indices
-            .filter { isVisibleSlot(slots[it]) }
-            .minByOrNull { index ->
-                val center = rotatedCenter(slots[index])
-                val dx = center.x - lensX
-                val dy = center.y - lensY
-                dx * dx + dy * dy
-            } ?: -1
     }
 
     private fun isVisibleSlot(slot: BannerSlot): Boolean {
@@ -481,14 +475,22 @@ private class ProjectPlazaPatternView(
             center.y <= height + margin
     }
 
+    private fun inverseRotatedPoint(screenX: Float, screenY: Float): BannerPoint {
+        return rotatePoint(screenX, screenY, -bannerRotation)
+    }
+
     private fun rotatedCenter(slot: BannerSlot): BannerPoint {
         val cx = slot.left + slot.size / 2f
         val cy = slot.top + slot.size / 2f
+        return rotatePoint(cx, cy, bannerRotation)
+    }
+
+    private fun rotatePoint(x: Float, y: Float, angle: Float): BannerPoint {
         val originX = width / 2f
         val originY = height / 2f
-        val radians = Math.toRadians(bannerRotation.toDouble())
-        val dx = (cx - originX).toDouble()
-        val dy = (cy - originY).toDouble()
+        val radians = Math.toRadians(angle.toDouble())
+        val dx = (x - originX).toDouble()
+        val dy = (y - originY).toDouble()
         val screenX = dx * cos(radians) - dy * sin(radians) + originX
         val screenY = dx * sin(radians) + dy * cos(radians) + originY
         return BannerPoint(screenX.toFloat(), screenY.toFloat())
@@ -530,4 +532,8 @@ private class ProjectPlazaPatternView(
     }
 
     private fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+
+    private companion object {
+        private const val FOCUS_SLOT_INDEX = 0
+    }
 }
