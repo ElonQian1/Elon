@@ -56,7 +56,9 @@ data class ChatMessage(
      */
     var copilotInToolBlock: Boolean = false,
     /** 已完成的工具调用数量，用于生成折叠标题 */
-    var copilotToolCallCount: Int = 0
+    var copilotToolCallCount: Int = 0,
+    /** 当前正在执行的工具名（用于 └ 结束时把占位行替换成结果摘要） */
+    var copilotLastToolName: String? = null
 )
 
 class ChatAdapter(
@@ -391,50 +393,86 @@ class ChatAdapter(
             return
         }
 
-        // ── 状态机：正确分离叙述文本 vs 工具块 ──────────────────────────
+        // ── 状态机：交织式叙述 + 工具块处理 ──────────────────────────
         // 工具块结构：
-        //   ● 操作名称 (tool)\n  ← 起始行（只有 ● 开头才是工具块起始，✗/✓ 在正文里也出现）
-        //   │ 代码/参数\n        ← 块内行
-        //   └ 结果\n             ← 结束行
-        // ✗/✓/✅/⚠ 单独出现在正文里时不触发工具块
+        //   ● 操作名称 (type)\n  ← 起始行（唯一可靠标记）
+        //   │ 参数/内容\n        ← 块内行（折叠到详情区，不进主气泡）
+        //   └ 结果摘要\n         ← 结束行
+        // 叙述文字（非工具块）直接追加到主气泡，保持叙事顺序。
+        // 每个工具块起始时在主气泡插入一行内联占位：「⚙️ Search…」
+        // 工具块结束时把占位行替换为带摘要的结果：「⚙️ Search → 104 files found」
+        // 这样主气泡内容完整呈现：文字 → ⚙️ 工具结果 → 文字 → ⚙️ 工具结果 → 文字
         val trimmed = chunk.trimStart()
-        // 工具块起始：● 后跟空格，是 Copilot 工具调用的唯一可靠标记
         val isToolBlockStart = trimmed.startsWith("● ")
-        // 工具块结束行
-        val isToolBlockEnd = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
-        // Copilot 统计尾行（始终折叠，不显示在主气泡）
-        val isStatsLine = trimmed.startsWith("Changes ") || trimmed.startsWith("Requests ") ||
-            trimmed.startsWith("Tokens ")
+        val isToolBlockEnd   = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
+        val isStatsLine      = trimmed.startsWith("Changes ") || trimmed.startsWith("Requests ") ||
+                               trimmed.startsWith("Tokens ")
 
         when {
             isToolBlockStart -> {
-                // 进入新工具块
-                msg.copilotInToolBlock = true
+                // ① 提取工具名："● Search (grep)" → "Search"；"● Edit file.ts +3" → "Edit"
+                val toolName = trimmed
+                    .removePrefix("● ")
+                    .substringBefore(" ").substringBefore("(").trim()
+                    .ifBlank { "操作" }
+                msg.copilotLastToolName = toolName
+                msg.copilotInToolBlock  = true
                 msg.copilotToolCallCount += 1
+
+                // ② 在主气泡原位插入内联占位行，保持叙事顺序
+                if (msg.content.isNotBlank() && !msg.content.endsWith("\n")) {
+                    msg.content += "\n"
+                }
+                msg.content += "⚙️ $toolName…\n"
+
+                // ③ 起始行本身也折叠到详情区（供展开查看参数）
+                val prev = msg.evidenceDetails ?: ""
+                msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
+                msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
+                    "已执行 ${msg.copilotToolCallCount} 个操作" else "执行详情"
+                notifyItemChanged(idx)
+                return
             }
             isToolBlockEnd -> {
-                // 工具块结束行自身也折叠，结束后退出块
+                // ④ 解析结果摘要："└ 104 files found" → "104 files found"
+                val rawResult = trimmed
+                    .removePrefix("└ ").removePrefix("  └ ").trim()
+                val summary = when {
+                    rawResult.contains("files found")  -> rawResult
+                    rawResult.contains("lines found")  -> rawResult
+                    rawResult.contains("lines read")   -> rawResult
+                    rawResult.contains('\\') || rawResult.contains('/') ->
+                        rawResult.substringAfterLast('\\').substringAfterLast('/')
+                    else -> rawResult.take(50)
+                }
+
+                // ⑤ 把主气泡里的占位行「⚙️ ToolName…」替换为结果行「⚙️ ToolName → summary」
+                val toolName    = msg.copilotLastToolName ?: "操作"
+                val placeholder = "⚙️ $toolName…"
+                val resultLine  = "⚙️ $toolName → $summary"
+                val lastIdx     = msg.content.lastIndexOf(placeholder)
+                if (lastIdx >= 0) {
+                    msg.content = msg.content.substring(0, lastIdx) + resultLine +
+                        msg.content.substring(lastIdx + placeholder.length)
+                }
+
+                // ⑥ 结束行也折叠到详情区
                 val prev = msg.evidenceDetails ?: ""
                 msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
                 msg.copilotInToolBlock = false
                 msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
-                    "已执行 ${msg.copilotToolCallCount} 个操作"
-                else "执行详情"
+                    "已执行 ${msg.copilotToolCallCount} 个操作" else "执行详情"
                 notifyItemChanged(idx)
                 return
             }
         }
 
-        if (msg.copilotInToolBlock || isToolBlockStart || isStatsLine) {
-            // 工具块内容 / 统计行 → 折叠区域（不显示在主气泡）
+        if (msg.copilotInToolBlock || isStatsLine) {
+            // 工具块内行 / 统计行 → 只进详情折叠区，不进主气泡
             val prev = msg.evidenceDetails ?: ""
             msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-            if (msg.evidenceTitle.isNullOrBlank()) {
-                msg.evidenceTitle = "执行详情"
-            }
         } else {
-            // 叙述文字 → 主气泡内容
-            // 跳过空白行（工具块之间的间隔行不加入主内容）
+            // 叙述文字 → 主气泡（跳过空白行，避免多余空行）
             if (chunk.isNotBlank()) {
                 msg.content += chunk
             }
