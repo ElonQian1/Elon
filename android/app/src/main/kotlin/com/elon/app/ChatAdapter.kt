@@ -187,9 +187,9 @@ class ChatAdapter(
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
             val isAiRole = message.role in setOf("ai", "ai-intent", "ai-working", "ai-progress", "ai-cli-log")
-            // Copilot CLI（model_used 以 node- 开头）的回复使用 Markdown 渲染；
+            // Copilot CLI（来自 PC 节点、nodeId 不为空）的回复使用 Markdown 渲染；
             // Codex CLI 和其他模型保持纯文本（Codex 输出不含 MD 格式）
-            val isCopilotReply = message.modelUsed?.startsWith("node-") == true
+            val isCopilotReply = !message.nodeId.isNullOrBlank()
             if (isAiRole && isCopilotReply && message.content.isNotBlank()) {
                 renderMarkdown(holder.text, message.content)
             } else {
@@ -383,8 +383,8 @@ class ChatAdapter(
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
         val msg = messages[idx]
-        // 只有 Copilot CLI（model_used 以 node- 开头）才需要工具块状态机
-        val isCopilotMsg = msg.modelUsed?.startsWith("node-") == true
+        // 只有来自 PC 节点（nodeId 不为空）的 Copilot CLI 回复才需要工具块状态机
+        val isCopilotMsg = !msg.nodeId.isNullOrBlank()
         if (!isCopilotMsg) {
             msg.content += chunk
             notifyItemChanged(idx)
