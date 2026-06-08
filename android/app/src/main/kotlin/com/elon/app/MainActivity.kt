@@ -652,7 +652,8 @@ class MainActivity : AppCompatActivity() {
             userId = userId,
             activeProject = projectStateActions::activeProject,
             saveProjects = projectStateActions::saveProjects,
-            copyText = externalActions::copyText
+            copyText = externalActions::copyText,
+            switchToLockedAgent = { agentName -> modelActions.switchToAgent(agentName) }
         )
     }
 
@@ -690,7 +691,8 @@ class MainActivity : AppCompatActivity() {
             showChat = { animate -> navigationController.showChat(animate = animate) },
             showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
             showProjectPersonalChat = { title, animate -> navigationController.showProjectPersonalChat(title, animate) },
-            saveProjects = projectStateActions::saveProjects
+            saveProjects = projectStateActions::saveProjects,
+            syncConversationAgentLock = conversationIdentityActions::syncConversationAgentLock
         )
     }
 

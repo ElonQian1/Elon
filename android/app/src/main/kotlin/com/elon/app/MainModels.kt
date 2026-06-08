@@ -9,6 +9,7 @@ data class AppConversation(
     var updatedAt: Long,
     var ended: Boolean = false,
     var codexThreadUri: String? = null,
+    var lockedAgentName: String? = null,
     val messages: MutableList<ChatMessage>
 )
 

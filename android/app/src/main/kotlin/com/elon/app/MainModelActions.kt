@@ -172,6 +172,16 @@ internal class MainModelActions(
         modelButtonShellProvider()?.contentDescription = "选择模型：$currentModelLabel"
     }
 
+    /// 软锁定回调：进入有首次 CLI 记录的会话时自动切换回对应的 agent
+    fun switchToAgent(agentName: String) {
+        if (selectedAgentName == agentName) return // 已经是正确的，不需要切换
+        val option = modelOptions.firstOrNull { it.agentName == agentName } ?: return
+        selectedAgentName = agentName
+        currentModelLabel = option.label
+        cacheModelSelection(agentName, option.label)
+        updateModelButton()
+    }
+
     private fun parseModelOptions(agents: JSONArray, includeDefault: Boolean): MutableList<ModelOption> {
         val options = mutableListOf<ModelOption>()
         if (includeDefault) {

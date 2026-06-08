@@ -253,6 +253,17 @@ async fn run_project_ws_job(
         )
         .await;
     }
+
+    // 软锁定：首次任务执行时记录 agent_name，后续切换时 APK 可据此提示用户
+    if let Some(agent) = agent_name.as_deref().filter(|s| !s.is_empty()) {
+        let _ = state.store.set_conversation_locked_agent_if_unset(
+            &project.id,
+            &user_id,
+            &conversation_id,
+            agent,
+        );
+    }
+
     emit_project_job_event(
         &state,
         &task_id,

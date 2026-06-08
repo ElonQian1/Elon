@@ -41,6 +41,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (19, "项目加入申请表（approval 审批流程）", migration_v19),
     (20, "PC 本地项目绑定节点 ID", migration_v20),
     (21, "分布式节点积分账本与节点凭证表", migration_v21),
+    (22, "conversations.locked_agent_name 会话首次 CLI 锁定", migration_v22),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -883,6 +884,18 @@ fn migration_v21(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_node_credentials_owner
           ON node_credentials(owner_user_id, created_at DESC);
         "#,
+    )?;
+    Ok(())
+}
+
+// ── v22：会话首次 CLI 软锁定 ──────────────────────────────────────────────────
+
+fn migration_v22(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "conversations",
+        "locked_agent_name",
+        "locked_agent_name TEXT",
     )?;
     Ok(())
 }

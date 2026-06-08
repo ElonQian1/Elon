@@ -17,13 +17,16 @@ internal class MainConversationOpenActions(
     private val showChat: (Boolean) -> Unit,
     private val showProjectChat: (Boolean) -> Unit,
     private val showProjectPersonalChat: (String, Boolean) -> Unit,
-    private val saveProjects: () -> Unit
+    private val saveProjects: () -> Unit,
+    private val syncConversationAgentLock: ((Int) -> Unit)? = null
 ) {
     fun openConversation(index: Int) {
         val currentConversations = conversations()
         if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
         setActiveConversationIndex(index.coerceIn(0, currentConversations.lastIndex))
         openActiveConversation(showChat)
+        // 软锁定：进入会话后异步同步 locked_agent_name
+        syncConversationAgentLock?.invoke(index.coerceIn(0, currentConversations.lastIndex))
     }
 
     fun openProject(index: Int) {

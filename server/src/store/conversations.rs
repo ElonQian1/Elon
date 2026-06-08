@@ -3,7 +3,7 @@
 //! 负责会话的创建/幂等更新、消息写入、消息历史查询以及管理后台会话总览。
 
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 
 use super::{
     clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
@@ -152,5 +152,42 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    /// 获取会话的软锁定 agent（首次使用的 CLI 选项 ID）。
+    pub fn get_conversation_locked_agent(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT locked_agent_name FROM conversations
+             WHERE project_id = ?1 AND user_id = ?2 AND id = ?3",
+            params![project_id, user_id, conversation_id],
+            |row| row.get::<_, Option<String>>(0),
+        )
+        .optional()
+        .map(|opt| opt.flatten())
+        .map_err(Into::into)
+    }
+
+    /// 设置会话的软锁定 agent（仅在首次时设置，已有值则忽略）。
+    pub fn set_conversation_locked_agent_if_unset(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+        agent_name: &str,
+    ) -> Result<()> {
+        self.conn()?.execute(
+            "UPDATE conversations
+             SET locked_agent_name = ?1
+             WHERE project_id = ?2 AND user_id = ?3 AND id = ?4
+               AND (locked_agent_name IS NULL OR locked_agent_name = '')",
+            params![agent_name, project_id, user_id, conversation_id],
+        )?;
+        Ok(())
     }
 }

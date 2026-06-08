@@ -95,6 +95,12 @@ async fn conversation_identity_response(
         .map(ToOwned::to_owned);
     let codex_thread_uri = codex_thread_id.as_deref().map(codex_thread_uri);
 
+    let locked_agent_name = state
+        .store
+        .get_conversation_locked_agent(&project.id, &user.id, &conversation_id)
+        .ok()
+        .flatten();
+
     Json(json!({
         "status": "ok",
         "project_id": project.id,
@@ -105,6 +111,7 @@ async fn conversation_identity_response(
         "codex_thread_uri": codex_thread_uri,
         "native_thread_id": native_thread_id,
         "task_codex_thread_id": task_thread_id,
+        "locked_agent_name": locked_agent_name,
     }))
     .into_response()
 }
