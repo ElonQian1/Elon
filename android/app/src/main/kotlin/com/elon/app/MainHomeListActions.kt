@@ -15,10 +15,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import okhttp3.OkHttpClient
+import kotlin.concurrent.thread
 
 internal class MainHomeListActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
+    private val http: OkHttpClient,
+    private val serverUrl: () -> String,
     private val projects: () -> List<AppProject>,
     private val conversations: () -> List<AppConversation>,
     private val friends: () -> List<AppFriend>,
@@ -42,6 +46,9 @@ internal class MainHomeListActions(
     private var friendSearchQuery = ""
     private var shouldFocusFriendSearch = false
     private var animateFriendSearchEnter = false
+    private var plazaBannerProjects: List<StoreProject> = emptyList()
+    private var plazaBannerLoading = false
+    private var plazaBannerLoaded = false
 
     fun showFriendLocalSearch() {
         if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
@@ -320,10 +327,12 @@ internal class MainHomeListActions(
     }
 
     fun renderProjectList() {
+        ensurePlazaBannerProjects()
         ProjectManagementHomeView(
             activity = activity,
             container = binding.projectContentLayout,
             projects = projects,
+            plazaProjects = { plazaBannerProjects },
             activeProjectIndex = { activeProject().let { active -> projects().indexOfFirst { it.id == active.id } } },
             formatTime = formatTime,
             openProject = openProject,
@@ -333,6 +342,33 @@ internal class MainHomeListActions(
             dp = dp,
             selectableForeground = selectableForeground
         ).render()
+    }
+
+    private fun ensurePlazaBannerProjects() {
+        if (plazaBannerLoading || plazaBannerLoaded) return
+        plazaBannerLoading = true
+        thread(name = "project-plaza-banner") {
+            val result = runCatching {
+                fetchStoreProjects(
+                    http = http,
+                    serverUrl = serverUrl(),
+                    limit = 18,
+                    sort = "members"
+                ).filter { it.isPublic }
+            }
+            activity.runOnUiThread {
+                plazaBannerLoading = false
+                plazaBannerLoaded = true
+                result.onSuccess { projects ->
+                    plazaBannerProjects = projects
+                        .sortedWith(
+                            compareByDescending<StoreProject> { it.memberCount }
+                                .thenBy { it.name }
+                        )
+                    if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
+                }
+            }
+        }
     }
 
     fun isConversationWorking(index: Int): Boolean {

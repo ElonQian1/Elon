@@ -21,6 +21,58 @@
     return typeof app.getProjects === 'function' ? app.getProjects() : [];
   }
 
+  const plazaBannerState = {
+    loading: false,
+    loaded: false,
+    projects: []
+  };
+
+  const plazaBannerSlots = [
+    { x: -1, y: 28, size: 50, rot: -14 },
+    { x: 20, y: 18, size: 50, rot: -14 },
+    { x: 36, y: -3, size: 50, rot: -14 },
+    { x: 76, y: 6, size: 50, rot: -14 },
+    { x: 95, y: 24, size: 50, rot: -14 },
+    { x: 17, y: 76, size: 50, rot: -14 },
+    { x: 43, y: 58, size: 50, rot: -14 },
+    { x: 74, y: 30, size: 50, rot: -14 },
+    { x: 87, y: 70, size: 50, rot: -14 },
+    { x: 62, y: 107, size: 50, rot: -14 },
+    { x: 2, y: 102, size: 50, rot: -14 },
+    { x: 108, y: 92, size: 50, rot: -14 }
+  ];
+
+  function memberCountOf(project) {
+    return Number(project.member_count || project.memberCount || project.members || 0) || 0;
+  }
+
+  function sortedBannerProjects() {
+    return plazaBannerState.projects
+      .slice()
+      .sort((a, b) => memberCountOf(b) - memberCountOf(a) || String(titleOf(a)).localeCompare(String(titleOf(b))))
+      .slice(0, plazaBannerSlots.length + 1);
+  }
+
+  function ensurePlazaBannerProjects() {
+    if (plazaBannerState.loading || plazaBannerState.loaded) return;
+    plazaBannerState.loading = true;
+    fetch('/api/store/projects?limit=18&sort=members', { cache: 'no-store' })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) throw new Error(data && data.error ? data.error : 'load failed');
+        plazaBannerState.projects = Array.isArray(data.projects) ? data.projects : [];
+        plazaBannerState.loaded = true;
+      })
+      .catch(() => {
+        plazaBannerState.projects = [];
+        plazaBannerState.loaded = true;
+      })
+      .finally(() => {
+        plazaBannerState.loading = false;
+        render();
+      });
+  }
+
   function formatTime(value) {
     const app = bridge();
     if (typeof app.formatTime === 'function') return app.formatTime(value);
@@ -88,19 +140,29 @@
     return formatTime(project.updated_at || project.updatedAt || project.updated_at_ms) || '时间';
   }
 
+  function renderBannerIcon(project, slot, extraClass) {
+    const iconUrl = project ? iconUrlOf(project) : '';
+    const label = project ? escapeHtml(projectInitial(project)) : '';
+    const fontSize = Math.round(slot.size * 0.42);
+    return `
+      <span class="project-plaza-tile ${extraClass || ''}" style="--x:${slot.x}%;--y:${slot.y}%;--size:${slot.size}px;--font:${fontSize}px;--rot:${slot.rot}deg">
+        ${label}
+        ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+      </span>
+    `;
+  }
+
   function renderPlazaTiles() {
-    const tiles = [];
-    for (let row = 0; row < 6; row += 1) {
-      for (let col = 0; col < 10; col += 1) {
-        const left = (col * 12) - 8 + (row % 2 ? 6 : 0);
-        const top = (row * 30) - 16;
-        tiles.push(`<span class="project-plaza-tile" style="left:${left}%;top:${top}%"></span>`);
-      }
-    }
+    const bannerProjects = sortedBannerProjects();
+    const focus = bannerProjects[0] || null;
+    const rest = bannerProjects.slice(1);
+    const tiles = plazaBannerSlots.map((slot, index) => renderBannerIcon(rest[index] || null, slot));
+    tiles.push(renderBannerIcon(focus, { x: 60, y: 43, size: 74, rot: -14 }, 'project-plaza-focus-tile'));
     return tiles.join('');
   }
 
   function renderPlazaBanner() {
+    ensurePlazaBannerProjects();
     return `
       <button class="project-plaza-banner" type="button" data-project-home-action="plaza" aria-label="进入项目广场">
         <span class="project-plaza-pattern" aria-hidden="true">${renderPlazaTiles()}</span>

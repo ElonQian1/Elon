@@ -1,10 +1,12 @@
 package com.elon.app
 
 import android.content.Context
-import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -23,6 +25,7 @@ internal class ProjectManagementHomeView(
     private val activity: AppCompatActivity,
     private val container: LinearLayout,
     private val projects: () -> List<AppProject>,
+    private val plazaProjects: () -> List<StoreProject>,
     private val activeProjectIndex: () -> Int,
     private val formatTime: (Long) -> String,
     private val openProject: (Int) -> Unit,
@@ -54,6 +57,7 @@ internal class ProjectManagementHomeView(
     private fun createPlazaBanner(): View {
         val contentWidth = activity.resources.displayMetrics.widthPixels - dp(16)
         val bannerHeight = (contentWidth * 0.36f).toInt().coerceIn(dp(124), dp(158))
+        val bannerProjects = plazaProjects()
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -68,7 +72,7 @@ internal class ProjectManagementHomeView(
             foreground = selectableForeground()
             setOnClickListener { showProjectPlaza() }
 
-            addView(ProjectPlazaPatternView(activity), FrameLayout.LayoutParams(
+            addView(ProjectPlazaPatternView(activity, bannerProjects), FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ))
@@ -88,14 +92,6 @@ internal class ProjectManagementHomeView(
                 topMargin = dp(10)
             })
 
-            addView(ImageView(activity).apply {
-                setImageResource(R.drawable.ic_search_simple)
-                imageTintList = ColorStateList.valueOf(Color.parseColor("#9FA1A6"))
-                alpha = 0.82f
-            }, FrameLayout.LayoutParams(dp(108), dp(108)).apply {
-                gravity = Gravity.CENTER
-                leftMargin = dp(112)
-            })
         }
     }
 
@@ -326,7 +322,20 @@ private class SquareProjectCardFrame(context: Context) : FrameLayout(context) {
     }
 }
 
-private class ProjectPlazaPatternView(context: Context) : View(context) {
+private class ProjectPlazaPatternView(
+    context: Context,
+    projects: List<StoreProject>
+) : View(context) {
+    private data class BannerSlot(
+        val x: Float,
+        val y: Float,
+        val sizeDp: Int,
+        val rotation: Float
+    )
+
+    private val sortedProjects = projects
+        .sortedWith(compareByDescending<StoreProject> { it.memberCount }.thenBy { it.name })
+        .take(14)
     private val density = resources.displayMetrics.density
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#181B20")
@@ -339,13 +348,41 @@ private class ProjectPlazaPatternView(context: Context) : View(context) {
     private val tilePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#D5D5D5")
     }
+    private val iconTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#253140")
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.DEFAULT_BOLD
+    }
+    private val lensPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#9FA1A6")
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        alpha = 210
+    }
     private val tileRect = RectF()
+    private val bitmapSource = Rect()
+    private val clipPath = Path()
+    private val iconSlots = listOf(
+        BannerSlot(-0.01f, 0.28f, 50, -14f),
+        BannerSlot(0.20f, 0.18f, 50, -14f),
+        BannerSlot(0.36f, -0.03f, 50, -14f),
+        BannerSlot(0.76f, 0.06f, 50, -14f),
+        BannerSlot(0.95f, 0.24f, 50, -14f),
+        BannerSlot(0.17f, 0.76f, 50, -14f),
+        BannerSlot(0.43f, 0.58f, 50, -14f),
+        BannerSlot(0.74f, 0.30f, 50, -14f),
+        BannerSlot(0.87f, 0.70f, 50, -14f),
+        BannerSlot(0.62f, 1.07f, 50, -14f),
+        BannerSlot(0.02f, 1.02f, 50, -14f),
+        BannerSlot(1.08f, 0.92f, 50, -14f)
+    )
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         drawGrid(canvas)
-        drawTiles(canvas)
+        drawProjectIcons(canvas)
+        drawMagnifier(canvas)
     }
 
     private fun drawGrid(canvas: Canvas) {
@@ -362,26 +399,72 @@ private class ProjectPlazaPatternView(context: Context) : View(context) {
         }
     }
 
-    private fun drawTiles(canvas: Canvas) {
-        val tileW = dp(50).toFloat()
-        val tileH = dp(50).toFloat()
-        val gapX = dp(96)
-        val gapY = dp(84)
+    private fun drawProjectIcons(canvas: Canvas) {
+        val focus = sortedProjects.firstOrNull()
+        val rest = sortedProjects.drop(1)
+        iconSlots.forEachIndexed { index, slot ->
+            drawProjectIcon(canvas, rest.getOrNull(index), slot)
+        }
+        drawProjectIcon(
+            canvas = canvas,
+            project = focus,
+            slot = BannerSlot(0.60f, 0.43f, 74, -14f)
+        )
+    }
+
+    private fun drawProjectIcon(canvas: Canvas, project: StoreProject?, slot: BannerSlot) {
+        val size = dp(slot.sizeDp).toFloat()
+        val cx = width * slot.x
+        val cy = height * slot.y
+        val radius = dp(5).toFloat()
+        tileRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
         canvas.save()
-        canvas.rotate(-14f, width / 2f, height / 2f)
-        var row = 0
-        var y = -height
-        while (y < height * 2) {
-            var x = -width + if (row % 2 == 0) 0 else gapX / 2
-            while (x < width * 2) {
-                tileRect.set(x.toFloat(), y.toFloat(), x + tileW, y + tileH)
-                canvas.drawRoundRect(tileRect, dp(5).toFloat(), dp(5).toFloat(), tilePaint)
-                x += gapX
-            }
-            row += 1
-            y += gapY
+        canvas.rotate(slot.rotation, cx, cy)
+        canvas.drawRoundRect(tileRect, radius, radius, tilePaint)
+
+        val icon = UserProfileStore.decodeAvatar(project?.iconDataUrl)
+        if (icon != null) {
+            drawBitmapIcon(canvas, icon, tileRect, radius)
+        } else if (project != null) {
+            drawInitialIcon(canvas, project, tileRect, size)
         }
         canvas.restore()
+    }
+
+    private fun drawBitmapIcon(canvas: Canvas, bitmap: Bitmap, rect: RectF, radius: Float) {
+        val sourceSize = minOf(bitmap.width, bitmap.height)
+        val left = (bitmap.width - sourceSize) / 2
+        val top = (bitmap.height - sourceSize) / 2
+        bitmapSource.set(left, top, left + sourceSize, top + sourceSize)
+        clipPath.reset()
+        clipPath.addRoundRect(rect, radius, radius, Path.Direction.CW)
+        canvas.save()
+        canvas.clipPath(clipPath)
+        canvas.drawBitmap(bitmap, bitmapSource, rect, null)
+        canvas.restore()
+    }
+
+    private fun drawInitialIcon(canvas: Canvas, project: StoreProject, rect: RectF, size: Float) {
+        iconTextPaint.textSize = size * 0.42f
+        val title = project.description?.takeIf { it.isNotBlank() } ?: project.name
+        val text = avatarText(title.ifBlank { "项目" })
+        val metrics = iconTextPaint.fontMetrics
+        val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(text, rect.centerX(), baseline, iconTextPaint)
+    }
+
+    private fun drawMagnifier(canvas: Canvas) {
+        val cx = width * 0.60f
+        val cy = height * 0.43f
+        lensPaint.strokeWidth = dp(8).toFloat()
+        canvas.drawCircle(cx, cy, dp(39).toFloat(), lensPaint)
+        canvas.drawLine(
+            cx + dp(29),
+            cy + dp(29),
+            cx + dp(64),
+            cy + dp(64),
+            lensPaint
+        )
     }
 
     private fun dp(value: Int): Int = (value * density + 0.5f).toInt()

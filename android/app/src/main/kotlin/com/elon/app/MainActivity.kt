@@ -753,6 +753,8 @@ class MainActivity : AppCompatActivity() {
         MainHomeListActions(
             activity = this,
             binding = binding,
+            http = s.http,
+            serverUrl = { serverUrl },
             projects = { s.projects },
             conversations = { projectStateActions.conversations },
             friends = { s.friends },
