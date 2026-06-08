@@ -82,16 +82,19 @@ internal class ProjectManagementHomeView(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "项目广场"
+                setPadding(dp(4), dp(3), dp(4), dp(3))
+                background = rect("#660F1217")
                 setTextColor(Color.parseColor("#F2F5FA"))
                 alpha = 0.92f
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setShadowLayer(dp(2).toFloat(), 0f, dp(1).toFloat(), Color.parseColor("#AA000000"))
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.START or Gravity.TOP
-                leftMargin = 0
-                topMargin = dp(10)
+                leftMargin = dp(3)
+                topMargin = dp(8)
             })
 
         }
@@ -118,6 +121,7 @@ internal class ProjectManagementHomeView(
         return LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(6), 0, 0, 0)
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
