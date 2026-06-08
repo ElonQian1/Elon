@@ -14,7 +14,6 @@ use super::{
     ai_cli_output::{extract_thread_id, parse_intent_gate_result},
     ai_cli_process::{
         cap_option_timeout, configured_timeout_cap, is_cli_timeout_error, run_cli_command_traced,
-        supports_codex_sessions,
     },
     ai_cli_prompts::build_intent_gate_prompt,
     ai_cli_trace::{record_cli_retry, record_intent_gate_fallback, CliTraceContext},
@@ -34,9 +33,9 @@ pub async fn confirm_project_intent(
 ) -> Result<IntentGateResult> {
     let mut option = state
         .ai_cli
-        .find_option(option_id)
+        .find_codex_option(option_id)
         .cloned()
-        .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
+        .ok_or_else(|| anyhow!("未找到可用于意图确认的 Codex CLI 选项"))?;
     cap_option_timeout(
         &mut option,
         configured_timeout_cap(
@@ -44,10 +43,6 @@ pub async fn confirm_project_intent(
             DEFAULT_INTENT_GATE_TIMEOUT_CAP_SECS,
         ),
     );
-    if !supports_codex_sessions(&option) {
-        return Err(anyhow!("当前阶段意图确认必须使用 Codex CLI"));
-    }
-
     std::fs::create_dir_all(workspace)?;
     let workspace_key = workspace.display().to_string();
     let native_session_id = native_session_scope.as_ref().and_then(|scope| {

@@ -141,6 +141,27 @@ impl AiCliConfig {
             .or_else(|| self.options.first())
     }
 
+    pub fn find_codex_option(&self, preferred_id: Option<&str>) -> Option<&AiCliOption> {
+        if let Some(id) = preferred_id.filter(|value| !value.trim().is_empty()) {
+            if let Some(option) = self
+                .options
+                .iter()
+                .find(|opt| opt.id.eq_ignore_ascii_case(id) && is_codex_cli_option(opt))
+            {
+                return Some(option);
+            }
+        }
+
+        self.default_option
+            .as_deref()
+            .and_then(|id| {
+                self.options
+                    .iter()
+                    .find(|opt| opt.id.eq_ignore_ascii_case(id) && is_codex_cli_option(opt))
+            })
+            .or_else(|| self.options.iter().find(|opt| is_codex_cli_option(opt)))
+    }
+
     pub fn has_option(&self, id: &str) -> bool {
         self.options
             .iter()
@@ -557,4 +578,94 @@ fn split_cli_args(raw: &str) -> Vec<String> {
         args.push(current);
     }
     args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cli_option(id: &str, provider: &str, bin: &str) -> AiCliOption {
+        AiCliOption {
+            id: id.to_string(),
+            label: id.to_string(),
+            provider: provider.to_string(),
+            model: None,
+            reasoning_effort: None,
+            reasoning_summary: None,
+            verbosity: None,
+            bin: bin.to_string(),
+            args: Vec::new(),
+            prompt_mode: CliPromptMode::Arg,
+            timeout_secs: 60,
+        }
+    }
+
+    fn cli_config(options: Vec<AiCliOption>, default_option: Option<&str>) -> AiCliConfig {
+        AiCliConfig {
+            enabled: true,
+            options,
+            default_option: default_option.map(ToString::to_string),
+            fallback_to_api: false,
+            codex_cli_only: false,
+            fallback_cli_option: None,
+        }
+    }
+
+    #[test]
+    fn find_codex_option_keeps_explicit_codex_choice() {
+        let config = cli_config(
+            vec![
+                cli_option("copilot:gpt-4o", "copilot", "copilot"),
+                cli_option("codex:gpt-5.4:high", "codex", "codex"),
+                cli_option("codex:gpt-5.5:xhigh", "codex", "codex"),
+            ],
+            Some("copilot:gpt-4o"),
+        );
+
+        let option = config
+            .find_codex_option(Some("codex:gpt-5.5:xhigh"))
+            .unwrap();
+
+        assert_eq!(option.id, "codex:gpt-5.5:xhigh");
+    }
+
+    #[test]
+    fn find_codex_option_falls_back_from_non_codex_choice() {
+        let config = cli_config(
+            vec![
+                cli_option("copilot:gpt-4o", "copilot", "copilot"),
+                cli_option("codex:gpt-5.4:high", "codex", "codex"),
+            ],
+            Some("copilot:gpt-4o"),
+        );
+
+        let option = config.find_codex_option(Some("copilot:gpt-4o")).unwrap();
+
+        assert_eq!(option.id, "codex:gpt-5.4:high");
+    }
+
+    #[test]
+    fn find_codex_option_prefers_default_codex_when_no_explicit_choice() {
+        let config = cli_config(
+            vec![
+                cli_option("codex:gpt-5.4:medium", "codex", "codex"),
+                cli_option("codex:gpt-5.5:xhigh", "codex", "codex"),
+            ],
+            Some("codex:gpt-5.5:xhigh"),
+        );
+
+        let option = config.find_codex_option(None).unwrap();
+
+        assert_eq!(option.id, "codex:gpt-5.5:xhigh");
+    }
+
+    #[test]
+    fn find_codex_option_returns_none_without_codex() {
+        let config = cli_config(
+            vec![cli_option("copilot:gpt-4o", "copilot", "copilot")],
+            Some("copilot:gpt-4o"),
+        );
+
+        assert!(config.find_codex_option(Some("copilot:gpt-4o")).is_none());
+    }
 }

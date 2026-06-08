@@ -3,9 +3,7 @@ use std::{path::Path, sync::Arc, time::Instant};
 
 use super::{
     ai_cli_output::extract_thread_id,
-    ai_cli_process::{
-        cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
-    },
+    ai_cli_process::{cap_option_timeout, configured_timeout_cap, run_cli_command_traced},
     ai_cli_prompts::build_prewarm_cli_prompt,
     ai_cli_trace::{record_prewarm_session_hit, CliTraceContext},
     NativeSessionScope,
@@ -31,14 +29,9 @@ pub async fn prewarm_codex_session(
     let started = Instant::now();
     let option = state
         .ai_cli
-        .find_option(option_id)
+        .find_codex_option(option_id)
         .cloned()
-        .ok_or_else(|| anyhow!("no local AI CLI option is available"))?;
-    if !supports_codex_sessions(&option) {
-        return Err(anyhow!(
-            "Codex CLI session prewarm requires a Codex CLI option"
-        ));
-    }
+        .ok_or_else(|| anyhow!("no Codex CLI option is available for session prewarm"))?;
 
     std::fs::create_dir_all(workspace)?;
     let workspace_key = workspace.display().to_string();
