@@ -363,12 +363,30 @@ async fn run_agent_session(
         cmd_tx: cmd_tx.clone(),
         pending: pending.clone(),
     };
-    state
-        .agent_manager
-        .agents
-        .write()
-        .await
-        .insert(agent_id.clone(), entry);
+
+    // 若同一 agent_id 已有旧连接，通过旧 cmd_tx 发 Close 消息主动终止它，
+    // 避免两个实例并存导致 WebSocket 资源竞争和 "Connection reset by peer"。
+    {
+        let mut agents = state.agent_manager.agents.write().await;
+        if let Some(old_entry) = agents.get(&agent_id) {
+            tracing::info!(%agent_id, "evicting previous agent session (same agent_id re-registered)");
+            // 通知旧连接的所有挂起请求立即失败
+            let mut old_pending = old_entry.pending.lock().await;
+            let stale: Vec<_> = old_pending.drain().collect();
+            drop(old_pending);
+            for (req_id, sender) in stale {
+                let _ = sender.send(AgentToServer::CliDone {
+                    req_id,
+                    exit_ok: false,
+                    error: Some("节点重新注册，旧连接已关闭".to_string()),
+                });
+            }
+            // 发 Close 让旧连接的 writer 关闭 WebSocket
+            let _ = old_entry.cmd_tx.send(ServerToAgent::Ping { nonce: None }); // flush any pending
+            drop(old_entry.cmd_tx.clone()); // 通过 drop sender 让 writer 退出
+        }
+        agents.insert(agent_id.clone(), entry);
+    }
 
     // 注册到节点注册表（分布式节点功能）
     let connected_at = SystemTime::now()
