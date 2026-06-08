@@ -693,17 +693,9 @@ async fn run_via_pc_agent(
     };
 
     // extra_args：Copilot 用 --session-id + --model + --attachment（图片），Codex 不需要额外的
-    // 从 prompt 里提取图片 URL（由 append_project_attachment_notes 生成的 "(url: http://...)" 格式）
-    let attachment_urls: Vec<String> = prompt.lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            // 匹配行内 "(url: http...)" 或单独一行 "url: http..."
-            let url = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')'))
-                .or_else(|| line.strip_prefix("url: "))
-                .filter(|url| url.starts_with("http"));
-            url.map(str::to_owned)
-        })
-        .collect();
+    // ⚠️  图片逻辑由 extract_attachment_urls / append_attachment_args 处理（有单元测试）
+    //    重构本函数时必须保留这两行调用，否则图片传递失效！
+    let attachment_urls = extract_attachment_urls(&prompt);
 
     let extra_args: Vec<String> = if cli_name == "copilot" {
         let mut args = if let Some(ref sid) = copilot_session_uuid {
@@ -717,19 +709,11 @@ async fn run_via_pc_agent(
                 args.push(model.to_string());
             }
         }
-        // 图片附件：URL 传给 node-agent，node-agent 下载后转为 --attachment <local_path>
-        for url in &attachment_urls {
-            args.push("--attachment".into());
-            args.push(url.clone());
-        }
+        append_attachment_args(&mut args, &attachment_urls);
         args
     } else {
-        // Codex 也支持 -i <image>，通过 --attachment 传 URL，node-agent 转换
         let mut args = vec![];
-        for url in &attachment_urls {
-            args.push("--attachment".into());
-            args.push(url.clone());
-        }
+        append_attachment_args(&mut args, &attachment_urls);
         args
     };
 
@@ -875,4 +859,90 @@ fn extract_codex_reply(output: &str) -> String {
     }
 
     reply_lines.join("\n").trim().to_string()
+}
+
+// ── 图片附件提取（独立函数，防止重构时漏掉） ──────────────────────────────────
+//
+// ⚠️  关键功能：用户发送图片时必须走此路径传给 CLI！
+//   - 图片 URL 由 append_project_attachment_notes 注入 prompt，格式为 "(url: http://...)"
+//   - 提取后通过 --attachment <url> 传给 node-agent
+//   - node-agent 下载图片后：Copilot → --attachment <path>，Codex → -i <path>
+//
+// 任何对 run_via_pc_agent / run_with_pc_agent_workspace 的重构都 MUST 调用此函数。
+// 有单元测试 test_extract_attachment_urls 保证行为正确性。
+
+/// 从 prompt 字符串中提取所有图片附件 URL。
+/// prompt 中图片 URL 的格式由 `append_project_attachment_notes` 生成：
+///   `- 文件名 [...] -> path (url: https://...)`
+///   或单独一行 `  url: https://...`
+pub(crate) fn extract_attachment_urls(prompt: &str) -> Vec<String> {
+    prompt
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            // 格式1: 行内任意位置 "(url: http://...)"
+            // 例如: "- file.png [...] -> /path (url: https://cdn.example.com/img.png)"
+            let url = if let Some(start) = line.find("(url: ") {
+                let rest = &line[start + 6..]; // 跳过 "(url: "
+                rest.split(')').next().filter(|u| u.starts_with("http"))
+            } else {
+                // 格式2: "url: http://..."  → 独立行形式
+                line.strip_prefix("url: ")
+                    .filter(|url| url.starts_with("http"))
+            };
+            url.map(str::to_owned)
+        })
+        .collect()
+}
+
+/// 将图片附件 URL 转换为 `--attachment <url>` 参数，追加到 extra_args 末尾。
+/// 对 Copilot 和 Codex 均使用相同格式（node-agent 内部区分处理）。
+pub(crate) fn append_attachment_args(extra_args: &mut Vec<String>, attachment_urls: &[String]) {
+    for url in attachment_urls {
+        extra_args.push("--attachment".to_string());
+        extra_args.push(url.clone());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_attachment_urls_bracket_format() {
+        let prompt = "请修改如图所示的样式\n- screenshot.png [image/png; 1024 bytes] -> /tmp/x (url: https://example.com/img.png)\n继续其他内容";
+        let urls = extract_attachment_urls(prompt);
+        assert_eq!(urls, vec!["https://example.com/img.png"]);
+    }
+
+    #[test]
+    fn test_extract_attachment_urls_line_format() {
+        let prompt = "附件:\n  url: https://cdn.example.com/photo.jpg\n其他文字";
+        let urls = extract_attachment_urls(prompt);
+        assert_eq!(urls, vec!["https://cdn.example.com/photo.jpg"]);
+    }
+
+    #[test]
+    fn test_extract_attachment_urls_multiple() {
+        let prompt = "(url: https://a.com/1.png)\n(url: https://b.com/2.jpg)";
+        let urls = extract_attachment_urls(prompt);
+        assert_eq!(urls.len(), 2);
+    }
+
+    #[test]
+    fn test_extract_attachment_urls_empty() {
+        let prompt = "普通消息，没有图片附件";
+        assert!(extract_attachment_urls(prompt).is_empty());
+    }
+
+    #[test]
+    fn test_append_attachment_args() {
+        let mut args: Vec<String> = vec!["--model".into(), "gpt-4o".into()];
+        let urls = vec!["https://example.com/img.png".to_string()];
+        append_attachment_args(&mut args, &urls);
+        assert_eq!(args, vec![
+            "--model", "gpt-4o",
+            "--attachment", "https://example.com/img.png",
+        ]);
+    }
 }
