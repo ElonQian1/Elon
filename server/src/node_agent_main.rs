@@ -649,21 +649,41 @@ async fn run_cli_prompt(
 
     // 构建命令
     // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
-    // Codex:   codex exec --dangerously-bypass-approvals-and-sandbox [extra_args] "<prompt>"
+    // Codex 首次: codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"
+    // Codex 续接: codex exec resume <session-uuid> "<prompt>"
     let mut cmd = tokio::process::Command::new(actual_bin);
     for a in &actual_args_prefix {
         cmd.arg(a);
     }
     if cli_name == "codex" {
-        // Codex 用 exec 子命令，prompt 是位置参数
         cmd.arg("exec");
-        cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+        // extra_args 中如果有 session-id，用 resume 子命令续接会话
+        let codex_session_id = extra_args.iter()
+            .find(|a| a.starts_with("--session-id="))
+            .and_then(|a| a.strip_prefix("--session-id="))
+            .map(str::to_owned);
+        if let Some(ref sid) = codex_session_id {
+            cmd.arg("resume");
+            cmd.arg(sid);
+        } else {
+            cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+            // 首次执行时也传 --dangerously... 以便写文件、跑命令
+        }
+        // 其余 extra_args（如 --model 等），跳过 --session-id（已处理）
+        for a in &extra_args {
+            if !a.starts_with("--session-id=") {
+                cmd.arg(a);
+            }
+        }
     } else if cli_name == "copilot" {
-        // Copilot 用 --allow-all 非交互确认
         cmd.arg("--allow-all");
-    }
-    for a in &extra_args {
-        cmd.arg(a);
+        for a in &extra_args {
+            cmd.arg(a);
+        }
+    } else {
+        for a in &extra_args {
+            cmd.arg(a);
+        }
     }
     // prompt 传递方式
     if cli_name == "codex" {

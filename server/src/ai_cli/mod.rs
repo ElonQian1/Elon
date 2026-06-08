@@ -673,28 +673,24 @@ async fn run_via_pc_agent(
         }
     };
 
-    // Copilot CLI 专用：--session-id 保证用户隔离+上下文复用
-    let copilot_session_uuid = if cli_name != "copilot" {
-        None
-    } else {
-        native_session_scope.as_ref().map(|scope| {
-            use sha2::Digest;
-            let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
-            let hash = sha2::Sha256::digest(seed.as_bytes());
-            format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-                hash[0], hash[1], hash[2], hash[3],
-                hash[4], hash[5],
-                hash[6] & 0x0f, hash[7],
-                (hash[8] & 0x3f) | 0x80, hash[9],
-                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
-            )
-        })
-    };
+    // 为 Copilot 和 Codex 分别派生确定性 session UUID（保证用户隔离+上下文复用）
+    let session_uuid = native_session_scope.as_ref().map(|scope| {
+        use sha2::Digest;
+        let seed = format!("{}-session/{}/{}/{}", cli_name, scope.project_id, scope.user_id, scope.conversation_id);
+        let hash = sha2::Sha256::digest(seed.as_bytes());
+        format!(
+            "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+            hash[0], hash[1], hash[2], hash[3],
+            hash[4], hash[5],
+            hash[6] & 0x0f, hash[7],
+            (hash[8] & 0x3f) | 0x80, hash[9],
+            hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
+        )
+    });
 
-    // extra_args：Copilot 用 --session-id + --model，Codex 不需要额外的（exec 子命令已传）
+    // extra_args：session-id 对 Copilot 和 Codex 都有效（node-agent 里分别处理）
     let extra_args: Vec<String> = if cli_name == "copilot" {
-        let mut args = if let Some(ref sid) = copilot_session_uuid {
+        let mut args = if let Some(ref sid) = session_uuid {
             vec![format!("--session-id={}", sid)]
         } else {
             vec![]
@@ -706,6 +702,13 @@ async fn run_via_pc_agent(
             }
         }
         args
+    } else if cli_name == "codex" {
+        // Codex: 通过 --session-id 让 node-agent 决定用 exec 还是 exec resume
+        if let Some(ref sid) = session_uuid {
+            vec![format!("--session-id={}", sid)]
+        } else {
+            vec![]
+        }
     } else {
         vec![]
     };
