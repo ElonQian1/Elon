@@ -362,19 +362,20 @@ private class ProjectPlazaPatternView(
     private val tileRect = RectF()
     private val bitmapSource = Rect()
     private val clipPath = Path()
+    private val focusSlot = BannerSlot(0.58f, 0.40f, 56, -14f)
     private val iconSlots = listOf(
-        BannerSlot(-0.01f, 0.28f, 50, -14f),
-        BannerSlot(0.20f, 0.18f, 50, -14f),
-        BannerSlot(0.36f, -0.03f, 50, -14f),
-        BannerSlot(0.76f, 0.06f, 50, -14f),
-        BannerSlot(0.95f, 0.24f, 50, -14f),
-        BannerSlot(0.17f, 0.76f, 50, -14f),
-        BannerSlot(0.43f, 0.58f, 50, -14f),
-        BannerSlot(0.74f, 0.30f, 50, -14f),
-        BannerSlot(0.87f, 0.70f, 50, -14f),
-        BannerSlot(0.62f, 1.07f, 50, -14f),
-        BannerSlot(0.02f, 1.02f, 50, -14f),
-        BannerSlot(1.08f, 0.92f, 50, -14f)
+        BannerSlot(-0.03f, 0.38f, 50, -14f),
+        BannerSlot(0.20f, 0.24f, 50, -14f),
+        BannerSlot(0.38f, -0.03f, 50, -14f),
+        BannerSlot(0.64f, -0.06f, 50, -14f),
+        BannerSlot(0.79f, 0.19f, 50, -14f),
+        BannerSlot(0.98f, 0.28f, 50, -14f),
+        BannerSlot(0.08f, 0.86f, 50, -14f),
+        BannerSlot(0.22f, 0.62f, 50, -14f),
+        BannerSlot(0.43f, 0.50f, 50, -14f),
+        BannerSlot(0.68f, 0.78f, 50, -14f),
+        BannerSlot(0.84f, 0.50f, 50, -14f),
+        BannerSlot(1.05f, 0.84f, 50, -14f)
     )
 
     override fun onDraw(canvas: Canvas) {
@@ -408,7 +409,7 @@ private class ProjectPlazaPatternView(
         drawProjectIcon(
             canvas = canvas,
             project = focus,
-            slot = BannerSlot(0.60f, 0.43f, 74, -14f)
+            slot = focusSlot
         )
     }
 
@@ -445,9 +446,8 @@ private class ProjectPlazaPatternView(
     }
 
     private fun drawInitialIcon(canvas: Canvas, project: StoreProject, rect: RectF, size: Float) {
-        iconTextPaint.textSize = size * 0.42f
-        val title = project.description?.takeIf { it.isNotBlank() } ?: project.name
-        val text = avatarText(title.ifBlank { "项目" })
+        iconTextPaint.textSize = size * 0.36f
+        val text = avatarText(project.name.ifBlank { "项目" })
         val metrics = iconTextPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(text, rect.centerX(), baseline, iconTextPaint)

@@ -28,19 +28,20 @@
   };
 
   const plazaBannerSlots = [
-    { x: -1, y: 28, size: 50, rot: -14 },
-    { x: 20, y: 18, size: 50, rot: -14 },
-    { x: 36, y: -3, size: 50, rot: -14 },
-    { x: 76, y: 6, size: 50, rot: -14 },
-    { x: 95, y: 24, size: 50, rot: -14 },
-    { x: 17, y: 76, size: 50, rot: -14 },
-    { x: 43, y: 58, size: 50, rot: -14 },
-    { x: 74, y: 30, size: 50, rot: -14 },
-    { x: 87, y: 70, size: 50, rot: -14 },
-    { x: 62, y: 107, size: 50, rot: -14 },
-    { x: 2, y: 102, size: 50, rot: -14 },
-    { x: 108, y: 92, size: 50, rot: -14 }
+    { x: -3, y: 38, size: 50, rot: -14 },
+    { x: 20, y: 24, size: 50, rot: -14 },
+    { x: 38, y: -3, size: 50, rot: -14 },
+    { x: 64, y: -6, size: 50, rot: -14 },
+    { x: 79, y: 19, size: 50, rot: -14 },
+    { x: 98, y: 28, size: 50, rot: -14 },
+    { x: 8, y: 86, size: 50, rot: -14 },
+    { x: 22, y: 62, size: 50, rot: -14 },
+    { x: 43, y: 50, size: 50, rot: -14 },
+    { x: 68, y: 78, size: 50, rot: -14 },
+    { x: 84, y: 50, size: 50, rot: -14 },
+    { x: 105, y: 84, size: 50, rot: -14 }
   ];
+  const plazaBannerFocusSlot = { x: 58, y: 40, size: 56, rot: -14 };
 
   function memberCountOf(project) {
     return Number(project.member_count || project.memberCount || project.members || 0) || 0;
@@ -143,7 +144,7 @@
   function renderBannerIcon(project, slot, extraClass) {
     const iconUrl = project ? iconUrlOf(project) : '';
     const label = project ? escapeHtml(projectInitial(project)) : '';
-    const fontSize = Math.round(slot.size * 0.42);
+    const fontSize = Math.round(slot.size * 0.36);
     return `
       <span class="project-plaza-tile ${extraClass || ''}" style="--x:${slot.x}%;--y:${slot.y}%;--size:${slot.size}px;--font:${fontSize}px;--rot:${slot.rot}deg">
         ${label}
@@ -157,7 +158,7 @@
     const focus = bannerProjects[0] || null;
     const rest = bannerProjects.slice(1);
     const tiles = plazaBannerSlots.map((slot, index) => renderBannerIcon(rest[index] || null, slot));
-    tiles.push(renderBannerIcon(focus, { x: 60, y: 43, size: 74, rot: -14 }, 'project-plaza-focus-tile'));
+    tiles.push(renderBannerIcon(focus, plazaBannerFocusSlot, 'project-plaza-focus-tile'));
     return tiles.join('');
   }
 
