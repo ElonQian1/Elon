@@ -63,7 +63,7 @@ internal fun fetchStoreProjects(
     val qs = buildString {
         append("limit=$limit&offset=$offset")
         fun appendParam(key: String, value: String?) {
-            if (!value.isNullOrBlank()) append("&$key=${java.net.URLEncoder.encode(value, "UTF-8")}")
+            if (!value.isNullOrBlank()) append("&$key=${storeUrlPart(value)}")
         }
         appendParam("q", search)
         appendParam("join_mode", joinMode)

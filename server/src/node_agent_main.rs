@@ -511,6 +511,35 @@ fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
 }
 
+fn truncate_cli_text(text: &str, max_chars: usize) -> String {
+    let trimmed = text.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
+    }
+    let tail: String = trimmed
+        .chars()
+        .rev()
+        .take(max_chars)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("...{}", tail)
+}
+
+fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> String {
+    let mut parts = vec![format!("{cli_name} 进程退出失败")];
+    let stderr = truncate_cli_text(stderr_text, 2000);
+    if !stderr.is_empty() {
+        parts.push(format!("stderr:\n{stderr}"));
+    }
+    let stdout = truncate_cli_text(stdout_text, 1200);
+    if !stdout.is_empty() {
+        parts.push(format!("stdout:\n{stdout}"));
+    }
+    parts.join("\n\n")
+}
+
 // ── CLI 执行（CliPrompt / Exec）────────────────────────────────────────────────
 
 /// 检测本机有哪些 CLI 可用。
@@ -796,6 +825,10 @@ async fn run_cli_prompt(
     let stderr = child.stderr.take().expect("stderr");
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
     let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+    let mut stdout_text = String::new();
+    let mut stderr_text = String::new();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
 
     // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
     // 并持久化到本地，以便下次用 exec resume <real_id> 续接
@@ -809,10 +842,12 @@ async fn run_cli_prompt(
     };
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
 
-    loop {
+    while !stdout_done || !stderr_done {
         tokio::select! {
-            line = stdout_lines.next_line() => match line {
+            line = stdout_lines.next_line(), if !stdout_done => match line {
                 Ok(Some(l)) => {
+                    stdout_text.push_str(&l);
+                    stdout_text.push('\n');
                     // 提取 Codex 真实 session id 并持久化
                     if cli_name == "codex" {
                         if let Some(real_id) = l.strip_prefix("session id: ").map(str::trim) {
@@ -836,11 +871,19 @@ async fn run_cli_prompt(
                     }
                     let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
                 }
-                Ok(None) => break,
-                Err(e) => { warn!("stdout 读取错误: {e}"); break; }
+                Ok(None) => { stdout_done = true; }
+                Err(e) => {
+                    let message = format!("stdout 读取错误: {e}");
+                    warn!("{message}");
+                    stdout_text.push_str(&message);
+                    stdout_text.push('\n');
+                    stdout_done = true;
+                }
             },
-            line = stderr_lines.next_line() => match line {
+            line = stderr_lines.next_line(), if !stderr_done => match line {
                 Ok(Some(l)) => {
+                    stderr_text.push_str(&l);
+                    stderr_text.push('\n');
                     if cli_name == "codex" {
                         // Codex stderr 有"Reading additional input from stdin..."等噪音，不发给用户
                         // 但记录到日志方便诊断
@@ -851,8 +894,14 @@ async fn run_cli_prompt(
                         let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
                     }
                 }
-                Ok(None) => {}
-                Err(_) => {}
+                Ok(None) => { stderr_done = true; }
+                Err(e) => {
+                    let message = format!("stderr 读取错误: {e}");
+                    warn!("{message}");
+                    stderr_text.push_str(&message);
+                    stderr_text.push('\n');
+                    stderr_done = true;
+                }
             },
             // 超时保护：Codex 5分钟、Copilot 3分钟内必须有 stdout EOF，否则强杀
             _ = tokio::time::sleep(std::time::Duration::from_secs(
@@ -872,7 +921,23 @@ async fn run_cli_prompt(
     }
 
     let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
-    let _ = out_tx.send(ws_text(&AgentToServer::CliDone { req_id, exit_ok, error: None }));
+    if exit_ok && cli_name == "codex" && !stdout_text.lines().any(|line| line.trim() == "codex") {
+        let diagnostic = if stdout_text.trim().is_empty() {
+            "Codex CLI 执行完成，但没有返回可解析输出。请查看 PC 节点日志确认是否已完成文件修改。"
+        } else {
+            "Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查看 PC 节点日志确认是否已完成文件修改。"
+        };
+        let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
+            req_id: req_id.clone(),
+            text: format!("codex\n{diagnostic}\n"),
+        }));
+    }
+    let error = if exit_ok {
+        None
+    } else {
+        Some(cli_done_error(cli_name, &stdout_text, &stderr_text))
+    };
+    let _ = out_tx.send(ws_text(&AgentToServer::CliDone { req_id, exit_ok, error }));
 }
 
 /// 执行 Exec：运行任意命令，流式返回 TaskStdout/TaskStderr/TaskExit。

@@ -135,8 +135,11 @@ internal fun startProjectChannelAiTask(
     projectId: String,
     channelId: String,
     content: String,
+    agent: String? = null,
     route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
+    val payload = JSONObject().put("content", content)
+    agent?.takeIf { it.isNotBlank() }?.let { payload.put("agent", it) }
     return postProjectChannelPayload(
         http = http,
         serverUrl = serverUrl,
@@ -144,7 +147,7 @@ internal fun startProjectChannelAiTask(
         projectId = projectId,
         channelId = channelId,
         suffix = "ai-tasks",
-        payload = JSONObject().put("content", content),
+        payload = payload,
         route = route
     )
 }
@@ -157,8 +160,13 @@ internal fun summarizeProjectChannelMessages(
     channelId: String,
     postContent: String,
     summaryPrompt: String,
+    agent: String? = null,
     route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
+    val payload = JSONObject()
+        .put("post_content", postContent)
+        .put("summary_prompt", summaryPrompt)
+    agent?.takeIf { it.isNotBlank() }?.let { payload.put("agent", it) }
     return postProjectChannelPayload(
         http = http,
         serverUrl = serverUrl,
@@ -166,9 +174,7 @@ internal fun summarizeProjectChannelMessages(
         projectId = projectId,
         channelId = channelId,
         suffix = "summaries",
-        payload = JSONObject()
-            .put("post_content", postContent)
-            .put("summary_prompt", summaryPrompt),
+        payload = payload,
         route = route
     )
 }

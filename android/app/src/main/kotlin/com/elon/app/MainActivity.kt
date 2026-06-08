@@ -573,6 +573,7 @@ class MainActivity : AppCompatActivity() {
             },
             showPersonalConversationActions = { index -> conversationActions.showConversationActions(index) },
             showCreatePersonalConversation = { conversationActions.showCreateConversationDialog() },
+            selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )

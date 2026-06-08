@@ -32,6 +32,7 @@ internal class ProjectSpaceController(
     private val openPersonalAiChat: (Int) -> Unit,
     private val showPersonalConversationActions: (Int) -> Unit,
     private val showCreatePersonalConversation: () -> Unit,
+    private val selectedAgentForRequest: () -> String?,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
@@ -176,7 +177,16 @@ internal class ProjectSpaceController(
         thread {
             val result = runCatching {
                 if (channel.kind == AI_CHANNEL_KIND) {
-                    startProjectChannelAiTask(http, serverUrl, activity, channel.projectId, channel.id, text, route)
+                    startProjectChannelAiTask(
+                        http = http,
+                        serverUrl = serverUrl,
+                        context = activity,
+                        projectId = channel.projectId,
+                        channelId = channel.id,
+                        content = text,
+                        agent = selectedAgentForRequest(),
+                        route = route
+                    )
                 } else {
                     sendProjectChannelMessage(http, serverUrl, activity, channel.projectId, channel.id, text, route)
                 }
@@ -220,6 +230,7 @@ internal class ProjectSpaceController(
                     channelId = channel.id,
                     postContent = summary.channelPost,
                     summaryPrompt = summary.channelPrompt,
+                    agent = selectedAgentForRequest(),
                     route = route
                 )
             }
