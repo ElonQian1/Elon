@@ -3,39 +3,57 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
-    response::IntoResponse,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use futures::{SinkExt, StreamExt};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tracing::{info, warn};
 
 use crate::{
-    friend_events,
+    billing, friend_events,
+    project_auth::{auth_from_headers_or_query, json_error},
     social_ai::realtime_social_ai_prompt,
     store::{SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID},
     types::AppState,
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
-    voice_config::{RealtimeChatConfig, MAX_BUFFERED_BYTES},
+    voice_config::{RealtimeChatConfig, MAX_BUFFERED_BYTES, REALTIME_SAMPLE_RATE_HZ},
     voice_openai_realtime_chat::{RealtimeChatEvent, RealtimeChatSession},
     voice_protocol::{
-        ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL, VOICE_TARGET_SOCIAL_AI_DIRECT,
+        resolve_authenticated_voice_user, ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL,
+        VOICE_TARGET_SOCIAL_AI_DIRECT,
     },
 };
 
 pub async fn ws_realtime_chat_handler(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| async move {
-        if let Err(err) = handle(state, socket).await {
+) -> Response {
+    let caller = match auth_from_headers_or_query(&state, &headers, &query) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
+    let authenticated_user_id = caller.id;
+    ws.on_upgrade(move |socket| async move {
+        if let Err(err) = handle(state, socket, authenticated_user_id).await {
             warn!(target: "voice", "realtime chat 连接异常退出: {err:#}");
         }
     })
+    .into_response()
 }
 
-async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
+async fn handle(
+    state: Arc<AppState>,
+    socket: WebSocket,
+    authenticated_user_id: String,
+) -> anyhow::Result<()> {
     let (mut sender, mut receiver) = socket.split();
     let hello = match receiver.next().await {
         Some(Ok(Message::Text(t))) => serde_json::from_str::<ClientControl>(&t).ok(),
@@ -59,6 +77,21 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             ))
             .await;
         return Ok(());
+    };
+    let user_id = match resolve_authenticated_voice_user(&authenticated_user_id, user_id) {
+        Ok(user_id) => user_id,
+        Err(message) => {
+            let _ = sender
+                .send(Message::Text(
+                    ServerEvent::Error {
+                        code: "user_mismatch",
+                        message,
+                    }
+                    .to_json(),
+                ))
+                .await;
+            return Ok(());
+        }
     };
     if target.as_deref() != Some(VOICE_TARGET_SOCIAL_AI_DIRECT)
         && target.as_deref() != Some(VOICE_TARGET_PHONE_CONTROL)
@@ -139,6 +172,8 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
         .await;
     info!(target: "voice", user_id, "realtime chat 会话已建立");
 
+    let mut turn_input_pcm_bytes: usize = 0;
+    let mut turn_output_pcm_bytes: usize = 0;
     loop {
         tokio::select! {
             biased;
@@ -148,6 +183,7 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                     Ok(Message::Binary(bytes)) => {
                         match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
                             PcmCheck::Ok => {
+                                turn_input_pcm_bytes += bytes.len();
                                 if let Err(err) = session.append_pcm(bytes.to_vec()) {
                                     warn!(target: "voice", "Realtime Chat 上行音频失败: {err:#}");
                                     break;
@@ -210,9 +246,38 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                         }
                     }
                     RealtimeChatEvent::AudioDelta(bytes) => {
+                        turn_output_pcm_bytes += bytes.len();
                         let _ = sender.send(Message::Binary(bytes)).await;
                     }
-                    RealtimeChatEvent::AudioDone | RealtimeChatEvent::ResponseDone => {
+                    RealtimeChatEvent::AudioDone => {
+                        let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
+                    }
+                    RealtimeChatEvent::ResponseDone(usage) => {
+                        match usage {
+                            Some(usage) => crate::token_usage_api::record_trusted_usage(
+                                &state.store,
+                                &user_id,
+                                "voice_realtime_chat",
+                                crate::compute_usage::USAGE_MODE_VOICE_REALTIME,
+                                Some(&cfg.model),
+                                &usage,
+                            ),
+                            None if turn_input_pcm_bytes > 0 || turn_output_pcm_bytes > 0 => {
+                                crate::compute_usage::record_realtime_voice_estimate(
+                                    &state.store,
+                                    &user_id,
+                                    "voice_realtime_chat",
+                                    &cfg.model,
+                                    turn_input_pcm_bytes,
+                                    turn_output_pcm_bytes,
+                                    REALTIME_SAMPLE_RATE_HZ,
+                                    1,
+                                );
+                            }
+                            None => {}
+                        }
+                        turn_input_pcm_bytes = 0;
+                        turn_output_pcm_bytes = 0;
                         let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
                     }
                     RealtimeChatEvent::Error(message) => {

@@ -21,6 +21,7 @@ use tracing::warn;
 use crate::{
     agent_api_loop::resolve_agent,
     agent_llm_call::call_chat_llm,
+    billing,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
     voice_tts_catalog::{self, ResolvedTtsStyle, TtsProvider},
@@ -106,9 +107,24 @@ pub async fn synthesize_handler(
     if req.rewrite.unwrap_or(true) && llm_rewrite_enabled() {
         spoken_text = rewrite_with_llm(&state, &caller.id, &req, &style, &spoken_text).await;
     }
+    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
 
     match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
-        Ok(audio) => audio_response(audio, &style),
+        Ok(audio) => {
+            if audio.cache_status != "hit" {
+                crate::compute_usage::record_tts_synthesis(
+                    &state.store,
+                    &caller.id,
+                    "voice_tts_synthesis",
+                    style.provider.as_worker_id(),
+                    &spoken_text,
+                    audio.bytes.len(),
+                );
+            }
+            audio_response(audio, &style)
+        }
         Err(err) => {
             warn!(target: "voice_tts", "TTS 合成失败: {err:#}");
             json_error(

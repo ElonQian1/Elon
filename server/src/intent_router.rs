@@ -438,8 +438,8 @@ mod tests {
     fn routes_image_asset_for_app() {
         let decision = classify("给 App 生成一个猫咪图标并替换启动图标");
         assert_eq!(decision.intent, UserIntent::ImageAssetForApp);
-        assert_eq!(decision.route, CapabilityRoute::CodeAgent);
-        assert!(!decision.needs_image_generation);
+        assert_eq!(decision.route, CapabilityRoute::ImageThenCode);
+        assert!(decision.needs_image_generation);
         assert!(decision.needs_code_change);
     }
 

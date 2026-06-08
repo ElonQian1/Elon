@@ -38,6 +38,15 @@ fn model_price(model: &str) -> (f64, f64, f64) {
         (3.0, 0.3, 15.0)
     } else if m.contains("deepseek") {
         (0.14, 0.014, 0.28)
+    } else if m.contains("metered-image") {
+        // 非 token 图片算力的内部计量单位，按 output units 计费。
+        (0.0, 0.0, 5.0)
+    } else if m.contains("metered-realtime") {
+        // 实时语音按输入/输出音频时长折算的内部计量单位。
+        (1.0, 0.0, 2.0)
+    } else if m.contains("metered-asr") || m.contains("metered-tts") {
+        // ASR/TTS Worker 或外部语音 API 的内部计量单位。
+        (1.0, 0.0, 1.0)
     } else {
         // 未知模型保守估算
         (3.0, 0.3, 15.0)

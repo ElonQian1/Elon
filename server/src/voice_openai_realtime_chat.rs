@@ -15,7 +15,10 @@ use tokio_tungstenite::{
     },
 };
 
-use crate::voice_config::{RealtimeChatConfig, REALTIME_SAMPLE_RATE_HZ};
+use crate::{
+    cli_usage::{usage_from_value, CliTokenUsage},
+    voice_config::{RealtimeChatConfig, REALTIME_SAMPLE_RATE_HZ},
+};
 
 #[derive(Debug, Clone)]
 pub enum RealtimeChatEvent {
@@ -28,7 +31,7 @@ pub enum RealtimeChatEvent {
     AiTranscriptDone(String),
     AudioDelta(Vec<u8>),
     AudioDone,
-    ResponseDone,
+    ResponseDone(Option<CliTokenUsage>),
     Error(String),
     Closed,
 }
@@ -205,7 +208,7 @@ fn parse_realtime_event(value: &Value) -> Option<RealtimeChatEvent> {
             .get("text")
             .and_then(Value::as_str)
             .map(|text| RealtimeChatEvent::AiTranscriptDone(text.to_string())),
-        "response.done" => Some(RealtimeChatEvent::ResponseDone),
+        "response.done" => Some(RealtimeChatEvent::ResponseDone(usage_from_value(value))),
         "error" => {
             let message = value
                 .get("error")
@@ -217,5 +220,33 @@ fn parse_realtime_event(value: &Value) -> Option<RealtimeChatEvent> {
             Some(RealtimeChatEvent::Error(message))
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_realtime_event, RealtimeChatEvent};
+    use serde_json::json;
+
+    #[test]
+    fn response_done_carries_usage_when_present() {
+        let event = parse_realtime_event(&json!({
+            "type": "response.done",
+            "response": {
+                "model": "gpt-realtime",
+                "usage": {
+                    "input_tokens": 12,
+                    "output_tokens": 8,
+                    "total_tokens": 20
+                }
+            }
+        }))
+        .expect("event parses");
+        let RealtimeChatEvent::ResponseDone(Some(usage)) = event else {
+            panic!("expected usage");
+        };
+        assert_eq!(usage.input_tokens, 12);
+        assert_eq!(usage.output_tokens, 8);
+        assert_eq!(usage.model.as_deref(), Some("gpt-realtime"));
     }
 }

@@ -3,34 +3,48 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
-    response::IntoResponse,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use futures::{SinkExt, StreamExt};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tracing::{info, warn};
 
 use crate::{
+    billing,
+    project_auth::{auth_from_headers_or_query, json_error},
     types::AppState,
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
     voice_config::{VirtualMicConfig, MAX_BUFFERED_BYTES},
-    voice_protocol::{ClientControl, ServerEvent},
+    voice_protocol::{resolve_authenticated_voice_user, ClientControl, ServerEvent},
     voice_pwcat::PwcatHandle,
 };
 
 pub async fn ws_virtual_mic_handler(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| async move {
-        if let Err(err) = handle(socket).await {
+) -> Response {
+    let caller = match auth_from_headers_or_query(&state, &headers, &query) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
+    let authenticated_user_id = caller.id;
+    ws.on_upgrade(move |socket| async move {
+        if let Err(err) = handle(socket, authenticated_user_id).await {
             warn!(target: "voice", "virtual-mic 连接异常退出: {err:#}");
         }
     })
+    .into_response()
 }
 
-async fn handle(socket: WebSocket) -> anyhow::Result<()> {
+async fn handle(socket: WebSocket, authenticated_user_id: String) -> anyhow::Result<()> {
     let cfg = VirtualMicConfig::from_env();
     let (mut sender, mut receiver) = socket.split();
 
@@ -56,6 +70,21 @@ async fn handle(socket: WebSocket) -> anyhow::Result<()> {
             ))
             .await;
         return Ok(());
+    };
+    let user_id = match resolve_authenticated_voice_user(&authenticated_user_id, user_id) {
+        Ok(user_id) => user_id,
+        Err(message) => {
+            let _ = sender
+                .send(Message::Text(
+                    ServerEvent::Error {
+                        code: "user_mismatch",
+                        message,
+                    }
+                    .to_json(),
+                ))
+                .await;
+            return Ok(());
+        }
     };
     if let Err(msg) = check_format_declaration(sample_rate, channels) {
         let _ = sender

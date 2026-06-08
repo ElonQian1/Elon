@@ -76,6 +76,7 @@ internal class RealtimeVoiceController(
             target = target,
             projectId = projectId,
             conversationId = conversationId,
+            authToken = AuthManager.token(context),
             listener = object : RealtimeVoiceWsClient.Listener {
                 override fun onReady(mode: String) {
                     // WS 握手成功后再启动麦克风

@@ -1,7 +1,7 @@
-use crate::types::AppState;
+use crate::{billing, project_auth::auth_from_headers, types::AppState};
 use axum::{
     extract::{Path as AxumPath, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use std::sync::Arc;
@@ -124,8 +124,21 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Json<ReadyResponse> {
 
 pub async fn generate_image(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(req): Json<ImageGenerateRequest>,
 ) -> Result<Json<ImageGenerateResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let user = auth_from_headers(&state, &headers).map_err(|_| {
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error": "未登录"})),
+        )
+    })?;
+    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
+        return Err((
+            StatusCode::PAYMENT_REQUIRED,
+            Json(serde_json::json!({"error": msg})),
+        ));
+    }
     let prompt = req.prompt.trim();
     if prompt.is_empty() {
         return Err((
@@ -141,11 +154,22 @@ pub async fn generate_image(
     }
 
     match crate::image_generation::generate_text_to_image(&state, prompt).await {
-        Ok(image) => Ok(Json(ImageGenerateResponse {
-            job_id: image.job_id,
-            url: image.url,
-            revised_prompt: image.revised_prompt,
-        })),
+        Ok(image) => {
+            if let Some(cfg) = state.image_model.as_ref() {
+                crate::compute_usage::record_image_generation(
+                    &state.store,
+                    &user.id,
+                    "image_generate_api",
+                    &cfg.model,
+                    prompt,
+                );
+            }
+            Ok(Json(ImageGenerateResponse {
+                job_id: image.job_id,
+                url: image.url,
+                revised_prompt: image.revised_prompt,
+            }))
+        }
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": e.to_string()})),

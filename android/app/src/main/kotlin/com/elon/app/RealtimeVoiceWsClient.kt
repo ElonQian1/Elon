@@ -29,6 +29,7 @@ internal class RealtimeVoiceWsClient(
     private val target: String? = null,
     private val projectId: String? = null,
     private val conversationId: String? = null,
+    private val authToken: String? = null,
     private val listener: Listener,
 ) {
     enum class Mode(val path: String, val label: String) {
@@ -84,7 +85,11 @@ internal class RealtimeVoiceWsClient(
             .replaceFirst(Regex("^http://"), "ws://")
             .replaceFirst(Regex("^https://"), "wss://")
             .trimEnd('/') + mode.path
-        val req = Request.Builder().url(wsUrl).build()
+        val reqBuilder = Request.Builder().url(wsUrl)
+        if (!authToken.isNullOrBlank()) {
+            reqBuilder.addHeader("Authorization", "Bearer ${authToken.trim()}")
+        }
+        val req = reqBuilder.build()
         closeRequested = false
         ws = client.newWebSocket(req, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {

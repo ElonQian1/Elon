@@ -15,40 +15,58 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Query, State,
     },
-    response::IntoResponse,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
 };
 use futures::{
     future::BoxFuture,
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tracing::{info, warn};
 
 use crate::{
+    billing,
+    project_auth::{auth_from_headers_or_query, json_error},
     types::AppState,
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
     voice_config::{RealtimeTranscribeConfig, MAX_BUFFERED_BYTES},
     voice_openai_realtime::{RealtimeTranscriber, TranscriptEvent},
-    voice_protocol::{ClientControl, ServerEvent},
+    voice_protocol::{resolve_authenticated_voice_user, ClientControl, ServerEvent},
     voice_to_cli::{dispatch_transcript, DispatchTarget},
     voice_whisper_local, voice_whisper_rest,
 };
 
 pub async fn ws_transcribe_handler(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| async move {
-        if let Err(err) = handle(state, socket).await {
+) -> Response {
+    let caller = match auth_from_headers_or_query(&state, &headers, &query) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
+    let authenticated_user_id = caller.id;
+    ws.on_upgrade(move |socket| async move {
+        if let Err(err) = handle(state, socket, authenticated_user_id).await {
             warn!(target: "voice", "transcribe 连接异常退出: {err:#}");
         }
     })
+    .into_response()
 }
 
-async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
+async fn handle(
+    state: Arc<AppState>,
+    socket: WebSocket,
+    authenticated_user_id: String,
+) -> anyhow::Result<()> {
     let cfg = RealtimeTranscribeConfig::from_env();
     let (mut sender, mut receiver) = socket.split();
 
@@ -76,6 +94,21 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             ))
             .await;
         return Ok(());
+    };
+    let user_id = match resolve_authenticated_voice_user(&authenticated_user_id, user_id) {
+        Ok(user_id) => user_id,
+        Err(message) => {
+            let _ = sender
+                .send(Message::Text(
+                    ServerEvent::Error {
+                        code: "user_mismatch",
+                        message,
+                    }
+                    .to_json(),
+                ))
+                .await;
+            return Ok(());
+        }
     };
     if let Err(msg) = check_format_declaration(sample_rate, channels) {
         let _ = sender
@@ -107,12 +140,21 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
             ))
             .await;
         info!(target: "voice", user_id, "whisper-local 会话已建立");
-        run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
-            let cfg = whisper_cfg.clone();
-            Box::pin(async move {
-                voice_whisper_local::transcribe_pcm(&cfg, &pcm, sample_rate, channels).await
-            })
-        })
+        run_buffered_loop(
+            &state,
+            &mut sender,
+            &mut receiver,
+            target,
+            "whisper-local".to_string(),
+            sample_rate,
+            channels,
+            move |pcm| {
+                let cfg = whisper_cfg.clone();
+                Box::pin(async move {
+                    voice_whisper_local::transcribe_pcm(&cfg, &pcm, sample_rate, channels).await
+                })
+            },
+        )
         .await;
         return Ok(());
     }
@@ -157,18 +199,27 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                 ))
                 .await;
             info!(target: "voice", user_id, "Tier 3 REST 转写会话已建立（{} 个候选）", candidates.len());
-            run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
-                let cands = candidates.clone();
-                Box::pin(async move {
-                    voice_whisper_rest::transcribe_with_fallback(
-                        &cands,
-                        &pcm,
-                        sample_rate,
-                        channels,
-                    )
-                    .await
-                })
-            })
+            run_buffered_loop(
+                &state,
+                &mut sender,
+                &mut receiver,
+                target,
+                "whisper-rest".to_string(),
+                sample_rate,
+                channels,
+                move |pcm| {
+                    let cands = candidates.clone();
+                    Box::pin(async move {
+                        voice_whisper_rest::transcribe_with_fallback(
+                            &cands,
+                            &pcm,
+                            sample_rate,
+                            channels,
+                        )
+                        .await
+                    })
+                },
+            )
             .await;
             return Ok(());
         }
@@ -192,6 +243,7 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
     let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
     // 4. 并发：客户端循环 + 转写事件循环 + AI 回复流
+    let mut turn_pcm_bytes: usize = 0;
     loop {
         tokio::select! {
             biased;
@@ -216,6 +268,7 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                                 continue;
                             }
                         }
+                        turn_pcm_bytes += bytes.len();
                         if let Err(err) = transcriber.append_pcm(bytes.to_vec()) {
                             warn!(target: "voice", "上行音频失败: {err:#}");
                             break;
@@ -242,6 +295,18 @@ async fn handle(state: Arc<AppState>, socket: WebSocket) -> anyhow::Result<()> {
                         )).await;
                     }
                     TranscriptEvent::Final(text) => {
+                        if turn_pcm_bytes > 0 {
+                            crate::compute_usage::record_pcm_asr(
+                                &state.store,
+                                &target.user_id,
+                                "voice_transcribe_realtime",
+                                &cfg.model,
+                                turn_pcm_bytes,
+                                sample_rate,
+                                channels,
+                            );
+                            turn_pcm_bytes = 0;
+                        }
                         let _ = sender.send(Message::Text(
                             ServerEvent::TranscriptFinal { text: text.clone() }.to_json()
                         )).await;
@@ -291,6 +356,9 @@ async fn run_buffered_loop(
     sender: &mut SplitSink<WebSocket, Message>,
     receiver: &mut SplitStream<WebSocket>,
     target: DispatchTarget,
+    usage_model: String,
+    sample_rate: u32,
+    channels: u16,
     transcribe: impl Fn(Vec<u8>) -> BoxFuture<'static, anyhow::Result<String>>,
 ) {
     let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -325,8 +393,20 @@ async fn run_buffered_loop(
                             Some(ClientControl::Commit) => {
                                 if pcm_buf.is_empty() { continue; }
                                 let pcm = std::mem::take(&mut pcm_buf);
+                                let pcm_len = pcm.len();
                                 let transcript = match transcribe(pcm).await {
-                                    Ok(t) if t.trim().is_empty() => continue,
+                                    Ok(t) if t.trim().is_empty() => {
+                                        crate::compute_usage::record_pcm_asr(
+                                            &state.store,
+                                            &target.user_id,
+                                            "voice_transcribe_buffered",
+                                            &usage_model,
+                                            pcm_len,
+                                            sample_rate,
+                                            channels,
+                                        );
+                                        continue;
+                                    }
                                     Ok(t) => t,
                                     Err(err) => {
                                         warn!(target: "voice", "ASR 转写失败: {err:#}");
@@ -337,6 +417,15 @@ async fn run_buffered_loop(
                                         continue;
                                     }
                                 };
+                                crate::compute_usage::record_pcm_asr(
+                                    &state.store,
+                                    &target.user_id,
+                                    "voice_transcribe_buffered",
+                                    &usage_model,
+                                    pcm_len,
+                                    sample_rate,
+                                    channels,
+                                );
                                 let _ = sender.send(Message::Text(
                                     ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
                                 )).await;

@@ -29,6 +29,7 @@ mod cli_config;
 mod cli_usage;
 mod codex_health;
 mod codex_stream;
+mod compute_usage;
 mod errors;
 mod friend_api;
 mod friend_events;

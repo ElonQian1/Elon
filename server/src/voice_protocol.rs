@@ -74,9 +74,23 @@ impl ServerEvent {
     }
 }
 
+pub fn resolve_authenticated_voice_user(
+    authenticated_user_id: &str,
+    claimed_user_id: String,
+) -> Result<String, String> {
+    if authenticated_user_id == "local-owner" {
+        return Ok(claimed_user_id);
+    }
+    if authenticated_user_id == claimed_user_id {
+        Ok(authenticated_user_id.to_string())
+    } else {
+        Err("登录用户与语音会话 user_id 不一致".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ClientControl, VOICE_TARGET_SOCIAL_AI_DIRECT};
+    use super::{resolve_authenticated_voice_user, ClientControl, VOICE_TARGET_SOCIAL_AI_DIRECT};
 
     #[test]
     fn hello_target_is_backward_compatible() {
@@ -111,5 +125,22 @@ mod tests {
             panic!("expected hello");
         };
         assert_eq!(target.as_deref(), Some(VOICE_TARGET_SOCIAL_AI_DIRECT));
+    }
+
+    #[test]
+    fn voice_user_must_match_authenticated_user() {
+        assert_eq!(
+            resolve_authenticated_voice_user("u1", "u1".to_string()).unwrap(),
+            "u1"
+        );
+        assert!(resolve_authenticated_voice_user("u1", "u2".to_string()).is_err());
+    }
+
+    #[test]
+    fn local_owner_can_claim_debug_voice_user() {
+        assert_eq!(
+            resolve_authenticated_voice_user("local-owner", "u2".to_string()).unwrap(),
+            "u2"
+        );
     }
 }

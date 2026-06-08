@@ -23,6 +23,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::{
+    billing,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
     voice_whisper_local, voice_whisper_rest,
@@ -42,8 +43,12 @@ pub async fn asr_upload_handler(
     mut multipart: Multipart,
 ) -> Response {
     // 鉴权
-    if auth_from_headers(&state, &headers).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "未登录");
+    let caller = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
+    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
     // 解析 multipart
@@ -148,6 +153,13 @@ pub async fn asr_upload_handler(
 
     match text {
         Ok(t) if t.trim().is_empty() => {
+            crate::compute_usage::record_encoded_asr(
+                &state.store,
+                &caller.id,
+                "voice_asr_upload",
+                "upload",
+                audio.len(),
+            );
             // Whisper 返回空串：可能是纯噪声/静音，不算错误
             Json(AsrResponse {
                 text: String::new(),
@@ -155,6 +167,13 @@ pub async fn asr_upload_handler(
             .into_response()
         }
         Ok(t) => {
+            crate::compute_usage::record_encoded_asr(
+                &state.store,
+                &caller.id,
+                "voice_asr_upload",
+                "upload",
+                audio.len(),
+            );
             info!(target: "voice_asr", "ASR 转写成功：{}", &t[..t.len().min(80)]);
             Json(AsrResponse { text: t }).into_response()
         }
