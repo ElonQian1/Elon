@@ -483,7 +483,10 @@ impl Store {
                      WHEN ?2 != 'template' OR source_type = 'template' THEN ?3
                      ELSE template
                  END,
-                 workspace_path = COALESCE(?4, workspace_path)
+                 workspace_path = CASE
+                     WHEN node_id IS NOT NULL AND node_id != '' THEN workspace_path
+                     ELSE COALESCE(?4, workspace_path)
+                 END
              WHERE id = ?1",
             params![id, source_type, template, clean_optional(workspace_path)],
         )?;
@@ -887,5 +890,52 @@ mod tests {
             Some(r"D:\rust\active-projects\elon cli")
         );
         assert_eq!(bound.project.node_id.as_deref(), Some("node-owner"));
+    }
+
+    #[test]
+    fn ensure_project_for_user_preserves_pc_bound_workspace_path() {
+        let store = temp_store();
+        let owner = store
+            .create_user("pc-bound-owner@example.com", "secret1", None, None)
+            .expect("user should be created");
+        store
+            .ensure_project_for_user(
+                &owner.id,
+                "elon-self",
+                "一龙项目",
+                None,
+                "template",
+                "android",
+                None,
+            )
+            .expect("shared project should exist");
+        store
+            .register_external_project(
+                &owner.id,
+                Some("elon-self"),
+                "一龙项目",
+                Some("PC local repo"),
+                r"D:\rust\active-projects\elon cli",
+                Some("node-owner"),
+            )
+            .expect("existing shared project should bind");
+
+        let ensured = store
+            .ensure_project_for_user(
+                &owner.id,
+                "elon-self",
+                "一龙项目",
+                Some("server fallback"),
+                "local_path",
+                "local",
+                Some("/opt/elon/data/projects/elon-self"),
+            )
+            .expect("ensure should keep project accessible");
+
+        assert_eq!(
+            ensured.workspace_path.as_deref(),
+            Some(r"D:\rust\active-projects\elon cli")
+        );
+        assert_eq!(ensured.node_id.as_deref(), Some("node-owner"));
     }
 }
