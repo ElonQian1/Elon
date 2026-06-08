@@ -24,6 +24,9 @@ pub struct CreateProjectRequest {
 
 #[derive(Deserialize)]
 pub struct RegisterExternalProjectRequest {
+    /// 可选：重绑定一个已存在项目，而不是按 name 创建/复用当前 owner 的项目。
+    /// 用于平台自身项目 elon-self 这类共享项目绑定到 PC 节点。
+    pub project_id: Option<String>,
     pub name: String,
     pub workspace_path: String,
     pub description: Option<String>,
@@ -161,6 +164,7 @@ pub async fn register_external_project(
 
     let create_result = match state.store.register_external_project(
         &user.id,
+        req.project_id.as_deref(),
         &req.name,
         req.description.as_deref(),
         workspace_path,

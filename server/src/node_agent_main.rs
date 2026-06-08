@@ -1441,6 +1441,7 @@ async fn admin_logout(
 
 #[derive(Deserialize)]
 struct AdminRegisterReq {
+    project_id: Option<String>,
     name: String,
     workspace_path: String,
     description: Option<String>,
@@ -1512,6 +1513,7 @@ async fn admin_register_project(
     // 3) 转发到云端
     let url = format!("{}/api/projects/external", rt.cfg.cloud_http_url.trim_end_matches('/'));
     let body = serde_json::json!({
+        "project_id": req.project_id.as_deref().map(str::trim).filter(|value| !value.is_empty()),
         "name": name,
         "workspace_path": path,
         "description": req.description,

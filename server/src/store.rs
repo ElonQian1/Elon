@@ -215,6 +215,7 @@ impl Store {
     pub fn register_external_project(
         &self,
         user_id: &str,
+        project_id: Option<&str>,
         name: &str,
         description: Option<&str>,
         workspace_path: &str,
@@ -234,6 +235,68 @@ impl Store {
 
         let now = now();
         let conn = self.conn()?;
+
+        let requested_project_id = project_id.map(str::trim).filter(|v| !v.is_empty());
+        if let Some(project_id) = requested_project_id {
+            let role: String = conn
+                .query_row(
+                    "SELECT pm.role
+                     FROM projects p
+                     JOIN project_members pm ON pm.project_id = p.id
+                     WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
+                    params![project_id, user_id],
+                    |row| row.get(0),
+                )
+                .optional()?
+                .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
+            if role != "owner" {
+                anyhow::bail!("只有项目 owner 才能绑定 PC 本地路径");
+            }
+
+            let tx = conn.unchecked_transaction()?;
+            tx.execute(
+                "UPDATE projects
+                 SET name = ?2,
+                     description = COALESCE(?3, description),
+                     template = 'local',
+                     source_type = 'local_path',
+                     workspace_path = ?4,
+                     node_id = ?5,
+                     updated_at = ?6
+                 WHERE id = ?1 AND status != 'deleted'",
+                params![
+                    project_id,
+                    name,
+                    clean_optional(description),
+                    workspace_path,
+                    node_id,
+                    now
+                ],
+            )?;
+            tx.execute(
+                "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
+                 VALUES (?1, ?2, ?3, 'project_bound_external', ?4, ?5)",
+                params![
+                    new_id("evt"),
+                    project_id,
+                    user_id,
+                    serde_json::json!({
+                        "workspace_path": workspace_path,
+                        "node_id": node_id,
+                    })
+                    .to_string(),
+                    now
+                ],
+            )?;
+            tx.commit()?;
+
+            let project = find_project_by_id_for_user(&conn, user_id, project_id)?
+                .ok_or_else(|| anyhow!("项目绑定后无法读取"))?;
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
 
         if let Some(mut project) = find_owner_project_by_name(&conn, user_id, name)? {
             conn.execute(
@@ -698,6 +761,39 @@ fn find_owner_project_by_name(
         .optional()?)
 }
 
+fn find_project_by_id_for_user(
+    conn: &Connection,
+    user_id: &str,
+    project_id: &str,
+) -> Result<Option<ProjectSummary>> {
+    Ok(conn
+        .query_row(
+            "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
+                    pm.role,
+                    (
+                        SELECT t.status FROM tasks t
+                        WHERE t.project_id = p.id
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_task_status,
+                    (
+                        SELECT t.apk_url FROM tasks t
+                        WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
+                        ORDER BY t.created_at DESC
+                        LIMIT 1
+                    ) AS last_apk_url,
+                    p.updated_at
+             FROM projects p
+             JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
+             WHERE p.id = ?1 AND p.status != 'deleted'
+             LIMIT 1",
+            params![project_id, user_id],
+            project_summary_from_row,
+        )
+        .optional()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -721,6 +817,7 @@ mod tests {
         let first = store
             .register_external_project(
                 &user.id,
+                None,
                 "PC Project",
                 Some("from pc"),
                 r"D:\rust\active-projects\one",
@@ -734,6 +831,7 @@ mod tests {
         let second = store
             .register_external_project(
                 &user.id,
+                None,
                 "PC Project",
                 Some("from pc"),
                 r"D:\rust\active-projects\two",
@@ -751,5 +849,43 @@ mod tests {
             .get_project_access(&user.id, &second.project.id)
             .expect("project access should include node binding");
         assert_eq!(access.node_id.as_deref(), Some("node-b"));
+    }
+
+    #[test]
+    fn register_external_project_can_bind_existing_shared_project_by_id() {
+        let store = temp_store();
+        let owner = store
+            .create_user("shared-owner@example.com", "secret1", None, None)
+            .expect("user should be created");
+        store
+            .ensure_project_for_user(
+                &owner.id,
+                "elon-self",
+                "一龙项目",
+                None,
+                "template",
+                "android",
+                None,
+            )
+            .expect("shared project should exist");
+
+        let bound = store
+            .register_external_project(
+                &owner.id,
+                Some("elon-self"),
+                "一龙项目",
+                Some("PC local repo"),
+                r"D:\rust\active-projects\elon cli",
+                Some("node-owner"),
+            )
+            .expect("existing shared project should bind");
+
+        assert!(bound.reused_existing);
+        assert_eq!(bound.project.id, "elon-self");
+        assert_eq!(
+            bound.project.workspace_path.as_deref(),
+            Some(r"D:\rust\active-projects\elon cli")
+        );
+        assert_eq!(bound.project.node_id.as_deref(), Some("node-owner"));
     }
 }

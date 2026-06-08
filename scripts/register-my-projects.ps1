@@ -41,6 +41,7 @@ Write-Host "✅ 登录成功，user_id: $($loginResp.user.id)" -ForegroundColor 
 # ── 2. 要注册的项目列表 ──────────────────────────────────────────────────────
 # 修改这里来添加或移除项目
 $projects = @(
+    @{ id = "elon-self"; name = "一龙项目"; path = "D:\rust\active-projects\elon cli"; desc = "一龙项目主仓库" }
     @{ name = "bb64a";       path = "D:\rust\active-projects\bb64a";       desc = "bb64a 项目" }
     @{ name = "fb2";         path = "D:\rust\active-projects\fb2";          desc = "fb2 项目" }
     @{ name = "江西吉安商会"; path = "D:\rust\active-projects\江西吉安商会"; desc = "江西吉安商会项目" }
@@ -56,6 +57,9 @@ foreach ($proj in $projects) {
             description    = $proj.desc
             is_public      = $true         # 发布到项目广场
             join_mode      = "approval"    # 申请加入需审批
+        }
+        if ($proj.id) {
+            $body.project_id = $proj.id
         }
         $r = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/projects/external" `
             -Headers @{ Authorization = "Bearer $token" } `
