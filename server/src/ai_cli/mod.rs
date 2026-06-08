@@ -753,10 +753,17 @@ async fn run_via_pc_agent(
         .or(copilot_model)
         .map(String::from)
         .unwrap_or_else(|| agent_id.to_string());
+    let is_codex = cli_name == "codex";
 
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
+                if is_codex {
+                    // Codex exec 输出包含启动信息、对话回放、内容重复等，
+                    // 累积全部后统一在 CliDone 时解析提取
+                    full_text.push_str(&text);
+                    continue;
+                }
                 if text.trim().is_empty() {
                     full_text.push_str(&text);
                     continue;
@@ -778,15 +785,20 @@ async fn run_via_pc_agent(
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 if exit_ok {
-                    if !stream_started {
-                        let reply = full_text.trim().to_string();
-                        if !reply.is_empty() {
-                            let _ = tx.send(WsMessage::AssistantMessage {
-                                text: reply,
-                                model_used: Some(display_model.clone()),
-                                stream_id: None,
-                            }.to_json());
-                        }
+                    // Codex 输出需要特殊解析：提取第一段 AI 回复（codex\n 后 tokens used 前）
+                    let reply = if is_codex {
+                        extract_codex_reply(&full_text)
+                    } else if stream_started {
+                        String::new() // 已流式发送完毕
+                    } else {
+                        full_text.trim().to_string()
+                    };
+                    if !reply.is_empty() {
+                        let _ = tx.send(WsMessage::AssistantMessage {
+                            text: reply,
+                            model_used: Some(display_model.clone()),
+                            stream_id: None,
+                        }.to_json());
                     }
                     let _ = tx.send(WsMessage::Done {
                         message: String::new(),
@@ -805,4 +817,39 @@ async fn run_via_pc_agent(
     }
 
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+/// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。
+/// Codex exec 的输出格式：
+///   [启动信息头 ... ---]
+///   user
+///   <用户消息回放>
+///   [可能的错误日志]
+///   codex
+///   <AI 回复>          ← 只取这段
+///   tokens used
+///   <AI 回复重复>       ← 丢弃
+///   <数字>
+///   <AI 回复重复>       ← 丢弃
+fn extract_codex_reply(output: &str) -> String {
+    let lines: Vec<&str> = output.lines().collect();
+    let mut in_codex_reply = false;
+    let mut reply_lines: Vec<&str> = Vec::new();
+
+    for line in &lines {
+        let trimmed = line.trim();
+        if trimmed == "codex" && !in_codex_reply {
+            in_codex_reply = true;
+            continue;
+        }
+        if in_codex_reply {
+            // tokens used 或纯数字行表示回复结束（后面是重复内容）
+            if trimmed == "tokens used" || trimmed.chars().all(|c| c.is_ascii_digit() || c == ',') {
+                break;
+            }
+            reply_lines.push(line);
+        }
+    }
+
+    reply_lines.join("\n").trim().to_string()
 }
