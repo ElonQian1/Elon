@@ -37,7 +37,7 @@ internal class MainHomeListActions(
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
     private val openProject: (Int) -> Unit,
-    private val showProjectActions: (Int) -> Unit,
+    private val showProjectActions: (Int, View?) -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
     private val openGroup: (AppGroup) -> Unit

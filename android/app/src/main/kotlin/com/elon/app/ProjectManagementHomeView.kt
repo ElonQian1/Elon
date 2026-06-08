@@ -31,7 +31,7 @@ internal class ProjectManagementHomeView(
     private val activeProjectIndex: () -> Int,
     private val formatTime: (Long) -> String,
     private val openProject: (Int) -> Unit,
-    private val showProjectActions: (Int) -> Unit,
+    private val showProjectActions: (Int, View?) -> Unit,
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
     private val dp: (Int) -> Int,
@@ -178,8 +178,8 @@ internal class ProjectManagementHomeView(
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
-            setOnLongClickListener {
-                showProjectActions(item.index)
+            setOnLongClickListener { anchor ->
+                showProjectActions(item.index, anchor)
                 true
             }
 

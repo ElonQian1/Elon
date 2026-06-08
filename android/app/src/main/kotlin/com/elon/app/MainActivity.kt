@@ -774,7 +774,7 @@ class MainActivity : AppCompatActivity() {
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showProjectPlaza = { navigationController.showProjectPlaza() },
             openProject = { index -> openProjectSpaceForProject(index, true) },
-            showProjectActions = { index -> projectActions.showProjectActions(index) },
+            showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
                 groupChatActions.closeGroupChat()
@@ -838,7 +838,7 @@ class MainActivity : AppCompatActivity() {
             openProject = { index ->
                 openProjectSpaceForProject(index, true)
             },
-            showProjectActions = { index -> projectActions.showProjectActions(index) },
+            showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
             dp = uiTools::dp,

@@ -24,7 +24,7 @@ internal class MainHomeRows(
     private val timeFormatter: DateFormat,
     private val activeProjectIndexProvider: () -> Int,
     private val openProject: (Int) -> Unit,
-    private val showProjectActions: (Int) -> Unit,
+    private val showProjectActions: (Int, View?) -> Unit,
     private val openConversation: (Int) -> Unit,
     private val showConversationActions: (Int) -> Unit,
     private val dp: (Int) -> Int,
@@ -242,8 +242,8 @@ internal class MainHomeRows(
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(index) }
-            setOnLongClickListener {
-                showProjectActions(index)
+            setOnLongClickListener { anchor ->
+                showProjectActions(index, anchor)
                 true
             }
         }
