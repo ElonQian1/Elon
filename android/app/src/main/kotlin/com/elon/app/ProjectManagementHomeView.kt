@@ -47,7 +47,7 @@ internal class ProjectManagementHomeView(
         val joint = indexed.filter { it.project.isJointDevelopmentProject() }
 
         addSection("个人项目", personal, topMargin = 18, emptyAction = showCreateProjectDialog)
-        addSection("联合项目", joint, topMargin = 20, emptyAction = null)
+        addSection("联合项目", joint, topMargin = 18, emptyAction = null)
         container.addView(bottomSpacer())
     }
 
@@ -78,23 +78,23 @@ internal class ProjectManagementHomeView(
                 text = "项目广场"
                 setTextColor(Color.parseColor("#F2F5FA"))
                 alpha = 0.92f
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 27f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.START or Gravity.TOP
-                leftMargin = dp(16)
-                topMargin = dp(22)
+                leftMargin = dp(14)
+                topMargin = dp(19)
             })
 
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_search_simple)
                 imageTintList = ColorStateList.valueOf(Color.parseColor("#9FA1A6"))
                 alpha = 0.82f
-            }, FrameLayout.LayoutParams(dp(116), dp(116)).apply {
+            }, FrameLayout.LayoutParams(dp(108), dp(108)).apply {
                 gravity = Gravity.CENTER
-                leftMargin = dp(142)
+                leftMargin = dp(112)
             })
         }
     }
@@ -107,7 +107,7 @@ internal class ProjectManagementHomeView(
     ) {
         container.addView(createSectionHeader(title), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(56)
+            dp(50)
         ).apply {
             marginStart = dp(20)
             marginEnd = dp(20)
@@ -124,15 +124,15 @@ internal class ProjectManagementHomeView(
                 includeFontPadding = false
                 text = title
                 setTextColor(Color.parseColor("#F2F5FA"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 21.5f)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "›"
                 gravity = Gravity.CENTER
                 setTextColor(Color.parseColor("#A6AFBD"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
-            }, LinearLayout.LayoutParams(dp(34), LinearLayout.LayoutParams.MATCH_PARENT))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 27f)
+            }, LinearLayout.LayoutParams(dp(30), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
@@ -153,8 +153,8 @@ internal class ProjectManagementHomeView(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         1f
                     ).apply {
-                        if (cellIndex == 0) marginEnd = dp(10)
-                        else marginStart = dp(10)
+                        if (cellIndex == 0) marginEnd = dp(7)
+                        else marginStart = dp(7)
                     })
                 }
             }, LinearLayout.LayoutParams(
@@ -163,7 +163,7 @@ internal class ProjectManagementHomeView(
             ).apply {
                 marginStart = dp(20)
                 marginEnd = dp(20)
-                topMargin = if (rowIndex == 0) dp(10) else dp(20)
+                topMargin = if (rowIndex == 0) dp(8) else dp(16)
             })
         }
     }
@@ -181,7 +181,7 @@ internal class ProjectManagementHomeView(
                 true
             }
 
-            addView(projectThumbnail(project), FrameLayout.LayoutParams(dp(46), dp(46)).apply {
+            addView(projectThumbnail(project), FrameLayout.LayoutParams(dp(38), dp(38)).apply {
                 gravity = Gravity.START or Gravity.TOP
                 leftMargin = dp(17)
                 topMargin = dp(17)
@@ -189,7 +189,7 @@ internal class ProjectManagementHomeView(
 
             addView(createProjectInfoBar(project, isActive), FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(58),
+                dp(47),
                 Gravity.BOTTOM
             ))
         }
@@ -209,7 +209,7 @@ internal class ProjectManagementHomeView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(7), dp(12), dp(7))
+            setPadding(dp(10), dp(5), dp(10), dp(5))
             background = rect(if (active) "#283345" else "#253140")
 
             addView(LinearLayout(activity).apply {
@@ -221,7 +221,7 @@ internal class ProjectManagementHomeView(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setTextColor(Color.parseColor("#F2F5FA"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16.5f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14.2f)
                     setTypeface(typeface, Typeface.BOLD)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(TextView(activity).apply {
@@ -229,12 +229,12 @@ internal class ProjectManagementHomeView(
                     text = projectTime(project)
                     maxLines = 1
                     setTextColor(Color.parseColor("#DDE8FC"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.2f)
                 }, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    marginStart = dp(8)
+                    marginStart = dp(7)
                 })
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -247,12 +247,12 @@ internal class ProjectManagementHomeView(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor("#DDE8FC"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.6f)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(7)
+                topMargin = dp(5)
             })
         }
     }
@@ -341,10 +341,10 @@ private class ProjectPlazaPatternView(context: Context) : View(context) {
     }
 
     private fun drawTiles(canvas: Canvas) {
-        val tileW = dp(54).toFloat()
-        val tileH = dp(54).toFloat()
-        val gapX = dp(92)
-        val gapY = dp(82)
+        val tileW = dp(50).toFloat()
+        val tileH = dp(50).toFloat()
+        val gapX = dp(96)
+        val gapY = dp(84)
         canvas.save()
         canvas.rotate(-14f, width / 2f, height / 2f)
         var row = 0
