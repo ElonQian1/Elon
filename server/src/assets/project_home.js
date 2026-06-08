@@ -31,6 +31,35 @@
     return project.name || project.title || '未命名项目';
   }
 
+  function projectInitial(project) {
+    const title = String(titleOf(project)).trim();
+    if (title.startsWith('一龙')) return '龙';
+    return Array.from(title)[0] || '项';
+  }
+
+  function iconUrlOf(project) {
+    return [
+      project.iconDataUrl,
+      project.icon_data_url,
+      project.iconUrl,
+      project.icon_url,
+      project.icon,
+      project.avatar,
+      project.logo
+    ].find((value) => typeof value === 'string' && value.trim()) || '';
+  }
+
+  function renderProjectThumb(project) {
+    const iconUrl = iconUrlOf(project);
+    const label = escapeHtml(projectInitial(project));
+    return `
+      <span class="project-home-thumb" aria-hidden="true">
+        ${label}
+        ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+      </span>
+    `;
+  }
+
   function roleOf(project) {
     return String(project.role || '').trim().toLowerCase();
   }
@@ -107,7 +136,7 @@
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     return `
       <button class="project-home-card ${active ? 'active' : ''}" type="button" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}">
-        <span class="project-home-thumb" aria-hidden="true"></span>
+        ${renderProjectThumb(project)}
         <span class="project-home-info">
           <span class="project-home-title-row">
             <span class="project-home-name">${escapeHtml(titleOf(project))}</span>

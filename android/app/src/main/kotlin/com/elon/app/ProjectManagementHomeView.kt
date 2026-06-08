@@ -78,7 +78,7 @@ internal class ProjectManagementHomeView(
                 text = "项目广场"
                 setTextColor(Color.parseColor("#F2F5FA"))
                 alpha = 0.92f
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
@@ -124,15 +124,15 @@ internal class ProjectManagementHomeView(
                 includeFontPadding = false
                 text = title
                 setTextColor(Color.parseColor("#F2F5FA"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 20.5f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "›"
                 gravity = Gravity.CENTER
                 setTextColor(Color.parseColor("#A6AFBD"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
-            }, LinearLayout.LayoutParams(dp(30), LinearLayout.LayoutParams.MATCH_PARENT))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
+            }, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
@@ -183,7 +183,7 @@ internal class ProjectManagementHomeView(
 
             addView(projectThumbnail(project), FrameLayout.LayoutParams(dp(38), dp(38)).apply {
                 gravity = Gravity.START or Gravity.TOP
-                leftMargin = dp(17)
+                leftMargin = dp(10)
                 topMargin = dp(17)
             })
 
@@ -201,6 +201,28 @@ internal class ProjectManagementHomeView(
             background = GradientDrawable().apply {
                 cornerRadius = dp(6).toFloat()
                 setColor(Color.parseColor("#D2D2D2"))
+            }
+            val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
+            if (iconBitmap != null) {
+                addView(ImageView(activity).apply {
+                    setImageBitmap(iconBitmap)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            } else {
+                addView(TextView(activity).apply {
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    text = avatarText(project.title.ifBlank { "项目" })
+                    setTextColor(Color.parseColor("#253140"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                    setTypeface(typeface, Typeface.BOLD)
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
             }
         }
     }

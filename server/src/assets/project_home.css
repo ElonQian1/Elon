@@ -51,7 +51,7 @@
   left: 14px;
   top: 19px;
   z-index: 2;
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1;
   color: rgba(242, 245, 250, 0.92);
 }
@@ -106,7 +106,7 @@
 .project-home-section-title {
   flex: 1;
   min-width: 0;
-  font-size: 20.5px;
+  font-size: 16px;
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -114,10 +114,10 @@
 }
 
 .project-home-section-arrow {
-  width: 30px;
+  width: 24px;
   text-align: center;
   color: #a6afbd;
-  font-size: 26px;
+  font-size: 21px;
   line-height: 1;
 }
 
@@ -159,12 +159,27 @@
 
 .project-home-thumb {
   position: absolute;
-  left: 17px;
+  left: 10px;
   top: 17px;
   width: 38px;
   height: 38px;
   border-radius: 6px;
   background: #d2d2d2;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #253140;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.project-home-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .project-home-info {
@@ -236,7 +251,7 @@
   }
 
   .project-home-section-title {
-    font-size: 20.5px;
+    font-size: 16px;
   }
 
   .project-home-name {

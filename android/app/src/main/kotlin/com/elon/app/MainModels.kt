@@ -21,6 +21,7 @@ data class AppProject(
     var isJointProject: Boolean = false,
     var collaborationProjectId: String? = null,
     var collaborationJoinMode: String? = null,
+    var iconDataUrl: String? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()

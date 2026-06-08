@@ -21,6 +21,7 @@ internal data class StoreProject(
     val joinMode: String,
     val lastTaskStatus: String?,
     val latestApkUrl: String? = null,
+    val iconDataUrl: String? = null,
     val role: String = "member"
 )
 
@@ -29,7 +30,8 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         id = id,
         isJointProject = true,
         collaborationProjectId = id,
-        collaborationJoinMode = normalizeProjectJoinMode(joinMode)
+        collaborationJoinMode = normalizeProjectJoinMode(joinMode),
+        iconDataUrl = iconDataUrl
     )
 }
 
@@ -43,7 +45,8 @@ internal fun StoreProject.toOwnerAppProject(): AppProject {
     return newAppProject(name, description ?: "我的项目").copy(
         id = id,
         isJointProject = false,
-        collaborationProjectId = null
+        collaborationProjectId = null,
+        iconDataUrl = iconDataUrl
     )
 }
 
@@ -260,6 +263,7 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
         ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
+    iconDataUrl = obj.optProjectIconDataUrl(),
     role = obj.optString("role", "member")
 )
 
@@ -274,8 +278,18 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     isPublic = false,
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
     lastTaskStatus = null,
-    latestApkUrl = null
+    latestApkUrl = null,
+    iconDataUrl = obj.optProjectIconDataUrl()
 )
+
+private fun JSONObject.optProjectIconDataUrl(): String? {
+    val keys = arrayOf("iconDataUrl", "icon_data_url", "iconUrl", "icon_url", "icon", "avatar", "logo")
+    for (key in keys) {
+        val value = optString(key, "").trim()
+        if (value.isNotBlank()) return value
+    }
+    return null
+}
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */
 internal fun fetchJoinedProjectIds(
