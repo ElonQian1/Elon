@@ -31,6 +31,9 @@ try {
     $TargetDir = $meta.target_directory
 } finally { Pop-Location }
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
+$PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
+if (-not $PackageVersion) { throw "无法解析 elon-node-agent 版本号" }
+$GitSha = (git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD).Trim()
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
@@ -83,13 +86,33 @@ if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/4] 验证下载地址..." -ForegroundColor Yellow
 $BaseUrl = "http://43.139.149.158:8080"
+$LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
+$WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 
 $size    = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}"
 $sizeWin = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
+$VersionInfo = [ordered]@{
+    version = $PackageVersion
+    gitSha = $GitSha
+    updated_at = (Get-Date).ToString("o")
+    downloadUrl = $WindowsDownloadUrl
+    linuxDownloadUrl = $LinuxDownloadUrl
+    fileSize = [int64]$sizeWin
+    linuxFileSize = [int64]$size
+}
+$VersionFile = New-TemporaryFile
+try {
+    $VersionInfo | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $VersionFile -Encoding UTF8
+    scp -o ProxyCommand=none $VersionFile "${Server}:${RemoteDir}/node-agent-version.json"
+    if ($LASTEXITCODE -ne 0) { throw "版本信息上传失败" }
+} finally {
+    Remove-Item -LiteralPath $VersionFile -Force -ErrorAction SilentlyContinue
+}
 Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
+Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "✅ elon-node-agent 发布完成" -ForegroundColor Green
-Write-Host "   下载地址（Linux）:   $BaseUrl/downloads/$Bin"
-Write-Host "   下载地址（Windows）: $BaseUrl/downloads/$Bin.exe"
+Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
+Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"

@@ -220,7 +220,7 @@ class NodeActivity : Activity() {
                     setOnClickListener {
                         copyToClipboard(
                             "Linux 下载命令",
-                            "curl -o elon-node-agent http://$serverUrl/downloads/elon-node-agent && chmod +x elon-node-agent"
+                            "curl -o elon-node-agent http://$serverUrl/api/node-agent/download/linux && chmod +x elon-node-agent"
                         )
                     }
                 })
@@ -234,7 +234,7 @@ class NodeActivity : Activity() {
                     setOnClickListener {
                         copyToClipboard(
                             "Windows 下载地址",
-                            "http://$serverUrl/downloads/elon-node-agent.exe"
+                            "http://$serverUrl/api/node-agent/download/windows"
                         )
                     }
                 })
@@ -481,7 +481,7 @@ class NodeActivity : Activity() {
         val serverBase = authService.getServerUrl()
         val linuxCmd = """
             # 下载 node-agent
-            curl -o elon-node-agent $serverBase/downloads/elon-node-agent && chmod +x elon-node-agent
+            curl -o elon-node-agent $serverBase/api/node-agent/download/linux && chmod +x elon-node-agent
             
             # 启动命令
             NODE_AGENT_ID=${result.agentId} \

@@ -71,7 +71,7 @@ foreach ($proj in $projects) {
         if ($status -eq 400 -and $errBody -match "没有在线 PC CLI 节点") {
             Write-Host "  ⚠️  提示：服务器找不到在线的 PC 节点来接管本地路径。" -ForegroundColor Yellow
             Write-Host "     解决方案：先下载并启动 elon-node-agent.exe，登录后再重跑本脚本。" -ForegroundColor Yellow
-            Write-Host "     下载地址: http://43.139.149.158:8080/downloads/elon-node-agent.exe" -ForegroundColor Yellow
+            Write-Host "     下载地址: http://43.139.149.158:8080/api/node-agent/download/windows" -ForegroundColor Yellow
         }
     }
 }

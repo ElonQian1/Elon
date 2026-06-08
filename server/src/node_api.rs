@@ -392,17 +392,34 @@ pub async fn node_agent_version(State(state): State<Arc<AppState>>) -> impl Into
 /// GET /api/node-agent/download/windows — 下载最新 Windows exe
 /// 不需要登录（执行文件不含敏感信息）
 pub async fn download_node_agent_windows(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let exe_path = state.data_dir.join("downloads").join("elon-node-agent.exe");
+    download_node_agent_binary(state, "elon-node-agent.exe", "elon-node-agent.exe").await
+}
+
+/// GET /api/node-agent/download/linux — 下载最新 Linux 可执行文件
+/// 不需要登录（执行文件不含敏感信息）
+pub async fn download_node_agent_linux(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    download_node_agent_binary(state, "elon-node-agent", "elon-node-agent").await
+}
+
+async fn download_node_agent_binary(
+    state: Arc<AppState>,
+    file_name: &'static str,
+    download_name: &'static str,
+) -> axum::response::Response {
+    let exe_path = state.data_dir.join("downloads").join(file_name);
     match tokio::fs::read(&exe_path).await {
         Ok(bytes) => axum::response::Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/octet-stream")
-            .header("content-disposition", "attachment; filename=\"elon-node-agent.exe\"")
+            .header(
+                "content-disposition",
+                format!("attachment; filename=\"{}\"", download_name),
+            )
             .body(axum::body::Body::from(bytes))
             .unwrap_or_else(|_| axum::response::Response::default()),
         Err(_) => (
             StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error": "node-agent exe not available"})),
+            Json(serde_json::json!({"error": "node-agent binary not available"})),
         )
             .into_response(),
     }
