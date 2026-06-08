@@ -32,6 +32,8 @@
   position: absolute;
   inset: 0;
   z-index: 1;
+  transform: rotate(-14deg) scale(1.08);
+  transform-origin: center;
 }
 
 .project-plaza-tile {
@@ -49,7 +51,7 @@
   font-weight: 700;
   line-height: 1;
   overflow: hidden;
-  transform: translate(-50%, -50%) rotate(var(--rot));
+  transform: translate(-50%, -50%);
   transform-origin: center;
 }
 

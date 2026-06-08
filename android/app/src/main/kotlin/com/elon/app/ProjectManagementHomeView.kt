@@ -20,6 +20,8 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import kotlin.math.cos
+import kotlin.math.sin
 
 internal class ProjectManagementHomeView(
     private val activity: AppCompatActivity,
@@ -327,12 +329,17 @@ private class ProjectPlazaPatternView(
     projects: List<StoreProject>
 ) : View(context) {
     private data class BannerSlot(
-        val x: Float,
-        val y: Float,
-        val sizeDp: Int,
-        val rotation: Float
+        val left: Float,
+        val top: Float,
+        val size: Float
     )
 
+    private data class BannerPoint(
+        val x: Float,
+        val y: Float
+    )
+
+    private val bannerRotation = -14f
     private val sortedProjects = projects
         .sortedWith(compareByDescending<StoreProject> { it.memberCount }.thenBy { it.name })
         .take(14)
@@ -362,21 +369,6 @@ private class ProjectPlazaPatternView(
     private val tileRect = RectF()
     private val bitmapSource = Rect()
     private val clipPath = Path()
-    private val focusSlot = BannerSlot(0.58f, 0.40f, 56, -14f)
-    private val iconSlots = listOf(
-        BannerSlot(-0.03f, 0.38f, 50, -14f),
-        BannerSlot(0.20f, 0.24f, 50, -14f),
-        BannerSlot(0.38f, -0.03f, 50, -14f),
-        BannerSlot(0.64f, -0.06f, 50, -14f),
-        BannerSlot(0.79f, 0.19f, 50, -14f),
-        BannerSlot(0.98f, 0.28f, 50, -14f),
-        BannerSlot(0.08f, 0.86f, 50, -14f),
-        BannerSlot(0.22f, 0.62f, 50, -14f),
-        BannerSlot(0.43f, 0.50f, 50, -14f),
-        BannerSlot(0.68f, 0.78f, 50, -14f),
-        BannerSlot(0.84f, 0.50f, 50, -14f),
-        BannerSlot(1.05f, 0.84f, 50, -14f)
-    )
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -401,35 +393,105 @@ private class ProjectPlazaPatternView(
     }
 
     private fun drawProjectIcons(canvas: Canvas) {
-        val focus = sortedProjects.firstOrNull()
-        val rest = sortedProjects.drop(1)
-        iconSlots.forEachIndexed { index, slot ->
-            drawProjectIcon(canvas, rest.getOrNull(index), slot)
+        val slots = buildBannerSlots()
+        val focusIndex = findFocusSlot(slots)
+        val assignments = assignProjects(slots, focusIndex)
+
+        canvas.save()
+        canvas.rotate(bannerRotation, width / 2f, height / 2f)
+        slots.forEachIndexed { index, slot ->
+            if (index != focusIndex) {
+                drawProjectIcon(canvas, assignments[index], slot)
+            }
         }
-        drawProjectIcon(
-            canvas = canvas,
-            project = focus,
-            slot = focusSlot
-        )
+        if (focusIndex in slots.indices) {
+            drawProjectIcon(canvas, assignments[focusIndex], slots[focusIndex])
+        }
+        canvas.restore()
     }
 
     private fun drawProjectIcon(canvas: Canvas, project: StoreProject?, slot: BannerSlot) {
-        val size = dp(slot.sizeDp).toFloat()
-        val cx = width * slot.x
-        val cy = height * slot.y
         val radius = dp(5).toFloat()
-        tileRect.set(cx - size / 2f, cy - size / 2f, cx + size / 2f, cy + size / 2f)
-        canvas.save()
-        canvas.rotate(slot.rotation, cx, cy)
+        tileRect.set(slot.left, slot.top, slot.left + slot.size, slot.top + slot.size)
         canvas.drawRoundRect(tileRect, radius, radius, tilePaint)
 
         val icon = UserProfileStore.decodeAvatar(project?.iconDataUrl)
         if (icon != null) {
             drawBitmapIcon(canvas, icon, tileRect, radius)
         } else if (project != null) {
-            drawInitialIcon(canvas, project, tileRect, size)
+            drawInitialIcon(canvas, project, tileRect, slot.size)
         }
-        canvas.restore()
+    }
+
+    private fun buildBannerSlots(): List<BannerSlot> {
+        val tileSize = dp(50).toFloat()
+        val gapX = dp(96).toFloat()
+        val gapY = dp(84).toFloat()
+        val slots = mutableListOf<BannerSlot>()
+        var row = 0
+        var y = -height.toFloat()
+        while (y < height * 2f) {
+            var x = -width.toFloat() + if (row % 2 == 0) 0f else gapX / 2f
+            while (x < width * 2f) {
+                slots += BannerSlot(x, y, tileSize)
+                x += gapX
+            }
+            row += 1
+            y += gapY
+        }
+        return slots
+    }
+
+    private fun assignProjects(slots: List<BannerSlot>, focusIndex: Int): Map<Int, StoreProject> {
+        if (sortedProjects.isEmpty()) return emptyMap()
+        val assignments = mutableMapOf<Int, StoreProject>()
+        if (focusIndex in slots.indices) {
+            assignments[focusIndex] = sortedProjects.first()
+        }
+        val restProjects = sortedProjects.drop(1)
+        val orderedSlots = slots.indices
+            .filter { it != focusIndex && isVisibleSlot(slots[it]) }
+            .sortedWith(compareBy({ rotatedCenter(slots[it]).y }, { rotatedCenter(slots[it]).x }))
+        restProjects.forEachIndexed { index, project ->
+            val slotIndex = orderedSlots.getOrNull(index) ?: return@forEachIndexed
+            assignments[slotIndex] = project
+        }
+        return assignments
+    }
+
+    private fun findFocusSlot(slots: List<BannerSlot>): Int {
+        val lensX = width * 0.60f
+        val lensY = height * 0.43f
+        return slots.indices
+            .filter { isVisibleSlot(slots[it]) }
+            .minByOrNull { index ->
+                val center = rotatedCenter(slots[index])
+                val dx = center.x - lensX
+                val dy = center.y - lensY
+                dx * dx + dy * dy
+            } ?: -1
+    }
+
+    private fun isVisibleSlot(slot: BannerSlot): Boolean {
+        val center = rotatedCenter(slot)
+        val margin = slot.size * 1.2f
+        return center.x >= -margin &&
+            center.x <= width + margin &&
+            center.y >= -margin &&
+            center.y <= height + margin
+    }
+
+    private fun rotatedCenter(slot: BannerSlot): BannerPoint {
+        val cx = slot.left + slot.size / 2f
+        val cy = slot.top + slot.size / 2f
+        val originX = width / 2f
+        val originY = height / 2f
+        val radians = Math.toRadians(bannerRotation.toDouble())
+        val dx = (cx - originX).toDouble()
+        val dy = (cy - originY).toDouble()
+        val screenX = dx * cos(radians) - dy * sin(radians) + originX
+        val screenY = dx * sin(radians) + dy * cos(radians) + originY
+        return BannerPoint(screenX.toFloat(), screenY.toFloat())
     }
 
     private fun drawBitmapIcon(canvas: Canvas, bitmap: Bitmap, rect: RectF, radius: Float) {

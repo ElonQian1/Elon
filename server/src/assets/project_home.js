@@ -28,20 +28,22 @@
   };
 
   const plazaBannerSlots = [
-    { x: -3, y: 38, size: 50, rot: -14 },
-    { x: 20, y: 24, size: 50, rot: -14 },
-    { x: 38, y: -3, size: 50, rot: -14 },
-    { x: 64, y: -6, size: 50, rot: -14 },
-    { x: 79, y: 19, size: 50, rot: -14 },
-    { x: 98, y: 28, size: 50, rot: -14 },
-    { x: 8, y: 86, size: 50, rot: -14 },
-    { x: 22, y: 62, size: 50, rot: -14 },
-    { x: 43, y: 50, size: 50, rot: -14 },
-    { x: 68, y: 78, size: 50, rot: -14 },
-    { x: 84, y: 50, size: 50, rot: -14 },
-    { x: 105, y: 84, size: 50, rot: -14 }
+    { x: -8, y: 10, size: 50 },
+    { x: 20, y: 10, size: 50 },
+    { x: 48, y: 10, size: 50 },
+    { x: 76, y: 10, size: 50 },
+    { x: 104, y: 10, size: 50 },
+    { x: 6, y: 58, size: 50 },
+    { x: 34, y: 58, size: 50 },
+    { x: 88, y: 58, size: 50 },
+    { x: 116, y: 58, size: 50 },
+    { x: -8, y: 106, size: 50 },
+    { x: 20, y: 106, size: 50 },
+    { x: 48, y: 106, size: 50 },
+    { x: 76, y: 106, size: 50 },
+    { x: 104, y: 106, size: 50 }
   ];
-  const plazaBannerFocusSlot = { x: 58, y: 40, size: 56, rot: -14 };
+  const plazaBannerFocusSlot = { x: 62, y: 58, size: 50 };
 
   function memberCountOf(project) {
     return Number(project.member_count || project.memberCount || project.members || 0) || 0;
@@ -146,7 +148,7 @@
     const label = project ? escapeHtml(projectInitial(project)) : '';
     const fontSize = Math.round(slot.size * 0.36);
     return `
-      <span class="project-plaza-tile ${extraClass || ''}" style="--x:${slot.x}%;--y:${slot.y}%;--size:${slot.size}px;--font:${fontSize}px;--rot:${slot.rot}deg">
+      <span class="project-plaza-tile ${extraClass || ''}" style="--x:${slot.x}%;--y:${slot.y}%;--size:${slot.size}px;--font:${fontSize}px">
         ${label}
         ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
       </span>
