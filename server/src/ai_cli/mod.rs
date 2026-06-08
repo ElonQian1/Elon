@@ -845,18 +845,10 @@ async fn run_via_pc_agent(
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }
 
-/// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。
-/// Codex exec 的输出格式：
-///   [启动信息头 ... ---]
-///   user
-///   <用户消息回放>
-///   [可能的错误日志]
-///   codex
-///   <AI 回复>          ← 只取这段
-///   tokens used
-///   <AI 回复重复>       ← 丢弃
-///   <数字>
-///   <AI 回复重复>       ← 丢弃
+/// 从 Codex exec 的完整输出中提取 AI 回复文本。
+///
+/// Codex 0.133+ exec 模式直接输出 AI 回复，无 user/codex 分隔标记。
+/// 旧版格式（有 "codex\n<AI回复>\ntokens used" 结构）作为兼容路径。
 fn extract_codex_reply(output: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
     let mut in_codex_reply = false;
@@ -877,7 +869,26 @@ fn extract_codex_reply(output: &str) -> String {
         }
     }
 
-    reply_lines.join("\n").trim().to_string()
+    // 旧版格式成功提取
+    let old_format = reply_lines.join("\n").trim().to_string();
+    if !old_format.is_empty() {
+        return old_format;
+    }
+
+    // 新版 Codex 0.133+：直接输出 AI 回复，过滤掉启动信息行（包含 "codex" 字符的标题行）
+    // 启动信息特征：含 "OpenAI Codex"、"Model:" 等
+    let clean: Vec<&str> = lines.iter()
+        .map(|l| *l)
+        .skip_while(|l| {
+            let t = l.trim();
+            t.is_empty()
+                || t.contains("OpenAI Codex")
+                || t.starts_with("Model:")
+                || t.starts_with("session id:")
+                || t.starts_with("---")
+        })
+        .collect();
+    clean.join("\n").trim().to_string()
 }
 
 // ── 图片附件提取（独立函数，防止重构时漏掉） ──────────────────────────────────
