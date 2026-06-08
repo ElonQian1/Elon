@@ -32,6 +32,7 @@ internal class ProjectSpaceController(
     private val openPersonalAiChat: (Int) -> Unit,
     private val showPersonalConversationActions: (Int) -> Unit,
     private val showCreatePersonalConversation: () -> Unit,
+    private val showForkPersonalConversation: (String) -> Unit,
     private val selectedAgentForRequest: () -> String?,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
@@ -109,12 +110,8 @@ internal class ProjectSpaceController(
         space.channels.forEach { channel ->
             container.addView(channelRow(channel))
         }
-        if (space.project.role != "observer") {
-            container.addView(sectionTitle("个人会话"))
-            renderPersonalConversations(container)
-        }
-        container.addView(sectionTitle("成员"))
-        container.addView(memberSummary(space.members))
+        container.addView(sectionTitle("团队成员"))
+        renderMemberList(container, space.members)
     }
 
     fun showMembers() {
@@ -128,13 +125,21 @@ internal class ProjectSpaceController(
             return
         }
         ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp) { member ->
+            val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
+            val isSelf = member.userId == selfId
             ProjectMemberConversationDialog.show(
                 activity = activity,
                 http = http,
                 serverUrl = serverUrl,
                 projectId = space.project.id,
                 member = member,
-                dp = dp
+                dp = dp,
+                onOpenConversation = if (isSelf) { convId -> openPersonalConversationById(convId) } else null,
+                onCreateConversation = if (isSelf) { -> showCreatePersonalConversation() } else null,
+                onForkConversation = if (!isSelf) { conversation ->
+                    val forkTitle = "分叉 ${member.account}：${conversation.title ?: "会话"}"
+                    showForkPersonalConversation(forkTitle)
+                } else null
             )
         }
     }
@@ -420,6 +425,91 @@ internal class ProjectSpaceController(
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
+        }
+    }
+
+    private fun renderMemberList(container: LinearLayout, members: List<ProjectMember>) {
+        val space = activeSpace ?: return
+        val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
+        if (members.isEmpty()) {
+            container.addView(emptyPersonalConversationRow().apply { text = "暂无成员" })
+            if (space.project.role != "observer") container.addView(createPersonalConversationRow())
+            return
+        }
+        var selfInList = false
+        members.forEach { member ->
+            val isSelf = member.userId == selfId
+            if (isSelf) selfInList = true
+            container.addView(memberCard(member, isSelf, space))
+        }
+        if (space.project.role != "observer") {
+            if (!selfInList) container.addView(createPersonalConversationRow())
+        }
+    }
+
+    private fun memberCard(member: ProjectMember, isSelf: Boolean, space: ProjectSpace): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+            background = panelBackground(if (isSelf) "#1E2A38" else "#181B20")
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener {
+                if (isSelf) {
+                    ProjectMemberConversationDialog.show(
+                        activity = activity,
+                        http = http,
+                        serverUrl = serverUrl,
+                        projectId = space.project.id,
+                        member = member,
+                        dp = dp,
+                        onOpenConversation = { convId -> openPersonalConversationById(convId) },
+                        onCreateConversation = { showCreatePersonalConversation() }
+                    )
+                } else {
+                    ProjectMemberConversationDialog.show(
+                        activity = activity,
+                        http = http,
+                        serverUrl = serverUrl,
+                        projectId = space.project.id,
+                        member = member,
+                        dp = dp,
+                        onForkConversation = { conversation ->
+                            val forkTitle = "分叉 ${member.account}：${conversation.title ?: "会话"}"
+                            showForkPersonalConversation(forkTitle)
+                        }
+                    )
+                }
+            }
+            addView(TextView(activity).apply {
+                text = buildString {
+                    append(member.account)
+                    if (isSelf) append(" (我)")
+                }
+                textSize = 16f
+                setTextColor(Color.parseColor("#F2F5FA"))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            addView(TextView(activity).apply {
+                text = buildString {
+                    append(roleLabel(member.role))
+                    val convCount = personalConversations().takeIf { isSelf }?.size
+                    if (convCount != null && convCount > 0) append(" · $convCount 个会话")
+                }
+                textSize = 12f
+                setTextColor(Color.parseColor("#6F7785"))
+                setPadding(0, dp(5), 0, 0)
+            })
+        }
+    }
+
+    private fun openPersonalConversationById(conversationId: String) {
+        val index = personalConversations().indexOfFirst { it.id == conversationId }
+        if (index >= 0) {
+            openPersonalAiChat(index)
+        } else {
+            Toast.makeText(activity, "找不到该会话，可能已删除", Toast.LENGTH_SHORT).show()
         }
     }
 

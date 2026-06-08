@@ -20,9 +20,9 @@ internal class MainConversationActions(
     private val setSendEnabled: (Boolean) -> Unit,
     private val onConversationsChanged: () -> Unit = {}
 ) {
-    fun showCreateConversationDialog() {
+    fun showCreateConversationDialog(suggestedTitle: String? = null) {
         val conversations = conversationsProvider()
-        val input = titleEditText("新会话 ${conversations.size + 1}")
+        val input = titleEditText(suggestedTitle ?: "新会话 ${conversations.size + 1}")
         val dialog = AlertDialog.Builder(activity)
             .setTitle("新建会话")
             .setView(input)

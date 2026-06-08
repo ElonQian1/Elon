@@ -22,7 +22,10 @@ internal object ProjectMemberConversationDialog {
         serverUrl: String,
         projectId: String,
         member: ProjectMember,
-        dp: (Int) -> Int
+        dp: (Int) -> Int,
+        onOpenConversation: ((String) -> Unit)? = null,
+        onCreateConversation: (() -> Unit)? = null,
+        onForkConversation: ((ProjectMemberConversation) -> Unit)? = null
     ) {
         val body = bodyContainer(activity, dp)
         val dialog = AlertDialog.Builder(activity)
@@ -44,11 +47,20 @@ internal object ProjectMemberConversationDialog {
                         body.addView(emptyRow(activity, dp, "这个成员还没有项目 AI 会话"))
                     } else {
                         conversations.forEach { conversation ->
-                            body.addView(conversationRow(activity, conversation, dp) {
+                            val forkAction = onForkConversation?.let { fork ->
+                                { dialog.dismiss(); fork(conversation) }
+                            }
+                            val openAction = onOpenConversation?.let { open ->
+                                { dialog.dismiss(); open(conversation.id) }
+                            }
+                            body.addView(conversationRow(activity, conversation, dp, forkAction, openAction) {
                                 dialog.dismiss()
                                 showMessages(activity, http, serverUrl, projectId, member, conversation, dp)
                             })
                         }
+                    }
+                    if (onOpenConversation != null) {
+                        body.addView(createNewConversationButton(activity, dp) { dialog.dismiss(); onCreateConversation?.invoke() })
                     }
                 }.onFailure { error ->
                     body.addView(errorRow(activity, dp, error.message ?: "加载成员会话失败"))
@@ -126,6 +138,8 @@ internal object ProjectMemberConversationDialog {
         activity: AppCompatActivity,
         conversation: ProjectMemberConversation,
         dp: (Int) -> Int,
+        onFork: (() -> Unit)? = null,
+        onOpen: (() -> Unit)? = null,
         onClick: () -> Unit
     ): View {
         return LinearLayout(activity).apply {
@@ -162,6 +176,33 @@ internal object ProjectMemberConversationDialog {
                     setPadding(0, dp(8), 0, 0)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
+                })
+            }
+            if (onOpen != null || onFork != null) {
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.END
+                    setPadding(0, dp(10), 0, 0)
+                    if (onOpen != null) {
+                        addView(TextView(activity).apply {
+                            text = "继续会话 →"
+                            textSize = 13f
+                            setTextColor(Color.parseColor("#60A5FA"))
+                            setTypeface(typeface, Typeface.BOLD)
+                            isClickable = true
+                            setOnClickListener { onOpen() }
+                        })
+                    }
+                    if (onFork != null) {
+                        addView(TextView(activity).apply {
+                            text = "在此基础上分叉 →"
+                            textSize = 13f
+                            setTextColor(Color.parseColor("#58BE6A"))
+                            setTypeface(typeface, Typeface.BOLD)
+                            isClickable = true
+                            setOnClickListener { onFork() }
+                        })
+                    }
                 })
             }
         }
@@ -268,6 +309,21 @@ internal object ProjectMemberConversationDialog {
             else -> "#A6AFBD"
         }
     )
+
+    private fun createNewConversationButton(activity: AppCompatActivity, dp: (Int) -> Int, onClick: () -> Unit): TextView {
+        return TextView(activity).apply {
+            text = "+ 新建个人 AI 会话"
+            textSize = 15f
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            isClickable = true
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(8) }
+        }
+    }
 
     private fun panelBackground(color: String, dp: (Int) -> Int): GradientDrawable {
         return GradientDrawable().apply {
