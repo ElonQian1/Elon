@@ -24,6 +24,12 @@ use crate::{
 pub struct StoreQuery {
     /// 关键词搜索（匹配项目名 / 描述）
     pub q: Option<String>,
+    /// 加入方式过滤：open / approval / readonly
+    pub join_mode: Option<String>,
+    /// 是否只看已有可安装 APK 的项目
+    pub has_apk: Option<bool>,
+    /// 排序：updated / created / members
+    pub sort: Option<String>,
     /// 每页数量，默认 20，最大 50
     pub limit: Option<i64>,
     /// 偏移量，默认 0
@@ -40,10 +46,14 @@ pub async fn list_store_projects(
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
     let offset = q.offset.unwrap_or(0).max(0);
 
-    match state
-        .store
-        .list_public_projects(q.q.as_deref(), limit, offset)
-    {
+    match state.store.list_public_projects(
+        q.q.as_deref(),
+        q.join_mode.as_deref(),
+        q.has_apk,
+        q.sort.as_deref(),
+        limit,
+        offset,
+    ) {
         Ok(projects) => Json(serde_json::json!({
             "projects": projects,
             "total": projects.len(),

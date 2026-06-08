@@ -1,15 +1,21 @@
 package com.elon.app
 
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
+import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import android.graphics.BitmapFactory
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
@@ -28,11 +34,43 @@ internal class MainMarketplaceActions(
 
     private val joinedIds = mutableSetOf<String>()
     private val avatarCache = HashMap<String, android.graphics.Bitmap>()
+    private val filterChipViews = LinkedHashMap<String, TextView>()
+    private var resultsContainer: LinearLayout? = null
+    private var searchField: EditText? = null
+    private var searchDebounce: Runnable? = null
+    private var searchQuery = ""
+    private var activeFilterKey = FILTER_ALL
+    @Volatile
+    private var loadSerial = 0
 
     private data class ProjectCardIdentity(
         val title: String,
         val subtitle: String?
     )
+
+    private data class MarketplaceFilter(
+        val key: String,
+        val label: String,
+        val joinMode: String? = null,
+        val hasApk: Boolean? = null,
+        val sort: String? = null,
+        val joinedOnly: Boolean = false
+    )
+
+    private val filters = listOf(
+        MarketplaceFilter(FILTER_ALL, "全部"),
+        MarketplaceFilter("installable", "可安装 APK", hasApk = true),
+        MarketplaceFilter("open", "可直接加入", joinMode = PROJECT_JOIN_MODE_OPEN),
+        MarketplaceFilter("readonly", "只读体验", joinMode = PROJECT_JOIN_MODE_READONLY),
+        MarketplaceFilter("approval", "需要申请", joinMode = PROJECT_JOIN_MODE_APPROVAL),
+        MarketplaceFilter("joined", "我已加入", joinedOnly = true),
+        MarketplaceFilter("popular", "成员最多", sort = "members")
+    )
+
+    private companion object {
+        const val FILTER_ALL = "all"
+        const val STORE_PAGE_LIMIT = 50
+    }
 
     // 根据字符串生成固定色相的深色渐变（用作卡片顶部识别色带）
     private val BANNER_PALETTES = arrayOf(
@@ -108,13 +146,188 @@ internal class MainMarketplaceActions(
         }
     }
 
+    private fun activeFilter(): MarketplaceFilter {
+        return filters.firstOrNull { it.key == activeFilterKey } ?: filters.first()
+    }
+
+    private fun isFilterActive(): Boolean {
+        return activeFilterKey != FILTER_ALL || searchQuery.isNotBlank()
+    }
+
+    private fun ensureDiscoveryShell(): LinearLayout {
+        val container = getListContainer()
+        val currentResults = resultsContainer
+        if (currentResults != null && currentResults.parent === container) {
+            updateFilterChipVisuals()
+            return currentResults
+        }
+        container.removeAllViews()
+        filterChipViews.clear()
+        val shell = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(12), dp(12), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        shell.addView(buildSearchBox())
+        shell.addView(buildFilterScroller())
+        container.addView(shell)
+        updateFilterChipVisuals()
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            container.addView(this)
+            resultsContainer = this
+        }
+    }
+
+    private fun buildSearchBox(): LinearLayout {
+        val input = EditText(activity).apply {
+            setText(searchQuery)
+            setSingleLine(true)
+            textSize = 15f
+            hint = "搜索项目、功能或创建者"
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#6F7785"))
+            background = null
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            setPadding(0, 0, dp(8), 0)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    val next = s?.toString()?.trim().orEmpty()
+                    if (next == searchQuery) return
+                    searchQuery = next
+                    searchDebounce?.let { activity.window.decorView.removeCallbacks(it) }
+                    searchDebounce = Runnable { loadProjects(searchQuery) }.also {
+                        activity.window.decorView.postDelayed(it, 360)
+                    }
+                }
+            })
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    searchDebounce?.let { activity.window.decorView.removeCallbacks(it) }
+                    loadProjects(searchQuery)
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+        searchField = input
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = roundedRect("#181B20", 8, "#1E2126")
+            setPadding(dp(12), 0, dp(8), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(46)
+            )
+            addView(TextView(activity).apply {
+                text = "搜索"
+                textSize = 13f
+                setTextColor(Color.parseColor("#81B3D9"))
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(dp(44), LinearLayout.LayoutParams.MATCH_PARENT))
+            addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+            addView(TextView(activity).apply {
+                text = "清除"
+                textSize = 13f
+                setTextColor(Color.parseColor("#A6AFBD"))
+                gravity = Gravity.CENTER
+                isClickable = true
+                foreground = selectableForeground()
+                setOnClickListener { clearDiscoveryFilters() }
+            }, LinearLayout.LayoutParams(dp(46), LinearLayout.LayoutParams.MATCH_PARENT))
+        }
+    }
+
+    private fun buildFilterScroller(): HorizontalScrollView {
+        return HorizontalScrollView(activity).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(10) }
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 0, dp(4), 0)
+                filters.forEach { option ->
+                    addView(filterChip(option))
+                }
+            })
+        }
+    }
+
+    private fun filterChip(option: MarketplaceFilter): TextView {
+        return TextView(activity).apply {
+            text = option.label
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(7), dp(12), dp(7))
+            isClickable = true
+            foreground = selectableForeground()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { rightMargin = dp(8) }
+            setOnClickListener {
+                if (activeFilterKey == option.key) return@setOnClickListener
+                activeFilterKey = option.key
+                updateFilterChipVisuals()
+                loadProjects(searchQuery)
+            }
+            filterChipViews[option.key] = this
+        }
+    }
+
+    private fun updateFilterChipVisuals() {
+        filterChipViews.forEach { (key, chip) ->
+            val selected = key == activeFilterKey
+            chip.setTextColor(Color.parseColor(if (selected) "#DDE8FC" else "#A6AFBD"))
+            chip.background = roundedRect(
+                if (selected) "#152C3E" else "#181B20",
+                999,
+                if (selected) "#6091CF" else "#283140"
+            )
+        }
+    }
+
+    private fun clearDiscoveryFilters() {
+        val hadState = isFilterActive()
+        searchQuery = ""
+        activeFilterKey = FILTER_ALL
+        searchField?.setText("")
+        updateFilterChipVisuals()
+        if (hadState) loadProjects("")
+    }
+
     // ─── 加载公开项目列表 ─────────────────────────────────────────────────────
 
     fun loadProjects(search: String? = null) {
+        if (search != null) searchQuery = search.trim()
+        val serial = ++loadSerial
         renderLoading()
         thread {
+            val filter = activeFilter()
             val storeResult = runCatching {
-                fetchStoreProjects(http, serverUrl, search?.trim()?.ifBlank { null })
+                fetchStoreProjects(
+                    http = http,
+                    serverUrl = serverUrl,
+                    search = searchQuery.ifBlank { null },
+                    limit = STORE_PAGE_LIMIT,
+                    joinMode = filter.joinMode,
+                    hasApk = filter.hasApk,
+                    sort = filter.sort
+                )
             }
             val alreadyJoined: Set<String> = runCatching {
                 if (!AuthManager.isLoggedIn(activity)) emptySet<String>()
@@ -122,10 +335,13 @@ internal class MainMarketplaceActions(
             }.getOrDefault(emptySet<String>())
 
             activity.runOnUiThread {
+                if (serial != loadSerial) return@runOnUiThread
                 joinedIds.clear()
                 joinedIds.addAll(alreadyJoined)
                 storeResult
-                    .onSuccess { renderProjects(it) }
+                    .onSuccess { projects ->
+                        renderProjects(if (filter.joinedOnly) projects.filter { joinedIds.contains(it.id) } else projects)
+                    }
                     .onFailure { renderError(it.message ?: "加载失败") }
             }
         }
@@ -140,6 +356,10 @@ internal class MainMarketplaceActions(
         }
         val token = AuthManager.token(activity) ?: run {
             Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (normalizeProjectJoinMode(project.joinMode) == PROJECT_JOIN_MODE_APPROVAL) {
+            tryRequestJoinProject(project, joinBtn, token)
             return
         }
         joinBtn.isEnabled = false
@@ -159,6 +379,29 @@ internal class MainMarketplaceActions(
                         joinBtn.isEnabled = true
                         joinBtn.text = projectJoinActionLabel(project.joinMode)
                         Toast.makeText(activity, it.message ?: "加入失败", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }
+    }
+
+    private fun tryRequestJoinProject(project: StoreProject, joinBtn: TextView, token: String) {
+        joinBtn.isEnabled = false
+        joinBtn.text = "申请中..."
+        thread {
+            val result = runCatching {
+                requestJoinStoreProject(http, serverUrl, project.id, token)
+            }
+            activity.runOnUiThread {
+                joinBtn.isEnabled = true
+                joinBtn.text = "已申请"
+                result
+                    .onSuccess {
+                        joinBtn.isEnabled = false
+                        Toast.makeText(activity, "申请已提交，等待项目管理员审核", Toast.LENGTH_SHORT).show()
+                    }
+                    .onFailure {
+                        joinBtn.text = projectJoinActionLabel(project.joinMode)
+                        Toast.makeText(activity, it.message ?: "申请失败", Toast.LENGTH_SHORT).show()
                     }
             }
         }
@@ -221,7 +464,7 @@ internal class MainMarketplaceActions(
     // ─── 渲染 ─────────────────────────────────────────────────────────────────
 
     private fun renderLoading() {
-        val container = getListContainer()
+        val container = ensureDiscoveryShell()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
             text = "加载中..."
@@ -237,7 +480,7 @@ internal class MainMarketplaceActions(
     }
 
     private fun renderError(msg: String) {
-        val container = getListContainer()
+        val container = ensureDiscoveryShell()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
             text = msg
@@ -253,27 +496,17 @@ internal class MainMarketplaceActions(
     }
 
     private fun renderProjects(projects: List<StoreProject>) {
-        val container = getListContainer()
+        val container = ensureDiscoveryShell()
         container.removeAllViews()
 
         if (projects.isEmpty()) {
-            container.addView(TextView(activity).apply {
-                text = "暂无公开项目"
-                textSize = 15f
-                setTextColor(Color.parseColor("#6F7785"))
-                gravity = Gravity.CENTER
-                setPadding(dp(24), dp(60), dp(24), dp(60))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            })
+            container.addView(emptyResultView())
             return
         }
 
         // 顶部标题栏
         container.addView(TextView(activity).apply {
-            text = "公开项目广场 · ${projects.size} 个项目"
+            text = resultSummary(projects.size)
             textSize = 12f
             setTextColor(Color.parseColor("#6F7785"))
             setPadding(dp(16), dp(16), dp(16), dp(8))
@@ -285,6 +518,47 @@ internal class MainMarketplaceActions(
 
         for (project in projects) {
             container.addView(buildProjectCard(project))
+        }
+    }
+
+    private fun resultSummary(count: Int): String {
+        val filter = activeFilter()
+        val parts = mutableListOf("公开项目广场", "${count} 个项目")
+        if (filter.key != FILTER_ALL) parts.add(filter.label)
+        if (searchQuery.isNotBlank()) parts.add("“$searchQuery”")
+        return parts.joinToString(" · ")
+    }
+
+    private fun emptyResultView(): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(54), dp(24), dp(54))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            addView(TextView(activity).apply {
+                text = if (isFilterActive()) "没有找到匹配的项目" else "暂无公开项目"
+                textSize = 15f
+                setTextColor(Color.parseColor("#A6AFBD"))
+                gravity = Gravity.CENTER
+            })
+            if (isFilterActive()) {
+                addView(TextView(activity).apply {
+                    text = "清除筛选"
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#DDE8FC"))
+                    gravity = Gravity.CENTER
+                    background = roundedRect("#283140", 8)
+                    isClickable = true
+                    foreground = selectableForeground()
+                    setOnClickListener { clearDiscoveryFilters() }
+                    layoutParams = LinearLayout.LayoutParams(dp(112), dp(40)).apply {
+                        topMargin = dp(16)
+                    }
+                })
+            }
         }
     }
 

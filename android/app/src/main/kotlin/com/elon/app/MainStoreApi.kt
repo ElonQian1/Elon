@@ -18,7 +18,8 @@ internal data class StoreProject(
     val memberCount: Int,
     val isPublic: Boolean,
     val joinMode: String,
-    val lastTaskStatus: String?
+    val lastTaskStatus: String?,
+    val latestApkUrl: String? = null
 )
 
 // ─── API 函数（在调用方手动切换线程） ─────────────────────────────────────────
@@ -29,11 +30,20 @@ internal fun fetchStoreProjects(
     serverUrl: String,
     search: String? = null,
     limit: Int = 30,
-    offset: Int = 0
+    offset: Int = 0,
+    joinMode: String? = null,
+    hasApk: Boolean? = null,
+    sort: String? = null
 ): List<StoreProject> {
     val qs = buildString {
         append("limit=$limit&offset=$offset")
-        if (!search.isNullOrBlank()) append("&q=${java.net.URLEncoder.encode(search, "UTF-8")}")
+        fun appendParam(key: String, value: String?) {
+            if (!value.isNullOrBlank()) append("&$key=${java.net.URLEncoder.encode(value, "UTF-8")}")
+        }
+        appendParam("q", search)
+        appendParam("join_mode", joinMode)
+        appendParam("sort", sort)
+        if (hasApk != null) append("&has_apk=$hasApk")
     }
     val resp = http.newCall(
         Request.Builder()
@@ -57,6 +67,28 @@ internal fun joinStoreProject(
         Request.Builder()
             .url("$serverUrl/api/projects/$projectId/join")
             .post("{}".toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+}
+
+/** POST /api/projects/:id/request-join — 需要 Bearer token */
+internal fun requestJoinStoreProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String,
+    message: String? = null
+) {
+    val payload = JSONObject().apply {
+        put("message", message.orEmpty())
+    }
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects/$projectId/request-join")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
             .header("Authorization", "Bearer $token")
             .build()
     ).execute()
@@ -123,7 +155,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
     joinMode = obj.optString("join_mode", "open"),
-    lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() }
+    lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
+    latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
 )
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */

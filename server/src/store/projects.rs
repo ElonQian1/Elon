@@ -19,6 +19,9 @@ impl Store {
     pub fn list_public_projects(
         &self,
         search: Option<&str>,
+        join_mode: Option<&str>,
+        has_apk: Option<bool>,
+        sort: Option<&str>,
         limit: i64,
         offset: i64,
     ) -> Result<Vec<PublicProjectItem>> {
@@ -26,8 +29,19 @@ impl Store {
         let pattern = search
             .filter(|s| !s.trim().is_empty())
             .map(|s| format!("%{}%", s.to_ascii_lowercase()));
+        let join_mode_filter = join_mode.and_then(|mode| match mode.trim() {
+            "open" | "approval" | "readonly" => Some(mode.trim().to_string()),
+            _ => None,
+        });
+        let has_apk_filter = has_apk.map(|value| if value { 1_i64 } else { 0_i64 });
+        let order_by = match sort.map(str::trim) {
+            Some("created") => "p.created_at DESC",
+            Some("members") => "member_count DESC, p.updated_at DESC",
+            _ => "p.updated_at DESC",
+        };
 
-        let sql = "
+        let sql = format!(
+            "
             SELECT
               p.id,
               p.name,
@@ -52,29 +66,54 @@ impl Store {
              WHERE p.is_public = 1
               AND p.join_mode != 'invite'
               AND p.status != 'deleted'
-              AND (?1 IS NULL OR LOWER(p.name) LIKE ?1 OR LOWER(COALESCE(p.description,'')) LIKE ?1)
-            ORDER BY p.updated_at DESC
-            LIMIT ?2 OFFSET ?3";
+              AND (
+                ?1 IS NULL
+                OR LOWER(p.name) LIKE ?1
+                OR LOWER(COALESCE(p.description,'')) LIKE ?1
+                OR LOWER(COALESCE(u.phone, u.email, p.created_by)) LIKE ?1
+              )
+              AND (?2 IS NULL OR p.join_mode = ?2)
+              AND (
+                ?3 IS NULL
+                OR (?3 = 1 AND EXISTS (
+                  SELECT 1 FROM tasks t_apk
+                  WHERE t_apk.project_id = p.id
+                    AND t_apk.apk_url IS NOT NULL
+                    AND t_apk.apk_url != ''
+                ))
+                OR (?3 = 0 AND NOT EXISTS (
+                  SELECT 1 FROM tasks t_apk
+                  WHERE t_apk.project_id = p.id
+                    AND t_apk.apk_url IS NOT NULL
+                    AND t_apk.apk_url != ''
+                ))
+              )
+            ORDER BY {order_by}
+            LIMIT ?4 OFFSET ?5"
+        );
 
-        let mut stmt = conn.prepare(sql)?;
+        let mut stmt = conn.prepare(&sql)?;
         let rows = stmt
-            .query_map(params![pattern, limit, offset], |row| {
-                Ok(PublicProjectItem {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    description: row.get(2)?,
-                    template: row.get(3)?,
-                    owner_account: row.get(4)?,
-                    member_count: row.get(5)?,
-                    is_public: row.get::<_, i64>(6)? != 0,
-                    join_mode: row.get(7)?,
-                    last_task_status: row.get(8)?,
-                    latest_apk_url: row.get(9)?,
-                    created_at: row.get(10)?,
-                    updated_at: row.get(11)?,
-                    owner_id: row.get(12).unwrap_or_default(),
-                })
-            })?
+            .query_map(
+                params![pattern, join_mode_filter, has_apk_filter, limit, offset],
+                |row| {
+                    Ok(PublicProjectItem {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        description: row.get(2)?,
+                        template: row.get(3)?,
+                        owner_account: row.get(4)?,
+                        member_count: row.get(5)?,
+                        is_public: row.get::<_, i64>(6)? != 0,
+                        join_mode: row.get(7)?,
+                        last_task_status: row.get(8)?,
+                        latest_apk_url: row.get(9)?,
+                        created_at: row.get(10)?,
+                        updated_at: row.get(11)?,
+                        owner_id: row.get(12).unwrap_or_default(),
+                    })
+                },
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
     }
@@ -525,7 +564,7 @@ mod tests {
             .expect("project should become invite-only");
 
         assert!(store
-            .list_public_projects(None, 10, 0)
+            .list_public_projects(None, None, None, None, 10, 0)
             .expect("store projects should list")
             .is_empty());
         assert!(store.get_public_project(&project.id).is_err());
@@ -558,7 +597,7 @@ mod tests {
             .expect("project should become readonly public");
 
         let public_projects = store
-            .list_public_projects(None, 10, 0)
+            .list_public_projects(None, None, None, None, 10, 0)
             .expect("store projects should list");
         assert_eq!(public_projects.len(), 1);
         assert_eq!(public_projects[0].join_mode, "readonly");
@@ -600,12 +639,64 @@ mod tests {
             .expect("task should finish with apk url");
 
         let public_projects = store
-            .list_public_projects(None, 10, 0)
+            .list_public_projects(None, None, None, None, 10, 0)
             .expect("store projects should list");
         assert_eq!(
             public_projects[0].latest_apk_url.as_deref(),
             Some("https://example.test/latest.apk")
         );
+    }
+
+    #[test]
+    fn public_projects_can_filter_join_mode_and_apk() {
+        let store = temp_store();
+        let owner = store
+            .create_user("filter-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let open_project = store
+            .create_project(&owner.id, "Open APK Project", None, None)
+            .expect("open project should be created")
+            .project;
+        let readonly_project = store
+            .create_project(&owner.id, "Readonly Demo", None, None)
+            .expect("readonly project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&open_project.id, true, "open")
+            .expect("open project should become public");
+        store
+            .set_project_visibility(&readonly_project.id, true, "readonly")
+            .expect("readonly project should become public");
+        let task = store
+            .create_task(&open_project.id, &owner.id, Some("conv"), "build apk")
+            .expect("task should be created");
+        store
+            .finish_task(
+                &task,
+                "done",
+                Some("done"),
+                Some("https://example.test/open.apk"),
+                None,
+            )
+            .expect("task should finish with apk url");
+
+        let readonly_only = store
+            .list_public_projects(None, Some("readonly"), None, None, 10, 0)
+            .expect("readonly filter should list");
+        assert_eq!(readonly_only.len(), 1);
+        assert_eq!(readonly_only[0].id, readonly_project.id);
+
+        let apk_only = store
+            .list_public_projects(None, None, Some(true), None, 10, 0)
+            .expect("apk filter should list");
+        assert_eq!(apk_only.len(), 1);
+        assert_eq!(apk_only[0].id, open_project.id);
+
+        let owner_matches = store
+            .list_public_projects(Some("filter-owner"), None, None, None, 10, 0)
+            .expect("owner search should list");
+        assert_eq!(owner_matches.len(), 2);
     }
 
     #[test]
