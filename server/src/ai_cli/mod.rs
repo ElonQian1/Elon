@@ -692,7 +692,19 @@ async fn run_via_pc_agent(
         })
     };
 
-    // extra_args：Copilot 用 --session-id + --model，Codex 不需要额外的（exec 子命令已传）
+    // extra_args：Copilot 用 --session-id + --model + --attachment（图片），Codex 不需要额外的
+    // 从 prompt 里提取图片 URL（由 append_project_attachment_notes 生成的 "(url: http://...)" 格式）
+    let attachment_urls: Vec<String> = prompt.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            // 匹配行内 "(url: http...)" 或单独一行 "url: http..."
+            let url = line.strip_prefix("(url: ").and_then(|s| s.strip_suffix(')'))
+                .or_else(|| line.strip_prefix("url: "))
+                .filter(|url| url.starts_with("http"));
+            url.map(str::to_owned)
+        })
+        .collect();
+
     let extra_args: Vec<String> = if cli_name == "copilot" {
         let mut args = if let Some(ref sid) = copilot_session_uuid {
             vec![format!("--session-id={}", sid)]
@@ -705,9 +717,20 @@ async fn run_via_pc_agent(
                 args.push(model.to_string());
             }
         }
+        // 图片附件：URL 传给 node-agent，node-agent 下载后转为 --attachment <local_path>
+        for url in &attachment_urls {
+            args.push("--attachment".into());
+            args.push(url.clone());
+        }
         args
     } else {
-        vec![]
+        // Codex 也支持 -i <image>，通过 --attachment 传 URL，node-agent 转换
+        let mut args = vec![];
+        for url in &attachment_urls {
+            args.push("--attachment".into());
+            args.push(url.clone());
+        }
+        args
     };
 
     // dispatch 时节点可能刚好掉线重连
