@@ -292,9 +292,20 @@ internal class ProjectManagementHomeView(
         return SquareProjectCardFrame(activity).apply {
             background = rect("#181B20")
             emptyAction?.let { action ->
+                contentDescription = "新建项目"
                 isClickable = true
                 foreground = selectableForeground()
                 setOnClickListener { action() }
+                addView(TextView(activity).apply {
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    text = "+"
+                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
             }
         }
     }

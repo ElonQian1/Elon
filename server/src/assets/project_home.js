@@ -221,7 +221,8 @@
 
   function renderEmptyCard(action) {
     const attr = action ? ` data-project-home-action="${action}" tabindex="0"` : ' tabindex="-1"';
-    return `<button class="project-home-empty-card" type="button"${attr} aria-label="空项目位"></button>`;
+    const plus = action ? '<span class="project-home-empty-plus" aria-hidden="true">+</span>' : '';
+    return `<button class="project-home-empty-card" type="button"${attr} aria-label="空项目位">${plus}</button>`;
   }
 
   function render() {

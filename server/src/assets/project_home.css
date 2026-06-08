@@ -163,6 +163,17 @@
   cursor: pointer;
 }
 
+.project-home-empty-plus {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #a6afbd;
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+}
+
 .project-home-card:hover,
 .project-home-empty-card[data-project-home-action]:hover,
 .project-plaza-banner:hover {
