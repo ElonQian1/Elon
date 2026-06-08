@@ -1,5 +1,21 @@
 package com.elon.app
 
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -24,6 +40,25 @@ internal class MainProjectActions(
     private val isLoggedIn: () -> Boolean,
     private val removeSentProjectShareCards: (Set<String>) -> Int
 ) {
+    private data class ProjectMenuAction(
+        val title: String,
+        val subtitle: String,
+        val iconRes: Int,
+        val tone: ProjectMenuTone = ProjectMenuTone.Neutral,
+        val action: () -> Unit
+    )
+
+    private enum class ProjectMenuTone(
+        val iconColor: String,
+        val iconBackground: String,
+        val titleColor: String = "#F2F5FA"
+    ) {
+        Primary("#58BE6A", "#17351E"),
+        Info("#81B3D9", "#152C3E"),
+        Neutral("#DDE8FC", "#283140"),
+        Danger("#FF6B6B", "#3A1F24", "#FF9A9A")
+    }
+
     fun showCreateProjectDialog() {
         val input = titleEditText("新项目 ${projects.size + 1}")
         val dialog = AlertDialog.Builder(activity)
@@ -81,39 +116,291 @@ internal class MainProjectActions(
         val project = projects[index]
         val isJoint = project.isJointDevelopmentProject()
 
-        val actions = buildList {
-            add("编辑项目名称")
-            add("打开项目空间")
-            if (!isJoint) add("邀请好友协作")
-            if (isJoint) add("恢复为个人项目")
-            if (isJoint) add("发布到项目商城")
-            add("Git 仓库")
-            add("协作权限 / 商城公开")
-            if (projects.size > 1 && project.id != ELON_SELF_PROJECT_ID) add("删除项目")
-        }.toTypedArray()
+        val actions = buildProjectMenuActions(index, project, isJoint)
+        val dialog = AlertDialog.Builder(activity).create()
+        val content = createProjectActionsDialogView(project, isJoint, actions) {
+            dialog.dismiss()
+        }
+        @Suppress("DEPRECATION")
+        dialog.setView(content, 0, 0, 0, 0)
+        dialog.setOnShowListener {
+            dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            dialog.window?.setDimAmount(0.62f)
+            val width = minOf(
+                activity.resources.displayMetrics.widthPixels - dp(48),
+                dp(360)
+            )
+            dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        dialog.show()
+    }
 
-        AlertDialog.Builder(activity)
-            .setTitle(project.title)
-            .setItems(actions) { _, which ->
-                when (actions[which]) {
-                    "编辑项目名称" -> showRenameProjectDialog(index)
-                    "邀请好友协作" -> confirmUpgradeToJoint(index)
-                    "打开项目空间" -> {
-                        setActiveProjectIndex(index)
-                        saveProjects()
-                        openProjectSpace(project)
-                    }
-                    "恢复为个人项目" -> confirmRestorePersonalProject(project)
-                    "发布到项目商城" -> confirmPublishToMarketplace(project)
-                    "Git 仓库" -> {
-                        openProject(index)
-                        showGitProjectDialog()
-                    }
-                    "协作权限 / 商城公开" -> showVisibilityDialog(project)
-                    "删除项目" -> confirmDeleteProject(index)
+    private fun buildProjectMenuActions(
+        index: Int,
+        project: AppProject,
+        isJoint: Boolean
+    ): List<ProjectMenuAction> {
+        return buildList {
+            add(
+                ProjectMenuAction(
+                    title = "编辑项目名称",
+                    subtitle = "调整项目列表里的显示名称",
+                    iconRes = R.drawable.ic_project_action_rename,
+                    tone = ProjectMenuTone.Neutral
+                ) { showRenameProjectDialog(index) }
+            )
+            add(
+                ProjectMenuAction(
+                    title = "打开项目空间",
+                    subtitle = if (isJoint) "进入联合协作空间" else "进入项目开发会话",
+                    iconRes = R.drawable.ic_project_action_space,
+                    tone = ProjectMenuTone.Primary
+                ) {
+                    setActiveProjectIndex(index)
+                    saveProjects()
+                    openProjectSpace(project)
                 }
+            )
+            if (!isJoint) {
+                add(
+                    ProjectMenuAction(
+                        title = "邀请好友协作",
+                        subtitle = "生成项目卡片并开启协作",
+                        iconRes = R.drawable.ic_project_action_invite,
+                        tone = ProjectMenuTone.Info
+                    ) { confirmUpgradeToJoint(index) }
+                )
             }
-            .show()
+            if (isJoint) {
+                add(
+                    ProjectMenuAction(
+                        title = "恢复为个人项目",
+                        subtitle = "撤回协作状态与分享卡片",
+                        iconRes = R.drawable.ic_project_action_restore,
+                        tone = ProjectMenuTone.Neutral
+                    ) { confirmRestorePersonalProject(project) }
+                )
+                add(
+                    ProjectMenuAction(
+                        title = "发布到项目商城",
+                        subtitle = "让其他用户可见并加入",
+                        iconRes = R.drawable.ic_project_action_publish,
+                        tone = ProjectMenuTone.Primary
+                    ) { confirmPublishToMarketplace(project) }
+                )
+            }
+            add(
+                ProjectMenuAction(
+                    title = "Git 仓库",
+                    subtitle = "查看或配置项目远端",
+                    iconRes = R.drawable.ic_project_action_git,
+                    tone = ProjectMenuTone.Info
+                ) {
+                    openProject(index)
+                    showGitProjectDialog()
+                }
+            )
+            add(
+                ProjectMenuAction(
+                    title = "协作权限 / 商城公开",
+                    subtitle = "管理加入方式和可见范围",
+                    iconRes = R.drawable.ic_project_action_visibility,
+                    tone = ProjectMenuTone.Info
+                ) { showVisibilityDialog(project) }
+            )
+            if (projects.size > 1 && project.id != ELON_SELF_PROJECT_ID) {
+                add(
+                    ProjectMenuAction(
+                        title = "删除项目",
+                        subtitle = "从服务器和本机移除",
+                        iconRes = R.drawable.ic_project_action_delete,
+                        tone = ProjectMenuTone.Danger
+                    ) { confirmDeleteProject(index) }
+                )
+            }
+        }
+    }
+
+    private fun createProjectActionsDialogView(
+        project: AppProject,
+        isJoint: Boolean,
+        actions: List<ProjectMenuAction>,
+        dismissDialog: () -> Unit
+    ): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(Color.parseColor("#181B20"))
+                setStroke(dp(1), Color.parseColor("#1E2126"))
+            }
+            setPadding(0, dp(18), 0, dp(8))
+
+            addView(createProjectActionsHeader(project, isJoint))
+            addView(createProjectActionsDivider(marginStart = dp(18), marginEnd = dp(18)))
+
+            addView(ScrollView(activity).apply {
+                isFillViewport = false
+                overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    actions.forEachIndexed { actionIndex, action ->
+                        addView(createProjectActionRow(action, dismissDialog))
+                        if (actionIndex < actions.lastIndex) {
+                            addView(createProjectActionsDivider(marginStart = dp(74), marginEnd = dp(18)))
+                        }
+                    }
+                })
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+    }
+
+    private fun createProjectActionsHeader(project: AppProject, isJoint: Boolean): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), 0, dp(18), dp(16))
+
+            addView(FrameLayout(activity).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor(if (isJoint) "#17351E" else "#152C3E"))
+                    setStroke(dp(1), Color.parseColor(if (isJoint) "#2B6F3A" else "#254761"))
+                }
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_popup_project)
+                    imageTintList = ColorStateList.valueOf(
+                        Color.parseColor(if (isJoint) "#58BE6A" else "#81B3D9")
+                    )
+                }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            }, LinearLayout.LayoutParams(dp(48), dp(48)))
+
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = project.title.ifBlank { "未命名项目" }
+                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = projectStatusText(project, isJoint)
+                    setTextColor(Color.parseColor(if (isJoint) "#58BE6A" else "#81B3D9"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(9).toFloat()
+                        setColor(Color.parseColor(if (isJoint) "#17351E" else "#152C3E"))
+                    }
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(8)
+                })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(14)
+            })
+        }
+    }
+
+    private fun createProjectActionRow(
+        action: ProjectMenuAction,
+        dismissDialog: () -> Unit
+    ): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(62)
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+            isClickable = true
+            foreground = selectableForeground()
+
+            addView(FrameLayout(activity).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor(action.tone.iconBackground))
+                }
+                addView(ImageView(activity).apply {
+                    setImageResource(action.iconRes)
+                    imageTintList = ColorStateList.valueOf(Color.parseColor(action.tone.iconColor))
+                }, FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER))
+            }, LinearLayout.LayoutParams(dp(40), dp(40)))
+
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = action.title
+                    setTextColor(Color.parseColor(action.tone.titleColor))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = action.subtitle
+                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(5)
+                })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(16)
+            })
+
+            setOnClickListener {
+                dismissDialog()
+                action.action()
+            }
+        }
+    }
+
+    private fun createProjectActionsDivider(marginStart: Int = 0, marginEnd: Int = 0): View {
+        return View(activity).apply {
+            alpha = 0.75f
+            setBackgroundColor(Color.parseColor("#1E2126"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1
+            ).apply {
+                this.marginStart = marginStart
+                this.marginEnd = marginEnd
+            }
+        }
+    }
+
+    private fun projectStatusText(project: AppProject, isJoint: Boolean): String {
+        if (!isJoint) return "个人项目"
+        return when (normalizeProjectJoinMode(project.collaborationJoinMode)) {
+            "open" -> "联合项目 · 商城公开"
+            "readonly" -> "联合项目 · 广场只读"
+            "approval" -> "联合项目 · 加入需审批"
+            else -> "联合项目 · 邀请协作"
+        }
+    }
+
+    private fun selectableForeground(): Drawable? = runCatching {
+        val outValue = TypedValue()
+        activity.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+        activity.getDrawable(outValue.resourceId)
+    }.getOrNull()
+
+    private fun dp(value: Int): Int {
+        return (value * activity.resources.displayMetrics.density + 0.5f).toInt()
     }
 
     private fun confirmUpgradeToJoint(index: Int) {

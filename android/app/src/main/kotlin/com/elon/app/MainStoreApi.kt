@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.net.URLEncoder
 
 // ─── 数据模型 ─────────────────────────────────────────────────────────────────
 
@@ -19,8 +20,32 @@ internal data class StoreProject(
     val isPublic: Boolean,
     val joinMode: String,
     val lastTaskStatus: String?,
-    val latestApkUrl: String? = null
+    val latestApkUrl: String? = null,
+    val role: String = "member"
 )
+
+internal fun StoreProject.toJointAppProject(): AppProject {
+    return newAppProject(name, description ?: "联合项目").copy(
+        id = id,
+        isJointProject = true,
+        collaborationProjectId = id,
+        collaborationJoinMode = normalizeProjectJoinMode(joinMode)
+    )
+}
+
+/**
+ * 将服务器项目还原为"个人独立项目"（适用于用户自己创建的 owner 项目）。
+ * id 直接用服务器项目 ID，collaborationProjectId 不设置，这样 resolveProjectId()
+ * 仍能通过 id 找到服务器项目，同时 isJointDevelopmentProject() 返回 false，
+ * 项目出现在"个人独立项目"分组。
+ */
+internal fun StoreProject.toOwnerAppProject(): AppProject {
+    return newAppProject(name, description ?: "我的项目").copy(
+        id = id,
+        isJointProject = false,
+        collaborationProjectId = null
+    )
+}
 
 // ─── API 函数（在调用方手动切换线程） ─────────────────────────────────────────
 
@@ -54,6 +79,34 @@ internal fun fetchStoreProjects(
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
     return parseStoreProjectList(JSONObject(body))
+}
+
+/** POST /api/projects — 创建私有服务器项目，发布为联合项目时再设置公开 */
+internal fun createStoreProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    name: String,
+    description: String?,
+    token: String,
+    ownerAccount: String? = null
+): StoreProject {
+    val payload = JSONObject().apply {
+        put("name", name)
+        put("description", description ?: "")
+        put("template", "android")
+    }
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/projects")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    val project = JSONObject(body).optJSONObject("project")
+        ?: error("响应缺少 project")
+    return parseCreatedStoreProject(project, ownerAccount)
 }
 
 /** POST /api/projects/:id/join — 需要 Bearer token */
@@ -114,6 +167,32 @@ internal fun leaveStoreProject(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
+/** DELETE /api/projects/:id 或旧匿名 /api/user/:user_id/projects/:id — 删除服务器项目和托管文件 */
+internal fun deleteServerProject(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String?,
+    userId: String
+): Boolean {
+    val encodedProjectId = storeUrlPart(projectId)
+    val builder = if (!token.isNullOrBlank()) {
+        Request.Builder()
+            .url("$serverUrl/api/projects/$encodedProjectId")
+            .delete()
+            .header("Authorization", "Bearer $token")
+    } else {
+        Request.Builder()
+            .url("$serverUrl/api/user/${storeUrlPart(userId)}/projects/$encodedProjectId")
+            .delete()
+    }
+    val resp = http.newCall(builder.build()).execute()
+    val body = resp.body?.string().orEmpty()
+    if (resp.code == 404) return false
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return true
+}
+
 /** PATCH /api/projects/:id/visibility — 仅 owner；需要 Bearer token */
 internal fun setProjectVisibility(
     http: OkHttpClient,
@@ -138,12 +217,35 @@ internal fun setProjectVisibility(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
+/** DELETE /api/me/project-share-messages/:project_id — 撤回自己发出的好友/群聊项目卡片 */
+internal fun revokeProjectShareMessages(
+    http: OkHttpClient,
+    serverUrl: String,
+    projectId: String,
+    token: String
+): Int {
+    val encodedProjectId = storeUrlPart(projectId)
+    val resp = http.newCall(
+        Request.Builder()
+            .url("$serverUrl/api/me/project-share-messages/$encodedProjectId")
+            .delete()
+            .header("Authorization", "Bearer $token")
+            .build()
+    ).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return runCatching { JSONObject(body).optInt("deleted", 0) }.getOrDefault(0)
+}
+
 // ─── 解析 ─────────────────────────────────────────────────────────────────────
 
 private fun parseStoreProjectList(json: JSONObject): List<StoreProject> {
     val arr = json.optJSONArray("projects") ?: return emptyList()
     return (0 until arr.length()).map { i -> parseStoreProject(arr.getJSONObject(i)) }
 }
+
+private fun storeUrlPart(value: String): String =
+    URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
 internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     id = obj.getString("id"),
@@ -154,9 +256,25 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     ownerUserId = obj.optString("owner_id", ""),
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
-    joinMode = obj.optString("join_mode", "open"),
+    joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "open")),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
+        ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
+    role = obj.optString("role", "member")
+)
+
+private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
+    id = obj.getString("id"),
+    name = obj.optString("name", "联合项目"),
+    description = obj.optString("description").takeIf { it.isNotBlank() },
+    template = obj.optString("template", "android"),
+    ownerAccount = ownerAccount?.takeIf { it.isNotBlank() } ?: "?",
+    ownerUserId = "",
+    memberCount = 1,
+    isPublic = false,
+    joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
+    lastTaskStatus = null,
+    latestApkUrl = null
 )
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */
@@ -174,6 +292,21 @@ internal fun fetchJoinedProjectIds(
     val obj = JSONObject(body)
     val arr = obj.optJSONArray("projects") ?: return emptySet()
     return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
+}
+
+/** GET /api/me/projects — 返回当前用户拥有或加入的项目列表，需要登录 */
+internal fun fetchMyProjects(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context
+): List<StoreProject> {
+    val req = AuthManager.applyAuth(ctx, Request.Builder()
+        .url("$serverUrl/api/me/projects")
+        .get())
+    val resp = http.newCall(req.build()).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    return parseStoreProjectList(JSONObject(body))
 }
 
 /** PUT /api/me/avatar — 同步头像到服务器，需要登录 */
@@ -194,4 +327,18 @@ internal fun syncAvatarToServer(
     val resp = http.newCall(req).execute()
     val respBody = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(respBody.ifBlank { "HTTP ${resp.code}" })
+}
+
+/** GET /api/me — 获取当前登录用户信息，返回 avatar_data_url（可为 null） */
+internal fun fetchMyAvatarDataUrl(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context
+): String? {
+    val req = AuthManager.applyAuth(ctx, Request.Builder().url("$serverUrl/api/me").get()).build()
+    val resp = http.newCall(req).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) return null
+    return JSONObject(body).optJSONObject("user")?.optString("avatar_data_url")
+        ?.takeIf { it.isNotBlank() }
 }
