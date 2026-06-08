@@ -696,10 +696,10 @@ async fn run_via_pc_agent(
             let seed = format!("{}-session/{}/{}/{}", cli_name, scope.project_id, scope.user_id, scope.conversation_id);
             let hash = sha2::Sha256::digest(seed.as_bytes());
             format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                 hash[0], hash[1], hash[2], hash[3],
                 hash[4], hash[5],
-                hash[6] & 0x0f, hash[7],
+                hash[6] & 0x0f, hash[7],   // {:x} = 1 nibble = 1 hex char，合计 "4xxx" 4字符
                 (hash[8] & 0x3f) | 0x80, hash[9],
                 hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
             )
