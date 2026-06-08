@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/elon_bg_app"
+    android:background="#101010"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:background="@color/elon_bg_app"
+        android:background="#101010"
         android:contentInsetStart="0dp"
         android:contentInsetEnd="0dp"
         android:elevation="0dp"
@@ -27,7 +27,7 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:text="‹"
-                android:textColor="@color/elon_text_primary"
+                android:textColor="#D0D0D0"
                 android:textSize="27sp"
                 android:visibility="gone" />
 
@@ -39,7 +39,7 @@
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:text="会话区"
-                android:textColor="@color/elon_text_primary"
+                android:textColor="#D0D0D0"
                 android:textSize="17sp" />
 
             <ImageButton
@@ -52,7 +52,7 @@
                 android:contentDescription="搜索"
                 android:padding="7dp"
                 android:src="@drawable/ic_search_simple"
-                app:tint="@color/elon_text_secondary" />
+                app:tint="#B8B8B8" />
 
             <ImageButton
                 android:id="@+id/addButton"
@@ -64,36 +64,9 @@
                 android:contentDescription="新增"
                 android:padding="7dp"
                 android:src="@drawable/ic_add_circle_simple"
-                app:tint="@color/elon_text_secondary" />
+                app:tint="#B8B8B8" />
 
-            <ImageButton
-                android:id="@+id/projectMembersButton"
-                android:layout_width="44dp"
-                android:layout_height="match_parent"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="成员列表"
-                android:padding="7dp"
-                android:src="@drawable/ic_project_members"
-                android:visibility="gone"
-                app:tint="@color/elon_text_secondary" />
-
-            <ImageButton
-                android:id="@+id/voiceCallButton"
-                android:layout_width="44dp"
-                android:layout_height="match_parent"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="52dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="实时语音通话"
-                android:padding="9dp"
-                android:scaleType="center"
-                android:src="@drawable/ic_top_phone"
-                android:visibility="gone"
-                app:tint="@color/elon_text_primary" />
-
-            <ImageButton
+            <TextView
                 android:id="@+id/moreButton"
                 android:layout_width="44dp"
                 android:layout_height="match_parent"
@@ -101,9 +74,11 @@
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="更多功能"
-                android:padding="8dp"
-                android:scaleType="center"
-                android:src="@drawable/ic_more_horizontal"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="⋯"
+                android:textColor="#D0D0D0"
+                android:textSize="25sp"
                 android:visibility="gone" />
         </FrameLayout>
     </androidx.appcompat.widget.Toolbar>
@@ -113,7 +88,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/elon_bg_app">
+        android:background="#101010">
 
         <LinearLayout
             android:id="@+id/conversationPage"
@@ -125,7 +100,7 @@
                 android:id="@+id/conversationItem"
                 android:layout_width="match_parent"
                 android:layout_height="66dp"
-                android:background="@color/elon_surface_card"
+                android:background="#242424"
                 android:clickable="true"
                 android:foreground="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
@@ -155,7 +130,7 @@
                         android:includeFontPadding="false"
                         android:maxLines="1"
                         android:text="一龙开发助手"
-                        android:textColor="@color/elon_text_primary"
+                        android:textColor="#D0D0D0"
                         android:textSize="16sp" />
 
                     <TextView
@@ -167,7 +142,7 @@
                         android:includeFontPadding="false"
                         android:maxLines="1"
                         android:text="连接中..."
-                        android:textColor="@color/elon_text_secondary"
+                        android:textColor="#A9A9A9"
                         android:textSize="13sp" />
                 </LinearLayout>
 
@@ -180,7 +155,7 @@
                     android:layout_marginTop="16dp"
                     android:includeFontPadding="false"
                     android:text="时间"
-                    android:textColor="@color/elon_text_secondary"
+                    android:textColor="#C4C4C4"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
@@ -189,7 +164,7 @@
             android:id="@+id/chatPage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/elon_bg_app"
+            android:background="#101010"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -197,7 +172,7 @@
                 android:id="@+id/quickActionStrip"
                 android:layout_width="match_parent"
                 android:layout_height="54dp"
-                android:background="@color/elon_bg_app"
+                android:background="#101010"
                 android:overScrollMode="never"
                 android:scrollbars="none"
                 android:visibility="gone">
@@ -241,14 +216,14 @@
                 android:id="@+id/stageHintText"
                 android:layout_width="match_parent"
                 android:layout_height="42dp"
-                android:background="@color/elon_surface_subtle"
+                android:background="#1C1C1C"
                 android:ellipsize="end"
                 android:gravity="center_vertical"
                 android:maxLines="1"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:text="点击输入需求，开发进度会自动记录到项目页。"
-                android:textColor="@color/elon_text_secondary"
+                android:textColor="#B8B8B8"
                 android:textSize="13sp" />
 
             <androidx.recyclerview.widget.RecyclerView
@@ -268,7 +243,7 @@
             android:id="@+id/projectPage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/elon_bg_app"
+            android:background="#101010"
             android:fillViewport="true"
             android:visibility="gone">
 
@@ -282,12 +257,12 @@
                     android:id="@+id/currentStageText"
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#242424"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="待提交需求"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="18sp" />
 
                 <TextView
@@ -295,19 +270,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:lineSpacingExtra="5dp"
                     android:minHeight="104dp"
                     android:padding="22dp"
                     android:text="项目管理\n当前没有正在执行的开发任务。"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="15sp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:orientation="vertical"
                     android:padding="18dp">
 
@@ -316,7 +291,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="开发进度"
-                        android:textColor="@color/elon_text_primary"
+                        android:textColor="#D0D0D0"
                         android:textSize="16sp" />
 
                     <TextView
@@ -345,19 +320,19 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:lineSpacingExtra="4dp"
                     android:minHeight="112dp"
                     android:padding="18dp"
                     android:text="通用项目工作流\n1. 准备 Git 和权限\n2. 读取项目文档\n3. 修改和验证\n4. 提交推送\n5. 合并发布串行保护"
-                    android:textColor="@color/elon_text_secondary"
+                    android:textColor="#B8B8B8"
                     android:textSize="13sp" />
 
                 <GridLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:columnCount="2"
                     android:padding="12dp">
 
@@ -392,12 +367,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:lineSpacingExtra="5dp"
                     android:minHeight="220dp"
                     android:padding="22dp"
                     android:text="暂无进度记录"
-                    android:textColor="@color/elon_text_secondary"
+                    android:textColor="#B8B8B8"
                     android:textSize="13sp" />
             </LinearLayout>
         </ScrollView>
@@ -406,7 +381,7 @@
             android:id="@+id/profilePage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/elon_bg_app"
+            android:background="#101010"
             android:fillViewport="true"
             android:visibility="gone">
 
@@ -419,50 +394,25 @@
                     android:id="@+id/userInfoText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@color/elon_surface_card"
+                    android:background="#242424"
                     android:lineSpacingExtra="5dp"
                     android:minHeight="112dp"
                     android:padding="22dp"
                     android:text="我的开发工作台"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="15sp" />
-
-                <LinearLayout
-                    android:id="@+id/profileUsageContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="vertical" />
-
-                <LinearLayout
-                    android:id="@+id/profileNodeBalanceContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <LinearLayout
-                    android:id="@+id/profileMyNodesContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <LinearLayout
-                    android:id="@+id/profileMemoriesContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
 
                 <TextView
                     android:id="@+id/profileLoginButton"
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="登录账号 · 多设备同步"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="16sp"
                     android:visibility="gone" />
 
@@ -471,38 +421,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="AI 代理设置"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/profileAgentButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
-                    android:gravity="center_vertical"
-                    android:paddingStart="22dp"
-                    android:paddingEnd="22dp"
-                    android:text="Agent 自动化"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/profileNodeMarketButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
-                    android:gravity="center_vertical"
-                    android:paddingStart="22dp"
-                    android:paddingEnd="22dp"
-                    android:text="节点算力市场"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="16sp" />
 
                 <TextView
@@ -510,12 +434,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="检查更新"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="16sp" />
 
                 <TextView
@@ -523,12 +447,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="分享推广"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="16sp" />
 
                 <TextView
@@ -536,12 +460,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
                     android:text="导入游客记录"
-                    android:textColor="@color/elon_text_primary"
+                    android:textColor="#D0D0D0"
                     android:textSize="16sp"
                     android:visibility="gone" />
 
@@ -550,7 +474,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="64dp"
                     android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
+                    android:background="#1E1E1E"
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
@@ -566,7 +490,7 @@
                     android:layout_marginTop="20dp"
                     android:gravity="center"
                     android:paddingBottom="24dp"
-                    android:textColor="@color/elon_text_tertiary"
+                    android:textColor="#505050"
                     android:textSize="12sp" />
             </LinearLayout>
         </ScrollView>
@@ -575,7 +499,7 @@
             android:id="@+id/marketplacePage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/elon_bg_app"
+            android:background="#101010"
             android:fillViewport="true"
             android:visibility="gone">
 
@@ -586,92 +510,21 @@
                 android:orientation="vertical"
                 android:paddingBottom="16dp" />
         </ScrollView>
-
-        <include
-            android:id="@+id/agentPage"
-            layout="@layout/page_agent"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone" />
     </FrameLayout>
 
     <FrameLayout
         android:id="@+id/bottomBarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/elon_nav_bg"
         android:clipChildren="false"
         android:clipToPadding="false">
-
-        <LinearLayout
-            android:id="@+id/chatSelectionBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:background="@drawable/bg_chat_selection_bar"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/selectionCountText"
-                android:layout_width="match_parent"
-                android:layout_height="24dp"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:text="选择消息"
-                android:textColor="@color/elon_text_secondary"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="58dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/selectionCancelButton"
-                    style="@style/ChatSelectionActionText"
-                    android:drawableTop="@drawable/ic_msg_multi"
-                    android:drawableTint="@color/elon_text_primary"
-                    android:text="取消" />
-
-                <TextView
-                    android:id="@+id/selectionCopyButton"
-                    style="@style/ChatSelectionActionText"
-                    android:drawableTop="@drawable/ic_msg_copy"
-                    android:drawableTint="@color/elon_text_primary"
-                    android:text="复制" />
-
-                <TextView
-                    android:id="@+id/selectionForwardButton"
-                    style="@style/ChatSelectionActionText"
-                    android:drawableTop="@drawable/ic_msg_forward"
-                    android:drawableTint="@color/elon_text_primary"
-                    android:text="转发" />
-
-                <TextView
-                    android:id="@+id/selectionSummarizeButton"
-                    style="@style/ChatSelectionActionText"
-                    android:drawableTop="@drawable/ic_popup_chat"
-                    android:drawableTint="@color/elon_text_primary"
-                    android:text="AI总结" />
-
-                <TextView
-                    android:id="@+id/selectionDeleteButton"
-                    style="@style/ChatSelectionActionText"
-                    android:drawableTop="@drawable/ic_msg_delete"
-                    android:drawableTint="#F06E6E"
-                    android:text="删除"
-                    android:textColor="#F06E6E" />
-            </LinearLayout>
-        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/inputLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:background="@color/elon_nav_bg"
+            android:background="#1E1E1E"
             android:gravity="bottom"
             android:orientation="horizontal"
             android:paddingStart="10dp"
@@ -696,8 +549,8 @@
                 android:paddingTop="8dp"
                 android:paddingEnd="14dp"
                 android:paddingBottom="8dp"
-                android:textColor="@color/elon_text_primary"
-                android:textColorHint="@color/elon_text_tertiary"
+                android:textColor="#EDEDED"
+                android:textColorHint="#8E8E8E"
                 android:textSize="15sp" />
 
             <TextView
@@ -709,7 +562,7 @@
                 android:gravity="center"
                 android:maxLines="1"
                 android:text="默认"
-                android:textColor="@color/elon_text_primary"
+                android:textColor="#D0D0D0"
                 android:textSize="13sp" />
 
             <TextView
@@ -720,48 +573,23 @@
                 android:background="@drawable/bg_send_button"
                 android:gravity="center"
                 android:text="发送"
-                android:textColor="@color/elon_button_primary_text"
+                android:textColor="#FFFFFF"
                 android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/main_bottom_menu_height"
+            android:layout_height="60dp"
             android:layout_gravity="bottom"
-            android:background="@color/elon_nav_bg"
+            android:background="#1E1E1E"
             android:orientation="horizontal">
 
-            <FrameLayout
-                android:id="@+id/tabChatWrap"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1">
-
-                <TextView
-                    android:id="@+id/tabChat"
-                    style="@style/MainTabText"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="0"
-                    android:drawableTop="@drawable/ic_tab_chat_refined"
-                    android:text="好友" />
-
-                <TextView
-                    android:id="@+id/tabChatBadge"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
-                    android:layout_gravity="top|center_horizontal"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginStart="14dp"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
-
-            </FrameLayout>
+            <TextView
+                android:id="@+id/tabChat"
+                style="@style/MainTabText"
+                android:drawableTop="@drawable/ic_tab_chat_refined"
+                android:text="好友" />
 
             <TextView
                 android:id="@+id/tabProject"
@@ -779,15 +607,7 @@
                 android:id="@+id/tabMarket"
                 style="@style/MainTabText"
                 android:drawableTop="@drawable/ic_tab_store"
-                android:text="商城"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tabAgent"
-                style="@style/MainTabText"
-                android:drawableTop="@drawable/ic_tab_agent"
-                android:text="Agent"
-                android:visibility="gone" />
+                android:text="商城" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

@@ -13,14 +13,6 @@
 
     版本号不再进入 git 历史；多 AI / 多 PC 不会因为撞版本号死循环 rebase。
 
-    慢构建并发保护（出现上传中止时参考）：
-      - 构建完成后检查服务器 versionCode；已有同等或更高版本 → 停止上传，finish(success=false)。
-      - 任何失败路径（编译失败、CAS 冲突、scp 失败）必须调 finish(success=false) 释放 in-flight 槽位，
-        否则需运维手动清理 release-state.json。
-      - 上传先传 staging 文件，服务器 flock+CAS 原子替换；version.json 包含源码 commit 的 gitSha。
-      - 中止提示"APK 发布已中止：服务器已有更新版本"是正常保护，不是失败。
-        强制覆盖用 -Force 参数。
-
 .PARAMETER Changelog
     本次版本更新说明（必填，写进 version.json 给手机端用户看）
 

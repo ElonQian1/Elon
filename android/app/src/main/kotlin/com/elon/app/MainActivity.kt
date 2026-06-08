@@ -1,16 +1,12 @@
 package com.elon.app
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
-import android.view.View
 import android.widget.PopupWindow
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import java.util.Date
@@ -19,50 +15,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
-    private lateinit var agentPageController: AgentPageController
-
-    /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
-    private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
-        adapter.onApkAction = { action, url -> handleApkChatAction(action, url) }
-        adapter.onVoiceAttachmentLongPress = { message, attachment ->
-            inputActions.showVoiceAttachmentActions(message, attachment)
-        }
-        chatAdapter = adapter
-    }
-
-    private fun handleApkChatAction(action: String, url: String) {
-        when (action) {
-            "install" -> ApkChatInstaller.downloadAndInstall(this, url, s.http)
-            "copy" -> {
-                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
-                    as android.content.ClipboardManager
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("apk_url", url))
-                android.widget.Toast.makeText(this, "链接已复制", android.widget.Toast.LENGTH_SHORT).show()
-            }
-            "share" -> startActivity(
-                android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, url)
-                }
-            )
-        }
-    }
     /** 运行时可变状态与工具实例（OkHttpClient 含超时配置）。 */
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
-    private val serverUrl get() = ServerUrlManager.getActive(this)
-    /** 返回当前活跃服务器对应的 token：备用服务器使用本地静态 token，云端使用 session token。 */
-    private fun activeToken(): String? {
-        val activeUrl = ServerUrlManager.getActive(this)
-        return if (activeUrl == BuildConfig.SERVER_URL) {
-            AuthManager.token(this)
-        } else {
-            getSharedPreferences("agent_config", android.content.Context.MODE_PRIVATE)
-                .getString("fallback_server_token", null)
-                ?.takeIf { it.isNotBlank() }
-                ?: AuthManager.token(this)
-        }
-    }
+    private val serverUrl = BuildConfig.SERVER_URL
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
     private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
@@ -86,10 +42,7 @@ class MainActivity : AppCompatActivity() {
             chatAdapter = { chatAdapter },
             activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
             setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
-            activeRequestIsPlanning = { s.activeRequestIsPlanning },
-            setActiveRequestIsPlanning = { s.activeRequestIsPlanning = it },
             setWaitingForReply = { s.waitingForReply = it },
-            preparePlanImplementationPrompt = { inputActions.preparePlanImplementationPrompt() },
             clearPendingRequestPayload = { s.pendingRequestPayload = null },
             clearPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = false },
             resetReconnectAttempts = { s.reconnectAttempts = 0 },
@@ -124,15 +77,7 @@ class MainActivity : AppCompatActivity() {
             conversationPreviewActions = { conversationPreviewActions },
             conversationTaskRegistryActions = { conversationTaskRegistryActions },
             activeWorkControlActions = { activeWorkControlActions },
-            sendEnabledActions = { inputActions.sendEnabledActions },
-            isProjectConversationVisible = {
-                !friendChatActions.isActive() &&
-                    !groupChatActions.isActive() &&
-                    !projectSpaceController.isChannelActive()
-            },
-            drainNextQueuedMessage = { projectId, conversationId ->
-                inputActions.runningInputActions.drainNextQueuedMessage(projectId, conversationId)
-            }
+            sendEnabledActions = { inputActions.sendEnabledActions }
         )
     }
 
@@ -146,7 +91,7 @@ class MainActivity : AppCompatActivity() {
             userId = { userId },
             projects = s.projects,
             setActiveProjectIndex = { s.activeProjectIndex = it },
-            setChatAdapter = ::setAdapterAndWireApkActions,
+            setChatAdapter = { chatAdapter = it },
             uiTools = { uiTools },
             modelActions = { modelActions },
             projectStateActions = { projectStateActions },
@@ -157,36 +102,18 @@ class MainActivity : AppCompatActivity() {
             messageActions = { messageActions },
             navigationController = { navigationController },
             stageHintShimmer = { stageHintShimmer() },
-            isFriendChatActive = {
-                friendChatActions.isActive() || groupChatActions.isActive() || projectSpaceController.isChannelActive()
-            },
-            isDirectSocialAiChatActive = {
-                friendChatActions.isDirectSocialAiActive()
-            },
-            isSocialAiChatActive = {
-                friendChatActions.isActive() || groupChatActions.isActive()
-            },
-            trySendFriendMessage = { text, attachments ->
-                projectSpaceController.trySendMessage(text, attachments.isNotEmpty()) ||
-                    groupChatActions.trySendMessage(text, attachments) ||
-                    friendChatActions.trySendMessage(text, attachments)
-            },
-            forkForRunningInput = { text, outgoingText ->
-                conversationForkActions.forkForRunningInput(text, outgoingText)
-            },
-            startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService
+            isFriendChatActive = { friendChatActions.isActive() },
+            trySendFriendMessage = { text, hasAttachments ->
+                friendChatActions.trySendMessage(text, hasAttachments)
+            }
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        applySystemBarColors()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         createActions.onCreate(intent)
-        messageSelectionActions.setup()
-        agentPageController = AgentPageController(this, binding)
-        agentPageController.setup()
     }
 
     private val createActions: MainCreateActions by lazy {
@@ -201,7 +128,7 @@ class MainActivity : AppCompatActivity() {
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
-            setChatAdapter = ::setAdapterAndWireApkActions,
+            setChatAdapter = { chatAdapter = it },
             setupNavigation = { navigationController.setupNavigation() },
             setupQuickActions = { profileQuickActions.setupQuickActions() },
             setupBackHandling = { navigationController.setupBackHandling() },
@@ -213,7 +140,6 @@ class MainActivity : AppCompatActivity() {
             registerTaskWorkReceiver = { taskActions.taskWorkReceiverActions.registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
-            syncProjectsFromServer = { accountActions().syncProjectsFromServer() },
             getWaitingForReply = { s.waitingForReply },
             getBackendConnected = { s.backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
@@ -234,7 +160,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        applySystemBarColors()
         resumeActions.onResume()
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
@@ -244,25 +169,6 @@ class MainActivity : AppCompatActivity() {
             if (::chatAdapter.isInitialized) chatAdapter.refreshUserProfile()
         }
         friendChatActions.resumeIfActive()
-        groupChatActions.resumeIfActive()
-        projectSpaceController.resumeIfActive()
-        if (::agentPageController.isInitialized) agentPageController.refresh()
-    }
-
-    private fun applySystemBarColors() {
-        window.statusBarColor = ContextCompat.getColor(this, R.color.elon_bg_app)
-        window.navigationBarColor = ContextCompat.getColor(this, R.color.elon_nav_bg)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
-        var flags = window.decorView.systemUiVisibility
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-        }
-        window.decorView.systemUiVisibility = flags
     }
 
     private val resumeActions: MainResumeActions by lazy {
@@ -288,7 +194,7 @@ class MainActivity : AppCompatActivity() {
                 taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = s.activeRequestIsDevelopment)
             },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession
         )
     }
@@ -296,8 +202,6 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         s.appInForeground = false
         friendChatActions.stopPolling()
-        groupChatActions.stopPolling()
-        projectSpaceController.stopPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         super.onPause()
     }
@@ -308,6 +212,7 @@ class MainActivity : AppCompatActivity() {
         projectStateActions.saveProjects()
         val gws = (application as ElonApplication).globalWs
         gws.removeListener(globalWsListener)
+        gws.stop()
         super.onStop()
     }
 
@@ -319,18 +224,6 @@ class MainActivity : AppCompatActivity() {
                 is GlobalWsEvent.FriendMessage -> {
                     friendChatActions.handleRealtimeMessage(event.fromUserId)
                     friendActions.loadFriends()
-                }
-                is GlobalWsEvent.GroupMessage -> {
-                    groupChatActions.handleRealtimeMessage(event.groupId)
-                    groupActions.loadGroups()
-                }
-                is GlobalWsEvent.PresenceChange -> {
-                    // 好友上线/下线，刷新列表以更新绿点
-                    friendActions.loadFriends()
-                }
-                is GlobalWsEvent.Typing -> {
-                    // 好友正在输入，通知聊天界面显示"正在输入..."
-                    friendChatActions.handleTypingEvent(event.fromUserId)
                 }
                 else -> Unit
             }
@@ -346,7 +239,7 @@ class MainActivity : AppCompatActivity() {
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 s.runningConversationTasks.containsKey(key)
             },
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             userId = { userId },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
@@ -355,11 +248,9 @@ class MainActivity : AppCompatActivity() {
             looksLikeDirectImageRequest = ::looksLikeDirectImageRequest,
             rememberConversationTask = conversationTaskRegistryActions::rememberConversationTask,
             setActiveRequestIsDevelopment = { s.activeRequestIsDevelopment = it },
-            setActiveRequestIsPlanning = { s.activeRequestIsPlanning = it },
             resetRequestState = {
                 s.pendingReconnectForActiveWork = false
                 s.reconnectAttempts = 0
-                s.activeRequestIsPlanning = false
                 conversationTaskRegistryActions.persistActiveWork()
                 workflowActions.foldedCliLogActions.reset()
                 workflowActions.evidenceActions.clearCurrentEvidence()
@@ -375,9 +266,6 @@ class MainActivity : AppCompatActivity() {
             nextServerResponseToken = { ++s.serverResponseToken },
             putTaskResponseToken = { traceId, token -> s.taskResponseTokens[traceId] = token },
             startTaskWorkService = taskActions.taskWorkServiceActions::startTaskWorkService,
-            ensureBackgroundKeepAlive = { isDevelopment ->
-                TaskBackgroundKeepAlive.maybePromptForDevelopmentTask(this, prefs, isDevelopment)
-            },
             markTaskPendingReconnect = { target ->
                 val key = conversationTaskRegistryActions.conversationTaskKey(target.projectId, target.conversationId)
                 s.runningConversationTasks[key]?.pendingReconnect = true
@@ -421,7 +309,7 @@ class MainActivity : AppCompatActivity() {
                 workflowActions.evidenceActions.stopWorkingEvidenceForActiveConversation()
             },
             clearCurrentEvidence = { workflowActions.evidenceActions.clearCurrentEvidence() },
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
@@ -451,72 +339,25 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList,
-            renderProjectSpace = { projectSpaceController.renderActiveSpace() },
             refreshServerVersion = { profileQuickActions.refreshServerVersion() },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
-            showContactChatSettings = { showActiveContactChatSettings() },
-            isDirectSocialAiChatActive = { friendChatActions.isDirectSocialAiActive() },
-            openSocialAiVoiceCall = { openSocialAiVoiceCall() },
-            showFriendLocalSearch = { homeListActions.showFriendLocalSearch() },
-            exitFriendLocalSearch = { homeListActions.exitFriendLocalSearch() },
-            refreshFriends = {
-                friendActions.loadFriends()
-                groupActions.loadGroups()
-            },
+            showAddFriendDialog = { friendActions.showAddFriendDialog() },
+            refreshFriends = { friendActions.loadFriends() },
             updateFirstConversationStatus = { text ->
                 conversationPreviewActions.updateFirstConversationStatus(text)
             },
             collapseInputComposer = { animate -> inputActions.inputFocusActions.collapseInputComposer(animate) },
-            collapseInputComposerForBack = { inputActions.hideInputOverlaysForBack() },
             isChatSideMenuOpen = { chatSideMenuController.isOpen },
             closeChatSideMenu = { animate -> chatSideMenuController.close(animate) },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
-            isMessageSelectionActive = { messageSelectionActions.isSelectionActive() },
-            clearMessageSelection = { messageSelectionActions.cancelSelection() },
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             maybePrewarmCodexSession = codexPrewarm::maybePrewarmCodexSession,
-            onFriendChatClosed = {
-                friendChatActions.closeFriendChat()
-                groupChatActions.closeGroupChat()
-                projectSpaceController.closeChannelChat()
-            },
-            onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
-            showProjectMembers = { projectSpaceController.showMembers() },
-            loadMarketplace = { marketplaceActions.loadProjects() },
-            onAgentTabSelected = { agentPageController.refresh() }
+            onFriendChatClosed = { friendChatActions.closeFriendChat() },
+            loadMarketplace = { marketplaceActions.loadProjects() }
         )
-    }
-
-    private val chatSettingsActions: MainChatSettingsActions by lazy {
-        MainChatSettingsActions(
-            activity = this,
-            dp = uiTools::dp,
-            selectableForeground = uiTools::selectableForeground,
-            clearFriendMessages = { friendChatActions.clearCurrentMessages() },
-            clearGroupMessages = { groupChatActions.clearCurrentMessages() },
-            onAddGroupMember = { group, onDone -> groupActions.showAddMemberDialog(group, onDone) }
-        )
-    }
-
-    private fun showActiveContactChatSettings() {
-        groupChatActions.currentGroup()?.let {
-            chatSettingsActions.showGroupSettings(it)
-            return
-        }
-        friendChatActions.currentFriend()?.let {
-            chatSettingsActions.showFriendSettings(it)
-        }
-    }
-
-    private fun openSocialAiVoiceCall() {
-        if (!friendChatActions.isDirectSocialAiActive()) {
-            Toast.makeText(this, "实时语音目前只支持一龙AI 私聊", Toast.LENGTH_SHORT).show()
-            return
-        }
-        startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
     }
 
     private val marketplaceActions: MainMarketplaceActions by lazy {
@@ -528,53 +369,17 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             getListContainer = { binding.marketplaceListContainer },
             openJoinedProject = { storeProject ->
-                val newProject = storeProject.toJointAppProject()
+                val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
+                    .copy(id = storeProject.id)
                 if (s.projects.none { it.id == storeProject.id }) {
                     s.projects.add(newProject)
                     projectStateActions.saveProjects()
                 }
                 val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }
                     ?: s.projects.lastIndex
-                s.activeProjectIndex = idx
-                projectStateActions.saveProjects()
+                conversationOpenActions.openProject(idx)
                 homeListActions.renderProjectList()
-                projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
             }
-        )
-    }
-
-    private val projectSpaceController: ProjectSpaceController by lazy {
-        ProjectSpaceController(
-            activity = this,
-            binding = binding,
-            http = s.http,
-            serverUrl = serverUrl,
-            setChatAdapter = ::setAdapterAndWireApkActions,
-            showProjectSpace = { title, animate -> navigationController.showProjectSpace(title, animate) },
-            showProjectChannelChat = { title, animate -> navigationController.showProjectChannelChat(title, animate) },
-            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
-            onProjectShareAction = chatProjectShareActions::handleCardAction,
-            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            personalConversations = { projectStateActions.conversations },
-            activePersonalConversationIndex = { projectStateActions.activeConversationIndex },
-            isPersonalConversationWorking = { conversationIndex ->
-                projectStateActions.conversations.getOrNull(conversationIndex)?.let { conversation ->
-                    val key = conversationTaskRegistryActions.conversationTaskKey(
-                        projectStateActions.activeProject().id,
-                        conversation.id
-                    )
-                    !conversation.ended && s.runningConversationTasks.containsKey(key)
-                } ?: false
-            },
-            openPersonalAiChat = { conversationIndex ->
-                val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
-                    .takeIf { it >= 0 } ?: s.activeProjectIndex
-                conversationOpenActions.openProjectSpaceConversation(idx, conversationIndex)
-            },
-            showPersonalConversationActions = { index -> conversationActions.showConversationActions(index) },
-            showCreatePersonalConversation = { conversationActions.showCreateConversationDialog() },
-            dp = uiTools::dp,
-            selectableForeground = uiTools::selectableForeground
         )
     }
 
@@ -586,20 +391,8 @@ class MainActivity : AppCompatActivity() {
             conversations = { projectStateActions.conversations },
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
-            copyConversationIdentity = conversationIdentityActions::copyConversationIdentity,
             isConversationWorking = homeListActions::isConversationWorking,
-            showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
-            projects = { s.projects },
-            activeProjectIndex = { s.activeProjectIndex },
-            openPersonalProject = { index ->
-                openProjectSpaceForProject(index, true)
-            },
-            openJointProject = { index ->
-                openProjectSpaceForProject(index, true)
-            },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
-            showCreateJointProjectDialog = { projectActions.showCreateJointProjectDialog() },
-            sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
@@ -624,34 +417,7 @@ class MainActivity : AppCompatActivity() {
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
-            onConversationsChanged = { projectSpaceController.renderActiveSpace() }
-        )
-    }
-
-    private val conversationForkActions: MainConversationForkActions by lazy {
-        MainConversationForkActions(
-            binding = binding,
-            activeProject = projectStateActions::activeProject,
-            activeConversation = projectStateActions::activeConversation,
-            activeConversationTask = conversationTaskRegistryActions::activeConversationTask,
-            setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
-            saveProjects = projectStateActions::saveProjects,
-            renderConversationList = homeListActions::renderConversationList,
-            openConversation = conversationOpenActions::openConversation,
-            renderProjectSpace = { projectSpaceController.renderActiveSpace() }
-        )
-    }
-
-    private val conversationIdentityActions: MainConversationIdentityActions by lazy {
-        MainConversationIdentityActions(
-            activity = this,
-            http = s.http,
-            serverUrl = serverUrl,
-            userId = userId,
-            activeProject = projectStateActions::activeProject,
-            saveProjects = projectStateActions::saveProjects,
-            copyText = externalActions::copyText
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled
         )
     }
 
@@ -664,7 +430,6 @@ class MainActivity : AppCompatActivity() {
             serverUrl = serverUrl,
             userIdProvider = { userId },
             modelButtonShellProvider = { inputActions.inputComposerViewsOrNull()?.modelButtonShell },
-            modelChevronProvider = { inputActions.inputComposerViewsOrNull()?.modelChevron },
             inputBarContainerProvider = { inputActions.inputComposerViewsOrNull()?.inputBarContainer },
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
@@ -682,13 +447,12 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             setActiveProjectIndex = { s.activeProjectIndex = it },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
-            setChatAdapter = ::setAdapterAndWireApkActions,
+            setChatAdapter = { chatAdapter = it },
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
             showChat = { animate -> navigationController.showChat(animate = animate) },
             showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
-            showProjectPersonalChat = { title, animate -> navigationController.showProjectPersonalChat(title, animate) },
             saveProjects = projectStateActions::saveProjects
         )
     }
@@ -718,7 +482,7 @@ class MainActivity : AppCompatActivity() {
             setPendingReconnectForActiveWork = { s.pendingReconnectForActiveWork = it },
             resetReconnectAttempts = { s.reconnectAttempts = 0 },
             getActiveRequestIsDevelopment = { s.activeRequestIsDevelopment },
-            setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
+            setSendEnabled = inputActions.sendEnabledActions::setSendEnabled,
             renderConversationList = homeListActions::renderConversationList,
             updateStage = projectViewActions::updateStage,
             updateProjectViews = projectViewActions::updateProjectViews
@@ -755,7 +519,6 @@ class MainActivity : AppCompatActivity() {
             projects = { s.projects },
             conversations = { projectStateActions.conversations },
             friends = { s.friends },
-            groups = { s.groups },
             activeProject = projectStateActions::activeProject,
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             formatTime = { s.timeFormatter.format(Date(it)) },
@@ -767,18 +530,8 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showProjectPlaza = { navigationController.showProjectPlaza() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
-            openFriend = { friend ->
-                groupChatActions.closeGroupChat()
-                projectSpaceController.closeChannelChat()
-                friendChatActions.openFriend(friend, animate = true)
-            },
-            openGroup = { group ->
-                friendChatActions.closeFriendChat()
-                projectSpaceController.closeChannelChat()
-                groupChatActions.openGroup(group, animate = true)
-            }
+            openFriend = { friend -> friendChatActions.openFriend(friend, animate = true) }
         )
     }
 
@@ -788,37 +541,11 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverUrl = serverUrl,
-            setChatAdapter = ::setAdapterAndWireApkActions,
+            setChatAdapter = { chatAdapter = it },
             showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
-            onProjectShareAction = chatProjectShareActions::handleCardAction,
-            onProjectShareLongPress = { anchor, message, share ->
-                actionPopups.showProjectShareActionPopup(anchor, message, share)
-            },
-            userId = { AuthManager.effectiveUserId(this) },
-            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             onFriendSummariesChanged = { friendActions.loadFriends() }
-        )
-    }
-
-    private val groupChatActions: MainGroupChatActions by lazy {
-        MainGroupChatActions(
-            activity = this,
-            binding = binding,
-            http = s.http,
-            serverUrl = serverUrl,
-            setChatAdapter = ::setAdapterAndWireApkActions,
-            showFriendChat = { title, animate -> navigationController.showFriendChat(title, animate) },
-            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
-            onProjectShareAction = chatProjectShareActions::handleCardAction,
-            onProjectShareLongPress = { anchor, message, share ->
-                actionPopups.showProjectShareActionPopup(anchor, message, share)
-            },
-            userId = { AuthManager.effectiveUserId(this) },
-            clearPendingAttachments = { inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false) },
-            collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            onGroupSummariesChanged = { groupActions.loadGroups() }
         )
     }
 
@@ -828,9 +555,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             timeFormatter = s.timeFormatter,
             activeProjectIndexProvider = { s.activeProjectIndex },
-            openProject = { index ->
-                openProjectSpaceForProject(index, true)
-            },
+            openProject = conversationOpenActions::openProject,
             showProjectActions = { index -> projectActions.showProjectActions(index) },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -839,28 +564,10 @@ class MainActivity : AppCompatActivity() {
         ).also { homeRows = it }
     }
 
-    private fun openProjectSpaceForProject(index: Int, animate: Boolean) {
-        if (index !in s.projects.indices) return
-        s.activeProjectIndex = index
-        projectStateActions.saveProjects()
-        openProjectSpaceForProject(s.projects[index], animate)
-    }
-
-    private fun openProjectSpaceForProject(project: AppProject, animate: Boolean) {
-        if (project.isJointDevelopmentProject()) {
-            projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, animate)
-        } else {
-            projectSpaceController.openPersonalProjectSpace(
-                project,
-                AuthManager.effectiveUserId(this),
-                animate
-            )
-        }
-    }
-
     private val projectActions: MainProjectActions by lazy {
         MainProjectActions(
             activity = this,
+            binding = binding,
             projects = s.projects,
             activeProjectIndexProvider = { s.activeProjectIndex },
             setActiveProjectIndex = { s.activeProjectIndex = it },
@@ -869,16 +576,11 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
-            openProjectSpace = { project -> openProjectSpaceForProject(project, true) },
             showGitProjectDialog = ::showGitProjectDialog,
             http = s.http,
             serverUrl = serverUrl,
-            tokenProvider = { activeToken() },
-            isLoggedIn = { AuthManager.isLoggedIn(this) },
-            removeSentProjectShareCards = { projectIds ->
-                friendChatActions.removeProjectShareCards(projectIds) +
-                    groupChatActions.removeProjectShareCards(projectIds)
-            }
+            tokenProvider = { AuthManager.token(this) },
+            isLoggedIn = { AuthManager.isLoggedIn(this) }
         )
     }
 
@@ -891,8 +593,6 @@ class MainActivity : AppCompatActivity() {
             projects = s.projects,
             gson = s.gson,
             prefs = prefs,
-            http = s.http,
-            serverUrl = serverUrl,
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             refreshProfileSummary = {
@@ -907,7 +607,6 @@ class MainActivity : AppCompatActivity() {
             binding = binding,
             http = s.http,
             serverVersionUrl = serverVersionUrl,
-            serverUrl = serverUrl,
             isBindingInitialized = { ::binding.isInitialized },
             refreshAccountUi = {
                 if (::binding.isInitialized) accountActions().refreshAccountUi()
@@ -920,7 +619,6 @@ class MainActivity : AppCompatActivity() {
             openProfileDetails = {
                 startActivity(Intent(this, PersonalProfileActivity::class.java))
             },
-            openAgentCenter = { navigationController.showAgentCenter() },
             showPromotionDialog = { messageActions.showPromotionDialog() },
             showGuestImportDialog = { accountActions().showGuestImportDialog() },
             confirmLogout = { accountActions().confirmLogout() }
@@ -932,44 +630,18 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             http = s.http,
             serverUrl = serverUrl,
-            tokenProvider = { activeToken() },
+            tokenProvider = { AuthManager.token(this) },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
             addJoinedProject = { storeProject ->
-                val newProject = storeProject.toJointAppProject()
-                if (s.projects.none { it.id == storeProject.id }) s.projects.add(newProject)
+                val newProject = newAppProject(storeProject.name, storeProject.description ?: "商店项目")
+                    .copy(id = storeProject.id)
+                s.projects.add(newProject)
                 projectStateActions.saveProjects()
-                val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }
-                    ?: s.projects.lastIndex
-                s.activeProjectIndex = idx
-                projectStateActions.saveProjects()
+                val idx = s.projects.lastIndex
+                conversationOpenActions.openProject(idx)
                 homeListActions.renderProjectList()
-                projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
             },
             dp = uiTools::dp
-        )
-    }
-
-    private val chatProjectShareActions: MainChatProjectShareActions by lazy {
-        MainChatProjectShareActions(
-            activity = this,
-            binding = binding,
-            http = s.http,
-            serverUrl = serverUrl,
-            projects = s.projects,
-            setActiveProjectIndex = { s.activeProjectIndex = it },
-            saveProjects = projectStateActions::saveProjects,
-            renderProjectList = homeListActions::renderProjectList,
-            openLocalProject = conversationOpenActions::openProject,
-            openProjectSpace = { id, title -> projectSpaceController.openProjectSpace(id, title, true) },
-            deleteActiveChatMessage = { message, onDeleted ->
-                when {
-                    friendChatActions.isActive() -> friendChatActions.deleteCurrentMessage(message, onDeleted)
-                    groupChatActions.isActive() -> groupChatActions.deleteCurrentMessage(message, onDeleted)
-                }
-            },
-            sendMessage = { inputActions.sendMessageActions.sendMessage() },
-            isLoggedIn = { AuthManager.isLoggedIn(this) },
-            tokenProvider = { activeToken() }
         )
     }
 
@@ -985,23 +657,11 @@ class MainActivity : AppCompatActivity() {
             showProjectRecordDialog = { projectRecordActions.showProjectRecordDialog() },
             showGitProjectDialog = ::showGitProjectDialog,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showCreateGroupDialog = { groupActions.showCreateGroupDialog() },
+            showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openSettings = { quickCommandActions.openSettings() },
             deleteMessage = { message -> messageActions.deleteMessage(message) },
-            startMultiSelect = { message -> messageSelectionActions.startSelection(message) },
-            revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
-            canRequestAiReply = {
-                friendChatActions.isActive() || groupChatActions.isActive()
-            },
-            requestAiReply = { message ->
-                when {
-                    friendChatActions.isActive() -> friendChatActions.requestAiReply(message)
-                    groupChatActions.isActive() -> groupChatActions.requestAiReply(message)
-                    else -> uiTools.shareActions().toastMessageAction("当前聊天暂不支持 AI回复")
-                }
-            },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showStoreDialog = { storeController.showStoreDialog() }
@@ -1019,42 +679,9 @@ class MainActivity : AppCompatActivity() {
                 s.friends.addAll(list)
             },
             onFriendsChanged = {
-                if (::binding.isInitialized) {
-                    homeListActions.renderConversationList()
-                    refreshChatTabBadge()
-                }
+                if (::binding.isInitialized) homeListActions.renderConversationList()
             }
         )
-    }
-
-    private val groupActions: MainGroupActions by lazy {
-        MainGroupActions(
-            activity = this,
-            http = s.http,
-            serverUrl = serverUrl,
-            friends = { s.friends },
-            dp = uiTools::dp,
-            setGroups = { list ->
-                s.groups.clear()
-                s.groups.addAll(list)
-            },
-            onGroupsChanged = {
-                if (::binding.isInitialized) {
-                    homeListActions.renderConversationList()
-                    refreshChatTabBadge()
-                }
-            },
-            openGroup = { group ->
-                friendChatActions.closeFriendChat()
-                projectSpaceController.closeChannelChat()
-                groupChatActions.openGroup(group, animate = true)
-            }
-        )
-    }
-
-    private fun refreshChatTabBadge() {
-        val total = s.friends.sumOf { it.unreadCount } + s.groups.sumOf { it.unreadCount }
-        navigationController.updateChatTabBadge(total)
     }
 
     private fun showGitProjectDialog() {
@@ -1092,8 +719,7 @@ class MainActivity : AppCompatActivity() {
             activeConversation = projectStateActions::activeConversation,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             showChat = { navigationController.showChat() },
-            sendMessage = { inputActions.sendMessageActions.sendMessage() },
-            enablePlanModeWithStarterPrompt = { inputActions.enablePlanModeWithStarterPrompt() }
+            sendMessage = { inputActions.sendMessageActions.sendMessage() }
         )
     }
 
@@ -1113,46 +739,6 @@ class MainActivity : AppCompatActivity() {
             apkDownloadUrl = { apkDownloadUrl },
             apkDownloadPageUrl = { apkDownloadPageUrl }
         )
-    }
-
-    private val messageSelectionActions: MainChatSelectionActions by lazy {
-        MainChatSelectionActions(
-            activity = this,
-            binding = binding,
-            chatAdapter = { chatAdapter },
-            activeConversation = projectStateActions::activeConversation,
-            saveConversations = projectStateActions::saveConversations,
-            renderConversationList = homeListActions::renderConversationList,
-            shareActions = uiTools::shareActions,
-            isProjectChannelActive = projectSpaceController::isChannelActive,
-            summarizeInCurrentChannel = projectSpaceController::summarizeSelectedDiscussion,
-            summarizeInPersonalChat = { prompt -> sendSelectedDiscussionToAi(prompt) },
-            summarizeInNewPersonalChat = { prompt -> sendSelectedDiscussionToNewAiChat(prompt) }
-        )
-    }
-
-    private fun sendSelectedDiscussionToNewAiChat(prompt: String) {
-        val project = projectStateActions.activeProject()
-        project.conversations.add(newAppConversation("多选讨论总结", "AI 总结多选聊天记录"))
-        project.activeConversationIndex = project.conversations.lastIndex
-        project.updatedAt = System.currentTimeMillis()
-        projectStateActions.saveConversations()
-        homeListActions.renderConversationList()
-        sendSelectedDiscussionToAi(prompt)
-    }
-
-    private fun sendSelectedDiscussionToAi(prompt: String) {
-        if (projectStateActions.activeConversation().ended) {
-            conversationActions.showCreateConversationDialog()
-            return
-        }
-        friendChatActions.closeFriendChat()
-        groupChatActions.closeGroupChat()
-        projectSpaceController.closeChannelChat()
-        navigationController.showProjectChat()
-        binding.inputEdit.setText(prompt)
-        binding.inputEdit.setSelection(binding.inputEdit.text.length)
-        inputActions.sendMessageActions.sendMessage()
     }
 
     private fun stageHintShimmer(): MainStageHintShimmer {
@@ -1234,8 +820,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         friendChatActions.stopPolling()
-        groupChatActions.stopPolling()
-        projectSpaceController.stopPolling()
         lifecycleEdgeActions.onDestroy()
         super.onDestroy()
     }

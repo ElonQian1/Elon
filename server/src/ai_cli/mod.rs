@@ -797,6 +797,7 @@ async fn run_via_pc_agent(
                         text: text.clone(),
                         model_used: Some(display_model.clone()),
                         stream_id: Some(stream_id.clone()),
+                        node_id: Some(agent_id.to_string()),
                     }.to_json());
                 } else {
                     let _ = tx.send(WsMessage::AssistantChunk {
@@ -822,6 +823,7 @@ async fn run_via_pc_agent(
                             text: reply.clone(),
                             model_used: Some(display_model.clone()),
                             stream_id: None,
+                            node_id: Some(agent_id.to_string()),
                         }.to_json());
                     }
                     let _ = tx.send(WsMessage::Done {

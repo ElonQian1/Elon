@@ -31,6 +31,9 @@ pub enum WsMessage {
         /// 流式气泡 ID：有此字段时 APK 以此 ID 创建气泡，后续 AssistantChunk 追加到同一气泡
         #[serde(skip_serializing_if = "Option::is_none")]
         stream_id: Option<String>,
+        /// PC 节点 ID（有此字段时 APK 启用 Markdown 渲染 + 工具块折叠）
+        #[serde(skip_serializing_if = "Option::is_none")]
+        node_id: Option<String>,
     },
     /// 流式追加到已有气泡（需配合 AssistantMessage 的 stream_id 使用）。
     /// APK 找到对应 stream_id 的气泡并追加 text，实现打字机效果。

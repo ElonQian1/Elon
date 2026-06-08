@@ -2,7 +2,6 @@ package com.elon.app
 
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -20,47 +19,34 @@ internal class MainNavigationController(
     private val compactProjectTitle: () -> String,
     private val renderConversationList: () -> Unit,
     private val renderProjectList: () -> Unit,
-    private val renderProjectSpace: () -> Unit,
     private val refreshServerVersion: () -> Unit,
     private val openConversation: (Int) -> Unit,
     private val showConversationActions: (Int) -> Unit,
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
-    private val showContactChatSettings: () -> Unit,
-    private val isDirectSocialAiChatActive: () -> Boolean,
-    private val openSocialAiVoiceCall: () -> Unit,
-    private val showFriendLocalSearch: () -> Unit,
-    private val exitFriendLocalSearch: () -> Boolean,
+    private val showAddFriendDialog: () -> Unit,
     private val refreshFriends: () -> Unit,
     private val updateFirstConversationStatus: (String) -> Unit,
     private val collapseInputComposer: (Boolean) -> Unit,
-    private val collapseInputComposerForBack: () -> Boolean,
     private val isChatSideMenuOpen: () -> Boolean,
     private val closeChatSideMenu: (Boolean) -> Unit,
     private val isActiveConversationWorking: () -> Boolean,
-    private val isMessageSelectionActive: () -> Boolean,
-    private val clearMessageSelection: () -> Unit,
     private val setSendEnabled: (Boolean) -> Unit,
     private val maybePrewarmCodexSession: (String) -> Unit,
     private val onFriendChatClosed: () -> Unit,
-    private val onProjectChannelClosed: () -> Unit,
-    private val showProjectMembers: () -> Unit,
-    private val loadMarketplace: () -> Unit,
-    private val onAgentTabSelected: () -> Unit
+    private val loadMarketplace: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
-        PROJECTS,
-        PROJECT_SPACE
+        PROJECTS
     }
 
     private var pageTransitionRunning = false
     private var chatReturnTarget = ChatReturnTarget.FRIENDS
-    private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
-        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile)
+        val tabs = listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket)
 
         fun select(tab: TextView) {
             WechatPageTransition.cancelActive()
@@ -73,15 +59,12 @@ internal class MainNavigationController(
             binding.chatPage.visibility = View.GONE
             binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
             binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
-            binding.marketplacePage.visibility = View.GONE
-            binding.agentPage.root.visibility = View.GONE
+            binding.marketplacePage.visibility = if (tab == binding.tabMarket) View.VISIBLE else View.GONE
             binding.inputLayout.visibility = View.GONE
             binding.pageTabs.visibility = View.VISIBLE
             binding.backButton.visibility = View.GONE
             binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
             binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
-            binding.projectMembersButton.visibility = View.GONE
-            hideVoiceCallButton()
             binding.moreButton.visibility = View.GONE
             binding.addButton.setOnClickListener {
                 showHomeActionPopup(binding.addButton, tab)
@@ -90,6 +73,7 @@ internal class MainNavigationController(
             binding.topTitleText.text = when (tab) {
                 binding.tabProject -> "项目管理"
                 binding.tabProfile -> "我的"
+                binding.tabMarket -> "商城"
                 else -> "好友"
             }
             if (tab != binding.tabChat) {
@@ -102,80 +86,24 @@ internal class MainNavigationController(
                 renderConversationList()
             } else if (tab == binding.tabProfile) {
                 refreshServerVersion()
+            } else if (tab == binding.tabMarket) {
+                loadMarketplace()
             }
         }
 
         binding.tabChat.setOnClickListener { select(binding.tabChat) }
         binding.tabProject.setOnClickListener { select(binding.tabProject) }
         binding.tabProfile.setOnClickListener { select(binding.tabProfile) }
+        binding.tabMarket.setOnClickListener { select(binding.tabMarket) }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
             true
         }
-        binding.searchButton.setOnClickListener { showFriendLocalSearch() }
+        binding.searchButton.setOnClickListener { showAddFriendDialog() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
-        binding.voiceCallButton.setOnClickListener { openSocialAiVoiceCall() }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         select(binding.tabChat)
-    }
-
-    fun showProjectPlaza() {
-        if (pageTransitionRunning) return
-        clearMessageSelection()
-        actionPopupProvider()?.dismiss()
-        closeChatSideMenu(false)
-        val shouldAnimate = binding.projectPage.visibility == View.VISIBLE &&
-            binding.marketplacePage.visibility != View.VISIBLE
-        loadMarketplace()
-        applyMarketplaceChrome()
-        if (shouldAnimate) {
-            pageTransitionRunning = true
-            WechatPageTransition.enterFromRight(
-                container = binding.contentContainer,
-                incoming = listOf(binding.marketplacePage),
-                outgoing = listOf(binding.projectPage),
-                onEnd = {
-                    binding.conversationPage.visibility = View.GONE
-                    binding.chatPage.visibility = View.GONE
-                    binding.projectPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.VISIBLE
-                    binding.agentPage.root.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.pageTabs.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            clearPageTranslations()
-        }
-    }
-
-    fun showAgentCenter() {
-        if (pageTransitionRunning) return
-        clearMessageSelection()
-        actionPopupProvider()?.dismiss()
-        closeChatSideMenu(false)
-        updateBottomTabSelection(binding.tabProfile)
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.GONE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.GONE
-        binding.agentPage.root.visibility = View.VISIBLE
-        binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
-        binding.moreButton.visibility = View.GONE
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = "Agent 自动化"
-        onAgentTabSelected()
     }
 
     fun setupBackHandling() {
@@ -188,45 +116,23 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
-        if (exitFriendLocalSearch()) return
-        if (isMessageSelectionActive()) {
-            clearMessageSelection()
-            return
-        }
         if (isChatSideMenuOpen()) {
             closeChatSideMenu(true)
             return
         }
         if (binding.chatPage.visibility == View.VISIBLE) {
-            if (collapseInputComposerForBack()) return
             collapseInputComposer(false)
-            when (chatReturnTarget) {
-                ChatReturnTarget.PROJECTS -> showProjectHome(animate = true)
-                ChatReturnTarget.PROJECT_SPACE -> {
-                    onProjectChannelClosed()
-                    showProjectSpace(projectSpaceTitle, animate = true)
-                }
-                ChatReturnTarget.FRIENDS -> showConversationHome(animate = true)
+            if (chatReturnTarget == ChatReturnTarget.PROJECTS) {
+                showProjectHome(animate = true)
+            } else {
+                showConversationHome(animate = true)
             }
-            return
-        }
-        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
-            showProjectHome(animate = true)
-            return
-        }
-        if (binding.marketplacePage.visibility == View.VISIBLE) {
-            showProjectHome(animate = true)
-            return
-        }
-        if (binding.agentPage.root.visibility == View.VISIBLE) {
-            binding.tabProfile.performClick()
             return
         }
         showExitConfirmation()
     }
 
     fun showConversationHome(animate: Boolean = false) {
-        clearMessageSelection()
         onFriendChatClosed()
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
@@ -258,7 +164,6 @@ internal class MainNavigationController(
 
     fun showChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
-        clearMessageSelection()
         if (binding.chatPage.visibility != View.VISIBLE) {
             chatReturnTarget = ChatReturnTarget.FRIENDS
         }
@@ -301,7 +206,6 @@ internal class MainNavigationController(
 
     fun showFriendChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
-        clearMessageSelection()
         chatReturnTarget = ChatReturnTarget.FRIENDS
         val shouldAnimate = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
@@ -343,8 +247,6 @@ internal class MainNavigationController(
 
     fun showProjectChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
-        clearMessageSelection()
-        onFriendChatClosed()
         chatReturnTarget = ChatReturnTarget.PROJECTS
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
@@ -383,152 +285,12 @@ internal class MainNavigationController(
         maybePrewarmCodexSession("show_project_chat")
     }
 
-    fun showProjectChannelChat(title: String, animate: Boolean = false) {
-        if (pageTransitionRunning) return
-        clearMessageSelection()
-        chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
-        val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
-        actionPopupProvider()?.dismiss()
-        closeChatSideMenu(false)
-        applyProjectChannelChrome(title)
-        if (shouldAnimate) {
-            collapseInputComposer(false)
-            pageTransitionRunning = true
-            WechatPageTransition.enterFromRight(
-                container = binding.contentContainer,
-                incoming = listOf(binding.chatPage, binding.inputLayout),
-                outgoing = listOf(binding.projectPage),
-                incomingFull = emptyList(),
-                outgoingFull = listOf(binding.pageTabs),
-                onEnd = {
-                    binding.projectPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.GONE
-                    binding.chatPage.visibility = View.VISIBLE
-                    binding.inputLayout.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
-            binding.projectPage.visibility = View.GONE
-            binding.profilePage.visibility = View.GONE
-            binding.marketplacePage.visibility = View.GONE
-            binding.chatPage.visibility = View.VISIBLE
-            binding.inputLayout.visibility = View.VISIBLE
-            clearPageTranslations()
-        }
-        setSendEnabled(true)
-    }
-
-    fun showProjectPersonalChat(title: String, animate: Boolean = false) {
-        if (pageTransitionRunning) return
-        clearMessageSelection()
-        onFriendChatClosed()
-        chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
-        val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
-        actionPopupProvider()?.dismiss()
-        closeChatSideMenu(false)
-        applyChatChrome()
-        binding.topTitleText.text = title.ifBlank { activeConversationProvider().title }
-        if (shouldAnimate) {
-            collapseInputComposer(false)
-            pageTransitionRunning = true
-            WechatPageTransition.enterFromRight(
-                container = binding.contentContainer,
-                incoming = listOf(binding.chatPage, binding.inputLayout),
-                outgoing = listOf(binding.projectPage),
-                incomingFull = emptyList(),
-                outgoingFull = listOf(binding.pageTabs),
-                onEnd = {
-                    binding.projectPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.GONE
-                    binding.chatPage.visibility = View.VISIBLE
-                    binding.inputLayout.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
-            binding.projectPage.visibility = View.GONE
-            binding.profilePage.visibility = View.GONE
-            binding.marketplacePage.visibility = View.GONE
-            binding.chatPage.visibility = View.VISIBLE
-            binding.inputLayout.visibility = View.VISIBLE
-            clearPageTranslations()
-        }
-        setSendEnabled(!isActiveConversationWorking())
-        maybePrewarmCodexSession("show_project_personal_chat")
-    }
-
     fun showProjectManagement(animate: Boolean = false) {
         showProjectHome(animate = animate)
     }
 
-    fun showProjectSpace(title: String, animate: Boolean = false) {
-        clearMessageSelection()
-        projectSpaceTitle = title.ifBlank { "项目空间" }
-        actionPopupProvider()?.dismiss()
-        closeChatSideMenu(false)
-        renderProjectSpace()
-        applyProjectSpaceChrome(projectSpaceTitle)
-        if (animate && binding.chatPage.visibility == View.VISIBLE) {
-            pageTransitionRunning = true
-            WechatPageTransition.exitToLeft(
-                container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage, binding.inputLayout),
-                incoming = listOf(binding.projectPage),
-                incomingFull = emptyList(),
-                outgoingFull = listOf(binding.pageTabs),
-                onEnd = {
-                    binding.chatPage.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.GONE
-                    binding.projectPage.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                    renderProjectSpace()
-                }
-            )
-        }
-    }
-
     private fun showProjectHome(animate: Boolean = false) {
-        if (animate && binding.marketplacePage.visibility == View.VISIBLE) {
-            actionPopupProvider()?.dismiss()
-            closeChatSideMenu(false)
-            renderProjectList()
-            applyProjectHomeChrome()
-            pageTransitionRunning = true
-            WechatPageTransition.exitToRight(
-                container = binding.contentContainer,
-                outgoing = listOf(binding.marketplacePage),
-                incoming = listOf(binding.projectPage),
-                onEnd = {
-                    binding.chatPage.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.GONE
-                    binding.projectPage.visibility = View.VISIBLE
-                    binding.pageTabs.visibility = View.VISIBLE
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                    renderProjectList()
-                }
-            )
-        } else if (animate && binding.chatPage.visibility == View.VISIBLE) {
+        if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
             closeChatSideMenu(false)
             renderProjectList()
@@ -577,11 +339,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
-        binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
-        binding.moreButton.contentDescription = "聊天功能"
         binding.stageHintText.visibility = View.VISIBLE
         renderConversationList()
         binding.topTitleText.text = activeConversationProvider().title
@@ -602,8 +360,6 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.VISIBLE
         binding.addButton.visibility = View.VISIBLE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabChat)
@@ -624,11 +380,7 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        updateFriendVoiceCallButton()
-        binding.moreButton.visibility = View.VISIBLE
-        binding.moreButton.setOnClickListener { showContactChatSettings() }
-        binding.moreButton.contentDescription = "聊天设置"
+        binding.moreButton.visibility = View.GONE
         binding.quickActionStrip.visibility = View.GONE
         binding.stageHintText.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
@@ -646,8 +398,6 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabProject)
@@ -657,109 +407,18 @@ internal class MainNavigationController(
         renderProjectList()
     }
 
-    private fun applyMarketplaceChrome() {
-        updateBottomTabSelection(binding.tabProject)
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.GONE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.VISIBLE
-        binding.agentPage.root.visibility = View.GONE
-        binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
-        binding.moreButton.visibility = View.GONE
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = "项目广场"
-    }
-
-    private fun applyProjectSpaceChrome(title: String) {
-        updateBottomTabSelection(binding.tabProject)
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.GONE
-        binding.projectPage.visibility = View.VISIBLE
-        binding.profilePage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.GONE
-        binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.GONE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.VISIBLE
-        binding.projectMembersButton.setOnClickListener { showProjectMembers() }
-        hideVoiceCallButton()
-        binding.moreButton.visibility = View.GONE
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = title
-    }
-
-    private fun applyProjectChannelChrome(title: String) {
-        updateBottomTabSelection(binding.tabProject)
-        binding.conversationPage.visibility = View.GONE
-        binding.chatPage.visibility = View.VISIBLE
-        binding.projectPage.visibility = View.GONE
-        binding.profilePage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.GONE
-        binding.inputLayout.visibility = View.VISIBLE
-        binding.pageTabs.visibility = View.GONE
-        binding.backButton.visibility = View.VISIBLE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.GONE
-        hideVoiceCallButton()
-        binding.moreButton.visibility = View.GONE
-        binding.quickActionStrip.visibility = View.GONE
-        binding.stageHintText.visibility = View.GONE
-        binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = title
-    }
-
-    private fun hideVoiceCallButton() {
-        binding.voiceCallButton.visibility = View.GONE
-    }
-
-    private fun updateFriendVoiceCallButton() {
-        binding.voiceCallButton.visibility = if (isDirectSocialAiChatActive()) {
-            View.VISIBLE
-        } else {
-            View.GONE
-        }
-    }
-
     private fun updateBottomTabSelection(selectedTab: TextView) {
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach { tab ->
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile, binding.tabMarket).forEach { tab ->
             updateBottomTabVisual(tab, tab == selectedTab)
         }
     }
 
     private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
-        val color = Color.parseColor(if (selected) "#58BE6A" else "#A6AFBD")
+        val color = Color.parseColor(if (selected) "#E1E1E1" else "#A8A8A8")
         tab.isSelected = selected
         tab.setTextColor(color)
-        tab.textSize = 12f
+        tab.textSize = 11f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
-    }
-
-    /** 更新"好友"tab 未读消息角标。count=0 时隐藏角标。 */
-    fun updateChatTabBadge(count: Int) {
-        val badge = binding.tabChatBadge
-        if (count <= 0) {
-            badge.visibility = View.GONE
-            return
-        }
-        badge.text = if (count > 99) "99+" else count.toString()
-        badge.textSize = if (count > 99) 7f else 9f
-        if (badge.background == null || badge.background !is GradientDrawable) {
-            badge.background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#E53935"))
-            }
-        }
-        badge.visibility = View.VISIBLE
     }
 
     private fun clearPageTranslations() {
@@ -768,7 +427,6 @@ internal class MainNavigationController(
         binding.projectPage.translationX = 0f
         binding.profilePage.translationX = 0f
         binding.marketplacePage.translationX = 0f
-        binding.agentPage.root.translationX = 0f
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
     }
