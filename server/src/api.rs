@@ -30,6 +30,10 @@ pub struct ReadyCliOption {
     pub label: String,
     pub provider: String,
     pub model: Option<String>,
+    pub display_model: String,
+    pub reasoning_effort: Option<String>,
+    pub reasoning_summary: Option<String>,
+    pub verbosity: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -98,6 +102,10 @@ pub async fn readyz(State(state): State<Arc<AppState>>) -> Json<ReadyResponse> {
             label: opt.label.clone(),
             provider: opt.provider.clone(),
             model: opt.model.clone(),
+            display_model: opt.display_label(),
+            reasoning_effort: opt.reasoning_effort.clone(),
+            reasoning_summary: opt.reasoning_summary.clone(),
+            verbosity: opt.verbosity.clone(),
         })
         .collect();
 

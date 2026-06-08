@@ -235,7 +235,7 @@ async fn run_cli_command(
         stdout,
         Some(last_activity_ms.clone()),
         Some(tx.clone()),
-        option.model.clone(),
+        Some(option.attribution_label()),
     ));
     let stderr_task = tokio::spawn(read_cli_stream(
         stderr,

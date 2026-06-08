@@ -893,15 +893,32 @@
     }
     .agent-option {
       width: 100%;
-      min-height: 42px;
+      min-height: 56px;
       background: var(--panel-3);
       border: 1px solid var(--line);
       color: var(--ink);
       border-radius: 6px;
-      padding: 0 12px;
+      padding: 8px 12px;
       text-align: left;
-      font-size: 15px;
       cursor: pointer;
+    }
+    .agent-option-title {
+      display: block;
+      font-size: 15px;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .agent-option-subtitle {
+      display: block;
+      color: var(--ink-muted);
+      font-size: 12px;
+      line-height: 1.25;
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .agent-option:hover { background: #283140; }
     .agent-option.active {
@@ -2156,6 +2173,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       'gpt-5-codex': 'GPT-5 Codex',
       'gpt-5.1': 'GPT-5.1',
       'gpt-5.1-codex': 'GPT-5.1 Codex',
+      'gpt-5.3-codex-spark': 'GPT-5.3 Codex Spark',
+      'gpt-5.4': 'GPT-5.4',
+      'gpt-5.4-mini': 'GPT-5.4 mini',
+      'gpt-5.5': 'GPT-5.5',
       'claude-3.5-sonnet': 'Claude 3.5 Sonnet',
       'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
       'claude-3.7-sonnet': 'Claude 3.7 Sonnet',
@@ -2192,13 +2213,36 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return friendlyModelName(m);
   }
   function modelOptionLabel(item) {
+    const display = (item.display_model || '').trim();
+    if (display) return display;
     const model = (item.model || '').trim();
-    if (model && !/^default$/i.test(model)) return friendlyModelName(model);
-    return cleanModelLabel(item.label || item.name || 'unknown');
+    let label = model && !/^default$/i.test(model)
+      ? friendlyModelName(model)
+      : cleanModelLabel(item.label || item.name || 'unknown');
+    if ((item.provider || '').toLowerCase() === 'codex') {
+      const bits = [label];
+      if (item.reasoning_effort) bits.push('推理 ' + item.reasoning_effort);
+      if (item.verbosity) bits.push('输出 ' + item.verbosity);
+      label = bits.join(' · ');
+    }
+    return label;
+  }
+  function modelOptionSubtitle(item) {
+    if ((item.provider || '').toLowerCase() !== 'codex') return '';
+    const bits = [];
+    const model = (item.model || '').trim();
+    if (model && !/^default$/i.test(model)) bits.push('模型 ' + friendlyModelName(model));
+    if (item.reasoning_effort) bits.push('推理 ' + item.reasoning_effort);
+    if (item.verbosity) bits.push('输出 ' + item.verbosity);
+    if (item.reasoning_summary) bits.push('摘要 ' + item.reasoning_summary);
+    return bits.join(' · ');
   }
   function shortModelLabel(label) {
     // 与 APK MainActivity.shortModelLabel 对齐
     const m = cleanModelLabel(label);
+    if (/^GPT-5\.5/i.test(m)) return codexCompactLabel('5.5', m);
+    if (/^GPT-5\.4 mini/i.test(m)) return codexCompactLabel('5.4m', m);
+    if (/^GPT-5\.4/i.test(m)) return codexCompactLabel('5.4', m);
     if (/^Codex/i.test(m)) return 'Codex';
     if (/^GitHub/i.test(m)) return 'GitHub';
     if (m.startsWith('混元')) return m.replace(/ /g, '').slice(0, 6);
@@ -2212,6 +2256,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (m.startsWith('Claude')) return 'Cl' + (m.split(' ').pop() || '').slice(0, 3);
     if (m.startsWith('Gemini')) return 'G' + (m.split(' ').pop() || '').slice(0, 4);
     return m.slice(0, 6);
+  }
+  function codexCompactLabel(prefix, label) {
+    const lower = (label || '').toLowerCase();
+    let suffix = '';
+    if (lower.includes('xhigh')) suffix = 'X';
+    else if (lower.includes('high')) suffix = '高';
+    else if (lower.includes('medium')) suffix = '中';
+    else if (lower.includes('low')) suffix = '低';
+    else if (lower.includes('minimal')) suffix = '微';
+    return (prefix + suffix).slice(0, 6);
   }
   function selectedAgentOption() {
     return agentOptions.find((it) => (it.name || '') === selectedAgent) || agentOptions[0] || { name: '', label: '默认模型' };
@@ -2228,7 +2282,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'agent-option' + (((item.name || '') === selectedAgent) ? ' active' : '');
-      button.textContent = item.label || '默认模型';
+      const title = document.createElement('span');
+      title.className = 'agent-option-title';
+      title.textContent = item.label || '默认模型';
+      button.appendChild(title);
+      if (item.subtitle) {
+        const subtitle = document.createElement('span');
+        subtitle.className = 'agent-option-subtitle';
+        subtitle.textContent = item.subtitle;
+        button.appendChild(subtitle);
+      }
       button.disabled = !!item.disabled || agentLoading;
       button.setAttribute('role', 'option');
       button.setAttribute('aria-selected', ((item.name || '') === selectedAgent) ? 'true' : 'false');
@@ -2283,7 +2346,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       codexCliOnly = !!data.codex_cli_only;
       const serverOptions = (data.available_agents || []).map((it) => ({
         name: it.name || '',
-        label: modelOptionLabel(it)
+        label: modelOptionLabel(it),
+        subtitle: modelOptionSubtitle(it),
+        provider: it.provider || '',
+        model: it.model || '',
+        reasoningEffort: it.reasoning_effort || '',
+        reasoningSummary: it.reasoning_summary || '',
+        verbosity: it.verbosity || ''
       })).filter((it) => it.name);
       if (codexCliOnly) {
         agentOptions = serverOptions.length ? serverOptions : [{ name: 'codex_cli', label: 'Codex' }];

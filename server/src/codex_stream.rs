@@ -335,7 +335,7 @@ mod tests {
     fn stream_event_ignores_blank_and_unknown_events() {
         assert!(stream_event_to_ws_messages("", None).is_empty());
         assert!(stream_event_to_ws_messages("not json", None).is_empty());
-        assert!(stream_event_to_ws_messages_RAW_REPLACED(r#"{"type":"unknown_event"}"#).is_empty());
+        assert!(stream_event_to_ws_messages(r#"{"type":"unknown_event"}"#, None).is_empty());
     }
 
     #[test]

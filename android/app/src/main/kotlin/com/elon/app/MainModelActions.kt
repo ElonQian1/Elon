@@ -182,12 +182,59 @@ internal class MainModelActions(
             val name = item.optString("name", "")
             val model = item.optString("model", "")
             val provider = item.optString("provider", "")
-            val label = displayModelLabel(provider, model, item.optString("label", ""))
+            val reasoningEffort = jsonStringOrNull(item, "reasoning_effort")
+            val reasoningSummary = jsonStringOrNull(item, "reasoning_summary")
+            val verbosity = jsonStringOrNull(item, "verbosity")
+            val displayModel = item.optString("display_model", "")
+            val label = displayModel.trim().takeIf { it.isNotBlank() }
+                ?: displayModelLabel(provider, model, item.optString("label", ""))
+                    .withCodexRunMeta(provider, reasoningEffort, verbosity)
+            val subtitle = codexOptionSubtitle(provider, model, reasoningEffort, reasoningSummary, verbosity)
             if (name.isNotBlank()) {
-                options.add(ModelOption(label, name, provider))
+                options.add(
+                    ModelOption(
+                        label = label,
+                        agentName = name,
+                        provider = provider,
+                        modelId = model,
+                        reasoningEffort = reasoningEffort,
+                        reasoningSummary = reasoningSummary,
+                        verbosity = verbosity,
+                        subtitle = subtitle
+                    )
+                )
             }
         }
         return options
+    }
+
+    private fun String.withCodexRunMeta(
+        provider: String,
+        reasoningEffort: String?,
+        verbosity: String?
+    ): String {
+        if (!provider.equals("codex", ignoreCase = true)) return this
+        val parts = mutableListOf(this)
+        reasoningEffort?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add("推理 $it") }
+        verbosity?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add("输出 $it") }
+        return parts.joinToString(" · ")
+    }
+
+    private fun codexOptionSubtitle(
+        provider: String,
+        model: String,
+        reasoningEffort: String?,
+        reasoningSummary: String?,
+        verbosity: String?
+    ): String? {
+        if (!provider.equals("codex", ignoreCase = true)) return null
+        val parts = mutableListOf<String>()
+        model.trim().takeIf { it.isNotBlank() && !it.equals("default", ignoreCase = true) }
+            ?.let { parts.add("模型 ${friendlyModelName(it)}") }
+        reasoningEffort?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add("推理 $it") }
+        verbosity?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add("输出 $it") }
+        reasoningSummary?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add("摘要 $it") }
+        return parts.joinToString(" · ").takeIf { it.isNotBlank() }
     }
 
     private fun cacheModelSelection(agentName: String?, label: String) {
@@ -234,7 +281,7 @@ internal class MainModelActions(
         }
 
         val headerHeight = dp(30)
-        val rowHeight = dp(52)
+        val rowHeight = dp(60)
         val availablePopupWidth = (activity.resources.displayMetrics.widthPixels - dp(24)).coerceAtLeast(dp(176))
         val popupWidth = dp(296).coerceAtMost(availablePopupWidth)
         val arrowHeight = dp(8)
@@ -285,7 +332,7 @@ internal class MainModelActions(
                     panel.addView(createSectionHeaderView(item.title))
                 }
                 is PopupRowItem.Option -> {
-                    panel.addView(createModelPopupRow(item.option.label, isModelOptionSelected(item.option)) {
+                    panel.addView(createModelPopupRow(item.option.label, item.option.subtitle, isModelOptionSelected(item.option)) {
                         dismissModelPopup(animate = false)
                         saveModelSelection(item.option)
                     })
@@ -299,7 +346,7 @@ internal class MainModelActions(
 
         if (showCustomRow) {
             if (items.isNotEmpty()) panel.addView(createPopupDivider(marginStart = dp(16)))
-            panel.addView(createModelPopupRow("自定义模型", currentModelLabel.startsWith("自定义")) {
+            panel.addView(createModelPopupRow("自定义模型", null, currentModelLabel.startsWith("自定义")) {
                 dismissModelPopup(animate = false)
                 openSettings()
             })
@@ -433,7 +480,7 @@ internal class MainModelActions(
         }
     }
 
-    private fun createModelPopupRow(title: String, selected: Boolean, action: () -> Unit): View {
+    private fun createModelPopupRow(title: String, subtitle: String?, selected: Boolean, action: () -> Unit): View {
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -445,15 +492,40 @@ internal class MainModelActions(
             isClickable = true
             foreground = selectableForeground()
 
-            addView(TextView(context).apply {
+            val textColumn = LinearLayout(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            textColumn.addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
                 includeFontPadding = false
-                maxLines = 2
+                maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 text = title
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 14.5f
             })
+            if (!subtitle.isNullOrBlank()) {
+                textColumn.addView(TextView(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = dp(4)
+                    }
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    text = subtitle
+                    setTextColor(Color.parseColor("#6F7785"))
+                    textSize = 11.5f
+                })
+            }
+            addView(textColumn)
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(22), LinearLayout.LayoutParams.WRAP_CONTENT)
                 gravity = Gravity.CENTER

@@ -64,6 +64,10 @@ pub async fn get_user_agent(
             serde_json::json!({
                 "name": opt.id,
                 "model": opt.model.as_deref().unwrap_or("default"),
+                "display_model": opt.display_label(),
+                "reasoning_effort": opt.reasoning_effort.as_deref(),
+                "reasoning_summary": opt.reasoning_summary.as_deref(),
+                "verbosity": opt.verbosity.as_deref(),
                 "api_base": "local",
                 "backend": "cli",
                 "provider": opt.provider,
@@ -253,13 +257,7 @@ fn agent_display_meta(name: &str, model: &str) -> (String, String) {
 }
 
 fn cli_option_display_label(option: &AiCliOption) -> String {
-    option
-        .model
-        .as_deref()
-        .map(|model| model.trim())
-        .filter(|model| !model.is_empty() && !model.eq_ignore_ascii_case("default"))
-        .map(|model| copilot_model_friendly_name(model).to_string())
-        .unwrap_or_else(|| cli_provider_display_name(&option.provider).to_string())
+    option.display_label()
 }
 
 fn dedupe_available_agents(agents: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
@@ -304,15 +302,6 @@ fn available_agent_priority(agent: &serde_json::Value) -> u8 {
         "cli" => 2,
         "api" => 1,
         _ => 0,
-    }
-}
-
-fn cli_provider_display_name(provider: &str) -> &str {
-    match provider.trim().to_ascii_lowercase().as_str() {
-        "copilot" => "GitHub",
-        "codex" => "Codex",
-        "hunyuan" | "tokenhub" => "混元",
-        _ => provider,
     }
 }
 
@@ -481,6 +470,9 @@ mod tests {
             label: "Codex CLI / gpt-5".into(),
             provider: "codex".into(),
             model: Some("gpt-5".into()),
+            reasoning_effort: None,
+            reasoning_summary: None,
+            verbosity: None,
             bin: "codex".into(),
             args: Vec::new(),
             prompt_mode: CliPromptMode::Arg,

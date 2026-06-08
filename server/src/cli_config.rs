@@ -30,6 +30,9 @@ pub struct AiCliOption {
     pub label: String,
     pub provider: String,
     pub model: Option<String>,
+    pub reasoning_effort: Option<String>,
+    pub reasoning_summary: Option<String>,
+    pub verbosity: Option<String>,
     pub bin: String,
     pub args: Vec<String>,
     pub prompt_mode: CliPromptMode,
@@ -42,6 +45,26 @@ impl AiCliOption {
         parts.extend(self.args.clone());
         parts.push("<prompt>".into());
         parts.join(" ")
+    }
+
+    pub fn display_label(&self) -> String {
+        if self.provider.eq_ignore_ascii_case("codex") {
+            return codex_profile_label(
+                self.model.as_deref(),
+                self.reasoning_effort.as_deref(),
+                self.verbosity.as_deref(),
+            );
+        }
+        self.model
+            .as_deref()
+            .map(str::trim)
+            .filter(|model| !model.is_empty() && !model.eq_ignore_ascii_case("default"))
+            .map(friendly_cli_model_name)
+            .unwrap_or_else(|| self.label.clone())
+    }
+
+    pub fn attribution_label(&self) -> String {
+        self.display_label()
     }
 }
 
@@ -138,6 +161,9 @@ struct AiCliOptionInput {
     label: Option<String>,
     provider: Option<String>,
     model: Option<String>,
+    reasoning_effort: Option<String>,
+    reasoning_summary: Option<String>,
+    verbosity: Option<String>,
     bin: String,
     #[serde(default)]
     args: Vec<String>,
@@ -173,6 +199,9 @@ fn cli_options_from_json_env() -> Vec<AiCliOption> {
                     label,
                     provider,
                     model: item.model,
+                    reasoning_effort: item.reasoning_effort,
+                    reasoning_summary: item.reasoning_summary,
+                    verbosity: item.verbosity,
                     bin: item.bin,
                     args,
                     prompt_mode: CliPromptMode::from_env_value(
@@ -227,6 +256,9 @@ fn provider_cli_options(
             }
         }
     }
+    if models.is_empty() && prefix.eq_ignore_ascii_case("CODEX") {
+        models = default_codex_models();
+    }
 
     if models.is_empty() {
         return vec![AiCliOption {
@@ -234,6 +266,9 @@ fn provider_cli_options(
             label,
             provider: provider.into(),
             model: None,
+            reasoning_effort: None,
+            reasoning_summary: None,
+            verbosity: None,
             bin,
             args: split_cli_args(&args_raw),
             prompt_mode,
@@ -241,17 +276,71 @@ fn provider_cli_options(
         }];
     }
 
+    let configured_efforts =
+        split_list(&std::env::var(format!("{}_CLI_REASONING_EFFORTS", prefix)).unwrap_or_default());
+    let default_reasoning_summary = std::env::var(format!("{}_CLI_REASONING_SUMMARY", prefix))
+        .ok()
+        .and_then(clean_optional);
+    let default_verbosity = std::env::var(format!("{}_CLI_VERBOSITY", prefix))
+        .ok()
+        .and_then(clean_optional);
+
     models
         .into_iter()
-        .map(|model| AiCliOption {
-            id: format!("{}:{}", provider, model),
-            label: format!("{} / {}", label, model),
-            provider: provider.into(),
-            model: Some(model.clone()),
-            bin: bin.clone(),
-            args: args_for_model(&args_raw, &model, &model_arg),
-            prompt_mode,
-            timeout_secs,
+        .flat_map(|model| {
+            let efforts = if provider.eq_ignore_ascii_case("codex") {
+                if configured_efforts.is_empty() {
+                    default_codex_reasoning_efforts(&model)
+                } else {
+                    configured_efforts.clone()
+                }
+            } else {
+                Vec::new()
+            };
+            let efforts: Vec<Option<String>> = if efforts.is_empty() {
+                vec![None]
+            } else {
+                efforts.into_iter().map(Some).collect()
+            };
+            let default_label = label.clone();
+            let provider = provider.to_string();
+            let bin = bin.clone();
+            let args_raw = args_raw.clone();
+            let model_arg = model_arg.clone();
+            let reasoning_summary = default_reasoning_summary.clone();
+            let verbosity = default_verbosity.clone();
+            efforts.into_iter().map(move |effort| {
+                let id = if let Some(effort) = effort.as_deref() {
+                    format!("{}:{}:{}", provider, model, effort)
+                } else {
+                    format!("{}:{}", provider, model)
+                };
+                let option_label = if provider.eq_ignore_ascii_case("codex") {
+                    codex_profile_label(Some(&model), effort.as_deref(), verbosity.as_deref())
+                } else {
+                    format!("{} / {}", default_label, model)
+                };
+                AiCliOption {
+                    id,
+                    label: option_label,
+                    provider: provider.clone(),
+                    model: Some(model.clone()),
+                    reasoning_effort: effort.clone(),
+                    reasoning_summary: reasoning_summary.clone(),
+                    verbosity: verbosity.clone(),
+                    bin: bin.clone(),
+                    args: args_for_model_config(
+                        &args_raw,
+                        &model,
+                        &model_arg,
+                        effort.as_deref(),
+                        reasoning_summary.as_deref(),
+                        verbosity.as_deref(),
+                    ),
+                    prompt_mode,
+                    timeout_secs,
+                }
+            })
         })
         .collect()
 }
@@ -268,6 +357,119 @@ fn args_for_model(args_raw: &str, model: &str, model_arg: &str) -> Vec<String> {
     }
     args.extend(split_cli_args(args_raw));
     args
+}
+
+fn args_for_model_config(
+    args_raw: &str,
+    model: &str,
+    model_arg: &str,
+    reasoning_effort: Option<&str>,
+    reasoning_summary: Option<&str>,
+    verbosity: Option<&str>,
+) -> Vec<String> {
+    let args = args_for_model(args_raw, model, model_arg);
+    with_codex_config_args(args, reasoning_effort, reasoning_summary, verbosity)
+}
+
+fn with_codex_config_args(
+    mut args: Vec<String>,
+    reasoning_effort: Option<&str>,
+    reasoning_summary: Option<&str>,
+    verbosity: Option<&str>,
+) -> Vec<String> {
+    let mut configs = Vec::new();
+    if let Some(value) = reasoning_effort.and_then(clean_optional_str) {
+        configs.extend([
+            "-c".to_string(),
+            toml_string_arg("model_reasoning_effort", value),
+        ]);
+    }
+    if let Some(value) = reasoning_summary.and_then(clean_optional_str) {
+        configs.extend([
+            "-c".to_string(),
+            toml_string_arg("model_reasoning_summary", value),
+        ]);
+    }
+    if let Some(value) = verbosity.and_then(clean_optional_str) {
+        configs.extend(["-c".to_string(), toml_string_arg("model_verbosity", value)]);
+    }
+    if configs.is_empty() {
+        return args;
+    }
+    let insert_at = args
+        .iter()
+        .position(|arg| arg == "exec" || arg == "e")
+        .unwrap_or(args.len());
+    args.splice(insert_at..insert_at, configs);
+    args
+}
+
+fn toml_string_arg(key: &str, value: &str) -> String {
+    format!("{key}=\"{value}\"")
+}
+
+fn default_codex_models() -> Vec<String> {
+    ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini"]
+        .into_iter()
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn default_codex_reasoning_efforts(model: &str) -> Vec<String> {
+    let model = model.trim().to_ascii_lowercase();
+    let efforts: &[&str] = if model.contains("mini") || model.contains("spark") {
+        &["low", "medium"]
+    } else if model == "gpt-5.5" {
+        &["high", "xhigh"]
+    } else {
+        &["medium", "high"]
+    };
+    efforts.iter().map(|value| (*value).to_string()).collect()
+}
+
+fn codex_profile_label(
+    model: Option<&str>,
+    reasoning_effort: Option<&str>,
+    verbosity: Option<&str>,
+) -> String {
+    let model = model
+        .and_then(clean_optional_str)
+        .map(friendly_cli_model_name)
+        .unwrap_or_else(|| "Codex 默认".to_string());
+    let mut parts = vec![model];
+    if let Some(effort) = reasoning_effort.and_then(clean_optional_str) {
+        parts.push(format!("推理 {}", effort));
+    }
+    if let Some(verbosity) = verbosity.and_then(clean_optional_str) {
+        parts.push(format!("输出 {}", verbosity));
+    }
+    parts.join(" · ")
+}
+
+fn friendly_cli_model_name(model: &str) -> String {
+    match model.trim().to_ascii_lowercase().as_str() {
+        "gpt-5.5" => "GPT-5.5".to_string(),
+        "gpt-5.4" => "GPT-5.4".to_string(),
+        "gpt-5.4-mini" => "GPT-5.4 mini".to_string(),
+        "gpt-5.3-codex-spark" => "GPT-5.3 Codex Spark".to_string(),
+        "gpt-5.3-codex" => "GPT-5.3 Codex".to_string(),
+        "gpt-5.2" => "GPT-5.2".to_string(),
+        "gpt-5" => "GPT-5".to_string(),
+        _ => model.trim().to_string(),
+    }
+}
+
+fn clean_optional(value: String) -> Option<String> {
+    clean_optional_str(&value).map(ToOwned::to_owned)
+}
+
+fn clean_optional_str(value: &str) -> Option<&str> {
+    let value = value.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 fn split_list(raw: &str) -> Vec<String> {

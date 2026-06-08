@@ -67,6 +67,10 @@ internal fun friendlyModelName(model: String): String {
         "gpt-5-codex" -> "GPT-5 Codex"
         "gpt-5.1" -> "GPT-5.1"
         "gpt-5.1-codex" -> "GPT-5.1 Codex"
+        "gpt-5.3-codex-spark" -> "GPT-5.3 Codex Spark"
+        "gpt-5.4" -> "GPT-5.4"
+        "gpt-5.4-mini" -> "GPT-5.4 mini"
+        "gpt-5.5" -> "GPT-5.5"
         "claude-3.5-sonnet", "claude-3-5-sonnet-20241022" -> "Claude 3.5 Sonnet"
         "claude-3.7-sonnet", "claude-3-7-sonnet-20250219" -> "Claude 3.7 Sonnet"
         "claude-sonnet-4", "claude-sonnet-4-5" -> "Claude Sonnet 4"
@@ -85,6 +89,9 @@ internal fun friendlyModelName(model: String): String {
 internal fun shortModelLabel(label: String): String {
     val m = cleanModelLabel(label)
     return when {
+        m.startsWith("GPT-5.5", ignoreCase = true) -> codexCompactLabel("5.5", m)
+        m.startsWith("GPT-5.4 mini", ignoreCase = true) -> codexCompactLabel("5.4m", m)
+        m.startsWith("GPT-5.4", ignoreCase = true) -> codexCompactLabel("5.4", m)
         m.startsWith("Codex", ignoreCase = true) -> "Codex"
         m.startsWith("GitHub", ignoreCase = true) -> "GitHub"
         m.startsWith("混元") -> m.replace(" ", "").take(6)
@@ -99,6 +106,19 @@ internal fun shortModelLabel(label: String): String {
         m.startsWith("Gemini") -> "G" + m.substringAfterLast(" ").take(4)
         else -> m.take(6)
     }
+}
+
+private fun codexCompactLabel(prefix: String, label: String): String {
+    val lower = label.lowercase(Locale.US)
+    val suffix = when {
+        "xhigh" in lower -> "X"
+        "high" in lower -> "高"
+        "medium" in lower -> "中"
+        "low" in lower -> "低"
+        "minimal" in lower -> "微"
+        else -> ""
+    }
+    return (prefix + suffix).take(6)
 }
 
 private fun stripProviderPrefix(label: String): String {
