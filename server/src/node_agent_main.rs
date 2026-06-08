@@ -834,6 +834,20 @@ async fn run_cli_prompt(
                 Ok(None) => {}
                 Err(_) => {}
             },
+            // 超时保护：Codex 5分钟、Copilot 3分钟内必须有 stdout EOF，否则强杀
+            _ = tokio::time::sleep(std::time::Duration::from_secs(
+                if cli_name == "codex" { 300 } else { 180 }
+            )) => {
+                warn!("[{}] CLI 执行超时，强杀进程", cli_name);
+                let _ = child.kill().await;
+                let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+                    req_id,
+                    exit_ok: false,
+                    error: Some(format!("{} 执行超时（超过{}分钟），已强制终止",
+                        cli_name, if cli_name == "codex" { 5 } else { 3 })),
+                }));
+                return;
+            },
         }
     }
 
