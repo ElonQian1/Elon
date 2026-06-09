@@ -75,6 +75,10 @@ internal class ChatProjectSideMenuView(
         val list = projects()
             .mapIndexed { index, project -> index to project }
             .filter { (_, project) -> !project.isJointDevelopmentProject() }
+            .sortedWith(
+                compareByDescending<Pair<Int, AppProject>> { it.second.isSystemArchiveProject() }
+                    .thenByDescending { it.second.updatedAt }
+            )
         if (list.isEmpty()) {
             content.addView(emptyRow("暂无个人项目"))
             return
@@ -93,6 +97,7 @@ internal class ChatProjectSideMenuView(
         val jointProjects = projects()
             .mapIndexed { index, project -> index to project }
             .filter { (_, project) -> project.isJointDevelopmentProject() }
+            .sortedByDescending { it.second.updatedAt }
         if (jointProjects.isEmpty()) {
             content.addView(emptyRow("暂无联合项目"))
             return

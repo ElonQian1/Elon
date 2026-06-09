@@ -29,6 +29,7 @@ mod store_types;
 mod system_projects;
 mod tasks;
 mod token_usage;
+mod user_archive;
 mod user_memories;
 mod users;
 
@@ -49,7 +50,10 @@ pub(crate) use social_ai_messages::{
 pub(crate) use social_ai_pending::SocialAiPendingMention;
 pub use store_types::JoinRequestRecord;
 pub use store_types::*;
-pub(crate) use system_projects::{CHAT_MEMORY_PROJECT_NAME, PHONE_CONTROL_PROJECT_NAME};
+pub(crate) use system_projects::{
+    is_system_project_name, is_system_project_source_type, system_project_key_for_source_type,
+    CHAT_MEMORY_PROJECT_NAME, PHONE_CONTROL_PROJECT_NAME,
+};
 pub use token_usage::{
     TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats,
     UsageTotals,
@@ -92,6 +96,9 @@ impl Store {
         let name = name.trim();
         if name.is_empty() {
             return Err(anyhow!("项目名称不能为空"));
+        }
+        if is_system_project_name(name) {
+            return Err(anyhow!("该名称是系统保留项目，请更换项目名称"));
         }
 
         let template = template
@@ -185,6 +192,9 @@ impl Store {
         if name.is_empty() {
             return Err(anyhow!("项目名称不能为空"));
         }
+        if is_system_project_name(name) {
+            return Err(anyhow!("该名称是系统保留项目，不能绑定为外部代码项目"));
+        }
         let workspace_path = workspace_path.trim();
         if workspace_path.is_empty() {
             return Err(anyhow!("workspace_path 不能为空"));
@@ -198,19 +208,22 @@ impl Store {
 
         let requested_project_id = project_id.map(str::trim).filter(|v| !v.is_empty());
         if let Some(project_id) = requested_project_id {
-            let role: String = conn
+            let (role, source_type): (String, String) = conn
                 .query_row(
-                    "SELECT pm.role
+                    "SELECT pm.role, p.source_type
                      FROM projects p
                      JOIN project_members pm ON pm.project_id = p.id
                      WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
                     params![project_id, user_id],
-                    |row| row.get(0),
+                    |row| Ok((row.get(0)?, row.get(1)?)),
                 )
                 .optional()?
                 .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
             if role != "owner" {
                 anyhow::bail!("只有项目 owner 才能绑定 PC 本地路径");
+            }
+            if is_system_project_source_type(&source_type) {
+                anyhow::bail!("系统归档项目不能绑定为外部代码工作区");
             }
 
             let tx = conn.unchecked_transaction()?;

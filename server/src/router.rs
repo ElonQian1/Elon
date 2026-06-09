@@ -14,8 +14,8 @@ use crate::{
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_downloads, project_git, project_join_requests, project_membership,
     project_space, project_store, release_claim, speech_translate, token_usage_api, user_api,
-    user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
-    voice_ws_virtual_mic, web,
+    user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat,
+    voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -81,6 +81,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/profile",
             axum::routing::patch(project_api::update_profile),
         )
+        .route("/api/me/archive", get(user_archive_api::get_user_archive))
+        .route("/api/me/workspaces", get(user_archive_api::get_user_archive))
         // ── 用户记忆 API ────────────────────────────────────────────────────────
         .route("/api/memories", get(user_memory_api::list_memories).post(user_memory_api::create_memory))
         .route("/api/memories/:id", delete(user_memory_api::delete_memory))

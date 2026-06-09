@@ -23,14 +23,46 @@ data class AppProject(
     var collaborationProjectId: String? = null,
     var collaborationJoinMode: String? = null,
     var iconDataUrl: String? = null,
+    var systemProjectKey: String? = null,
+    var remoteConversationCount: Int? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()
 )
 
+internal fun AppProject.isSystemArchiveProject(): Boolean {
+    return !systemProjectKey.isNullOrBlank()
+}
+
 internal fun AppProject.isJointDevelopmentProject(): Boolean {
+    if (isSystemArchiveProject()) return false
     val remoteId = collaborationProjectId?.trim().orEmpty()
     return isJointProject || remoteId.isNotBlank()
+}
+
+internal fun AppProject.displayConversationCount(): Int {
+    val remoteCount = remoteConversationCount?.takeIf { it >= 0 }
+    return if (isSystemArchiveProject() && remoteCount != null) {
+        remoteCount
+    } else {
+        conversations.size.coerceAtLeast(remoteCount ?: 0)
+    }
+}
+
+internal fun AppProject.projectKindLabel(): String {
+    return when {
+        isSystemArchiveProject() -> "系统档案"
+        isJointDevelopmentProject() -> "联合开发"
+        else -> "个人独立"
+    }
+}
+
+internal fun AppProject.systemArchiveDisplayName(): String {
+    return when (systemProjectKey?.trim()?.lowercase()) {
+        "phone_control" -> "手机控制"
+        "chat_memory" -> "聊天记忆"
+        else -> "系统档案"
+    }
 }
 
 internal fun AppProject.projectSpaceId(): String {

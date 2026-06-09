@@ -12,6 +12,7 @@ use crate::{
     project_mobile::ensure_mobile_project,
     project_workspace_provision,
     project_ws_session::handle_project_ws,
+    store::is_system_project_source_type,
     types::AppState,
 };
 
@@ -48,6 +49,11 @@ pub struct UpdateProfileRequest {
     pub nickname: Option<String>,
 }
 
+#[derive(Deserialize, Default)]
+pub struct ListMyProjectsQuery {
+    pub include_system: Option<bool>,
+}
+
 pub async fn update_profile(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -73,14 +79,29 @@ pub async fn update_profile(
     }
 }
 
-pub async fn list_my_projects(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+pub async fn list_my_projects(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListMyProjectsQuery>,
+) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
     match state.store.list_projects_for_user(&user.id) {
-        Ok(projects) => Json(serde_json::json!({ "projects": projects })).into_response(),
+        Ok(projects) => {
+            let include_system = query.include_system.unwrap_or(false);
+            let projects = if include_system {
+                projects
+            } else {
+                projects
+                    .into_iter()
+                    .filter(|project| !is_system_project_source_type(&project.source_type))
+                    .collect()
+            };
+            Json(serde_json::json!({ "projects": projects })).into_response()
+        }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

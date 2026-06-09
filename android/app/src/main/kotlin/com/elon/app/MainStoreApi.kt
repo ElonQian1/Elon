@@ -317,7 +317,7 @@ internal fun fetchJoinedProjectIds(
     return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
 }
 
-/** GET /api/me/projects — 返回当前用户拥有或加入的项目列表，需要登录 */
+/** GET /api/me/projects — 返回当前用户拥有或加入的代码项目列表（不含系统档案项目），需要登录 */
 internal fun fetchMyProjects(
     http: OkHttpClient,
     serverUrl: String,

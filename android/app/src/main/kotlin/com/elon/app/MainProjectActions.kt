@@ -286,6 +286,19 @@ internal class MainProjectActions(
         project: AppProject,
         isJoint: Boolean
     ): List<ProjectMenuAction> {
+        if (project.isSystemArchiveProject()) {
+            return listOf(
+                ProjectMenuAction(
+                    title = "打开项目空间",
+                    subtitle = "进入${project.systemArchiveDisplayName()}会话归档",
+                    iconRes = R.drawable.ic_project_action_space
+                ) {
+                    setActiveProjectIndex(index)
+                    saveProjects()
+                    openProjectSpace(project)
+                }
+            )
+        }
         return buildList {
             add(
                 ProjectMenuAction(
@@ -520,6 +533,9 @@ internal class MainProjectActions(
     }
 
     private fun projectStatusText(project: AppProject, isJoint: Boolean): String {
+        if (project.isSystemArchiveProject()) {
+            return "${project.systemArchiveDisplayName()} · 专属会话归档"
+        }
         if (!isJoint) return "个人项目"
         return when (normalizeProjectJoinMode(project.collaborationJoinMode)) {
             "open" -> "联合项目 · 商城公开"
@@ -870,6 +886,10 @@ internal class MainProjectActions(
         val project = projects[index]
         if (project.id == ELON_SELF_PROJECT_ID) {
             Toast.makeText(activity, "一龙项目是平台自身项目，不能删除", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (project.isSystemArchiveProject()) {
+            Toast.makeText(activity, "${project.systemArchiveDisplayName()}是系统档案，不能删除", Toast.LENGTH_SHORT).show()
             return
         }
         AlertDialog.Builder(activity)

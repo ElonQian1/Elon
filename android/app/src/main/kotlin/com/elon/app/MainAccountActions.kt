@@ -24,33 +24,22 @@ internal class MainAccountActions(
     private val refreshProfileSummary: () -> Unit
 ) {
     /**
-     * 登录后从服务器拉取项目列表，恢复本地丢失的项目（换机/重装场景）。
+     * 登录后从服务器拉取项目归档，恢复本地丢失的项目（换机/重装场景）。
      * - 已存在（按 id 或 collaborationProjectId 匹配）的项目不会被覆盖。
-     * - role == "owner" 的项目还原为"个人独立项目"；其余为"联合开发项目"。
+     * - 系统档案仍归到个人项目，只保留系统身份和受限操作。
      * - 同步拉取服务器头像并写入本地（仅当本地头像为空时）。
      */
     fun syncProjectsFromServer() {
         if (!AuthManager.isLoggedIn(activity)) return
         thread(name = "sync-my-projects") {
             try {
-                val serverProjects = fetchMyProjects(http, serverUrl, activity)
-                // 用 id 和 collaborationProjectId 双重匹配，防止重复添加
-                val existingIds = projects.flatMap { p ->
-                    listOfNotNull(
-                        p.id.takeIf { it.isNotBlank() },
-                        p.collaborationProjectId?.takeIf { it.isNotBlank() }
-                    )
-                }.toSet()
-                val toAdd = serverProjects.filter { sp ->
-                    sp.id != ELON_SELF_PROJECT_ID && sp.id !in existingIds
-                }
-                if (toAdd.isNotEmpty()) {
-                    activity.runOnUiThread {
-                        for (sp in toAdd) {
-                            val project = if (sp.role == "owner") sp.toOwnerAppProject()
-                            else sp.toJointAppProject()
-                            projects.add(project)
-                        }
+                val archive = fetchMyProjectArchive(http, serverUrl, activity)
+                val remoteProjects = archive.allProjects
+                    .map { it.toAppProject() }
+                    .filter { it.id != ELON_SELF_PROJECT_ID }
+                activity.runOnUiThread {
+                    val changed = mergeRemoteProjects(remoteProjects)
+                    if (changed) {
                         saveProjects()
                         renderProjectList()
                     }
@@ -68,6 +57,53 @@ internal class MainAccountActions(
                 // 网络不可用时静默失败，不影响正常使用
             }
         }
+    }
+
+    private fun mergeRemoteProjects(remoteProjects: List<AppProject>): Boolean {
+        var changed = false
+        remoteProjects.forEach { remoteProject ->
+            val index = projects.indexOfFirst { local ->
+                local.id == remoteProject.id ||
+                    local.collaborationProjectId?.trim() == remoteProject.id
+            }
+            if (index >= 0) {
+                val local = projects[index]
+                changed = mergeRemoteProjectIntoLocal(local, remoteProject) || changed
+            } else {
+                projects.add(remoteProject)
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    private fun mergeRemoteProjectIntoLocal(local: AppProject, remote: AppProject): Boolean {
+        var changed = false
+        fun <T> update(current: T, next: T, apply: (T) -> Unit) {
+            if (current != next) {
+                apply(next)
+                changed = true
+            }
+        }
+
+        update(local.title, remote.title) { local.title = it }
+        update(local.stage, remote.stage) { local.stage = it }
+        update(local.isJointProject, remote.isJointProject) { local.isJointProject = it }
+        update(local.collaborationProjectId, remote.collaborationProjectId) { local.collaborationProjectId = it }
+        update(local.collaborationJoinMode, remote.collaborationJoinMode) { local.collaborationJoinMode = it }
+        update(local.iconDataUrl, remote.iconDataUrl) { local.iconDataUrl = it }
+        update(local.systemProjectKey, remote.systemProjectKey) { local.systemProjectKey = it }
+        update(local.remoteConversationCount, remote.remoteConversationCount) { local.remoteConversationCount = it }
+
+        val remoteSubtitle = remote.subtitle.trim()
+        if (local.subtitle.isBlank() || local.isSystemArchiveProject() || remote.isSystemArchiveProject()) {
+            update(local.subtitle, remoteSubtitle) { local.subtitle = it }
+        }
+        if (remote.updatedAt > 0L && remote.updatedAt != local.updatedAt) {
+            local.updatedAt = remote.updatedAt
+            changed = true
+        }
+        return changed
     }
 
     fun refreshAccountUi() {

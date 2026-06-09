@@ -120,6 +120,7 @@ fn delete_error_status(message: &str) -> StatusCode {
     } else if message.contains("无权")
         || message.contains("owner")
         || message.contains("平台自身项目")
+        || message.contains("系统归档项目")
     {
         StatusCode::FORBIDDEN
     } else if message.contains("正在运行") {

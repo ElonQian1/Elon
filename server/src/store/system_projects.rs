@@ -11,8 +11,8 @@ use super::{new_id, now, Store};
 
 pub const PHONE_CONTROL_PROJECT_NAME: &str = "手机控制";
 pub const CHAT_MEMORY_PROJECT_NAME: &str = "聊天记忆";
-const PHONE_CONTROL_SOURCE_TYPE: &str = "agent_balloon";
-const CHAT_MEMORY_SOURCE_TYPE: &str = "chat_memory";
+pub(crate) const PHONE_CONTROL_SOURCE_TYPE: &str = "agent_balloon";
+pub(crate) const CHAT_MEMORY_SOURCE_TYPE: &str = "chat_memory";
 
 struct SystemProjectSpec {
     name: &'static str,
@@ -53,9 +53,9 @@ impl Store {
     ) -> Result<(String, bool)> {
         let conn = self.conn()?;
 
-        let existing: Option<String> = conn
+        let existing: Option<(String, String)> = conn
             .query_row(
-                "SELECT p.id FROM projects p
+                "SELECT p.id, p.source_type FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE pm.user_id = ?1 AND pm.role = 'owner'
                    AND p.name = ?2
@@ -63,11 +63,27 @@ impl Store {
                  ORDER BY CASE WHEN p.source_type = ?3 THEN 0 ELSE 1 END, p.created_at ASC
                  LIMIT 1",
                 params![user_id, spec.name, spec.source_type],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
 
-        if let Some(id) = existing {
+        if let Some((id, source_type)) = existing {
+            if source_type != spec.source_type {
+                conn.execute(
+                    "UPDATE projects
+                     SET source_type = ?2,
+                         template = ?3,
+                         description = CASE
+                             WHEN description IS NULL OR TRIM(description) = '' THEN ?4
+                             ELSE description
+                         END,
+                         is_public = 0,
+                         join_mode = 'invite',
+                         updated_at = ?5
+                     WHERE id = ?1",
+                    params![id, spec.source_type, spec.template, spec.description, now()],
+                )?;
+            }
             return Ok((id, false));
         }
 
@@ -115,6 +131,25 @@ impl Store {
     }
 }
 
+pub(crate) fn is_system_project_name(name: &str) -> bool {
+    matches!(
+        name.trim(),
+        PHONE_CONTROL_PROJECT_NAME | CHAT_MEMORY_PROJECT_NAME
+    )
+}
+
+pub(crate) fn system_project_key_for_source_type(source_type: &str) -> Option<&'static str> {
+    match source_type.trim() {
+        PHONE_CONTROL_SOURCE_TYPE => Some("phone_control"),
+        CHAT_MEMORY_SOURCE_TYPE => Some("chat_memory"),
+        _ => None,
+    }
+}
+
+pub(crate) fn is_system_project_source_type(source_type: &str) -> bool {
+    system_project_key_for_source_type(source_type).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,5 +194,45 @@ mod tests {
             .collect::<Vec<_>>();
         assert!(names.contains(&PHONE_CONTROL_PROJECT_NAME.to_string()));
         assert!(names.contains(&CHAT_MEMORY_PROJECT_NAME.to_string()));
+    }
+
+    #[test]
+    fn ensure_system_project_normalizes_legacy_metadata() {
+        let store = temp_store();
+        let user = store
+            .create_user("legacy-system-projects@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let legacy_id = new_id("prj");
+        let now_str = now();
+        let conn = store.conn().expect("conn should open");
+        conn.execute(
+            "INSERT INTO projects (
+                id, name, description, workspace_key, template, source_type,
+                status, created_by, is_public, join_mode, created_at, updated_at
+             )
+             VALUES (?1, ?2, '旧数据', ?1, 'android', 'template',
+                     'active', ?3, 1, 'open', ?4, ?4)",
+            params![legacy_id, PHONE_CONTROL_PROJECT_NAME, user.id, now_str],
+        )
+        .expect("legacy project should insert");
+        conn.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, 'owner', ?3)",
+            params![legacy_id, user.id, now_str],
+        )
+        .expect("legacy membership should insert");
+        drop(conn);
+
+        let (project_id, created) = store
+            .ensure_balloon_project_for_user(&user.id)
+            .expect("system project should be normalized");
+
+        assert_eq!(project_id, legacy_id);
+        assert!(!created);
+
+        let access = store
+            .get_project_access(&user.id, &project_id)
+            .expect("project should still exist");
+        assert_eq!(access.source_type, PHONE_CONTROL_SOURCE_TYPE);
     }
 }

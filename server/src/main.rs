@@ -98,6 +98,7 @@ mod tools_git;
 mod types;
 mod typing_events;
 mod user_api;
+mod user_archive_api;
 mod user_memory_api;
 mod user_memory_extract;
 mod voice_asr_upload;

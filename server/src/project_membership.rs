@@ -242,7 +242,17 @@ pub async fn update_visibility(
             "join_mode": join_mode,
         }))
         .into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不存在") {
+                StatusCode::NOT_FOUND
+            } else if msg.contains("系统归档项目") {
+                StatusCode::FORBIDDEN
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            json_error(status, msg)
+        }
     }
 }
 

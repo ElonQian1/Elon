@@ -33,6 +33,11 @@
     return typeof app.getProjects === 'function' ? app.getProjects() : [];
   }
 
+  function archive() {
+    const app = bridge();
+    return typeof app.getProjectArchive === 'function' ? app.getProjectArchive() : null;
+  }
+
   function projectById(id) {
     return projects().find((item) => item && String(item.id) === String(id));
   }
@@ -141,11 +146,25 @@
     return String(project.role || '').trim().toLowerCase();
   }
 
+  function sourceTypeOf(project) {
+    return String(project.source_type || project.sourceType || '').trim().toLowerCase();
+  }
+
+  function systemKeyOf(project) {
+    return String(project.system_key || project.systemKey || '').trim().toLowerCase();
+  }
+
+  function isSystemProject(project) {
+    const sourceType = sourceTypeOf(project);
+    return sourceType === 'agent_balloon' || sourceType === 'chat_memory' || !!systemKeyOf(project);
+  }
+
   function boolOf(value) {
     return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
   }
 
   function isJointProject(project) {
+    if (isSystemProject(project)) return false;
     const role = roleOf(project);
     const memberCount = Number(project.member_count || project.memberCount || 0) || 0;
     return Boolean(
@@ -160,6 +179,7 @@
   }
 
   function stageOf(project) {
+    if (isSystemProject(project)) return '会话归档';
     return project.last_task_status || project.status || project.stage || '待提交需求';
   }
 
@@ -245,8 +265,9 @@
   }
 
   function renderCard(project) {
-    const joint = isJointProject(project);
-    const kind = joint ? '联合开发' : '个人独立';
+    const system = isSystemProject(project);
+    const joint = !system && isJointProject(project);
+    const kind = system ? '系统档案' : joint ? '联合开发' : '个人独立';
     const meta = `${kind} · ${conversationCount(project)}个会话 · ${stageOf(project)}`;
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
@@ -287,8 +308,17 @@
     if (!root) return;
     attachEvents(root);
     const all = projects();
-    const personal = all.filter((project) => !isJointProject(project));
-    const joint = all.filter(isJointProject);
+    const archiveData = archive();
+    const system = Array.isArray(archiveData && archiveData.system_projects)
+      ? archiveData.system_projects
+      : all.filter(isSystemProject);
+    const owned = Array.isArray(archiveData && archiveData.owned_projects)
+      ? archiveData.owned_projects.filter((project) => !isSystemProject(project))
+      : all.filter((project) => !isSystemProject(project) && !isJointProject(project));
+    const personal = system.concat(owned);
+    const joint = Array.isArray(archiveData && archiveData.shared_projects)
+      ? archiveData.shared_projects.filter((project) => !isSystemProject(project))
+      : all.filter((project) => !isSystemProject(project) && isJointProject(project));
     root.innerHTML = [
       renderPlazaBanner(),
       renderSection('personal', '个人项目', personal, 'create'),
@@ -321,6 +351,9 @@
   }
 
   function projectStatusText(project, joint) {
+    if (isSystemProject(project)) {
+      return `${systemProjectLabel(project)} · 专属会话归档`;
+    }
     if (!joint) return '个人项目 · 开发会话';
     const joinMode = String(project.join_mode || project.joinMode || 'invite').trim();
     if (joinMode === 'open') return '联合项目 · 商城公开';
@@ -330,6 +363,22 @@
   }
 
   function projectActionRows(project, joint) {
+    if (isSystemProject(project)) {
+      return [
+        {
+          action: 'open',
+          icon: '开',
+          title: '打开会话归档',
+          subtitle: '进入这个系统入口的历史会话'
+        },
+        {
+          action: 'record',
+          icon: '记',
+          title: '查看记录',
+          subtitle: '查看最近状态和会话进度'
+        }
+      ];
+    }
     const role = roleOf(project);
     const isOwner = !role || role === 'owner';
     const rows = [
@@ -378,6 +427,16 @@
       });
     }
     return rows;
+  }
+
+  function systemProjectLabel(project) {
+    const key = systemKeyOf(project);
+    if (key === 'phone_control') return '手机控制';
+    if (key === 'chat_memory') return '聊天记忆';
+    const sourceType = sourceTypeOf(project);
+    if (sourceType === 'agent_balloon') return '手机控制';
+    if (sourceType === 'chat_memory') return '聊天记忆';
+    return '系统档案';
   }
 
   function renderActionRow(row) {

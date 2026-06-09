@@ -11,7 +11,8 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    normalize_account, now, ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
+    is_system_project_source_type, normalize_account, now, ProjectDeletionTarget,
+    ProjectMemberEntry, PublicProjectItem, Store,
 };
 
 impl Store {
@@ -68,6 +69,7 @@ impl Store {
              WHERE p.is_public = 1
               AND p.join_mode != 'invite'
               AND p.status != 'deleted'
+              AND p.source_type NOT IN ('agent_balloon', 'chat_memory')
               AND (
                 ?1 IS NULL
                 OR LOWER(p.name) LIKE ?1
@@ -140,7 +142,11 @@ impl Store {
                p.created_by AS owner_id
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
-             WHERE p.id = ?1 AND p.is_public = 1 AND p.join_mode != 'invite' AND p.status != 'deleted'",
+             WHERE p.id = ?1
+               AND p.is_public = 1
+               AND p.join_mode != 'invite'
+               AND p.status != 'deleted'
+               AND p.source_type NOT IN ('agent_balloon', 'chat_memory')",
             params![project_id],
             |row| {
                 Ok(PublicProjectItem {
@@ -172,7 +178,9 @@ impl Store {
         is_public: bool,
         join_mode: &str,
     ) -> Result<()> {
-        let n = self.conn()?.execute(
+        let conn = self.conn()?;
+        ensure_project_not_system(&conn, project_id, "系统归档项目不能公开到项目广场")?;
+        let n = conn.execute(
             "UPDATE projects SET is_public = ?1, join_mode = ?2, updated_at = ?3
              WHERE id = ?4 AND status != 'deleted'",
             params![is_public as i64, join_mode, now(), project_id],
@@ -187,14 +195,17 @@ impl Store {
     pub fn join_project(&self, user_id: &str, project_id: &str) -> Result<()> {
         let conn = self.conn()?;
         // 检查项目存在且公开
-        let (is_public, join_mode): (i64, String) = conn
+        let (is_public, join_mode, source_type): (i64, String, String) = conn
             .query_row(
-                "SELECT is_public, join_mode FROM projects
+                "SELECT is_public, join_mode, source_type FROM projects
                  WHERE id = ?1 AND status != 'deleted'",
                 params![project_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .map_err(|_| anyhow!("项目不存在"))?;
+        if is_system_project_source_type(&source_type) {
+            anyhow::bail!("系统归档项目不支持加入");
+        }
 
         if is_public == 0 {
             anyhow::bail!("该项目不对外公开");
@@ -222,17 +233,26 @@ impl Store {
     /// 退出项目（owner 不可退出，由 handler 层校验）
     pub fn leave_project(&self, user_id: &str, project_id: &str) -> Result<()> {
         // 禁止 owner 退出
-        let role: Option<String> = self
+        let project_info: Option<(String, String)> = self
             .conn()?
             .query_row(
-                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                "SELECT pm.role, p.source_type
+                 FROM project_members pm
+                 JOIN projects p ON p.id = pm.project_id
+                 WHERE pm.project_id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
                 params![project_id, user_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
-        match role.as_deref() {
+        let (role, source_type) = match project_info {
+            Some(info) => info,
             None => anyhow::bail!("你不是该项目的成员"),
-            Some("owner") => anyhow::bail!("项目 owner 不可退出，请先转让所有权或删除项目"),
+        };
+        if is_system_project_source_type(&source_type) {
+            anyhow::bail!("系统归档项目不能退出");
+        }
+        match role.as_str() {
+            "owner" => anyhow::bail!("项目 owner 不可退出，请先转让所有权或删除项目"),
             _ => {}
         }
         self.conn()?.execute(
@@ -449,6 +469,9 @@ impl Store {
         if role != "owner" {
             anyhow::bail!("只有项目 owner 才能删除项目");
         }
+        if is_system_project_source_type(&target.source_type) {
+            anyhow::bail!("系统归档项目不能删除");
+        }
 
         let running_tasks: i64 = conn.query_row(
             "SELECT COUNT(*) FROM tasks WHERE project_id = ?1 AND status = 'running'",
@@ -484,6 +507,15 @@ impl Store {
             Some("owner") => {}
             Some(_) => anyhow::bail!("只有项目 owner 才能删除项目"),
             None => anyhow::bail!("项目不存在，或当前用户无权访问"),
+        }
+
+        let source_type: String = tx.query_row(
+            "SELECT source_type FROM projects WHERE id = ?1 AND status != 'deleted'",
+            params![project_id],
+            |row| row.get(0),
+        )?;
+        if is_system_project_source_type(&source_type) {
+            anyhow::bail!("系统归档项目不能删除");
         }
 
         let running_tasks: i64 = tx.query_row(
@@ -581,6 +613,25 @@ fn project_member_entry(
         },
     )
     .map_err(Into::into)
+}
+
+fn ensure_project_not_system(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+    message: &str,
+) -> Result<()> {
+    let source_type: String = conn
+        .query_row(
+            "SELECT source_type FROM projects WHERE id = ?1 AND status != 'deleted'",
+            params![project_id],
+            |row| row.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("项目不存在"))?;
+    if is_system_project_source_type(&source_type) {
+        anyhow::bail!(message.to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -839,6 +890,29 @@ mod tests {
             .to_string();
 
         assert!(err.contains("正在运行"));
+    }
+
+    #[test]
+    fn system_projects_cannot_be_deleted_or_published() {
+        let store = temp_store();
+        let user = store
+            .create_user("system-guard@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let (project_id, _) = store
+            .ensure_balloon_project_for_user(&user.id)
+            .expect("system project should exist");
+
+        let delete_err = store
+            .project_deletion_target(&user.id, &project_id)
+            .expect_err("system project deletion should be rejected")
+            .to_string();
+        assert!(delete_err.contains("系统归档项目"));
+
+        let visibility_err = store
+            .set_project_visibility(&project_id, true, "open")
+            .expect_err("system project visibility should be rejected")
+            .to_string();
+        assert!(visibility_err.contains("系统归档项目"));
     }
 
     #[test]

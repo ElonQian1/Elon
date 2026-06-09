@@ -324,6 +324,38 @@ pub struct ProjectSummary {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct UserArchiveProject {
+    #[serde(flatten)]
+    pub project: ProjectSummary,
+    pub conversation_count: i64,
+    /// `system_archive` | `pc_node_workspace` | `external_workspace` | `server_workspace`
+    pub workspace_kind: String,
+    /// `phone_control` | `chat_memory`
+    pub system_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserArchiveNode {
+    pub node_id: String,
+    pub label: String,
+    pub device_name: Option<String>,
+    pub display_name: String,
+    pub short_id: String,
+    pub online: bool,
+    pub project_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserArchiveSummary {
+    pub total_projects: i64,
+    pub system_project_count: i64,
+    pub owned_project_count: i64,
+    pub shared_project_count: i64,
+    pub node_count: i64,
+    pub online_node_count: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct ProjectAccess {
     pub id: String,

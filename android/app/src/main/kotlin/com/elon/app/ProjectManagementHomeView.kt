@@ -56,8 +56,13 @@ internal class ProjectManagementHomeView(
         container.addView(createPlazaBanner())
 
         val indexed = projects().mapIndexed { index, project -> IndexedProject(index, project) }
-        val personal = indexed.filter { !it.project.isJointDevelopmentProject() }
-        val joint = indexed.filter { it.project.isJointDevelopmentProject() }
+        val personal = indexed
+            .filter { !it.project.isJointDevelopmentProject() }
+            .sortedWith(compareByDescending<IndexedProject> { it.project.isSystemArchiveProject() }
+                .thenByDescending { it.project.updatedAt })
+        val joint = indexed
+            .filter { it.project.isJointDevelopmentProject() }
+            .sortedByDescending { it.project.updatedAt }
 
         addSection(
             title = "个人项目",
@@ -427,9 +432,9 @@ internal class ProjectManagementHomeView(
     }
 
     private fun projectMeta(project: AppProject): String {
-        val kind = if (project.isJointDevelopmentProject()) "联合开发" else "个人独立"
+        val kind = project.projectKindLabel()
         val stage = project.stage.takeIf { it.isNotBlank() } ?: "待提交需求"
-        return "$kind · ${project.conversations.size}个会话 · $stage"
+        return "$kind · ${project.displayConversationCount()}个会话 · $stage"
     }
 
     private fun projectTime(project: AppProject): String {
