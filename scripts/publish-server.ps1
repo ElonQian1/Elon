@@ -296,7 +296,8 @@ Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
 # ─────────────────────────────────────────────────────────────
 # Release API helper（与服务器 /api/release/{claim,heartbeat,finish} 通讯）
 # ─────────────────────────────────────────────────────────────
-$ReleaseApiBase = "http://43.139.149.158:8080/api/release"
+$ServerHttpBase = "http://43.139.149.158:8080"
+$ReleaseApiBase = "$ServerHttpBase/api/release"
 
 function Invoke-ReleaseApi {
     param(
@@ -330,6 +331,83 @@ function Invoke-ReleaseApi {
     } finally {
         if ($tmp -and (Test-Path $tmp)) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
     }
+}
+
+function Invoke-HttpJson {
+    param(
+        [Parameter(Mandatory)] [string]$Url,
+        [int]$TimeoutSec = 10
+    )
+    $raw = & curl.exe --noproxy '*' -s --max-time $TimeoutSec -w "`n__HTTP_STATUS__:%{http_code}" $Url 2>&1
+    $rawText = ($raw -join "`n")
+    if ($LASTEXITCODE -ne 0) {
+        throw "curl GET 失败 (exit=$LASTEXITCODE): $rawText"
+    }
+    $statusLine = ($rawText -split "`n") | Where-Object { $_ -match '^__HTTP_STATUS__:' } | Select-Object -Last 1
+    $bodyText = ($rawText -replace "(?s)\n?__HTTP_STATUS__:\d+\s*$","")
+    $status = if ($statusLine) { [int]($statusLine -replace '^__HTTP_STATUS__:','') } else { 0 }
+    if ($status -lt 200 -or $status -ge 300) {
+        throw "HTTP ${status}: $bodyText"
+    }
+    if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
+    return ($bodyText | ConvertFrom-Json)
+}
+
+function Get-VersionSortKey {
+    param([string]$VersionName)
+    if ($VersionName -match '^(\d+)\.(\d+)\.(\d+)$') {
+        return ('{0:D8}.{1:D8}.{2:D8}' -f [int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
+    }
+    return '00000000.00000000.00000000'
+}
+
+function Get-ServerReleaseVersionBaseline {
+    $candidates = @()
+    $errors = @()
+
+    try {
+        $status = Invoke-HttpJson -Url "$ReleaseApiBase/status?kind=server" -TimeoutSec 10
+        $name = [string]$status.lastPublishedVersionName
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+            $candidates += [pscustomobject]@{
+                Source      = '/api/release/status'
+                VersionName = $name
+            }
+        }
+    } catch {
+        $errors += "/api/release/status?kind=server: $_"
+    }
+
+    try {
+        $live = Invoke-HttpJson -Url "$ServerHttpBase/api/server/version" -TimeoutSec 10
+        $name = [string]$live.versionName
+        if (-not [string]::IsNullOrWhiteSpace($name)) {
+            $candidates += [pscustomobject]@{
+                Source      = '/api/server/version'
+                VersionName = $name
+            }
+        }
+    } catch {
+        $errors += "/api/server/version: $_"
+    }
+
+    if ($candidates.Count -eq 0) {
+        foreach ($errorText in $errors) {
+            Write-Warning "   ⚠️  后端版本基线读取失败：$errorText"
+        }
+        Write-Error "❌ 无法读取服务器后端版本基线；发布已停止，避免用 Cargo.toml 兜底版本发布。"
+    }
+
+    $selected = $candidates |
+        Sort-Object -Property @{ Expression = { Get-VersionSortKey $_.VersionName }; Descending = $true } |
+        Select-Object -First 1
+    foreach ($candidate in $candidates) {
+        if ($candidate.VersionName -ne $selected.VersionName) {
+            Write-Warning "   ⚠️  服务器后端版本来源不一致：$($candidate.Source)=v$($candidate.VersionName)，最终采用 v$($selected.VersionName)"
+        }
+    }
+    Write-Host "   ℹ️  服务器后端版本基线: v$($selected.VersionName) [$($selected.Source)]" -ForegroundColor DarkGray
+    return $selected
 }
 
 # 全局状态：claim token，脚本失败/中止时用来调 finish 释放槽位
@@ -420,6 +498,8 @@ $FallbackVersion = [regex]::Match(
 ).Groups[1].Value
 Write-Host "   ✅ 最新 SHA: $Sha" -ForegroundColor Green
 Write-Host "   ℹ️  Cargo.toml 兜底版本: v$FallbackVersion（不会被本次脚本修改）" -ForegroundColor DarkGray
+$serverVersionBaseline = Get-ServerReleaseVersionBaseline
+$ClaimCurrentVersion = [string]$serverVersionBaseline.VersionName
 
 # ─────────────────────────────────────────────────────────────
 # 1.5  从服务器原子分配新版本号（claim）
@@ -439,7 +519,7 @@ try {
         builderId         = $builderId
         builderLabel      = $builderLabel
         bump              = 'patch'
-        currentVersionName = $FallbackVersion
+        currentVersionName = $ClaimCurrentVersion
     })
 } catch {
     Write-Error "❌ /api/release/claim 失败：$_"

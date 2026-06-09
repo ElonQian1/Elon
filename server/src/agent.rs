@@ -167,12 +167,16 @@ pub async fn run_for_project_in_workspace(
         return;
     }
     if require_git_for_this_request {
-        match tools::git_pull_rebase(&workspace) {
+        match tools::git_fetch_status(&workspace) {
             Ok(msg) => {
-                if msg.starts_with("git pull 未成功") {
+                if msg.starts_with("git fetch 未成功")
+                    || msg.contains("本地落后")
+                    || msg.contains("未推送提交")
+                    || msg.contains("已分叉")
+                {
                     warn!("项目同步预检未完成，交给 AI CLI 处理: {}", msg);
                     let _ = tx.send(
-                        WsMessage::progress("同步检查遇到 Git 工作区问题，已交给 AI 助手处理。")
+                        WsMessage::progress("同步状态检查已完成，远端状态已交给 AI 助手处理。")
                             .to_json(),
                     );
                     preflight_note = Some(msg);
@@ -181,7 +185,7 @@ pub async fn run_for_project_in_workspace(
                 }
             }
             Err(e) => {
-                let msg = format!("git pull --rebase 执行出错: {}", e);
+                let msg = format!("git fetch origin main 执行出错: {}", e);
                 warn!("项目同步预检执行出错，交给 AI CLI 处理: {}", msg);
                 let _ = tx
                     .send(WsMessage::progress("同步检查执行出错，已交给 AI 助手处理。").to_json());

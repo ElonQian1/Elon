@@ -154,6 +154,64 @@ read_live_server_version_name() {
     python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('versionName',''))" 2>/dev/null || true
 }
 
+version_gt() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+
+def key(value: str):
+    parts = []
+    for part in value.split("."):
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return parts[:3]
+
+sys.exit(0 if key(sys.argv[1]) > key(sys.argv[2]) else 1)
+PY
+}
+
+resolve_server_version_baseline() {
+  local best_name="" best_source="" found=0
+  local status_json status_name live_json live_name
+
+  if status_json=$(curl --noproxy '*' -sS --fail --max-time 10 "$RELEASE_API_BASE/status?kind=server" 2>/dev/null); then
+    status_name=$(json_field "$status_json" lastPublishedVersionName)
+    if [ -n "$status_name" ]; then
+      best_name="$status_name"
+      best_source="/api/release/status"
+      found=1
+    fi
+  else
+    echo -e "${YELLOW}   ⚠️  后端版本基线读取失败：/api/release/status?kind=server${NC}" >&2
+  fi
+
+  if live_json=$(curl --noproxy '*' -sS --fail --max-time 10 "$SERVER_HTTP_BASE/api/server/version" 2>/dev/null); then
+    live_name=$(json_field "$live_json" versionName)
+    if [ -n "$live_name" ]; then
+      if [ "$found" -eq 1 ] && [ "$live_name" != "$best_name" ]; then
+        echo -e "${YELLOW}   ⚠️  服务器后端版本来源不一致：/api/server/version=v${live_name}，release/status=v${best_name}，采用较高版本${NC}" >&2
+      fi
+      if [ "$found" -eq 0 ] || version_gt "$live_name" "$best_name"; then
+        best_name="$live_name"
+        best_source="/api/server/version"
+      fi
+      found=1
+    fi
+  else
+    echo -e "${YELLOW}   ⚠️  后端版本基线读取失败：/api/server/version${NC}" >&2
+  fi
+
+  if [ "$found" -eq 0 ]; then
+    echo -e "${RED}❌ 无法读取服务器后端版本基线；发布已停止，避免用 Cargo.toml 兜底版本发布。${NC}" >&2
+    return 1
+  fi
+
+  printf '%s|%s\n' "$best_name" "$best_source"
+}
+
 read_deployed_server_sha() {
   local deployed_sha_file="$REMOTE_DIR/.deployed-sha"
   local live_sha file_sha
@@ -384,8 +442,9 @@ if [ "$SHA_BIG" != "$REMOTE_MAIN" ]; then
 fi
 
 FALLBACK_VERSION=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$SERVER_DIR/Cargo.toml" | head -1)
-LIVE_SERVER_VERSION=$(read_live_server_version_name)
-CLAIM_CURRENT_VERSION="${LIVE_SERVER_VERSION:-$FALLBACK_VERSION}"
+SERVER_VERSION_BASELINE=$(resolve_server_version_baseline) || exit 1
+CLAIM_CURRENT_VERSION="${SERVER_VERSION_BASELINE%%|*}"
+CLAIM_CURRENT_SOURCE="${SERVER_VERSION_BASELINE#*|}"
 echo -e "${GREEN}   ✅ 最新 SHA: $SHA${NC}"
 DEPLOYED_SERVER_SHA=$(read_deployed_server_sha)
 if [ "$FORCE" -eq 0 ] && [ -n "$DEPLOYED_SERVER_SHA" ] && [ "$DEPLOYED_SERVER_SHA" != "$SHA_BIG" ]; then
@@ -396,9 +455,7 @@ if [ "$FORCE" -eq 0 ] && [ -n "$DEPLOYED_SERVER_SHA" ] && [ "$DEPLOYED_SERVER_SH
   fi
 fi
 echo -e "${GREEN}   ✅ Cargo.toml 兜底版本: v$FALLBACK_VERSION${NC}"
-if [ -n "$LIVE_SERVER_VERSION" ]; then
-  echo -e "${GREEN}   ✅ 当前线上后端版本: v$LIVE_SERVER_VERSION${NC}"
-fi
+echo -e "${GREEN}   ✅ 服务器后端版本基线: v$CLAIM_CURRENT_VERSION [$CLAIM_CURRENT_SOURCE]${NC}"
 
 # ── 1.5 从服务器原子分配新版本号（claim）─────────────────────
 echo -e "${YELLOW}1.5⃣  向服务器申请新版本号...${NC}"

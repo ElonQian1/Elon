@@ -92,6 +92,11 @@ json_get_int() {
   echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(int(d.get('$2',0)))" 2>/dev/null || echo "0"
 }
 
+http_get_json() {
+  local url="$1"
+  curl -sS --fail --noproxy '*' --max-time 10 "$url"
+}
+
 # ── Release API ───────────────────────────────────────────────
 call_release_api() {
   local endpoint="$1"
@@ -141,6 +146,49 @@ complete_release() {
 
   call_release_api "finish" "$payload" > /dev/null 2>&1 || true
   RELEASE_FINISHED=1
+}
+
+resolve_apk_version_baseline() {
+  local best_code=0 best_name="" best_source="" found=0
+  local status_json status_code status_name deployed_json deployed_code deployed_name
+
+  if status_json=$(http_get_json "$RELEASE_API_BASE/status?kind=apk" 2>/dev/null); then
+    status_code=$(json_get_int "$status_json" "lastPublishedVersionCode")
+    status_name=$(json_get "$status_json" "lastPublishedVersionName")
+    if [[ "$status_code" -gt 0 && -n "$status_name" ]]; then
+      best_code="$status_code"
+      best_name="$status_name"
+      best_source="/api/release/status"
+      found=1
+    fi
+  else
+    echo -e "${YELLOW}   ⚠️  APK 版本基线读取失败：/api/release/status?kind=apk${NC}" >&2
+  fi
+
+  if deployed_json=$(http_get_json "$SERVER_URL/app/version.json" 2>/dev/null); then
+    deployed_code=$(json_get_int "$deployed_json" "versionCode")
+    deployed_name=$(json_get "$deployed_json" "versionName")
+    if [[ "$deployed_code" -gt 0 && -n "$deployed_name" ]]; then
+      if [[ "$found" -eq 1 && ( "$deployed_code" -ne "$best_code" || "$deployed_name" != "$best_name" ) ]]; then
+        echo -e "${YELLOW}   ⚠️  服务器 APK 版本来源不一致：/app/version.json=v${deployed_name} build ${deployed_code}，release/status=v${best_name} build ${best_code}，采用最高 build${NC}" >&2
+      fi
+      if [[ "$deployed_code" -gt "$best_code" ]]; then
+        best_code="$deployed_code"
+        best_name="$deployed_name"
+        best_source="/app/version.json"
+      fi
+      found=1
+    fi
+  else
+    echo -e "${YELLOW}   ⚠️  APK 版本基线读取失败：/app/version.json${NC}" >&2
+  fi
+
+  if [[ "$found" -eq 0 ]]; then
+    echo -e "${RED}❌ 无法读取服务器 APK 版本基线；发布已停止，避免用 build.gradle 兜底版本发布。${NC}" >&2
+    return 1
+  fi
+
+  printf '%s|%s|%s\n' "$best_code" "$best_name" "$best_source"
 }
 
 find_aapt() {
@@ -426,18 +474,12 @@ OLD_NAME=$(grep 'versionName' "$GRADLE_PATH" | grep -oP '"[^"]+"' | tr -d '"' | 
 
 echo -e "${GRAY}   build.gradle 兜底: v${OLD_NAME} (build ${OLD_CODE}) — 不会被本次脚本提交${NC}"
 
-CLAIM_BASE_CODE="$OLD_CODE"
-CLAIM_BASE_NAME="$OLD_NAME"
-LIVE_BEFORE_CLAIM=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
-if [[ -n "$LIVE_BEFORE_CLAIM" ]]; then
-  LIVE_BEFORE_CODE=$(json_get_int "$LIVE_BEFORE_CLAIM" "versionCode")
-  LIVE_BEFORE_NAME=$(json_get "$LIVE_BEFORE_CLAIM" "versionName")
-  if [[ "$LIVE_BEFORE_CODE" -gt "$CLAIM_BASE_CODE" ]]; then
-    CLAIM_BASE_CODE="$LIVE_BEFORE_CODE"
-    [[ -n "$LIVE_BEFORE_NAME" ]] && CLAIM_BASE_NAME="$LIVE_BEFORE_NAME"
-    echo -e "${GRAY}   线上版本基线: v${CLAIM_BASE_NAME} (build ${CLAIM_BASE_CODE})${NC}"
-  fi
-fi
+BASELINE=$(resolve_apk_version_baseline) || exit 1
+CLAIM_BASE_CODE="${BASELINE%%|*}"
+BASELINE_REST="${BASELINE#*|}"
+CLAIM_BASE_NAME="${BASELINE_REST%%|*}"
+CLAIM_BASE_SOURCE="${BASELINE_REST#*|}"
+echo -e "${GRAY}   服务器 APK 版本基线: v${CLAIM_BASE_NAME} (build ${CLAIM_BASE_CODE}) [${CLAIM_BASE_SOURCE}]${NC}"
 
 BUILDER_ID="${HOSTNAME:-unknown}-${USER:-unknown}"
 BUILDER_LABEL="publish-apk.sh @ $BUILDER_ID"
@@ -462,6 +504,12 @@ NEW_NAME=$(json_get "$CLAIM_RESP" "assignedVersionName")
 
 if [[ -z "$RELEASE_TOKEN" || -z "$NEW_NAME" || "$NEW_CODE" -le 0 ]]; then
   echo -e "${RED}❌ release/claim 未返回有效的版本号: $CLAIM_RESP${NC}" >&2; exit 1
+fi
+
+if [[ "$NEW_CODE" -le "$CLAIM_BASE_CODE" ]]; then
+  complete_release "false" "" 0 "" "claim returned non-incrementing apk build $NEW_CODE from baseline $CLAIM_BASE_CODE"
+  echo -e "${RED}❌ release/claim 分配的 build $NEW_CODE 未高于服务器基线 build $CLAIM_BASE_CODE，已停止发布。${NC}" >&2
+  exit 1
 fi
 
 echo -e "${GREEN}   ✅ 已分配版本号: v${NEW_NAME} (build ${NEW_CODE})${NC}"
@@ -549,8 +597,18 @@ SERVER_SHA_BEFORE=$(get_deployed_apk_sha)
 
 if [[ "$FORCE" == "0" ]]; then
   SERVER_NOW=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
+  if [[ -z "$SERVER_NOW" ]]; then
+    complete_release "false" "" 0 "" "could not read server apk version before upload"
+    echo -e "${RED}❌ 上传前无法读取服务器 version.json，已停止发布，避免覆盖服务器上的未知新版本。${NC}" >&2
+    exit 1
+  fi
   if [[ -n "$SERVER_NOW" ]]; then
     SERVER_NOW_CODE=$(json_get_int "$SERVER_NOW" "versionCode")
+    if [[ "$SERVER_NOW_CODE" -le 0 ]]; then
+      complete_release "false" "" 0 "" "invalid server apk version before upload"
+      echo -e "${RED}❌ 上传前读取到的服务器 version.json 无有效 versionCode，已停止发布。${NC}" >&2
+      exit 1
+    fi
     if [[ "$SERVER_NOW_CODE" -ge "$NEW_CODE" ]]; then
       if live_apk_includes_build_base; then
         SERVER_NOW_NAME=$(json_get "$SERVER_NOW" "versionName")

@@ -7,7 +7,7 @@ use std::{
 };
 use tracing::{info, warn};
 
-pub use crate::tools_git::{git_commit, git_pull_rebase};
+pub use crate::tools_git::{git_commit, git_fetch_status};
 
 /// 每用户并发构建槽（同一用户同时只允许一个本地构建）
 static BUILD_SLOTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();

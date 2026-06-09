@@ -1,4 +1,4 @@
-//! Git 相关工具（commit/push、pull --rebase、版本号递增、初始化仓库）。
+//! Git 相关工具（commit/push、fetch 状态检查、版本号递增、初始化仓库）。
 //! 从 `tools.rs` 中抽出，调用者通过 `tools::git_commit` 等 re-export 使用。
 
 use anyhow::{anyhow, Result};
@@ -85,23 +85,73 @@ fn current_branch(project_root: &Path) -> Option<String> {
     }
 }
 
-/// git pull --rebase origin main（同步最新代码，非致命）
-pub fn git_pull_rebase(project_root: &Path) -> Result<String> {
-    info!("[工具] git pull --rebase origin main");
+/// 只获取远端 main 并汇报状态，不自动 rebase 或改写工作区。
+pub fn git_fetch_status(project_root: &Path) -> Result<String> {
+    info!("[工具] git fetch origin main");
     let output = Command::new("git")
-        .args(["pull", "--rebase", "origin", "main"])
+        .args(["fetch", "origin", "main"])
         .current_dir(project_root)
         .output()?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
     if !output.status.success() {
-        warn!("[工具] git pull --rebase 失败（非致命）: {}", stderr.trim());
+        warn!("[工具] git fetch 失败（非致命）: {}", stderr.trim());
         return Ok(format!(
-            "git pull 未成功（{}），在本地代码继续操作",
+            "git fetch 未成功（{}），已交给 AI 助手处理",
             stderr.trim()
         ));
     }
-    Ok(format!("已同步最新代码: {}", stdout.trim()))
+
+    let head = git_rev_parse(project_root, "HEAD")?;
+    let origin_main = git_rev_parse(project_root, "origin/main")?;
+    if head == origin_main {
+        return Ok("已检查远端 main，当前工作区就是最新主线。".into());
+    }
+    if git_is_ancestor(project_root, &head, &origin_main)? {
+        return Ok(format!(
+            "已检查远端 main：本地落后 origin/main {}，禁止自动 rebase，交给 AI 助手选择 ff-only 或隔离 worktree。",
+            short_sha(&origin_main)
+        ));
+    }
+    if git_is_ancestor(project_root, &origin_main, &head)? {
+        return Ok(
+            "已检查远端 main：本地包含未推送提交，禁止自动 rebase，请先 push 后继续。".into(),
+        );
+    }
+    Ok("已检查远端 main：本地与 origin/main 已分叉，禁止自动 rebase，交给 AI 助手处理。".into())
+}
+
+fn git_rev_parse(project_root: &Path, rev: &str) -> Result<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", rev])
+        .current_dir(project_root)
+        .output()?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "git rev-parse {} 失败: {}",
+            rev,
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn git_is_ancestor(project_root: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
+    let output = Command::new("git")
+        .args(["merge-base", "--is-ancestor", ancestor, descendant])
+        .current_dir(project_root)
+        .output()?;
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(anyhow!(
+            "git merge-base --is-ancestor 失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )),
+    }
+}
+
+fn short_sha(sha: &str) -> &str {
+    sha.get(..7).unwrap_or(sha)
 }
 
 /// Android build.gradle 版本号自动递增（versionCode +1，versionName PATCH +1）
@@ -109,6 +159,9 @@ pub(crate) fn bump_android_version(work_dir: &Path) -> String {
     let gradle_path = work_dir.join("app").join("build.gradle");
     if !gradle_path.exists() {
         return "（未找到 app/build.gradle，跳过版本号递增）".into();
+    }
+    if is_elon_self_android_dir(work_dir) {
+        return "（一龙自项目版本号由发布脚本向服务器申请，跳过 build.gradle 自动递增）".into();
     }
     // 幂等性守卫：5 分钟内如果已递增过版本号，跳过（防止服务器重启后重复递增）
     let bump_marker = work_dir.join(".version_bumped_at");
@@ -196,6 +249,16 @@ pub(crate) fn bump_android_version(work_dir: &Path) -> String {
         }
         Err(e) => format!("（写入 build.gradle 失败: {}）", e),
     }
+}
+
+fn is_elon_self_android_dir(work_dir: &Path) -> bool {
+    let Some(parent) = work_dir.parent() else {
+        return false;
+    };
+    work_dir.file_name().and_then(|name| name.to_str()) == Some("android")
+        && parent.join("scripts").join("publish-apk.ps1").exists()
+        && parent.join("scripts").join("publish-apk.sh").exists()
+        && parent.join("server").join("Cargo.toml").exists()
 }
 
 pub(crate) fn ensure_git_repo(project_root: &Path, user_id: &str) -> Result<()> {

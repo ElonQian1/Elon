@@ -102,6 +102,11 @@ function Invoke-HttpJson {
     return ($bodyText | ConvertFrom-Json)
 }
 
+function Get-ReleaseStatus {
+    param([Parameter(Mandatory)] [string]$Kind)
+    Invoke-HttpJson -Url "$ReleaseApiBase/status?kind=$Kind" -TimeoutSec 10
+}
+
 $script:ReleaseToken = $null
 $script:ReleaseFinished = $false
 
@@ -168,6 +173,57 @@ $UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
 $OriginalGradleContent = $null
 $BuildBaseSha = $null
 $LocalHeadSha = $null
+
+function Get-ServerApkVersionBaseline {
+    $candidates = @()
+    $errors = @()
+
+    try {
+        $status = Get-ReleaseStatus -Kind 'apk'
+        $code = [int]$status.lastPublishedVersionCode
+        $name = [string]$status.lastPublishedVersionName
+        if ($code -gt 0 -and -not [string]::IsNullOrWhiteSpace($name)) {
+            $candidates += [pscustomobject]@{
+                Source      = '/api/release/status'
+                VersionCode = $code
+                VersionName = $name
+            }
+        }
+    } catch {
+        $errors += "/api/release/status?kind=apk: $_"
+    }
+
+    try {
+        $deployed = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
+        $code = [int]$deployed.versionCode
+        $name = [string]$deployed.versionName
+        if ($code -gt 0 -and -not [string]::IsNullOrWhiteSpace($name)) {
+            $candidates += [pscustomobject]@{
+                Source      = '/app/version.json'
+                VersionCode = $code
+                VersionName = $name
+            }
+        }
+    } catch {
+        $errors += "/app/version.json: $_"
+    }
+
+    if ($candidates.Count -eq 0) {
+        foreach ($errorText in $errors) {
+            Write-Warning "   ⚠️  APK 版本基线读取失败：$errorText"
+        }
+        Write-Error "❌ 无法读取服务器 APK 版本基线；发布已停止，避免用 build.gradle 兜底版本发布。"
+    }
+
+    $selected = $candidates | Sort-Object VersionCode -Descending | Select-Object -First 1
+    foreach ($candidate in $candidates) {
+        if ($candidate.VersionCode -ne $selected.VersionCode -or $candidate.VersionName -ne $selected.VersionName) {
+            Write-Warning "   ⚠️  服务器 APK 版本来源不一致：$($candidate.Source)=v$($candidate.VersionName) build $($candidate.VersionCode)，最终采用最高 build $($selected.VersionCode)"
+        }
+    }
+    Write-Host "   ℹ️  服务器 APK 版本基线: v$($selected.VersionName) (build $($selected.VersionCode)) [$($selected.Source)]" -ForegroundColor DarkGray
+    return $selected
+}
 
 function Get-AaptExecutable {
     $candidatePaths = @()
@@ -714,19 +770,11 @@ $oldCode = [int]([regex]::Match($content, 'versionCode\s+(\d+)').Groups[1].Value
 $oldName = [regex]::Match($content, 'versionName\s+"([\d.]+)"').Groups[1].Value
 Write-Host "   build.gradle 兜底: v$oldName (build $oldCode) — 不会被本次脚本提交" -ForegroundColor DarkGray
 
-# 查服务器当前已部署版本，作为 claim 的基准（防止 build.gradle 兜底值远低于线上导致重复分配）
-$serverCurrentCode = $oldCode
-$serverCurrentName = $oldName
-try {
-    $serverDeployed = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
-    if ($serverDeployed.versionCode -gt $serverCurrentCode) {
-        $serverCurrentCode = [int]$serverDeployed.versionCode
-        $serverCurrentName = [string]$serverDeployed.versionName
-        Write-Host "   ℹ️  服务器已部署 build $serverCurrentCode (v$serverCurrentName)，以此为 claim 基准" -ForegroundColor DarkGray
-    }
-} catch {
-    Write-Warning "   ⚠️  无法读取服务器当前版本，以 build.gradle 兜底值为 claim 基准"
-}
+# 查服务器当前已部署版本，作为 claim 的唯一基准。
+# build.gradle 只保留冷启动兜底，不允许在发布时当作版本基线。
+$serverBaseline = Get-ServerApkVersionBaseline
+$serverCurrentCode = [int]$serverBaseline.VersionCode
+$serverCurrentName = [string]$serverBaseline.VersionName
 
 if ($CurrentInstalledVersionCode -gt $serverCurrentCode) {
     $serverCurrentCode = $CurrentInstalledVersionCode
@@ -891,7 +939,8 @@ if (-not $Force) {
             Write-Host "   ✅ 服务器版本检查通过（服务器 $serverNowCode < 本次 $newCode）" -ForegroundColor Green
         }
     } catch {
-        Write-Warning "   ⚠️  上传前无法读取服务器 version.json，跳过祖先检查：$_"
+        Complete-Release -Success:$false -ErrorMessage "could not read server apk version before upload"
+        Write-Error "❌ 上传前无法读取服务器 version.json，已停止发布，避免覆盖服务器上的未知新版本：$_"
     }
 }
 # ── Step 6: SCP 上传到服务器 ──────────────────────────────────────────────────
