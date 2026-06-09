@@ -137,6 +137,11 @@ function Complete-Release {
 # 全局错误兜底：任何未捕获的 terminating error 也释放槽位
 trap {
     try {
+        if (Get-Command Restore-GradleVersionFile -ErrorAction SilentlyContinue) {
+            Restore-GradleVersionFile
+        }
+    } catch {}
+    try {
         if ($script:ReleaseToken -and -not $script:ReleaseFinished) {
             Complete-Release -Success:$false -ErrorMessage ("uncaught error: " + ($_ | Out-String))
         }
@@ -202,9 +207,22 @@ function Get-ApkManifestVersion {
     }
 
     $aapt = Get-AaptExecutable
-    $badging = & $aapt dump badging $ApkPath 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "aapt dump badging 失败: $($badging -join "`n")"
+    $inspectPath = $ApkPath
+    $tmpInspectApk = $null
+    try {
+        # Windows aapt can fail on non-ASCII workspace paths; inspect an ASCII temp copy.
+        $tmpInspectApk = Join-Path $env:TEMP ("elon-aapt-inspect-" + [Guid]::NewGuid().ToString("N") + ".apk")
+        Copy-Item -LiteralPath $ApkPath -Destination $tmpInspectApk -Force
+        $inspectPath = $tmpInspectApk
+
+        $badging = & $aapt dump badging $inspectPath 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "aapt dump badging 失败: $($badging -join "`n")"
+        }
+    } finally {
+        if ($tmpInspectApk) {
+            Remove-Item -LiteralPath $tmpInspectApk -Force -ErrorAction SilentlyContinue
+        }
     }
 
     $packageLine = ($badging | Where-Object { $_ -match "^package:" } | Select-Object -First 1)
