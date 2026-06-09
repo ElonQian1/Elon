@@ -5,6 +5,7 @@
 //! - POST /api/admin/billing/recharge          充值
 //! - GET  /api/admin/billing/users?page=1&size=20  用户余额列表
 //! - GET  /api/admin/billing/users/:user_id        单用户计费详情
+//! - GET  /api/admin/billing/reservations          预授权明细
 //! - GET  /api/admin/billing/config               查询计费配置
 //! - PUT  /api/admin/billing/config               修改计费配置
 
@@ -89,6 +90,16 @@ fn default_size() -> i64 {
     20
 }
 
+#[derive(Deserialize)]
+pub struct ReservationQuery {
+    pub status: Option<String>,
+    #[serde(default = "default_reservation_limit")]
+    pub limit: i64,
+}
+fn default_reservation_limit() -> i64 {
+    100
+}
+
 pub async fn list_users(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -131,6 +142,34 @@ pub async fn get_user(
         Ok(None) => json_error(StatusCode::NOT_FOUND, "该用户未开通计费"),
         Err(e) => {
             tracing::warn!("admin get_user billing error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+// ── GET /api/admin/billing/reservations ──────────────────────────────────────
+
+pub async fn list_reservations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<ReservationQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    let limit = q.limit.clamp(1, 500);
+    match state
+        .store
+        .admin_billing_reservations(q.status.as_deref(), limit)
+    {
+        Ok(rows) => Json(json!({
+            "status": q.status.unwrap_or_else(|| "all".to_string()),
+            "limit": limit,
+            "rows": rows,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::warn!("admin billing reservations error: {}", e);
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
         }
     }

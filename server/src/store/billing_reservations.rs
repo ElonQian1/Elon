@@ -44,6 +44,28 @@ pub struct BillingReconciliationSummary {
     pub billed_cost_rmb_fen_period: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminBillingReservationRow {
+    pub id: String,
+    pub user_id: String,
+    pub account: Option<String>,
+    pub nickname: Option<String>,
+    pub compute_call_id: String,
+    pub feature: String,
+    pub usage_mode: String,
+    pub model: Option<String>,
+    pub reserved_fen: i64,
+    pub settled_cost_fen: i64,
+    pub refunded_fen: i64,
+    pub status: String,
+    pub token_usage_event_id: Option<String>,
+    pub billing_event_id: Option<String>,
+    pub balance_after_fen: Option<i64>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub expires_at: Option<String>,
+}
+
 #[derive(Debug)]
 pub(super) struct BillingReservationForSettlement {
     pub id: String,
@@ -304,6 +326,61 @@ impl Store {
             reserved_fen_open,
             billed_cost_rmb_fen_period: billed_cost,
         })
+    }
+
+    pub fn admin_billing_reservations(
+        &self,
+        status: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<AdminBillingReservationRow>> {
+        let conn = self.conn()?;
+        let limit = limit.clamp(1, 500);
+        let status = status
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && *value != "all");
+        let base_select = r#"SELECT b.id, b.user_id, COALESCE(u.phone, u.email), u.nickname,
+                                    b.compute_call_id, b.feature, b.usage_mode, b.model,
+                                    b.reserved_fen, b.settled_cost_fen, b.refunded_fen,
+                                    b.status, b.token_usage_event_id, b.billing_event_id,
+                                    b.balance_after_fen, b.created_at, b.updated_at, b.expires_at
+                             FROM billing_reservations b
+                             LEFT JOIN users u ON u.id = b.user_id"#;
+        let sql = if status.is_some() {
+            format!("{base_select} WHERE b.status = ?1 ORDER BY b.updated_at DESC LIMIT ?2")
+        } else {
+            format!("{base_select} ORDER BY b.updated_at DESC LIMIT ?1")
+        };
+        let mut stmt = conn.prepare(&sql)?;
+        let read_row = |row: &rusqlite::Row<'_>| {
+            Ok(AdminBillingReservationRow {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                account: row.get(2)?,
+                nickname: row.get(3)?,
+                compute_call_id: row.get(4)?,
+                feature: row.get(5)?,
+                usage_mode: row.get(6)?,
+                model: row.get(7)?,
+                reserved_fen: row.get(8)?,
+                settled_cost_fen: row.get(9)?,
+                refunded_fen: row.get(10)?,
+                status: row.get(11)?,
+                token_usage_event_id: row.get(12)?,
+                billing_event_id: row.get(13)?,
+                balance_after_fen: row.get(14)?,
+                created_at: row.get(15)?,
+                updated_at: row.get(16)?,
+                expires_at: row.get(17)?,
+            })
+        };
+        let rows = if let Some(status) = status {
+            stmt.query_map(params![status, limit], read_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        } else {
+            stmt.query_map(params![limit], read_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        Ok(rows)
     }
 }
 

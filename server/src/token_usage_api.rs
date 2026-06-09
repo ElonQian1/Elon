@@ -20,7 +20,7 @@ use std::sync::Arc;
 use crate::{
     cli_usage::{parse_cli_usage, usage_from_value, CliTokenUsage},
     project_auth::{auth_from_headers, json_error},
-    store::{Store, TokenUsageRecord},
+    store::{ComputeMeterEvent, Store, TokenUsageAccountingResult, TokenUsageRecord},
     types::AppState,
 };
 
@@ -199,6 +199,16 @@ pub(crate) fn record_trusted_usage_with_key(
                 deduplicated = result.deduplicated,
                 "record_trusted_usage accounted"
             );
+            record_token_meter_event(
+                store,
+                user_id,
+                feature,
+                usage_mode,
+                model,
+                &usage,
+                idempotency_key,
+                &result,
+            );
             Some(result)
         }
         Err(e) => {
@@ -211,6 +221,48 @@ pub(crate) fn record_trusted_usage_with_key(
             );
             None
         }
+    }
+}
+
+fn record_token_meter_event(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    usage: &CliTokenUsage,
+    idempotency_key: Option<&str>,
+    result: &TokenUsageAccountingResult,
+) {
+    if result.deduplicated || model.unwrap_or_default().starts_with("metered-") {
+        return;
+    }
+    let event = ComputeMeterEvent {
+        user_id,
+        compute_call_id: idempotency_key,
+        feature,
+        usage_mode,
+        model,
+        source: "trusted_token_usage",
+        input_unit_kind: "token",
+        output_unit_kind: "token",
+        input_units: usage.input_tokens,
+        output_units: usage.output_tokens,
+        metered_input_tokens: usage.input_tokens,
+        metered_output_tokens: usage.output_tokens,
+        token_usage_event_id: Some(result.token_usage_event_id.as_str()),
+        billing_event_id: result.billing_event_id.as_deref(),
+        cost_rmb_fen: result.cost_rmb_fen,
+        accounting_status: result.accounting_status.as_str(),
+    };
+    if let Err(error) = store.record_compute_meter_event(&event) {
+        tracing::warn!(
+            user_id,
+            feature,
+            usage_mode,
+            "record token compute meter event failed: {}",
+            error
+        );
     }
 }
 
@@ -273,5 +325,65 @@ fn sanitize_label(s: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         cleaned
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_store() -> (Store, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "elon-token-meter-test-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let _ = std::fs::remove_file(&path);
+        (Store::open(&path).unwrap(), path)
+    }
+
+    #[test]
+    fn trusted_token_usage_writes_compute_meter_event() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("token-meter-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 1_000, "test", "test", None)
+            .unwrap();
+        let usage = CliTokenUsage {
+            input_tokens: 12,
+            output_tokens: 34,
+            total_tokens: 46,
+            model: Some("gpt-4o-mini".to_string()),
+            ..CliTokenUsage::default()
+        };
+
+        let result = record_trusted_usage_with_key(
+            &store,
+            &user.id,
+            "codex_cli_chat",
+            "server_codex_cli",
+            Some("gpt-4o-mini"),
+            &usage,
+            Some("token:test-meter"),
+        )
+        .unwrap();
+        assert!(!result.deduplicated);
+
+        let events = store.admin_compute_meter_events(30, 10).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].input_unit_kind, "token");
+        assert_eq!(events[0].output_unit_kind, "token");
+        assert_eq!(events[0].input_units, 12);
+        assert_eq!(events[0].output_units, 34);
+        assert_eq!(events[0].metered_tokens, 46);
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }

@@ -9,6 +9,8 @@
 //!   GET /api/admin/token-stats/trend?days=30
 //!   GET /api/admin/token-stats/accounting-audit?days=30&limit=100
 //!   GET /api/admin/token-stats/reconciliation-summary?days=30
+//!   GET /api/admin/token-stats/compute-meter-summary?days=30&limit=100
+//!   GET /api/admin/token-stats/compute-meter-events?days=30&limit=100
 
 use axum::{
     extract::{Path, Query, State},
@@ -152,6 +154,56 @@ pub async fn get_reconciliation_summary(
         Ok(summary) => Json(summary).into_response(),
         Err(e) => {
             tracing::warn!("admin_billing_reconciliation_summary error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+/// GET /api/admin/token-stats/compute-meter-summary?days=30&limit=100
+pub async fn get_compute_meter_summary(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<StatsQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    let days = q.days.clamp(1, 365);
+    let limit = q.limit.clamp(1, 500);
+    match state.store.admin_compute_meter_summary(days, limit) {
+        Ok(rows) => Json(serde_json::json!({
+            "rows": rows,
+            "days": days,
+            "limit": limit,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::warn!("admin_compute_meter_summary error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+/// GET /api/admin/token-stats/compute-meter-events?days=30&limit=100
+pub async fn get_compute_meter_events(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<StatsQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    let days = q.days.clamp(1, 365);
+    let limit = q.limit.clamp(1, 500);
+    match state.store.admin_compute_meter_events(days, limit) {
+        Ok(rows) => Json(serde_json::json!({
+            "rows": rows,
+            "days": days,
+            "limit": limit,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::warn!("admin_compute_meter_events error: {}", e);
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
         }
     }

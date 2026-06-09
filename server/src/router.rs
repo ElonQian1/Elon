@@ -456,6 +456,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/admin/token-stats/reconciliation-summary",
             get(admin_token_stats::get_reconciliation_summary),
         )
+        .route(
+            "/api/admin/token-stats/compute-meter-summary",
+            get(admin_token_stats::get_compute_meter_summary),
+        )
+        .route(
+            "/api/admin/token-stats/compute-meter-events",
+            get(admin_token_stats::get_compute_meter_events),
+        )
         // ── 用户配额管理 ──────────────────────────────────────────────────────
         .route(
             "/api/admin/quotas",
@@ -509,6 +517,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/admin/billing/recharge", post(billing_admin::recharge_user))
         .route("/api/admin/billing/users", get(billing_admin::list_users))
         .route("/api/admin/billing/users/:user_id", get(billing_admin::get_user))
+        .route(
+            "/api/admin/billing/reservations",
+            get(billing_admin::list_reservations),
+        )
         .route(
             "/api/admin/billing/config",
             get(billing_admin::get_config).put(billing_admin::set_config),

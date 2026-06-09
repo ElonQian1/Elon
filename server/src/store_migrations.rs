@@ -55,6 +55,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (33, "计费调用预授权冻结与对账摘要", migration_v33),
     (34, "非 CLI 算力预授权配置", migration_v34),
     (35, "PC 项目工作区健康快照", migration_v35),
+    (36, "算力多单位计量明细账本", migration_v36),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1277,6 +1278,44 @@ fn migration_v35(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_workspace_health_node_latest
           ON project_workspace_health_snapshots(node_id, captured_at DESC)
           WHERE node_id IS NOT NULL;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v36(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS compute_meter_events (
+          id                    TEXT PRIMARY KEY,
+          user_id               TEXT NOT NULL,
+          compute_call_id       TEXT,
+          feature               TEXT NOT NULL,
+          usage_mode            TEXT NOT NULL,
+          model                 TEXT,
+          source                TEXT NOT NULL,
+          input_unit_kind       TEXT NOT NULL,
+          output_unit_kind      TEXT NOT NULL,
+          input_units           INTEGER NOT NULL DEFAULT 0,
+          output_units          INTEGER NOT NULL DEFAULT 0,
+          metered_input_tokens  INTEGER NOT NULL DEFAULT 0,
+          metered_output_tokens INTEGER NOT NULL DEFAULT 0,
+          metered_total_tokens  INTEGER NOT NULL DEFAULT 0,
+          token_usage_event_id  TEXT,
+          billing_event_id      TEXT,
+          cost_rmb_fen          INTEGER NOT NULL DEFAULT 0,
+          accounting_status     TEXT NOT NULL DEFAULT 'unknown',
+          created_at            TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_compute_meter_events_time
+          ON compute_meter_events(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_compute_meter_events_user_time
+          ON compute_meter_events(user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_compute_meter_events_call
+          ON compute_meter_events(user_id, compute_call_id);
+        CREATE INDEX IF NOT EXISTS idx_compute_meter_events_feature_mode
+          ON compute_meter_events(feature, usage_mode, created_at DESC);
         "#,
     )?;
     Ok(())

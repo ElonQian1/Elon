@@ -14,6 +14,7 @@ mod billing_reservation_tests;
 mod billing_reservations;
 mod build_quota;
 mod common;
+mod compute_metering;
 mod conversations;
 mod friend_messages;
 mod friends;
@@ -48,6 +49,7 @@ use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
+pub use compute_metering::ComputeMeterEvent;
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,

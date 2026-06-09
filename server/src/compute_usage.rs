@@ -5,7 +5,10 @@
 //! through the same quota and prepaid-balance deduction path as LLM usage.
 
 use crate::{
-    billing_lifecycle::TrustedBillingCall, cli_usage::CliTokenUsage, store::Store, token_usage_api,
+    billing_lifecycle::TrustedBillingCall,
+    cli_usage::CliTokenUsage,
+    store::{ComputeMeterEvent, Store, TokenUsageAccountingResult},
+    token_usage_api,
 };
 
 pub(crate) const USAGE_MODE_METERED_COMPUTE: &str = "server_metered_compute";
@@ -45,6 +48,13 @@ pub(crate) fn record_image_generation_with_key(
     idempotency_key: Option<&str>,
 ) {
     let (input, output) = image_generation_units(prompt);
+    let units = MeterUnits {
+        source: "estimated_image",
+        input_unit_kind: "prompt_char",
+        output_unit_kind: "image",
+        input_units: prompt.chars().count() as i64,
+        output_units: 1,
+    };
     record_units_with_key(
         store,
         user_id,
@@ -54,6 +64,7 @@ pub(crate) fn record_image_generation_with_key(
         input,
         output,
         idempotency_key,
+        units,
     );
 }
 
@@ -87,6 +98,13 @@ pub(crate) fn record_encoded_asr_with_key(
     audio_bytes: usize,
     idempotency_key: Option<&str>,
 ) {
+    let units = MeterUnits {
+        source: "estimated_audio",
+        input_unit_kind: "audio_kib",
+        output_unit_kind: "none",
+        input_units: ceil_div(audio_bytes as i64, 1_024),
+        output_units: 0,
+    };
     record_units_with_key(
         store,
         user_id,
@@ -96,6 +114,7 @@ pub(crate) fn record_encoded_asr_with_key(
         encoded_audio_units(audio_bytes),
         0,
         idempotency_key,
+        units,
     );
 }
 
@@ -154,6 +173,13 @@ pub(crate) fn record_pcm_asr_with_key(
     channels: u16,
     idempotency_key: Option<&str>,
 ) {
+    let units = MeterUnits {
+        source: "estimated_pcm",
+        input_unit_kind: "audio_ms",
+        output_unit_kind: "none",
+        input_units: pcm_audio_millis(pcm_bytes, sample_rate, channels),
+        output_units: 0,
+    };
     record_units_with_key(
         store,
         user_id,
@@ -163,6 +189,7 @@ pub(crate) fn record_pcm_asr_with_key(
         pcm_audio_units(pcm_bytes, sample_rate, channels),
         0,
         idempotency_key,
+        units,
     );
 }
 
@@ -179,6 +206,13 @@ pub(crate) fn record_realtime_voice_estimate_with_key(
 ) {
     let input = pcm_audio_units(input_pcm_bytes, sample_rate, channels);
     let output = pcm_audio_units(output_pcm_bytes, sample_rate, channels);
+    let units = MeterUnits {
+        source: "estimated_realtime_audio",
+        input_unit_kind: "audio_ms",
+        output_unit_kind: "audio_ms",
+        input_units: pcm_audio_millis(input_pcm_bytes, sample_rate, channels),
+        output_units: pcm_audio_millis(output_pcm_bytes, sample_rate, channels),
+    };
     record_units_with_key(
         store,
         user_id,
@@ -188,6 +222,7 @@ pub(crate) fn record_realtime_voice_estimate_with_key(
         input,
         output,
         idempotency_key,
+        units,
     );
 }
 
@@ -247,6 +282,13 @@ pub(crate) fn record_tts_synthesis_with_key(
 ) {
     let input = text_units(spoken_text, 2);
     let output = ceil_div(audio_bytes as i64, 2_048).max(1);
+    let units = MeterUnits {
+        source: "estimated_tts",
+        input_unit_kind: "text_char",
+        output_unit_kind: "audio_kib",
+        input_units: spoken_text.chars().count() as i64,
+        output_units: ceil_div(audio_bytes as i64, 1_024),
+    };
     record_units_with_key(
         store,
         user_id,
@@ -256,7 +298,16 @@ pub(crate) fn record_tts_synthesis_with_key(
         input,
         output,
         idempotency_key,
+        units,
     );
+}
+
+struct MeterUnits<'a> {
+    source: &'a str,
+    input_unit_kind: &'a str,
+    output_unit_kind: &'a str,
+    input_units: i64,
+    output_units: i64,
 }
 
 fn reserve_units<'a>(
@@ -303,6 +354,7 @@ fn record_units_with_key(
     input_tokens: i64,
     output_tokens: i64,
     idempotency_key: Option<&str>,
+    units: MeterUnits<'_>,
 ) {
     let usage = CliTokenUsage {
         input_tokens: input_tokens.max(0),
@@ -311,7 +363,7 @@ fn record_units_with_key(
         model: Some(model.clone()),
         ..CliTokenUsage::default()
     };
-    token_usage_api::record_trusted_usage_with_key(
+    let accounting = token_usage_api::record_trusted_usage_with_key(
         store,
         user_id,
         feature,
@@ -320,6 +372,64 @@ fn record_units_with_key(
         &usage,
         idempotency_key,
     );
+    if let Some(result) = accounting.as_ref() {
+        record_compute_meter_event(
+            store,
+            user_id,
+            feature,
+            usage_mode,
+            &model,
+            input_tokens,
+            output_tokens,
+            idempotency_key,
+            units,
+            result,
+        );
+    }
+}
+
+fn record_compute_meter_event(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: &str,
+    metered_input_tokens: i64,
+    metered_output_tokens: i64,
+    idempotency_key: Option<&str>,
+    units: MeterUnits<'_>,
+    result: &TokenUsageAccountingResult,
+) {
+    if result.deduplicated {
+        return;
+    }
+    let event = ComputeMeterEvent {
+        user_id,
+        compute_call_id: idempotency_key,
+        feature,
+        usage_mode,
+        model: Some(model),
+        source: units.source,
+        input_unit_kind: units.input_unit_kind,
+        output_unit_kind: units.output_unit_kind,
+        input_units: units.input_units,
+        output_units: units.output_units,
+        metered_input_tokens,
+        metered_output_tokens,
+        token_usage_event_id: Some(result.token_usage_event_id.as_str()),
+        billing_event_id: result.billing_event_id.as_deref(),
+        cost_rmb_fen: result.cost_rmb_fen,
+        accounting_status: result.accounting_status.as_str(),
+    };
+    if let Err(error) = store.record_compute_meter_event(&event) {
+        tracing::warn!(
+            user_id,
+            feature,
+            usage_mode,
+            "record compute meter event failed: {}",
+            error
+        );
+    }
 }
 
 fn image_generation_units(prompt: &str) -> (i64, i64) {
@@ -351,11 +461,18 @@ fn encoded_audio_units(audio_bytes: usize) -> i64 {
 }
 
 pub(crate) fn pcm_audio_units(pcm_bytes: usize, sample_rate: u32, channels: u16) -> i64 {
+    ceil_div(
+        pcm_audio_millis(pcm_bytes, sample_rate, channels) * 50,
+        1_000,
+    )
+    .max(1)
+}
+
+fn pcm_audio_millis(pcm_bytes: usize, sample_rate: u32, channels: u16) -> i64 {
     let bytes_per_second = sample_rate.max(1) as i64
         * channels.max(1) as i64
         * crate::voice_config::PCM16_BYTES_PER_SAMPLE as i64;
-    let millis = ceil_div(pcm_bytes as i64 * 1_000, bytes_per_second);
-    ceil_div(millis * 50, 1_000).max(1)
+    ceil_div(pcm_bytes as i64 * 1_000, bytes_per_second)
 }
 
 fn ceil_div(n: i64, d: i64) -> i64 {
@@ -370,16 +487,63 @@ fn ceil_div(n: i64, d: i64) -> i64 {
 mod tests {
     use super::*;
 
+    fn temp_store() -> (crate::store::Store, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "elon-compute-usage-test-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let _ = std::fs::remove_file(&path);
+        (crate::store::Store::open(&path).unwrap(), path)
+    }
+
     #[test]
     fn pcm_audio_units_are_duration_based() {
         let one_second = 24_000 * 2;
         assert_eq!(pcm_audio_units(one_second, 24_000, 1), 50);
         assert_eq!(pcm_audio_units(one_second / 2, 24_000, 1), 25);
+        assert_eq!(pcm_audio_millis(one_second, 24_000, 1), 1_000);
     }
 
     #[test]
     fn encoded_audio_units_have_minimum() {
         assert_eq!(encoded_audio_units(1), 1);
         assert_eq!(encoded_audio_units(2_049), 3);
+    }
+
+    #[test]
+    fn tts_record_writes_compute_meter_event() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("meter-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 1_000, "test", "test", None)
+            .unwrap();
+
+        record_tts_synthesis_with_key(
+            &store,
+            &user.id,
+            "voice_tts",
+            "cosyvoice",
+            "hello",
+            4_096,
+            Some("tts:test-meter"),
+        );
+
+        let events = store.admin_compute_meter_events(30, 10).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].input_unit_kind, "text_char");
+        assert_eq!(events[0].output_unit_kind, "audio_kib");
+        assert_eq!(events[0].input_units, 5);
+        assert_eq!(events[0].output_units, 4);
+        assert_eq!(events[0].accounting_status, "billed");
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }
