@@ -99,10 +99,7 @@ internal class ProjectSpaceController(
     }
 
     fun renderActiveSpace() {
-        val space = activeSpace ?: run {
-            renderLoading()
-            return
-        }
+        val space = activeSpace ?: return
         val container = binding.projectContentLayout
         container.removeAllViews()
         container.addView(spaceHeader(space))
