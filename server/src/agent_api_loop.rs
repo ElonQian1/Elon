@@ -97,6 +97,25 @@ async fn run_casual_chat(
     ))
 }
 
+fn load_context_memories(
+    state: &Arc<AppState>,
+    user_id: &str,
+    scope_type: Option<&str>,
+    scope_id: Option<&str>,
+    limit: i64,
+) -> Vec<crate::store::UserMemory> {
+    match scope_type {
+        Some(scope_type) => state
+            .store
+            .get_user_memories_for_scope(user_id, scope_type, scope_id, limit)
+            .unwrap_or_default(),
+        None => state
+            .store
+            .get_user_memories(user_id, limit)
+            .unwrap_or_default(),
+    }
+}
+
 pub(crate) async fn run_api_inner_with_workspace(
     user_id: &str,
     workspace: &Path,
@@ -106,6 +125,8 @@ pub(crate) async fn run_api_inner_with_workspace(
     preflight_note: Option<&str>,
     agent_name: Option<&str>,
     planning_mode: bool,
+    memory_scope_type: Option<&str>,
+    memory_scope_id: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -137,14 +158,12 @@ pub(crate) async fn run_api_inner_with_workspace(
             .to_json(),
         );
 
-        let memories = state
-            .store
-            .get_user_memories(user_id, 20)
-            .unwrap_or_default();
+        let memories =
+            load_context_memories(state, user_id, memory_scope_type, memory_scope_id, 20);
         let (reply, chat_node_id, chat_model) =
             run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
-        // 异步提取本轮记忆，不阻塞响应
-        {
+        // 非项目入口由这里提取全局记忆；项目入口在 project_chat 收尾处按 project_id 统一提取。
+        if memory_scope_type.is_none() {
             let state2 = state.clone();
             let uid = user_id.to_string();
             let umsg = user_message.to_string();
@@ -216,10 +235,7 @@ pub(crate) async fn run_api_inner_with_workspace(
     };
 
     // 初始化对话历史
-    let memories = state
-        .store
-        .get_user_memories(user_id, 20)
-        .unwrap_or_default();
+    let memories = load_context_memories(state, user_id, memory_scope_type, memory_scope_id, 20);
     let mut messages = vec![
         json!({
             "role": "system",

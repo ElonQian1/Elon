@@ -28,7 +28,7 @@ use crate::{
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
     project_ws_protocol::{ProjectAttachmentRef, ProjectChatRequest},
-    store::ProjectAccess,
+    store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AppState, WsMessage},
 };
@@ -192,8 +192,19 @@ pub async fn chat_project(
                 let uid = user.id.clone();
                 let umsg = original_user_message.clone();
                 let rep = reply.clone();
+                let scope_id = Some(project_id_for_history.clone());
+                let source_conv_id = Some(conversation_id.clone());
                 tokio::spawn(async move {
-                    crate::user_memory_extract::extract_and_save_memories(state2, uid, umsg, rep).await;
+                    crate::user_memory_extract::extract_and_save_memories_scoped(
+                        state2,
+                        uid,
+                        umsg,
+                        rep,
+                        MEMORY_SCOPE_PROJECT.to_string(),
+                        scope_id,
+                        source_conv_id,
+                    )
+                    .await;
                 });
             }
         }
@@ -423,7 +434,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
     // PC 节点项目（有 node_id）的路径在用户 PC 上，不在服务器本地。
     // 服务器上不应创建 worktree——直接透传给 agent 层，由 pc_project_binding 接管。
     // 同时 bypass 整个 scheduler（PC项目无需 worktree/合并锁），减少不必要的等待。
-    let is_pc_node_project = project.node_id.as_deref()
+    let is_pc_node_project = project
+        .node_id
+        .as_deref()
         .map(|n| !n.is_empty())
         .unwrap_or(false);
 
@@ -444,18 +457,20 @@ pub(crate) async fn run_project_agent_with_scheduler(
         return;
     }
 
-    let prepared_execution_workspace = if needs_project_workflow && !execution_mode.is_plan() && !is_pc_node_project {
-        match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
-            Ok(workspace) => Some(workspace),
-            Err(error) => {
-                let _ = tx
-                    .send(WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json());
-                return;
+    let prepared_execution_workspace =
+        if needs_project_workflow && !execution_mode.is_plan() && !is_pc_node_project {
+            match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
+                Ok(workspace) => Some(workspace),
+                Err(error) => {
+                    let _ = tx.send(
+                        WsMessage::error(format!("创建会话 worktree 失败: {}", error)).to_json(),
+                    );
+                    return;
+                }
             }
-        }
-    } else {
-        None
-    };
+        } else {
+            None
+        };
     let workspace = prepared_execution_workspace
         .as_ref()
         .map(|workspace| workspace.active_path())

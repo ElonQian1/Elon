@@ -314,6 +314,43 @@ Authorization: Bearer <token>
 - 多个在线 PC 节点但未指定 `node_id`：返回 409，提示选择节点。
 - PC 节点目录创建或 Git 初始化失败：返回 503，并清理本次项目记录。
 
+### 5.1 用户档案、系统项目与会话归档
+
+每个用户登录后，服务端以 `users.id` 作为档案根。档案下面统一挂载三类项目：
+
+1. `手机控制`
+   - `projects.source_type = 'agent_balloon'`
+   - 悬浮球语音、手机控制脚本、悬浮球普通对话都归档到这个真实项目 ID。
+   - `/api/agent-balloon/ensure` 和默认 `/api/llm/chat` 都必须返回并使用这个项目 ID。
+
+2. `聊天记忆`
+   - `projects.source_type = 'chat_memory'`
+   - PC/Web/APK 的普通聊天归档到这个项目。
+   - `/api/llm/chat` 传 `scope = "chat_memory"` 时，服务端自动确保该项目存在，并把会话写入该项目。
+
+3. 用户新建或打开的真实项目
+   - `projects.source_type = 'pc_managed'` 或 `local_path`。
+   - 每个项目有自己的会话列表、任务列表、成员权限、`node_id` 和 `workspace_path`。
+   - 只要项目绑定 `node_id`，代码、编译和部署必须路由到该 PC 节点。
+
+会话归档规则：
+
+```text
+users.id
+  手机控制(project_id=A)
+    conversations / messages
+    user_memories(scope_type=phone_control, scope_id=A)
+  聊天记忆(project_id=B)
+    conversations / messages
+    user_memories(scope_type=chat_memory, scope_id=B)
+  用户项目(project_id=C)
+    conversations / messages / tasks
+    user_memories(scope_type=project, scope_id=C)
+    node_id + workspace_path -> PC 节点真实目录
+```
+
+`user_memories` 必须支持 `scope_type + scope_id`。读取上下文时合并全局记忆和当前作用域记忆；写入时只写当前作用域，避免悬浮球、普通聊天和项目开发互相污染。
+
 ## 6. PC 节点如何建立 Git
 
 PC 节点收到 `ProvisionProjectWorkspace` 时执行下面的逻辑。

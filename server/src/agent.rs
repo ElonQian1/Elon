@@ -16,7 +16,7 @@ use crate::{
     ai_cli,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     source_hygiene,
-    store::ProjectAccess,
+    store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
@@ -544,6 +544,10 @@ async fn run_backend_with_workspace(
     };
     let combined_preflight_note =
         combine_preflight_notes(preflight_note, source_hygiene_note.as_deref());
+    let memory_scope_project_id = native_session_scope
+        .as_ref()
+        .map(|scope| scope.project_id.as_str());
+    let memory_scope_type = memory_scope_project_id.map(|_| MEMORY_SCOPE_PROJECT);
 
     match backend {
         AiBackend::LocalCli => {
@@ -665,6 +669,8 @@ async fn run_backend_with_workspace(
                                 combined_preflight_note.as_deref(),
                                 api_agent_name(state, agent_name),
                                 planning_mode,
+                                memory_scope_type,
+                                memory_scope_project_id,
                                 state,
                                 tx,
                             )
@@ -695,6 +701,8 @@ async fn run_backend_with_workspace(
                         combined_preflight_note.as_deref(),
                         api_agent_name(state, agent_name),
                         planning_mode,
+                        memory_scope_type,
+                        memory_scope_project_id,
                         state,
                         tx,
                     )
@@ -713,6 +721,8 @@ async fn run_backend_with_workspace(
                 combined_preflight_note.as_deref(),
                 api_agent_name(state, agent_name),
                 planning_mode,
+                memory_scope_type,
+                memory_scope_project_id,
                 state,
                 tx,
             )

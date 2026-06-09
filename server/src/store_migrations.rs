@@ -43,6 +43,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (21, "分布式节点积分账本与节点凭证表", migration_v21),
     (22, "conversations.locked_agent_name 会话首次 CLI 锁定", migration_v22),
     (23, "node_credentials.device_name PC 设备展示名", migration_v23),
+    (24, "user_memories 记忆作用域", migration_v24),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -905,5 +906,24 @@ fn migration_v22(conn: &Connection) -> Result<()> {
 
 fn migration_v23(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "node_credentials", "device_name", "device_name TEXT")?;
+    Ok(())
+}
+
+// ── v24：用户记忆作用域 ─────────────────────────────────────────────────────
+
+fn migration_v24(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "user_memories",
+        "scope_type",
+        "scope_type TEXT NOT NULL DEFAULT 'global'",
+    )?;
+    add_column_if_missing(conn, "user_memories", "scope_id", "scope_id TEXT")?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_user_memories_scope
+          ON user_memories(user_id, scope_type, scope_id, importance DESC, updated_at DESC);
+        "#,
+    )?;
     Ok(())
 }

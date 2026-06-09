@@ -10,7 +10,10 @@ use serde::Deserialize;
 use serde_json::json;
 use tracing::{debug, warn};
 
-use crate::{agent_api_loop::resolve_agent, agent_llm_call::call_chat_llm, types::AppState};
+use crate::{
+    agent_api_loop::resolve_agent, agent_llm_call::call_chat_llm, store::MEMORY_SCOPE_GLOBAL,
+    types::AppState,
+};
 
 /// 从一轮对话中提取记忆并写入数据库。
 ///
@@ -22,6 +25,28 @@ pub async fn extract_and_save_memories(
     user_id: String,
     user_message: String,
     assistant_reply: String,
+) {
+    extract_and_save_memories_scoped(
+        state,
+        user_id,
+        user_message,
+        assistant_reply,
+        MEMORY_SCOPE_GLOBAL.to_string(),
+        None,
+        None,
+    )
+    .await;
+}
+
+/// 从一轮对话中提取记忆并写入指定作用域。
+pub async fn extract_and_save_memories_scoped(
+    state: Arc<AppState>,
+    user_id: String,
+    user_message: String,
+    assistant_reply: String,
+    scope_type: String,
+    scope_id: Option<String>,
+    source_conv_id: Option<String>,
 ) {
     // user_message 或 assistant_reply 过短时跳过（无有效信息）
     if user_message.trim().len() < 5 || assistant_reply.trim().len() < 5 {
@@ -96,10 +121,15 @@ pub async fn extract_and_save_memories(
         }
         let category = normalize_category(&item.category);
         let importance = item.importance.clamp(1, 10);
-        if let Err(e) = state
-            .store
-            .insert_user_memory(&user_id, &content, &category, importance, None)
-        {
+        if let Err(e) = state.store.insert_user_memory_scoped(
+            &user_id,
+            &content,
+            &category,
+            importance,
+            source_conv_id.as_deref(),
+            &scope_type,
+            scope_id.as_deref(),
+        ) {
             warn!("记忆写入失败 user={user_id}: {e}");
         }
     }

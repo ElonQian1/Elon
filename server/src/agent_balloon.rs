@@ -15,10 +15,9 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
+    store::PHONE_CONTROL_PROJECT_NAME,
     types::AppState,
 };
-
-const BALLOON_PROJECT_NAME: &str = "手机控制";
 
 /// 悬浮球项目 AGENTS.md：让 Codex/Claude 知道这是手机自动化项目
 const AGENTS_MD: &str = r#"# 手机控制助手
@@ -87,10 +86,7 @@ pub async fn ensure_balloon_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    let (project_id, created) = match state
-        .store
-        .ensure_balloon_project_for_user(&user.id, BALLOON_PROJECT_NAME)
-    {
+    let (project_id, created) = match state.store.ensure_balloon_project_for_user(&user.id) {
         Ok(v) => v,
         Err(e) => {
             return json_error(
@@ -108,6 +104,7 @@ pub async fn ensure_balloon_project(
 
     Json(json!({
         "project_id": project_id,
+        "project_name": PHONE_CONTROL_PROJECT_NAME,
         "created": created,
     }))
     .into_response()

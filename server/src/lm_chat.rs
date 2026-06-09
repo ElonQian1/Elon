@@ -24,12 +24,13 @@ use crate::{
     agent_api_loop::resolve_agent,
     agent_llm_call::call_chat_llm,
     project_auth::{auth_from_headers, json_error},
+    store::{
+        CHAT_MEMORY_PROJECT_NAME, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_PHONE_CONTROL,
+        PHONE_CONTROL_PROJECT_NAME,
+    },
     types::AppState,
-    user_memory_extract::extract_and_save_memories,
+    user_memory_extract::extract_and_save_memories_scoped,
 };
-
-/// 悬浮球专用项目 ID（用于隔离会话记录和脚本历史，与主聊天区项目不混用）
-const AGENT_BALLOON_PROJECT_ID: &str = "__agent_balloon__";
 
 #[derive(Deserialize)]
 pub struct LmChatRequest {
@@ -39,6 +40,51 @@ pub struct LmChatRequest {
     pub agent: Option<String>,
     /// 可选：会话 ID；为空时服务器自动生成新会话
     pub conversation_id: Option<String>,
+    /// 可选：聊天归档作用域。默认 phone_control；普通聊天传 chat_memory。
+    pub scope: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+enum LmChatScope {
+    PhoneControl,
+    ChatMemory,
+}
+
+impl LmChatScope {
+    fn from_request(value: Option<&str>) -> Self {
+        match value.unwrap_or("").trim().to_ascii_lowercase().as_str() {
+            "chat" | "chat_memory" | "normal_chat" | "ordinary_chat" => Self::ChatMemory,
+            _ => Self::PhoneControl,
+        }
+    }
+
+    fn wire_name(self) -> &'static str {
+        match self {
+            Self::PhoneControl => "phone_control",
+            Self::ChatMemory => "chat_memory",
+        }
+    }
+
+    fn project_name(self) -> &'static str {
+        match self {
+            Self::PhoneControl => PHONE_CONTROL_PROJECT_NAME,
+            Self::ChatMemory => CHAT_MEMORY_PROJECT_NAME,
+        }
+    }
+
+    fn memory_scope(self) -> &'static str {
+        match self {
+            Self::PhoneControl => MEMORY_SCOPE_PHONE_CONTROL,
+            Self::ChatMemory => MEMORY_SCOPE_CHAT,
+        }
+    }
+
+    fn conversation_title(self) -> &'static str {
+        match self {
+            Self::PhoneControl => "悬浮球语音会话",
+            Self::ChatMemory => "普通聊天会话",
+        }
+    }
 }
 
 /// POST /api/llm/chat
@@ -56,14 +102,31 @@ pub async fn lm_chat_handler(
         return json_error(StatusCode::BAD_REQUEST, "messages 不能为空");
     }
 
+    let chat_scope = LmChatScope::from_request(req.scope.as_deref());
+    let (project_id, _created) = match chat_scope {
+        LmChatScope::PhoneControl => state.store.ensure_balloon_project_for_user(&user.id),
+        LmChatScope::ChatMemory => state.store.ensure_chat_memory_project_for_user(&user.id),
+    }
+    .unwrap_or_else(|e| {
+        tracing::warn!(
+            "确保 LLM 聊天系统项目失败 user={} scope={}: {e}",
+            user.id,
+            chat_scope.wire_name()
+        );
+        (String::new(), false)
+    });
+    if project_id.is_empty() {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建聊天归档项目失败");
+    }
+
     // ── 1. 确保会话存在 ───────────────────────────────────────────────────────
     let conversation_id = state
         .store
         .ensure_conversation(
-            AGENT_BALLOON_PROJECT_ID,
+            &project_id,
             &user.id,
             req.conversation_id.as_deref(),
-            Some("悬浮球语音会话"),
+            Some(chat_scope.conversation_title()),
         )
         .unwrap_or_else(|_| {
             req.conversation_id
@@ -74,7 +137,7 @@ pub async fn lm_chat_handler(
     // ── 2. 把用户长期记忆注入 system prompt ──────────────────────────────────
     let memories = state
         .store
-        .get_user_memories(&user.id, 15)
+        .get_user_memories_for_scope(&user.id, chat_scope.memory_scope(), Some(&project_id), 15)
         .unwrap_or_default();
     let mut messages = req.messages.clone();
     if !memories.is_empty() {
@@ -101,7 +164,7 @@ pub async fn lm_chat_handler(
     // 意图分析 / 脚本生成的调用通常只有一条 user 消息，历史注入对它们无害。
     let history = state
         .store
-        .list_recent_conversation_messages(AGENT_BALLOON_PROJECT_ID, Some(&conversation_id), 6)
+        .list_recent_conversation_messages(&project_id, Some(&conversation_id), 6)
         .unwrap_or_default();
     if !history.is_empty() {
         // 找到第一条 user/assistant 消息的插入位置（system prompt 之后）
@@ -114,7 +177,6 @@ pub async fn lm_chat_handler(
         }
     }
 
-    // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
     // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
     let agent = match resolve_agent(&state, std::path::Path::new(""), req.agent.as_deref()).await {
         Ok(a) => a,
@@ -153,7 +215,7 @@ pub async fn lm_chat_handler(
         .to_string();
 
     let _ = state.store.add_message(
-        AGENT_BALLOON_PROJECT_ID,
+        &project_id,
         Some(&conversation_id),
         None,
         Some(&user.id),
@@ -161,7 +223,7 @@ pub async fn lm_chat_handler(
         &user_msg,
     );
     let _ = state.store.add_message(
-        AGENT_BALLOON_PROJECT_ID,
+        &project_id,
         Some(&conversation_id),
         None,
         None,
@@ -175,14 +237,29 @@ pub async fn lm_chat_handler(
         let uid = user.id.clone();
         let umsg = user_msg.clone();
         let rep = reply.clone();
+        let scope_type = chat_scope.memory_scope().to_string();
+        let scope_id = Some(project_id.clone());
+        let source_conv_id = Some(conversation_id.clone());
         tokio::spawn(async move {
-            extract_and_save_memories(state2, uid, umsg, rep).await;
+            extract_and_save_memories_scoped(
+                state2,
+                uid,
+                umsg,
+                rep,
+                scope_type,
+                scope_id,
+                source_conv_id,
+            )
+            .await;
         });
     }
 
     Json(json!({
         "reply": reply,
         "conversation_id": conversation_id,
+        "project_id": project_id,
+        "project_name": chat_scope.project_name(),
+        "scope": chat_scope.wire_name(),
     }))
     .into_response()
 }

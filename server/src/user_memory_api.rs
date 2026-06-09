@@ -27,6 +27,10 @@ pub struct ListMemoriesQuery {
     pub page: i64,
     #[serde(default = "default_page_size")]
     pub page_size: i64,
+    /// 可选：只列出某个作用域的记忆，例如 global / chat_memory / phone_control / project
+    pub scope_type: Option<String>,
+    /// 可选：作用域 ID，例如 project 作用域下传 project_id
+    pub scope_id: Option<String>,
 }
 
 fn default_page() -> i64 {
@@ -50,7 +54,18 @@ pub async fn list_memories(
     };
 
     let page_size = q.page_size.clamp(1, 100);
-    let memories = match state.store.list_user_memories(&user.id, q.page, page_size) {
+    let memories = if let Some(scope_type) = q.scope_type.as_deref() {
+        state.store.list_user_memories_for_scope(
+            &user.id,
+            scope_type,
+            q.scope_id.as_deref(),
+            q.page,
+            page_size,
+        )
+    } else {
+        state.store.list_user_memories(&user.id, q.page, page_size)
+    };
+    let memories = match memories {
         Ok(m) => m,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
@@ -90,6 +105,10 @@ pub struct CreateMemoryBody {
     pub category: String,
     #[serde(default = "default_importance")]
     pub importance: i64,
+    /// 可选：global / chat_memory / phone_control / project
+    pub scope_type: Option<String>,
+    /// 可选：project 作用域下传 project_id
+    pub scope_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -133,10 +152,23 @@ pub async fn create_memory(
 
     let importance = body.importance.clamp(1, 10);
 
-    match state
-        .store
-        .insert_user_memory(&user.id, &content, &category, importance, None)
-    {
+    let result = if let Some(scope_type) = body.scope_type.as_deref() {
+        state.store.insert_user_memory_scoped(
+            &user.id,
+            &content,
+            &category,
+            importance,
+            None,
+            scope_type,
+            body.scope_id.as_deref(),
+        )
+    } else {
+        state
+            .store
+            .insert_user_memory(&user.id, &content, &category, importance, None)
+    };
+
+    match result {
         Ok(()) => Json(CreateMemoryResp {
             ok: true,
             message: "已添加",
