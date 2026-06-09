@@ -38,3 +38,4 @@ workspaces-local/
 
 # node-agent 启动器目录里的本地 exe（不纳入版本管理）
 scripts/node-agent-launcher/*.exe
+scripts/node-agent-launcher/elon-node-agent.exe.new
