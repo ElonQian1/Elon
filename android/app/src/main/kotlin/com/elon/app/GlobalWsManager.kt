@@ -13,32 +13,12 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * 应用级全局 WS 管理器（由 ElonApplication 持有）
- *
- * 连接服务器 /ws/app 作为统一实时通道：
- *  - APK 更新推送
- *  - 好友消息（服务端上线后自动生效）
- *  - 未来：通知、在线状态等
- *
- * 设计原则：
- *  - 单例由 ElonApplication 持有，不绑定 Activity
- *  - 所有事件回调均在主线程，监听者无需切线程
- *  - 断线按指数退避重连（5 → 10 → 20 → 40 → 120 秒封顶）
- *  - 认证可选：有 token 传给服务端以接收个人事件，匿名也能收更新推送
- *
- * 生命周期：
- *  Application 启动后保持连接；Activity 只增删自己的前台 UI 监听者。
- */
 class GlobalWsManager(private val serverUrl: String) {
-
     companion object {
         private const val TAG = "GlobalWs"
-        /** 指数退避重连间隔，单位毫秒 */
         private val BACKOFF_MS = longArrayOf(5_000L, 10_000L, 20_000L, 40_000L, 120_000L)
     }
 
-    /** 事件监听者接口，在主线程回调 */
     interface Listener {
         fun onGlobalWsEvent(event: GlobalWsEvent)
     }
@@ -51,87 +31,83 @@ class GlobalWsManager(private val serverUrl: String) {
     private val listeners = CopyOnWriteArrayList<Listener>()
     private val handler = Handler(Looper.getMainLooper())
     private val running = AtomicBoolean(false)
+    private val connected = AtomicBoolean(false)
     private val reconnecting = AtomicBoolean(false)
     private var ws: WebSocket? = null
     private var retryCount = 0
     private var connectedToken: String? = null
-    private var appCtx: Context? = null // 始终持有 applicationContext，不持有 Activity
+    private var appCtx: Context? = null
 
-    // ── 公共 API ─────────────────────────────────────────────────────────────
-
-    /** 开始保活连接。ctx 会提取 applicationContext，不会持有 Activity。 */
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
-        val activeUrl = ServerUrlManager.getActive(ctx)
-        val isPrimary = (activeUrl == BuildConfig.SERVER_URL)
-        val latestToken = if (isPrimary) {
-            AuthManager.token(ctx)
-        } else {
-            ctx.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
-                .getString("fallback_server_token", null)
-                ?.takeIf { it.isNotBlank() }
-                ?: AuthManager.token(ctx)
-        }
+        val latestToken = currentToken(ctx)
         if (!running.compareAndSet(false, true)) {
-            if (latestToken != connectedToken) reconnectWithNewToken()
+            if (latestToken != connectedToken) {
+                reconnectWithNewToken()
+            } else if (!connected.get() && ws == null) {
+                connect()
+            }
             return
         }
         retryCount = 0
         connect()
     }
 
-    /** 停止连接，取消所有重连定时器。 */
     fun stop() {
         running.set(false)
+        connected.set(false)
         handler.removeCallbacksAndMessages(null)
         ws?.cancel()
         ws = null
         connectedToken = null
     }
 
-    /** 当用户登录/退出后调用，立即重连以刷新 token。 */
     fun reconnectWithNewToken() {
         if (!running.get()) return
+        connected.set(false)
         ws?.cancel()
         ws = null
         retryCount = 0
         connect()
     }
 
-    fun addListener(l: Listener) { listeners.add(l) }
-    fun removeListener(l: Listener) { listeners.remove(l) }
+    fun addListener(listener: Listener) {
+        listeners.add(listener)
+    }
 
-    /** 向服务端发送 JSON 文本消息（如 typing 事件）。已连接时返回 true。 */
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
+    }
+
     fun send(text: String): Boolean = ws?.send(text) ?: false
 
-    // ── 内部实现 ──────────────────────────────────────────────────────────────
+    private fun currentToken(ctx: Context): String? {
+        val activeUrl = ServerUrlManager.getActive(ctx)
+        if (activeUrl == BuildConfig.SERVER_URL) return AuthManager.token(ctx)
+        val fallbackToken = ctx.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
+            .getString("fallback_server_token", null)
+            ?.takeIf { it.isNotBlank() }
+        return fallbackToken ?: AuthManager.token(ctx)
+    }
 
     private fun connect() {
         val ctx = appCtx ?: return
         if (!running.get()) return
+        connected.set(false)
 
         val activeUrl = ServerUrlManager.getActive(ctx)
         val wsBase = activeUrl
             .replace("https://", "wss://")
             .replace("http://", "ws://")
-        // 备用服务器：优先使用 fallbackServerToken；云端：使用 session token
-        val isPrimary = (activeUrl == BuildConfig.SERVER_URL)
-        val token = if (isPrimary) {
-            AuthManager.token(ctx)
-        } else {
-            val fallbackToken = ctx.getSharedPreferences("agent_config", Context.MODE_PRIVATE)
-                .getString("fallback_server_token", null)
-                ?.takeIf { it.isNotBlank() }
-            fallbackToken ?: AuthManager.token(ctx)
-        }
+        val token = currentToken(ctx)
         connectedToken = token
         val versionCode = BuildConfig.VERSION_CODE
-
         val url = buildString {
             append("$wsBase/ws/app?version_code=$versionCode")
             if (!token.isNullOrBlank()) append("&token=$token")
         }
-        Log.d(TAG, "连接 $url (retry=$retryCount)")
+
+        Log.d(TAG, "connect retry=$retryCount")
         ws = http.newWebSocket(Request.Builder().url(url).build(), InnerListener())
     }
 
@@ -140,7 +116,7 @@ class GlobalWsManager(private val serverUrl: String) {
         if (!reconnecting.compareAndSet(false, true)) return
         val delay = BACKOFF_MS.getOrElse(retryCount) { BACKOFF_MS.last() }
         retryCount = (retryCount + 1).coerceAtMost(BACKOFF_MS.size - 1)
-        Log.d(TAG, "将在 ${delay / 1000}s 后重连")
+        Log.d(TAG, "reconnect in ${delay / 1000}s")
         handler.postDelayed({
             reconnecting.set(false)
             connect()
@@ -153,8 +129,9 @@ class GlobalWsManager(private val serverUrl: String) {
 
     private inner class InnerListener : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            Log.d(TAG, "已连接")
+            connected.set(true)
             retryCount = 0
+            Log.d(TAG, "connected")
             appCtx?.let { ServerUrlManager.reportSuccess(it) }
         }
 
@@ -163,14 +140,18 @@ class GlobalWsManager(private val serverUrl: String) {
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            Log.w(TAG, "连接失败: ${t.message}")
+            connected.set(false)
+            if (ws === webSocket) ws = null
+            Log.w(TAG, "connection failed: ${t.message}")
             appCtx?.let { ServerUrlManager.reportFailure(it) }
             scheduleReconnect()
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            connected.set(false)
+            if (ws === webSocket) ws = null
             if (running.get()) {
-                Log.d(TAG, "连接关闭 code=$code, 将重连")
+                Log.d(TAG, "closed code=$code, reconnecting")
                 scheduleReconnect()
             }
         }

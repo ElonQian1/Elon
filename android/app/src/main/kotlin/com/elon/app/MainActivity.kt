@@ -3,6 +3,8 @@ package com.elon.app
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
@@ -15,11 +17,20 @@ import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import java.util.Date
 
+private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var chatAdapter: ChatAdapter
     private lateinit var agentPageController: AgentPageController
+    private val socialSummaryHandler = Handler(Looper.getMainLooper())
+    private val socialSummaryRefreshRunnable = object : Runnable {
+        override fun run() {
+            refreshSocialSummaries()
+            socialSummaryHandler.postDelayed(this, SOCIAL_SUMMARY_REFRESH_MS)
+        }
+    }
 
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
@@ -237,6 +248,7 @@ class MainActivity : AppCompatActivity() {
         s.appInForeground = true
         applySystemBarColors()
         resumeActions.onResume()
+        ChatRealtimeService.ensureRunning(this)
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
         gws.start(this)
@@ -247,8 +259,7 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.resumeIfActive()
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
-        friendActions.loadFriends()
-        groupActions.loadGroups()
+        startSocialSummaryPolling()
         syncVisibleChatNotificationState()
         if (::agentPageController.isInitialized) agentPageController.refresh()
     }
@@ -300,6 +311,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         s.appInForeground = false
         syncVisibleChatNotificationState()
+        stopSocialSummaryPolling()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
         projectSpaceController.stopPolling()
@@ -309,6 +321,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         s.appInForeground = false
+        stopSocialSummaryPolling()
         taskActions.taskWorkServiceActions.setTaskAppForeground(false)
         projectStateActions.saveProjects()
         val gws = (application as ElonApplication).globalWs
@@ -809,6 +822,21 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun startSocialSummaryPolling() {
+        socialSummaryHandler.removeCallbacks(socialSummaryRefreshRunnable)
+        refreshSocialSummaries()
+        socialSummaryHandler.postDelayed(socialSummaryRefreshRunnable, SOCIAL_SUMMARY_REFRESH_MS)
+    }
+
+    private fun stopSocialSummaryPolling() {
+        socialSummaryHandler.removeCallbacks(socialSummaryRefreshRunnable)
+    }
+
+    private fun refreshSocialSummaries() {
+        friendActions.loadFriends()
+        groupActions.loadGroups()
+    }
+
     private val friendChatActions: MainFriendChatActions by lazy {
         MainFriendChatActions(
             activity = this,
@@ -1263,6 +1291,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        stopSocialSummaryPolling()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
         projectSpaceController.stopPolling()

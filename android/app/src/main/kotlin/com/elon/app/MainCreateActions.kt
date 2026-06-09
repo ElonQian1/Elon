@@ -44,6 +44,7 @@ internal class MainCreateActions(
 ) {
     fun onCreate(intent: Intent?) {
         setupTaskCompletionAlerts(activity, prefs, notificationPermissionRequest)
+        ChatRealtimeService.ensureRunning(activity)
         loadProjects()
         setupAttachmentLaunchers()
         val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)

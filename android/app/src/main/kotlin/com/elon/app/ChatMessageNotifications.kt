@@ -18,7 +18,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v5_loud_badge"
+private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v6_loud_badge"
 private const val CHAT_MESSAGE_GROUP_KEY = "com.elon.app.CHAT_MESSAGES"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
 private const val FALLBACK_RING_MS = 1600L
@@ -49,10 +49,10 @@ internal object ChatMessageNotifications {
             .build()
         val channel = NotificationChannel(
             CHAT_MESSAGE_CHANNEL_ID,
-            "聊天消息提醒",
+            "\u804a\u5929\u6d88\u606f\u63d0\u9192",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "好友和群聊新消息提醒"
+            description = "\u597d\u53cb\u548c\u7fa4\u804a\u65b0\u6d88\u606f\u63d0\u9192"
             setShowBadge(true)
             enableVibration(true)
             setSound(soundUri, soundAttributes)
@@ -65,19 +65,21 @@ internal object ChatMessageNotifications {
         fromUserId: String,
         messageId: String,
         content: String,
-        senderName: String? = null
+        senderName: String? = null,
+        createdAt: String? = null
     ) {
         if (fromUserId.isBlank()) return
         if (appInForeground && visibleFriendId == fromUserId) return
-        val key = "friend:${messageId.ifBlank { "${fromUserId}:${content.hashCode()}" }}"
-        if (!markMessageShown(key)) return
+        val primaryKey = "friend:${messageId.ifBlank { "$fromUserId:${content.hashCode()}" }}"
+        val fingerprintKey = "friend:fingerprint:$fromUserId:${createdAt.orEmpty()}:${content.hashCode()}"
+        if (!markMessageShown(primaryKey, fingerprintKey)) return
         val badgeCount = incrementChatLauncherBadgeCount(context)
         showMessageNotification(
             context = context,
-            notificationId = stableNotificationId(100_000, key),
-            title = senderName?.takeIf { it.isNotBlank() } ?: "好友消息",
+            notificationId = stableNotificationId(100_000, primaryKey),
+            title = senderName?.takeIf { it.isNotBlank() } ?: "\u597d\u53cb\u6d88\u606f",
             text = messagePreview(content),
-            summary = "收到一条好友消息",
+            summary = "\u6536\u5230\u4e00\u6761\u597d\u53cb\u6d88\u606f",
             requestKey = "friend:$fromUserId",
             badgeCount = badgeCount
         )
@@ -90,23 +92,25 @@ internal object ChatMessageNotifications {
         messageId: String,
         content: String,
         senderName: String? = null,
-        groupName: String? = null
+        groupName: String? = null,
+        createdAt: String? = null
     ) {
         if (groupId.isBlank()) return
         if (fromUserId == AuthManager.userId(context)) return
         if (appInForeground && visibleGroupId == groupId) return
-        val key = "group:${messageId.ifBlank { "${groupId}:${fromUserId}:${content.hashCode()}" }}"
-        if (!markMessageShown(key)) return
+        val primaryKey = "group:${messageId.ifBlank { "$groupId:$fromUserId:${content.hashCode()}" }}"
+        val fingerprintKey = "group:fingerprint:$groupId:${createdAt.orEmpty()}:${content.hashCode()}"
+        if (!markMessageShown(primaryKey, fingerprintKey)) return
         val badgeCount = incrementChatLauncherBadgeCount(context)
         showMessageNotification(
             context = context,
-            notificationId = stableNotificationId(200_000, key),
-            title = groupName?.takeIf { it.isNotBlank() } ?: "群聊消息",
+            notificationId = stableNotificationId(200_000, primaryKey),
+            title = groupName?.takeIf { it.isNotBlank() } ?: "\u7fa4\u804a\u6d88\u606f",
             text = senderName
                 ?.takeIf { it.isNotBlank() }
-                ?.let { "$it：${messagePreview(content)}" }
+                ?.let { "$it\uff1a${messagePreview(content)}" }
                 ?: messagePreview(content),
-            summary = "收到一条群聊消息",
+            summary = "\u6536\u5230\u4e00\u6761\u7fa4\u804a\u6d88\u606f",
             requestKey = "group:$groupId",
             badgeCount = badgeCount
         )
@@ -161,17 +165,19 @@ internal object ChatMessageNotifications {
 
     private fun messagePreview(content: String): String {
         val text = content.trim()
-        if (text.isBlank()) return "收到一条新消息"
+        if (text.isBlank()) return "\u6536\u5230\u4e00\u6761\u65b0\u6d88\u606f"
         return text.take(80)
     }
 
     @Synchronized
-    private fun markMessageShown(key: String): Boolean {
-        val added = shownMessageKeys.add(key)
+    private fun markMessageShown(vararg keys: String): Boolean {
+        val normalized = keys.filter { it.isNotBlank() }
+        if (normalized.any { shownMessageKeys.contains(it) }) return false
+        normalized.forEach { shownMessageKeys.add(it) }
         while (shownMessageKeys.size > MAX_DEDUPED_CHAT_MESSAGES) {
             shownMessageKeys.remove(shownMessageKeys.first())
         }
-        return added
+        return true
     }
 
     private fun stableNotificationId(base: Int, key: String): Int {
