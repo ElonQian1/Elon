@@ -93,6 +93,9 @@ pub enum AgentToServer {
         /// 节点归属用户 ID（分布式节点功能，旧版 homecli 不发此字段）
         #[serde(default)]
         owner_user_id: Option<String>,
+        /// PC 设备名，仅用于展示
+        #[serde(default)]
+        device_name: Option<String>,
     },
     TaskStarted {
         task_id: String,

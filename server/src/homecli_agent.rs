@@ -40,6 +40,7 @@ use crate::types::AppState;
 pub struct AgentEntry {
     pub agent_id: String,
     pub version: String,
+    pub device_name: Option<String>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -113,6 +114,7 @@ impl AgentManager {
             .map(|a| AgentSummary {
                 agent_id: a.agent_id.clone(),
                 version: a.version.clone(),
+                device_name: a.device_name.clone(),
                 allowed_clis: a.allowed_clis.clone(),
                 allowed_cwds: a.allowed_cwds.clone(),
                 connected_at: a.connected_at,
@@ -254,9 +256,16 @@ impl AgentManager {
 pub struct AgentSummary {
     pub agent_id: String,
     pub version: String,
+    pub device_name: Option<String>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
+}
+
+fn clean_optional(value: Option<String>) -> Option<String> {
+    value
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 // ── secret config ────────────────────────────────────────────────────────────
@@ -332,25 +341,27 @@ async fn run_agent_session(
         _ => return Err(anyhow!("expected text register frame")),
     };
     let register: AgentToServer = serde_json::from_str(&text)?;
-    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id) = match register
-    {
-        AgentToServer::Register {
-            agent_id,
-            version,
-            proto_version,
-            allowed_clis,
-            allowed_cwds,
-            owner_user_id,
-        } => (
-            agent_id,
-            version,
-            allowed_clis,
-            allowed_cwds,
-            proto_version,
-            owner_user_id,
-        ),
-        _ => return Err(anyhow!("first frame must be register")),
-    };
+    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id, device_name) =
+        match register {
+            AgentToServer::Register {
+                agent_id,
+                version,
+                proto_version,
+                allowed_clis,
+                allowed_cwds,
+                owner_user_id,
+                device_name,
+            } => (
+                agent_id,
+                version,
+                allowed_clis,
+                allowed_cwds,
+                proto_version,
+                owner_user_id,
+                clean_optional(device_name),
+            ),
+            _ => return Err(anyhow!("first frame must be register")),
+        };
 
     // Auth check: presented token must equal the secret bound to agent_id.
     // Priority: env var secrets (static, for legacy/admin agents) → DB credentials (dynamic, user-registered nodes).
@@ -381,7 +392,16 @@ async fn run_agent_session(
         None
     };
 
-    tracing::info!(%agent_id, %version, "agent registered");
+    if let (Some(owner), Some(device)) = (&resolved_owner_user_id, &device_name) {
+        if let Err(e) = state
+            .store
+            .update_node_credential_device_name(&agent_id, owner, device)
+        {
+            tracing::warn!(%agent_id, error = %e, "failed to update node device name");
+        }
+    }
+
+    tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
 
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
@@ -389,6 +409,7 @@ async fn run_agent_session(
     let entry = AgentEntry {
         agent_id: agent_id.clone(),
         version,
+        device_name: device_name.clone(),
         allowed_clis,
         allowed_cwds,
         connected_at: SystemTime::now()
@@ -439,6 +460,7 @@ async fn run_agent_session(
         .register(
             agent_id.clone(),
             resolved_owner_user_id.clone().unwrap_or_default(),
+            device_name,
             vec![],
             connected_at,
         )

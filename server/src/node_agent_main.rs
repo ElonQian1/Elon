@@ -1202,6 +1202,7 @@ async fn run_session(
         allowed_clis: available_clis,
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
+        device_name: Some(machine_label()),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
@@ -1579,6 +1580,7 @@ async fn admin_status(
         "version": env!("CARGO_PKG_VERSION"),
         "logged_in": creds.is_some(),
         "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
+        "device_name": machine_label(),
         "owner_user_id": creds.as_ref().map(|c| c.owner_user_id.clone()),
         "user_token_configured": creds.as_ref().map(|c| c.user_token.is_some()).unwrap_or(false),
         "cloud_url": rt.cfg.cloud_url,
