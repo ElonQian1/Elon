@@ -1,5 +1,8 @@
 package com.elon.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -15,6 +18,7 @@ import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -29,6 +33,10 @@ internal class ProjectManagementHomeView(
     private val projects: () -> List<AppProject>,
     private val plazaProjects: () -> List<StoreProject>,
     private val activeProjectIndex: () -> Int,
+    private val personalProjectsExpanded: () -> Boolean,
+    private val jointProjectsExpanded: () -> Boolean,
+    private val setPersonalProjectsExpanded: (Boolean) -> Unit,
+    private val setJointProjectsExpanded: (Boolean) -> Unit,
     private val formatTime: (Long) -> String,
     private val openProject: (Int) -> Unit,
     private val showProjectActions: (Int, View?) -> Unit,
@@ -51,8 +59,22 @@ internal class ProjectManagementHomeView(
         val personal = indexed.filter { !it.project.isJointDevelopmentProject() }
         val joint = indexed.filter { it.project.isJointDevelopmentProject() }
 
-        addSection("个人项目", personal, topMargin = 4, emptyAction = showCreateProjectDialog)
-        addSection("联合项目", joint, topMargin = 4, emptyAction = null)
+        addSection(
+            title = "个人项目",
+            items = personal,
+            topMargin = 4,
+            emptyAction = showCreateProjectDialog,
+            expanded = personalProjectsExpanded(),
+            setExpanded = setPersonalProjectsExpanded
+        )
+        addSection(
+            title = "联合项目",
+            items = joint,
+            topMargin = 4,
+            emptyAction = null,
+            expanded = jointProjectsExpanded(),
+            setExpanded = setJointProjectsExpanded
+        )
         container.addView(bottomSpacer())
     }
 
@@ -104,9 +126,33 @@ internal class ProjectManagementHomeView(
         title: String,
         items: List<IndexedProject>,
         topMargin: Int,
-        emptyAction: (() -> Unit)?
+        emptyAction: (() -> Unit)?,
+        expanded: Boolean,
+        setExpanded: (Boolean) -> Unit
     ) {
-        container.addView(createSectionHeader(title), LinearLayout.LayoutParams(
+        val canExpand = items.size > COLLAPSED_PROJECT_LIMIT
+        val initiallyExpanded = expanded && canExpand
+        val gridContainer = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            clipChildren = true
+        }
+        lateinit var header: LinearLayout
+        header = createSectionHeader(title, canExpand, initiallyExpanded) { arrow ->
+            val targetExpanded = !arrow.isSelected
+            setExpanded(targetExpanded)
+            header.contentDescription = "${title}${if (targetExpanded) "收起" else "展开"}"
+            header.isEnabled = false
+            animateSectionGrid(
+                gridContainer = gridContainer,
+                allItems = items,
+                emptyAction = emptyAction,
+                expanded = targetExpanded,
+                arrow = arrow
+            ) {
+                header.isEnabled = true
+            }
+        }
+        container.addView(header, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(42)
         ).apply {
@@ -114,38 +160,66 @@ internal class ProjectManagementHomeView(
             marginEnd = dp(8)
             this.topMargin = dp(topMargin)
         })
-        addProjectGrid(items, emptyAction)
+        container.addView(gridContainer, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+        addProjectGrid(gridContainer, sectionItems(items, initiallyExpanded), emptyAction)
     }
 
-    private fun createSectionHeader(title: String): LinearLayout {
+    private fun createSectionHeader(
+        title: String,
+        canExpand: Boolean,
+        expanded: Boolean,
+        onToggle: (TextView) -> Unit
+    ): LinearLayout {
+        val arrow = TextView(activity).apply {
+            includeFontPadding = false
+            text = "›"
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
+            isSelected = expanded
+            rotation = if (expanded) 90f else 0f
+            visibility = if (canExpand) View.VISIBLE else View.INVISIBLE
+        }
         return LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(6), 0, 0, 0)
+            if (canExpand) {
+                isClickable = true
+                foreground = selectableForeground()
+                contentDescription = "${title}${if (expanded) "收起" else "展开"}"
+                setOnClickListener { onToggle(arrow) }
+            }
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
                 setTextColor(Color.parseColor("#F2F5FA"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = "›"
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A6AFBD"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
-            }, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.MATCH_PARENT))
+            addView(arrow, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.MATCH_PARENT))
         }
     }
 
-    private fun addProjectGrid(items: List<IndexedProject>, emptyAction: (() -> Unit)?) {
+    private fun sectionItems(items: List<IndexedProject>, expanded: Boolean): List<IndexedProject> {
+        if (expanded || items.size <= COLLAPSED_PROJECT_LIMIT) return items
+        return items.take(COLLAPSED_PROJECT_LIMIT)
+    }
+
+    private fun addProjectGrid(
+        target: LinearLayout,
+        items: List<IndexedProject>,
+        emptyAction: (() -> Unit)?
+    ) {
         val cells = when {
             items.isEmpty() -> listOf<IndexedProject?>(null, null)
             items.size % 2 == 0 -> items
             else -> items + listOf(null)
         }
         cells.chunked(2).forEachIndexed { rowIndex, rowItems ->
-            container.addView(LinearLayout(activity).apply {
+            target.addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.TOP
                 rowItems.forEachIndexed { cellIndex, indexed ->
@@ -168,6 +242,77 @@ internal class ProjectManagementHomeView(
                 topMargin = if (rowIndex == 0) dp(6) else dp(14)
             })
         }
+    }
+
+    private fun animateSectionGrid(
+        gridContainer: LinearLayout,
+        allItems: List<IndexedProject>,
+        emptyAction: (() -> Unit)?,
+        expanded: Boolean,
+        arrow: TextView,
+        onFinished: () -> Unit
+    ) {
+        val startHeight = gridContainer.height.takeIf { it > 0 }
+            ?: measureProjectGridHeight(sectionItems(allItems, !expanded), emptyAction)
+        val targetItems = sectionItems(allItems, expanded)
+        val targetHeight = measureProjectGridHeight(targetItems, emptyAction)
+        gridContainer.animate().cancel()
+        arrow.animate().cancel()
+        arrow.isSelected = expanded
+        arrow.animate()
+            .rotation(if (expanded) 90f else 0f)
+            .setDuration(180L)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+
+        if (expanded) {
+            gridContainer.removeAllViews()
+            addProjectGrid(gridContainer, targetItems, emptyAction)
+        }
+        gridContainer.layoutParams = gridContainer.layoutParams.apply { height = startHeight }
+        gridContainer.requestLayout()
+
+        ValueAnimator.ofInt(startHeight, targetHeight).apply {
+            duration = SECTION_ANIMATION_MS
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animator ->
+                gridContainer.layoutParams = gridContainer.layoutParams.apply {
+                    height = animator.animatedValue as Int
+                }
+                gridContainer.requestLayout()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (!expanded) {
+                        gridContainer.removeAllViews()
+                        addProjectGrid(gridContainer, targetItems, emptyAction)
+                    }
+                    gridContainer.layoutParams = gridContainer.layoutParams.apply {
+                        height = LinearLayout.LayoutParams.WRAP_CONTENT
+                    }
+                    gridContainer.requestLayout()
+                    onFinished()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun measureProjectGridHeight(
+        items: List<IndexedProject>,
+        emptyAction: (() -> Unit)?
+    ): Int {
+        val temp = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.INVISIBLE
+        }
+        addProjectGrid(temp, items, emptyAction)
+        val width = container.width.takeIf { it > 0 } ?: activity.resources.displayMetrics.widthPixels
+        temp.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        return temp.measuredHeight
     }
 
     private fun createProjectCard(item: IndexedProject): View {
@@ -328,6 +473,11 @@ internal class ProjectManagementHomeView(
             shape = GradientDrawable.RECTANGLE
             setColor(Color.parseColor(color))
         }
+    }
+
+    private companion object {
+        const val COLLAPSED_PROJECT_LIMIT = 4
+        const val SECTION_ANIMATION_MS = 260L
     }
 }
 

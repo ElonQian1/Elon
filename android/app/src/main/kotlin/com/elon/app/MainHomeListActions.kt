@@ -46,6 +46,8 @@ internal class MainHomeListActions(
     private var friendSearchQuery = ""
     private var shouldFocusFriendSearch = false
     private var animateFriendSearchEnter = false
+    private var personalProjectsExpanded = false
+    private var jointProjectsExpanded = false
     private var plazaBannerProjects: List<StoreProject> = emptyList()
     private var plazaBannerLoading = false
     private var plazaBannerLoaded = false
@@ -334,6 +336,10 @@ internal class MainHomeListActions(
             projects = projects,
             plazaProjects = { plazaBannerProjects },
             activeProjectIndex = { activeProject().let { active -> projects().indexOfFirst { it.id == active.id } } },
+            personalProjectsExpanded = { personalProjectsExpanded },
+            jointProjectsExpanded = { jointProjectsExpanded },
+            setPersonalProjectsExpanded = { personalProjectsExpanded = it },
+            setJointProjectsExpanded = { jointProjectsExpanded = it },
             formatTime = formatTime,
             openProject = openProject,
             showProjectActions = showProjectActions,

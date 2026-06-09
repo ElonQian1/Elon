@@ -124,6 +124,15 @@
   color: #f2f5fa;
 }
 
+.project-home-section-head.expandable {
+  cursor: pointer;
+}
+
+.project-home-section-head.expandable:focus-visible {
+  outline: 2px solid rgba(221, 232, 252, 0.72);
+  outline-offset: -2px;
+}
+
 .project-home-section-head + .project-home-grid {
   margin-top: 6px;
 }
@@ -144,12 +153,23 @@
   color: #a6afbd;
   font-size: 21px;
   line-height: 1;
+  transition: transform 180ms ease;
+  transform-origin: center;
+}
+
+.project-home-section-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.project-home-section-head:not(.expandable) .project-home-section-arrow {
+  visibility: hidden;
 }
 
 .project-home-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  overflow: hidden;
 }
 
 .project-home-card,

@@ -1,11 +1,16 @@
 (function () {
   const ROOT_ID = 'projectHomeRoot';
   const LONG_PRESS_MS = 520;
+  const COLLAPSED_PROJECT_LIMIT = 4;
 
   const actionMenuState = {
     projectId: '',
     pressTimer: null,
     suppressNextOpen: false
+  };
+  const sectionExpandedState = {
+    personal: false,
+    joint: false
   };
 
   function bridge() {
@@ -199,22 +204,44 @@
     `;
   }
 
-  function renderSection(title, items, emptyAction) {
+  function renderSection(key, title, items, emptyAction) {
+    const expandable = items.length > COLLAPSED_PROJECT_LIMIT;
+    const expanded = expandable && sectionExpandedState[key];
+    const headAttrs = expandable
+      ? ` role="button" tabindex="0" data-project-home-action="toggle-section" data-project-section="${escapeHtml(key)}" aria-expanded="${expanded ? 'true' : 'false'}"`
+      : '';
+    const cells = sectionCells(sectionItems(items, expanded));
+    return `
+      <div class="project-home-section" data-project-section="${escapeHtml(key)}">
+        <div class="project-home-section-head ${expandable ? 'expandable' : ''}"${headAttrs}>
+          <div class="project-home-section-title">${escapeHtml(title)}</div>
+          <div class="project-home-section-arrow ${expanded ? 'expanded' : ''}">›</div>
+        </div>
+        <div class="project-home-grid" data-project-home-grid>
+          ${renderGridCells(cells, emptyAction)}
+        </div>
+      </div>
+    `;
+  }
+
+  function sectionItems(items, expanded) {
+    return expanded || items.length <= COLLAPSED_PROJECT_LIMIT
+      ? items
+      : items.slice(0, COLLAPSED_PROJECT_LIMIT);
+  }
+
+  function sectionCells(items) {
     const cells = items.slice();
     if (!cells.length) {
       cells.push(null, null);
     } else if (cells.length % 2) {
       cells.push(null);
     }
-    return `
-      <div class="project-home-section-head">
-        <div class="project-home-section-title">${escapeHtml(title)}</div>
-        <div class="project-home-section-arrow">›</div>
-      </div>
-      <div class="project-home-grid">
-        ${cells.map((project) => project ? renderCard(project) : renderEmptyCard(emptyAction)).join('')}
-      </div>
-    `;
+    return cells;
+  }
+
+  function renderGridCells(cells, emptyAction) {
+    return cells.map((project) => project ? renderCard(project) : renderEmptyCard(emptyAction)).join('');
   }
 
   function renderCard(project) {
@@ -264,8 +291,8 @@
     const joint = all.filter(isJointProject);
     root.innerHTML = [
       renderPlazaBanner(),
-      renderSection('个人项目', personal, 'create'),
-      renderSection('联合项目', joint, null),
+      renderSection('personal', '个人项目', personal, 'create'),
+      renderSection('joint', '联合项目', joint, null),
       renderActionMenu()
     ].join('');
   }
@@ -473,6 +500,10 @@
       if (typeof app.openProjectPlaza === 'function') app.openProjectPlaza();
       return;
     }
+    if (action === 'toggle-section') {
+      toggleSection(actionEl.dataset.projectSection || '');
+      return;
+    }
     if (action === 'open') {
       const id = actionEl.dataset.projectId;
       const project = projectById(id);
@@ -507,6 +538,75 @@
       app.leaveProject(project);
       return;
     }
+  }
+
+  function toggleSection(key) {
+    if (key !== 'personal' && key !== 'joint') return;
+    const root = document.getElementById(ROOT_ID);
+    const section = root && root.querySelector(`.project-home-section[data-project-section="${key}"]`);
+    const grid = section && section.querySelector('[data-project-home-grid]');
+    const head = section && section.querySelector('.project-home-section-head');
+    const arrow = section && section.querySelector('.project-home-section-arrow');
+    const items = projectSectionItems(key);
+    if (!section || !grid || !head || !arrow || items.length <= COLLAPSED_PROJECT_LIMIT) return;
+
+    const targetExpanded = !sectionExpandedState[key];
+    sectionExpandedState[key] = targetExpanded;
+    const cells = sectionCells(sectionItems(items, targetExpanded));
+    const nextHtml = renderGridCells(cells, key === 'personal' ? 'create' : null);
+    const fromHeight = grid.offsetHeight;
+    const toHeight = nextGridHeight(grid, nextHtml, targetExpanded);
+
+    head.setAttribute('aria-expanded', targetExpanded ? 'true' : 'false');
+    arrow.classList.toggle('expanded', targetExpanded);
+    animateGridHeight(grid, fromHeight, toHeight, () => {
+      if (!targetExpanded) grid.innerHTML = nextHtml;
+    });
+  }
+
+  function projectSectionItems(key) {
+    const all = projects();
+    return key === 'joint' ? all.filter(isJointProject) : all.filter((project) => !isJointProject(project));
+  }
+
+  function nextGridHeight(grid, html, applyNow) {
+    if (applyNow) {
+      grid.innerHTML = html;
+      return grid.scrollHeight;
+    }
+    const clone = grid.cloneNode(false);
+    clone.innerHTML = html;
+    clone.style.position = 'absolute';
+    clone.style.visibility = 'hidden';
+    clone.style.pointerEvents = 'none';
+    clone.style.height = 'auto';
+    clone.style.transition = 'none';
+    clone.style.width = `${grid.getBoundingClientRect().width}px`;
+    grid.parentNode.appendChild(clone);
+    const height = clone.scrollHeight;
+    clone.remove();
+    return height;
+  }
+
+  function animateGridHeight(grid, fromHeight, toHeight, after) {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      grid.removeEventListener('transitionend', finish);
+      grid.style.height = '';
+      grid.style.overflow = '';
+      grid.style.transition = '';
+      after();
+    };
+    grid.style.overflow = 'hidden';
+    grid.style.height = `${fromHeight}px`;
+    grid.style.transition = 'height 260ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+    window.requestAnimationFrame(() => {
+      grid.style.height = `${toHeight}px`;
+    });
+    grid.addEventListener('transitionend', finish);
+    window.setTimeout(finish, 340);
   }
 
   window.ElonProjectHome = { render };
