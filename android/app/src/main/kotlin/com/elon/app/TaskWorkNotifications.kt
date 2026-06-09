@@ -19,9 +19,10 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
-private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked"
+private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v2_chat_task"
 
 internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
+    ChatMessageNotifications.createChannel(activity)
     createTaskWorkNotificationChannels(activity)
     requestTaskNotificationPermissionIfNeeded(activity, prefs, requestCode)
 }

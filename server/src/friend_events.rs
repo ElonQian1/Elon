@@ -25,6 +25,8 @@ pub struct FriendMessagePush {
     #[serde(rename = "messageId")]
     pub message_id: String,
     pub content: String,
+    #[serde(rename = "senderName", skip_serializing_if = "Option::is_none")]
+    pub sender_name: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     /// 消息类型："text"（普通文本）| "project_bridge"（开发需求跳转卡片）
@@ -46,6 +48,8 @@ pub struct GroupMessagePush {
     #[serde(rename = "messageId")]
     pub message_id: String,
     pub content: String,
+    #[serde(rename = "senderName", skip_serializing_if = "Option::is_none")]
+    pub sender_name: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(skip_serializing)]
@@ -82,6 +86,7 @@ pub fn publish_friend_message(message: &FriendChatMessage) {
         to_user_id: message.receiver_user_id.clone(),
         message_id: message.id.clone(),
         content: message.content.clone(),
+        sender_name: message.sender_name.clone(),
         created_at: message.created_at.clone(),
         message_kind: "text".into(),
         dev_summary: None,
@@ -102,6 +107,7 @@ pub fn publish_friend_bridge_message(message: &FriendChatMessage, dev_summary: &
         to_user_id: message.receiver_user_id.clone(),
         message_id: message.id.clone(),
         content: message.content.clone(),
+        sender_name: message.sender_name.clone(),
         created_at: message.created_at.clone(),
         message_kind: "project_bridge".into(),
         dev_summary: Some(dev_summary.chars().take(80).collect()),
@@ -116,6 +122,7 @@ pub fn publish_group_message(message: &FriendGroupMessage, recipient_user_ids: V
         from_user_id: message.sender_user_id.clone(),
         message_id: message.id.clone(),
         content: message.content.clone(),
+        sender_name: Some(message.sender_name.clone()),
         created_at: message.created_at.clone(),
         recipient_user_ids,
     };

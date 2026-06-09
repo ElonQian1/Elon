@@ -516,26 +516,7 @@ internal class MainHomeRows(
             }
             addView(avatar)
             if (friend.unreadCount > 0) {
-                addView(TextView(activity).apply {
-                    val badgeText = if (friend.unreadCount > 99) "99+" else friend.unreadCount.toString()
-                    val badgeWidth = if (badgeText.length > 2) dp(28) else dp(19)
-                    layoutParams = FrameLayout.LayoutParams(badgeWidth, dp(19)).apply {
-                        gravity = Gravity.TOP or Gravity.END
-                        topMargin = -dp(5)
-                        rightMargin = -dp(6)
-                    }
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        cornerRadius = dp(10).toFloat()
-                        setColor(Color.parseColor("#F04B4F"))
-                    }
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    text = badgeText
-                    setTextColor(Color.parseColor("#F2F5FA"))
-                    textSize = 10f
-                    setTypeface(typeface, Typeface.BOLD)
-                })
+                addView(createUnreadBadge(friend.unreadCount))
             }
             // 在线绿点（右下角，10dp，与未读红点不重叠）
             if (friend.isOnline) {
@@ -565,27 +546,36 @@ internal class MainHomeRows(
                 else createGroupMemberGrid(group.members.take(9), size)
             )
             if (group.unreadCount > 0) {
-                addView(TextView(activity).apply {
-                    val badgeText = if (group.unreadCount > 99) "99+" else group.unreadCount.toString()
-                    val badgeWidth = if (badgeText.length > 2) dp(28) else dp(19)
-                    layoutParams = FrameLayout.LayoutParams(badgeWidth, dp(19)).apply {
-                        gravity = Gravity.TOP or Gravity.END
-                        topMargin = -dp(5)
-                        rightMargin = -dp(6)
-                    }
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.RECTANGLE
-                        cornerRadius = dp(10).toFloat()
-                        setColor(Color.parseColor("#F04B4F"))
-                    }
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    text = badgeText
-                    setTextColor(Color.parseColor("#F2F5FA"))
-                    textSize = 10f
-                    setTypeface(typeface, Typeface.BOLD)
-                })
+                addView(createUnreadBadge(group.unreadCount))
             }
+        }
+    }
+
+    private fun createUnreadBadge(unreadCount: Int): TextView {
+        val badgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+        val badgeHeight = dp(22)
+        val badgeWidth = when {
+            badgeText.length >= 3 -> dp(34)
+            badgeText.length == 2 -> dp(28)
+            else -> badgeHeight
+        }
+        return TextView(activity).apply {
+            layoutParams = FrameLayout.LayoutParams(badgeWidth, badgeHeight).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = -dp(9)
+                rightMargin = -dp(10)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = badgeHeight / 2f
+                setColor(Color.parseColor("#F04B4F"))
+            }
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            text = badgeText
+            setTextColor(Color.WHITE)
+            textSize = 12f
+            setTypeface(typeface, Typeface.BOLD)
         }
     }
 

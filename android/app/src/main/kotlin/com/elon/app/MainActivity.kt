@@ -234,6 +234,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        s.appInForeground = true
         applySystemBarColors()
         resumeActions.onResume()
         val gws = (application as ElonApplication).globalWs
@@ -246,6 +247,7 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.resumeIfActive()
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
+        syncVisibleChatNotificationState()
         if (::agentPageController.isInitialized) agentPageController.refresh()
     }
 
@@ -295,6 +297,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         s.appInForeground = false
+        syncVisibleChatNotificationState()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()
         projectSpaceController.stopPolling()
@@ -482,8 +485,12 @@ class MainActivity : AppCompatActivity() {
                 friendChatActions.closeFriendChat()
                 groupChatActions.closeGroupChat()
                 projectSpaceController.closeChannelChat()
+                syncVisibleChatNotificationState()
             },
-            onProjectChannelClosed = { projectSpaceController.closeChannelChat() },
+            onProjectChannelClosed = {
+                projectSpaceController.closeChannelChat()
+                syncVisibleChatNotificationState()
+            },
             showProjectMembers = { projectSpaceController.showMembers() },
             loadMarketplace = { marketplaceActions.loadProjects() },
             onAgentTabSelected = { agentPageController.refresh() }
@@ -781,12 +788,22 @@ class MainActivity : AppCompatActivity() {
                 groupChatActions.closeGroupChat()
                 projectSpaceController.closeChannelChat()
                 friendChatActions.openFriend(friend, animate = true)
+                syncVisibleChatNotificationState()
             },
             openGroup = { group ->
                 friendChatActions.closeFriendChat()
                 projectSpaceController.closeChannelChat()
                 groupChatActions.openGroup(group, animate = true)
+                syncVisibleChatNotificationState()
             }
+        )
+    }
+
+    private fun syncVisibleChatNotificationState() {
+        ChatMessageNotifications.setVisibleConversation(
+            foreground = s.appInForeground,
+            friendId = friendChatActions.currentFriend()?.id,
+            groupId = groupChatActions.currentGroup()?.id
         )
     }
 
@@ -1056,6 +1073,7 @@ class MainActivity : AppCompatActivity() {
                 friendChatActions.closeFriendChat()
                 projectSpaceController.closeChannelChat()
                 groupChatActions.openGroup(group, animate = true)
+                syncVisibleChatNotificationState()
             }
         )
     }
@@ -1157,6 +1175,7 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.closeFriendChat()
         groupChatActions.closeGroupChat()
         projectSpaceController.closeChannelChat()
+        syncVisibleChatNotificationState()
         navigationController.showProjectChat()
         binding.inputEdit.setText(prompt)
         binding.inputEdit.setSelection(binding.inputEdit.text.length)

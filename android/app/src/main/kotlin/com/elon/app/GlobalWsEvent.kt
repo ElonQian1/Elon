@@ -32,6 +32,7 @@ sealed class GlobalWsEvent {
         val messageId: String,
         val content: String,
         val createdAt: String,
+        val senderName: String?,
     ) : GlobalWsEvent()
 
     /** 群聊消息 */
@@ -41,6 +42,8 @@ sealed class GlobalWsEvent {
         val messageId: String,
         val content: String,
         val createdAt: String,
+        val senderName: String?,
+        val groupName: String?,
     ) : GlobalWsEvent()
 
     /** 好友在线状态变更：isOnline=true 表示上线，false 表示下线 */
@@ -80,6 +83,7 @@ sealed class GlobalWsEvent {
                     messageId = json.optString("messageId", ""),
                     content = json.optString("content", ""),
                     createdAt = json.optString("createdAt", ""),
+                    senderName = json.optString("senderName", "").takeIf { it.isNotBlank() },
                 )
                 "group_message" -> GroupMessage(
                     groupId = json.optString("groupId", ""),
@@ -87,6 +91,8 @@ sealed class GlobalWsEvent {
                     messageId = json.optString("messageId", ""),
                     content = json.optString("content", ""),
                     createdAt = json.optString("createdAt", ""),
+                    senderName = json.optString("senderName", "").takeIf { it.isNotBlank() },
+                    groupName = json.optString("groupName", "").takeIf { it.isNotBlank() },
                 )
                 "presence" -> PresenceChange(
                     userId = json.optString("userId", ""),

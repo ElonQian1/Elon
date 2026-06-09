@@ -4,6 +4,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -753,15 +754,29 @@ internal class MainNavigationController(
             badge.visibility = View.GONE
             return
         }
-        badge.text = if (count > 99) "99+" else count.toString()
-        badge.textSize = if (count > 99) 7f else 9f
-        if (badge.background == null || badge.background !is GradientDrawable) {
-            badge.background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#E53935"))
-            }
+        val badgeText = if (count > 99) "99+" else count.toString()
+        val height = dp(22)
+        val width = when {
+            badgeText.length >= 3 -> dp(34)
+            badgeText.length == 2 -> dp(28)
+            else -> height
+        }
+        badge.text = badgeText
+        badge.textSize = 12f
+        badge.layoutParams = (badge.layoutParams as FrameLayout.LayoutParams).apply {
+            this.width = width
+            this.height = height
+        }
+        badge.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = height / 2f
+            setColor(Color.parseColor("#F04B4F"))
         }
         badge.visibility = View.VISIBLE
+    }
+
+    private fun dp(value: Int): Int {
+        return (value * activity.resources.displayMetrics.density + 0.5f).toInt()
     }
 
     private fun clearPageTranslations() {

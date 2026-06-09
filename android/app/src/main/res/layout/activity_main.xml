@@ -749,15 +749,15 @@
 
                 <TextView
                     android:id="@+id/tabChatBadge"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:layout_gravity="top|center_horizontal"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginStart="14dp"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginStart="17dp"
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:textColor="@color/elon_text_primary"
-                    android:textSize="9sp"
+                    android:textSize="12sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
 

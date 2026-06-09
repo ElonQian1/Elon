@@ -17,7 +17,8 @@ class ElonApplication : Application() {
                         context = this@ElonApplication,
                         fromUserId = event.fromUserId,
                         messageId = event.messageId,
-                        content = event.content
+                        content = event.content,
+                        senderName = event.senderName
                     )
                 is GlobalWsEvent.GroupMessage ->
                     ChatMessageNotifications.showGroupMessage(
@@ -25,7 +26,9 @@ class ElonApplication : Application() {
                         groupId = event.groupId,
                         fromUserId = event.fromUserId,
                         messageId = event.messageId,
-                        content = event.content
+                        content = event.content,
+                        senderName = event.senderName,
+                        groupName = event.groupName
                     )
                 else -> Unit
             }
