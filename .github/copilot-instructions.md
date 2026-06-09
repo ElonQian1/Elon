@@ -25,16 +25,28 @@
 | **给用户构建他们的子项目** | 通过 `build_project()` 工具调用，工作目录在 `/opt/elon/projects/<id>/` | `assembleDebug`（服务器无签名密钥，debug 正确） |
 
 **绝不能**在改动 elon 自身代码后用 `assembleDebug` 或跳过签名脚本直接运行 `./gradlew assembleRelease`。
-### Android 新功能完成定义
+### Android 任务完成定义
 
-涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算完成。只要改动触及 `android/app/src/main/**`、`AndroidManifest.xml`、聊天链路、更新链路、权限、后台服务或手机端调试能力，除非用户明确要求“只改代码不发布 APK”，否则必须运行：
+涉及 APK 可安装端能力的任务，默认分成两层完成定义：
 
-```powershell
-scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
-powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
-```
+1. **代码同步完成**
+   - 业务代码已 `commit` 并 `push origin main`
+   - 若用户明确要求“先同步代码”“先合并远端”“发布稍后再说”或“不要求这次发布成功”，到这里即可收尾
+   - 可用：
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
+     ```
 
-最终回复必须包含 APK 发布状态、版本号、发布 SHA、服务器 `/app/version.json` 校验结果和下载地址。
+2. **APK 发布完成**
+   - 只有当用户明确要求“给我可安装 APK / 下载链接 / 立即发布到线上”时，才把发布成功作为完成定义
+   - 这时运行：
+     ```powershell
+     scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+     ```
+
+最终回复要明确区分：本次是“代码已同步”还是“APK 已发布”。  
+发布脚本仍然负责版本号申请、构建、上传、并发保护和 finish；但**发布失败或被更新的 main 抢先覆盖，不影响代码已经同步到远端这一事实**。
 
 **脚本内置防慢构建覆盖和并发保护**，无需手动干预；强制覆盖用 `-Force`。
 

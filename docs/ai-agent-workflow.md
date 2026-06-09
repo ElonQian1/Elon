@@ -297,16 +297,23 @@ Linux/macOS 开发机使用 `bash scripts/publish-server.sh`。不得使用旧�
 
 ### 8.2 分发 APK
 
-Android 可安装端能力变更必须使用仓库发布脚本，不得手工拼接版本号、签名、上传步骤：
+Android 可安装端能力变更要先区分**代码同步**和**APK 发布**：
 
 ```powershell
+# 只确认代码已经合并到远端主线
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
+
+# 需要交付可安装 APK 时，再单独跑发布
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
+- **代码同步完成**：业务代码已 commit 并 push 到 `origin/main`。如果用户明确说“先同步代码”“发布不一定成功”或“这次不用出 APK”，到这里即可结束任务。
+- **APK 发布完成**：只有当用户明确要求下载链接、线上 APK、安装包交付时，才要求 `AndroidFeature` 校验通过。
+
 发布脚本会完成：同步 `main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
 
-APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进但线上未确认包含本次基础提交，就停止上传并从最新 `main` 重新发布。脚本不得在 APK 编译完成后自动 rebase 再上传旧产物。
+APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进但线上未确认包含本次基础提交，就停止上传并从最新 `main` 重新发布。脚本不得在 APK 编译完成后自动 rebase 再上传旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
 
 ### 8.3 推送结果给用户
 

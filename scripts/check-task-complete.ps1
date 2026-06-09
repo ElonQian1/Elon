@@ -3,17 +3,19 @@
     Elon task completion check.
 
 .DESCRIPTION
-    Use this before the final AI report. AndroidFeature verifies that local
+    Use this before the final AI report. CodeSync verifies that local HEAD has
+    already been merged into origin/main. AndroidFeature verifies that local
     HEAD equals origin/main and that server /app/version.json points at the
     pushed source commit. APK version numbers are assigned by the server.
     Server verifies /health and /api/server/version.
 
 .EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 #>
 param(
-    [ValidateSet("AndroidFeature", "DocsOnly", "Server")]
-    [string]$Kind = "AndroidFeature",
+    [ValidateSet("CodeSync", "AndroidFeature", "DocsOnly", "Server")]
+    [string]$Kind = "CodeSync",
 
     [switch]$SkipGitStatus
 )
@@ -48,6 +50,23 @@ if ($LASTEXITCODE -ne 0) {
 
 $head = (git rev-parse HEAD).Trim()
 $originMain = (git rev-parse origin/main).Trim()
+
+if ($Kind -eq "CodeSync") {
+    git merge-base --is-ancestor $head $originMain | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Stop-Check "Code sync is not complete: local HEAD=$($head.Substring(0, 7)) has not been merged into origin/main=$($originMain.Substring(0, 7))."
+    }
+
+    Write-Host "Code sync check passed:" -ForegroundColor Green
+    Write-Host "  HEAD:        $($head.Substring(0, 7))"
+    Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    if ($head -eq $originMain) {
+        Write-Host "  status:      local HEAD is the current origin/main tip"
+    } else {
+        Write-Host "  status:      local HEAD is already contained in origin/main"
+    }
+    exit 0
+}
 
 if ($Kind -eq "AndroidFeature") {
     if ($head -ne $originMain) {

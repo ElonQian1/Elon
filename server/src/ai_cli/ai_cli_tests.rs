@@ -124,6 +124,7 @@ fn development_prompt_keeps_project_workflow() {
 
     assert!(prompt.contains("scripts/publish-apk.ps1"));
     assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind AndroidFeature"));
+    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind CodeSync"));
     assert!(prompt.contains("scripts/publish-server.ps1"));
     assert!(prompt.contains("脚本负责版本分配、构建、上传、并发保护和 finish"));
     assert!(prompt.contains("脚本负责版本分配、临时构建配置、上传、并发保护和 finish"));
