@@ -12,7 +12,10 @@
 use serde_json::Value;
 use tracing::warn;
 
-use crate::store::{Store, TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord};
+use crate::store::{
+    BillingReservationOutcome, BillingReservationRequest, Store, TokenUsageAccountingResult,
+    TokenUsageBillingCharge, TokenUsageRecord,
+};
 
 // ── 模型定价表（USD / 1M tokens）─────────────────────────────────────────────
 // 返回 (input_per_m, cached_per_m, output_per_m)，单位：美元 / 百万 token
@@ -89,6 +92,8 @@ pub fn calc_cost_fen(
 /// - 有行且 balance_fen > 0 → 放行
 /// - 有行且 balance_fen <= 0 → 返回 Err（错误消息直接展示给用户）
 pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
+    release_expired_reservations_best_effort(store);
+
     if let Err(e) = store.check_user_quota(user_id) {
         let msg = e.to_string();
         if msg.contains("用户已被封禁") || msg.contains("token 用量已达上限") {
@@ -128,6 +133,112 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
     }
 }
 
+pub fn reserve_trusted_call(
+    store: &Store,
+    user_id: &str,
+    compute_call_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    estimated_cost_fen: i64,
+) -> Result<Option<BillingReservationOutcome>, String> {
+    let compute_call_id = compute_call_id.trim();
+    if compute_call_id.is_empty() {
+        check_can_call(store, user_id)?;
+        return Ok(None);
+    }
+    release_expired_reservations_best_effort(store);
+
+    if let Err(e) = store.check_user_quota(user_id) {
+        let msg = e.to_string();
+        if msg.contains("用户已被封禁") || msg.contains("token 用量已达上限") {
+            return Err(msg);
+        }
+        warn!(
+            "billing reservation quota check db error for {}: {}",
+            user_id, e
+        );
+        if !billing_db_fail_open() {
+            return Err("计费系统暂时不可用，请稍后重试".to_string());
+        }
+    }
+
+    let request = BillingReservationRequest {
+        user_id,
+        compute_call_id,
+        feature,
+        usage_mode,
+        model,
+        reserve_fen: estimated_cost_fen.max(0),
+        bill_missing_balance: billing_required_for_all_users(store),
+    };
+    match store.reserve_billing_call(&request) {
+        Ok(outcome) => {
+            if let Some(balance) = outcome.balance_after_fen {
+                publish_low_balance_if_needed(store, user_id, balance);
+            }
+            Ok(Some(outcome))
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            warn!(
+                user_id,
+                compute_call_id, feature, usage_mode, "billing reservation failed: {}", msg
+            );
+            if billing_db_fail_open() && !msg.contains("余额不足") {
+                Ok(None)
+            } else {
+                Err(msg)
+            }
+        }
+    }
+}
+
+pub fn release_trusted_call(store: &Store, user_id: &str, compute_call_id: &str, status: &str) {
+    if compute_call_id.trim().is_empty() {
+        return;
+    }
+    if let Err(e) = store.release_billing_call(user_id, compute_call_id, status) {
+        warn!(
+            user_id,
+            compute_call_id, "billing reservation release failed: {}", e
+        );
+    }
+}
+
+pub fn configured_reservation_fen(store: &Store, key: &str, fallback: i64) -> i64 {
+    std::env::var(key.to_ascii_uppercase())
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .or_else(|| {
+            store
+                .billing_get_config(key)
+                .ok()
+                .flatten()
+                .and_then(|value| value.trim().parse::<i64>().ok())
+        })
+        .unwrap_or(fallback)
+        .max(0)
+}
+
+pub fn estimate_cost_for_tokens(
+    store: &Store,
+    model: &str,
+    input_tokens: i64,
+    cached_input_tokens: i64,
+    output_tokens: i64,
+) -> i64 {
+    let (rate, markup) = store.billing_get_rate_and_markup();
+    calc_cost_fen(
+        model,
+        input_tokens.max(0),
+        cached_input_tokens.max(0),
+        output_tokens.max(0),
+        rate,
+        markup,
+    )
+}
+
 /// 可信用量记账：插入 token 用量，并在用户已开通预存计费时原子扣款。
 pub fn account_trusted_usage(
     store: &Store,
@@ -155,15 +266,7 @@ pub fn account_trusted_usage(
     };
     let result = store.record_token_usage_with_billing(record, &charge)?;
     if let Some(balance) = result.balance_after_fen {
-        let threshold = store
-            .billing_get_config("low_balance_threshold_fen")
-            .ok()
-            .flatten()
-            .and_then(|s| s.parse::<i64>().ok())
-            .unwrap_or(100);
-        if balance <= threshold {
-            crate::billing_events::publish_low_balance(record.user_id.to_string(), balance);
-        }
+        publish_low_balance_if_needed(store, record.user_id, balance);
     }
     Ok(result)
 }
@@ -282,6 +385,26 @@ fn billing_db_fail_open() -> bool {
             value == "1" || value == "true" || value == "yes"
         })
         .unwrap_or(false)
+}
+
+fn publish_low_balance_if_needed(store: &Store, user_id: &str, balance: i64) {
+    let threshold = store
+        .billing_get_config("low_balance_threshold_fen")
+        .ok()
+        .flatten()
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(100);
+    if balance <= threshold {
+        crate::billing_events::publish_low_balance(user_id.to_string(), balance);
+    }
+}
+
+fn release_expired_reservations_best_effort(store: &Store) {
+    match store.release_expired_billing_reservations() {
+        Ok(0) => {}
+        Ok(n) => tracing::info!("released {} expired billing reservations", n),
+        Err(e) => warn!("release expired billing reservations failed: {}", e),
+    }
 }
 
 fn billing_required_for_all_users(store: &Store) -> bool {

@@ -9,6 +9,9 @@ use crate::store_schema::apply_migrations;
 
 mod admin_stats;
 mod billing;
+#[cfg(test)]
+mod billing_reservation_tests;
+mod billing_reservations;
 mod build_quota;
 mod common;
 mod conversations;
@@ -39,6 +42,7 @@ pub use admin_stats::{
     AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
 };
 pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
+pub use billing_reservations::{BillingReservationOutcome, BillingReservationRequest};
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,

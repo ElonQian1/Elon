@@ -9,6 +9,7 @@ use chrono::Datelike;
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
+use super::billing_reservations::{load_reservation_for_settlement, mark_reservation_settled};
 use super::{new_id, now, Store};
 
 // ── 写入结构 ──────────────────────────────────────────────────────────────────
@@ -223,7 +224,81 @@ impl Store {
             balance = Some(0);
         }
 
-        if let Some(balance) = balance {
+        let reservation = if let Some(key) = idempotency_key.as_deref() {
+            load_reservation_for_settlement(&tx, r.user_id, key)?
+        } else {
+            None
+        };
+
+        if let Some(reservation) = reservation {
+            let balance_after_reserve = tx
+                .query_row(
+                    "SELECT balance_fen FROM user_balance WHERE user_id = ?1",
+                    params![r.user_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?
+                .unwrap_or(0);
+            if charge.cost_rmb_fen > 0 && (charge.input_tokens > 0 || charge.output_tokens > 0) {
+                let delta = charge.cost_rmb_fen - reservation.reserved_fen;
+                let new_balance = balance_after_reserve - delta;
+                tx.execute(
+                    "UPDATE user_balance SET balance_fen = ?1, updated_at = ?2 WHERE user_id = ?3",
+                    params![new_balance, created, r.user_id],
+                )?;
+                let event_id = new_id("bev");
+                tx.execute(
+                    r#"INSERT INTO billing_events
+                       (id, user_id, model, input_tokens, cached_input_tokens, output_tokens,
+                        cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at,
+                        token_usage_event_id)
+                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)"#,
+                    params![
+                        event_id,
+                        r.user_id,
+                        charge.model,
+                        charge.input_tokens.max(0),
+                        charge.cached_input_tokens.max(0),
+                        charge.output_tokens.max(0),
+                        charge.cost_rmb_fen,
+                        charge.exchange_rate_x10000,
+                        charge.markup_x1000,
+                        created,
+                        token_event_id,
+                    ],
+                )?;
+                mark_reservation_settled(
+                    &tx,
+                    &reservation.id,
+                    &token_event_id,
+                    Some(&event_id),
+                    charge.cost_rmb_fen,
+                    (reservation.reserved_fen - charge.cost_rmb_fen).max(0),
+                    &created,
+                )?;
+                billing_event_id = Some(event_id);
+                balance_after = Some(new_balance);
+                billed_cost = charge.cost_rmb_fen;
+                accounting_status = "billed".to_string();
+            } else {
+                let new_balance = balance_after_reserve + reservation.reserved_fen;
+                tx.execute(
+                    "UPDATE user_balance SET balance_fen = ?1, updated_at = ?2 WHERE user_id = ?3",
+                    params![new_balance, created, r.user_id],
+                )?;
+                mark_reservation_settled(
+                    &tx,
+                    &reservation.id,
+                    &token_event_id,
+                    None,
+                    0,
+                    reservation.reserved_fen,
+                    &created,
+                )?;
+                balance_after = Some(new_balance);
+                accounting_status = "zero_cost".to_string();
+            }
+        } else if let Some(balance) = balance {
             if charge.cost_rmb_fen > 0 && (charge.input_tokens > 0 || charge.output_tokens > 0) {
                 let new_balance = balance - charge.cost_rmb_fen;
                 tx.execute(

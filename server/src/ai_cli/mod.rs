@@ -201,6 +201,35 @@ async fn run_with_workspace_mode(
     }
 
     let android_task = development_task && !planning_task && looks_like_android_task(user_message);
+    let cli_feature = if planning_task {
+        "codex_cli_plan"
+    } else if development_task {
+        "codex_cli_dev"
+    } else {
+        "codex_cli_chat"
+    };
+    let accounting_key = trace_id
+        .map(|trace_id| format!("codex_cli:{cli_feature}:{trace_id}"))
+        .unwrap_or_else(|| format!("codex_cli:{cli_feature}:{}", Uuid::new_v4()));
+    let reserve_fen = billing::configured_reservation_fen(
+        &state.store,
+        if development_task {
+            "billing_cli_dev_reservation_fen"
+        } else {
+            "billing_cli_chat_reservation_fen"
+        },
+        if development_task { 100 } else { 10 },
+    );
+    billing::reserve_trusted_call(
+        &state.store,
+        user_id,
+        &accounting_key,
+        cli_feature,
+        "server_codex_cli",
+        Some(option.id.as_str()),
+        reserve_fen,
+    )
+    .map_err(|msg| anyhow!(msg))?;
     if planning_task {
         let _ =
             tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
@@ -560,22 +589,14 @@ async fn run_with_workspace_mode(
         }
     }
     // 从 Codex CLI stdout 解析 token 用量并写入数据库
-    let cli_feature = if planning_task {
-        "codex_cli_plan"
-    } else if development_task {
-        "codex_cli_dev"
-    } else {
-        "codex_cli_chat"
-    };
     let usage_text = format!("{}\n{}", output.stdout, output.stderr);
-    let accounting_key = trace_id.map(|trace_id| format!("codex_cli:{cli_feature}:{trace_id}"));
     crate::token_usage_api::record_codex_usage_from_stdout_with_key(
         &state.store,
         user_id,
         cli_feature,
         Some(option.id.as_str()),
         &usage_text,
-        accounting_key.as_deref(),
+        Some(&accounting_key),
     );
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
@@ -794,6 +815,33 @@ async fn run_via_pc_agent(
         }
         result?
     };
+    let pc_cli_feature = if request_mode.is_plan() {
+        "pc_agent_cli_plan"
+    } else if cwd.is_some() {
+        "pc_agent_cli_dev"
+    } else {
+        "pc_agent_cli_chat"
+    };
+    let pc_accounting_key = format!("pc_agent_cli:{pc_req_id}");
+    let pc_reserve_fen = billing::configured_reservation_fen(
+        &state.store,
+        if cwd.is_some() {
+            "billing_cli_dev_reservation_fen"
+        } else {
+            "billing_cli_chat_reservation_fen"
+        },
+        if cwd.is_some() { 100 } else { 10 },
+    );
+    billing::reserve_trusted_call(
+        &state.store,
+        user_id,
+        &pc_accounting_key,
+        pc_cli_feature,
+        "pc_agent_cli",
+        model_label.or(copilot_model).or(Some(cli_name)),
+        pc_reserve_fen,
+    )
+    .map_err(|msg| anyhow!(msg))?;
     record_pc_execution_started(
         state,
         native_session_scope.as_ref(),
@@ -927,22 +975,14 @@ async fn run_via_pc_agent(
                     total_tokens,
                     model.clone().or_else(|| Some(display_model.clone())),
                 ) {
-                    let feature = if request_mode.is_plan() {
-                        "pc_agent_cli_plan"
-                    } else if cwd.is_some() {
-                        "pc_agent_cli_dev"
-                    } else {
-                        "pc_agent_cli_chat"
-                    };
-                    let accounting_key = format!("pc_agent_cli:{pc_req_id}");
                     accounting_result = crate::token_usage_api::record_trusted_usage_with_key(
                         &state.store,
                         user_id,
-                        feature,
+                        pc_cli_feature,
                         "pc_agent_cli",
                         model.as_deref().or(Some(display_model.as_str())),
                         &usage,
-                        Some(&accounting_key),
+                        Some(&pc_accounting_key),
                     );
                     settle_pc_cli_node_usage(
                         state,

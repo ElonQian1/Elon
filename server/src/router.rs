@@ -452,6 +452,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/admin/token-stats/accounting-audit",
             get(admin_token_stats::get_accounting_audit),
         )
+        .route(
+            "/api/admin/token-stats/reconciliation-summary",
+            get(admin_token_stats::get_reconciliation_summary),
+        )
         // ── 用户配额管理 ──────────────────────────────────────────────────────
         .route(
             "/api/admin/quotas",

@@ -166,6 +166,9 @@ pub(crate) fn record_trusted_usage_with_key(
     idempotency_key: Option<&str>,
 ) -> Option<crate::store::TokenUsageAccountingResult> {
     let Some(usage) = usage.clone().normalized() else {
+        if let Some(key) = idempotency_key {
+            crate::billing::release_trusted_call(store, user_id, key, "released_no_usage");
+        }
         return None;
     };
     let model = model.or(usage.model.as_deref());
@@ -233,6 +236,9 @@ pub(crate) fn record_codex_usage_from_stdout_with_key(
             "record_codex_usage_from_stdout: 未找到 token 用量事件（stdout {} 字节）",
             stdout.len()
         );
+        if let Some(key) = idempotency_key {
+            crate::billing::release_trusted_call(store, user_id, key, "released_no_usage");
+        }
         return;
     };
     tracing::info!(

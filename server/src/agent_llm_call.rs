@@ -265,13 +265,33 @@ pub(crate) async fn try_casual_chat_via_node(
     let dispatch =
         crate::node_router::dispatch_to_node(state, model, messages.to_vec(), Some(1024)).await;
 
-    let (_req_id, actual_node_id, mut rx) = match dispatch {
+    let (req_id, actual_node_id, mut rx) = match dispatch {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!("节点路由失败，降级到云端 LLM: {e}");
             return None;
         }
     };
+    let node_reserve_fen =
+        crate::billing::estimate_cost_for_tokens(&state.store, model, 0, 0, 1024).max(
+            crate::billing::configured_reservation_fen(
+                &state.store,
+                "billing_node_llm_min_reservation_fen",
+                1,
+            ),
+        );
+    if let Err(msg) = crate::billing::reserve_trusted_call(
+        &state.store,
+        user_id,
+        &format!("node_llm:{req_id}"),
+        "node_llm",
+        "server_node_llm",
+        Some(model),
+        node_reserve_fen,
+    ) {
+        tracing::warn!(user_id, model, "节点推理预授权失败: {}", msg);
+        return None;
+    }
 
     let mut content = String::new();
     let mut prompt_tokens: u32 = 0;
@@ -317,6 +337,7 @@ pub(crate) async fn try_casual_chat_via_node(
     crate::node_router::settle_after_stream(
         state,
         user_id,
+        Some(&req_id),
         Some(&owner),
         &actual_node_id,
         model,

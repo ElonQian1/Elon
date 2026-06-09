@@ -997,6 +997,9 @@ function loadSummary(days) {
         summaryCard('📅 今日 Token', fmtNum(d.total_tokens_today), 'var(--success)'),
         summaryCard('💰 估算费用', '¥' + d.estimated_cost_cny.toFixed(4), '#fbbf24'),
         summaryCard('✅ 实际扣费', '¥' + (((d.billed_cost_rmb_fen_period || 0) / 100).toFixed(2)), 'var(--success)'),
+        summaryCard('⚠️ 未扣费事件', fmtNum(d.billing_unbilled_events || 0), 'var(--danger)'),
+        summaryCard('🧊 冻结中', fmtNum(d.billing_open_reservations || 0), '#38bdf8'),
+        summaryCard('📉 负余额用户', fmtNum(d.billing_negative_balance_users || 0), '#fbbf24'),
         summaryCard('👥 活跃用户', d.active_users_period, 'var(--text-dim)'),
         summaryCard('📞 调用次数', fmtNum(d.call_count_period), 'var(--text-dim)'),
       ].join('');

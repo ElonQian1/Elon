@@ -52,6 +52,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (30, "token 用量与扣费事件原子对账字段", migration_v30),
     (31, "token 用量可信记账幂等键", migration_v31),
     (32, "PC 项目执行会话 token 用量字段", migration_v32),
+    (33, "计费调用预授权冻结与对账摘要", migration_v33),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1183,6 +1184,48 @@ fn migration_v32(conn: &Connection) -> Result<()> {
         r#"
         CREATE INDEX IF NOT EXISTS idx_project_execution_sessions_node_time
           ON project_execution_sessions(node_id, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v33(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS billing_reservations (
+          id                   TEXT PRIMARY KEY,
+          user_id              TEXT NOT NULL,
+          compute_call_id      TEXT NOT NULL,
+          feature              TEXT NOT NULL,
+          usage_mode           TEXT NOT NULL,
+          model                TEXT,
+          reserved_fen         INTEGER NOT NULL DEFAULT 0,
+          settled_cost_fen     INTEGER NOT NULL DEFAULT 0,
+          refunded_fen         INTEGER NOT NULL DEFAULT 0,
+          status               TEXT NOT NULL DEFAULT 'reserved',
+          token_usage_event_id TEXT,
+          billing_event_id     TEXT,
+          created_at           TEXT NOT NULL,
+          updated_at           TEXT NOT NULL,
+          expires_at           TEXT,
+          balance_after_fen    INTEGER,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_reservations_user_call
+          ON billing_reservations(user_id, compute_call_id);
+        CREATE INDEX IF NOT EXISTS idx_billing_reservations_status
+          ON billing_reservations(status, expires_at);
+        CREATE INDEX IF NOT EXISTS idx_billing_reservations_user_time
+          ON billing_reservations(user_id, created_at DESC);
+
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_default_reservation_fen', '1', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_cli_dev_reservation_fen', '100', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_cli_chat_reservation_fen', '10', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_node_llm_min_reservation_fen', '1', datetime('now'));
         "#,
     )?;
     Ok(())

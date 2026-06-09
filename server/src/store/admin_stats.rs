@@ -19,6 +19,12 @@ pub struct AdminPlatformSummary {
     pub call_count_period: i64,
     pub estimated_cost_cny: f64,
     pub billed_cost_rmb_fen_period: i64,
+    pub billing_unbilled_events: i64,
+    pub billing_legacy_events: i64,
+    pub billing_negative_balance_users: i64,
+    pub billing_open_reservations: i64,
+    pub billing_expired_reservations: i64,
+    pub billing_reserved_fen_open: i64,
 }
 
 /// 单用户在指定周期内的统计行（用于排行榜）
@@ -223,6 +229,7 @@ impl Store {
 
         // 估算费用：按模型聚合，分别估算
         let cost = self.admin_estimate_period_cost_cny(days)?;
+        let reconciliation = self.admin_billing_reconciliation_summary(days)?;
 
         Ok(AdminPlatformSummary {
             total_tokens_all_time: total_all_time,
@@ -233,6 +240,12 @@ impl Store {
             call_count_period: call_count,
             estimated_cost_cny: cost,
             billed_cost_rmb_fen_period: billed_cost,
+            billing_unbilled_events: reconciliation.unbilled_events,
+            billing_legacy_events: reconciliation.legacy_events,
+            billing_negative_balance_users: reconciliation.negative_balance_users,
+            billing_open_reservations: reconciliation.open_reservations,
+            billing_expired_reservations: reconciliation.expired_reservations,
+            billing_reserved_fen_open: reconciliation.reserved_fen_open,
         })
     }
 

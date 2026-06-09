@@ -8,6 +8,7 @@
 //!   GET /api/admin/token-stats/users/:user_id?days=30
 //!   GET /api/admin/token-stats/trend?days=30
 //!   GET /api/admin/token-stats/accounting-audit?days=30&limit=100
+//!   GET /api/admin/token-stats/reconciliation-summary?days=30
 
 use axum::{
     extract::{Path, Query, State},
@@ -132,6 +133,25 @@ pub async fn get_accounting_audit(
         .into_response(),
         Err(e) => {
             tracing::warn!("admin_accounting_audit error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+/// GET /api/admin/token-stats/reconciliation-summary?days=30
+pub async fn get_reconciliation_summary(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<StatsQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    let days = q.days.clamp(1, 365);
+    match state.store.admin_billing_reconciliation_summary(days) {
+        Ok(summary) => Json(summary).into_response(),
+        Err(e) => {
+            tracing::warn!("admin_billing_reconciliation_summary error: {}", e);
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
         }
     }

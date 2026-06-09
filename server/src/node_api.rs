@@ -483,8 +483,9 @@ pub async fn chat_with_node(
             .into_response();
     }
 
+    let max_output_tokens = req.max_tokens.unwrap_or(1024) as i64;
     // 找节点、发起请求
-    let (_req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node(
+    let (req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node(
         &state,
         &req.model_id,
         req.messages,
@@ -501,6 +502,33 @@ pub async fn chat_with_node(
                 .into_response();
         }
     };
+    let node_reserve_fen = crate::billing::estimate_cost_for_tokens(
+        &state.store,
+        &req.model_id,
+        0,
+        0,
+        max_output_tokens,
+    )
+    .max(crate::billing::configured_reservation_fen(
+        &state.store,
+        "billing_node_llm_min_reservation_fen",
+        1,
+    ));
+    if let Err(msg) = crate::billing::reserve_trusted_call(
+        &state.store,
+        &user.id,
+        &format!("node_llm:{req_id}"),
+        "node_llm",
+        "server_node_llm",
+        Some(&req.model_id),
+        node_reserve_fen,
+    ) {
+        return (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(serde_json::json!({"error": msg})),
+        )
+            .into_response();
+    }
 
     // 收集流式块
     let mut content = String::new();
@@ -546,6 +574,7 @@ pub async fn chat_with_node(
     crate::node_router::settle_after_stream(
         &state,
         &user.id,
+        Some(&req_id),
         Some(&owner),
         &node_id,
         &req.model_id,

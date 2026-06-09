@@ -38,6 +38,7 @@ pub async fn dispatch_to_node(
 pub fn settle_after_stream(
     state: &Arc<AppState>,
     consumer_user_id: &str,
+    compute_call_id: Option<&str>,
     provider_user_id: Option<&str>,
     node_id: &str,
     model_id: &str,
@@ -52,6 +53,10 @@ pub fn settle_after_stream(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string);
+    let accounting_key = compute_call_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("node_llm:{value}"));
     let node = node_id.to_string();
     let model = model_id.to_string();
 
@@ -64,13 +69,14 @@ pub fn settle_after_stream(
             total_tokens: (prompt_tokens + completion_tokens) as i64,
             model: Some(model.clone()),
         };
-        crate::token_usage_api::record_trusted_usage(
+        crate::token_usage_api::record_trusted_usage_with_key(
             &state.store,
             &consumer,
             "node_llm",
             "server_node_llm",
             Some(&model),
             &usage,
+            accounting_key.as_deref(),
         );
 
         let Some(provider) = provider else {
