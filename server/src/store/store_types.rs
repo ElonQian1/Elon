@@ -360,6 +360,9 @@ pub struct UserArchiveWorkspaceStatus {
     pub project_id: String,
     pub workspace_kind: String,
     pub execution_target: String,
+    pub health_label: String,
+    pub health_tone: String,
+    pub recommended_action: String,
     pub node_id: Option<String>,
     pub node_online: bool,
     pub node_display_name: Option<String>,
@@ -369,6 +372,7 @@ pub struct UserArchiveWorkspaceStatus {
     pub latest_execution_active_workspace_path: Option<String>,
     pub warning_count: i64,
     pub warnings: Vec<String>,
+    pub recovery_actions: Vec<crate::project_workspace_lifecycle::ProjectWorkspaceRecoveryAction>,
 }
 
 #[derive(Debug, Clone, Serialize)]

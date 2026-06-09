@@ -179,7 +179,7 @@
   }
 
   function stageOf(project) {
-    if (isSystemProject(project)) return '会话归档';
+    if (isSystemProject(project)) return '个人归档';
     return project.last_task_status || project.status || project.stage || '待提交需求';
   }
 
@@ -188,6 +188,8 @@
     if (!status || typeof status !== 'object') return '';
     const latest = String(status.latest_execution_status || status.latestExecutionStatus || '').trim().toLowerCase();
     if (latest === 'running') return '运行中';
+    const serverLabel = status.health_label || status.healthLabel;
+    if (serverLabel) return serverLabel;
     const kind = String(status.workspace_kind || status.workspaceKind || '').trim();
     if (kind === 'system_archive') return systemProjectLabel(project) + '归档';
     if (kind === 'pc_node_workspace') {
@@ -313,7 +315,7 @@
   function renderCard(project) {
     const system = isSystemProject(project);
     const joint = !system && isJointProject(project);
-    const kind = system ? '系统档案' : joint ? '联合开发' : '个人独立';
+    const kind = system ? '个人归档' : joint ? '联合开发' : '个人项目';
     const status = workspaceStatusOf(project) || stageOf(project);
     const meta = `${kind} · ${conversationCount(project)}个会话 · ${status}`;
     const app = bridge();
@@ -499,7 +501,7 @@
     const sourceType = sourceTypeOf(project);
     if (sourceType === 'agent_balloon') return '手机控制';
     if (sourceType === 'chat_memory') return '聊天记忆';
-    return '系统档案';
+    return '个人归档';
   }
 
   function renderActionRow(row) {

@@ -42,7 +42,7 @@ internal data class ArchiveProjectRecord(
             subtitle = subtitle,
             updatedAt = updatedAtMs,
             stage = lastTaskStatus?.takeIf { it.isNotBlank() }
-                ?: if (isSystem) "会话归档" else "待提交需求",
+                ?: if (isSystem) "个人归档" else "待提交需求",
             isJointProject = opensAsJoint,
             collaborationProjectId = id.takeIf { opensAsJoint },
             collaborationJoinMode = joinMode.takeIf { opensAsJoint },
@@ -80,6 +80,9 @@ internal data class ArchiveWorkspaceStatus(
     val nodeOnline: Boolean,
     val nodeDisplayName: String?,
     val canRunOnPc: Boolean,
+    val healthLabel: String?,
+    val healthTone: String?,
+    val recommendedAction: String?,
     val latestExecutionStatus: String?,
     val latestExecutionMergeStatus: String?,
     val warningCount: Int,
@@ -87,6 +90,7 @@ internal data class ArchiveWorkspaceStatus(
 ) {
     fun displayLabel(systemKey: String?): String {
         if (latestExecutionStatus.equals("running", ignoreCase = true)) return "运行中"
+        healthLabel?.let { return it }
         return when (workspaceKind) {
             "system_archive" -> "${systemDisplayName(systemKey)}归档"
             "pc_node_workspace" -> when {
@@ -102,6 +106,7 @@ internal data class ArchiveWorkspaceStatus(
 
     fun displayTone(): String {
         if (latestExecutionStatus.equals("running", ignoreCase = true)) return "active"
+        healthTone?.let { return it }
         return when {
             workspaceKind == "system_archive" -> "neutral"
             workspaceKind == "pc_node_workspace" && canRunOnPc && warningCount <= 0 -> "ok"
@@ -206,6 +211,9 @@ private fun parseArchiveWorkspaceStatus(obj: JSONObject?): ArchiveWorkspaceStatu
         nodeOnline = obj.optBoolean("node_online", false),
         nodeDisplayName = obj.optCleanString("node_display_name"),
         canRunOnPc = obj.optBoolean("can_run_on_pc", false),
+        healthLabel = obj.optCleanString("health_label"),
+        healthTone = obj.optCleanString("health_tone"),
+        recommendedAction = obj.optCleanString("recommended_action"),
         latestExecutionStatus = obj.optCleanString("latest_execution_status"),
         latestExecutionMergeStatus = obj.optCleanString("latest_execution_merge_status"),
         warningCount = obj.optInt("warning_count", warnings.size).coerceAtLeast(0),
@@ -231,6 +239,6 @@ private fun systemDisplayName(systemKey: String?): String {
     return when (systemKey?.trim()?.lowercase()) {
         "phone_control" -> "手机控制"
         "chat_memory" -> "聊天记忆"
-        else -> "系统档案"
+        else -> "个人归档"
     }
 }

@@ -64,10 +64,10 @@ internal fun StoreProject.toJointAppProject(): AppProject {
 }
 
 /**
- * 将 PC 托管项目还原为"个人独立项目"（适用于用户自己创建的 owner 项目）。
+ * 将 PC 托管项目还原为"个人项目"（适用于用户自己创建的 owner 项目）。
  * id 直接用服务端项目 ID，collaborationProjectId 不设置，这样 resolveProjectId()
  * 仍能通过 id 找到项目档案，同时 isJointDevelopmentProject() 返回 false，
- * 项目出现在"个人独立项目"分组。
+ * 项目出现在"个人项目"分组。
  */
 internal fun StoreProject.toOwnerAppProject(): AppProject {
     return newAppProject(name, description ?: "我的项目").copy(
@@ -424,7 +424,7 @@ internal fun fetchJoinedProjectIds(
     return (0 until arr.length()).map { arr.getJSONObject(it).getString("id") }.toSet()
 }
 
-/** GET /api/me/projects — 返回当前用户拥有或加入的代码项目列表（不含系统档案项目），需要登录 */
+/** GET /api/me/projects — 返回当前用户拥有或加入的代码项目列表（不含手机控制/聊天记忆归档），需要登录 */
 internal fun fetchMyProjects(
     http: OkHttpClient,
     serverUrl: String,

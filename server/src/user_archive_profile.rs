@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     conversation_router::{ensure_user_system_conversation_routes, ConversationRoute},
+    project_workspace_lifecycle::workspace_lifecycle,
     store::{
         UserArchiveConversationRoute, UserArchiveNode, UserArchiveProject, UserArchiveSummary,
         UserArchiveWorkspaceStatus, MEMORY_SCOPE_PROJECT,
@@ -196,20 +197,35 @@ fn workspace_status_for_project(
         warnings.push("最近一次执行来自旧版节点，缺少工作区状态".to_string());
     }
 
+    let can_run_on_pc = project.workspace_kind == "pc_node_workspace"
+        && project
+            .project
+            .workspace_path
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
+        && node.map(|node| node.online).unwrap_or(false);
+    let lifecycle = workspace_lifecycle(
+        &project.workspace_kind,
+        project.project.node_id.as_deref(),
+        project.project.workspace_path.as_deref(),
+        node.map(|node| node.online).unwrap_or(false),
+        can_run_on_pc,
+        None,
+        None,
+        warnings.len(),
+    );
+
     UserArchiveWorkspaceStatus {
         project_id: project.project.id.clone(),
         workspace_kind: project.workspace_kind.clone(),
         execution_target,
+        health_label: lifecycle.health_label,
+        health_tone: lifecycle.health_tone.to_string(),
+        recommended_action: lifecycle.recommended_action,
         node_id: project.project.node_id.clone(),
         node_online: node.map(|node| node.online).unwrap_or(false),
         node_display_name: node.map(|node| node.display_name.clone()),
-        can_run_on_pc: project.workspace_kind == "pc_node_workspace"
-            && project
-                .project
-                .workspace_path
-                .as_deref()
-                .is_some_and(|value| !value.trim().is_empty())
-            && node.map(|node| node.online).unwrap_or(false),
+        can_run_on_pc,
         latest_execution_status: latest_execution
             .as_ref()
             .map(|session| session.status.clone()),
@@ -221,6 +237,7 @@ fn workspace_status_for_project(
             .and_then(|session| session.active_workspace_path.clone()),
         warning_count: warnings.len() as i64,
         warnings,
+        recovery_actions: lifecycle.recovery_actions,
     }
 }
 

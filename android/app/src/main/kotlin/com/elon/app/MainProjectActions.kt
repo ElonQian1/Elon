@@ -881,7 +881,7 @@ internal class MainProjectActions(
             return
         }
         if (project.isSystemArchiveProject()) {
-            Toast.makeText(activity, "${project.systemArchiveDisplayName()}是系统档案，不能删除", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "${project.systemArchiveDisplayName()}是个人专属归档，不能删除", Toast.LENGTH_SHORT).show()
             return
         }
         AlertDialog.Builder(activity)

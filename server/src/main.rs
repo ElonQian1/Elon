@@ -77,6 +77,7 @@ mod project_task_scheduler;
 mod project_trace_events;
 mod project_workspace_health;
 mod project_workspace_inspect;
+pub(crate) mod project_workspace_lifecycle;
 mod project_workspace_provision;
 mod project_ws_job;
 mod project_ws_protocol;

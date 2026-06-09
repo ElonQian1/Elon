@@ -2,7 +2,6 @@ package com.elon.app
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -10,7 +9,6 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
@@ -53,6 +51,47 @@ internal class ProjectSpaceController(
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
+    private val personalConversationPanel = ProjectSpacePersonalConversationPanel(
+        activity = activity,
+        personalConversations = personalConversations,
+        activePersonalConversationIndex = activePersonalConversationIndex,
+        isPersonalConversationWorking = isPersonalConversationWorking,
+        openPersonalAiChat = openPersonalAiChat,
+        showPersonalConversationActions = showPersonalConversationActions,
+        showCreatePersonalConversation = showCreatePersonalConversation,
+        dp = dp,
+        selectableForeground = selectableForeground
+    )
+    private val memberConversationViews = ProjectSpaceMemberConversationViews(
+        activity = activity,
+        http = http,
+        serverUrl = serverUrl,
+        dp = dp,
+        selectableForeground = selectableForeground,
+        renderActiveSpace = {
+            pendingMemberBack = null
+            renderActiveSpace()
+        },
+        renderMessages = { conversation, member, space ->
+            renderMemberConversationMessages(conversation, member, space)
+        },
+        openPersonalConversationById = { conversationId ->
+            openPersonalConversationById(conversationId)
+        },
+        showCreateAndOpenPersonalConversation = showCreateAndOpenPersonalConversation,
+        openPersonalAiChat = openPersonalAiChat
+    )
+    private val memberListView = ProjectSpaceMemberListView(
+        activity = activity,
+        http = http,
+        serverUrl = serverUrl,
+        dp = dp,
+        selectableForeground = selectableForeground,
+        personalConversations = personalConversations,
+        showCreatePersonalConversation = showCreatePersonalConversation,
+        openMemberConversations = { member -> renderMemberConversationList(member) },
+        reloadActiveSpace = { reloadActiveSpace() }
+    )
 
     private data class ActiveMemberConversation(
         val projectId: String,
@@ -279,7 +318,7 @@ internal class ProjectSpaceController(
                 result.onSuccess { sent ->
                     val index = messages.indexOf(pending)
                     if (index >= 0) {
-                        messages[index] = sent.toChatMessage()
+                        messages[index] = sent.toChatMessage(activeSpace?.project?.role)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
@@ -378,7 +417,7 @@ internal class ProjectSpaceController(
                 result.onSuccess { sent ->
                     val index = messages.indexOfFirst { it === pending }
                     if (index >= 0) {
-                        messages[index] = sent.toChatMessage()
+                        messages[index] = sent.toChatMessage(activeSpace?.project?.role)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
@@ -429,7 +468,7 @@ internal class ProjectSpaceController(
         thread {
             val result = runCatching {
                 fetchProjectChannelMessages(http, serverUrl, activity, channel.projectId, channel.id, route = route)
-                    .map { it.toChatMessage() }
+                    .map { it.toChatMessage(activeSpace?.project?.role) }
             }
             activity.runOnUiThread {
                 if (activeChannel?.id != channel.id) return@runOnUiThread
@@ -550,7 +589,7 @@ internal class ProjectSpaceController(
                 text = buildString {
                     append("${space.project.memberCount} 位成员")
                     append(" · ")
-                    append(roleLabel(space.project.role))
+                    append(projectRoleLabel(space.project.role))
                     space.project.description?.let { append("\n").append(it) }
                 }
                 textSize = 13f
@@ -558,7 +597,7 @@ internal class ProjectSpaceController(
                 setPadding(0, dp(8), 0, 0)
             })
             space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
-                addView(downloadApkButton(apkUrl))
+                addView(projectSpaceDownloadButton(activity, apkUrl, dp, selectableForeground))
             }
         }
     }
@@ -591,7 +630,7 @@ internal class ProjectSpaceController(
                 setTextColor(Color.parseColor("#F2F5FA"))
             })
             addView(TextView(activity).apply {
-                text = channelHint(channel)
+                text = projectChannelHint(channel, activeSpace?.project?.role)
                 textSize = 12f
                 setTextColor(Color.parseColor("#6F7785"))
                 setPadding(0, dp(5), 0, 0)
@@ -604,97 +643,7 @@ internal class ProjectSpaceController(
     private fun renderMemberList(container: LinearLayout, members: List<ProjectMember>) {
         val space = activeSpace ?: return
         val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
-        val canManageMembers = canManageProjectMembers(space.project.role) && !activeRoute.isUserProject
-        if (canManageMembers) {
-            container.addView(ProjectSpaceMemberManagement.inviteRow(activity, dp, selectableForeground) {
-                ProjectSpaceMemberManagement.showInviteDialog(
-                    activity = activity,
-                    http = http,
-                    serverUrl = serverUrl,
-                    projectId = space.project.id,
-                    existingMemberIds = space.members.mapTo(mutableSetOf()) { it.userId },
-                    dp = dp,
-                    onChanged = { reloadActiveSpace() }
-                )
-            })
-        }
-        if (members.isEmpty()) {
-            container.addView(emptyPersonalConversationRow().apply { text = "暂无成员" })
-            if (space.project.role != "observer") container.addView(createPersonalConversationRow())
-            return
-        }
-        var selfInList = false
-        members.forEach { member ->
-            val isSelf = member.userId == selfId
-            if (isSelf) selfInList = true
-            container.addView(memberCard(member, isSelf, space))
-        }
-        if (space.project.role != "observer") {
-            if (!selfInList) container.addView(createPersonalConversationRow())
-        }
-    }
-
-    private fun memberCard(member: ProjectMember, isSelf: Boolean, space: ProjectSpace): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground(if (isSelf) "#1E2A38" else "#181B20")
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { renderMemberConversationList(member) }
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(member.account)
-                    if (isSelf) append(" (我)")
-                }
-                textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(roleLabel(member.role))
-                    val convCount = personalConversations().takeIf { isSelf }?.size
-                    if (convCount != null && convCount > 0) append(" · $convCount 个会话")
-                }
-                textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
-                setPadding(0, dp(5), 0, 0)
-            })
-            if (canManageProjectMembers(space.project.role) &&
-                !activeRoute.isUserProject &&
-                !isSelf &&
-                member.role != "owner"
-            ) {
-                addView(ProjectSpaceMemberManagement.actionRow(
-                    activity = activity,
-                    dp = dp,
-                    selectableForeground = selectableForeground,
-                    onChangeRole = {
-                        ProjectSpaceMemberManagement.showRoleDialog(
-                            activity = activity,
-                            http = http,
-                            serverUrl = serverUrl,
-                            projectId = space.project.id,
-                            member = member,
-                            dp = dp,
-                            onChanged = { reloadActiveSpace() }
-                        )
-                    },
-                    onRemove = {
-                        ProjectSpaceMemberManagement.confirmRemove(
-                            activity = activity,
-                            http = http,
-                            serverUrl = serverUrl,
-                            projectId = space.project.id,
-                            member = member,
-                            onChanged = { reloadActiveSpace() }
-                        )
-                    }
-                ))
-            }
-        }
+        memberListView.render(container, space, members, selfId, activeRoute.isUserProject)
     }
 
     private fun reloadActiveSpace() {
@@ -724,47 +673,6 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun localPersonalConversationCard(index: Int, conv: AppConversation, member: ProjectMember): LinearLayout {
-        val active = index == activePersonalConversationIndex()
-        val working = isPersonalConversationWorking(index)
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            val rowBackground = panelBackground(if (active) "#283140" else "#181B20")
-            background = rowBackground
-            if (working) startProjectConversationShimmer(this, rowBackground)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener {
-                pendingMemberBack = member
-                openPersonalAiChat(index)
-            }
-            setOnLongClickListener {
-                showPersonalConversationActions(index)
-                true
-            }
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(conv.title.ifBlank { "个人会话 ${index + 1}" })
-                    if (active) append("  ·  当前")
-                    if (conv.ended) append("  ·  已结束")
-                }
-                textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = personalConversationHint(conv)
-                textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
-                setPadding(0, dp(5), 0, 0)
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-        }
-    }
-
     // ── 成员会话列表（内联页面）───────────────────────────────────────
 
     private fun renderMemberConversationList(member: ProjectMember) {
@@ -774,55 +682,7 @@ internal class ProjectSpaceController(
         activeMemberListUserId = member.userId
         activeChannel = null
         activeMemberConversation = null
-
-        val container = binding.projectContentLayout
-        container.removeAllViews()
-        container.addView(backRow("← 项目空间") {
-            pendingMemberBack = null
-            renderActiveSpace()
-        })
-        container.addView(memberPageHeader(member))
-        container.addView(sectionTitle("项目 AI 会话"))
-
-        val loadingView = inlineStatusRow("正在加载会话...", "#A6AFBD")
-        container.addView(loadingView)
-
-        thread {
-            val result = runCatching {
-                fetchProjectMemberConversations(http, serverUrl, activity, space.project.id, member.userId)
-            }
-            activity.runOnUiThread {
-                if (container.indexOfChild(loadingView) < 0) return@runOnUiThread
-                container.removeView(loadingView)
-                result.onSuccess { conversations ->
-                    if (conversations.isEmpty()) {
-                        container.addView(inlineStatusRow("还没有项目 AI 会话", "#6F7785"))
-                    } else {
-                        conversations.forEach { conversation ->
-                            container.addView(
-                                memberConversationInlineCard(conversation, member, isSelf, space)
-                            )
-                        }
-                    }
-                    if (isSelf && space.project.role != "observer") {
-                        container.addView(TextView(activity).apply {
-                            text = "+ 新建个人 AI 会话"
-                            textSize = 15f
-                            setTextColor(Color.parseColor("#F2F5FA"))
-                            setPadding(dp(20), dp(14), dp(20), dp(14))
-                            background = panelBackground("#181B20")
-                            isClickable = true
-                            foreground = selectableForeground()
-                            setOnClickListener {
-                                showCreateAndOpenPersonalConversation(null) { index -> openPersonalAiChat(index) }
-                            }
-                        })
-                    }
-                }.onFailure { error ->
-                    container.addView(inlineStatusRow(error.message ?: "加载失败", "#FF7A7A"))
-                }
-            }
-        }
+        memberConversationViews.renderList(binding.projectContentLayout, space, member, isSelf)
     }
 
     private fun renderMemberConversationMessages(
@@ -855,340 +715,8 @@ internal class ProjectSpaceController(
         startPolling()
     }
 
-    private fun backRow(label: String, onClick: () -> Unit): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { onClick() }
-            addView(TextView(activity).apply {
-                text = label
-                textSize = 15f
-                setTextColor(Color.parseColor("#60A5FA"))
-            })
-        }
-    }
-
-    private fun memberPageHeader(member: ProjectMember): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(16), dp(20), dp(8))
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(member.account)
-                    val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
-                    if (member.userId == selfId) append(" (我)")
-                }
-                textSize = 20f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
-            })
-            addView(TextView(activity).apply {
-                text = roleLabel(member.role)
-                textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
-                setPadding(0, dp(6), 0, 0)
-            })
-        }
-    }
-
-    private fun memberConversationInlineCard(
-        conversation: ProjectMemberConversation,
-        member: ProjectMember,
-        isSelf: Boolean,
-        space: ProjectSpace
-    ): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener {
-                if (isSelf) {
-                    openPersonalConversationById(conversation.id)
-                } else {
-                    renderMemberConversationMessages(conversation, member, space)
-                }
-            }
-            if (isSelf) {
-                setOnLongClickListener {
-                    showMemberConversationVisibilityActions(conversation, member, space)
-                    true
-                }
-            }
-            addView(TextView(activity).apply {
-                text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
-                textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(if (conversation.isPublic) "公开" else "私密")
-                    append(" · ")
-                    append("${conversation.messageCount} 条消息")
-                    if (conversation.taskCount > 0) append(" · ${conversation.taskCount} 个任务")
-                    conversation.lastTaskStatus?.takeIf { it.isNotBlank() }?.let { st ->
-                        append(" \u00b7 ").append(when (st) {
-                            "running" -> "运行中"
-                            "done" -> "已完成"
-                            "failed" -> "失败"
-                            else -> st
-                        })
-                    }
-                    conversation.updatedAt.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
-                }
-                textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
-                setPadding(0, dp(5), 0, 0)
-            })
-            conversation.lastMessage?.takeIf { it.isNotBlank() }?.let { preview ->
-                addView(TextView(activity).apply {
-                    text = preview
-                    textSize = 13f
-                    setTextColor(Color.parseColor("#A6AFBD"))
-                    setPadding(0, dp(8), 0, 0)
-                    maxLines = 2
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                })
-            }
-            if (!isSelf) {
-                addView(LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.END
-                    setPadding(0, dp(10), 0, 0)
-                    addView(TextView(activity).apply {
-                        text = "在此基础上分叉 →"
-                        textSize = 13f
-                        setTextColor(Color.parseColor("#58BE6A"))
-                        setTypeface(typeface, Typeface.BOLD)
-                        isClickable = true
-                        setOnClickListener {
-                            val forkTitle = "分叉 ${member.account}：${conversation.title ?: "会话"}"
-                            showCreateAndOpenPersonalConversation(forkTitle) { index -> openPersonalAiChat(index) }
-                        }
-                    })
-                })
-            }
-        }
-    }
-
-    private fun showMemberConversationVisibilityActions(
-        conversation: ProjectMemberConversation,
-        member: ProjectMember,
-        space: ProjectSpace
-    ) {
-        val nextPublic = !conversation.isPublic
-        val action = if (nextPublic) "设为公开" else "关闭公开"
-        AlertDialog.Builder(activity)
-            .setTitle(conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}")
-            .setItems(arrayOf(action)) { dialog, _ ->
-                dialog.dismiss()
-                updateMemberConversationVisibility(conversation, member, space, nextPublic)
-            }
-            .show()
-    }
-
-    private fun updateMemberConversationVisibility(
-        conversation: ProjectMemberConversation,
-        member: ProjectMember,
-        space: ProjectSpace,
-        isPublic: Boolean
-    ) {
-        thread {
-            val result = runCatching {
-                updateProjectMemberConversationVisibility(
-                    http,
-                    serverUrl,
-                    activity,
-                    space.project.id,
-                    conversation.id,
-                    isPublic
-                )
-            }
-            activity.runOnUiThread {
-                result.onSuccess { updated ->
-                    Toast.makeText(
-                        activity,
-                        if (updated.isPublic) "已设为公开" else "已关闭公开",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    renderMemberConversationList(member)
-                }.onFailure { error ->
-                    Toast.makeText(activity, error.message ?: "修改失败", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
-    private fun messageInlineCard(message: ProjectMemberConversationMessage): LinearLayout {
-        val roleColor = when (message.role) {
-            "user" -> "#93C5FD"; "assistant" -> "#A7F3D0"; "system" -> "#FCA5A5"; "discussion" -> "#C4B5FD"; else -> "#A6AFBD"
-        }
-        val roleText = when (message.role) {
-            "user" -> "成员"; "assistant" -> "AI"; "system" -> "系统"; "discussion" -> message.senderName ?: "讨论"; else -> message.role
-        }
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground("#181B20")
-            addView(TextView(activity).apply {
-                text = "$roleText · ${message.createdAt}"
-                textSize = 12f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(roleColor))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = message.content.ifBlank { "(空消息)" }
-                textSize = 14f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                setPadding(0, dp(6), 0, 0)
-            })
-        }
-    }
-
-    private fun inlineStatusRow(text: String, colorHex: String): TextView {
-        return TextView(activity).apply {
-            this.text = text
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(colorHex))
-            setPadding(dp(20), dp(36), dp(20), dp(36))
-        }
-    }
-
     private fun renderPersonalConversations(container: LinearLayout) {
-        val conversations = personalConversations()
-        if (conversations.isEmpty()) {
-            container.addView(emptyPersonalConversationRow())
-        } else {
-            val activeIndex = activePersonalConversationIndex()
-            conversations.forEachIndexed { index, conversation ->
-                container.addView(
-                    personalConversationRow(
-                        index = index,
-                        conversation = conversation,
-                        active = index == activeIndex,
-                        working = isPersonalConversationWorking(index)
-                    )
-                )
-            }
-        }
-        container.addView(createPersonalConversationRow())
-    }
-
-    private fun personalConversationRow(
-        index: Int,
-        conversation: AppConversation,
-        active: Boolean,
-        working: Boolean
-    ): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(12))
-            val rowBackground = panelBackground(if (active) "#283140" else "#181B20")
-            background = rowBackground
-            if (working) startProjectConversationShimmer(this, rowBackground)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { openPersonalAiChat(index) }
-            setOnLongClickListener {
-                showPersonalConversationActions(index)
-                true
-            }
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append(conversation.title.ifBlank { "个人会话 ${index + 1}" })
-                    if (active) append("  ·  当前")
-                    if (conversation.ended) append("  ·  已结束")
-                }
-                textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = personalConversationHint(conversation)
-                textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
-                setPadding(0, dp(5), 0, 0)
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-        }
-    }
-
-    private fun createPersonalConversationRow(): TextView {
-        return TextView(activity).apply {
-            text = "+ 新建个人 AI 会话"
-            textSize = 15f
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { showCreatePersonalConversation() }
-        }
-    }
-
-    private fun emptyPersonalConversationRow(): TextView {
-        return TextView(activity).apply {
-            text = "暂无个人会话"
-            textSize = 13f
-            setTextColor(Color.parseColor("#6F7785"))
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
-        }
-    }
-
-    private fun personalConversationHint(conversation: AppConversation): String {
-        val subtitle = conversation.subtitle.takeIf { it.isNotBlank() } ?: "还没有消息"
-        return if (conversation.messages.isEmpty()) {
-            subtitle
-        } else {
-            "${conversation.messages.size} 条消息 · $subtitle"
-        }
-    }
-
-    private fun ProjectChannelMessage.toChatMessage(): ChatMessage {
-        val role = when (kind) {
-            "ai_progress" -> "ai-progress"
-            "ai_result" -> "ai-complete"
-            "system" -> "ai"
-            else -> if (outgoing) "user" else "friend"
-        }
-        return ChatMessage(
-            role = role,
-            content = content,
-            senderLabel = if (role == "friend") senderName else null,
-            id = id,
-            suggestionStatus = suggestionStatus,
-            suggestionResolvedByName = suggestionResolvedByName,
-            suggestionResolvedAt = suggestionResolvedAt,
-            canResolveSuggestion = canResolveSuggestion(this),
-            createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
-        )
-    }
-
-    private fun ProjectMemberConversationMessage.toChatMessage(): ChatMessage {
-        val chatRole = when (role) {
-            "assistant", "system" -> "ai"
-            else -> if (outgoing) "user" else "friend"
-        }
-        return ChatMessage(
-            role = chatRole,
-            content = content,
-            senderLabel = if (chatRole == "friend") senderName ?: userId ?: "成员" else null,
-            id = id,
-            createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
-        )
+        personalConversationPanel.render(container)
     }
 
     private fun markSuggestionUpdated(message: ChatMessage) {
@@ -1222,7 +750,7 @@ internal class ProjectSpaceController(
                 val index = messages.indexOfFirst { it.id == messageId }
                 result.onSuccess { updated ->
                     if (index >= 0) {
-                        messages[index] = updated.toChatMessage()
+                        messages[index] = updated.toChatMessage(activeSpace?.project?.role)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     Toast.makeText(activity, "已标记为更新完成", Toast.LENGTH_SHORT).show()
@@ -1234,76 +762,6 @@ internal class ProjectSpaceController(
                     Toast.makeText(activity, error.message ?: "标记失败", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
-    }
-
-    private fun canResolveSuggestion(message: ProjectChannelMessage): Boolean {
-        return message.kind == "suggestion" &&
-            message.suggestionStatus != "updated" &&
-            canResolveProjectSuggestion(activeSpace?.project?.role)
-    }
-
-    private fun channelHint(channel: ProjectChannel): String {
-        channel.lastMessage?.takeIf { it.isNotBlank() }?.let { return it }
-        return when (channel.kind) {
-            "announcements" -> "项目公告、规则和重要更新。"
-            "discussion" -> "成员日常讨论和协作交流。"
-            "requirements" -> "集中提出功能想法，后续可转为 AI 开发任务。"
-            SUGGESTIONS_CHANNEL_KIND -> "游客和成员在这里发布建议，开发者完成后可标记已更新。"
-            "issues" -> "反馈 bug、安装问题和体验问题。"
-            AI_CHANNEL_KIND -> if (activeSpace?.project?.role == "observer") {
-                "只读模式下可以询问 AI；涉及修改代码、编译或发布的请求会被拒绝。"
-            } else {
-                "在这里发消息会发起集体 AI 开发任务，过程和结果对成员可见。"
-            }
-            "builds" -> "构建、发布、APK 下载和部署结果记录。"
-            else -> "项目成员共享频道。"
-        }
-    }
-
-    private fun roleLabel(role: String): String = when (role) {
-        "owner" -> "所有者"
-        "admin" -> "管理员"
-        "editor" -> "协作者"
-        "member" -> "成员"
-        "observer" -> "只读成员"
-        else -> role
-    }
-
-    private fun downloadApkButton(apkUrl: String): TextView {
-        return TextView(activity).apply {
-            text = "下载最新 APK"
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#07120A"))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor("#58BE6A"))
-            }
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { openApkDownload(apkUrl) }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
-            ).apply { topMargin = dp(14) }
-        }
-    }
-
-    private fun openApkDownload(apkUrl: String) {
-        val token = AuthManager.token(activity)?.trim().orEmpty()
-        if (token.isBlank()) {
-            Toast.makeText(activity, "请先登录后下载 APK", Toast.LENGTH_SHORT).show()
-            return
-        }
-        openProjectApkInstall(activity, apkUrl, token)
-    }
-
-    private fun panelBackground(color: String): GradientDrawable {
-        return GradientDrawable().apply {
-            setColor(Color.parseColor(color))
-            cornerRadius = dp(0).toFloat()
         }
     }
 

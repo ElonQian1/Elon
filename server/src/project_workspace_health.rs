@@ -11,7 +11,8 @@ use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
-    store::ProjectExecutionSession,
+    project_workspace_lifecycle::{workspace_lifecycle, ProjectWorkspaceRecoveryAction},
+    store::{is_system_project_source_type, ProjectExecutionSession},
     types::AppState,
 };
 
@@ -24,7 +25,11 @@ pub struct ProjectWorkspaceHealthResponse {
     pub verified_can_run_on_pc: Option<bool>,
     pub live_inspect: Option<ProjectWorkspaceInspectStatus>,
     pub inspect_error: Option<String>,
+    pub health_label: String,
+    pub health_tone: String,
+    pub recommended_action: String,
     pub warnings: Vec<String>,
+    pub recovery_actions: Vec<ProjectWorkspaceRecoveryAction>,
 }
 
 #[derive(Debug, Serialize)]
@@ -114,6 +119,20 @@ pub async fn get_project_workspace_health(
     let verified_can_run_on_pc = live_inspect
         .as_ref()
         .map(|status| status.path_exists && status.is_dir && cli_available(status));
+    let lifecycle = workspace_lifecycle(
+        workspace_kind_for_health(
+            &access.source_type,
+            access.node_id.as_deref(),
+            access.workspace_path.as_deref(),
+        ),
+        access.node_id.as_deref(),
+        access.workspace_path.as_deref(),
+        node.as_ref().map(|node| node.online).unwrap_or(false),
+        can_run_on_pc,
+        verified_can_run_on_pc,
+        live_inspect.as_ref(),
+        warnings.len(),
+    );
 
     Json(ProjectWorkspaceHealthResponse {
         project: ProjectWorkspaceHealthProject {
@@ -131,7 +150,11 @@ pub async fn get_project_workspace_health(
         verified_can_run_on_pc,
         live_inspect,
         inspect_error,
+        health_label: lifecycle.health_label,
+        health_tone: lifecycle.health_tone.to_string(),
+        recommended_action: lifecycle.recommended_action,
         warnings,
+        recovery_actions: lifecycle.recovery_actions,
     })
     .into_response()
 }
@@ -164,6 +187,23 @@ async fn inspect_workspace(
             Some(format!("unexpected inspect response: {other:?}")),
         ),
         Err(e) => (None, Some(e.to_string())),
+    }
+}
+
+fn workspace_kind_for_health(
+    source_type: &str,
+    node_id: Option<&str>,
+    workspace_path: Option<&str>,
+) -> &'static str {
+    if is_system_project_source_type(source_type) {
+        return "system_archive";
+    }
+    if node_id.is_some_and(|value| !value.trim().is_empty()) {
+        "pc_node_workspace"
+    } else if workspace_path.is_some_and(|value| !value.trim().is_empty()) {
+        "external_workspace"
+    } else {
+        "server_workspace"
     }
 }
 

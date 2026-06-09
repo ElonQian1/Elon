@@ -66,9 +66,9 @@ internal fun AppProject.displayConversationCount(): Int {
 
 internal fun AppProject.projectKindLabel(): String {
     return when {
-        isSystemArchiveProject() -> "系统档案"
+        isSystemArchiveProject() -> "个人归档"
         isJointDevelopmentProject() -> "联合开发"
-        else -> "个人独立"
+        else -> "个人项目"
     }
 }
 
@@ -76,7 +76,7 @@ internal fun AppProject.systemArchiveDisplayName(): String {
     return when (normalizedSystemProjectKey()?.lowercase()) {
         "phone_control" -> "手机控制"
         "chat_memory" -> "聊天记忆"
-        else -> "系统档案"
+        else -> "个人归档"
     }
 }
 

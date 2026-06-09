@@ -26,7 +26,7 @@ internal class MainAccountActions(
     /**
      * 登录后从服务器拉取项目归档，恢复本地丢失的项目（换机/重装场景）。
      * - 已存在（按 id 或 collaborationProjectId 匹配）的项目不会被覆盖。
-     * - 系统档案仍归到个人项目，只保留系统身份和受限操作。
+     * - 手机控制/聊天记忆归到个人项目，只保留系统身份和受限操作。
      * - 同步拉取服务器头像并写入本地（仅当本地头像为空时）。
      */
     fun syncProjectsFromServer() {
