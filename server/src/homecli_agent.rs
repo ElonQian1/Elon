@@ -493,6 +493,7 @@ async fn run_agent_session(
                     reasoning_tokens: None,
                     total_tokens: None,
                     model: None,
+                    workspace_status: None,
                 });
             }
             // 发 Close 让旧连接的 writer 关闭 WebSocket
@@ -649,6 +650,7 @@ async fn run_agent_session(
                 reasoning_tokens: None,
                 total_tokens: None,
                 model: None,
+                workspace_status: None,
             });
         }
     }

@@ -16,7 +16,7 @@ mod ai_cli_types;
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
-use homecli_proto::{AgentToServer, CliProjectContext};
+use homecli_proto::{AgentToServer, CliProjectContext, CliWorkspaceStatus};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -728,7 +728,7 @@ async fn run_via_pc_agent(
     };
 
     // dispatch 时节点可能刚好掉线重连
-    let (_, mut rx) = {
+    let (pc_req_id, mut rx) = {
         let mut last_err = anyhow::anyhow!("dispatch failed");
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
@@ -780,6 +780,14 @@ async fn run_via_pc_agent(
         }
         result?
     };
+    record_pc_execution_started(
+        state,
+        native_session_scope.as_ref(),
+        agent_id,
+        &pc_req_id,
+        cwd,
+        model_label.or(copilot_model),
+    );
 
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
@@ -882,8 +890,23 @@ async fn run_via_pc_agent(
                 }
                 full_text.push_str(&text);
             }
-            AgentToServer::CliDone { exit_ok, error, .. } => {
+            AgentToServer::CliDone {
+                exit_ok,
+                error,
+                model,
+                workspace_status,
+                ..
+            } => {
                 progress_handle.abort(); // 停止心跳
+                record_pc_execution_finished(
+                    state,
+                    native_session_scope.as_ref(),
+                    &pc_req_id,
+                    exit_ok,
+                    error.as_deref(),
+                    model.as_deref().or(Some(display_model.as_str())),
+                    workspace_status.as_ref(),
+                );
                 let has_useful_output = !full_text.trim().is_empty();
                 if exit_ok
                     || (is_codex
@@ -938,6 +961,76 @@ async fn run_via_pc_agent(
 
     progress_handle.abort();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn record_pc_execution_started(
+    state: &AppState,
+    scope: Option<&NativeSessionScope>,
+    node_id: &str,
+    request_id: &str,
+    requested_workspace_path: Option<&str>,
+    model: Option<&str>,
+) {
+    let Some(scope) = scope else {
+        return;
+    };
+    if let Err(e) =
+        state
+            .store
+            .record_project_execution_started(crate::store::ProjectExecutionSessionStart {
+                project_id: &scope.project_id,
+                conversation_id: &scope.conversation_id,
+                user_id: &scope.user_id,
+                node_id,
+                request_id,
+                requested_workspace_path,
+                model,
+            })
+    {
+        tracing::warn!("record project execution start failed: {e:#}");
+    }
+}
+
+fn record_pc_execution_finished(
+    state: &AppState,
+    scope: Option<&NativeSessionScope>,
+    request_id: &str,
+    exit_ok: bool,
+    error: Option<&str>,
+    model: Option<&str>,
+    workspace_status: Option<&CliWorkspaceStatus>,
+) {
+    if scope.is_none() {
+        return;
+    }
+    let status = if exit_ok { "done" } else { "failed" };
+    let merge_status = workspace_status
+        .and_then(|status| status.merge_status.as_deref())
+        .or(Some("legacy_no_workspace_status"));
+    let workspace_message = workspace_status.and_then(|status| status.merge_message.as_deref());
+    let last_error = error.or_else(|| (!exit_ok).then_some(workspace_message).flatten());
+
+    if let Err(e) =
+        state
+            .store
+            .record_project_execution_finished(crate::store::ProjectExecutionSessionFinish {
+                request_id,
+                base_workspace_path: workspace_status
+                    .and_then(|status| status.base_workspace_path.as_deref()),
+                active_workspace_path: workspace_status
+                    .map(|status| status.active_workspace_path.as_str()),
+                branch: workspace_status.and_then(|status| status.branch.as_deref()),
+                isolated: workspace_status
+                    .map(|status| status.isolated)
+                    .unwrap_or(false),
+                status,
+                merge_status,
+                last_error,
+                model,
+            })
+    {
+        tracing::warn!("record project execution finish failed: {e:#}");
+    }
 }
 
 /// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。

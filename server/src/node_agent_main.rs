@@ -26,7 +26,9 @@
 
 use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, ModelCapability, ServerToAgent, PROTO_VERSION};
+use homecli_proto::{
+    AgentToServer, CliWorkspaceStatus, ModelCapability, ServerToAgent, PROTO_VERSION,
+};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -882,6 +884,7 @@ async fn run_cli_prompt(
                 reasoning_tokens: None,
                 total_tokens: None,
                 model: None,
+                workspace_status: None,
             }));
             return;
         }
@@ -987,6 +990,7 @@ async fn run_cli_prompt(
                     reasoning_tokens: None,
                     total_tokens: None,
                     model: None,
+                    workspace_status: None,
                 }));
                 return;
             },
@@ -1010,7 +1014,8 @@ async fn run_cli_prompt(
     } else {
         Some(cli_done_error(cli_name, &stdout_text, &stderr_text))
     };
-    let (exit_ok, error) = finalize_cli_prompt_workspace(exit_ok, error, conversation_workspace);
+    let (exit_ok, error, workspace_status) =
+        finalize_cli_prompt_workspace(exit_ok, error, conversation_workspace);
     let combined_usage_text = format!("{}\n{}", stdout_text, stderr_text);
     let usage = cli_usage::parse_cli_usage(&combined_usage_text);
     let model = usage
@@ -1018,7 +1023,12 @@ async fn run_cli_prompt(
         .and_then(|u| u.model.clone())
         .or_else(|| cli_model_from_args(cli_name, &extra_args));
     let _ = out_tx.send(ws_text(&cli_done_message(
-        req_id, exit_ok, error, usage, model,
+        req_id,
+        exit_ok,
+        error,
+        usage,
+        model,
+        workspace_status,
     )));
 }
 
@@ -1056,7 +1066,7 @@ fn prepare_cli_prompt_cwd(
     }
     Ok(PreparedCliPromptCwd {
         cwd: Some(workspace.workspace_path.clone()),
-        conversation_workspace: workspace.isolated.then_some(workspace),
+        conversation_workspace: Some(workspace),
     })
 }
 
@@ -1064,29 +1074,75 @@ fn finalize_cli_prompt_workspace(
     exit_ok: bool,
     error: Option<String>,
     workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
-) -> (bool, Option<String>) {
-    if !exit_ok {
-        return (exit_ok, error);
-    }
+) -> (bool, Option<String>, Option<CliWorkspaceStatus>) {
     let Some(workspace) = workspace else {
-        return (exit_ok, error);
+        return (exit_ok, error, None);
     };
+    if !exit_ok {
+        return (
+            exit_ok,
+            error.clone(),
+            Some(cli_workspace_status(
+                &workspace,
+                "skipped",
+                error.as_deref(),
+            )),
+        );
+    }
     match pc_workspace_provisioner::merge_conversation_workspace(&workspace) {
         Ok(message)
             if message.starts_with("conversation worktree still")
                 || message.starts_with("base workspace") =>
         {
             warn!("会话 worktree 暂未合并: {message}");
-            (false, Some(message))
+            (
+                false,
+                Some(message.clone()),
+                Some(cli_workspace_status(&workspace, "blocked", Some(&message))),
+            )
         }
         Ok(message) => {
             info!("会话 worktree 合并结果: {message}");
-            (true, None)
+            let merge_status = if workspace.isolated {
+                "merged"
+            } else {
+                "shared"
+            };
+            (
+                true,
+                None,
+                Some(cli_workspace_status(
+                    &workspace,
+                    merge_status,
+                    Some(&message),
+                )),
+            )
         }
         Err(e) => {
             warn!("会话 worktree 合并失败: {e:#}");
-            (false, Some(format!("会话 worktree 合并失败: {e}")))
+            let message = format!("会话 worktree 合并失败: {e}");
+            (
+                false,
+                Some(message.clone()),
+                Some(cli_workspace_status(&workspace, "failed", Some(&message))),
+            )
         }
+    }
+}
+
+fn cli_workspace_status(
+    workspace: &pc_workspace_provisioner::ConversationWorkspaceResult,
+    merge_status: &str,
+    merge_message: Option<&str>,
+) -> CliWorkspaceStatus {
+    CliWorkspaceStatus {
+        base_workspace_path: workspace.base_workspace_path.clone(),
+        active_workspace_path: workspace.workspace_path.clone(),
+        isolated: workspace.isolated,
+        branch: workspace.branch.clone(),
+        prepare_status: "prepared".into(),
+        merge_status: Some(merge_status.into()),
+        merge_message: merge_message.map(ToOwned::to_owned),
     }
 }
 
@@ -1096,6 +1152,7 @@ fn cli_done_message(
     error: Option<String>,
     usage: Option<cli_usage::CliTokenUsage>,
     model: Option<String>,
+    workspace_status: Option<CliWorkspaceStatus>,
 ) -> AgentToServer {
     let usage = usage.and_then(cli_usage::CliTokenUsage::normalized);
     AgentToServer::CliDone {
@@ -1108,6 +1165,7 @@ fn cli_done_message(
         reasoning_tokens: usage.as_ref().map(|u| u.reasoning_tokens.max(0) as u64),
         total_tokens: usage.as_ref().map(|u| u.total_tokens.max(0) as u64),
         model,
+        workspace_status,
     }
 }
 
@@ -1528,6 +1586,7 @@ async fn run_session(
                                                 reasoning_tokens: None,
                                                 total_tokens: None,
                                                 model: None,
+                                                workspace_status: None,
                                             }));
                                             return;
                                         }

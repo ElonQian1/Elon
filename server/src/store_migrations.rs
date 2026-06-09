@@ -48,6 +48,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (26, "指定钱一龙账号为一龙自项目管理员", migration_v26),
     (27, "项目成员会话人类讨论消息", migration_v27),
     (28, "项目成员个人会话公开状态", migration_v28),
+    (29, "PC 项目执行会话与工作区状态", migration_v29),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1029,6 +1030,38 @@ fn migration_v28(conn: &Connection) -> Result<()> {
         r#"
         CREATE INDEX IF NOT EXISTS idx_conversations_project_user_public_updated
           ON conversations(project_id, user_id, is_public, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v29(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_execution_sessions (
+          id                    TEXT PRIMARY KEY,
+          project_id            TEXT NOT NULL,
+          conversation_id       TEXT NOT NULL,
+          user_id               TEXT NOT NULL,
+          node_id               TEXT NOT NULL,
+          request_id            TEXT NOT NULL UNIQUE,
+          base_workspace_path   TEXT,
+          active_workspace_path TEXT,
+          branch                TEXT,
+          isolated              INTEGER NOT NULL DEFAULT 0,
+          status                TEXT NOT NULL DEFAULT 'running',
+          merge_status          TEXT,
+          last_error            TEXT,
+          model                 TEXT,
+          created_at            TEXT NOT NULL,
+          updated_at            TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (user_id)    REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_execution_sessions_latest
+          ON project_execution_sessions(project_id, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_project_execution_sessions_conversation
+          ON project_execution_sessions(project_id, conversation_id, updated_at DESC);
         "#,
     )?;
     Ok(())

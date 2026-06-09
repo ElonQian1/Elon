@@ -12,7 +12,7 @@
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, ServerToAgent, PROTO_VERSION};
+use homecli_proto::{AgentToServer, CliWorkspaceStatus, ServerToAgent, PROTO_VERSION};
 use std::path::Path;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -336,6 +336,7 @@ async fn handle_cli_prompt(
                 reasoning_tokens: None,
                 total_tokens: None,
                 model: None,
+                workspace_status: None,
             };
             let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
             return;
@@ -357,7 +358,7 @@ async fn handle_cli_prompt(
             (false, Some(e.to_string()))
         }
     };
-    let (exit_ok, error) =
+    let (exit_ok, error, workspace_status) =
         finalize_cli_workspace(exit_ok, error, prepared_cwd.conversation_workspace);
     let done = AgentToServer::CliDone {
         req_id,
@@ -369,6 +370,7 @@ async fn handle_cli_prompt(
         reasoning_tokens: None,
         total_tokens: None,
         model: None,
+        workspace_status,
     };
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
 }
@@ -407,7 +409,7 @@ fn prepare_cli_cwd(
     }
     Ok(PreparedCliCwd {
         cwd: Some(workspace.workspace_path.clone()),
-        conversation_workspace: workspace.isolated.then_some(workspace),
+        conversation_workspace: Some(workspace),
     })
 }
 
@@ -415,29 +417,67 @@ fn finalize_cli_workspace(
     exit_ok: bool,
     error: Option<String>,
     workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
-) -> (bool, Option<String>) {
-    if !exit_ok {
-        return (exit_ok, error);
-    }
+) -> (bool, Option<String>, Option<CliWorkspaceStatus>) {
     let Some(workspace) = workspace else {
-        return (exit_ok, error);
+        return (exit_ok, error, None);
     };
+    if !exit_ok {
+        return (
+            exit_ok,
+            error.clone(),
+            Some(workspace_status(&workspace, "skipped", error.as_deref())),
+        );
+    }
     match crate::pc_workspace_provisioner::merge_conversation_workspace(&workspace) {
         Ok(message)
             if message.starts_with("conversation worktree still")
                 || message.starts_with("base workspace") =>
         {
             warn!("[relay-client] 会话 worktree 暂未合并: {message}");
-            (false, Some(message))
+            (
+                false,
+                Some(message.clone()),
+                Some(workspace_status(&workspace, "blocked", Some(&message))),
+            )
         }
         Ok(message) => {
             info!("[relay-client] 会话 worktree 合并结果: {message}");
-            (true, None)
+            let merge_status = if workspace.isolated {
+                "merged"
+            } else {
+                "shared"
+            };
+            (
+                true,
+                None,
+                Some(workspace_status(&workspace, merge_status, Some(&message))),
+            )
         }
         Err(e) => {
             warn!("[relay-client] 会话 worktree 合并失败: {e:#}");
-            (false, Some(format!("会话 worktree 合并失败: {e}")))
+            let message = format!("会话 worktree 合并失败: {e}");
+            (
+                false,
+                Some(message.clone()),
+                Some(workspace_status(&workspace, "failed", Some(&message))),
+            )
         }
+    }
+}
+
+fn workspace_status(
+    workspace: &crate::pc_workspace_provisioner::ConversationWorkspaceResult,
+    merge_status: &str,
+    merge_message: Option<&str>,
+) -> CliWorkspaceStatus {
+    CliWorkspaceStatus {
+        base_workspace_path: workspace.base_workspace_path.clone(),
+        active_workspace_path: workspace.workspace_path.clone(),
+        isolated: workspace.isolated,
+        branch: workspace.branch.clone(),
+        prepare_status: "prepared".into(),
+        merge_status: Some(merge_status.into()),
+        merge_message: merge_message.map(ToOwned::to_owned),
     }
 }
 

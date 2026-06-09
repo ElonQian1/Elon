@@ -24,6 +24,21 @@ pub struct CliProjectContext {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliWorkspaceStatus {
+    #[serde(default)]
+    pub base_workspace_path: Option<String>,
+    pub active_workspace_path: String,
+    pub isolated: bool,
+    #[serde(default)]
+    pub branch: Option<String>,
+    pub prepare_status: String,
+    #[serde(default)]
+    pub merge_status: Option<String>,
+    #[serde(default)]
+    pub merge_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
     Exec {
@@ -180,6 +195,8 @@ pub enum AgentToServer {
         total_tokens: Option<u64>,
         #[serde(default)]
         model: Option<String>,
+        #[serde(default)]
+        workspace_status: Option<CliWorkspaceStatus>,
     },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {

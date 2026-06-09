@@ -19,6 +19,7 @@ mod join_requests;
 mod native_sessions;
 mod node_ledger;
 mod pc_project_binding;
+mod project_execution_sessions;
 mod project_member_conversations;
 mod project_space;
 mod projects;
@@ -43,6 +44,9 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
+pub use project_execution_sessions::{
+    ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
+};
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_FRIEND_ACCOUNT,
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
