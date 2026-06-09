@@ -40,6 +40,7 @@ class ElonApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         ChatMessageNotifications.createChannel(this)
+        ChatBackgroundService.ensureChannel(this)
         globalWs.addListener(chatNotificationListener)
         globalWs.start(this)
         DebugTraceStore.init(this)
@@ -51,6 +52,10 @@ class ElonApplication : Application() {
             )
         )
         McpDebugServer.start(this)
+        // 已登录用户默认开启后台消息保活，让 APK 在后台也能像微信一样收到好友消息提醒
+        if (AuthManager.isLoggedIn(this) && ChatBackgroundPrefs.isKeepAliveEnabled(this)) {
+            ChatBackgroundService.start(this)
+        }
     }
 
     companion object {

@@ -122,6 +122,13 @@ object AuthManager {
     }
 
     private fun refreshGlobalWsAuth(ctx: Context) {
-        (ctx.applicationContext as? ElonApplication)?.globalWs?.reconnectWithNewToken()
+        val app = ctx.applicationContext
+        (app as? ElonApplication)?.globalWs?.reconnectWithNewToken()
+        // 登录后启动后台保活让用户能像微信一样后台收消息；登出后停止
+        if (isLoggedIn(app) && ChatBackgroundPrefs.isKeepAliveEnabled(app)) {
+            ChatBackgroundService.start(app)
+        } else if (!isLoggedIn(app)) {
+            ChatBackgroundService.stop(app)
+        }
     }
 }

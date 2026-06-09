@@ -116,7 +116,11 @@
             android:name=".ChatRealtimeService"
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
-
+        <!-- 后台聊天保活服务，让 APK 在后台也能像微信一样收到好友/群消息提醒 -->
+        <service
+            android:name=".ChatBackgroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <service
             android:name=".mcp.McpDebugKeepAliveService"
             android:exported="false"

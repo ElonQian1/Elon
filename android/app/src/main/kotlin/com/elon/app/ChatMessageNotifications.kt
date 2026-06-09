@@ -13,6 +13,9 @@ import android.media.RingtoneManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -22,12 +25,15 @@ private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v6_loud_badge"
 private const val CHAT_MESSAGE_GROUP_KEY = "com.elon.app.CHAT_MESSAGES"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
 private const val FALLBACK_RING_MS = 1600L
+private const val FOREGROUND_HINT_VIBRATE_MS = 60L
+private const val FOREGROUND_SOUND_MIN_INTERVAL_MS = 1500L
 
 internal object ChatMessageNotifications {
     private val shownMessageKeys = LinkedHashSet<String>()
     @Volatile private var appInForeground = false
     @Volatile private var visibleFriendId: String? = null
     @Volatile private var visibleGroupId: String? = null
+    @Volatile private var lastForegroundHintAtMs = 0L
 
     fun setVisibleConversation(
         foreground: Boolean,
@@ -83,6 +89,7 @@ internal object ChatMessageNotifications {
             requestKey = "friend:$fromUserId",
             badgeCount = badgeCount
         )
+        playForegroundHintIfNeeded(context)
     }
 
     fun showGroupMessage(
@@ -114,6 +121,7 @@ internal object ChatMessageNotifications {
             requestKey = "group:$groupId",
             badgeCount = badgeCount
         )
+        playForegroundHintIfNeeded(context)
     }
 
     private fun showMessageNotification(
@@ -211,5 +219,65 @@ internal object ChatMessageNotifications {
                 if (ringtone.isPlaying) ringtone.stop()
             }
         }, FALLBACK_RING_MS)
+    }
+
+    /**
+     * 前台收到非当前会话的消息时，主动播放一次系统提示音 + 短震动。
+     *
+     * 解决问题：通知通道虽然是 IMPORTANCE_HIGH，但部分厂商在前台时会把声音压制得很弱、
+     * 甚至直接静默，用户感受不到"叮"的提醒。这里像微信一样在前台主动响一下。
+     *
+     * 注意：仅在前台 + 不在静音模式时触发；与系统通知音叠加时间隔 1.5 秒去重。
+     */
+    private fun playForegroundHintIfNeeded(context: Context) {
+        if (!appInForeground) return
+        val now = System.currentTimeMillis()
+        if (now - lastForegroundHintAtMs < FOREGROUND_SOUND_MIN_INTERVAL_MS) return
+        lastForegroundHintAtMs = now
+        playForegroundSound(context)
+        triggerForegroundVibration(context)
+    }
+
+    private fun playForegroundSound(context: Context) {
+        val appContext = context.applicationContext
+        val audioManager = appContext.getSystemService(AudioManager::class.java) ?: return
+        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+        if (audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) <= 0) return
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) ?: return
+        val ringtone = runCatching { RingtoneManager.getRingtone(appContext, soundUri) }.getOrNull() ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ringtone.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        }
+        runCatching { ringtone.play() }
+        Handler(Looper.getMainLooper()).postDelayed({
+            runCatching {
+                if (ringtone.isPlaying) ringtone.stop()
+            }
+        }, FALLBACK_RING_MS)
+    }
+
+    private fun triggerForegroundVibration(context: Context) {
+        val appContext = context.applicationContext
+        val vibrator = obtainVibrator(appContext) ?: return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(FOREGROUND_HINT_VIBRATE_MS, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(FOREGROUND_HINT_VIBRATE_MS)
+            }
+        }
+    }
+
+    private fun obtainVibrator(context: Context): Vibrator? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (context.getSystemService(VibratorManager::class.java))?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
     }
 }
