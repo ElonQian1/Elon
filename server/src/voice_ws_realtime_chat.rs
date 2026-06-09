@@ -265,15 +265,17 @@ async fn handle(
                                 )
                             });
                         match usage {
-                            Some(usage) => crate::token_usage_api::record_trusted_usage_with_key(
-                                &state.store,
-                                &user_id,
-                                "voice_realtime_chat",
-                                crate::compute_usage::USAGE_MODE_VOICE_REALTIME,
-                                Some(&cfg.model),
-                                &usage,
-                                Some(&accounting_key),
-                            ),
+                            Some(usage) => {
+                                let _ = crate::token_usage_api::record_trusted_usage_with_key(
+                                    &state.store,
+                                    &user_id,
+                                    "voice_realtime_chat",
+                                    crate::compute_usage::USAGE_MODE_VOICE_REALTIME,
+                                    Some(&cfg.model),
+                                    &usage,
+                                    Some(&accounting_key),
+                                );
+                            }
                             None if turn_input_pcm_bytes > 0 || turn_output_pcm_bytes > 0 => {
                                 crate::compute_usage::record_realtime_voice_estimate_with_key(
                                     &state.store,

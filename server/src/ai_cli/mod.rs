@@ -917,6 +917,8 @@ async fn run_via_pc_agent(
                 ..
             } => {
                 progress_handle.abort(); // 停止心跳
+                let mut cli_usage = None;
+                let mut accounting_result = None;
                 if let Some(usage) = crate::cli_usage::usage_from_optional_parts(
                     prompt_tokens,
                     cached_input_tokens,
@@ -933,7 +935,7 @@ async fn run_via_pc_agent(
                         "pc_agent_cli_chat"
                     };
                     let accounting_key = format!("pc_agent_cli:{pc_req_id}");
-                    crate::token_usage_api::record_trusted_usage_with_key(
+                    accounting_result = crate::token_usage_api::record_trusted_usage_with_key(
                         &state.store,
                         user_id,
                         feature,
@@ -942,6 +944,15 @@ async fn run_via_pc_agent(
                         &usage,
                         Some(&accounting_key),
                     );
+                    settle_pc_cli_node_usage(
+                        state,
+                        user_id,
+                        agent_id,
+                        model.as_deref().or(Some(display_model.as_str())),
+                        &usage,
+                        accounting_result.as_ref(),
+                    );
+                    cli_usage = Some(usage);
                 }
                 record_pc_execution_finished(
                     state,
@@ -951,6 +962,8 @@ async fn run_via_pc_agent(
                     error.as_deref(),
                     model.as_deref().or(Some(display_model.as_str())),
                     workspace_status.as_ref(),
+                    cli_usage.as_ref(),
+                    accounting_result.as_ref(),
                 );
                 let has_useful_output = !full_text.trim().is_empty();
                 if exit_ok
@@ -1044,6 +1057,8 @@ fn record_pc_execution_finished(
     error: Option<&str>,
     model: Option<&str>,
     workspace_status: Option<&CliWorkspaceStatus>,
+    usage: Option<&crate::cli_usage::CliTokenUsage>,
+    accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
 ) {
     if scope.is_none() {
         return;
@@ -1072,10 +1087,100 @@ fn record_pc_execution_finished(
                 merge_status,
                 last_error,
                 model,
+                prompt_tokens: usage.map(|usage| usage.input_tokens.max(0)),
+                cached_input_tokens: usage.map(|usage| usage.cached_input_tokens.max(0)),
+                completion_tokens: usage.map(|usage| usage.output_tokens.max(0)),
+                reasoning_tokens: usage.map(|usage| usage.reasoning_tokens.max(0)),
+                total_tokens: usage.map(|usage| usage.total_tokens.max(0)),
+                token_usage_event_id: accounting_result
+                    .map(|result| result.token_usage_event_id.as_str()),
+                billing_event_id: accounting_result
+                    .and_then(|result| result.billing_event_id.as_deref()),
             })
     {
         tracing::warn!("record project execution finish failed: {e:#}");
     }
+}
+
+fn settle_pc_cli_node_usage(
+    state: &AppState,
+    consumer_user_id: &str,
+    node_id: &str,
+    model: Option<&str>,
+    usage: &crate::cli_usage::CliTokenUsage,
+    accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
+) {
+    if accounting_result
+        .map(|result| result.deduplicated)
+        .unwrap_or(true)
+    {
+        return;
+    }
+    let provider_user_id = match state.store.get_node_credential_owner(node_id) {
+        Ok(Some(owner)) if !owner.trim().is_empty() => owner,
+        Ok(_) => {
+            tracing::warn!(
+                node_id,
+                "PC CLI 用量已记录，但节点缺少 owner，跳过节点收益流水"
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，跳过节点收益流水");
+            return;
+        }
+    };
+    let prompt_tokens = clamp_i64_to_u32(usage.input_tokens.max(0));
+    let total_tokens = usage
+        .total_tokens
+        .max(usage.input_tokens.max(0) + usage.output_tokens.max(0));
+    let completion_tokens = clamp_i64_to_u32((total_tokens - usage.input_tokens.max(0)).max(0));
+    if prompt_tokens == 0 && completion_tokens == 0 {
+        return;
+    }
+    let model_id = model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("pc-cli/{value}"))
+        .unwrap_or_else(|| "pc-cli/unknown".to_string());
+    let params = crate::store::SettleParams {
+        consumer_user_id,
+        provider_user_id: &provider_user_id,
+        node_id,
+        model_id: &model_id,
+        prompt_tokens,
+        completion_tokens,
+        price_per_1k_credits: pc_cli_price_per_1k_credits(),
+        platform_fee_rate: 0.2,
+    };
+    match state.store.settle_node_inference(params) {
+        Ok(tx) => tracing::debug!(
+            consumer_user_id,
+            provider_user_id,
+            node_id,
+            tokens = prompt_tokens + completion_tokens,
+            settled_credits = tx.settled_credits,
+            "PC CLI 节点收益流水已记录"
+        ),
+        Err(e) => tracing::error!(
+            consumer_user_id,
+            provider_user_id,
+            node_id,
+            "PC CLI 节点收益流水记录失败: {e}"
+        ),
+    }
+}
+
+fn pc_cli_price_per_1k_credits() -> f64 {
+    std::env::var("ELON_PC_CLI_PRICE_PER_1K_CREDITS")
+        .ok()
+        .and_then(|value| value.trim().parse::<f64>().ok())
+        .filter(|value| *value >= 0.0)
+        .unwrap_or(0.1)
+}
+
+fn clamp_i64_to_u32(value: i64) -> u32 {
+    value.clamp(0, u32::MAX as i64) as u32
 }
 
 /// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。

@@ -131,7 +131,7 @@ pub(crate) fn record_api_usage(
     let Some(usage) = usage_from_value(response) else {
         return;
     };
-    record_trusted_usage(
+    let _ = record_trusted_usage(
         store,
         user_id,
         feature,
@@ -152,8 +152,8 @@ pub(crate) fn record_trusted_usage(
     usage_mode: &str,
     model: Option<&str>,
     usage: &CliTokenUsage,
-) {
-    record_trusted_usage_with_key(store, user_id, feature, usage_mode, model, usage, None);
+) -> Option<crate::store::TokenUsageAccountingResult> {
+    record_trusted_usage_with_key(store, user_id, feature, usage_mode, model, usage, None)
 }
 
 pub(crate) fn record_trusted_usage_with_key(
@@ -164,9 +164,9 @@ pub(crate) fn record_trusted_usage_with_key(
     model: Option<&str>,
     usage: &CliTokenUsage,
     idempotency_key: Option<&str>,
-) {
+) -> Option<crate::store::TokenUsageAccountingResult> {
     let Some(usage) = usage.clone().normalized() else {
-        return;
+        return None;
     };
     let model = model.or(usage.model.as_deref());
     let record = TokenUsageRecord {
@@ -196,6 +196,7 @@ pub(crate) fn record_trusted_usage_with_key(
                 deduplicated = result.deduplicated,
                 "record_trusted_usage accounted"
             );
+            Some(result)
         }
         Err(e) => {
             tracing::error!(
@@ -205,6 +206,7 @@ pub(crate) fn record_trusted_usage_with_key(
                 "record_trusted_usage 记账失败: {}",
                 e
             );
+            None
         }
     }
 }
@@ -241,7 +243,7 @@ pub(crate) fn record_codex_usage_from_stdout_with_key(
         total = usage.total_tokens,
         "记录 Codex CLI token 用量"
     );
-    record_trusted_usage_with_key(
+    let _ = record_trusted_usage_with_key(
         store,
         user_id,
         feature,

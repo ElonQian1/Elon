@@ -25,6 +25,13 @@ pub struct ProjectExecutionSession {
     pub merge_status: Option<String>,
     pub last_error: Option<String>,
     pub model: Option<String>,
+    pub prompt_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub completion_tokens: i64,
+    pub reasoning_tokens: i64,
+    pub total_tokens: i64,
+    pub token_usage_event_id: Option<String>,
+    pub billing_event_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -49,6 +56,13 @@ pub struct ProjectExecutionSessionFinish<'a> {
     pub merge_status: Option<&'a str>,
     pub last_error: Option<&'a str>,
     pub model: Option<&'a str>,
+    pub prompt_tokens: Option<i64>,
+    pub cached_input_tokens: Option<i64>,
+    pub completion_tokens: Option<i64>,
+    pub reasoning_tokens: Option<i64>,
+    pub total_tokens: Option<i64>,
+    pub token_usage_event_id: Option<&'a str>,
+    pub billing_event_id: Option<&'a str>,
 }
 
 impl Store {
@@ -97,7 +111,14 @@ impl Store {
                  merge_status = ?7,
                  last_error = ?8,
                  model = COALESCE(?9, model),
-                 updated_at = ?10
+                 prompt_tokens = COALESCE(?10, prompt_tokens),
+                 cached_input_tokens = COALESCE(?11, cached_input_tokens),
+                 completion_tokens = COALESCE(?12, completion_tokens),
+                 reasoning_tokens = COALESCE(?13, reasoning_tokens),
+                 total_tokens = COALESCE(?14, total_tokens),
+                 token_usage_event_id = COALESCE(?15, token_usage_event_id),
+                 billing_event_id = COALESCE(?16, billing_event_id),
+                 updated_at = ?17
              WHERE request_id = ?1",
             params![
                 session.request_id,
@@ -109,6 +130,13 @@ impl Store {
                 session.merge_status,
                 session.last_error,
                 session.model,
+                session.prompt_tokens,
+                session.cached_input_tokens,
+                session.completion_tokens,
+                session.reasoning_tokens,
+                session.total_tokens,
+                session.token_usage_event_id,
+                session.billing_event_id,
                 now()
             ],
         )?;
@@ -123,7 +151,10 @@ impl Store {
             .query_row(
                 "SELECT id, project_id, conversation_id, user_id, node_id, request_id,
                         base_workspace_path, active_workspace_path, branch, isolated,
-                        status, merge_status, last_error, model, created_at, updated_at
+                        status, merge_status, last_error, model,
+                        prompt_tokens, cached_input_tokens, completion_tokens, reasoning_tokens,
+                        total_tokens, token_usage_event_id, billing_event_id,
+                        created_at, updated_at
                  FROM project_execution_sessions
                  WHERE project_id = ?1
                  ORDER BY updated_at DESC
@@ -154,8 +185,15 @@ fn project_execution_session_from_row(
         merge_status: row.get(11)?,
         last_error: row.get(12)?,
         model: row.get(13)?,
-        created_at: row.get(14)?,
-        updated_at: row.get(15)?,
+        prompt_tokens: row.get(14)?,
+        cached_input_tokens: row.get(15)?,
+        completion_tokens: row.get(16)?,
+        reasoning_tokens: row.get(17)?,
+        total_tokens: row.get(18)?,
+        token_usage_event_id: row.get(19)?,
+        billing_event_id: row.get(20)?,
+        created_at: row.get(21)?,
+        updated_at: row.get(22)?,
     })
 }
 
@@ -204,6 +242,13 @@ mod tests {
                 merge_status: Some("merged"),
                 last_error: None,
                 model: Some("gpt-5"),
+                prompt_tokens: Some(100),
+                cached_input_tokens: Some(20),
+                completion_tokens: Some(30),
+                reasoning_tokens: Some(5),
+                total_tokens: Some(130),
+                token_usage_event_id: Some("tok-a"),
+                billing_event_id: Some("bev-a"),
             })
             .expect("finish should update");
 
@@ -215,5 +260,12 @@ mod tests {
         assert_eq!(latest.active_workspace_path.as_deref(), Some("D:/wt"));
         assert!(latest.isolated);
         assert_eq!(latest.model.as_deref(), Some("gpt-5"));
+        assert_eq!(latest.prompt_tokens, 100);
+        assert_eq!(latest.cached_input_tokens, 20);
+        assert_eq!(latest.completion_tokens, 30);
+        assert_eq!(latest.reasoning_tokens, 5);
+        assert_eq!(latest.total_tokens, 130);
+        assert_eq!(latest.token_usage_event_id.as_deref(), Some("tok-a"));
+        assert_eq!(latest.billing_event_id.as_deref(), Some("bev-a"));
     }
 }

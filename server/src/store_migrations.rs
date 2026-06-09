@@ -51,6 +51,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (29, "PC 项目执行会话与工作区状态", migration_v29),
     (30, "token 用量与扣费事件原子对账字段", migration_v30),
     (31, "token 用量可信记账幂等键", migration_v31),
+    (32, "PC 项目执行会话 token 用量字段", migration_v32),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1130,6 +1131,58 @@ fn migration_v31(conn: &Connection) -> Result<()> {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_user_idempotency
           ON token_usage_events(user_id, idempotency_key)
           WHERE idempotency_key IS NOT NULL;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v32(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "prompt_tokens",
+        "prompt_tokens INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "cached_input_tokens",
+        "cached_input_tokens INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "completion_tokens",
+        "completion_tokens INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "reasoning_tokens",
+        "reasoning_tokens INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "total_tokens",
+        "total_tokens INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "token_usage_event_id",
+        "token_usage_event_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "project_execution_sessions",
+        "billing_event_id",
+        "billing_event_id TEXT",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_project_execution_sessions_node_time
+          ON project_execution_sessions(node_id, updated_at DESC);
         "#,
     )?;
     Ok(())
