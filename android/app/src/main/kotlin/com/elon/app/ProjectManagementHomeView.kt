@@ -421,7 +421,8 @@ internal class ProjectManagementHomeView(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor("#DDE8FC"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.6f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.8f)
+                setAutoSizeTextTypeUniformWithConfiguration(9, 11, 1, TypedValue.COMPLEX_UNIT_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
