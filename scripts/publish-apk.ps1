@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     新版业务流程（version-from-server）：
-      1. git pull --rebase origin main      (业务 commit 必须先由 AI 自己 push)
+      1. git fetch origin main + fast-forward only (业务 commit 必须先由 AI 自己 push)
       2. POST /api/release/claim            (服务器原子分配 assignedVersionName + assignedVersionCode)
       3. 临时改写 build.gradle 注入版本号 → ./gradlew assembleRelease
       4. 上传 APK + version.json (CAS by .apk-deployed-sha)
@@ -422,27 +422,6 @@ function Test-RemoteAdvanceSafeForApk {
     return $true
 }
 
-function Push-HeadToMain {
-    for ($i = 1; $i -le 4; $i++) {
-        git -C $RepoRoot push origin HEAD:main
-        if ($LASTEXITCODE -eq 0) { return }
-        Write-Host "   ⚠️  git push 被拒绝（第 $i 次），尝试 rebase 最新 origin/main 后重推..." -ForegroundColor Yellow
-        git -C $RepoRoot fetch origin main | Out-Null
-        $base = git -C $RepoRoot merge-base HEAD origin/main
-        if (-not (Test-RemoteAdvanceSafeForApk -BaseSha $base)) {
-            Write-Error "远端 origin/main 自基线后包含 Android 改动，rebase 不安全，请人工同步后重发。"
-            return
-        }
-        git -C $RepoRoot rebase origin/main
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "自动 rebase 失败，请人工解决冲突后重发。"
-            return
-        }
-        Start-Sleep -Seconds 2
-    }
-    Write-Error "连续 4 次推送均被拒绝，放弃自动重试。"
-}
-
 function Assert-ApkStillCurrentBeforeCommit {
     $freshness = Get-ApkBuildFreshness -BaseSha $BuildBaseSha
     if ($freshness.Action -eq "Continue") { return }
@@ -451,13 +430,13 @@ function Assert-ApkStillCurrentBeforeCommit {
         Stop-StaleApkRelease -Success -Message "服务器已部署更新 APK（$((Format-ShortSha $freshness.DeployedSha))），且包含本次基础提交 $((Format-ShortSha $BuildBaseSha))。本次旧构建不再提交、不再上传。"
     }
 
-    # 远端有新提交，但若全部都不影响 Android/发布脚本，则 APK 仍有效，允许 commit 后自动 rebase 重推
+    # 远端有新提交，但若全部都不影响 Android/发布脚本，则 APK 仍有效，允许继续发布。
     if (Test-RemoteAdvanceSafeForApk -BaseSha $BuildBaseSha) {
-        Write-Host "   ℹ️  origin/main 前进到 $((Format-ShortSha $freshness.RemoteHead))，但新提交仅涉及非 Android 路径，本次 APK 仍可发布（commit 后自动 rebase）。" -ForegroundColor Cyan
+        Write-Host "   ℹ️  origin/main 前进到 $((Format-ShortSha $freshness.RemoteHead))，但新提交仅涉及非 Android 路径，本次 APK 仍可发布。" -ForegroundColor Cyan
         return
     }
 
-    Stop-StaleApkRelease -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，且包含 Android 改动，本次 APK 产物已过期。已还原 build.gradle，请基于最新 main 重新运行发布脚本。"
+    Stop-StaleApkRelease -Success -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，且包含 Android 改动，本次 APK 产物已过期。已还原 build.gradle；代码已推送的任务到此收尾，APK 发布交由后续最新 main。"
 }
 
 function Assert-ApkStillCurrentBeforeUpload {
@@ -479,7 +458,8 @@ function Assert-ApkStillCurrentBeforeUpload {
             return
         }
         Complete-Release -Success:$false -ErrorMessage "origin/main moved to $remoteHead and changed android files"
-        Write-Error "origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；请重新运行发布脚本。"
+        Write-Host "⏭️  origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；发布交由后续最新 main。" -ForegroundColor Cyan
+        exit 0
     }
 }
 
@@ -561,7 +541,8 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
         }
         ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
         Complete-Release -Success:$false -ErrorMessage "cas mismatch in apk deploy"
-        Write-Error "APK 上传 CAS 失败：服务器部署状态已变化，但未确认包含本 release commit。请基于最新 main 重新发布。"
+        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本 release commit。本次 staging 不覆盖；发布交由后续最新 main。" -ForegroundColor Cyan
+        exit 0
     }
 
     if ($deployExit -ne 0) {
@@ -570,11 +551,36 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
     }
 }
 
-# ── Step 0: Git pull（防止 push 冲突） ────────────────────────────────────────
+# ── Step 0: Git fetch + fast-forward（发布只基于远端最新 main） ─────────────
 
 Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
-git -C $RepoRoot pull --rebase origin main
-if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
+git -C $RepoRoot fetch origin main | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败" }
+
+$dirty = (git -C $RepoRoot status --porcelain 2>$null) | Out-String
+$dirty = $dirty.Trim()
+if ($dirty) {
+    Write-Host "❌ 工作区不干净，请先 commit + push 业务改动再运行 APK 发布脚本：" -ForegroundColor Red
+    Write-Host $dirty -ForegroundColor Yellow
+    Write-Error "工作区有未提交改动"
+}
+
+$localHeadBeforeSync = (git -C $RepoRoot rev-parse HEAD).Trim()
+$originMainBeforeSync = (git -C $RepoRoot rev-parse origin/main).Trim()
+if ($localHeadBeforeSync -ne $originMainBeforeSync) {
+    git -C $RepoRoot merge-base --is-ancestor $localHeadBeforeSync $originMainBeforeSync | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ℹ️  本地 HEAD 已包含在 origin/main 中，快进到最新 main：$((Format-ShortSha $originMainBeforeSync))" -ForegroundColor Cyan
+        git -C $RepoRoot merge --ff-only origin/main | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Error "git merge --ff-only origin/main 失败" }
+    } else {
+        git -C $RepoRoot merge-base --is-ancestor $originMainBeforeSync $localHeadBeforeSync | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Error "当前 HEAD 尚未进入 origin/main，禁止基于未推送提交发布 APK。请先执行：git push origin HEAD:main"
+        }
+        Write-Error "当前 HEAD 与 origin/main 已分叉，APK 发布脚本不会自动 rebase。请先完成代码合并并 push 后再运行。"
+    }
+}
 $BuildBaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 $LocalHeadSha = $BuildBaseSha
 $originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()

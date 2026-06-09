@@ -4,7 +4,7 @@
 .DESCRIPTION
     新版业务流程（version-from-server，不再把版本号写进 git）：
 
-      1. git pull --rebase origin main    (业务代码 commit 必须先由 AI 自己 push)
+      1. git fetch origin main + fast-forward only (业务代码 commit 必须先由 AI 自己 push)
       2. POST /api/release/claim          (服务器原子分配一个新的 versionName 给本机)
       3. cargo zigbuild --target musl     (设 ELON_BUILD_VERSION=<assignedVersionName> 注入产物)
       4. SHA 顺序检查 + flock CAS         (服务器若已有更新版本则作废本机产物)
@@ -39,7 +39,7 @@
       3. 未设置时：%LOCALAPPDATA%\Elon\build-target\elon-server-musl（Windows 默认）
 
     并发安全模型（出现中止提示时参考）：
-      T0  git pull --rebase origin main        ← 基于最新 main 编译
+      T0  git fetch origin main + fast-forward ← 基于最新 main 编译
       T1  本地编译（几分钟到几十分钟）            ← 窗口期，其他 PC 可能抢先发布
       T2  服务器祖先检查：serverSha 是 localSha 的祖先 → 继续；否则 → 中止（exit 0）
       T3  flock 锁内 CAS 二次校验（最后防线）
@@ -377,13 +377,9 @@ Write-Host "  服务器: $Server" -ForegroundColor Gray
 Write-Host ""
 
 # ─────────────────────────────────────────────────────────────
-# 1. git pull --rebase（同步业务代码；版本号不再由本机改动）
+# 1. git fetch + fast-forward（同步业务代码；版本号不再由本机改动）
 # ─────────────────────────────────────────────────────────────
 Write-Host "1⃣  同步最新代码..." -ForegroundColor Yellow
-git -C $RepoRoot pull --rebase origin main
-if ($LASTEXITCODE -ne 0) { Write-Error "git pull --rebase 失败" }
-
-# 提前阻断：业务代码必须已 commit + push，否则脚本不应当继续（claim 会基于线上 main 的最新版本号）
 $dirty = (git -C $RepoRoot status --porcelain 2>$null) | Out-String
 $dirty = $dirty.Trim()
 if ($dirty) {
@@ -392,6 +388,27 @@ if ($dirty) {
     Write-Host $dirty -ForegroundColor Yellow
     Write-Host ""
     Write-Error "工作区有未提交改动"
+}
+
+git -C $RepoRoot fetch origin main | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败" }
+
+$localHead = (git -C $RepoRoot rev-parse HEAD).Trim()
+$remoteHead = (git -C $RepoRoot rev-parse origin/main).Trim()
+
+if ($localHead -ne $remoteHead) {
+    git -C $RepoRoot merge-base --is-ancestor $localHead $remoteHead | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ℹ️  本地 HEAD 已包含在 origin/main 中，快进到最新 main：$($remoteHead.Substring(0, 7))" -ForegroundColor Cyan
+        git -C $RepoRoot merge --ff-only origin/main | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Error "git merge --ff-only origin/main 失败" }
+    } else {
+        git -C $RepoRoot merge-base --is-ancestor $remoteHead $localHead | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Error "当前 HEAD 尚未进入 origin/main，禁止基于未推送提交部署。请先执行：git push origin HEAD:main"
+        }
+        Write-Error "当前 HEAD 与 origin/main 已分叉，发布脚本不会自动 rebase。请先完成代码合并并 push 后再运行。"
+    }
 }
 
 $Sha      = (git -C $RepoRoot rev-parse --short HEAD).Trim()
@@ -607,7 +624,7 @@ if (-not $Force) {
             Write-Host "   ⚠️  部署已中止：服务器版本更新" -ForegroundColor Yellow
             Write-Host "   服务器当前: $shortServer（比本次 $Sha 更新）" -ForegroundColor Yellow
             Write-Host "   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。" -ForegroundColor Yellow
-            Write-Host "   解决：git pull --rebase 后重新编译部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+            Write-Host "   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
             Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host ""
@@ -680,7 +697,7 @@ if ($lockExit -eq 42) {
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     Write-Host "   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）" -ForegroundColor Yellow
     Write-Host "   $lockResult" -ForegroundColor Yellow
-    Write-Host "   解决：git pull --rebase 后重新部署，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+    Write-Host "   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
     Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     exit 0

@@ -27,14 +27,14 @@
 **绝不能**在改动 elon 自身代码后用 `assembleDebug` 或跳过签名脚本直接运行 `./gradlew assembleRelease`。
 ### Android 任务完成定义
 
-涉及 APK 可安装端能力的任务，默认分成两层完成定义：
+涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交由后续最新 main”，不要反复 rebase 重跑。
 
 1. **代码同步完成**
    - 业务代码已 `commit` 并 `push origin main`
    - 若用户明确要求“先同步代码”“先合并远端”“发布稍后再说”或“不要求这次发布成功”，到这里即可收尾
    - 可用：
      ```powershell
-     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
      ```
 
 2. **APK 发布完成**
@@ -48,7 +48,9 @@
 最终回复要明确区分：本次是“代码已同步”还是“APK 已发布”。  
 发布脚本仍然负责版本号申请、构建、上传、并发保护和 finish；但**发布失败或被更新的 main 抢先覆盖，不影响代码已经同步到远端这一事实**。
 
-**脚本内置防慢构建覆盖和并发保护**，无需手动干预；强制覆盖用 `-Force`。
+最终回复必须包含代码提交 SHA、push 状态，以及 APK 发布状态（已发布 / 已被更新 main 超越 / 未尝试发布）。发布成功时再附版本号、发布 SHA、服务器 `/app/version.json` 校验结果和下载地址。
+
+**脚本内置防慢构建覆盖和并发保护**。并发保护触发时不要为了让本代理“发布成功”继续追最新 main；强制覆盖仅用于明确的发布协调任务，参数为 `-Force`。
 
 > 详细流程见：`docs/ai-agent-workflow.md`
 
@@ -70,7 +72,7 @@
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
 - **APP 颜色规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/APP 颜色规范.md`；只有用户明确要求更新颜色规范时，才修改该文件。
 - **APK UI ↔ 网页 UI 同步**：改动 APK 任何 layout XML、Toolbar、Tab、气泡、颜色主题时，必须在同一 commit 同步更新 `server/src/assets/web_page.html`。对照规则见 `.github/instructions/apk-web-ui-sync.instructions.md`
-- **后端运行代码变更**：直接运行 `.\scripts\publish-server.ps1`，脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`；版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
+- **后端运行代码变更**：先 commit + push 到 `origin/main`，再运行 `.\scripts\publish-server.ps1`；脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`。版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。并行任务若发布被后续 main 或服务器版本超越，汇报代码已推送和发布被最新主线接管，不要重复 rebase 重跑。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
 - **Android 新功能默认先同步代码到远端主线**；只有用户明确要求交付安装包、下载链接或线上 APK 时，才把发布成功作为完成定义
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
 
@@ -79,7 +81,7 @@
 ## 🚀 部署速查（服务端改动后必看）
 
 ```
-改后端代码 → git add（只加 .rs 业务文件）→ git commit → git push origin main → 运行 scripts/publish-server.ps1（脚本自动 claim 版本号 → 编译 → 部署 → finish）→ 校验 /api/server/version
+改后端代码 → git add（只加 .rs 业务文件）→ git commit → git push origin main → check-task-complete -Kind CodePushed → 运行 scripts/publish-server.ps1（脚本自动 claim 版本号 → 编译 → 部署 → finish；被后续 main 超越则停止追车）→ 校验 /api/server/version
 ```
 
 | 项目 | 值 |

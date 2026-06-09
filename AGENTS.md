@@ -29,7 +29,7 @@
 
 ## 脚本优先
 
-- 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`。
-- Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；再运行 `scripts\check-task-complete.ps1 -Kind AndroidFeature`（Windows）。
+- 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`；若发布期间被更新的 `origin/main` 或服务器版本超越，按脚本提示汇报“代码已推送，发布交由后续最新 main”，不要反复 rebase 重跑。
+- Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；并行任务若只要求代码先合并，运行 `scripts\check-task-complete.ps1 -Kind CodePushed` 即可收尾；明确负责 APK 发布的任务再运行 `-Kind AndroidFeature`。
 - 任务收尾清理 worktree：`scripts\cleanup-task-worktrees.ps1 -Apply`（Windows）或 `bash scripts/cleanup-task-worktrees.sh --apply`（Linux）。预览模式（不带 `-Apply`/`--apply`）只列不删；脏 worktree 和未合并分支会自动保留。
 - 脚本已经负责版本 claim/finish、构建、上传、并发保护和清理。AI 不要手搓这些步骤。

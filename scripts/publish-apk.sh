@@ -259,11 +259,47 @@ live_apk_includes_build_base() {
   is_git_ancestor "$BUILD_BASE_SHA" "$live_sha"
 }
 
+remote_advance_safe_for_apk() {
+  local base_sha="$1" changed p
+  git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+  changed=$(git -C "$REPO_ROOT" diff --name-only "$base_sha..origin/main" 2>/dev/null || true)
+  [[ -n "$changed" ]] || return 0
+  while IFS= read -r p; do
+    [[ -n "$p" ]] || continue
+    if [[ "$p" == android/* || "$p" == scripts/publish-apk* ]]; then
+      return 1
+    fi
+  done <<< "$changed"
+  return 0
+}
+
 # ═══════════════════════════════════════════════════════════════
-# Step 0: Git sync
+# Step 0: Git fetch + fast-forward
 # ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}🔄 同步最新代码...${NC}"
-git -C "$REPO_ROOT" pull --rebase origin main
+git -C "$REPO_ROOT" fetch origin main
+
+DIRTY=$(git -C "$REPO_ROOT" status --porcelain)
+if [[ -n "$DIRTY" ]]; then
+  echo -e "${RED}❌ 工作区不干净，请先 commit + push 业务改动再运行 APK 发布脚本：${NC}" >&2
+  echo "$DIRTY" >&2
+  exit 1
+fi
+
+LOCAL_HEAD=$(git -C "$REPO_ROOT" rev-parse HEAD)
+ORIGIN_MAIN_SHA=$(git -C "$REPO_ROOT" rev-parse origin/main)
+if [[ "$LOCAL_HEAD" != "$ORIGIN_MAIN_SHA" ]]; then
+  if git -C "$REPO_ROOT" merge-base --is-ancestor "$LOCAL_HEAD" "$ORIGIN_MAIN_SHA" 2>/dev/null; then
+    echo -e "${CYAN}   ℹ️  本地 HEAD 已包含在 origin/main 中，快进到最新 main：${ORIGIN_MAIN_SHA:0:7}${NC}"
+    git -C "$REPO_ROOT" merge --ff-only origin/main
+  elif git -C "$REPO_ROOT" merge-base --is-ancestor "$ORIGIN_MAIN_SHA" "$LOCAL_HEAD" 2>/dev/null; then
+    echo -e "${RED}❌ 当前 HEAD 尚未进入 origin/main，禁止基于未推送提交发布 APK。请先执行：git push origin HEAD:main${NC}" >&2
+    exit 1
+  else
+    echo -e "${RED}❌ 当前 HEAD 与 origin/main 已分叉，APK 发布脚本不会自动 rebase。请先完成代码合并并 push 后再运行。${NC}" >&2
+    exit 1
+  fi
+fi
 
 BUILD_BASE_SHA=$(git -C "$REPO_ROOT" rev-parse HEAD)
 ORIGIN_MAIN_SHA=$(git -C "$REPO_ROOT" rev-parse origin/main)
@@ -405,6 +441,18 @@ echo -e "${GREEN}   本次发布对应源 SHA: ${SHA_SHORT} (无新增 release c
 # ═══════════════════════════════════════════════════════════════
 # Step 5: 上传前检查（防慢构建覆盖）
 # ═══════════════════════════════════════════════════════════════
+git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+REMOTE_HEAD_NOW=$(git -C "$REPO_ROOT" rev-parse origin/main)
+if [[ "$REMOTE_HEAD_NOW" != "$SHA_FULL" ]]; then
+  if remote_advance_safe_for_apk "$SHA_FULL"; then
+    echo -e "${CYAN}   ℹ️  origin/main 已前进到 ${REMOTE_HEAD_NOW:0:7}，但新提交不影响 Android，继续发布。${NC}"
+  else
+    echo -e "${CYAN}⏭️  origin/main 已从本次基础 ${SHA_SHORT} 前进到 ${REMOTE_HEAD_NOW:0:7}，且包含 Android 改动。为避免上传过期 APK，已停止；发布交由后续最新 main。${NC}"
+    complete_release "false" "" 0 "" "origin/main moved to $REMOTE_HEAD_NOW and changed android files"
+    exit 0
+  fi
+fi
+
 SERVER_SHA_BEFORE=$(get_deployed_apk_sha)
 [[ -z "$SERVER_SHA_BEFORE" ]] && SERVER_SHA_BEFORE=""
 
@@ -535,14 +583,15 @@ if [[ $DEPLOY_EXIT -eq 42 ]]; then
     complete_release "false" "" 0 "" "superseded by deployed apk $DEPLOYED_SHA"
     exit 0
   fi
-  echo -e "${RED}❌ APK 上传 CAS 失败（并发冲突），请重新运行发布脚本${NC}" >&2
+  echo -e "${CYAN}⏭️  APK 上传 CAS 失败（并发冲突）。本次 staging 不覆盖；发布交由后续最新 main。${NC}"
   if is_local_apk_deploy; then
     rm -f "$APK_STAGE" "$JSON_STAGE" 2>/dev/null || true
   else
     # shellcheck disable=SC2086
     ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
   fi
-  exit 1
+  complete_release "false" "" 0 "" "cas mismatch in apk deploy"
+  exit 0
 fi
 
 if [[ $DEPLOY_EXIT -ne 0 ]]; then

@@ -17,11 +17,11 @@
 
 1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
-3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。修改前先 `git fetch origin main`；工作区干净才直接 `git pull --rebase origin main`，当前任务自己的未提交改动可 stash/rebase/pop，其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。修改前先 `git fetch origin main`；工作区干净可 `git pull --ff-only origin main`。当前任务自己的提交完成后第一时间 push；只有 push 被 non-fast-forward 拒绝时才 rebase。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
-7. Android APK 新功能默认先以“代码已同步到 origin/main”为第一层完成定义；只有用户明确要求安装包交付、下载链接或线上发布时，才以“手机可安装到最新 APK”为最终完成定义。
+7. Android APK 新功能默认先以“业务提交已进入 `origin/main`”为第一层完成定义；并行任务可以先用 `CodePushed` 收尾。只有用户明确要求安装包交付、下载链接或线上发布时，才以“服务器 APK 指向最新主线”为最终完成定义。
 8. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
 
 ---
@@ -45,7 +45,7 @@
 5. Codex CLI 不能依赖跨任务记忆；未知项目先读 `AGENTS.md`、`CODEX.md`、`README.md` 等轻量入口，再按任务读取细则。
 6. Codex CLI 完成后，后端负责验收和产品化状态：任务记录、进度展示、下载链接、版本信息、合并/发布/部署锁。
 7. 并发安全、版本顺序、APK 发布、服务器部署不能只靠提示词，必须由后端代码和发布脚本强制执行。
-8. 后端不能因为 `git pull --rebase` 的业务性失败直接终止开发任务；应把失败原因注入 CLI 任务单，让 CLI 优先自愈。只有 CLI 启动失败、超时、IO 异常这类平台问题，才由后端直接失败或切换 fallback。
+8. 后端不能因为 Git 同步的业务性失败直接终止开发任务；应把失败原因注入 CLI 任务单，让 CLI 优先自愈。只有 CLI 启动失败、超时、IO 异常这类平台问题，才由后端直接失败或切换 fallback。
 
 ---
 
@@ -301,7 +301,7 @@ Android 可安装端能力变更要先区分**代码同步**和**APK 发布**：
 
 ```powershell
 # 只确认代码已经合并到远端主线
-powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 
 # 需要交付可安装 APK 时，再单独跑发布
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
@@ -311,9 +311,9 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 - **代码同步完成**：业务代码已 commit 并 push 到 `origin/main`。如果用户明确说“先同步代码”“发布不一定成功”或“这次不用出 APK”，到这里即可结束任务。
 - **APK 发布完成**：只有当用户明确要求下载链接、线上 APK、安装包交付时，才要求 `AndroidFeature` 校验通过。
 
-发布脚本会完成：同步 `main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
+发布脚本会完成：快进到当前 `origin/main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
 
-APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进但线上未确认包含本次基础提交，就停止上传并从最新 `main` 重新发布。脚本不得在 APK 编译完成后自动 rebase 再上传旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
+APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进且包含 Android 改动，就停止上传并汇报“代码已推送，发布交由后续最新 main”。脚本不得在 APK 编译完成后自动 rebase 或要求本代理重新跑旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
 
 ### 8.3 推送结果给用户
 
@@ -356,6 +356,6 @@ APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现�
 3. **禁止**把机器本地路径、密钥、签名材料或临时构建状态写入共享说明文件
 4. **每个用户任务**必须有完整的 git 提交记录，可溯源
 5. **不允许**一次修改范围过大（超过5个文件应拆分为多次任务）
-6. **Android 新功能禁止只交 PR 或 Debug 包**；默认必须完成 APK 发布闭环并校验服务器 `version.json`
-7. **后端运行代码变更必须使用发布脚本部署**；版本号由服务器分配，默认必须部署后校验服务器 `/api/server/version`
+6. **Android 新功能禁止只交 PR 或 Debug 包**；默认先 push 到 `origin/main` 并用 `CodePushed` 校验，明确负责 APK 发布时再完成 `AndroidFeature` 闭环
+7. **后端运行代码变更必须先 push 到 `origin/main`**；版本号由服务器分配，发布脚本被后续 main 超越时停止追车并汇报，明确负责发布时再校验服务器 `/api/server/version`
 8. **不允许继续制造巨型文件**；新建源文件默认目标 ≤500 行，501-800 行可容忍但必须单一职责，超过 800 行必须拆分；新功能默认按职责模块化，入口文件只做组装和路由

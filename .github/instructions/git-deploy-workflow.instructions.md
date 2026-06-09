@@ -17,8 +17,9 @@ applyTo: "**"
   → git add（仅自己的文件）
   → git commit -m "type(scope): 描述"
   → git push origin main
-  → 临时工作树构建 / 部署
-  → 验证
+  → check-task-complete -Kind CodePushed
+  → 临时工作树构建 / 部署（需要发布时；被更新 main 超越则停止追车）
+  → 验证（明确负责发布时）
   → 清理工作树
   → 汇报 SHA
 ```
@@ -58,6 +59,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 在主工作区执行 `git reset --hard`、`git checkout --` | 会覆盖其他并发 AI 的未提交改动 |
 | 夹带无关文件进同一次 commit | 污染提交历史，妨碍定位问题 |
 | 编译完成后跳过"服务器是否已有更新版本"的祖先检查，强推上传 | 用旧编译覆盖别人刚发布的新版本，手机端版本倒退 |
+| 代码已 push 后为了让本代理发布成功而反复 rebase / 重跑构建 | 并行任务会互相追车；发布应由运行时最新 main 或发布协调者统一完成 |
 | 在共享脚本里写死某台机器的本机盘符（如 `E:\rust-target\...`） | 其他 PC / 远程 Codex 没有这个盘，脚本秒退；本机差异必须走 `.env.local` + `RUST_SERVER_MUSL_TARGET_DIR` / `ELON_BUILD_TARGET_DIR`（详见 `scripts/publish-server.ps1` 的 `.NOTES` 注释和 `.env.local.example`） |
 
 ---
@@ -73,16 +75,17 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 3. 任务开始 **前后** 各执行一次 `git status --short`，识别当前工作区是否有其他 AI 的未提交改动
 4. `git add` 只加自己任务相关的文件
 5. 发现其他代理未提交改动 → **不回退、不覆盖**，回到预检脚本创建的 worktree 继续
-6. 提交前再执行 `git fetch origin main` + `git rebase origin/main`，确保本次提交基于最新远端
-7. **每次 commit 后必须立即 `git push origin main`**
-8. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
+6. 提交前执行 `git fetch origin main` 了解远端是否前进；不要为了“永远基于最新远端”在提交前反复 rebase。自己的提交完成后第一时间 push。
+7. **每次 commit 后必须立即 `git push origin HEAD:main`**；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main` 一次，把自己的提交接到远端最新提交之后再推。
+8. push 成功后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed`（Linux/macOS 可用同等 git 祖先检查），确认本次 HEAD 已包含在 `origin/main`。
+9. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
 
 ### 本地有未提交改动时如何同步远端
 
 | 场景 | 做法 |
 |---|---|
-| 工作区干净 | `git pull --rebase origin main` |
-| 未提交改动确定属于本任务 | `git stash push -u -m "wip-before-sync"` → `git pull --rebase origin main` → `git stash pop` → 解决冲突 |
+| 工作区干净 | 任务开始可 `git fetch origin main` 后 `git pull --ff-only origin main`；提交后不要为了发布追车反复同步 |
+| 未提交改动确定属于本任务 | 先完成本任务提交；push 被拒绝时再 `git fetch origin` → `git rebase origin/main` → 解决冲突并重推 |
 | 未提交改动属于其他 AI / 其他任务 / 来源不明 | 不在当前工作区 pull/rebase；从 `origin/main` 创建独立 worktree |
 
 独立 worktree 示例：
@@ -200,11 +203,10 @@ Set-Location ..\Elon-session-$id
 git add <自己的文件>
 git commit -m "feat(scope): 描述"
 
-# 3. 回到主仓库 cherry-pick 集成到 main
-  $repoRoot = git rev-parse --show-toplevel
-  Set-Location $repoRoot
-git cherry-pick <session_commit_sha>
-git push origin main
+# 3. 第一时间把本会话提交推入远端 main
+git push origin HEAD:main
+# 若 push 被拒绝：git fetch origin; git rebase origin/main; 解决冲突后重推
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 
 # 4. 清理会话工作树
 git worktree remove ..\Elon-session-$id --force
@@ -240,24 +242,27 @@ if ($rs) { rustfmt $rs }
 
 ```powershell
 git add server/src/<file>.rs; git commit -m "fix(server): 描述"; git push origin main
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 .\scripts\publish-server.ps1   # claim → 编译 → 部署 → finish（内部原理见脚本注释）
 curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ```
 
-> Linux/macOS: `bash scripts/publish-server.sh`。仅本地验证不部署：`.\publish-server.ps1 -SkipUpload`。版本号由服务器 `/api/release/claim` 原子分配，不写 git。
+> Linux/macOS: `bash scripts/publish-server.sh`。仅本地验证不部署：`.\publish-server.ps1 -SkipUpload`。版本号由服务器 `/api/release/claim` 原子分配，不写 git。并行任务中，发布脚本发现 `origin/main` 或服务器已进入更新版本时应停止上传并汇报，不要求本代理继续 rebase 重跑。
 
 ---
 
 ## 📱 Android APK 部署
 
-> Android 新功能不是“代码合并即完成”。只要改了 APK 可安装端能力，必须跑发布脚本并校验服务器版本。
+> Android 新功能的代码完成标准是“业务提交已进入 `origin/main`”；APK 发布标准是“服务器 APK 指向最新主线”。并行任务先确保代码 push；只有明确负责发布的任务才必须等到 `AndroidFeature` 校验通过。
 
 ### APK 发布两步式工作流（v0.3.69+ 新流程：版本号不进 git）
 
 ```
 [第1步：提交业务代码]   git add 业务文件 → commit → push origin main
         ↓
-[第2步：运行发布脚本]   publish-apk.ps1 -Changelog "..."
+[第1.5步：代码完成检查] check-task-complete.ps1 -Kind CodePushed
+        ↓
+[第2步：运行发布脚本]   publish-apk.ps1 -Changelog "..."（需要发布时）
         （脚本自动：claim 拿版本号 → 临时注入 build.gradle → 编译 → 上传
          → finish 释放槽位 → 还原 build.gradle 到 git 兜底版本）
 ```
@@ -271,13 +276,14 @@ curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 git add android/app/src/main/...   # 只加业务文件，不加 build.gradle
 git commit -m "feat(android): 描述"
 git push origin main               # 脚本基于远端 HEAD，必须先 push
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 
-# 第2步：运行发布脚本（脚本会自动 claim 版本号、编译、上传、finish）
+# 第2步：运行发布脚本（明确负责 APK 发布时）
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-> APK 发布并发保护（慢构建防覆盖、finish 槽位释放）详见 `scripts/publish-apk.ps1` 注释。
+> APK 发布并发保护（慢构建防覆盖、finish 槽位释放）详见 `scripts/publish-apk.ps1` 注释。并行任务中，若发布脚本提示已被更新的 `origin/main` 或服务器 APK 超越，视为“代码已合并，发布交由后续最新 main”，不要为了当前代理发布成功继续 rebase 重跑。
 ---
 
 ## 🏷️ 版本号管理规则（v0.3.69+ 服务器分配）

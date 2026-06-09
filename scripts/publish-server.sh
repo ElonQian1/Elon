@@ -24,7 +24,7 @@
 #  防止全局 Cargo config 中的 target-cpu=native 污染服务器产物。
 #
 #  发布顺序：
-#    1. 同步并确认本地 HEAD 已经是 origin/main
+#    1. fetch origin/main 并只做 fast-forward，同步到远端最新主线
 #    2. 调 /api/release/claim 原子申请版本号
 #    3. 用 ELON_BUILD_VERSION 注入版本号后编译
 #    4. 上传/本机 staging + flock/CAS 部署
@@ -339,9 +339,9 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# ── 1. git pull --rebase ──────────────────────────────────────
+# ── 1. git fetch + fast-forward ───────────────────────────────
 echo -e "${YELLOW}1⃣  同步最新代码...${NC}"
-git -C "$REPO_ROOT" pull --rebase origin main
+git -C "$REPO_ROOT" fetch origin main
 DIRTY=$(git -C "$REPO_ROOT" status --porcelain)
 if [ -n "$DIRTY" ]; then
   echo ""
@@ -350,15 +350,36 @@ if [ -n "$DIRTY" ]; then
   exit 1
 fi
 
+LOCAL_HEAD=$(git -C "$REPO_ROOT" rev-parse HEAD)
+REMOTE_MAIN=$(git -C "$REPO_ROOT" rev-parse origin/main)
+if [ "$LOCAL_HEAD" != "$REMOTE_MAIN" ]; then
+  if git -C "$REPO_ROOT" merge-base --is-ancestor "$LOCAL_HEAD" "$REMOTE_MAIN" 2>/dev/null; then
+    echo -e "${CYAN}   ℹ️  本地 HEAD 已包含在 origin/main 中，快进到最新 main：${REMOTE_MAIN:0:7}${NC}"
+    git -C "$REPO_ROOT" merge --ff-only origin/main
+  elif git -C "$REPO_ROOT" merge-base --is-ancestor "$REMOTE_MAIN" "$LOCAL_HEAD" 2>/dev/null; then
+    echo ""
+    echo -e "${RED}❌ 当前 HEAD 尚未进入 origin/main，禁止基于未推送提交编译部署。${NC}" >&2
+    echo -e "${YELLOW}   当前 HEAD:  $LOCAL_HEAD${NC}" >&2
+    echo -e "${YELLOW}   origin/main: $REMOTE_MAIN${NC}" >&2
+    echo -e "${YELLOW}   请先执行：git push origin HEAD:main${NC}" >&2
+    exit 1
+  else
+    echo ""
+    echo -e "${RED}❌ 当前 HEAD 与 origin/main 已分叉，发布脚本不会自动 rebase。请先完成代码合并并 push 后再运行。${NC}" >&2
+    echo -e "${YELLOW}   当前 HEAD:  $LOCAL_HEAD${NC}" >&2
+    echo -e "${YELLOW}   origin/main: $REMOTE_MAIN${NC}" >&2
+    exit 1
+  fi
+fi
+
 SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
 SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
 REMOTE_MAIN=$(git -C "$REPO_ROOT" rev-parse origin/main)
 if [ "$SHA_BIG" != "$REMOTE_MAIN" ]; then
   echo ""
-  echo -e "${RED}❌ 当前 HEAD 尚未进入 origin/main，禁止基于未推送提交编译部署。${NC}" >&2
+  echo -e "${RED}❌ 同步后 HEAD 仍不等于 origin/main，发布脚本停止。${NC}" >&2
   echo -e "${YELLOW}   当前 HEAD:  $SHA_BIG${NC}" >&2
   echo -e "${YELLOW}   origin/main: $REMOTE_MAIN${NC}" >&2
-  echo -e "${YELLOW}   请先执行：git push origin HEAD:main${NC}" >&2
   exit 1
 fi
 
@@ -555,7 +576,7 @@ if [ "$FORCE" -eq 0 ]; then
       echo -e "${YELLOW}   ⚠️  部署已中止：服务器版本更新${NC}"
       echo -e "${YELLOW}   服务器当前: $SHORT_SERVER（比本次 $SHA 更新）${NC}"
       echo -e "${YELLOW}   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。${NC}"
-      echo -e "${YELLOW}   解决：git pull --rebase 后重新编译部署，或用 --force 强制覆盖。${NC}"
+      echo -e "${YELLOW}   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
       complete_release false "" "" "superseded by server sha $SERVER_SHA"
       echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
       echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
@@ -625,7 +646,7 @@ if [ "$LOCK_EXIT" -eq 42 ]; then
   echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
   echo -e "${YELLOW}   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）${NC}"
   echo -e "${YELLOW}   $LOCK_OUT${NC}"
-  echo -e "${YELLOW}   解决：git pull --rebase 后重新部署，或用 --force 强制覆盖。${NC}"
+  echo -e "${YELLOW}   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
   complete_release false "" "" "cas conflict inside flock: $LOCK_OUT"
   echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
   echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"

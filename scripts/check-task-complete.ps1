@@ -3,19 +3,25 @@
     Elon task completion check.
 
 .DESCRIPTION
-    Use this before the final AI report. CodeSync verifies that local HEAD has
-    already been merged into origin/main. AndroidFeature verifies that local
+    Use this before the final AI report. CodePushed/CodeSync verifies that
+    local HEAD is already contained in origin/main, even if newer commits have
+    landed. AndroidFeature verifies that local
     HEAD equals origin/main and that server /app/version.json points at the
     pushed source commit. APK version numbers are assigned by the server.
     Server verifies /health and /api/server/version.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+
+.EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 #>
 param(
-    [ValidateSet("CodeSync", "AndroidFeature", "DocsOnly", "Server")]
-    [string]$Kind = "CodeSync",
+    [ValidateSet("CodePushed", "CodeSync", "AndroidFeature", "DocsOnly", "Server")]
+    [string]$Kind = "CodePushed",
 
     [switch]$SkipGitStatus
 )
@@ -51,13 +57,13 @@ if ($LASTEXITCODE -ne 0) {
 $head = (git rev-parse HEAD).Trim()
 $originMain = (git rev-parse origin/main).Trim()
 
-if ($Kind -eq "CodeSync") {
+if ($Kind -eq "CodePushed" -or $Kind -eq "CodeSync") {
     git merge-base --is-ancestor $head $originMain | Out-Null
     if ($LASTEXITCODE -ne 0) {
-        Stop-Check "Code sync is not complete: local HEAD=$($head.Substring(0, 7)) has not been merged into origin/main=$($originMain.Substring(0, 7))."
+        Stop-Check "Code push is not complete: local HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
     }
 
-    Write-Host "Code sync check passed:" -ForegroundColor Green
+    Write-Host "$Kind completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     if ($head -eq $originMain) {
