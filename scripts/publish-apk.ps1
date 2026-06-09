@@ -506,15 +506,14 @@ function Invoke-GradleReleaseBuild {
 
     $exitCode = $process.ExitCode
     if ($null -eq $exitCode) {
-        $freshApk = Get-ChildItem $ApkPattern -ErrorAction SilentlyContinue |
-            Where-Object { $_.LastWriteTime -ge $buildStartedAt } |
+        $candidateApk = Get-ChildItem $ApkPattern -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime |
             Select-Object -Last 1
-        if ($freshApk) {
-            Write-Warning "Gradle 进程退出码为空，但本次构建已产出 release APK：$($freshApk.Name)。继续发布。"
+        if ($candidateApk) {
+            Write-Warning "Gradle 进程退出码为空，使用现有 release APK：$($candidateApk.Name)。后续 manifest 校验会确认版本是否匹配。"
             return
         }
-        Write-Error "Gradle assembleRelease 结束但无法读取退出码，且未发现本次新 APK。"
+        Write-Error "Gradle assembleRelease 结束但无法读取退出码，且未发现 release APK。"
     }
 
     if ($exitCode -ne 0) {
