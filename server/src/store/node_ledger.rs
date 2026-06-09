@@ -55,6 +55,7 @@ pub struct NodeCredential {
     pub agent_id: String,
     pub owner_user_id: String,
     pub label: String,
+    pub device_name: Option<String>,
     pub created_at: String,
 }
 
@@ -235,7 +236,7 @@ impl Store {
         Ok(owner)
     }
 
-    /// 回填节点设备名。当前表结构复用 label 展示名；只在用户尚未自定义 label 时更新。
+    /// 回填节点设备名。设备名来自 PC 系统名，和用户自定义 label 分开保存。
     pub fn update_node_credential_device_name(
         &self,
         agent_id: &str,
@@ -250,10 +251,9 @@ impl Store {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "UPDATE node_credentials
-             SET label = ?3
+             SET device_name = ?3
              WHERE agent_id = ?1
-               AND owner_user_id = ?2
-               AND (label = '' OR label = agent_id)",
+               AND owner_user_id = ?2",
             params![agent_id, owner_user_id, device_name],
         )?;
         Ok(())
@@ -263,7 +263,7 @@ impl Store {
     pub fn list_node_credentials(&self, owner_user_id: &str) -> Result<Vec<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT agent_id, owner_user_id, label, created_at
+            "SELECT agent_id, owner_user_id, label, device_name, created_at
              FROM node_credentials WHERE owner_user_id = ?1
              ORDER BY created_at DESC",
         )?;
@@ -272,7 +272,8 @@ impl Store {
                 agent_id: row.get(0)?,
                 owner_user_id: row.get(1)?,
                 label: row.get(2)?,
-                created_at: row.get(3)?,
+                device_name: row.get(3)?,
+                created_at: row.get(4)?,
             })
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
