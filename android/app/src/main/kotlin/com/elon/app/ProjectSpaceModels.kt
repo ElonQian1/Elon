@@ -42,6 +42,7 @@ internal data class ProjectMemberConversation(
     val userAccount: String,
     val title: String?,
     val status: String,
+    val isPublic: Boolean,
     val messageCount: Int,
     val taskCount: Int,
     val lastMessage: String?,

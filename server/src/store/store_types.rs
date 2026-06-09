@@ -274,6 +274,7 @@ pub struct ProjectMemberConversationEntry {
     pub user_account: String,
     pub title: Option<String>,
     pub status: String,
+    pub is_public: bool,
     pub message_count: i64,
     pub task_count: i64,
     pub last_message: Option<String>,

@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
@@ -853,6 +854,12 @@ internal class ProjectSpaceController(
                     renderMemberConversationMessages(conversation, member, space)
                 }
             }
+            if (isSelf) {
+                setOnLongClickListener {
+                    showMemberConversationVisibilityActions(conversation, member, space)
+                    true
+                }
+            }
             addView(TextView(activity).apply {
                 text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
                 textSize = 16f
@@ -862,6 +869,8 @@ internal class ProjectSpaceController(
             })
             addView(TextView(activity).apply {
                 text = buildString {
+                    append(if (conversation.isPublic) "公开" else "私密")
+                    append(" · ")
                     append("${conversation.messageCount} 条消息")
                     if (conversation.taskCount > 0) append(" · ${conversation.taskCount} 个任务")
                     conversation.lastTaskStatus?.takeIf { it.isNotBlank() }?.let { st ->
@@ -905,6 +914,54 @@ internal class ProjectSpaceController(
                         }
                     })
                 })
+            }
+        }
+    }
+
+    private fun showMemberConversationVisibilityActions(
+        conversation: ProjectMemberConversation,
+        member: ProjectMember,
+        space: ProjectSpace
+    ) {
+        val nextPublic = !conversation.isPublic
+        val action = if (nextPublic) "设为公开" else "关闭公开"
+        AlertDialog.Builder(activity)
+            .setTitle(conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}")
+            .setItems(arrayOf(action)) { dialog, _ ->
+                dialog.dismiss()
+                updateMemberConversationVisibility(conversation, member, space, nextPublic)
+            }
+            .show()
+    }
+
+    private fun updateMemberConversationVisibility(
+        conversation: ProjectMemberConversation,
+        member: ProjectMember,
+        space: ProjectSpace,
+        isPublic: Boolean
+    ) {
+        thread {
+            val result = runCatching {
+                updateProjectMemberConversationVisibility(
+                    http,
+                    serverUrl,
+                    activity,
+                    space.project.id,
+                    conversation.id,
+                    isPublic
+                )
+            }
+            activity.runOnUiThread {
+                result.onSuccess { updated ->
+                    Toast.makeText(
+                        activity,
+                        if (updated.isPublic) "已设为公开" else "已关闭公开",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    renderMemberConversationList(member)
+                }.onFailure { error ->
+                    Toast.makeText(activity, error.message ?: "修改失败", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

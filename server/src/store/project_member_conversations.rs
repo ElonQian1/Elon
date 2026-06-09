@@ -28,6 +28,7 @@ impl Store {
                COALESCE(u.nickname, u.phone, u.email, c.user_id) AS user_account,
                c.title,
                c.status,
+               COALESCE(c.is_public, 1) AS is_public,
                (SELECT COUNT(*) FROM messages m
                 WHERE m.project_id = c.project_id
                   AND m.conversation_id = c.id
@@ -93,12 +94,18 @@ impl Store {
              LEFT JOIN users u ON u.id = c.user_id
              WHERE c.project_id = ?1
                AND c.user_id = ?2
+               AND (?3 = c.user_id OR COALESCE(c.is_public, 1) = 1)
              ORDER BY c.updated_at DESC
-             LIMIT ?3",
+             LIMIT ?4",
         )?;
         let rows = stmt
             .query_map(
-                params![project_id, member_user_id, limit.clamp(1, 100)],
+                params![
+                    project_id,
+                    member_user_id,
+                    requester_id,
+                    limit.clamp(1, 100)
+                ],
                 |row| {
                     Ok(ProjectMemberConversationEntry {
                         id: row.get(0)?,
@@ -107,14 +114,15 @@ impl Store {
                         user_account: row.get(3)?,
                         title: row.get(4)?,
                         status: row.get(5)?,
-                        message_count: row.get(6)?,
-                        task_count: row.get(7)?,
-                        last_message: row.get(8)?,
-                        last_message_role: row.get(9)?,
-                        last_message_at: row.get(10)?,
-                        last_task_status: row.get(11)?,
-                        created_at: row.get(12)?,
-                        updated_at: row.get(13)?,
+                        is_public: row.get::<_, i64>(6)? != 0,
+                        message_count: row.get(7)?,
+                        task_count: row.get(8)?,
+                        last_message: row.get(9)?,
+                        last_message_role: row.get(10)?,
+                        last_message_at: row.get(11)?,
+                        last_task_status: row.get(12)?,
+                        created_at: row.get(13)?,
+                        updated_at: row.get(14)?,
                     })
                 },
             )?
@@ -130,19 +138,13 @@ impl Store {
         conversation_id: &str,
         limit: i64,
     ) -> Result<Vec<ProjectMemberConversationMessage>> {
-        self.ensure_project_member_conversation_access(requester_id, project_id, member_user_id)?;
+        self.ensure_project_member_conversation_visible(
+            requester_id,
+            project_id,
+            member_user_id,
+            conversation_id,
+        )?;
         let conn = self.conn()?;
-        let exists: Option<String> = conn
-            .query_row(
-                "SELECT id FROM conversations
-                 WHERE project_id = ?1 AND user_id = ?2 AND id = ?3",
-                params![project_id, member_user_id, conversation_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if exists.is_none() {
-            return Err(anyhow!("成员会话不存在"));
-        }
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, conversation_id, task_id, user_id, sender_name,
@@ -208,24 +210,18 @@ impl Store {
         conversation_id: &str,
         content: &str,
     ) -> Result<ProjectMemberConversationMessage> {
-        self.ensure_project_member_conversation_access(requester_id, project_id, member_user_id)?;
+        self.ensure_project_member_conversation_visible(
+            requester_id,
+            project_id,
+            member_user_id,
+            conversation_id,
+        )?;
         let content = content.trim();
         if content.is_empty() {
             return Err(anyhow!("消息内容不能为空"));
         }
 
         let conn = self.conn()?;
-        let exists: Option<String> = conn
-            .query_row(
-                "SELECT id FROM conversations
-                 WHERE project_id = ?1 AND user_id = ?2 AND id = ?3",
-                params![project_id, member_user_id, conversation_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if exists.is_none() {
-            return Err(anyhow!("成员会话不存在"));
-        }
 
         let id = new_id("pmcm");
         let created_at = now();
@@ -274,6 +270,42 @@ impl Store {
         })
     }
 
+    pub fn update_project_member_conversation_visibility(
+        &self,
+        requester_id: &str,
+        project_id: &str,
+        conversation_id: &str,
+        is_public: bool,
+    ) -> Result<ProjectMemberConversationEntry> {
+        self.ensure_project_member_conversation_access(requester_id, project_id, requester_id)?;
+        let updated_at = now();
+        let changed = {
+            let conn = self.conn()?;
+            conn.execute(
+                "UPDATE conversations
+                    SET is_public = ?1,
+                        updated_at = ?2
+                  WHERE project_id = ?3
+                    AND user_id = ?4
+                    AND id = ?5",
+                params![
+                    if is_public { 1 } else { 0 },
+                    updated_at,
+                    project_id,
+                    requester_id,
+                    conversation_id
+                ],
+            )?
+        };
+        if changed == 0 {
+            return Err(anyhow!("成员会话不存在"));
+        }
+        self.list_project_member_conversations(requester_id, project_id, requester_id, 100)?
+            .into_iter()
+            .find(|conversation| conversation.id == conversation_id)
+            .ok_or_else(|| anyhow!("成员会话不存在"))
+    }
+
     fn ensure_project_member_conversation_access(
         &self,
         requester_id: &str,
@@ -305,6 +337,31 @@ impl Store {
             return Err(anyhow!("目标成员不在该项目中"));
         }
         Ok(())
+    }
+
+    fn ensure_project_member_conversation_visible(
+        &self,
+        requester_id: &str,
+        project_id: &str,
+        member_user_id: &str,
+        conversation_id: &str,
+    ) -> Result<()> {
+        self.ensure_project_member_conversation_access(requester_id, project_id, member_user_id)?;
+        let conn = self.conn()?;
+        let is_public: Option<i64> = conn
+            .query_row(
+                "SELECT COALESCE(is_public, 1)
+                 FROM conversations
+                 WHERE project_id = ?1 AND user_id = ?2 AND id = ?3",
+                params![project_id, member_user_id, conversation_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match is_public {
+            Some(value) if value != 0 || requester_id == member_user_id => Ok(()),
+            Some(_) => Err(anyhow!("该成员已关闭此会话公开")),
+            None => Err(anyhow!("成员会话不存在")),
+        }
     }
 }
 
@@ -482,5 +539,97 @@ mod tests {
                 "outsider comment",
             )
             .is_err());
+    }
+
+    #[test]
+    fn member_can_hide_own_project_conversation_from_other_members() {
+        let store = temp_store();
+        let owner = store
+            .create_user("owner3@example.com", "secret1", Some("Owner"), None)
+            .expect("owner should be created");
+        let member = store
+            .create_user("member3@example.com", "secret1", Some("Member"), None)
+            .expect("member should be created");
+        let project = store
+            .create_project(&owner.id, "Member Conversation Visibility", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should be public");
+        store
+            .join_project(&member.id, &project.id)
+            .expect("member should join project");
+
+        let member_task = store
+            .create_task(&project.id, &member.id, Some("default"), "member request")
+            .expect("member task should be created");
+        store
+            .finish_task(&member_task, "done", Some("member reply"), None, None)
+            .expect("member task should finish");
+
+        let owner_view = store
+            .list_project_member_conversations(&owner.id, &project.id, &member.id, 10)
+            .expect("owner can inspect public member conversations");
+        assert_eq!(owner_view.len(), 1);
+        assert!(owner_view[0].is_public);
+
+        let hidden = store
+            .update_project_member_conversation_visibility(
+                &member.id,
+                &project.id,
+                "default",
+                false,
+            )
+            .expect("member can hide own conversation");
+        assert!(!hidden.is_public);
+
+        let owner_view = store
+            .list_project_member_conversations(&owner.id, &project.id, &member.id, 10)
+            .expect("owner can list visible member conversations");
+        assert!(owner_view.is_empty());
+        assert!(store
+            .list_project_member_conversation_messages(
+                &owner.id,
+                &project.id,
+                &member.id,
+                "default",
+                10,
+            )
+            .is_err());
+        assert!(store
+            .insert_project_member_conversation_discussion_message(
+                &owner.id,
+                &project.id,
+                &member.id,
+                "default",
+                "owner comment",
+            )
+            .is_err());
+
+        let self_view = store
+            .list_project_member_conversations(&member.id, &project.id, &member.id, 10)
+            .expect("member can still inspect own hidden conversation");
+        assert_eq!(self_view.len(), 1);
+        assert!(!self_view[0].is_public);
+        store
+            .list_project_member_conversation_messages(
+                &member.id,
+                &project.id,
+                &member.id,
+                "default",
+                10,
+            )
+            .expect("member can still read own hidden conversation");
+
+        let visible = store
+            .update_project_member_conversation_visibility(&member.id, &project.id, "default", true)
+            .expect("member can reopen own conversation");
+        assert!(visible.is_public);
+        let owner_view = store
+            .list_project_member_conversations(&owner.id, &project.id, &member.id, 10)
+            .expect("owner can inspect reopened member conversations");
+        assert_eq!(owner_view.len(), 1);
+        assert!(owner_view[0].is_public);
     }
 }

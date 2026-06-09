@@ -229,6 +229,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
                 .post(project_space::send_member_conversation_message),
         )
         .route(
+            "/api/projects/:project_id/conversations/:conversation_id/visibility",
+            axum::routing::patch(project_space::update_member_conversation_visibility),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/messages",
             get(project_space::list_channel_messages).post(project_space::send_channel_message),
         )

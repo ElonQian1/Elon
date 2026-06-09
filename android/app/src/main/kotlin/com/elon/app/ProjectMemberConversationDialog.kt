@@ -281,6 +281,8 @@ internal object ProjectMemberConversationDialog {
 
     private fun conversationMeta(conversation: ProjectMemberConversation): String {
         return buildString {
+            append(if (conversation.isPublic) "公开" else "私密")
+            append(" · ")
             append("${conversation.messageCount} 条消息")
             if (conversation.taskCount > 0) append(" · ${conversation.taskCount} 个任务")
             conversation.lastTaskStatus?.takeIf { it.isNotBlank() }?.let {

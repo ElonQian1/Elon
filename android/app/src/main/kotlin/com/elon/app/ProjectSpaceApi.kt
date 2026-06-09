@@ -131,6 +131,28 @@ internal fun sendProjectMemberConversationMessage(
     }
 }
 
+internal fun updateProjectMemberConversationVisibility(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    conversationId: String,
+    isPublic: Boolean
+): ProjectMemberConversation {
+    val payload = JSONObject().put("is_public", isPublic)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/conversations/${projectSpaceUrlPart(conversationId)}/visibility")
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "修改会话公开状态失败"))
+        return parseProjectMemberConversation(JSONObject(body).optJSONObject("conversation") ?: JSONObject())
+    }
+}
+
 internal fun fetchProjectInviteFriends(
     http: OkHttpClient,
     serverUrl: String,
@@ -406,6 +428,7 @@ private fun parseProjectMemberConversation(json: JSONObject) = ProjectMemberConv
     userAccount = json.optString("user_account", ""),
     title = json.optString("title").takeIf { it.isNotBlank() },
     status = json.optString("status", "active"),
+    isPublic = json.optBoolean("is_public", true),
     messageCount = json.optInt("message_count", 0).coerceAtLeast(0),
     taskCount = json.optInt("task_count", 0).coerceAtLeast(0),
     lastMessage = json.optString("last_message").takeIf { it.isNotBlank() },

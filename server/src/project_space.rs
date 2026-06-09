@@ -39,6 +39,11 @@ pub struct SendChannelMessageRequest {
 }
 
 #[derive(Deserialize)]
+pub struct UpdateMemberConversationVisibilityRequest {
+    pub is_public: bool,
+}
+
+#[derive(Deserialize)]
 pub struct StartChannelAiTaskRequest {
     pub content: String,
     pub agent: Option<String>,
@@ -216,6 +221,32 @@ pub async fn send_member_conversation_message(
             &req.content,
         ) {
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn update_member_conversation_visibility(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, conversation_id)): Path<(String, String)>,
+    Json(req): Json<UpdateMemberConversationVisibilityRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if let Err(e) = project_access(&state, &user.id, &project_id) {
+        return json_error(StatusCode::FORBIDDEN, e.to_string());
+    }
+    match state.store.update_project_member_conversation_visibility(
+        &user.id,
+        &project_id,
+        &conversation_id,
+        req.is_public,
+    ) {
+        Ok(conversation) => {
+            Json(serde_json::json!({ "conversation": conversation })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }

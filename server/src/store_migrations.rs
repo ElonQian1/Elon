@@ -47,6 +47,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (25, "收紧一龙自项目默认成员与加入权限", migration_v25),
     (26, "指定钱一龙账号为一龙自项目管理员", migration_v26),
     (27, "项目成员会话人类讨论消息", migration_v27),
+    (28, "项目成员个人会话公开状态", migration_v28),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1012,6 +1013,22 @@ fn migration_v27(conn: &Connection) -> Result<()> {
           ON project_member_conversation_discussion_messages(
             project_id, member_user_id, conversation_id, created_at
           );
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v28(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "conversations",
+        "is_public",
+        "is_public INTEGER NOT NULL DEFAULT 1",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_conversations_project_user_public_updated
+          ON conversations(project_id, user_id, is_public, updated_at DESC);
         "#,
     )?;
     Ok(())
