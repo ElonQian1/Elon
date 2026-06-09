@@ -16,10 +16,10 @@ mod ai_cli_types;
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
-use homecli_proto::AgentToServer;
+use homecli_proto::{AgentToServer, CliProjectContext};
 use std::{path::Path, sync::Arc};
-use uuid::Uuid;
 use tokio::sync::mpsc::UnboundedSender;
+use uuid::Uuid;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
@@ -733,14 +733,32 @@ async fn run_via_pc_agent(
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
         for attempt in 0..MAX_ATTEMPTS {
-            match state.agent_manager.dispatch_cli_prompt_in_cwd(
-                agent_id,
-                cli_name.to_string(),
-                extra_args.clone(),
-                cwd.map(ToOwned::to_owned),
-                prompt.clone(),
-            ).await {
-                Ok(r) => { result = Ok(r); break; }
+            let project_context = if request_mode.is_plan() {
+                None
+            } else {
+                native_session_scope
+                    .as_ref()
+                    .map(|scope| CliProjectContext {
+                        project_id: scope.project_id.clone(),
+                        conversation_id: scope.conversation_id.clone(),
+                    })
+            };
+            match state
+                .agent_manager
+                .dispatch_cli_prompt_with_context(
+                    agent_id,
+                    cli_name.to_string(),
+                    extra_args.clone(),
+                    cwd.map(ToOwned::to_owned),
+                    project_context,
+                    prompt.clone(),
+                )
+                .await
+            {
+                Ok(r) => {
+                    result = Ok(r);
+                    break;
+                }
                 Err(e) => {
                     last_err = e;
                     let msg = last_err.to_string();
@@ -817,17 +835,23 @@ async fn run_via_pc_agent(
                     progress_handle.abort(); // 收到第一行有效内容时停止心跳
                     if !stream_started {
                         stream_started = true;
-                        let _ = tx.send(WsMessage::AssistantMessage {
-                            text: text.clone(),
-                            model_used: Some(display_model.clone()),
-                            stream_id: Some(stream_id.clone()),
-                            node_id: Some(agent_id.to_string()),
-                        }.to_json());
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: text.clone(),
+                                model_used: Some(display_model.clone()),
+                                stream_id: Some(stream_id.clone()),
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
                     } else {
-                        let _ = tx.send(WsMessage::AssistantChunk {
-                            stream_id: stream_id.clone(),
-                            text: text.clone(),
-                        }.to_json());
+                        let _ = tx.send(
+                            WsMessage::AssistantChunk {
+                                stream_id: stream_id.clone(),
+                                text: text.clone(),
+                            }
+                            .to_json(),
+                        );
                     }
                     continue;
                 }
@@ -838,25 +862,41 @@ async fn run_via_pc_agent(
                 if !stream_started {
                     stream_started = true;
                     progress_handle.abort();
-                    let _ = tx.send(WsMessage::AssistantMessage {
-                        text: text.clone(),
-                        model_used: Some(display_model.clone()),
-                        stream_id: Some(stream_id.clone()),
-                        node_id: Some(agent_id.to_string()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantMessage {
+                            text: text.clone(),
+                            model_used: Some(display_model.clone()),
+                            stream_id: Some(stream_id.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
                 } else {
-                    let _ = tx.send(WsMessage::AssistantChunk {
-                        stream_id: stream_id.clone(),
-                        text: text.clone(),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::AssistantChunk {
+                            stream_id: stream_id.clone(),
+                            text: text.clone(),
+                        }
+                        .to_json(),
+                    );
                 }
                 full_text.push_str(&text);
             }
             AgentToServer::CliDone { exit_ok, error, .. } => {
                 progress_handle.abort(); // 停止心跳
                 let has_useful_output = !full_text.trim().is_empty();
-                if exit_ok || (is_codex && has_useful_output
-                    && error.as_deref().map(|e| !e.contains("断线") && !e.contains("超时")).unwrap_or(true))
+                if exit_ok
+                    || (is_codex
+                        && has_useful_output
+                        && error
+                            .as_deref()
+                            .map(|e| {
+                                !e.contains("断线")
+                                    && !e.contains("超时")
+                                    && !e.contains("worktree")
+                                    && !e.contains("合并")
+                            })
+                            .unwrap_or(true))
                 {
                     // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
                     let reply = if stream_started {
@@ -867,20 +907,26 @@ async fn run_via_pc_agent(
                         full_text.trim().to_string()
                     };
                     if !reply.is_empty() {
-                        let _ = tx.send(WsMessage::AssistantMessage {
-                            text: reply,
-                            model_used: Some(display_model.clone()),
-                            stream_id: None,
-                            node_id: Some(agent_id.to_string()),
-                        }.to_json());
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: reply,
+                                model_used: Some(display_model.clone()),
+                                stream_id: None,
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
                     }
-                    let _ = tx.send(WsMessage::Done {
-                        message: String::new(),
-                        apk_url: None,
-                        image_url: None,
-                        model_used: Some(display_model.clone()),
-                        node_id: Some(agent_id.to_string()),
-                    }.to_json());
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                            model_used: Some(display_model.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
                     return Ok(());
                 } else {
                     return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));

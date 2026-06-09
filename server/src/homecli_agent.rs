@@ -86,6 +86,20 @@ impl AgentManager {
         cwd: Option<String>,
         prompt: String,
     ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        self.dispatch_cli_prompt_with_context(agent_id, cli, extra_args, cwd, None, prompt)
+            .await
+    }
+
+    /// 把项目 AI 提示发给 PC agent，并带上会话上下文用于 PC 本地 worktree 隔离。
+    pub async fn dispatch_cli_prompt_with_context(
+        &self,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        cwd: Option<String>,
+        project_context: Option<homecli_proto::CliProjectContext>,
+        prompt: String,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
         let agent = agents
@@ -100,6 +114,7 @@ impl AgentManager {
                 cli,
                 extra_args,
                 cwd,
+                project_context,
                 prompt,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
@@ -582,10 +597,17 @@ async fn run_agent_session(
                         } else {
                             // Register/Pong without task_id — 处理节点专属消息
                             match &msg {
-                                AgentToServer::RegisterCapabilities { models, tts_worker_url } => {
+                                AgentToServer::RegisterCapabilities {
+                                    models,
+                                    tts_worker_url,
+                                } => {
                                     state
                                         .node_registry
-                                        .update_capabilities(&agent_id, models.clone(), tts_worker_url.clone())
+                                        .update_capabilities(
+                                            &agent_id,
+                                            models.clone(),
+                                            tts_worker_url.clone(),
+                                        )
                                         .await;
                                 }
                                 AgentToServer::Pong { .. } => {

@@ -442,6 +442,12 @@ pub(crate) async fn run_project_agent_with_scheduler(
 
     if is_pc_node_project {
         // PC 节点项目快速路径：跳过 worktree/调度器，直接交给 agent
+        let _ = tx.send(
+            WsMessage::progress(
+                "PC 节点项目已启用本机会话隔离：代码会在你的 PC 节点上创建/复用会话 worktree 后执行。",
+            )
+            .to_json(),
+        );
         agent::run_for_project(
             &user_id,
             &project,

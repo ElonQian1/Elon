@@ -1,9 +1,11 @@
 package com.elon.app
 
+import android.content.Context
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 
@@ -23,6 +25,13 @@ internal data class StoreProject(
     val latestApkUrl: String? = null,
     val iconDataUrl: String? = null,
     val role: String = "member"
+)
+
+internal data class ProjectCreateNodeOption(
+    val nodeId: String,
+    val displayName: String,
+    val shortId: String,
+    val online: Boolean
 )
 
 internal fun StoreProject.toJointAppProject(): AppProject {
@@ -97,13 +106,15 @@ internal fun createStoreProject(
     name: String,
     description: String?,
     token: String,
-    ownerAccount: String? = null
+    ownerAccount: String? = null,
+    nodeId: String? = null
 ): StoreProject {
     val payload = JSONObject().apply {
         put("name", name)
         put("description", description ?: "")
         put("template", "android")
         put("execution_target", "pc_node")
+        if (!nodeId.isNullOrBlank()) put("node_id", nodeId)
     }
     val resp = http.newCall(
         Request.Builder()
@@ -117,6 +128,40 @@ internal fun createStoreProject(
     val project = JSONObject(body).optJSONObject("project")
         ?: error("响应缺少 project")
     return parseCreatedStoreProject(project, ownerAccount)
+}
+
+internal fun fetchProjectCreateNodes(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: Context
+): List<ProjectCreateNodeOption> {
+    val req = AuthManager.applyAuth(
+        ctx,
+        Request.Builder().url("$serverUrl/api/me/nodes").get()
+    ).build()
+    val resp = http.newCall(req).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(apiErrorMessage(body, resp.code))
+    val arr: JSONArray = JSONObject(body).optJSONArray("nodes") ?: return emptyList()
+    return (0 until arr.length()).mapNotNull { index ->
+        val obj = arr.optJSONObject(index) ?: return@mapNotNull null
+        val nodeId = obj.optString("node_id", obj.optString("agent_id", "")).trim()
+        if (nodeId.isBlank()) return@mapNotNull null
+        val shortId = obj.optString("short_id").ifBlank {
+            if (nodeId.length > 16) "...${nodeId.takeLast(14)}" else nodeId
+        }
+        val deviceName = obj.optString("device_name").trim()
+        val displayName = obj.optString("display_name")
+            .ifBlank { obj.optString("label") }
+            .ifBlank { deviceName }
+            .ifBlank { shortId }
+        ProjectCreateNodeOption(
+            nodeId = nodeId,
+            displayName = displayName,
+            shortId = shortId,
+            online = obj.optBoolean("online", false)
+        )
+    }
 }
 
 private fun apiErrorMessage(body: String, code: Int): String {

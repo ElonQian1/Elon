@@ -776,6 +776,7 @@ async fn run_cli_prompt(
     cli_name: &str,
     extra_args: Vec<String>,
     cwd: Option<String>,
+    conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     prompt: String,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
@@ -1009,6 +1010,7 @@ async fn run_cli_prompt(
     } else {
         Some(cli_done_error(cli_name, &stdout_text, &stderr_text))
     };
+    let (exit_ok, error) = finalize_cli_prompt_workspace(exit_ok, error, conversation_workspace);
     let combined_usage_text = format!("{}\n{}", stdout_text, stderr_text);
     let usage = cli_usage::parse_cli_usage(&combined_usage_text);
     let model = usage
@@ -1018,6 +1020,74 @@ async fn run_cli_prompt(
     let _ = out_tx.send(ws_text(&cli_done_message(
         req_id, exit_ok, error, usage, model,
     )));
+}
+
+struct PreparedCliPromptCwd {
+    cwd: Option<String>,
+    conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
+}
+
+fn prepare_cli_prompt_cwd(
+    cwd: Option<String>,
+    project_context: Option<homecli_proto::CliProjectContext>,
+) -> anyhow::Result<PreparedCliPromptCwd> {
+    let Some(base_cwd) = cwd else {
+        return Ok(PreparedCliPromptCwd {
+            cwd: None,
+            conversation_workspace: None,
+        });
+    };
+    let Some(context) = project_context else {
+        return Ok(PreparedCliPromptCwd {
+            cwd: Some(base_cwd),
+            conversation_workspace: None,
+        });
+    };
+    let workspace = pc_workspace_provisioner::prepare_conversation_workspace(
+        &base_cwd,
+        &context.project_id,
+        &context.conversation_id,
+    )?;
+    if workspace.isolated {
+        info!(
+            "🧩 项目会话使用隔离 worktree: project={} conversation={} path={}",
+            context.project_id, context.conversation_id, workspace.workspace_path
+        );
+    }
+    Ok(PreparedCliPromptCwd {
+        cwd: Some(workspace.workspace_path.clone()),
+        conversation_workspace: workspace.isolated.then_some(workspace),
+    })
+}
+
+fn finalize_cli_prompt_workspace(
+    exit_ok: bool,
+    error: Option<String>,
+    workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
+) -> (bool, Option<String>) {
+    if !exit_ok {
+        return (exit_ok, error);
+    }
+    let Some(workspace) = workspace else {
+        return (exit_ok, error);
+    };
+    match pc_workspace_provisioner::merge_conversation_workspace(&workspace) {
+        Ok(message)
+            if message.starts_with("conversation worktree still")
+                || message.starts_with("base workspace") =>
+        {
+            warn!("会话 worktree 暂未合并: {message}");
+            (false, Some(message))
+        }
+        Ok(message) => {
+            info!("会话 worktree 合并结果: {message}");
+            (true, None)
+        }
+        Err(e) => {
+            warn!("会话 worktree 合并失败: {e:#}");
+            (false, Some(format!("会话 worktree 合并失败: {e}")))
+        }
+    }
 }
 
 fn cli_done_message(
@@ -1149,10 +1219,18 @@ async fn run_tts_synthesis(
         "text": text,
         "cacheVersion": "pc_relay_v1",
     });
-    if let Some(v) = &voice_id  { body["voiceId"]    = serde_json::json!(v); }
-    if let Some(e) = &emotion_id { body["emotionId"]  = serde_json::json!(e); }
-    if let Some(i) = &intensity  { body["intensity"]  = serde_json::json!(i); }
-    if let Some(p) = &provider   { body["provider"]   = serde_json::json!(p); }
+    if let Some(v) = &voice_id {
+        body["voiceId"] = serde_json::json!(v);
+    }
+    if let Some(e) = &emotion_id {
+        body["emotionId"] = serde_json::json!(e);
+    }
+    if let Some(i) = &intensity {
+        body["intensity"] = serde_json::json!(i);
+    }
+    if let Some(p) = &provider {
+        body["provider"] = serde_json::json!(p);
+    }
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(180))
@@ -1191,19 +1269,43 @@ async fn run_tts_synthesis(
     if content_type.starts_with("application/json") {
         match resp.json::<serde_json::Value>().await {
             Ok(j) => {
-                let b64 = j.get("audioBase64").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let mime = j.get("mime").and_then(|v| v.as_str()).unwrap_or("audio/wav").to_string();
-                AgentToServer::TtsSynthesizeResponse { req_id, audio_b64: b64, mime, worker_voice }
+                let b64 = j
+                    .get("audioBase64")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let mime = j
+                    .get("mime")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("audio/wav")
+                    .to_string();
+                AgentToServer::TtsSynthesizeResponse {
+                    req_id,
+                    audio_b64: b64,
+                    mime,
+                    worker_voice,
+                }
             }
-            Err(e) => AgentToServer::TtsSynthesizeError { req_id, message: format!("JSON 解析失败: {e}") },
+            Err(e) => AgentToServer::TtsSynthesizeError {
+                req_id,
+                message: format!("JSON 解析失败: {e}"),
+            },
         }
     } else {
         match resp.bytes().await {
             Ok(bytes) => {
                 let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                AgentToServer::TtsSynthesizeResponse { req_id, audio_b64: b64, mime: content_type, worker_voice }
+                AgentToServer::TtsSynthesizeResponse {
+                    req_id,
+                    audio_b64: b64,
+                    mime: content_type,
+                    worker_voice,
+                }
             }
-            Err(e) => AgentToServer::TtsSynthesizeError { req_id, message: format!("读取音频失败: {e}") },
+            Err(e) => AgentToServer::TtsSynthesizeError {
+                req_id,
+                message: format!("读取音频失败: {e}"),
+            },
         }
     }
 }
@@ -1390,6 +1492,7 @@ async fn run_session(
                             cli,
                             extra_args,
                             cwd,
+                            project_context,
                             prompt,
                         } => {
                             info!("📝 CliPrompt: {} cli={}", req_id, cli);
@@ -1411,12 +1514,31 @@ async fn run_session(
                                         .as_deref(),
                                 )
                                 .await;
+                                let prepared_cwd =
+                                    match prepare_cli_prompt_cwd(cwd, project_context) {
+                                        Ok(cwd) => cwd,
+                                        Err(e) => {
+                                            let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
+                                                req_id,
+                                                exit_ok: false,
+                                                error: Some(e.to_string()),
+                                                prompt_tokens: None,
+                                                cached_input_tokens: None,
+                                                completion_tokens: None,
+                                                reasoning_tokens: None,
+                                                total_tokens: None,
+                                                model: None,
+                                            }));
+                                            return;
+                                        }
+                                    };
                                 run_cli_prompt(
                                     req_id,
                                     &full_path,
                                     &cli,
                                     resolved_args,
-                                    cwd,
+                                    prepared_cwd.cwd,
+                                    prepared_cwd.conversation_workspace,
                                     prompt,
                                     tx_c,
                                 )
@@ -1455,7 +1577,11 @@ async fn run_session(
                                         message: "本机 TTS Worker 未配置".to_string(),
                                     },
                                     Some(url) => {
-                                        run_tts_synthesis(req_id, url, text, voice_id, emotion_id, intensity, provider).await
+                                        run_tts_synthesis(
+                                            req_id, url, text, voice_id, emotion_id, intensity,
+                                            provider,
+                                        )
+                                        .await
                                     }
                                 };
                                 let _ = tx_c.send(ws_text(&reply));
@@ -1665,8 +1791,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
                 axum::routing::post(admin_register_project),
             )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
-            .route("/api/tts-relay-config", axum::routing::get(admin_tts_relay_get)
-                .post(admin_tts_relay_set))
+            .route(
+                "/api/tts-relay-config",
+                axum::routing::get(admin_tts_relay_get).post(admin_tts_relay_set),
+            )
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -1721,7 +1849,12 @@ async fn admin_tts_status() -> axum::Json<serde_json::Value> {
         .and_then(|v| v.parse::<u16>().ok())
         .unwrap_or(5011);
     let enabled = std::env::var("TTS_WORKER_ENABLED")
-        .map(|v| matches!(v.trim().to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|v| {
+            matches!(
+                v.trim().to_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(false);
     let url = format!("http://127.0.0.1:{}/health", port);
     let client = reqwest::Client::builder()
@@ -1738,13 +1871,15 @@ async fn admin_tts_status() -> axum::Json<serde_json::Value> {
                     "health": body,
                 }));
             }
-            axum::Json(serde_json::json!({ "running": true, "enabled_in_env": enabled, "port": port }))
+            axum::Json(
+                serde_json::json!({ "running": true, "enabled_in_env": enabled, "port": port }),
+            )
         }
         _ => axum::Json(serde_json::json!({
             "running": false,
             "enabled_in_env": enabled,
             "port": port,
-        }))
+        })),
     }
 }
 

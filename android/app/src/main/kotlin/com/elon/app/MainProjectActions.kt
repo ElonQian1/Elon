@@ -68,27 +68,14 @@ internal class MainProjectActions(
     }
 
     fun showCreateProjectDialog() {
-        val input = titleEditText("新项目 ${projects.size + 1}")
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("新建项目")
-            .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("创建", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val title = input.text.toString().trim()
-                if (title.isBlank()) {
-                    input.error = "请输入项目名称"
-                    return@setOnClickListener
-                }
-                createProject(title)
-                dialog.dismiss()
-            }
+        ProjectCreateDialog.show(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            defaultTitle = "新项目 ${projects.size + 1}",
+        ) { title, nodeId ->
+            createProject(title, nodeId)
         }
-        dialog.show()
-        input.selectAll()
     }
 
     fun showCreateJointProjectDialog() {
@@ -768,7 +755,7 @@ internal class MainProjectActions(
         }.start()
     }
 
-    private fun createProject(title: String) {
+    private fun createProject(title: String, nodeId: String? = null) {
         val token = tokenProvider() ?: run {
             Toast.makeText(activity, "请先登录并启动 PC 节点后新建项目", Toast.LENGTH_SHORT).show()
             return
@@ -783,7 +770,8 @@ internal class MainProjectActions(
                     name = title,
                     description = "个人开发项目",
                     token = token,
-                    ownerAccount = ownerAccount
+                    ownerAccount = ownerAccount,
+                    nodeId = nodeId
                 )
                 activity.runOnUiThread {
                     val appProject = created.toOwnerAppProject()

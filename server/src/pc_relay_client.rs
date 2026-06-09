@@ -203,10 +203,19 @@ async fn run_relay_session(
                 cli,
                 extra_args,
                 cwd,
+                project_context,
                 prompt,
             } => {
                 let tx = out_tx.clone();
-                tokio::spawn(handle_cli_prompt(req_id, cli, extra_args, cwd, prompt, tx));
+                tokio::spawn(handle_cli_prompt(
+                    req_id,
+                    cli,
+                    extra_args,
+                    cwd,
+                    project_context,
+                    prompt,
+                    tx,
+                ));
             }
 
             ServerToAgent::Ping { nonce } => {
@@ -303,6 +312,7 @@ async fn handle_cli_prompt(
     cli: String,
     extra_args: Vec<String>,
     cwd: Option<String>,
+    project_context: Option<homecli_proto::CliProjectContext>,
     prompt: String,
     out: mpsc::UnboundedSender<Message>,
 ) {
@@ -312,14 +322,43 @@ async fn handle_cli_prompt(
         cwd.as_deref().unwrap_or("<default>"),
         req_id
     );
+    let prepared_cwd = match prepare_cli_cwd(cwd, project_context) {
+        Ok(cwd) => cwd,
+        Err(e) => {
+            warn!("[relay-client] 准备 CLI 工作目录失败: {e:#}");
+            let done = AgentToServer::CliDone {
+                req_id,
+                exit_ok: false,
+                error: Some(e.to_string()),
+                prompt_tokens: None,
+                cached_input_tokens: None,
+                completion_tokens: None,
+                reasoning_tokens: None,
+                total_tokens: None,
+                model: None,
+            };
+            let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
+            return;
+        }
+    };
+    let (exit_ok, error) = match run_cli_and_stream(
+        &req_id,
+        &cli,
+        &extra_args,
+        prepared_cwd.cwd.as_deref(),
+        &prompt,
+        &out,
+    )
+    .await
+    {
+        Ok(ok) => (ok, None),
+        Err(e) => {
+            warn!("[relay-client] CLI 执行失败: {e:#}");
+            (false, Some(e.to_string()))
+        }
+    };
     let (exit_ok, error) =
-        match run_cli_and_stream(&req_id, &cli, &extra_args, cwd.as_deref(), &prompt, &out).await {
-            Ok(ok) => (ok, None),
-            Err(e) => {
-                warn!("[relay-client] CLI 执行失败: {e:#}");
-                (false, Some(e.to_string()))
-            }
-        };
+        finalize_cli_workspace(exit_ok, error, prepared_cwd.conversation_workspace);
     let done = AgentToServer::CliDone {
         req_id,
         exit_ok,
@@ -332,6 +371,74 @@ async fn handle_cli_prompt(
         model: None,
     };
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
+}
+
+struct PreparedCliCwd {
+    cwd: Option<String>,
+    conversation_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
+}
+
+fn prepare_cli_cwd(
+    cwd: Option<String>,
+    project_context: Option<homecli_proto::CliProjectContext>,
+) -> Result<PreparedCliCwd> {
+    let Some(base_cwd) = cwd else {
+        return Ok(PreparedCliCwd {
+            cwd: None,
+            conversation_workspace: None,
+        });
+    };
+    let Some(context) = project_context else {
+        return Ok(PreparedCliCwd {
+            cwd: Some(base_cwd),
+            conversation_workspace: None,
+        });
+    };
+    let workspace = crate::pc_workspace_provisioner::prepare_conversation_workspace(
+        &base_cwd,
+        &context.project_id,
+        &context.conversation_id,
+    )?;
+    if workspace.isolated {
+        info!(
+            "[relay-client] project={} conversation={} 使用会话 worktree: {}",
+            context.project_id, context.conversation_id, workspace.workspace_path
+        );
+    }
+    Ok(PreparedCliCwd {
+        cwd: Some(workspace.workspace_path.clone()),
+        conversation_workspace: workspace.isolated.then_some(workspace),
+    })
+}
+
+fn finalize_cli_workspace(
+    exit_ok: bool,
+    error: Option<String>,
+    workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
+) -> (bool, Option<String>) {
+    if !exit_ok {
+        return (exit_ok, error);
+    }
+    let Some(workspace) = workspace else {
+        return (exit_ok, error);
+    };
+    match crate::pc_workspace_provisioner::merge_conversation_workspace(&workspace) {
+        Ok(message)
+            if message.starts_with("conversation worktree still")
+                || message.starts_with("base workspace") =>
+        {
+            warn!("[relay-client] 会话 worktree 暂未合并: {message}");
+            (false, Some(message))
+        }
+        Ok(message) => {
+            info!("[relay-client] 会话 worktree 合并结果: {message}");
+            (true, None)
+        }
+        Err(e) => {
+            warn!("[relay-client] 会话 worktree 合并失败: {e:#}");
+            (false, Some(format!("会话 worktree 合并失败: {e}")))
+        }
+    }
 }
 
 fn resolve_cli_program(cli: &str) -> String {

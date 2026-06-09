@@ -1453,6 +1453,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <option value="android_compose">Android（Compose）</option>
       </select>
     </div>
+    <div>
+      <label for="projectNodeSelect">PC 节点</label>
+      <select id="projectNodeSelect" disabled>
+        <option value="">正在加载你的 PC 节点...</option>
+      </select>
+    </div>
     <div class="error-text" id="newProjectError"></div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="cancelNewProjectBtn">取消</button>
@@ -1707,6 +1713,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectNameInput = $('projectNameInput');
   const projectDescInput = $('projectDescInput');
   const templateSelect = $('templateSelect');
+  const projectNodeSelect = $('projectNodeSelect');
   const newProjectError = $('newProjectError');
   const createProjectBtn = $('createProjectBtn');
   const cancelNewProjectBtn = $('cancelNewProjectBtn');
@@ -3261,10 +3268,34 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     newProjectError.textContent = '';
     projectNameInput.value = '';
     projectDescInput.value = '';
+    loadProjectCreateNodes().catch((err) => {
+      projectNodeSelect.innerHTML = '<option value="">加载 PC 节点失败</option>';
+      projectNodeSelect.disabled = true;
+      newProjectError.textContent = err.message || '加载 PC 节点失败';
+    });
     newProjectMask.classList.add('active');
     setTimeout(() => projectNameInput.focus(), 50);
   }
   function closeNewProject() { newProjectMask.classList.remove('active'); }
+  async function loadProjectCreateNodes() {
+    projectNodeSelect.disabled = true;
+    projectNodeSelect.innerHTML = '<option value="">正在加载你的 PC 节点...</option>';
+    const res = await api('/api/me/nodes');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载 PC 节点失败');
+    const nodes = (data.nodes || []).filter((node) => node.online && (node.node_id || node.agent_id));
+    if (!nodes.length) {
+      projectNodeSelect.innerHTML = '<option value="">没有在线 PC 节点</option>';
+      return;
+    }
+    projectNodeSelect.innerHTML = nodes.map((node) => {
+      const nodeId = node.node_id || node.agent_id || '';
+      const shortId = node.short_id || (nodeId.length > 16 ? '...' + nodeId.slice(-14) : nodeId);
+      const label = node.display_name || node.label || node.device_name || shortId;
+      return `<option value="${escapeHtml(nodeId)}">${escapeHtml(label)} · ${escapeHtml(shortId)}</option>`;
+    }).join('');
+    projectNodeSelect.disabled = false;
+  }
   function openAddFriendDialog() {
     addFriendResult.textContent = '';
     friendSearchType.value = 'auto';
@@ -3290,12 +3321,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     createProjectBtn.disabled = true;
     newProjectError.textContent = '';
     try {
+      if (!projectNodeSelect.value) throw new Error('请先选择一个在线 PC 节点');
       const res = await api('/api/projects', {
         method: 'POST',
         body: JSON.stringify({
           name: projectNameInput.value.trim(),
           description: projectDescInput.value.trim(),
-          template: templateSelect.value
+          template: templateSelect.value,
+          execution_target: 'pc_node',
+          node_id: projectNodeSelect.value
         })
       });
       const data = await res.json().catch(() => ({}));

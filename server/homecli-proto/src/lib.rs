@@ -18,6 +18,12 @@ pub struct ModelCapability {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliProjectContext {
+    pub project_id: String,
+    pub conversation_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
     Exec {
@@ -58,6 +64,10 @@ pub enum ServerToAgent {
         /// 可选工作目录；为空时由 PC relay 使用自身默认工作目录
         #[serde(default)]
         cwd: Option<String>,
+        /// 项目会话上下文。新版 PC 节点会用它把 CLI cwd 切到会话隔离 worktree；
+        /// 老版节点忽略未知字段后仍可直接在 cwd 执行。
+        #[serde(default)]
+        project_context: Option<CliProjectContext>,
         /// 完整的提示内容
         prompt: String,
     },
