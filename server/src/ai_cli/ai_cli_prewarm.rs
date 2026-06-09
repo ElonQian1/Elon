@@ -91,12 +91,14 @@ pub async fn prewarm_codex_session(
     )
     .await?;
     let usage_text = format!("{}\n{}", output.stdout, output.stderr);
-    crate::token_usage_api::record_codex_usage_from_stdout(
+    let accounting_key = trace_id.map(|trace_id| format!("codex_cli_prewarm:{trace_id}"));
+    crate::token_usage_api::record_codex_usage_from_stdout_with_key(
         &state.store,
         &native_session_scope.user_id,
         "codex_cli_prewarm",
         Some(option.id.as_str()),
         &usage_text,
+        accounting_key.as_deref(),
     );
     let thread_id = extract_thread_id(&output.stdout);
     if let Some(thread_id) = thread_id.as_deref() {

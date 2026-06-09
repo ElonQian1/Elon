@@ -31,7 +31,10 @@ pub enum RealtimeChatEvent {
     AiTranscriptDone(String),
     AudioDelta(Vec<u8>),
     AudioDone,
-    ResponseDone(Option<CliTokenUsage>),
+    ResponseDone {
+        response_id: Option<String>,
+        usage: Option<CliTokenUsage>,
+    },
     Error(String),
     Closed,
 }
@@ -208,7 +211,17 @@ fn parse_realtime_event(value: &Value) -> Option<RealtimeChatEvent> {
             .get("text")
             .and_then(Value::as_str)
             .map(|text| RealtimeChatEvent::AiTranscriptDone(text.to_string())),
-        "response.done" => Some(RealtimeChatEvent::ResponseDone(usage_from_value(value))),
+        "response.done" => {
+            let response_id = value
+                .get("response")
+                .and_then(|response| response.get("id"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            Some(RealtimeChatEvent::ResponseDone {
+                response_id,
+                usage: usage_from_value(value),
+            })
+        }
         "error" => {
             let message = value
                 .get("error")
@@ -233,6 +246,7 @@ mod tests {
         let event = parse_realtime_event(&json!({
             "type": "response.done",
             "response": {
+                "id": "resp_test",
                 "model": "gpt-realtime",
                 "usage": {
                     "input_tokens": 12,
@@ -242,9 +256,14 @@ mod tests {
             }
         }))
         .expect("event parses");
-        let RealtimeChatEvent::ResponseDone(Some(usage)) = event else {
+        let RealtimeChatEvent::ResponseDone {
+            response_id,
+            usage: Some(usage),
+        } = event
+        else {
             panic!("expected usage");
         };
+        assert_eq!(response_id.as_deref(), Some("resp_test"));
         assert_eq!(usage.input_tokens, 12);
         assert_eq!(usage.output_tokens, 8);
         assert_eq!(usage.model.as_deref(), Some("gpt-realtime"));

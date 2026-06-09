@@ -176,12 +176,14 @@ pub async fn confirm_project_intent(
 
     if let Some(scope) = native_session_scope.as_ref() {
         let usage_text = format!("{}\n{}", output.stdout, output.stderr);
-        crate::token_usage_api::record_codex_usage_from_stdout(
+        let accounting_key = trace_id.map(|trace_id| format!("codex_cli_intent_gate:{trace_id}"));
+        crate::token_usage_api::record_codex_usage_from_stdout_with_key(
             &state.store,
             &scope.user_id,
             "codex_cli_intent_gate",
             Some(option.id.as_str()),
             &usage_text,
+            accounting_key.as_deref(),
         );
     }
 

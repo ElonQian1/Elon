@@ -767,6 +767,36 @@ function closeConvModal() {
     <div class="loader"></div>
   </div>
 
+  <!-- 对账审计 -->
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">计费对账审计</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">优先显示未扣费、旧记录和零费用调用</div>
+      </div>
+      <span id="accountingAuditSubtitle" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">状态</th>
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px">功能</th>
+            <th style="padding:8px 10px">来源</th>
+            <th style="padding:8px 10px;text-align:right">Token</th>
+            <th style="padding:8px 10px;text-align:right">调用</th>
+            <th style="padding:8px 10px;text-align:right">已扣金额</th>
+            <th style="padding:8px 10px">最后调用</th>
+          </tr>
+        </thead>
+        <tbody id="accountingAuditBody">
+          <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- 趋势图 -->
   <div class="card" style="margin-bottom:24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -951,6 +981,7 @@ let currentQuotaUserId = null;
 function loadTokenStats() {
   const days = document.getElementById('statsDays').value;
   loadSummary(days);
+  loadAccountingAudit(days);
   loadTrend(days);
   loadUsersTable(days);
 }
@@ -965,6 +996,7 @@ function loadSummary(days) {
         summaryCard('📦 周期总 Token', fmtNum(d.total_tokens_period), 'var(--accent)'),
         summaryCard('📅 今日 Token', fmtNum(d.total_tokens_today), 'var(--success)'),
         summaryCard('💰 估算费用', '¥' + d.estimated_cost_cny.toFixed(4), '#fbbf24'),
+        summaryCard('✅ 实际扣费', '¥' + (((d.billed_cost_rmb_fen_period || 0) / 100).toFixed(2)), 'var(--success)'),
         summaryCard('👥 活跃用户', d.active_users_period, 'var(--text-dim)'),
         summaryCard('📞 调用次数', fmtNum(d.call_count_period), 'var(--text-dim)'),
       ].join('');
@@ -977,6 +1009,57 @@ function summaryCard(label, val, color) {
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${label}</div>
     <div style="font-size:24px;font-weight:700;color:${color}">${val}</div>
   </div>`;
+}
+
+function loadAccountingAudit(days) {
+  const tbody = document.getElementById('accountingAuditBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>';
+  fetch('/api/admin/token-stats/accounting-audit?days=' + days + '&limit=100', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => r.json())
+    .then(d => {
+      const rows = d.rows || [];
+      document.getElementById('accountingAuditSubtitle').textContent = '共 ' + rows.length + ' 组';
+      renderAccountingAudit(rows);
+    })
+    .catch(e => {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--danger);padding:12px">' + esc(String(e)) + '</td></tr>';
+    });
+}
+
+function renderAccountingAudit(rows) {
+  const tbody = document.getElementById('accountingAuditBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">暂无对账异常</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const status = accountingStatusBadge(row.accounting_status);
+    const cost = ((row.billed_cost_rmb_fen || 0) / 100).toFixed(2);
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px">${status}</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(row.account || row.user_id)}</div>
+        ${row.nickname ? '<div style="font-size:11px;color:var(--text-dim)">' + esc(row.nickname) + '</div>' : ''}
+        <div style="font-size:10px;color:var(--text-dim)">${esc(row.user_id || '')}</div>
+      </td>
+      <td style="padding:8px 10px">${esc(row.feature || '')}</td>
+      <td style="padding:8px 10px">${esc(row.usage_mode || '')}</td>
+      <td style="padding:8px 10px;text-align:right">${fmtNum(row.total_tokens || 0)}</td>
+      <td style="padding:8px 10px;text-align:right">${fmtNum(row.call_count || 0)}</td>
+      <td style="padding:8px 10px;text-align:right;color:#fbbf24">¥${cost}</td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(row.last_call_at || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function accountingStatusBadge(status) {
+  const s = status || 'unknown';
+  if (s === 'billed') return '<span style="color:#4ade80;font-size:12px">已扣费</span>';
+  if (s === 'zero_cost') return '<span style="color:#fbbf24;font-size:12px">零费用</span>';
+  if (s === 'unbilled_no_balance') return '<span style="color:#ff4d6d;font-size:12px">未扣费</span>';
+  if (s === 'legacy') return '<span style="color:#94a3b8;font-size:12px">历史记录</span>';
+  return '<span style="color:#ff4d6d;font-size:12px">' + esc(s) + '</span>';
 }
 
 function loadTrend(days) {

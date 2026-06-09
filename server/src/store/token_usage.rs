@@ -31,6 +31,10 @@ pub struct TokenUsageRecord<'a> {
     pub output_tokens: i64,
     pub reasoning_tokens: i64,
     pub total_tokens: i64,
+    /// Stable request/trace key for idempotent trusted accounting.
+    ///
+    /// When present, the same `(user_id, idempotency_key)` is billed at most once.
+    pub idempotency_key: Option<&'a str>,
 }
 
 /// 可信用量对应的扣费参数。
@@ -52,6 +56,8 @@ pub struct TokenUsageAccountingResult {
     pub cost_rmb_fen: i64,
     pub balance_after_fen: Option<i64>,
     pub accounting_status: String,
+    pub idempotency_key: Option<String>,
+    pub deduplicated: bool,
 }
 
 // ── 查询结构 ──────────────────────────────────────────────────────────────────
@@ -127,12 +133,13 @@ impl Store {
     pub fn record_token_usage(&self, r: &TokenUsageRecord<'_>) -> Result<()> {
         let id = new_id("tok");
         let created = now();
+        let idempotency_key = normalized_idempotency_key(r.idempotency_key);
         self.conn()?.execute(
             "INSERT INTO token_usage_events (
                id, user_id, feature, usage_mode, model,
                input_tokens, cached_input_tokens, output_tokens,
-               reasoning_tokens, total_tokens, created_at
-             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+               reasoning_tokens, total_tokens, created_at, idempotency_key
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
             params![
                 id,
                 r.user_id,
@@ -145,6 +152,7 @@ impl Store {
                 r.reasoning_tokens,
                 r.total_tokens,
                 created,
+                idempotency_key,
             ],
         )?;
         Ok(())
@@ -168,10 +176,37 @@ impl Store {
         let tx = conn.unchecked_transaction()?;
         let token_event_id = new_id("tok");
         let created = now();
+        let idempotency_key = normalized_idempotency_key(r.idempotency_key);
         let mut billing_event_id = None;
         let mut balance_after = None;
         let mut billed_cost = 0;
         let mut accounting_status = "unbilled_no_balance".to_string();
+
+        if let Some(key) = idempotency_key.as_deref() {
+            let existing = tx
+                .query_row(
+                    "SELECT id, billing_event_id, cost_rmb_fen, balance_after_fen, accounting_status
+                     FROM token_usage_events
+                     WHERE user_id = ?1 AND idempotency_key = ?2",
+                    params![r.user_id, key],
+                    |row| {
+                        Ok(TokenUsageAccountingResult {
+                            token_usage_event_id: row.get(0)?,
+                            billing_event_id: row.get(1)?,
+                            cost_rmb_fen: row.get(2)?,
+                            balance_after_fen: row.get(3)?,
+                            accounting_status: row.get(4)?,
+                            idempotency_key: Some(key.to_string()),
+                            deduplicated: true,
+                        })
+                    },
+                )
+                .optional()?;
+            if let Some(existing) = existing {
+                tx.commit()?;
+                return Ok(existing);
+            }
+        }
 
         let mut balance = tx
             .query_row(
@@ -231,8 +266,9 @@ impl Store {
                id, user_id, feature, usage_mode, model,
                input_tokens, cached_input_tokens, output_tokens,
                reasoning_tokens, total_tokens, created_at,
-               accounting_status, billing_event_id, cost_rmb_fen, balance_after_fen
-             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+               accounting_status, billing_event_id, cost_rmb_fen, balance_after_fen,
+               idempotency_key
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
             params![
                 token_event_id,
                 r.user_id,
@@ -249,6 +285,7 @@ impl Store {
                 billing_event_id,
                 billed_cost,
                 balance_after,
+                idempotency_key,
             ],
         )?;
         tx.commit()?;
@@ -259,6 +296,8 @@ impl Store {
             cost_rmb_fen: billed_cost,
             balance_after_fen: balance_after,
             accounting_status,
+            idempotency_key,
+            deduplicated: false,
         })
     }
 
@@ -433,6 +472,13 @@ impl Store {
     }
 }
 
+fn normalized_idempotency_key(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(160).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,6 +517,7 @@ mod tests {
             output_tokens: 1_000,
             reasoning_tokens: 0,
             total_tokens: 2_000,
+            idempotency_key: None,
         };
         let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
 
@@ -529,6 +576,7 @@ mod tests {
             output_tokens: 100,
             reasoning_tokens: 0,
             total_tokens: 200,
+            idempotency_key: None,
         };
         let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
 
@@ -575,6 +623,7 @@ mod tests {
             output_tokens: 100,
             reasoning_tokens: 0,
             total_tokens: 200,
+            idempotency_key: None,
         };
         let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
 
@@ -590,6 +639,60 @@ mod tests {
             events[0].token_usage_event_id.as_deref(),
             Some(result.token_usage_event_id.as_str())
         );
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn trusted_usage_idempotency_key_prevents_double_billing() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("idempotent-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 1_000, "test", "test", None)
+            .unwrap();
+
+        let record = TokenUsageRecord {
+            user_id: &user.id,
+            feature: "test_feature",
+            usage_mode: "server_codex_cli",
+            model: Some("gpt-4o-mini"),
+            input_tokens: 1_000,
+            cached_input_tokens: 0,
+            output_tokens: 1_000,
+            reasoning_tokens: 0,
+            total_tokens: 2_000,
+            idempotency_key: Some("trace:test-123"),
+        };
+        let first = crate::billing::account_trusted_usage(&store, &record).unwrap();
+        let second = crate::billing::account_trusted_usage(&store, &record).unwrap();
+
+        assert!(!first.deduplicated);
+        assert!(second.deduplicated);
+        assert_eq!(first.token_usage_event_id, second.token_usage_event_id);
+        assert_eq!(first.billing_event_id, second.billing_event_id);
+        assert_eq!(first.cost_rmb_fen, second.cost_rmb_fen);
+        assert_eq!(
+            store.billing_get_balance(&user.id).unwrap(),
+            Some(1_000 - first.cost_rmb_fen)
+        );
+
+        let (events, total) = store.billing_list_events(&user.id, 1, 10).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(
+            events[0].token_usage_event_id.as_deref(),
+            Some(first.token_usage_event_id.as_str())
+        );
+        let stats = store.get_usage_stats(&user.id, 30).unwrap();
+        assert_eq!(stats.total.total_tokens, 2_000);
+        assert_eq!(stats.total.billed_cost_rmb_fen, first.cost_rmb_fen);
 
         drop(store);
         let _ = std::fs::remove_file(path);

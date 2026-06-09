@@ -18,6 +18,7 @@ pub struct AdminPlatformSummary {
     pub active_users_period: i64,
     pub call_count_period: i64,
     pub estimated_cost_cny: f64,
+    pub billed_cost_rmb_fen_period: i64,
 }
 
 /// 单用户在指定周期内的统计行（用于排行榜）
@@ -208,15 +209,16 @@ impl Store {
         let since = format!("-{} days", days);
         let today_start = chrono::Utc::now().format("%Y-%m-%dT00:00:00Z").to_string();
 
-        let (total_all_time, total_today, total_period, active_users, call_count): (i64,i64,i64,i64,i64) = conn.query_row(
+        let (total_all_time, total_today, total_period, active_users, call_count, billed_cost): (i64,i64,i64,i64,i64,i64) = conn.query_row(
             "SELECT
                (SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events WHERE usage_mode != 'client_reported'),
                (SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= ?1),
                (SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= datetime('now', ?2)),
                (SELECT COUNT(DISTINCT user_id) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= datetime('now', ?2)),
-               (SELECT COUNT(*) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= datetime('now', ?2))",
+               (SELECT COUNT(*) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= datetime('now', ?2)),
+               (SELECT COALESCE(SUM(cost_rmb_fen),0) FROM token_usage_events WHERE usage_mode != 'client_reported' AND created_at >= datetime('now', ?2))",
             params![today_start, since],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         )?;
 
         // 估算费用：按模型聚合，分别估算
@@ -230,6 +232,7 @@ impl Store {
             active_users_period: active_users,
             call_count_period: call_count,
             estimated_cost_cny: cost,
+            billed_cost_rmb_fen_period: billed_cost,
         })
     }
 

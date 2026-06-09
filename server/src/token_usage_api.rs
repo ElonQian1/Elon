@@ -5,7 +5,7 @@
 //!
 //! 还提供两个 `pub(crate)` 辅助函数，供其他模块在记录用量时调用：
 //! - `record_api_usage`           服务端调用 OpenAI API 后调用
-//! - `record_codex_usage_from_stdout`  Codex CLI 运行完成后调用
+//! - `record_codex_usage_from_stdout_with_key`  Codex CLI 运行完成后调用
 
 use axum::{
     extract::{Path, Query, State},
@@ -106,6 +106,7 @@ pub async fn report_client_usage(
         output_tokens: output,
         reasoning_tokens: reasoning,
         total_tokens: total,
+        idempotency_key: None,
     };
 
     if let Err(e) = state.store.record_token_usage(&record) {
@@ -152,6 +153,18 @@ pub(crate) fn record_trusted_usage(
     model: Option<&str>,
     usage: &CliTokenUsage,
 ) {
+    record_trusted_usage_with_key(store, user_id, feature, usage_mode, model, usage, None);
+}
+
+pub(crate) fn record_trusted_usage_with_key(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    usage: &CliTokenUsage,
+    idempotency_key: Option<&str>,
+) {
     let Some(usage) = usage.clone().normalized() else {
         return;
     };
@@ -166,6 +179,7 @@ pub(crate) fn record_trusted_usage(
         output_tokens: usage.output_tokens,
         reasoning_tokens: usage.reasoning_tokens,
         total_tokens: usage.total_tokens,
+        idempotency_key,
     };
     match crate::billing::account_trusted_usage(store, &record) {
         Ok(result) => {
@@ -178,6 +192,8 @@ pub(crate) fn record_trusted_usage(
                 cost_rmb_fen = result.cost_rmb_fen,
                 balance_after_fen = ?result.balance_after_fen,
                 accounting_status = %result.accounting_status,
+                idempotency_key = ?result.idempotency_key,
+                deduplicated = result.deduplicated,
                 "record_trusted_usage accounted"
             );
         }
@@ -200,12 +216,13 @@ pub(crate) fn record_trusted_usage(
 /// Codex 输出两类事件（字段名可能是 camelCase 或 snake_case，两者都尝试）：
 /// - `{"type":"token_count", "inputTokens":N, ...}` 或 `{"type":"token_count","input_tokens":N,...}`
 /// - `{"type":"turn.completed", "usage": {"input_tokens":N, ...}}`
-pub(crate) fn record_codex_usage_from_stdout(
+pub(crate) fn record_codex_usage_from_stdout_with_key(
     store: &Store,
     user_id: &str,
     feature: &str,
     model: Option<&str>,
     stdout: &str,
+    idempotency_key: Option<&str>,
 ) {
     let Some(usage) = parse_cli_usage(stdout) else {
         tracing::debug!(
@@ -224,7 +241,15 @@ pub(crate) fn record_codex_usage_from_stdout(
         total = usage.total_tokens,
         "记录 Codex CLI token 用量"
     );
-    record_trusted_usage(store, user_id, feature, "server_codex_cli", model, &usage);
+    record_trusted_usage_with_key(
+        store,
+        user_id,
+        feature,
+        "server_codex_cli",
+        model,
+        &usage,
+        idempotency_key,
+    );
 }
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────────

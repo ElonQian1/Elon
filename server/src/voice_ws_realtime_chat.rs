@@ -174,6 +174,8 @@ async fn handle(
 
     let mut turn_input_pcm_bytes: usize = 0;
     let mut turn_output_pcm_bytes: usize = 0;
+    let accounting_session_id = uuid::Uuid::new_v4().simple().to_string();
+    let mut accounting_turn_index: u64 = 0;
     loop {
         tokio::select! {
             biased;
@@ -252,18 +254,28 @@ async fn handle(
                     RealtimeChatEvent::AudioDone => {
                         let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
                     }
-                    RealtimeChatEvent::ResponseDone(usage) => {
+                    RealtimeChatEvent::ResponseDone { response_id, usage } => {
+                        accounting_turn_index += 1;
+                        let accounting_key = response_id
+                            .as_deref()
+                            .map(|id| format!("voice_realtime_chat:{user_id}:{id}"))
+                            .unwrap_or_else(|| {
+                                format!(
+                                    "voice_realtime_chat:{user_id}:{accounting_session_id}:{accounting_turn_index}"
+                                )
+                            });
                         match usage {
-                            Some(usage) => crate::token_usage_api::record_trusted_usage(
+                            Some(usage) => crate::token_usage_api::record_trusted_usage_with_key(
                                 &state.store,
                                 &user_id,
                                 "voice_realtime_chat",
                                 crate::compute_usage::USAGE_MODE_VOICE_REALTIME,
                                 Some(&cfg.model),
                                 &usage,
+                                Some(&accounting_key),
                             ),
                             None if turn_input_pcm_bytes > 0 || turn_output_pcm_bytes > 0 => {
-                                crate::compute_usage::record_realtime_voice_estimate(
+                                crate::compute_usage::record_realtime_voice_estimate_with_key(
                                     &state.store,
                                     &user_id,
                                     "voice_realtime_chat",
@@ -272,6 +284,7 @@ async fn handle(
                                     turn_output_pcm_bytes,
                                     REALTIME_SAMPLE_RATE_HZ,
                                     1,
+                                    Some(&accounting_key),
                                 );
                             }
                             None => {}

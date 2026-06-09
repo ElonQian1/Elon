@@ -69,7 +69,7 @@ pub(crate) fn record_pcm_asr(
     );
 }
 
-pub(crate) fn record_realtime_voice_estimate(
+pub(crate) fn record_realtime_voice_estimate_with_key(
     store: &Store,
     user_id: &str,
     feature: &str,
@@ -78,10 +78,11 @@ pub(crate) fn record_realtime_voice_estimate(
     output_pcm_bytes: usize,
     sample_rate: u32,
     channels: u16,
+    idempotency_key: Option<&str>,
 ) {
     let input = pcm_audio_units(input_pcm_bytes, sample_rate, channels);
     let output = pcm_audio_units(output_pcm_bytes, sample_rate, channels);
-    record_units(
+    record_units_with_key(
         store,
         user_id,
         feature,
@@ -89,6 +90,7 @@ pub(crate) fn record_realtime_voice_estimate(
         format!("metered-realtime:{model}"),
         input,
         output,
+        idempotency_key,
     );
 }
 
@@ -122,6 +124,28 @@ fn record_units(
     input_tokens: i64,
     output_tokens: i64,
 ) {
+    record_units_with_key(
+        store,
+        user_id,
+        feature,
+        usage_mode,
+        model,
+        input_tokens,
+        output_tokens,
+        None,
+    );
+}
+
+fn record_units_with_key(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: String,
+    input_tokens: i64,
+    output_tokens: i64,
+    idempotency_key: Option<&str>,
+) {
     let usage = CliTokenUsage {
         input_tokens: input_tokens.max(0),
         output_tokens: output_tokens.max(0),
@@ -129,13 +153,14 @@ fn record_units(
         model: Some(model.clone()),
         ..CliTokenUsage::default()
     };
-    token_usage_api::record_trusted_usage(
+    token_usage_api::record_trusted_usage_with_key(
         store,
         user_id,
         feature,
         usage_mode,
         Some(&model),
         &usage,
+        idempotency_key,
     );
 }
 

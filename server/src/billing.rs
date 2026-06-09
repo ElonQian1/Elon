@@ -6,7 +6,8 @@
 //! - `deduct_usage(store, user_id, model, input, cached, output)` —— 兼容旧调用点，直接扣费
 //! - `deduct_from_response(store, user_id, model, response)` —— 兼容旧调用点，静默扣费
 //!
-//! 向后兼容：若用户在 user_balance 表中没有记录，视为"未开通计费"，全部放行。
+//! 默认严格计费：若用户没有 `user_balance` 行，调用前自动创建 0 余额并拦截。
+//! 仅当 `billing_required_for_all_users=false` 时进入兼容模式，缺余额行才放行。
 
 use serde_json::Value;
 use tracing::warn;
@@ -83,7 +84,8 @@ pub fn calc_cost_fen(
 
 /// LLM 调用前：检查余额是否充足。
 ///
-/// - 用户没有 user_balance 行 → 视为未开通计费，直接放行（返回 Ok）
+/// - 用户没有 user_balance 行 → 默认创建 0 余额并拦截
+/// - 兼容模式下用户没有 user_balance 行 → 视为未开通计费，直接放行
 /// - 有行且 balance_fen > 0 → 放行
 /// - 有行且 balance_fen <= 0 → 返回 Err（错误消息直接展示给用户）
 pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
@@ -168,7 +170,7 @@ pub fn account_trusted_usage(
 
 /// LLM 调用后：用已解析出的 token 用量执行扣费。
 ///
-/// 用户没有 `user_balance` 行表示未开通预存计费，只记录 token 用量、不扣 RMB。
+/// 兼容旧调用点：严格模式之外，用户没有 `user_balance` 行时不扣 RMB。
 pub fn deduct_usage(
     store: &Store,
     user_id: &str,

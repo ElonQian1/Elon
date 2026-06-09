@@ -50,6 +50,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (28, "项目成员个人会话公开状态", migration_v28),
     (29, "PC 项目执行会话与工作区状态", migration_v29),
     (30, "token 用量与扣费事件原子对账字段", migration_v30),
+    (31, "token 用量可信记账幂等键", migration_v31),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1112,6 +1113,23 @@ fn migration_v30(conn: &Connection) -> Result<()> {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_events_token_usage_event
           ON billing_events(token_usage_event_id)
           WHERE token_usage_event_id IS NOT NULL;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v31(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "token_usage_events",
+        "idempotency_key",
+        "idempotency_key TEXT",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_token_usage_user_idempotency
+          ON token_usage_events(user_id, idempotency_key)
+          WHERE idempotency_key IS NOT NULL;
         "#,
     )?;
     Ok(())

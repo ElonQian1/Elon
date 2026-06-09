@@ -568,12 +568,14 @@ async fn run_with_workspace_mode(
         "codex_cli_chat"
     };
     let usage_text = format!("{}\n{}", output.stdout, output.stderr);
-    crate::token_usage_api::record_codex_usage_from_stdout(
+    let accounting_key = trace_id.map(|trace_id| format!("codex_cli:{cli_feature}:{trace_id}"));
+    crate::token_usage_api::record_codex_usage_from_stdout_with_key(
         &state.store,
         user_id,
         cli_feature,
         Some(option.id.as_str()),
         &usage_text,
+        accounting_key.as_deref(),
     );
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
@@ -930,13 +932,15 @@ async fn run_via_pc_agent(
                     } else {
                         "pc_agent_cli_chat"
                     };
-                    crate::token_usage_api::record_trusted_usage(
+                    let accounting_key = format!("pc_agent_cli:{pc_req_id}");
+                    crate::token_usage_api::record_trusted_usage_with_key(
                         &state.store,
                         user_id,
                         feature,
                         "pc_agent_cli",
                         model.as_deref().or(Some(display_model.as_str())),
                         &usage,
+                        Some(&accounting_key),
                     );
                 }
                 record_pc_execution_finished(
