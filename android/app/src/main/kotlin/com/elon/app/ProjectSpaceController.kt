@@ -626,9 +626,12 @@ internal class ProjectSpaceController(
                 text = buildString {
                     append("${conversation.messageCount} 条消息")
                     if (conversation.taskCount > 0) append(" · ${conversation.taskCount} 个任务")
-                    conversation.lastTaskStatus?.takeIf { it.isNotBlank() }?.let {
-                        append(" · ").append(when (it) {
-                            "running" -> "运行中"; "done" -> "已完成"; "failed" -> "失败"; else -> it
+                    conversation.lastTaskStatus?.takeIf { it.isNotBlank() }?.let { st ->
+                        append(" \u00b7 ").append(when (st) {
+                            "running" -> "运行中"
+                            "done" -> "已完成"
+                            "failed" -> "失败"
+                            else -> st
                         })
                     }
                     conversation.updatedAt.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
@@ -703,18 +706,6 @@ internal class ProjectSpaceController(
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor(colorHex))
             setPadding(dp(20), dp(36), dp(20), dp(36))
-        }
-    }
-        return TextView(activity).apply {
-            text = if (members.isEmpty()) {
-                "暂无成员"
-            } else {
-                members.take(12).joinToString("  ·  ") { "${it.account} (${roleLabel(it.role)})" }
-            }
-            textSize = 13f
-            setTextColor(Color.parseColor("#A6AFBD"))
-            setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
         }
     }
 
