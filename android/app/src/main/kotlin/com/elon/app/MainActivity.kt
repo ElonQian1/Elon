@@ -247,6 +247,8 @@ class MainActivity : AppCompatActivity() {
         friendChatActions.resumeIfActive()
         groupChatActions.resumeIfActive()
         projectSpaceController.resumeIfActive()
+        friendActions.loadFriends()
+        groupActions.loadGroups()
         syncVisibleChatNotificationState()
         if (::agentPageController.isInitialized) agentPageController.refresh()
     }

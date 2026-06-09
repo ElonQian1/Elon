@@ -8,16 +8,20 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v4_loud_badge"
+private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v5_loud_badge"
 private const val CHAT_MESSAGE_GROUP_KEY = "com.elon.app.CHAT_MESSAGES"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
+private const val FALLBACK_RING_MS = 1600L
 
 internal object ChatMessageNotifications {
     private val shownMessageKeys = LinkedHashSet<String>()
@@ -152,6 +156,7 @@ internal object ChatMessageNotifications {
         runCatching {
             NotificationManagerCompat.from(context).notify(notificationId, notification)
         }
+        playFallbackMessageSound(context)
     }
 
     private fun messagePreview(content: String): String {
@@ -178,5 +183,27 @@ internal object ChatMessageNotifications {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun playFallbackMessageSound(context: Context) {
+        if (appInForeground) return
+        val appContext = context.applicationContext
+        val audioManager = appContext.getSystemService(AudioManager::class.java) ?: return
+        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+        if (audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) <= 0) return
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) ?: return
+        val ringtone = runCatching { RingtoneManager.getRingtone(appContext, soundUri) }.getOrNull() ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            ringtone.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        }
+        runCatching { ringtone.play() }
+        Handler(Looper.getMainLooper()).postDelayed({
+            runCatching {
+                if (ringtone.isPlaying) ringtone.stop()
+            }
+        }, FALLBACK_RING_MS)
     }
 }
