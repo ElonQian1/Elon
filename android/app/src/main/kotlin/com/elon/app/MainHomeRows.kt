@@ -51,6 +51,8 @@ internal class MainHomeRows(
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), 0, dp(14), 0)
+            clipChildren = false
+            clipToPadding = false
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
@@ -121,6 +123,8 @@ internal class MainHomeRows(
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), 0, dp(14), 0)
+            clipChildren = false
+            clipToPadding = false
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
@@ -511,6 +515,10 @@ internal class MainHomeRows(
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
+            clipChildren = false
+            clipToPadding = false
+            elevation = dp(4).toFloat()
+            translationZ = dp(4).toFloat()
             val avatar = createAvatarView(friend.name, 44, 17f, friend.avatarDataUrl).apply {
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
@@ -541,6 +549,10 @@ internal class MainHomeRows(
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
+            clipChildren = false
+            clipToPadding = false
+            elevation = dp(4).toFloat()
+            translationZ = dp(4).toFloat()
             addView(
                 if (group.members.isEmpty()) createGroupFallbackAvatar(size)
                 else createGroupMemberGrid(group.members.take(9), size)
@@ -562,8 +574,8 @@ internal class MainHomeRows(
         return TextView(activity).apply {
             layoutParams = FrameLayout.LayoutParams(badgeWidth, badgeHeight).apply {
                 gravity = Gravity.TOP or Gravity.END
-                topMargin = -dp(9)
-                rightMargin = -dp(10)
+                topMargin = -badgeHeight / 2
+                rightMargin = -badgeHeight / 2
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE

@@ -8,14 +8,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
-import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v3_sound"
+private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v4_loud_badge"
+private const val CHAT_MESSAGE_GROUP_KEY = "com.elon.app.CHAT_MESSAGES"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
 
 internal object ChatMessageNotifications {
@@ -37,6 +38,7 @@ internal object ChatMessageNotifications {
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val soundAttributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -49,7 +51,7 @@ internal object ChatMessageNotifications {
             description = "好友和群聊新消息提醒"
             setShowBadge(true)
             enableVibration(true)
-            setSound(Settings.System.DEFAULT_NOTIFICATION_URI, soundAttributes)
+            setSound(soundUri, soundAttributes)
         }
         manager.createNotificationChannel(channel)
     }
@@ -65,13 +67,15 @@ internal object ChatMessageNotifications {
         if (appInForeground && visibleFriendId == fromUserId) return
         val key = "friend:${messageId.ifBlank { "${fromUserId}:${content.hashCode()}" }}"
         if (!markMessageShown(key)) return
+        val badgeCount = incrementChatLauncherBadgeCount(context)
         showMessageNotification(
             context = context,
-            notificationId = stableNotificationId(100_000, fromUserId),
+            notificationId = stableNotificationId(100_000, key),
             title = senderName?.takeIf { it.isNotBlank() } ?: "好友消息",
             text = messagePreview(content),
             summary = "收到一条好友消息",
-            requestKey = "friend:$fromUserId"
+            requestKey = "friend:$fromUserId",
+            badgeCount = badgeCount
         )
     }
 
@@ -89,16 +93,18 @@ internal object ChatMessageNotifications {
         if (appInForeground && visibleGroupId == groupId) return
         val key = "group:${messageId.ifBlank { "${groupId}:${fromUserId}:${content.hashCode()}" }}"
         if (!markMessageShown(key)) return
+        val badgeCount = incrementChatLauncherBadgeCount(context)
         showMessageNotification(
             context = context,
-            notificationId = stableNotificationId(200_000, groupId),
+            notificationId = stableNotificationId(200_000, key),
             title = groupName?.takeIf { it.isNotBlank() } ?: "群聊消息",
             text = senderName
                 ?.takeIf { it.isNotBlank() }
                 ?.let { "$it：${messagePreview(content)}" }
                 ?: messagePreview(content),
             summary = "收到一条群聊消息",
-            requestKey = "group:$groupId"
+            requestKey = "group:$groupId",
+            badgeCount = badgeCount
         )
     }
 
@@ -108,10 +114,12 @@ internal object ChatMessageNotifications {
         title: String,
         text: String,
         summary: String,
-        requestKey: String
+        requestKey: String,
+        badgeCount: Int
     ) {
         if (!canPostNotifications(context)) return
         createChannel(context)
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val pendingIntent = PendingIntent.getActivity(
             context,
             stableNotificationId(300_000, requestKey),
@@ -131,11 +139,14 @@ internal object ChatMessageNotifications {
             .setOnlyAlertOnce(false)
             .setShowWhen(true)
             .setWhen(System.currentTimeMillis())
+            .setNumber(badgeCount.coerceAtLeast(1))
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setGroup(CHAT_MESSAGE_GROUP_KEY)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setSound(Settings.System.DEFAULT_NOTIFICATION_URI)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+            .setSound(soundUri)
             .setVibrate(longArrayOf(0L, 220L, 120L, 220L))
             .build()
         runCatching {
@@ -163,6 +174,7 @@ internal object ChatMessageNotifications {
     }
 
     private fun canPostNotifications(context: Context): Boolean {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED

@@ -1081,6 +1081,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshChatTabBadge() {
         val total = s.friends.sumOf { it.unreadCount } + s.groups.sumOf { it.unreadCount }
         navigationController.updateChatTabBadge(total)
+        setChatLauncherBadgeCount(this, total)
     }
 
     private fun showGitProjectDialog() {

@@ -10,16 +10,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
-private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v2_chat_task"
+private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v3_chat_sound_badge"
 
 internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
     ChatMessageNotifications.createChannel(activity)
@@ -30,7 +28,7 @@ internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferen
 internal fun clearCompletedTaskBadge(context: Context, prefs: SharedPreferences) {
     prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).apply()
     NotificationManagerCompat.from(context).cancel(TaskWorkService.TASK_COMPLETE_NOTIFICATION_ID)
-    updateLauncherBadgeCount(context, 0)
+    setTaskLauncherBadgeCount(context, 0)
 }
 
 internal fun createTaskWorkNotificationChannels(context: Context) {
@@ -135,7 +133,7 @@ internal fun notifyBackgroundTaskCompleted(
 ) {
     val count = prefs.getInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
     prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
-    updateLauncherBadgeCount(context, count)
+    setTaskLauncherBadgeCount(context, count)
     showTaskCompletedNotification(context, count, wasDevelopment, apkUrl, success)
 }
 
@@ -224,21 +222,4 @@ private fun canPostNotifications(context: Context): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
-}
-
-private fun updateLauncherBadgeCount(context: Context, count: Int) {
-    val badge = count.coerceAtLeast(0)
-    val payload = Bundle().apply {
-        putString("package", context.packageName)
-        putString("class", MainActivity::class.java.name)
-        putInt("badgenumber", badge)
-    }
-    listOf(
-        "content://com.huawei.android.launcher.settings/badge/",
-        "content://com.hihonor.android.launcher.settings/badge/"
-    ).forEach { badgeUri ->
-        runCatching {
-            context.contentResolver.call(Uri.parse(badgeUri), "change_badge", null, payload)
-        }
-    }
 }

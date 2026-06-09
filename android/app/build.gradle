@@ -108,6 +108,7 @@ dependencies {
     // JSON 解析
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'com.google.zxing:core:3.5.3'
+    implementation 'me.leolin:ShortcutBadger:1.1.22@aar'
 
     // 协程
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
