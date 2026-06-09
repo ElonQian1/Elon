@@ -2,7 +2,10 @@ use anyhow::{anyhow, Result};
 use axum::http::StatusCode;
 use homecli_proto::AgentToServer;
 
-use crate::{homecli_agent::AgentSummary, types::AppState};
+use crate::{
+    node_runtime::{node_runtime_by_id, supports_project_cli},
+    types::AppState,
+};
 
 pub struct PcProjectWorkspace {
     pub workspace_path: String,
@@ -15,19 +18,28 @@ pub async fn resolve_pc_project_node(
     _user_id: &str,
     requested_node_id: Option<&str>,
 ) -> Result<String, (StatusCode, String)> {
-    let cli_agents = connected_cli_agents(state).await;
     let requested_node_id = requested_node_id
         .map(str::trim)
         .filter(|value| !value.is_empty());
 
     if let Some(node_id) = requested_node_id {
-        let Some(agent) = cli_agents.iter().find(|agent| agent.agent_id == node_id) else {
+        let runtime = match node_runtime_by_id(state, node_id).await {
+            Ok(Some(runtime)) => runtime,
+            Ok(None) => {
+                return Err((
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
+                ))
+            }
+            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+        };
+        if !runtime.cli_connected {
             return Err((
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
             ));
-        };
-        if !supports_project_cli(agent) {
+        }
+        if !runtime.cli_project_ready() {
             return Err((
                 StatusCode::BAD_REQUEST,
                 format!("PC 节点不支持 Codex/Copilot CLI: {node_id}"),
@@ -36,8 +48,9 @@ pub async fn resolve_pc_project_node(
         return Ok(node_id.to_string());
     }
 
-    match cli_agents.len() {
-        1 => Ok(cli_agents[0].agent_id.clone()),
+    let cli_node_ids = connected_project_cli_node_ids(state).await;
+    match cli_node_ids.len() {
+        1 => Ok(cli_node_ids[0].clone()),
         0 => Err((
             StatusCode::SERVICE_UNAVAILABLE,
             "当前没有在线 PC 节点，无法新建代码项目。请先启动 PC 节点后重试。".into(),
@@ -91,19 +104,13 @@ pub async fn provision_project_workspace(
     }
 }
 
-async fn connected_cli_agents(state: &AppState) -> Vec<AgentSummary> {
+async fn connected_project_cli_node_ids(state: &AppState) -> Vec<String> {
     state
         .agent_manager
         .list()
         .await
         .into_iter()
-        .filter(supports_project_cli)
+        .filter(|agent| supports_project_cli(&agent.allowed_clis))
+        .map(|agent| agent.agent_id)
         .collect()
-}
-
-fn supports_project_cli(agent: &AgentSummary) -> bool {
-    agent
-        .allowed_clis
-        .iter()
-        .any(|cli| cli.eq_ignore_ascii_case("copilot") || cli.eq_ignore_ascii_case("codex"))
 }

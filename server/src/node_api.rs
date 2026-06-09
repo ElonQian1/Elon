@@ -19,7 +19,13 @@ use homecli_proto::ModelCapability;
 use sha2::Digest as _;
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{project_auth::auth_from_headers, types::AppState};
+use crate::{
+    node_runtime::{
+        clean_string, display_node_name, short_node_id, supports_project_cli, user_node_runtimes,
+    },
+    project_auth::auth_from_headers,
+    types::AppState,
+};
 use serde::{Deserialize, Serialize};
 
 // ── /api/nodes ────────────────────────────────────────────────────────────────
@@ -294,7 +300,7 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         }
     };
 
-    let credentials = match state.store.list_node_credentials(&user.id) {
+    let runtimes = match user_node_runtimes(&state, &user.id).await {
         Ok(nodes) => nodes,
         Err(e) => {
             return (
@@ -304,96 +310,32 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 .into_response()
         }
     };
-    let mut online_by_id: HashMap<_, _> = state
-        .node_registry
-        .list_by_owner(&user.id)
-        .await
-        .into_iter()
-        .map(|node| (node.node_id.clone(), node))
-        .collect();
-    let cli_by_id: HashMap<_, _> = state
-        .agent_manager
-        .list()
-        .await
-        .into_iter()
-        .map(|agent| (agent.agent_id.clone(), agent))
-        .collect();
-    let project_counts = project_counts_for_user(&state, &user.id);
 
-    let mut nodes = Vec::new();
-    for credential in credentials {
-        let node_id = credential.agent_id.clone();
-        let online = online_by_id.remove(&node_id);
-        let cli_agent = cli_by_id.get(&node_id);
-        let short_id = short_node_id(&node_id);
-        let label = credential.label.trim().to_string();
-        let device_name = online
-            .as_ref()
-            .and_then(|node| clean_string(node.device_name.as_deref()))
-            .or_else(|| cli_agent.and_then(|agent| clean_string(agent.device_name.as_deref())))
-            .or_else(|| clean_string(credential.device_name.as_deref()));
-        let display_label = if label == node_id { "" } else { &label };
-        let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
-        let models = online
-            .as_ref()
-            .map(|node| node.models.clone())
-            .unwrap_or_default();
-        let allowed_clis = cli_agent
-            .map(|agent| agent.allowed_clis.clone())
-            .unwrap_or_default();
-        let connected_at = online
-            .as_ref()
-            .map(|node| node.connected_at)
-            .unwrap_or_else(|| cli_agent.map(|agent| agent.connected_at).unwrap_or(0));
-        let is_online =
-            online.as_ref().map(|node| node.online).unwrap_or(false) || cli_agent.is_some();
-        nodes.push(MyNodeResponse {
-            agent_id: node_id.clone(),
-            node_id,
-            owner_user_id: credential.owner_user_id,
-            label,
-            device_name,
-            display_name,
-            short_id,
-            models,
-            allowed_clis: allowed_clis.clone(),
-            cli_project_ready: supports_project_cli(&allowed_clis),
-            project_count: project_counts
-                .get(&credential.agent_id)
-                .copied()
-                .unwrap_or(0),
-            connected_at,
-            created_at: credential.created_at,
-            online: is_online,
-        });
-    }
-
-    for node in online_by_id.into_values() {
-        let node_id = node.node_id.clone();
-        let cli_agent = cli_by_id.get(&node_id);
-        let allowed_clis = cli_agent
-            .map(|agent| agent.allowed_clis.clone())
-            .unwrap_or_default();
-        let short_id = short_node_id(&node_id);
-        let device_name = clean_string(node.device_name.as_deref());
-        let display_name = display_node_name("", device_name.as_deref(), &short_id);
-        nodes.push(MyNodeResponse {
-            agent_id: node_id.clone(),
-            node_id: node_id.clone(),
-            owner_user_id: node.owner_user_id,
-            label: String::new(),
-            device_name,
-            display_name,
-            short_id,
-            models: node.models,
-            allowed_clis: allowed_clis.clone(),
-            cli_project_ready: supports_project_cli(&allowed_clis),
-            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
-            connected_at: node.connected_at,
-            created_at: String::new(),
-            online: node.online,
-        });
-    }
+    let nodes = runtimes
+        .into_iter()
+        .map(|node| {
+            let cli_project_ready = node.cli_project_ready();
+            MyNodeResponse {
+                agent_id: node.node_id.clone(),
+                node_id: node.node_id,
+                owner_user_id: node.owner_user_id,
+                label: node.label,
+                device_name: node.device_name,
+                display_name: node.display_name,
+                short_id: node.short_id,
+                models: node.models,
+                allowed_clis: node.allowed_clis,
+                allowed_cwds: node.allowed_cwds,
+                cli_project_ready,
+                project_count: node.project_count,
+                connected_at: node.connected_at,
+                created_at: node.created_at,
+                online: node.online,
+                registry_online: node.registry_online,
+                cli_connected: node.cli_connected,
+            }
+        })
+        .collect::<Vec<_>>();
 
     Json(serde_json::json!({ "nodes": nodes })).into_response()
 }
@@ -426,11 +368,14 @@ struct MyNodeResponse {
     short_id: String,
     models: Vec<ModelCapability>,
     allowed_clis: Vec<String>,
+    allowed_cwds: Vec<String>,
     cli_project_ready: bool,
     project_count: i64,
     connected_at: u64,
     created_at: String,
     online: bool,
+    registry_online: bool,
+    cli_connected: bool,
 }
 
 fn project_counts_for_user(state: &AppState, user_id: &str) -> HashMap<String, i64> {
@@ -446,35 +391,6 @@ fn project_counts_for_user(state: &AppState, user_id: &str) -> HashMap<String, i
             tracing::warn!(user_id = %user_id, error = %e, "failed to count user projects per node");
             HashMap::new()
         }
-    }
-}
-
-fn supports_project_cli(allowed_clis: &[String]) -> bool {
-    allowed_clis
-        .iter()
-        .any(|cli| cli.eq_ignore_ascii_case("copilot") || cli.eq_ignore_ascii_case("codex"))
-}
-
-fn clean_string(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn display_node_name(label: &str, device_name: Option<&str>, short_id: &str) -> String {
-    clean_string(Some(label))
-        .or_else(|| clean_string(device_name))
-        .unwrap_or_else(|| short_id.to_string())
-}
-
-fn short_node_id(id: &str) -> String {
-    let chars: Vec<char> = id.chars().collect();
-    if chars.len() > 16 {
-        let tail: String = chars[chars.len() - 14..].iter().collect();
-        format!("...{tail}")
-    } else {
-        id.to_string()
     }
 }
 

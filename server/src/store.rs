@@ -47,7 +47,7 @@ use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
-pub use node_ledger::{NodeBalance, NodeTransaction, SettleParams};
+pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
 };

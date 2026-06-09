@@ -365,6 +365,8 @@ pub struct UserArchiveWorkspaceStatus {
     pub recommended_action: String,
     pub node_id: Option<String>,
     pub node_online: bool,
+    pub node_cli_connected: bool,
+    pub node_cli_project_ready: bool,
     pub node_display_name: Option<String>,
     pub can_run_on_pc: bool,
     pub latest_execution_status: Option<String>,
@@ -383,6 +385,9 @@ pub struct UserArchiveNode {
     pub display_name: String,
     pub short_id: String,
     pub online: bool,
+    pub cli_connected: bool,
+    pub cli_project_ready: bool,
+    pub allowed_clis: Vec<String>,
     pub project_count: i64,
 }
 

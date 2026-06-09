@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     conversation_router::{ensure_user_system_conversation_routes, ConversationRoute},
+    node_runtime::user_node_runtimes,
     project_workspace_lifecycle::workspace_lifecycle,
     store::{
         UserArchiveConversationRoute, UserArchiveNode, UserArchiveProject, UserArchiveSummary,
@@ -29,7 +30,7 @@ pub async fn build_user_archive_response(
 ) -> Result<UserArchiveResponse> {
     let system_routes = ensure_user_system_conversation_routes(&state.store, user_id)?;
     let mut projects = state.store.list_archive_projects_for_user(user_id)?;
-    let nodes = build_archive_nodes(state, user_id, &projects).await?;
+    let nodes = build_archive_nodes(state, user_id).await?;
     let node_by_id = nodes
         .iter()
         .map(|node| (node.node_id.clone(), node.clone()))
@@ -86,7 +87,7 @@ pub async fn build_user_archive_project_response(
 ) -> Result<Option<UserArchiveProject>> {
     let system_routes = ensure_user_system_conversation_routes(&state.store, user_id)?;
     let mut projects = state.store.list_archive_projects_for_user(user_id)?;
-    let nodes = build_archive_nodes(state, user_id, &projects).await?;
+    let nodes = build_archive_nodes(state, user_id).await?;
     let node_by_id = nodes
         .iter()
         .map(|node| (node.node_id.clone(), node.clone()))
@@ -186,6 +187,10 @@ fn workspace_status_for_project(
         }
         if !node.map(|node| node.online).unwrap_or(false) {
             warnings.push("PC 节点离线".to_string());
+        } else if !node.map(|node| node.cli_connected).unwrap_or(false) {
+            warnings.push("PC CLI 通道未连接".to_string());
+        } else if !node.map(|node| node.cli_project_ready).unwrap_or(false) {
+            warnings.push("PC 节点未上报 Codex/Copilot CLI 能力".to_string());
         }
     }
     if matches!(
@@ -203,14 +208,16 @@ fn workspace_status_for_project(
             .workspace_path
             .as_deref()
             .is_some_and(|value| !value.trim().is_empty())
-        && node.map(|node| node.online).unwrap_or(false);
+        && node
+            .map(|node| node.cli_connected && node.cli_project_ready)
+            .unwrap_or(false);
     let lifecycle = workspace_lifecycle(
         &project.workspace_kind,
         project.project.node_id.as_deref(),
         project.project.workspace_path.as_deref(),
         node.map(|node| node.online).unwrap_or(false),
         can_run_on_pc,
-        None,
+        node.map(|node| node.cli_connected && node.cli_project_ready),
         None,
         warnings.len(),
     );
@@ -224,6 +231,8 @@ fn workspace_status_for_project(
         recommended_action: lifecycle.recommended_action,
         node_id: project.project.node_id.clone(),
         node_online: node.map(|node| node.online).unwrap_or(false),
+        node_cli_connected: node.map(|node| node.cli_connected).unwrap_or(false),
+        node_cli_project_ready: node.map(|node| node.cli_project_ready).unwrap_or(false),
         node_display_name: node.map(|node| node.display_name.clone()),
         can_run_on_pc,
         latest_execution_status: latest_execution
@@ -250,95 +259,24 @@ fn execution_target_for_workspace_kind(workspace_kind: &str) -> &'static str {
     }
 }
 
-async fn build_archive_nodes(
-    state: &AppState,
-    user_id: &str,
-    projects: &[UserArchiveProject],
-) -> Result<Vec<UserArchiveNode>> {
-    let project_counts = projects
-        .iter()
-        .filter_map(|project| project.project.node_id.as_deref())
-        .fold(HashMap::<String, i64>::new(), |mut counts, node_id| {
-            *counts.entry(node_id.to_string()).or_insert(0) += 1;
-            counts
-        });
-
-    let credentials = state.store.list_node_credentials(user_id)?;
-    let mut online_by_id: HashMap<_, _> = state
-        .node_registry
-        .list_by_owner(user_id)
-        .await
+async fn build_archive_nodes(state: &AppState, user_id: &str) -> Result<Vec<UserArchiveNode>> {
+    Ok(user_node_runtimes(state, user_id)
+        .await?
         .into_iter()
-        .map(|node| (node.node_id.clone(), node))
-        .collect();
-
-    let mut nodes = Vec::new();
-    for credential in credentials {
-        let node_id = credential.agent_id.clone();
-        let online = online_by_id.remove(&node_id);
-        let short_id = short_node_id(&node_id);
-        let label = credential.label.trim().to_string();
-        let device_name = online
-            .as_ref()
-            .and_then(|node| clean_string(node.device_name.as_deref()))
-            .or_else(|| clean_string(credential.device_name.as_deref()));
-        let display_label = if label == node_id { "" } else { &label };
-        let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
-        nodes.push(UserArchiveNode {
-            node_id: node_id.clone(),
-            label,
-            device_name,
-            display_name,
-            short_id,
-            online: online.as_ref().map(|node| node.online).unwrap_or(false),
-            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
-        });
-    }
-
-    for node in online_by_id.into_values() {
-        let short_id = short_node_id(&node.node_id);
-        let device_name = clean_string(node.device_name.as_deref());
-        let display_name = display_node_name("", device_name.as_deref(), &short_id);
-        nodes.push(UserArchiveNode {
-            node_id: node.node_id.clone(),
-            label: String::new(),
-            device_name,
-            display_name,
-            short_id,
-            online: node.online,
-            project_count: project_counts.get(&node.node_id).copied().unwrap_or(0),
-        });
-    }
-
-    nodes.sort_by(|left, right| {
-        right
-            .online
-            .cmp(&left.online)
-            .then(right.project_count.cmp(&left.project_count))
-            .then_with(|| left.display_name.cmp(&right.display_name))
-    });
-    Ok(nodes)
-}
-
-fn clean_string(value: Option<&str>) -> Option<String> {
-    value
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-fn display_node_name(label: &str, device_name: Option<&str>, short_id: &str) -> String {
-    clean_string(Some(label))
-        .or_else(|| clean_string(device_name))
-        .unwrap_or_else(|| short_id.to_string())
-}
-
-fn short_node_id(id: &str) -> String {
-    let chars: Vec<char> = id.chars().collect();
-    if chars.len() > 16 {
-        let tail: String = chars[chars.len() - 14..].iter().collect();
-        format!("...{tail}")
-    } else {
-        id.to_string()
-    }
+        .map(|node| {
+            let cli_project_ready = node.cli_project_ready();
+            UserArchiveNode {
+                node_id: node.node_id,
+                label: node.label,
+                device_name: node.device_name,
+                display_name: node.display_name,
+                short_id: node.short_id,
+                online: node.online,
+                cli_connected: node.cli_connected,
+                cli_project_ready,
+                allowed_clis: node.allowed_clis,
+                project_count: node.project_count,
+            }
+        })
+        .collect())
 }

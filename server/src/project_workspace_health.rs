@@ -10,6 +10,7 @@ use std::sync::Arc;
 use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 
 use crate::{
+    node_runtime::node_runtime_by_id,
     project_auth::{auth_from_headers, json_error, project_access},
     project_workspace_lifecycle::{workspace_lifecycle, ProjectWorkspaceRecoveryAction},
     store::{is_system_project_source_type, ProjectExecutionSession},
@@ -49,6 +50,9 @@ pub struct ProjectWorkspaceHealthNode {
     pub owner_user_id: Option<String>,
     pub device_name: Option<String>,
     pub online: bool,
+    pub cli_connected: bool,
+    pub cli_project_ready: bool,
+    pub allowed_clis: Vec<String>,
     pub connected_at: Option<u64>,
     pub model_count: usize,
 }
@@ -98,6 +102,11 @@ pub async fn get_project_workspace_health(
     if matches!(node.as_ref(), Some(node) if !node.online) {
         warnings.push("PC 节点当前不在线".to_string());
     }
+    if matches!(node.as_ref(), Some(node) if node.online && !node.cli_connected) {
+        warnings.push("PC CLI 通道未连接，无法执行项目代码任务".to_string());
+    } else if matches!(node.as_ref(), Some(node) if node.cli_connected && !node.cli_project_ready) {
+        warnings.push("PC 节点未上报 Codex/Copilot CLI 能力".to_string());
+    }
     if matches!(
         latest_execution
             .as_ref()
@@ -113,12 +122,16 @@ pub async fn get_project_workspace_health(
         append_live_inspect_warnings(status, &mut warnings);
     }
 
-    let can_run_on_pc = access.node_id.is_some()
-        && access.workspace_path.is_some()
-        && node.as_ref().map(|node| node.online).unwrap_or(false);
+    let node_can_run_project_cli = node
+        .as_ref()
+        .map(|node| node.cli_connected && node.cli_project_ready)
+        .unwrap_or(false);
+    let can_run_on_pc =
+        access.node_id.is_some() && access.workspace_path.is_some() && node_can_run_project_cli;
     let verified_can_run_on_pc = live_inspect
         .as_ref()
-        .map(|status| status.path_exists && status.is_dir && cli_available(status));
+        .map(|status| status.path_exists && status.is_dir && cli_available(status))
+        .or_else(|| (!node_can_run_project_cli && node.is_some()).then_some(false));
     let lifecycle = workspace_lifecycle(
         workspace_kind_for_health(
             &access.source_type,
@@ -171,7 +184,10 @@ async fn inspect_workspace(
     let Some(workspace_path) = workspace_path.filter(|value| !value.trim().is_empty()) else {
         return (None, None);
     };
-    if !node.map(|node| node.online).unwrap_or(false) {
+    if !node
+        .map(|node| node.cli_connected && node.cli_project_ready)
+        .unwrap_or(false)
+    {
         return (None, None);
     }
 
@@ -236,37 +252,36 @@ fn cli_available(status: &ProjectWorkspaceInspectStatus) -> bool {
 }
 
 async fn node_health(state: &AppState, node_id: &str) -> ProjectWorkspaceHealthNode {
-    let online_node = state
-        .node_registry
-        .list_online()
-        .await
-        .into_iter()
-        .find(|node| node.node_id == node_id);
-    let owner_user_id = online_node
-        .as_ref()
-        .map(|node| node.owner_user_id.clone())
-        .or_else(|| {
-            state
-                .store
-                .get_node_credential_owner(node_id)
-                .ok()
-                .flatten()
-        });
+    if let Ok(Some(runtime)) = node_runtime_by_id(state, node_id).await {
+        let cli_project_ready = runtime.cli_project_ready();
+        return ProjectWorkspaceHealthNode {
+            node_id: runtime.node_id,
+            owner_user_id: (!runtime.owner_user_id.is_empty()).then_some(runtime.owner_user_id),
+            device_name: runtime.device_name,
+            online: runtime.online,
+            cli_connected: runtime.cli_connected,
+            cli_project_ready,
+            allowed_clis: runtime.allowed_clis,
+            connected_at: (runtime.connected_at > 0).then_some(runtime.connected_at),
+            model_count: runtime.models.len(),
+        };
+    }
+
+    let owner_user_id = state
+        .store
+        .get_node_credential_owner(node_id)
+        .ok()
+        .flatten();
 
     ProjectWorkspaceHealthNode {
         node_id: node_id.to_string(),
         owner_user_id,
-        device_name: online_node
-            .as_ref()
-            .and_then(|node| node.device_name.clone()),
-        online: online_node
-            .as_ref()
-            .map(|node| node.online)
-            .unwrap_or(false),
-        connected_at: online_node.as_ref().map(|node| node.connected_at),
-        model_count: online_node
-            .as_ref()
-            .map(|node| node.models.len())
-            .unwrap_or(0),
+        device_name: None,
+        online: false,
+        cli_connected: false,
+        cli_project_ready: false,
+        allowed_clis: Vec::new(),
+        connected_at: None,
+        model_count: 0,
     }
 }

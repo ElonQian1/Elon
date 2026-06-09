@@ -10,7 +10,7 @@ use crate::{
     agent_routing::{casual_chat_prompt, is_local_cli_option, quick_casual_reply},
     intent_router, tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
-    user_memory_extract::extract_and_save_memories,
+    user_memory_extract::{extract_and_save_memories, extract_and_save_memories_scoped},
 };
 
 pub(crate) async fn resolve_agent(
@@ -162,16 +162,22 @@ pub(crate) async fn run_api_inner_with_workspace(
             load_context_memories(state, user_id, memory_scope_type, memory_scope_id, 20);
         let (reply, chat_node_id, chat_model) =
             run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
-        // 非项目入口由这里提取全局记忆；项目入口在 project_chat 收尾处按 project_id 统一提取。
-        if memory_scope_type.is_none() {
-            let state2 = state.clone();
-            let uid = user_id.to_string();
-            let umsg = user_message.to_string();
-            let rep = reply.clone();
-            tokio::spawn(async move {
+        let state2 = state.clone();
+        let uid = user_id.to_string();
+        let umsg = user_message.to_string();
+        let rep = reply.clone();
+        let scope_type = memory_scope_type.map(str::to_string);
+        let scope_id = memory_scope_id.map(str::to_string);
+        tokio::spawn(async move {
+            if let Some(scope_type) = scope_type {
+                extract_and_save_memories_scoped(
+                    state2, uid, umsg, rep, scope_type, scope_id, None,
+                )
+                .await;
+            } else {
                 extract_and_save_memories(state2, uid, umsg, rep).await;
-            });
-        }
+            }
+        });
         let _ = tx.send(
             WsMessage::Done {
                 message: reply,

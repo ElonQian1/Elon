@@ -44,6 +44,7 @@ mod lm_chat;
 mod node_api;
 mod node_registry;
 mod node_router;
+mod node_runtime;
 mod pc_relay;
 mod pc_relay_client;
 mod pc_workspace_provisioner;
