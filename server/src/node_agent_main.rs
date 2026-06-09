@@ -1133,6 +1133,8 @@ async fn run_exec(
 
 // ── 本机 TTS 合成（代理到本地 model-tts-worker）────────────────────────────
 
+use base64::Engine as _;
+
 async fn run_tts_synthesis(
     req_id: String,
     worker_base_url: String,
@@ -1705,6 +1707,8 @@ async fn admin_tts_relay_set(
     rt.wake.notify_one();
     axum::Json(serde_json::json!({ "ok": true, "ttsWorkerUrl": url }))
 }
+
+async fn admin_index() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("node_agent_admin.html"))
 }
 

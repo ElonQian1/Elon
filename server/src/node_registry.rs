@@ -203,6 +203,7 @@ impl NodeRegistry {
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
                 models: e.models.clone(),
+                tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
                 online: e.last_seen.elapsed() < NODE_TIMEOUT,
             })

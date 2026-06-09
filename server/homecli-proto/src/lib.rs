@@ -246,7 +246,9 @@ impl AgentToServer {
             | Self::LlmStreamEnd { .. }
             | Self::LlmStreamError { .. }
             | Self::ProjectWorkspaceProvisioned { .. }
-            | Self::ProjectWorkspaceProvisionError { .. } => None,
+            | Self::ProjectWorkspaceProvisionError { .. }
+            | Self::TtsSynthesizeResponse { .. }
+            | Self::TtsSynthesizeError { .. } => None,
         }
     }
 

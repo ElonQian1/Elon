@@ -271,6 +271,15 @@ async fn run_relay_session(
                 };
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
+
+            // TTS 合成请求 —— pc_relay_client 不处理（由 node_agent_main 处理）
+            ServerToAgent::TtsSynthesizeRequest { req_id, .. } => {
+                let err = AgentToServer::TtsSynthesizeError {
+                    req_id,
+                    message: "此节点未配置 TTS 能力".into(),
+                };
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+            }
         }
     }
 
