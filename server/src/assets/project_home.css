@@ -259,7 +259,7 @@
   left: 0;
   right: 0;
   top: 0;
-  bottom: 58px;
+  bottom: 47px;
   padding: 17px 10px 0;
   box-sizing: border-box;
   display: flex;
@@ -325,8 +325,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 58px;
-  background: #283140;
+  height: 47px;
+  background: #303338;
   padding: 5px 10px;
   display: flex;
   flex-direction: column;
@@ -334,7 +334,7 @@
 }
 
 .project-home-card.active .project-home-info {
-  background: #283345;
+  background: #303338;
 }
 
 .project-home-title-row {

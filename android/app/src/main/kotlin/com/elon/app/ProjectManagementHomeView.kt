@@ -450,7 +450,7 @@ internal class ProjectManagementHomeView(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(5), dp(10), dp(5))
-            background = rect(if (active) "#283345" else "#283140")
+            background = rect(if (active) CARD_INFO_BAR_ACTIVE_BG else CARD_INFO_BAR_BG)
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -565,7 +565,9 @@ internal class ProjectManagementHomeView(
     private companion object {
         const val COLLAPSED_PROJECT_LIMIT = 4
         const val SECTION_ANIMATION_MS = 260L
-        const val CARD_INFO_BAR_HEIGHT_DP = 58
+        const val CARD_INFO_BAR_HEIGHT_DP = 47
+        const val CARD_INFO_BAR_BG = "#303338"
+        const val CARD_INFO_BAR_ACTIVE_BG = "#303338"
         const val SECTION_TITLE_TEXT_SP = 16f
         const val CARD_TITLE_TEXT_SP = 14.2f
         const val CARD_TIME_TEXT_SP = 12.2f
