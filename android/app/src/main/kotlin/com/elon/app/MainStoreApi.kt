@@ -24,7 +24,15 @@ internal data class StoreProject(
     val lastTaskStatus: String?,
     val latestApkUrl: String? = null,
     val iconDataUrl: String? = null,
-    val role: String = "member"
+    val role: String = "member",
+    val remoteConversationCount: Int? = null,
+    val workspaceKind: String? = null,
+    val workspaceHealthLabel: String? = null,
+    val workspaceHealthTone: String? = null,
+    val archiveEntryKey: String? = null,
+    val archiveConversationTitle: String? = null,
+    val memoryScopeType: String? = null,
+    val memoryScopeId: String? = null
 )
 
 internal data class ProjectCreateNodeOption(
@@ -43,7 +51,15 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
         memberCount = memberCount.coerceAtLeast(0),
-        projectDescription = description?.takeIf { it.isNotBlank() }
+        projectDescription = description?.takeIf { it.isNotBlank() },
+        remoteConversationCount = remoteConversationCount,
+        workspaceKind = workspaceKind,
+        workspaceHealthLabel = workspaceHealthLabel,
+        workspaceHealthTone = workspaceHealthTone,
+        archiveEntryKey = archiveEntryKey,
+        archiveConversationTitle = archiveConversationTitle,
+        memoryScopeType = memoryScopeType,
+        memoryScopeId = memoryScopeId
     )
 }
 
@@ -61,7 +77,15 @@ internal fun StoreProject.toOwnerAppProject(): AppProject {
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
         memberCount = memberCount.coerceAtLeast(0),
-        projectDescription = description?.takeIf { it.isNotBlank() }
+        projectDescription = description?.takeIf { it.isNotBlank() },
+        remoteConversationCount = remoteConversationCount,
+        workspaceKind = workspaceKind,
+        workspaceHealthLabel = workspaceHealthLabel,
+        workspaceHealthTone = workspaceHealthTone,
+        archiveEntryKey = archiveEntryKey,
+        archiveConversationTitle = archiveConversationTitle,
+        memoryScopeType = memoryScopeType,
+        memoryScopeId = memoryScopeId
     )
 }
 
@@ -125,7 +149,11 @@ internal fun createStoreProject(
     ).execute()
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(apiErrorMessage(body, resp.code))
-    val project = JSONObject(body).optJSONObject("project")
+    val root = JSONObject(body)
+    root.optJSONObject("archive_project")?.let { archive ->
+        return parseArchiveProject(archive).toStoreProject(ownerAccount)
+    }
+    val project = root.optJSONObject("project")
         ?: error("响应缺少 project")
     return parseCreatedStoreProject(project, ownerAccount)
 }
@@ -324,7 +352,15 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
         ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
     iconDataUrl = obj.optProjectIconDataUrl(),
-    role = obj.optString("role", "member")
+    role = obj.optString("role", "member"),
+    remoteConversationCount = obj.optNullableInt("conversation_count"),
+    workspaceKind = obj.optCleanStoreString("workspace_kind"),
+    workspaceHealthLabel = obj.optCleanStoreString("workspace_health_label"),
+    workspaceHealthTone = obj.optCleanStoreString("workspace_health_tone"),
+    archiveEntryKey = obj.optCleanStoreString("archive_entry_key"),
+    archiveConversationTitle = obj.optCleanStoreString("archive_conversation_title"),
+    memoryScopeType = obj.optCleanStoreString("memory_scope_type"),
+    memoryScopeId = obj.optCleanStoreString("memory_scope_id")
 )
 
 private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
@@ -341,7 +377,14 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
     lastTaskStatus = null,
     latestApkUrl = null,
-    iconDataUrl = obj.optProjectIconDataUrl()
+    iconDataUrl = obj.optProjectIconDataUrl(),
+    workspaceKind = obj.optCleanStoreString("workspace_kind"),
+    workspaceHealthLabel = obj.optCleanStoreString("workspace_health_label"),
+    workspaceHealthTone = obj.optCleanStoreString("workspace_health_tone"),
+    archiveEntryKey = obj.optCleanStoreString("archive_entry_key"),
+    archiveConversationTitle = obj.optCleanStoreString("archive_conversation_title"),
+    memoryScopeType = obj.optCleanStoreString("memory_scope_type"),
+    memoryScopeId = obj.optCleanStoreString("memory_scope_id")
 )
 
 private fun JSONObject.optProjectIconDataUrl(): String? {
@@ -351,6 +394,17 @@ private fun JSONObject.optProjectIconDataUrl(): String? {
         if (value.isNotBlank()) return value
     }
     return null
+}
+
+private fun JSONObject.optCleanStoreString(key: String): String? {
+    if (!has(key) || isNull(key)) return null
+    val value = optString(key, "").trim()
+    return value.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
+
+private fun JSONObject.optNullableInt(key: String): Int? {
+    if (!has(key) || isNull(key)) return null
+    return optInt(key)
 }
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */

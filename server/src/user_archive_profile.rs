@@ -78,6 +78,30 @@ pub async fn build_user_archive_response(
     })
 }
 
+pub async fn build_user_archive_project_response(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+) -> Result<Option<UserArchiveProject>> {
+    let system_routes = ensure_user_system_conversation_routes(&state.store, user_id)?;
+    let mut projects = state.store.list_archive_projects_for_user(user_id)?;
+    let nodes = build_archive_nodes(state, user_id, &projects).await?;
+    let node_by_id = nodes
+        .iter()
+        .map(|node| (node.node_id.clone(), node.clone()))
+        .collect::<HashMap<_, _>>();
+    let system_route_by_project = system_routes
+        .into_iter()
+        .map(|route| (route.project_id.clone(), route))
+        .collect::<HashMap<_, _>>();
+
+    enrich_archive_projects(&mut projects, &node_by_id, &system_route_by_project, state);
+
+    Ok(projects
+        .into_iter()
+        .find(|project| project.project.id == project_id))
+}
+
 fn enrich_archive_projects(
     projects: &mut [UserArchiveProject],
     node_by_id: &HashMap<String, UserArchiveNode>,

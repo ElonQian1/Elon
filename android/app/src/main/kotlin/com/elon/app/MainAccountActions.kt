@@ -97,6 +97,13 @@ internal class MainAccountActions(
         update(local.memberCount, remote.memberCount) { local.memberCount = it }
         update(local.projectDescription, remote.projectDescription) { local.projectDescription = it }
         update(local.remoteConversationCount, remote.remoteConversationCount) { local.remoteConversationCount = it }
+        update(local.workspaceKind, remote.workspaceKind) { local.workspaceKind = it }
+        update(local.workspaceHealthLabel, remote.workspaceHealthLabel) { local.workspaceHealthLabel = it }
+        update(local.workspaceHealthTone, remote.workspaceHealthTone) { local.workspaceHealthTone = it }
+        update(local.archiveEntryKey, remote.archiveEntryKey) { local.archiveEntryKey = it }
+        update(local.archiveConversationTitle, remote.archiveConversationTitle) { local.archiveConversationTitle = it }
+        update(local.memoryScopeType, remote.memoryScopeType) { local.memoryScopeType = it }
+        update(local.memoryScopeId, remote.memoryScopeId) { local.memoryScopeId = it }
 
         val remoteSubtitle = remote.subtitle.trim()
         if (local.subtitle.isBlank() || local.isSystemArchiveProject() || remote.isSystemArchiveProject()) {

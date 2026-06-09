@@ -14,6 +14,7 @@ use crate::{
     project_ws_session::handle_project_ws,
     store::is_system_project_source_type,
     types::AppState,
+    user_archive_profile::build_user_archive_project_response,
 };
 
 #[derive(Deserialize)]
@@ -152,8 +153,10 @@ pub async fn create_project(
                 .is_some_and(|value| !value.trim().is_empty())
         {
             let existing_node_id = project.node_id.clone();
+            let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
             return Json(serde_json::json!({
                 "project": project,
+                "archive_project": archive_project,
                 "reused_existing": true,
                 "node_id": existing_node_id,
                 "provisioned": false,
@@ -214,14 +217,30 @@ pub async fn create_project(
         }
     };
 
+    let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
     Json(serde_json::json!({
         "project": project,
+        "archive_project": archive_project,
         "reused_existing": false,
         "node_id": node_id,
         "provisioned": true,
         "workspace_created": provisioned.created,
     }))
     .into_response()
+}
+
+async fn archive_project_payload(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+) -> Option<crate::store::UserArchiveProject> {
+    match build_user_archive_project_response(state, user_id, project_id).await {
+        Ok(project) => project,
+        Err(e) => {
+            tracing::warn!("构造项目归档响应失败 project_id={project_id}: {e}");
+            None
+        }
+    }
 }
 
 /// 注册一个指向外部本地路径的项目（如本机 D:\rust\active-projects\bb64a）。

@@ -32,7 +32,9 @@ data class AppProject(
     var workspaceHealthLabel: String? = null,
     var workspaceHealthTone: String? = null,
     var archiveEntryKey: String? = null,
+    var archiveConversationTitle: String? = null,
     var memoryScopeType: String? = null,
+    var memoryScopeId: String? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()

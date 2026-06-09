@@ -56,7 +56,9 @@ internal data class ArchiveProjectRecord(
             workspaceHealthLabel = workspaceStatus?.displayLabel(systemKey),
             workspaceHealthTone = workspaceStatus?.displayTone(),
             archiveEntryKey = conversationRoute?.entryKey,
+            archiveConversationTitle = conversationRoute?.conversationTitle,
             memoryScopeType = conversationRoute?.memoryScopeType,
+            memoryScopeId = conversationRoute?.memoryScopeId,
             conversations = mutableListOf()
         )
     }
@@ -151,7 +153,7 @@ private fun parseArchiveProjectList(arr: JSONArray?): List<ArchiveProjectRecord>
     }
 }
 
-private fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
+internal fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
     val project = obj.optJSONObject("project") ?: obj
     return ArchiveProjectRecord(
         id = project.getString("id"),
