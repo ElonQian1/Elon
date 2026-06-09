@@ -100,7 +100,7 @@ internal object ProjectCreateDialog {
         thread(name = "project-create-nodes") {
             val result = runCatching {
                 fetchProjectCreateNodes(http, serverUrl, activity)
-                    .filter { it.online }
+                    .filter { it.online && it.cliProjectReady }
                     .sortedBy { it.displayName }
             }
             activity.runOnUiThread {
@@ -109,7 +109,7 @@ internal object ProjectCreateDialog {
                         onLoaded(nodes)
                         if (nodes.isEmpty()) {
                             nodeSpinner.visibility = View.GONE
-                            nodeStatus.text = "没有在线 PC 节点。请先启动 PC 节点后再创建代码项目。"
+                            nodeStatus.text = "没有可用于项目的在线 PC 节点。请先启动已配置 Codex/Copilot 的 PC 节点。"
                             return@onSuccess
                         }
                         nodeSpinner.visibility = View.VISIBLE
@@ -121,7 +121,10 @@ internal object ProjectCreateDialog {
                         nodeSpinner.adapter = ArrayAdapter(
                             activity,
                             android.R.layout.simple_spinner_dropdown_item,
-                            nodes.map { "${it.displayName} · ${it.shortId}" }
+                            nodes.map { node ->
+                                val cli = node.allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "CLI"
+                                "${node.displayName} · ${node.shortId} · ${node.projectCount}个项目 · $cli"
+                            }
                         )
                     }
                     .onFailure { error ->

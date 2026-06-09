@@ -259,16 +259,38 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         .into_iter()
         .map(|node| (node.node_id.clone(), node))
         .collect();
+    let cli_by_id: HashMap<_, _> = state
+        .agent_manager
+        .list()
+        .await
+        .into_iter()
+        .map(|agent| (agent.agent_id.clone(), agent))
+        .collect();
+    let project_counts = match state.store.list_projects_for_user(&user.id) {
+        Ok(projects) => projects
+            .into_iter()
+            .filter_map(|project| project.node_id)
+            .fold(HashMap::<String, i64>::new(), |mut counts, node_id| {
+                *counts.entry(node_id).or_insert(0) += 1;
+                counts
+            }),
+        Err(e) => {
+            tracing::warn!(user_id = %user.id, error = %e, "failed to count user projects per node");
+            HashMap::new()
+        }
+    };
 
     let mut nodes = Vec::new();
     for credential in credentials {
         let node_id = credential.agent_id.clone();
         let online = online_by_id.remove(&node_id);
+        let cli_agent = cli_by_id.get(&node_id);
         let short_id = short_node_id(&node_id);
         let label = credential.label.trim().to_string();
         let device_name = online
             .as_ref()
             .and_then(|node| clean_string(node.device_name.as_deref()))
+            .or_else(|| cli_agent.and_then(|agent| clean_string(agent.device_name.as_deref())))
             .or_else(|| clean_string(credential.device_name.as_deref()));
         let display_label = if label == node_id { "" } else { &label };
         let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
@@ -276,8 +298,15 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
             .as_ref()
             .map(|node| node.models.clone())
             .unwrap_or_default();
-        let connected_at = online.as_ref().map(|node| node.connected_at).unwrap_or(0);
-        let is_online = online.as_ref().map(|node| node.online).unwrap_or(false);
+        let allowed_clis = cli_agent
+            .map(|agent| agent.allowed_clis.clone())
+            .unwrap_or_default();
+        let connected_at = online
+            .as_ref()
+            .map(|node| node.connected_at)
+            .unwrap_or_else(|| cli_agent.map(|agent| agent.connected_at).unwrap_or(0));
+        let is_online =
+            online.as_ref().map(|node| node.online).unwrap_or(false) || cli_agent.is_some();
         nodes.push(MyNodeResponse {
             agent_id: node_id.clone(),
             node_id,
@@ -287,6 +316,12 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
             display_name,
             short_id,
             models,
+            allowed_clis: allowed_clis.clone(),
+            cli_project_ready: supports_project_cli(&allowed_clis),
+            project_count: project_counts
+                .get(&credential.agent_id)
+                .copied()
+                .unwrap_or(0),
             connected_at,
             created_at: credential.created_at,
             online: is_online,
@@ -294,18 +329,22 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
     }
 
     for node in online_by_id.into_values() {
+        let node_id = node.node_id.clone();
         let short_id = short_node_id(&node.node_id);
         let device_name = clean_string(node.device_name.as_deref());
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
         nodes.push(MyNodeResponse {
-            agent_id: node.node_id.clone(),
-            node_id: node.node_id,
+            agent_id: node_id.clone(),
+            node_id: node_id.clone(),
             owner_user_id: node.owner_user_id,
             label: String::new(),
             device_name,
             display_name,
             short_id,
             models: node.models,
+            allowed_clis: Vec::new(),
+            cli_project_ready: false,
+            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
             connected_at: node.connected_at,
             created_at: String::new(),
             online: node.online,
@@ -339,9 +378,18 @@ struct MyNodeResponse {
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
+    allowed_clis: Vec<String>,
+    cli_project_ready: bool,
+    project_count: i64,
     connected_at: u64,
     created_at: String,
     online: bool,
+}
+
+fn supports_project_cli(allowed_clis: &[String]) -> bool {
+    allowed_clis
+        .iter()
+        .any(|cli| cli.eq_ignore_ascii_case("copilot") || cli.eq_ignore_ascii_case("codex"))
 }
 
 fn clean_string(value: Option<&str>) -> Option<String> {

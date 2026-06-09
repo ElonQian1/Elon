@@ -305,6 +305,25 @@ internal class MainProjectActions(
                     openProjectSpace(project)
                 }
             )
+            add(
+                ProjectMenuAction(
+                    title = "PC 工作区",
+                    subtitle = project.workspaceHealthLabel ?: "检查节点、目录、CLI 和恢复动作",
+                    iconRes = R.drawable.ic_project_action_space
+                ) {
+                    ProjectWorkspaceRecoveryDialog.show(activity, http, serverUrl, project) { updated ->
+                        updated?.toAppProject()?.let { remote ->
+                            projects.getOrNull(index)?.apply {
+                                workspaceKind = remote.workspaceKind
+                                workspaceHealthLabel = remote.workspaceHealthLabel
+                                workspaceHealthTone = remote.workspaceHealthTone
+                            }
+                        }
+                        saveProjects()
+                        renderProjectList()
+                    }
+                }
+            )
             if (!isJoint) {
                 add(
                     ProjectMenuAction(

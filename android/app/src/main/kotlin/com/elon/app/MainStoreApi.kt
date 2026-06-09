@@ -39,7 +39,10 @@ internal data class ProjectCreateNodeOption(
     val nodeId: String,
     val displayName: String,
     val shortId: String,
-    val online: Boolean
+    val online: Boolean,
+    val projectCount: Int = 0,
+    val cliProjectReady: Boolean = false,
+    val allowedClis: List<String> = emptyList()
 )
 
 internal fun StoreProject.toJointAppProject(): AppProject {
@@ -165,7 +168,7 @@ internal fun fetchProjectCreateNodes(
 ): List<ProjectCreateNodeOption> {
     val req = AuthManager.applyAuth(
         ctx,
-        Request.Builder().url("$serverUrl/api/nodes").get()
+        Request.Builder().url("$serverUrl/api/me/nodes").get()
     ).build()
     val resp = http.newCall(req).execute()
     val body = resp.body?.string().orEmpty()
@@ -183,11 +186,21 @@ internal fun fetchProjectCreateNodes(
             .ifBlank { obj.optString("label") }
             .ifBlank { deviceName }
             .ifBlank { shortId }
+        val allowedClis = obj.optJSONArray("allowed_clis")?.let { clis ->
+            (0 until clis.length()).mapNotNull { idx ->
+                clis.optString(idx).trim().takeIf { it.isNotBlank() }
+            }
+        }.orEmpty()
+        val cliReady = obj.optBoolean("cli_project_ready", false) ||
+            allowedClis.any { it.equals("codex", ignoreCase = true) || it.equals("copilot", ignoreCase = true) }
         ProjectCreateNodeOption(
             nodeId = nodeId,
             displayName = displayName,
             shortId = shortId,
-            online = obj.optBoolean("online", false)
+            online = obj.optBoolean("online", false),
+            projectCount = obj.optInt("project_count", 0).coerceAtLeast(0),
+            cliProjectReady = cliReady,
+            allowedClis = allowedClis
         )
     }
 }
