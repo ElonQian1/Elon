@@ -84,13 +84,8 @@ internal class ProjectSpaceController(
                 result.onSuccess {
                     activeSpace = it
                     activeProjectTitle = it.project.name
-                    val defaultChannel = it.defaultGroupChannel()
-                    if (defaultChannel != null) {
-                        openChannel(defaultChannel, animate = false)
-                    } else {
-                        showProjectSpace(activeProjectTitle, false)
-                        renderActiveSpace()
-                    }
+                    showProjectSpace(activeProjectTitle, false)
+                    renderActiveSpace()
                 }.onFailure { error ->
                     renderError(error.message ?: "加载项目空间失败")
                 }
@@ -255,17 +250,6 @@ internal class ProjectSpaceController(
         showProjectChannelChat("#${channel.name}", animate)
         loadMessages(channel, silent = false, scrollToBottom = true)
         startPolling()
-    }
-
-    private fun ProjectSpace.defaultGroupChannel(): ProjectChannel? {
-        return if (project.role == "observer") {
-            channels.firstOrNull { it.kind == AI_CHANNEL_KIND }
-                ?: channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
-                ?: channels.firstOrNull()
-        } else {
-            channels.firstOrNull { it.kind == DEFAULT_GROUP_CHANNEL_KIND }
-                ?: channels.firstOrNull()
-        }
     }
 
     private fun startPolling() {
@@ -1011,7 +995,6 @@ internal class ProjectSpaceController(
     private companion object {
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
-        const val DEFAULT_GROUP_CHANNEL_KIND = "discussion"
         const val AI_CHANNEL_KIND = "ai_development"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
     }
