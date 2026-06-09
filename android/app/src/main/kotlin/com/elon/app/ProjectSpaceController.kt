@@ -39,6 +39,7 @@ internal class ProjectSpaceController(
 ) {
     private val pollHandler = Handler(Looper.getMainLooper())
     private val messagesByChannel = linkedMapOf<String, MutableList<ChatMessage>>()
+    private val spaceCache = linkedMapOf<String, ProjectSpace>()
     private var activeSpace: ProjectSpace? = null
     private var activeProjectId: String? = null
     private var activeProjectTitle: String = "项目空间"
@@ -71,23 +72,35 @@ internal class ProjectSpaceController(
     private fun openProjectSpace(projectId: String, title: String, animate: Boolean, route: ProjectSpaceRoute) {
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
-        activeSpace = null
         activeChannel = null
         activeRoute = route
         activeAdapter = null
         stopPolling()
-        showProjectSpace(activeProjectTitle, animate)
-        renderLoading()
+        val cached = spaceCache[projectId]
+        if (cached != null) {
+            // 命中缓存：立即渲染，同时后台静默刷新
+            activeSpace = cached
+            activeProjectTitle = cached.project.name
+            showProjectSpace(activeProjectTitle, animate)
+            renderActiveSpace()
+        } else {
+            activeSpace = null
+            showProjectSpace(activeProjectTitle, animate)
+            renderLoading()
+        }
         thread {
             val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
             activity.runOnUiThread {
-                result.onSuccess {
-                    activeSpace = it
-                    activeProjectTitle = it.project.name
+                if (activeProjectId != projectId) return@runOnUiThread  // 用户已切走
+                result.onSuccess { space ->
+                    spaceCache[projectId] = space
+                    activeSpace = space
+                    activeProjectTitle = space.project.name
                     showProjectSpace(activeProjectTitle, false)
                     renderActiveSpace()
                 }.onFailure { error ->
-                    renderError(error.message ?: "加载项目空间失败")
+                    if (cached == null) renderError(error.message ?: "加载项目空间失败")
+                    // 有缓存时静默失败，保留已显示的缓存内容
                 }
             }
         }
