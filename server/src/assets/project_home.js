@@ -337,13 +337,16 @@
     attachEvents(root);
     const all = projects();
     const archiveData = archive();
+    const serverPersonal = Array.isArray(archiveData && archiveData.personal_projects)
+      ? archiveData.personal_projects
+      : null;
     const system = Array.isArray(archiveData && archiveData.system_projects)
       ? archiveData.system_projects
       : all.filter(isSystemProject);
     const owned = Array.isArray(archiveData && archiveData.owned_projects)
       ? archiveData.owned_projects.filter((project) => !isSystemProject(project))
       : all.filter((project) => !isSystemProject(project) && !isJointProject(project));
-    const personal = system.concat(owned);
+    const personal = serverPersonal || system.concat(owned);
     const joint = Array.isArray(archiveData && archiveData.shared_projects)
       ? archiveData.shared_projects.filter((project) => !isSystemProject(project))
       : all.filter((project) => !isSystemProject(project) && isJointProject(project));

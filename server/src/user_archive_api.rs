@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
+    conversation_router::ensure_user_system_conversation_routes,
     project_auth::{auth_from_headers, json_error},
     store::{UserArchiveNode, UserArchiveProject, UserArchiveSummary},
     types::AppState,
@@ -16,6 +17,7 @@ use crate::{
 #[derive(Serialize)]
 struct UserArchiveResponse {
     projects: Vec<UserArchiveProject>,
+    personal_projects: Vec<UserArchiveProject>,
     system_projects: Vec<UserArchiveProject>,
     owned_projects: Vec<UserArchiveProject>,
     shared_projects: Vec<UserArchiveProject>,
@@ -29,16 +31,10 @@ pub async fn get_user_archive(State(state): State<Arc<AppState>>, headers: Heade
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    if let Err(e) = state.store.ensure_balloon_project_for_user(&user.id) {
+    if let Err(e) = ensure_user_system_conversation_routes(&state.store, &user.id) {
         return json_error(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("初始化手机控制档案失败: {e}"),
-        );
-    }
-    if let Err(e) = state.store.ensure_chat_memory_project_for_user(&user.id) {
-        return json_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("初始化聊天记忆档案失败: {e}"),
+            format!("初始化系统会话档案失败: {e}"),
         );
     }
 
@@ -60,6 +56,12 @@ pub async fn get_user_archive(State(state): State<Arc<AppState>>, headers: Heade
         }
     }
 
+    let personal_projects = system_projects
+        .iter()
+        .cloned()
+        .chain(owned_projects.iter().cloned())
+        .collect::<Vec<_>>();
+
     let nodes = match build_archive_nodes(&state, &user.id, &projects).await {
         Ok(nodes) => nodes,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -68,12 +70,12 @@ pub async fn get_user_archive(State(state): State<Arc<AppState>>, headers: Heade
 
     Json(UserArchiveResponse {
         projects,
+        personal_projects: personal_projects.clone(),
         system_projects: system_projects.clone(),
         owned_projects: owned_projects.clone(),
         shared_projects: shared_projects.clone(),
         summary: UserArchiveSummary {
-            total_projects: (system_projects.len() + owned_projects.len() + shared_projects.len())
-                as i64,
+            total_projects: (personal_projects.len() + shared_projects.len()) as i64,
             system_project_count: system_projects.len() as i64,
             owned_project_count: owned_projects.len() as i64,
             shared_project_count: shared_projects.len() as i64,

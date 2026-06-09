@@ -48,12 +48,13 @@ internal data class ArchiveProjectRecord(
 }
 
 internal data class ProjectArchiveSnapshot(
+    val personalProjects: List<ArchiveProjectRecord>,
     val systemProjects: List<ArchiveProjectRecord>,
     val ownedProjects: List<ArchiveProjectRecord>,
     val sharedProjects: List<ArchiveProjectRecord>
 ) {
     val allProjects: List<ArchiveProjectRecord>
-        get() = systemProjects + ownedProjects + sharedProjects
+        get() = personalProjects + sharedProjects
 }
 
 internal fun fetchMyProjectArchive(
@@ -68,9 +69,14 @@ internal fun fetchMyProjectArchive(
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
     val json = JSONObject(body)
+    val systemProjects = parseArchiveProjectList(json.optJSONArray("system_projects"))
+    val ownedProjects = parseArchiveProjectList(json.optJSONArray("owned_projects"))
+    val personalProjects = json.optJSONArray("personal_projects")?.let(::parseArchiveProjectList)
+        ?: (systemProjects + ownedProjects)
     return ProjectArchiveSnapshot(
-        systemProjects = parseArchiveProjectList(json.optJSONArray("system_projects")),
-        ownedProjects = parseArchiveProjectList(json.optJSONArray("owned_projects")),
+        personalProjects = personalProjects,
+        systemProjects = systemProjects,
+        ownedProjects = ownedProjects,
         sharedProjects = parseArchiveProjectList(json.optJSONArray("shared_projects"))
     )
 }

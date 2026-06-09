@@ -14,8 +14,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
     project_auth::{auth_from_headers, json_error},
-    store::PHONE_CONTROL_PROJECT_NAME,
     types::AppState,
 };
 
@@ -86,8 +86,12 @@ pub async fn ensure_balloon_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    let (project_id, created) = match state.store.ensure_balloon_project_for_user(&user.id) {
-        Ok(v) => v,
+    let route = match resolve_system_conversation_route(
+        &state.store,
+        &user.id,
+        ConversationEntryKind::PhoneControl,
+    ) {
+        Ok(route) => route,
         Err(e) => {
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -97,15 +101,15 @@ pub async fn ensure_balloon_project(
     };
 
     // 写入 AGENTS.md（幂等：每次 ensure 都覆盖写，保证最新格式）
-    let workspace = state.get_project_workspace(&project_id);
+    let workspace = state.get_project_workspace(&route.project_id);
     if let Err(e) = write_agents_md(&workspace) {
         tracing::warn!("写入 balloon AGENTS.md 失败（非致命）: {e}");
     }
 
     Json(json!({
-        "project_id": project_id,
-        "project_name": PHONE_CONTROL_PROJECT_NAME,
-        "created": created,
+        "project_id": route.project_id,
+        "project_name": route.project_name,
+        "created": route.project_created,
     }))
     .into_response()
 }
