@@ -443,6 +443,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/admin/token-stats/trend",
             get(admin_token_stats::get_platform_trend),
         )
+        .route(
+            "/api/admin/token-stats/accounting-audit",
+            get(admin_token_stats::get_accounting_audit),
+        )
         // ── 用户配额管理 ──────────────────────────────────────────────────────
         .route(
             "/api/admin/quotas",

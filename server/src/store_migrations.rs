@@ -49,6 +49,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (27, "项目成员会话人类讨论消息", migration_v27),
     (28, "项目成员个人会话公开状态", migration_v28),
     (29, "PC 项目执行会话与工作区状态", migration_v29),
+    (30, "token 用量与扣费事件原子对账字段", migration_v30),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1062,6 +1063,55 @@ fn migration_v29(conn: &Connection) -> Result<()> {
           ON project_execution_sessions(project_id, updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_project_execution_sessions_conversation
           ON project_execution_sessions(project_id, conversation_id, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v30(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "token_usage_events",
+        "accounting_status",
+        "accounting_status TEXT NOT NULL DEFAULT 'not_billable'",
+    )?;
+    add_column_if_missing(
+        conn,
+        "token_usage_events",
+        "billing_event_id",
+        "billing_event_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "token_usage_events",
+        "cost_rmb_fen",
+        "cost_rmb_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "token_usage_events",
+        "balance_after_fen",
+        "balance_after_fen INTEGER",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "token_usage_event_id",
+        "token_usage_event_id TEXT",
+    )?;
+    conn.execute_batch(
+        r#"
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_required_for_all_users', 'true', datetime('now'));
+
+        CREATE INDEX IF NOT EXISTS idx_token_usage_accounting_status
+          ON token_usage_events(accounting_status, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_token_usage_billing_event
+          ON token_usage_events(billing_event_id)
+          WHERE billing_event_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_events_token_usage_event
+          ON billing_events(token_usage_event_id)
+          WHERE token_usage_event_id IS NOT NULL;
         "#,
     )?;
     Ok(())

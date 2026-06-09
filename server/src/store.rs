@@ -35,8 +35,8 @@ mod user_memories;
 mod users;
 
 pub use admin_stats::{
-    estimate_cost_cny, AdminDayRow, AdminFeatureRow, AdminModelRow, AdminPlatformSummary,
-    AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
+    estimate_cost_cny, AdminAccountingAuditRow, AdminDayRow, AdminFeatureRow, AdminModelRow,
+    AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
 };
 pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
 use common::{
@@ -59,8 +59,8 @@ pub(crate) use system_projects::{
     CHAT_MEMORY_PROJECT_NAME, PHONE_CONTROL_PROJECT_NAME,
 };
 pub use token_usage::{
-    TokenUsageRecord, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats,
-    UsageTotals,
+    TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord, UsageDayRow,
+    UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats, UsageTotals,
 };
 pub use user_memories::{
     UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL, MEMORY_SCOPE_PHONE_CONTROL,

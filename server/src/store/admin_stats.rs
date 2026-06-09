@@ -106,6 +106,20 @@ pub struct UserQuota {
     pub updated_at: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct AdminAccountingAuditRow {
+    pub accounting_status: String,
+    pub user_id: String,
+    pub account: String,
+    pub nickname: Option<String>,
+    pub feature: String,
+    pub usage_mode: String,
+    pub total_tokens: i64,
+    pub call_count: i64,
+    pub billed_cost_rmb_fen: i64,
+    pub last_call_at: Option<String>,
+}
+
 // ── 模型定价表（USD / 1M tokens）────────────────────────────────────────────
 
 struct ModelPrice {
@@ -478,6 +492,62 @@ impl Store {
                     output_tokens: row.get(3)?,
                     call_count: row.get(4)?,
                     active_users: row.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    /// 管理员对账审计：按记账状态、用户、功能和来源汇总可信用量。
+    pub fn admin_accounting_audit(
+        &self,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<AdminAccountingAuditRow>> {
+        let conn = self.conn()?;
+        let since = format!("-{} days", days);
+        let mut stmt = conn.prepare(
+            "SELECT COALESCE(t.accounting_status, 'legacy') AS accounting_status,
+                    t.user_id,
+                    u.phone, u.email, u.nickname,
+                    t.feature,
+                    t.usage_mode,
+                    COALESCE(SUM(t.total_tokens),0) AS total_tokens,
+                    COUNT(*) AS call_count,
+                    COALESCE(SUM(t.cost_rmb_fen),0) AS billed_cost_rmb_fen,
+                    MAX(t.created_at) AS last_call_at
+             FROM token_usage_events t
+             LEFT JOIN users u ON u.id = t.user_id
+             WHERE t.usage_mode != 'client_reported'
+               AND t.created_at >= datetime('now', ?1)
+             GROUP BY accounting_status, t.user_id, t.feature, t.usage_mode
+             ORDER BY
+               CASE accounting_status
+                 WHEN 'billed' THEN 3
+                 WHEN 'zero_cost' THEN 4
+                 ELSE 1
+               END ASC,
+               total_tokens DESC
+             LIMIT ?2",
+        )?;
+        let rows = stmt
+            .query_map(params![since, limit], |row| {
+                let accounting_status: String = row.get(0)?;
+                let user_id: String = row.get(1)?;
+                let phone: Option<String> = row.get(2)?;
+                let email: Option<String> = row.get(3)?;
+                let nickname: Option<String> = row.get(4)?;
+                Ok(AdminAccountingAuditRow {
+                    accounting_status,
+                    account: phone.or(email).unwrap_or_else(|| user_id.clone()),
+                    user_id,
+                    nickname,
+                    feature: row.get(5)?,
+                    usage_mode: row.get(6)?,
+                    total_tokens: row.get(7)?,
+                    call_count: row.get(8)?,
+                    billed_cost_rmb_fen: row.get(9)?,
+                    last_call_at: row.get(10)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

@@ -31,6 +31,12 @@ pub async fn confirm_project_intent(
     trace_id: Option<&str>,
     state: &Arc<AppState>,
 ) -> Result<IntentGateResult> {
+    if let Some(scope) = native_session_scope.as_ref() {
+        if let Err(msg) = crate::billing::check_can_call(&state.store, &scope.user_id) {
+            return Err(anyhow!(msg));
+        }
+    }
+
     let mut option = state
         .ai_cli
         .find_codex_option(option_id)
@@ -165,6 +171,17 @@ pub async fn confirm_project_intent(
             &option.id,
             &workspace_key,
             &thread_id,
+        );
+    }
+
+    if let Some(scope) = native_session_scope.as_ref() {
+        let usage_text = format!("{}\n{}", output.stdout, output.stderr);
+        crate::token_usage_api::record_codex_usage_from_stdout(
+            &state.store,
+            &scope.user_id,
+            "codex_cli_intent_gate",
+            Some(option.id.as_str()),
+            &usage_text,
         );
     }
 

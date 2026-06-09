@@ -167,24 +167,29 @@ pub(crate) fn record_trusted_usage(
         reasoning_tokens: usage.reasoning_tokens,
         total_tokens: usage.total_tokens,
     };
-    if let Err(e) = store.record_token_usage(&record) {
-        tracing::warn!("record_trusted_usage 写入失败: {}", e);
-    }
-    if let Err(e) = crate::billing::deduct_usage(
-        store,
-        user_id,
-        model,
-        usage.input_tokens,
-        usage.cached_input_tokens,
-        usage.output_tokens,
-    ) {
-        tracing::warn!(
-            user_id,
-            feature,
-            usage_mode,
-            "record_trusted_usage 扣费失败: {}",
-            e
-        );
+    match crate::billing::account_trusted_usage(store, &record) {
+        Ok(result) => {
+            tracing::debug!(
+                user_id,
+                feature,
+                usage_mode,
+                token_event_id = %result.token_usage_event_id,
+                billing_event_id = ?result.billing_event_id,
+                cost_rmb_fen = result.cost_rmb_fen,
+                balance_after_fen = ?result.balance_after_fen,
+                accounting_status = %result.accounting_status,
+                "record_trusted_usage accounted"
+            );
+        }
+        Err(e) => {
+            tracing::error!(
+                user_id,
+                feature,
+                usage_mode,
+                "record_trusted_usage 记账失败: {}",
+                e
+            );
+        }
     }
 }
 

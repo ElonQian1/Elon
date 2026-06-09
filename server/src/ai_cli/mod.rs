@@ -43,7 +43,7 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
 };
 use crate::{
-    intent_router, tools,
+    billing, intent_router, tools,
     types::{AppState, WsMessage},
 };
 
@@ -134,6 +134,10 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
+    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!(msg));
+    }
+
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
     // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
@@ -146,6 +150,7 @@ async fn run_with_workspace_mode(
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
             match run_via_pc_agent(
                 &agent_id,
+                user_id,
                 None,
                 user_message,
                 preflight_note,
@@ -562,12 +567,13 @@ async fn run_with_workspace_mode(
     } else {
         "codex_cli_chat"
     };
+    let usage_text = format!("{}\n{}", output.stdout, output.stderr);
     crate::token_usage_api::record_codex_usage_from_stdout(
         &state.store,
         user_id,
         cli_feature,
         Some(option.id.as_str()),
-        &output.stdout,
+        &usage_text,
     );
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
@@ -626,8 +632,13 @@ pub async fn run_with_pc_agent_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!(msg));
+    }
+
     run_via_pc_agent(
         agent_id,
+        user_id,
         Some(workspace_path),
         user_message,
         preflight_note,
@@ -647,6 +658,7 @@ pub async fn run_with_pc_agent_workspace(
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
     agent_id: &str,
+    user_id: &str,
     cwd: Option<&str>,
     user_message: &str,
     preflight_note: Option<&str>,
@@ -893,11 +905,40 @@ async fn run_via_pc_agent(
             AgentToServer::CliDone {
                 exit_ok,
                 error,
+                prompt_tokens,
+                cached_input_tokens,
+                completion_tokens,
+                reasoning_tokens,
+                total_tokens,
                 model,
                 workspace_status,
                 ..
             } => {
                 progress_handle.abort(); // 停止心跳
+                if let Some(usage) = crate::cli_usage::usage_from_optional_parts(
+                    prompt_tokens,
+                    cached_input_tokens,
+                    completion_tokens,
+                    reasoning_tokens,
+                    total_tokens,
+                    model.clone().or_else(|| Some(display_model.clone())),
+                ) {
+                    let feature = if request_mode.is_plan() {
+                        "pc_agent_cli_plan"
+                    } else if cwd.is_some() {
+                        "pc_agent_cli_dev"
+                    } else {
+                        "pc_agent_cli_chat"
+                    };
+                    crate::token_usage_api::record_trusted_usage(
+                        &state.store,
+                        user_id,
+                        feature,
+                        "pc_agent_cli",
+                        model.as_deref().or(Some(display_model.as_str())),
+                        &usage,
+                    );
+                }
                 record_pc_execution_finished(
                     state,
                     native_session_scope.as_ref(),

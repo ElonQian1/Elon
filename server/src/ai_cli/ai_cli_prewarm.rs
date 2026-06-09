@@ -26,6 +26,10 @@ pub async fn prewarm_codex_session(
     trace_id: Option<&str>,
     state: &Arc<AppState>,
 ) -> Result<PrewarmResult> {
+    if let Err(msg) = crate::billing::check_can_call(&state.store, &native_session_scope.user_id) {
+        return Err(anyhow!(msg));
+    }
+
     let started = Instant::now();
     let option = state
         .ai_cli
@@ -86,6 +90,14 @@ pub async fn prewarm_codex_session(
         }),
     )
     .await?;
+    let usage_text = format!("{}\n{}", output.stdout, output.stderr);
+    crate::token_usage_api::record_codex_usage_from_stdout(
+        &state.store,
+        &native_session_scope.user_id,
+        "codex_cli_prewarm",
+        Some(option.id.as_str()),
+        &usage_text,
+    );
     let thread_id = extract_thread_id(&output.stdout);
     if let Some(thread_id) = thread_id.as_deref() {
         let _ = state.store.upsert_native_agent_session_if_no_active(

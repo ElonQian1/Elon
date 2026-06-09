@@ -15,6 +15,7 @@ use super::{new_id, now, Store};
 #[derive(Debug, Clone, Serialize)]
 pub struct BillingEvent {
     pub id: String,
+    pub token_usage_event_id: Option<String>,
     pub model: Option<String>,
     pub input_tokens: i64,
     pub cached_input_tokens: i64,
@@ -179,7 +180,7 @@ impl Store {
         )?;
         let offset = (page - 1).max(0) * size;
         let mut stmt = conn.prepare_cached(
-            r#"SELECT id, model, input_tokens, cached_input_tokens, output_tokens,
+            r#"SELECT id, token_usage_event_id, model, input_tokens, cached_input_tokens, output_tokens,
                       cost_rmb_fen, created_at
                FROM billing_events
                WHERE user_id = ?1
@@ -190,12 +191,13 @@ impl Store {
             .query_map(params![user_id, size, offset], |row| {
                 Ok(BillingEvent {
                     id: row.get(0)?,
-                    model: row.get(1)?,
-                    input_tokens: row.get(2)?,
-                    cached_input_tokens: row.get(3)?,
-                    output_tokens: row.get(4)?,
-                    cost_rmb_fen: row.get(5)?,
-                    created_at: row.get(6)?,
+                    token_usage_event_id: row.get(1)?,
+                    model: row.get(2)?,
+                    input_tokens: row.get(3)?,
+                    cached_input_tokens: row.get(4)?,
+                    output_tokens: row.get(5)?,
+                    cost_rmb_fen: row.get(6)?,
+                    created_at: row.get(7)?,
                 })
             })?
             .filter_map(|r| r.ok())

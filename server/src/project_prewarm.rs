@@ -75,6 +75,9 @@ async fn prewarm_project_response(
             "current user cannot edit this project",
         );
     }
+    if let Err(msg) = crate::billing::check_can_call(&state.store, &user.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
 
     let conversation_id = match state.store.ensure_conversation(
         &project.id,

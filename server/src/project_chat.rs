@@ -12,7 +12,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     agent, agent_intent,
     agent_routing::is_local_cli_option,
-    ai_cli, intent_router,
+    ai_cli, billing, intent_router,
     project_attachment_notes::{
         append_project_attachment_notes, append_project_cli_attachment_artifacts,
     },
@@ -53,6 +53,9 @@ pub async fn chat_project(
     let message = req.message.trim().to_string();
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
+    }
+    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
     let conversation_id = match state.store.ensure_conversation(
@@ -263,6 +266,9 @@ pub async fn chat_project_stream(
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
+    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
         &user.id,
@@ -364,6 +370,11 @@ pub(crate) async fn run_project_agent_with_scheduler(
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
+    if let Err(msg) = billing::check_can_call(&state.store, &user_id) {
+        let _ = tx.send(WsMessage::error(msg).to_json());
+        return;
+    }
+
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,

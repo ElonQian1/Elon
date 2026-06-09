@@ -16,6 +16,7 @@ use std::{
 use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::{
+    billing,
     project_chat::run_project_agent_with_scheduler,
     project_execution_mode::ProjectExecutionMode,
     project_keys::project_ws_job_key,
@@ -133,6 +134,25 @@ pub(crate) async fn get_or_start_project_ws_job(
                 }),
             );
         }
+        jobs.insert(key.clone(), job.clone());
+        schedule_project_job_cleanup(key, job.clone());
+        return job;
+    }
+
+    if let Err(msg) = billing::check_can_call(&state.store, &user_id) {
+        let raw = WsMessage::error(msg).to_json();
+        let (broadcast_tx, _) = broadcast::channel::<String>(256);
+        let (cancel_tx, _cancel_rx) = watch::channel(false);
+        let job = Arc::new(ProjectWsJob {
+            key: key.clone(),
+            fingerprint,
+            task_id: "tsk_billing_blocked".into(),
+            trace_id: trace_id.clone(),
+            cancel_tx,
+            backlog: Mutex::new(vec![raw]),
+            broadcaster: broadcast_tx,
+            finished: AtomicBool::new(true),
+        });
         jobs.insert(key.clone(), job.clone());
         schedule_project_job_cleanup(key, job.clone());
         return job;

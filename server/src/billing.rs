@@ -2,7 +2,8 @@
 //!
 //! 对外提供两个关键钩子：
 //! - `check_can_call(store, user_id)` —— LLM 调用前调用，余额不足时返回错误
-//! - `deduct_usage(store, user_id, model, input, cached, output)` —— 可信用量落库后扣费
+//! - `account_trusted_usage(store, record)` —— 可信用量落库并原子扣费
+//! - `deduct_usage(store, user_id, model, input, cached, output)` —— 兼容旧调用点，直接扣费
 //! - `deduct_from_response(store, user_id, model, response)` —— 兼容旧调用点，静默扣费
 //!
 //! 向后兼容：若用户在 user_balance 表中没有记录，视为"未开通计费"，全部放行。
@@ -10,7 +11,7 @@
 use serde_json::Value;
 use tracing::warn;
 
-use crate::store::Store;
+use crate::store::{Store, TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord};
 
 // ── 模型定价表（USD / 1M tokens）─────────────────────────────────────────────
 // 返回 (input_per_m, cached_per_m, output_per_m)，单位：美元 / 百万 token
@@ -92,21 +93,77 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
             return Err(msg);
         }
         warn!("billing quota check db error for {}: {}", user_id, e);
+        if !billing_db_fail_open() {
+            return Err("计费系统暂时不可用，请稍后重试".to_string());
+        }
     }
 
     match store.billing_get_balance(user_id) {
-        Ok(None) => Ok(()), // 未开通计费，放行
+        Ok(None) if billing_required_for_all_users(store) => {
+            if let Err(e) = store.billing_ensure_balance_row(user_id) {
+                warn!("billing ensure balance row failed for {}: {}", user_id, e);
+                if billing_db_fail_open() {
+                    return Ok(());
+                }
+                return Err("计费系统暂时不可用，请稍后重试".to_string());
+            }
+            Err("余额不足（当前 0 分），请联系管理员充值后继续使用".to_string())
+        }
+        Ok(None) => Ok(()), // 兼容模式：未开通计费，放行
         Ok(Some(fen)) if fen > 0 => Ok(()),
         Ok(Some(fen)) => Err(format!(
             "余额不足（当前 {} 分），请联系管理员充值后继续使用",
             fen
         )),
         Err(e) => {
-            // DB 故障时放行，避免阻断服务
             warn!("billing check_can_call db error for {}: {}", user_id, e);
-            Ok(())
+            if billing_db_fail_open() {
+                Ok(())
+            } else {
+                Err("计费系统暂时不可用，请稍后重试".to_string())
+            }
         }
     }
+}
+
+/// 可信用量记账：插入 token 用量，并在用户已开通预存计费时原子扣款。
+pub fn account_trusted_usage(
+    store: &Store,
+    record: &TokenUsageRecord<'_>,
+) -> anyhow::Result<TokenUsageAccountingResult> {
+    let (rate, markup) = store.billing_get_rate_and_markup();
+    let model = record.model.unwrap_or("unknown");
+    let cost_fen = calc_cost_fen(
+        model,
+        record.input_tokens.max(0),
+        record.cached_input_tokens.max(0),
+        record.output_tokens.max(0),
+        rate,
+        markup,
+    );
+    let charge = TokenUsageBillingCharge {
+        model: record.model,
+        input_tokens: record.input_tokens.max(0),
+        cached_input_tokens: record.cached_input_tokens.max(0),
+        output_tokens: record.output_tokens.max(0),
+        cost_rmb_fen: cost_fen,
+        exchange_rate_x10000: rate,
+        markup_x1000: markup,
+        bill_missing_balance: billing_required_for_all_users(store),
+    };
+    let result = store.record_token_usage_with_billing(record, &charge)?;
+    if let Some(balance) = result.balance_after_fen {
+        let threshold = store
+            .billing_get_config("low_balance_threshold_fen")
+            .ok()
+            .flatten()
+            .and_then(|s| s.parse::<i64>().ok())
+            .unwrap_or(100);
+        if balance <= threshold {
+            crate::billing_events::publish_low_balance(record.user_id.to_string(), balance);
+        }
+    }
+    Ok(result)
 }
 
 /// LLM 调用后：用已解析出的 token 用量执行扣费。
@@ -213,4 +270,33 @@ pub fn deduct_from_response(store: &Store, user_id: &str, model: &str, response:
             warn!("billing deduct failed for {}: {}", user_id, e);
         }
     }
+}
+
+fn billing_db_fail_open() -> bool {
+    std::env::var("BILLING_DB_FAIL_OPEN")
+        .ok()
+        .map(|value| {
+            let value = value.trim().to_ascii_lowercase();
+            value == "1" || value == "true" || value == "yes"
+        })
+        .unwrap_or(false)
+}
+
+fn billing_required_for_all_users(store: &Store) -> bool {
+    std::env::var("BILLING_REQUIRED_FOR_ALL_USERS")
+        .ok()
+        .map(|value| truthy(&value))
+        .or_else(|| {
+            store
+                .billing_get_config("billing_required_for_all_users")
+                .ok()
+                .flatten()
+                .map(|value| truthy(&value))
+        })
+        .unwrap_or(true)
+}
+
+fn truthy(value: &str) -> bool {
+    let value = value.trim().to_ascii_lowercase();
+    value == "1" || value == "true" || value == "yes" || value == "on"
 }

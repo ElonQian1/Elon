@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use chrono::Datelike;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
 use super::{new_id, now, Store};
@@ -33,6 +33,27 @@ pub struct TokenUsageRecord<'a> {
     pub total_tokens: i64,
 }
 
+/// 可信用量对应的扣费参数。
+pub struct TokenUsageBillingCharge<'a> {
+    pub model: Option<&'a str>,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub cost_rmb_fen: i64,
+    pub exchange_rate_x10000: i64,
+    pub markup_x1000: i64,
+    pub bill_missing_balance: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenUsageAccountingResult {
+    pub token_usage_event_id: String,
+    pub billing_event_id: Option<String>,
+    pub cost_rmb_fen: i64,
+    pub balance_after_fen: Option<i64>,
+    pub accounting_status: String,
+}
+
 // ── 查询结构 ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,6 +63,8 @@ pub struct UsageTotals {
     pub output_tokens: i64,
     pub reasoning_tokens: i64,
     pub total_tokens: i64,
+    pub billable_tokens: i64,
+    pub billed_cost_rmb_fen: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -127,6 +150,118 @@ impl Store {
         Ok(())
     }
 
+    /// 原子写入可信 token 用量，并在用户已开通预存计费时同步扣费。
+    ///
+    /// 事务内完成：
+    /// - 插入 `token_usage_events`
+    /// - 更新 `user_balance`
+    /// - 插入 `billing_events`
+    /// - 将 token 事件回填 `billing_event_id` / `cost_rmb_fen` / `balance_after_fen`
+    ///
+    /// 没有 `user_balance` 行表示未开通预存计费：仍记录可信用量，但不扣 RMB。
+    pub fn record_token_usage_with_billing(
+        &self,
+        r: &TokenUsageRecord<'_>,
+        charge: &TokenUsageBillingCharge<'_>,
+    ) -> Result<TokenUsageAccountingResult> {
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let token_event_id = new_id("tok");
+        let created = now();
+        let mut billing_event_id = None;
+        let mut balance_after = None;
+        let mut billed_cost = 0;
+        let mut accounting_status = "unbilled_no_balance".to_string();
+
+        let mut balance = tx
+            .query_row(
+                "SELECT balance_fen FROM user_balance WHERE user_id = ?1",
+                params![r.user_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?;
+        if balance.is_none() && charge.bill_missing_balance {
+            tx.execute(
+                "INSERT INTO user_balance (user_id, balance_fen, updated_at) VALUES (?1, 0, ?2)",
+                params![r.user_id, created],
+            )?;
+            balance = Some(0);
+        }
+
+        if let Some(balance) = balance {
+            if charge.cost_rmb_fen > 0 && (charge.input_tokens > 0 || charge.output_tokens > 0) {
+                let new_balance = balance - charge.cost_rmb_fen;
+                tx.execute(
+                    "UPDATE user_balance SET balance_fen = ?1, updated_at = ?2 WHERE user_id = ?3",
+                    params![new_balance, created, r.user_id],
+                )?;
+                let event_id = new_id("bev");
+                tx.execute(
+                    r#"INSERT INTO billing_events
+                       (id, user_id, model, input_tokens, cached_input_tokens, output_tokens,
+                        cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at,
+                        token_usage_event_id)
+                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)"#,
+                    params![
+                        event_id,
+                        r.user_id,
+                        charge.model,
+                        charge.input_tokens.max(0),
+                        charge.cached_input_tokens.max(0),
+                        charge.output_tokens.max(0),
+                        charge.cost_rmb_fen,
+                        charge.exchange_rate_x10000,
+                        charge.markup_x1000,
+                        created,
+                        token_event_id,
+                    ],
+                )?;
+                billing_event_id = Some(event_id);
+                balance_after = Some(new_balance);
+                billed_cost = charge.cost_rmb_fen;
+                accounting_status = "billed".to_string();
+            } else {
+                balance_after = Some(balance);
+                accounting_status = "zero_cost".to_string();
+            }
+        }
+
+        tx.execute(
+            "INSERT INTO token_usage_events (
+               id, user_id, feature, usage_mode, model,
+               input_tokens, cached_input_tokens, output_tokens,
+               reasoning_tokens, total_tokens, created_at,
+               accounting_status, billing_event_id, cost_rmb_fen, balance_after_fen
+             ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
+            params![
+                token_event_id,
+                r.user_id,
+                r.feature,
+                r.usage_mode,
+                r.model,
+                r.input_tokens,
+                r.cached_input_tokens,
+                r.output_tokens,
+                r.reasoning_tokens,
+                r.total_tokens,
+                created,
+                accounting_status,
+                billing_event_id,
+                billed_cost,
+                balance_after,
+            ],
+        )?;
+        tx.commit()?;
+
+        Ok(TokenUsageAccountingResult {
+            token_usage_event_id: token_event_id,
+            billing_event_id,
+            cost_rmb_fen: billed_cost,
+            balance_after_fen: balance_after,
+            accounting_status,
+        })
+    }
+
     /// 返回用户在最近 `days` 天内的 token 用量聚合统计。
     pub fn get_usage_stats(&self, user_id: &str, days: i64) -> Result<UsageStats> {
         let conn = self.conn()?;
@@ -139,7 +274,9 @@ impl Store {
                     COALESCE(SUM(cached_input_tokens),0),
                     COALESCE(SUM(output_tokens),0),
                     COALESCE(SUM(reasoning_tokens),0),
-                    COALESCE(SUM(total_tokens),0)
+                    COALESCE(SUM(total_tokens),0),
+                    COALESCE(SUM(CASE WHEN usage_mode != 'client_reported' THEN total_tokens ELSE 0 END),0),
+                    COALESCE(SUM(cost_rmb_fen),0)
              FROM token_usage_events
              WHERE user_id=?1 AND created_at >= datetime('now', ?2)",
             params![user_id, &since],
@@ -150,6 +287,8 @@ impl Store {
                     output_tokens: row.get(2)?,
                     reasoning_tokens: row.get(3)?,
                     total_tokens: row.get(4)?,
+                    billable_tokens: row.get(5)?,
+                    billed_cost_rmb_fen: row.get(6)?,
                 })
             },
         )?;
@@ -291,5 +430,168 @@ impl Store {
             by_day,
             quota,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_store() -> (Store, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "elon-token-usage-test-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let _ = std::fs::remove_file(&path);
+        (Store::open(&path).expect("store should open"), path)
+    }
+
+    #[test]
+    fn trusted_usage_records_token_event_and_billing_event_atomically() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("billing-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 1_000, "test", "test", None)
+            .unwrap();
+
+        let record = TokenUsageRecord {
+            user_id: &user.id,
+            feature: "test_feature",
+            usage_mode: "server_codex_cli",
+            model: Some("gpt-4o-mini"),
+            input_tokens: 1_000,
+            cached_input_tokens: 100,
+            output_tokens: 1_000,
+            reasoning_tokens: 0,
+            total_tokens: 2_000,
+        };
+        let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
+
+        assert_eq!(result.accounting_status, "billed");
+        assert!(result.cost_rmb_fen > 0);
+        assert!(result.billing_event_id.is_some());
+        assert_eq!(
+            store.billing_get_balance(&user.id).unwrap(),
+            Some(1_000 - result.cost_rmb_fen)
+        );
+
+        let (events, total) = store.billing_list_events(&user.id, 1, 10).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(
+            events[0].token_usage_event_id.as_deref(),
+            Some(result.token_usage_event_id.as_str())
+        );
+
+        let stats = store.get_usage_stats(&user.id, 30).unwrap();
+        assert_eq!(stats.total.total_tokens, 2_000);
+        assert_eq!(stats.total.billable_tokens, 2_000);
+        assert_eq!(stats.total.billed_cost_rmb_fen, result.cost_rmb_fen);
+        let audit = store.admin_accounting_audit(30, 10).unwrap();
+        assert!(audit.iter().any(|row| {
+            row.user_id == user.id
+                && row.accounting_status == "billed"
+                && row.billed_cost_rmb_fen == result.cost_rmb_fen
+        }));
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn trusted_usage_without_balance_row_is_recorded_but_not_billed() {
+        let (store, path) = temp_store();
+        store
+            .billing_set_config("billing_required_for_all_users", "false")
+            .unwrap();
+        let user = store
+            .create_user(
+                &format!("unbilled-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        let record = TokenUsageRecord {
+            user_id: &user.id,
+            feature: "test_feature",
+            usage_mode: "server_codex_cli",
+            model: Some("gpt-4o-mini"),
+            input_tokens: 100,
+            cached_input_tokens: 0,
+            output_tokens: 100,
+            reasoning_tokens: 0,
+            total_tokens: 200,
+        };
+        let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
+
+        assert_eq!(result.accounting_status, "unbilled_no_balance");
+        assert_eq!(result.cost_rmb_fen, 0);
+        assert!(result.billing_event_id.is_none());
+        let (_events, total) = store.billing_list_events(&user.id, 1, 10).unwrap();
+        assert_eq!(total, 0);
+
+        let stats = store.get_usage_stats(&user.id, 30).unwrap();
+        assert_eq!(stats.total.total_tokens, 200);
+        assert_eq!(stats.total.billable_tokens, 200);
+        assert_eq!(stats.total.billed_cost_rmb_fen, 0);
+        let audit = store.admin_accounting_audit(30, 10).unwrap();
+        assert!(audit.iter().any(|row| {
+            row.user_id == user.id
+                && row.accounting_status == "unbilled_no_balance"
+                && row.total_tokens == 200
+        }));
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn strict_billing_auto_opens_missing_balance_row_and_bills_negative() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("strict-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        let record = TokenUsageRecord {
+            user_id: &user.id,
+            feature: "test_feature",
+            usage_mode: "server_codex_cli",
+            model: Some("gpt-4o-mini"),
+            input_tokens: 100,
+            cached_input_tokens: 0,
+            output_tokens: 100,
+            reasoning_tokens: 0,
+            total_tokens: 200,
+        };
+        let result = crate::billing::account_trusted_usage(&store, &record).unwrap();
+
+        assert_eq!(result.accounting_status, "billed");
+        assert!(result.cost_rmb_fen > 0);
+        assert_eq!(
+            store.billing_get_balance(&user.id).unwrap(),
+            Some(-result.cost_rmb_fen)
+        );
+        let (events, total) = store.billing_list_events(&user.id, 1, 10).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(
+            events[0].token_usage_event_id.as_deref(),
+            Some(result.token_usage_event_id.as_str())
+        );
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }
