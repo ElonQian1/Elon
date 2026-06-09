@@ -39,6 +39,27 @@ pub struct CliWorkspaceStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectWorkspaceInspectStatus {
+    pub workspace_path: String,
+    pub path_exists: bool,
+    pub is_dir: bool,
+    pub is_git_worktree: bool,
+    #[serde(default)]
+    pub git_branch: Option<String>,
+    #[serde(default)]
+    pub git_head: Option<String>,
+    #[serde(default)]
+    pub git_remote_origin: Option<String>,
+    pub has_uncommitted_changes: bool,
+    #[serde(default)]
+    pub uncommitted_count: Option<u32>,
+    #[serde(default)]
+    pub disk_free_bytes: Option<u64>,
+    pub codex_available: bool,
+    pub copilot_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
     Exec {
@@ -101,6 +122,11 @@ pub enum ServerToAgent {
         user_id: String,
         name: String,
         template: String,
+    },
+    /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
+    InspectProjectWorkspace {
+        req_id: String,
+        workspace_path: String,
     },
     /// 云端把 TTS 合成请求转发给有 GPU 的 PC 节点处理
     TtsSynthesizeRequest {
@@ -237,6 +263,16 @@ pub enum AgentToServer {
         project_id: String,
         message: String,
     },
+    /// PC 节点返回项目工作区巡检结果。
+    ProjectWorkspaceInspected {
+        req_id: String,
+        status: ProjectWorkspaceInspectStatus,
+    },
+    /// PC 节点检查项目工作区失败。
+    ProjectWorkspaceInspectError {
+        req_id: String,
+        message: String,
+    },
     /// PC 节点 TTS 合成完成
     TtsSynthesizeResponse {
         req_id: String,
@@ -274,6 +310,8 @@ impl AgentToServer {
             | Self::LlmStreamError { .. }
             | Self::ProjectWorkspaceProvisioned { .. }
             | Self::ProjectWorkspaceProvisionError { .. }
+            | Self::ProjectWorkspaceInspected { .. }
+            | Self::ProjectWorkspaceInspectError { .. }
             | Self::TtsSynthesizeResponse { .. }
             | Self::TtsSynthesizeError { .. } => None,
         }
@@ -290,6 +328,8 @@ impl AgentToServer {
             | Self::LlmStreamError { req_id, .. }
             | Self::ProjectWorkspaceProvisioned { req_id, .. }
             | Self::ProjectWorkspaceProvisionError { req_id, .. }
+            | Self::ProjectWorkspaceInspected { req_id, .. }
+            | Self::ProjectWorkspaceInspectError { req_id, .. }
             | Self::TtsSynthesizeResponse { req_id, .. }
             | Self::TtsSynthesizeError { req_id, .. } => Some(req_id.as_str()),
             _ => None,

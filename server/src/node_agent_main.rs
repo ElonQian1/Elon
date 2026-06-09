@@ -39,6 +39,7 @@ use tracing::{info, warn};
 
 mod cli_usage;
 mod pc_workspace_provisioner;
+mod project_workspace_inspect;
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
 
@@ -1539,6 +1540,29 @@ async fn run_session(
                                         Err(e) => AgentToServer::ProjectWorkspaceProvisionError {
                                             req_id,
                                             project_id: project_id_for_error,
+                                            message: e.to_string(),
+                                        },
+                                    };
+                                let _ = tx_c.send(ws_text(&response));
+                            });
+                        }
+                        ServerToAgent::InspectProjectWorkspace {
+                            req_id,
+                            workspace_path,
+                        } => {
+                            info!("🔎 InspectProjectWorkspace: {}", req_id);
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                let response =
+                                    match project_workspace_inspect::inspect_project_workspace(
+                                        &workspace_path,
+                                    ) {
+                                        Ok(status) => AgentToServer::ProjectWorkspaceInspected {
+                                            req_id,
+                                            status,
+                                        },
+                                        Err(e) => AgentToServer::ProjectWorkspaceInspectError {
+                                            req_id,
                                             message: e.to_string(),
                                         },
                                     };

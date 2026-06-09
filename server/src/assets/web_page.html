@@ -395,6 +395,80 @@
       white-space: pre-wrap;
       min-height: 104px;
     }
+    .project-workspace-health {
+      background: var(--panel);
+      padding: 18px 22px;
+      margin-top: 10px !important;
+      color: var(--ink-soft);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .workspace-health-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .workspace-health-title {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 500;
+      min-width: 0;
+    }
+    .workspace-health-pill {
+      border-radius: 999px;
+      padding: 4px 10px;
+      white-space: nowrap;
+      color: #d8e2ec;
+      background: #283140;
+      border: 1px solid rgba(216,226,236,0.12);
+    }
+    .workspace-health-pill.ok {
+      color: #dff8e4;
+      background: rgba(88,190,106,0.18);
+      border-color: rgba(88,190,106,0.34);
+    }
+    .workspace-health-pill.warn {
+      color: #f7e6b2;
+      background: rgba(201,150,48,0.18);
+      border-color: rgba(201,150,48,0.35);
+    }
+    .workspace-health-pill.bad {
+      color: #ffd8d8;
+      background: rgba(196,70,70,0.18);
+      border-color: rgba(196,70,70,0.35);
+    }
+    .workspace-health-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .workspace-health-item {
+      min-width: 0;
+      padding: 10px 12px;
+      background: var(--panel-2);
+      border-radius: 6px;
+    }
+    .workspace-health-label {
+      color: var(--ink-faint);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .workspace-health-value {
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+    .workspace-health-warnings {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: #f7d28a;
+    }
+    .workspace-health-warnings li + li { margin-top: 4px; }
+    @media (max-width: 640px) {
+      .workspace-health-grid { grid-template-columns: 1fr; }
+      .workspace-health-head { align-items: flex-start; flex-direction: column; }
+    }
     .project-block {
       background: var(--panel);
       padding: 18px 22px;
@@ -1182,6 +1256,13 @@
         <div class="project-stage" id="currentStageText">待提交需求</div>
         <div class="project-overview" id="projectOverviewText">项目管理
 当前没有正在执行的开发任务。</div>
+        <div class="project-workspace-health" id="projectWorkspaceHealth">
+          <div class="workspace-health-head">
+            <div class="workspace-health-title">PC 工作区</div>
+            <div class="workspace-health-pill warn">待检查</div>
+          </div>
+          <div>进入项目后自动检查 PC 节点状态。</div>
+        </div>
         <div class="project-block">
           <h3>开发进度</h3>
           <div class="stage-line" id="stagePlanText">1. 需求分析：等待</div>
@@ -1651,6 +1732,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const searchInput = $('searchInput');
 
   const projectOverviewText = $('projectOverviewText');
+  const projectWorkspaceHealth = $('projectWorkspaceHealth');
   const currentStageText = $('currentStageText');
   const stagePlanText = $('stagePlanText');
   const stageCodeText = $('stageCodeText');
@@ -1785,6 +1867,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let friendPollTimer = null;
   let typingResetTimer = null;
   let lastTypingSentMs = 0;
+  let projectHealthRequestSeq = 0;
   const SOCIAL_AI_USER_ID = 'usr_elon_ai';
 
   // ====== 工具 ======
@@ -2588,9 +2671,117 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   // ====== 项目页渲染 ======
+  function resetProjectWorkspaceHealth(label = '待检查', tone = 'warn', detail = '进入项目后自动检查 PC 节点状态。') {
+    if (!projectWorkspaceHealth) return;
+    projectWorkspaceHealth.innerHTML = [
+      '<div class="workspace-health-head">',
+      '<div class="workspace-health-title">PC 工作区</div>',
+      '<div class="workspace-health-pill ' + tone + '">' + escapeHtml(label) + '</div>',
+      '</div>',
+      '<div>' + escapeHtml(detail) + '</div>'
+    ].join('');
+  }
+  function formatBytes(value) {
+    const bytes = Number(value || 0);
+    if (!Number.isFinite(bytes) || bytes <= 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let n = bytes;
+    let i = 0;
+    while (n >= 1024 && i < units.length - 1) { n /= 1024; i += 1; }
+    return (i >= 3 ? n.toFixed(1) : Math.round(n).toString()) + ' ' + units[i];
+  }
+  function formatLatestExecution(session) {
+    if (!session) return '暂无执行记录';
+    const status = session.status || '未知';
+    const merge = session.merge_status || session.mergeStatus || '';
+    const at = session.updated_at || session.completed_at || session.started_at || '';
+    return [status, merge, at].filter(Boolean).join(' · ');
+  }
+  function renderProjectWorkspaceHealth(data) {
+    if (!projectWorkspaceHealth) return;
+    const inspect = data.live_inspect || null;
+    const node = data.node || null;
+    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+    let tone = 'warn';
+    let label = '待处理';
+    if (data.verified_can_run_on_pc === true) {
+      tone = warnings.length ? 'warn' : 'ok';
+      label = warnings.length ? '可运行，有提醒' : '可运行';
+    } else if (data.verified_can_run_on_pc === false || data.can_run_on_pc === false) {
+      tone = 'bad';
+      label = '不可运行';
+    } else if (data.can_run_on_pc) {
+      tone = 'warn';
+      label = data.inspect_error ? '未验证' : '可调度';
+    }
+
+    const nodeText = node
+      ? [(node.device_name || ''), node.node_id, node.online ? '在线' : '离线'].filter(Boolean).join(' · ')
+      : '未绑定';
+    const workspaceText = (data.project && data.project.workspace_path)
+      || (inspect && inspect.workspace_path)
+      || '未设置';
+    const gitText = inspect
+      ? (inspect.is_git_worktree
+        ? [inspect.git_branch || 'HEAD', inspect.git_head || '', inspect.has_uncommitted_changes ? '有未提交改动' : '干净'].filter(Boolean).join(' · ')
+        : (inspect.path_exists ? '不是 Git worktree' : '目录不存在'))
+      : (data.inspect_error ? '检查失败' : '未检查');
+    const cliText = inspect
+      ? [
+          inspect.codex_available ? 'Codex' : '',
+          inspect.copilot_available ? 'Copilot' : ''
+        ].filter(Boolean).join(' / ') || '未检测到 CLI'
+      : '未检查';
+    const diskText = inspect && inspect.disk_free_bytes
+      ? formatBytes(inspect.disk_free_bytes)
+      : '未检查';
+    const rows = [
+      ['节点', nodeText],
+      ['工作区', workspaceText],
+      ['Git', gitText],
+      ['CLI', cliText],
+      ['磁盘剩余', diskText],
+      ['最近执行', formatLatestExecution(data.latest_execution)]
+    ];
+    const warningHtml = warnings.length
+      ? '<ul class="workspace-health-warnings">' + warnings.map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('') + '</ul>'
+      : '';
+    projectWorkspaceHealth.innerHTML = [
+      '<div class="workspace-health-head">',
+      '<div class="workspace-health-title">PC 工作区</div>',
+      '<div class="workspace-health-pill ' + tone + '">' + escapeHtml(label) + '</div>',
+      '</div>',
+      '<div class="workspace-health-grid">',
+      rows.map((row) => [
+        '<div class="workspace-health-item">',
+        '<div class="workspace-health-label">' + escapeHtml(row[0]) + '</div>',
+        '<div class="workspace-health-value">' + escapeHtml(row[1]) + '</div>',
+        '</div>'
+      ].join('')).join(''),
+      '</div>',
+      warningHtml
+    ].join('');
+  }
+  async function loadProjectWorkspaceHealth(project) {
+    if (!project || !project.id || !token) return;
+    const requestSeq = ++projectHealthRequestSeq;
+    resetProjectWorkspaceHealth('检查中', 'warn', '正在连接 PC 节点并检查项目工作区。');
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(project.id) + '/workspace/health');
+      const data = await res.json().catch(() => ({}));
+      if (!currentProject || currentProject.id !== project.id || requestSeq !== projectHealthRequestSeq) return;
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      renderProjectWorkspaceHealth(data);
+    } catch (err) {
+      if (!currentProject || currentProject.id !== project.id || requestSeq !== projectHealthRequestSeq) return;
+      resetProjectWorkspaceHealth('检查失败', 'bad', (err && err.message) ? err.message : '请稍后重试');
+    }
+  }
   function resetProjectPage() {
+    projectHealthRequestSeq += 1;
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
+    resetProjectWorkspaceHealth();
     projectWorkflowText.textContent = defaultWorkflowText('待提交需求');
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';
@@ -2613,6 +2804,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '更新：' + (p.updated_at || '')
     ].filter(Boolean).join('\n');
     projectOverviewText.textContent = overview;
+    loadProjectWorkspaceHealth(p);
     projectWorkflowText.textContent = defaultWorkflowText(currentStageText.textContent);
   }
 

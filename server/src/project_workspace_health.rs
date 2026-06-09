@@ -7,6 +7,8 @@ use axum::{
 use serde::Serialize;
 use std::sync::Arc;
 
+use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
+
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
     store::ProjectExecutionSession,
@@ -19,6 +21,9 @@ pub struct ProjectWorkspaceHealthResponse {
     pub node: Option<ProjectWorkspaceHealthNode>,
     pub latest_execution: Option<ProjectExecutionSession>,
     pub can_run_on_pc: bool,
+    pub verified_can_run_on_pc: Option<bool>,
+    pub live_inspect: Option<ProjectWorkspaceInspectStatus>,
+    pub inspect_error: Option<String>,
     pub warnings: Vec<String>,
 }
 
@@ -65,6 +70,13 @@ pub async fn get_project_workspace_health(
         Ok(session) => session,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e),
     };
+    let (live_inspect, inspect_error) = inspect_workspace(
+        &state,
+        node.as_ref(),
+        access.node_id.as_deref(),
+        access.workspace_path.as_deref(),
+    )
+    .await;
 
     let mut warnings = Vec::new();
     if access.node_id.as_deref().unwrap_or_default().is_empty() {
@@ -89,10 +101,19 @@ pub async fn get_project_workspace_health(
     ) {
         warnings.push("最近一次执行来自旧版节点，未返回工作区状态".to_string());
     }
+    if let Some(error) = inspect_error.as_deref() {
+        warnings.push(format!("PC 工作区实时巡检失败：{error}"));
+    }
+    if let Some(status) = live_inspect.as_ref() {
+        append_live_inspect_warnings(status, &mut warnings);
+    }
 
     let can_run_on_pc = access.node_id.is_some()
         && access.workspace_path.is_some()
         && node.as_ref().map(|node| node.online).unwrap_or(false);
+    let verified_can_run_on_pc = live_inspect
+        .as_ref()
+        .map(|status| status.path_exists && status.is_dir && cli_available(status));
 
     Json(ProjectWorkspaceHealthResponse {
         project: ProjectWorkspaceHealthProject {
@@ -107,9 +128,71 @@ pub async fn get_project_workspace_health(
         node,
         latest_execution,
         can_run_on_pc,
+        verified_can_run_on_pc,
+        live_inspect,
+        inspect_error,
         warnings,
     })
     .into_response()
+}
+
+async fn inspect_workspace(
+    state: &AppState,
+    node: Option<&ProjectWorkspaceHealthNode>,
+    node_id: Option<&str>,
+    workspace_path: Option<&str>,
+) -> (Option<ProjectWorkspaceInspectStatus>, Option<String>) {
+    let Some(node_id) = node_id.filter(|value| !value.trim().is_empty()) else {
+        return (None, None);
+    };
+    let Some(workspace_path) = workspace_path.filter(|value| !value.trim().is_empty()) else {
+        return (None, None);
+    };
+    if !node.map(|node| node.online).unwrap_or(false) {
+        return (None, None);
+    }
+
+    match state
+        .agent_manager
+        .dispatch_project_workspace_inspect(node_id, workspace_path.to_string())
+        .await
+    {
+        Ok(AgentToServer::ProjectWorkspaceInspected { status, .. }) => (Some(status), None),
+        Ok(AgentToServer::ProjectWorkspaceInspectError { message, .. }) => (None, Some(message)),
+        Ok(other) => (
+            None,
+            Some(format!("unexpected inspect response: {other:?}")),
+        ),
+        Err(e) => (None, Some(e.to_string())),
+    }
+}
+
+fn append_live_inspect_warnings(
+    status: &ProjectWorkspaceInspectStatus,
+    warnings: &mut Vec<String>,
+) {
+    if !status.path_exists {
+        warnings.push("PC 工作区目录不存在，项目无法在该节点继续执行".to_string());
+    } else if !status.is_dir {
+        warnings.push("PC workspace_path 不是目录".to_string());
+    } else if !status.is_git_worktree {
+        warnings.push("PC 工作区不是 Git worktree，后续合并/回收能力受限".to_string());
+    }
+
+    if status.has_uncommitted_changes {
+        let count = status.uncommitted_count.unwrap_or(0);
+        warnings.push(format!("PC 工作区存在 {count} 个未提交改动"));
+    }
+    if !cli_available(status) {
+        warnings.push("PC 节点未检测到 codex 或 copilot CLI".to_string());
+    }
+    if matches!(status.disk_free_bytes, Some(bytes) if bytes < 2 * 1024 * 1024 * 1024) {
+        warnings.push("PC 工作区所在磁盘剩余空间低于 2GB".to_string());
+    }
+}
+
+fn cli_available(status: &ProjectWorkspaceInspectStatus) -> bool {
+    status.codex_available || status.copilot_available
 }
 
 async fn node_health(state: &AppState, node_id: &str) -> ProjectWorkspaceHealthNode {

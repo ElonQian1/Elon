@@ -259,6 +259,25 @@ async fn run_relay_session(
                 });
             }
 
+            ServerToAgent::InspectProjectWorkspace {
+                req_id,
+                workspace_path,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let response = match crate::project_workspace_inspect::inspect_project_workspace(
+                        &workspace_path,
+                    ) {
+                        Ok(status) => AgentToServer::ProjectWorkspaceInspected { req_id, status },
+                        Err(e) => AgentToServer::ProjectWorkspaceInspectError {
+                            req_id,
+                            message: e.to_string(),
+                        },
+                    };
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
+
             // Exec 在本地 relay 模式下不支持（使用 CliPrompt 替代）
             ServerToAgent::Exec { task_id, .. } => {
                 let err = AgentToServer::TaskError {
