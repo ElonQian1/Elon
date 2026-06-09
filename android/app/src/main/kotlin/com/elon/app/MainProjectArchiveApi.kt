@@ -23,7 +23,8 @@ internal data class ArchiveProjectRecord(
     val systemKey: String? = null
 ) {
     fun toAppProject(): AppProject {
-        val systemKey = systemKey?.trim()?.takeIf { it.isNotBlank() }
+        val systemKey = systemKey?.trim()
+            ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
         val isSystem = !systemKey.isNullOrBlank()
         val opensAsJoint = !isSystem && (role != "owner" || isPublic)
         val subtitle = when {
@@ -98,31 +99,36 @@ private fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
     val project = obj.optJSONObject("project") ?: obj
     return ArchiveProjectRecord(
         id = project.getString("id"),
-        name = project.optString("name", "未命名项目"),
-        description = project.optString("description").takeIf { it.isNotBlank() },
-        role = project.optString("role", "member"),
+        name = project.optCleanString("name") ?: "未命名项目",
+        description = project.optCleanString("description"),
+        role = project.optCleanString("role") ?: "member",
         isPublic = project.optBoolean("is_public", false),
         joinMode = normalizeProjectJoinMode(
             project.optString("join_mode", "invite")
         ),
-        lastTaskStatus = project.optString("last_task_status").takeIf { it.isNotBlank() },
-        ownerAccount = project.optString("owner_account").takeIf { it.isNotBlank() },
-        ownerUserId = project.optString("owner_id").takeIf { it.isNotBlank() },
+        lastTaskStatus = project.optCleanString("last_task_status"),
+        ownerAccount = project.optCleanString("owner_account") ?: obj.optCleanString("owner_account"),
+        ownerUserId = project.optCleanString("owner_id") ?: obj.optCleanString("owner_id"),
         memberCount = project.optInt("member_count", 0).coerceAtLeast(0),
         updatedAtMs = parseChatMessageCreatedAt(
-            project.optString("updated_at", "").trim()
+            project.optCleanString("updated_at").orEmpty()
         ) ?: 0L,
         conversationCount = obj.optInt("conversation_count", 0),
         iconDataUrl = project.optArchiveProjectIconDataUrl(),
-        systemKey = obj.optString("system_key").trim().ifBlank { null }
+        systemKey = obj.optCleanString("system_key")
     )
+}
+
+private fun JSONObject.optCleanString(key: String): String? {
+    if (!has(key) || isNull(key)) return null
+    val value = optString(key, "").trim()
+    return value.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
 
 private fun JSONObject.optArchiveProjectIconDataUrl(): String? {
     val keys = arrayOf("iconDataUrl", "icon_data_url", "iconUrl", "icon_url", "icon", "avatar", "logo")
     for (key in keys) {
-        val value = optString(key, "").trim()
-        if (value.isNotBlank()) return value
+        optCleanString(key)?.let { return it }
     }
     return null
 }

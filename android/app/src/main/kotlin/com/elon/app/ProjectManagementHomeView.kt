@@ -507,17 +507,18 @@ internal class ProjectManagementHomeView(
     }
 
     private fun projectStageText(stage: String): String {
-        return when (stage.trim().lowercase()) {
+        val value = cleanProjectText(stage)
+        return when (value?.lowercase()) {
             "running" -> "运行中"
             "done" -> "已完成"
             "failed" -> "失败"
-            "" -> "待提交需求"
-            else -> stage.trim()
+            null -> "待提交需求"
+            else -> value
         }
     }
 
     private fun projectOwner(project: AppProject): String {
-        project.ownerAccount?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+        cleanProjectText(project.ownerAccount)?.let { return it }
         if (project.isSystemArchiveProject()) return "一龙"
         if (project.isJointDevelopmentProject()) return "未知"
         return AuthManager.displayName(activity).takeIf { it.isNotBlank() } ?: "未知"
@@ -528,7 +529,12 @@ internal class ProjectManagementHomeView(
     }
 
     private fun projectCode(project: AppProject): String? {
-        return project.projectDescription?.trim()?.takeIf { it.isNotBlank() }
+        return cleanProjectText(project.projectDescription)
+    }
+
+    private fun cleanProjectText(value: String?): String? {
+        val text = value?.trim().orEmpty()
+        return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun projectTime(project: AppProject): String {

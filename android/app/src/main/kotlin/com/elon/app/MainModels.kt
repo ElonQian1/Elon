@@ -34,7 +34,12 @@ data class AppProject(
 )
 
 internal fun AppProject.isSystemArchiveProject(): Boolean {
-    return !systemProjectKey.isNullOrBlank()
+    return normalizedSystemProjectKey() != null
+}
+
+internal fun AppProject.normalizedSystemProjectKey(): String? {
+    return systemProjectKey?.trim()
+        ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
 
 internal fun AppProject.isJointDevelopmentProject(): Boolean {
@@ -61,7 +66,7 @@ internal fun AppProject.projectKindLabel(): String {
 }
 
 internal fun AppProject.systemArchiveDisplayName(): String {
-    return when (systemProjectKey?.trim()?.lowercase()) {
+    return when (normalizedSystemProjectKey()?.lowercase()) {
         "phone_control" -> "手机控制"
         "chat_memory" -> "聊天记忆"
         else -> "系统档案"

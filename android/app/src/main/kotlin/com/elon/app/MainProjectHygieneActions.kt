@@ -7,6 +7,10 @@ internal class MainProjectHygieneActions(
     private val closeStaleWorkflowMessages: (MutableList<ChatMessage>) -> Unit
 ) {
     fun normalizeProject(project: AppProject) {
+        project.systemProjectKey = cleanNullableText(project.systemProjectKey)
+        project.ownerAccount = cleanNullableText(project.ownerAccount)
+        project.projectDescription = cleanNullableText(project.projectDescription)
+        if (project.stage.trim().equals("null", ignoreCase = true)) project.stage = ""
         if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())
         project.conversations.forEach { conversation ->
             if (conversation.messages.isEmpty()) conversation.messages.add(welcomeChatMessage())
@@ -25,6 +29,11 @@ internal class MainProjectHygieneActions(
         if (project.subtitle.isBlank()) project.subtitle = "点击进入会话"
         compactCliProjectEvents(project.events)
         project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
+    }
+
+    private fun cleanNullableText(value: String?): String? {
+        val text = value?.trim().orEmpty()
+        return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun compactCliProjectEvents(events: MutableList<String>) {
