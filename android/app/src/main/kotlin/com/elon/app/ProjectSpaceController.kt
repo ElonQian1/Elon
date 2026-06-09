@@ -32,7 +32,7 @@ internal class ProjectSpaceController(
     private val openPersonalAiChat: (Int) -> Unit,
     private val showPersonalConversationActions: (Int) -> Unit,
     private val showCreatePersonalConversation: () -> Unit,
-    private val showForkPersonalConversation: (String) -> Unit,
+    private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
@@ -506,7 +506,18 @@ internal class ProjectSpaceController(
                         }
                     }
                     if (isSelf && space.project.role != "observer") {
-                        container.addView(createPersonalConversationRow())
+                        container.addView(TextView(activity).apply {
+                            text = "+ 新建个人 AI 会话"
+                            textSize = 15f
+                            setTextColor(Color.parseColor("#F2F5FA"))
+                            setPadding(dp(20), dp(14), dp(20), dp(14))
+                            background = panelBackground("#181B20")
+                            isClickable = true
+                            foreground = selectableForeground()
+                            setOnClickListener {
+                                showCreateAndOpenPersonalConversation(null) { index -> openPersonalAiChat(index) }
+                            }
+                        })
                     }
                 }.onFailure { error ->
                     container.addView(inlineStatusRow(error.message ?: "加载失败", "#FF7A7A"))
@@ -663,7 +674,7 @@ internal class ProjectSpaceController(
                         isClickable = true
                         setOnClickListener {
                             val forkTitle = "分叉 ${member.account}：${conversation.title ?: "会话"}"
-                            showForkPersonalConversation(forkTitle)
+                            showCreateAndOpenPersonalConversation(forkTitle) { index -> openPersonalAiChat(index) }
                         }
                     })
                 })

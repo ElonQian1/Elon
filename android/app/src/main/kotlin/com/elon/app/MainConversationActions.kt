@@ -20,7 +20,7 @@ internal class MainConversationActions(
     private val setSendEnabled: (Boolean) -> Unit,
     private val onConversationsChanged: () -> Unit = {}
 ) {
-    fun showCreateConversationDialog(suggestedTitle: String? = null) {
+    fun showCreateConversationDialog(suggestedTitle: String? = null, onCreated: ((Int) -> Unit)? = null) {
         val conversations = conversationsProvider()
         val input = titleEditText(suggestedTitle ?: "新会话 ${conversations.size + 1}")
         val dialog = AlertDialog.Builder(activity)
@@ -37,7 +37,7 @@ internal class MainConversationActions(
                     input.error = "请输入会话标题"
                     return@setOnClickListener
                 }
-                createConversation(title)
+                createConversation(title, onCreated)
                 dialog.dismiss()
             }
         }
@@ -67,7 +67,7 @@ internal class MainConversationActions(
             .show()
     }
 
-    private fun createConversation(title: String) {
+    private fun createConversation(title: String, onCreated: ((Int) -> Unit)? = null) {
         val conversations = conversationsProvider()
         val project = activeProjectProvider()
         conversations.add(newAppConversation(title, "点击进入开发会话"))
@@ -76,6 +76,7 @@ internal class MainConversationActions(
         saveConversations()
         renderConversationList()
         onConversationsChanged()
+        onCreated?.invoke(conversations.lastIndex)
     }
 
     private fun showRenameConversationDialog(index: Int) {
