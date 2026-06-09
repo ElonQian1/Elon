@@ -7,6 +7,14 @@
         <item name="android:statusBarColor">@color/elon_bg_app</item>
         <item name="android:navigationBarColor">@color/elon_nav_bg</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
+        <item name="android:windowAnimationStyle">@style/ElonPageAnimation</item>
+    </style>
+
+    <style name="ElonPageAnimation">
+        <item name="android:activityOpenEnterAnimation">@anim/elon_page_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/elon_page_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/elon_page_close_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/elon_page_close_exit</item>
     </style>
 
     <style name="MainTabText">
