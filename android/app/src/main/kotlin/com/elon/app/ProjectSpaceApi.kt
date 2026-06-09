@@ -8,6 +8,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.time.Instant
 
 internal data class ProjectSpaceRoute(
     val userId: String? = null,
@@ -104,6 +105,26 @@ internal fun fetchProjectMemberConversationMessages(
         return List(arr.length()) {
             parseProjectMemberConversationMessage(arr.optJSONObject(it) ?: JSONObject())
         }
+    }
+}
+
+internal fun fetchProjectInviteFriends(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context
+): List<AppFriend> {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/me/friends")
+            .get()
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "加载好友失败"))
+        val arr = JSONObject(body).optJSONArray("friends") ?: JSONArray()
+        return List(arr.length()) { parseProjectInviteFriend(arr.optJSONObject(it) ?: JSONObject()) }
+            .filter { it.id != PROJECT_INVITE_SOCIAL_AI_USER_ID }
     }
 }
 
@@ -332,6 +353,29 @@ private fun parseProjectMember(json: JSONObject) = ProjectMember(
     joinedAt = json.optString("joined_at", "")
 )
 
+private fun parseProjectInviteFriend(json: JSONObject): AppFriend {
+    val account = json.optString("account", "").trim()
+    val phone = json.optString("phone", "").trim().takeIf { it.isNotEmpty() }
+    val nickname = json.optString("nickname", "").trim().takeIf { it.isNotEmpty() }
+    return AppFriend(
+        id = json.optString("id", "").trim(),
+        name = nickname ?: account.ifBlank { phone ?: "好友" },
+        account = account,
+        phone = phone,
+        avatarDataUrl = json.optString("avatar_data_url", "").trim().takeIf { it.isNotEmpty() },
+        friendSince = json.optString("friend_since", "").trim().takeIf { it.isNotEmpty() },
+        lastMessage = json.optString("last_message", "").trim().takeIf { it.isNotEmpty() },
+        lastMessageAt = parseProjectInviteServerTime(json.optString("last_message_at", "").trim()),
+        unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0),
+        isOnline = json.optBoolean("is_online", false)
+    )
+}
+
+private fun parseProjectInviteServerTime(value: String): Long? {
+    if (value.isBlank()) return null
+    return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+}
+
 private fun parseProjectMemberConversation(json: JSONObject) = ProjectMemberConversation(
     id = json.optString("id", ""),
     projectId = json.optString("project_id", ""),
@@ -383,6 +427,8 @@ private fun readProjectSpaceError(body: String, fallback: String): String {
         JSONObject(body).optString("error", "").ifBlank { fallback }
     }.getOrDefault(fallback)
 }
+
+private const val PROJECT_INVITE_SOCIAL_AI_USER_ID = "usr_elon_ai"
 
 private fun projectSpaceUrlPart(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 

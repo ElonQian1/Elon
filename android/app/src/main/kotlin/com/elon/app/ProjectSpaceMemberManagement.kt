@@ -8,10 +8,12 @@ import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -21,6 +23,11 @@ import kotlin.concurrent.thread
 
 internal object ProjectSpaceMemberManagement {
     private data class RoleOption(val role: String, val label: String)
+    private data class InviteBatchResult(
+        val successCount: Int,
+        val errorCount: Int,
+        val firstError: String?
+    )
 
     private val roleOptions = listOf(
         RoleOption("admin", "管理员"),
@@ -80,14 +87,40 @@ internal object ProjectSpaceMemberManagement {
         http: OkHttpClient,
         serverUrl: String,
         projectId: String,
+        existingMemberIds: Set<String>,
         dp: (Int) -> Int,
         onChanged: () -> Unit
     ) {
         val accountInput = accountInput(activity, dp)
         val (roleView, selectedRole) = rolePicker(activity, dp, "member")
+        val selectedFriends = linkedMapOf<String, AppFriend>()
+        val friendList = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val friendStatus = TextView(activity).apply {
+            text = "正在加载好友..."
+            textSize = 13f
+            setTextColor(Color.parseColor("#6F7785"))
+            setPadding(0, dp(4), 0, dp(6))
+        }
+        val friendScroll = ScrollView(activity).apply {
+            isFillViewport = false
+            addView(friendList)
+        }
         val body = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(4), dp(4), dp(4), 0)
+            addView(TextView(activity).apply {
+                text = "从好友列表勾选成员，也可以手动输入账号。"
+                textSize = 13f
+                setTextColor(Color.parseColor("#6F7785"))
+                setPadding(0, 0, 0, dp(6))
+            })
+            addView(friendStatus)
+            addView(friendScroll, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(220)
+            ))
             addView(accountInput)
             addView(roleView)
         }
@@ -98,31 +131,140 @@ internal object ProjectSpaceMemberManagement {
             .setNegativeButton("取消", null)
             .setPositiveButton("邀请", null)
             .show()
+        thread(name = "project-load-invite-friends") {
+            val result = runCatching { fetchProjectInviteFriends(http, serverUrl, activity) }
+            activity.runOnUiThread {
+                result.onSuccess { friends ->
+                    renderFriendRows(
+                        activity = activity,
+                        dp = dp,
+                        friends = friends,
+                        existingMemberIds = existingMemberIds,
+                        selectedFriends = selectedFriends,
+                        friendList = friendList,
+                        friendStatus = friendStatus
+                    )
+                }.onFailure { error ->
+                    friendStatus.text = error.message ?: "好友加载失败，可手动输入账号"
+                    friendStatus.setTextColor(Color.parseColor("#B35E5E"))
+                }
+            }
+        }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val account = accountInput.text?.toString()?.trim().orEmpty()
-            if (account.isBlank()) {
-                Toast.makeText(activity, "请输入账号", Toast.LENGTH_SHORT).show()
+            val selected = selectedFriends.values.toList()
+            if (account.isBlank() && selected.isEmpty()) {
+                Toast.makeText(activity, "请选择好友或输入账号", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            positive.isEnabled = false
+            positive.text = "邀请中..."
             thread(name = "project-invite-member") {
-                val result = runCatching {
-                    inviteProjectMember(http, serverUrl, activity, projectId, account, selectedRole())
-                }
+                val result = inviteSelectedMembers(
+                    http = http,
+                    serverUrl = serverUrl,
+                    activity = activity,
+                    projectId = projectId,
+                    selectedFriends = selected,
+                    manualAccount = account,
+                    role = selectedRole()
+                )
                 activity.runOnUiThread {
-                    result.onSuccess { member ->
-                        Toast.makeText(
-                            activity,
-                            "已添加 ${member.account.ifBlank { "成员" }} 为${projectRoleLabel(member.role)}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    positive.isEnabled = true
+                    positive.text = "邀请"
+                    if (result.successCount > 0) {
+                        val tail = result.firstError?.let { "，${result.errorCount} 个失败：$it" }.orEmpty()
+                        Toast.makeText(activity, "已邀请 ${result.successCount} 位成员$tail", Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
                         onChanged()
-                    }.onFailure { error ->
-                        Toast.makeText(activity, error.message ?: "邀请成员失败", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(
+                            activity,
+                            result.firstError ?: "邀请成员失败",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 }
             }
         }
+    }
+
+    private fun renderFriendRows(
+        activity: AppCompatActivity,
+        dp: (Int) -> Int,
+        friends: List<AppFriend>,
+        existingMemberIds: Set<String>,
+        selectedFriends: MutableMap<String, AppFriend>,
+        friendList: LinearLayout,
+        friendStatus: TextView
+    ) {
+        friendList.removeAllViews()
+        selectedFriends.clear()
+        if (friends.isEmpty()) {
+            friendStatus.text = "暂无好友，可手动输入账号邀请"
+            friendStatus.setTextColor(Color.parseColor("#6F7785"))
+            return
+        }
+        friendStatus.text = "好友列表"
+        friendStatus.setTextColor(Color.parseColor("#6F7785"))
+        friends.forEach { friend ->
+            val alreadyMember = existingMemberIds.contains(friend.id)
+            friendList.addView(CheckBox(activity).apply {
+                text = buildString {
+                    append(friend.name.ifBlank { "好友" })
+                    friend.account.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
+                    if (alreadyMember) append(" · 已在项目中")
+                }
+                textSize = 14f
+                setTextColor(Color.parseColor(if (alreadyMember) "#9AA1AD" else "#1E2126"))
+                setPadding(0, dp(5), 0, dp(5))
+                isEnabled = !alreadyMember
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) selectedFriends[friend.id] = friend
+                    else selectedFriends.remove(friend.id)
+                }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+    }
+
+    private fun inviteSelectedMembers(
+        http: OkHttpClient,
+        serverUrl: String,
+        activity: AppCompatActivity,
+        projectId: String,
+        selectedFriends: List<AppFriend>,
+        manualAccount: String,
+        role: String
+    ): InviteBatchResult {
+        var successCount = 0
+        val errors = mutableListOf<String>()
+        selectedFriends.forEach { friend ->
+            runCatching {
+                inviteProjectMember(http, serverUrl, activity, projectId, friend.id, role)
+            }.onSuccess {
+                successCount += 1
+            }.onFailure { error ->
+                errors += "${friend.name.ifBlank { "好友" }}：${error.message ?: "失败"}"
+            }
+        }
+        manualAccount.takeIf { it.isNotBlank() }?.let { account ->
+            runCatching {
+                inviteProjectMember(http, serverUrl, activity, projectId, account, role)
+            }.onSuccess {
+                successCount += 1
+            }.onFailure { error ->
+                errors += "手动输入：${error.message ?: "失败"}"
+            }
+        }
+        return InviteBatchResult(
+            successCount = successCount,
+            errorCount = errors.size,
+            firstError = errors.firstOrNull()
+        )
     }
 
     fun showRoleDialog(

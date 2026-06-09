@@ -418,6 +418,7 @@ internal class ProjectSpaceController(
                     http = http,
                     serverUrl = serverUrl,
                     projectId = space.project.id,
+                    existingMemberIds = space.members.mapTo(mutableSetOf()) { it.userId },
                     dp = dp,
                     onChanged = { reloadActiveSpace() }
                 )
