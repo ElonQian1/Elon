@@ -162,6 +162,10 @@ internal object VoiceTtsVoicePicker {
         }
 
         // ── 状态栏文字更新 ──────────────────────────────────────────────────
+        // systemVoice 始终排第一，服务器声线追加在后面
+        fun voicesWithSystem(serverVoices: List<VoiceTtsVoiceOption>): List<VoiceTtsVoiceOption> =
+            listOf(VoiceTtsVoiceCatalog.systemVoice) + serverVoices
+
         fun applyResult(result: TtsCatalogResult) {
             val statusText = when {
                 result.isFallback && VoiceTtsCatalogFetcher.getCachedOrNull() == null ->
@@ -180,7 +184,7 @@ internal object VoiceTtsVoicePicker {
             mainHandler.post {
                 if (!dialog.isShowing) return@post
                 statusView.text = statusText
-                buildVoiceRows(result.voices, result.workerConfigured)
+                buildVoiceRows(voicesWithSystem(result.voices), result.workerConfigured)
             }
         }
 
@@ -190,15 +194,9 @@ internal object VoiceTtsVoicePicker {
             VoiceTtsVoiceCatalog.updateFromServer(cached.voices)
             applyResult(cached)
         } else {
-            // 无缓存：先用内置预设占位，让用户不面对空列表
-            val fallback = TtsCatalogResult(
-                voices = VoiceTtsVoiceCatalog.presetVoices,
-                workerConfigured = false,
-                defaultProvider = "auto",
-                isFallback = true,
-            )
+            // 无缓存：先用完整 allVoices（含系统TTS）占位，让用户不面对空列表
             mainHandler.post {
-                if (dialog.isShowing) buildVoiceRows(fallback.voices, false)
+                if (dialog.isShowing) buildVoiceRows(VoiceTtsVoiceCatalog.allVoices, false)
             }
         }
 
