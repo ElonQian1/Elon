@@ -502,8 +502,18 @@ internal class ProjectManagementHomeView(
 
     private fun projectMeta(project: AppProject): String {
         val kind = project.projectKindLabel()
-        val stage = project.stage.takeIf { it.isNotBlank() } ?: "待提交需求"
+        val stage = projectStageText(project.stage)
         return "$kind · ${project.displayConversationCount()}个会话 · $stage"
+    }
+
+    private fun projectStageText(stage: String): String {
+        return when (stage.trim().lowercase()) {
+            "running" -> "运行中"
+            "done" -> "已完成"
+            "failed" -> "失败"
+            "" -> "待提交需求"
+            else -> stage.trim()
+        }
     }
 
     private fun projectOwner(project: AppProject): String {

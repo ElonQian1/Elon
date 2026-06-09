@@ -386,9 +386,15 @@ internal class MainHomeListActions(
     }
 
     private fun isProjectWorking(project: AppProject): Boolean {
+        if (projectHasRunningStatus(project)) return true
         return project.conversations.any { conversation ->
             !conversation.ended && isTaskRunning(project.projectSpaceId(), conversation.id)
         }
+    }
+
+    private fun projectHasRunningStatus(project: AppProject): Boolean {
+        val stage = project.stage.trim()
+        return stage.equals("running", ignoreCase = true) || stage == "运行中"
     }
 
 }
