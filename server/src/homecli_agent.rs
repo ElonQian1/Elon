@@ -213,6 +213,41 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((req_id, rx))
     }
+
+    /// Ask a PC node to create or reuse a managed project workspace.
+    pub async fn dispatch_project_workspace_provision(
+        &self,
+        agent_id: &str,
+        project_id: String,
+        user_id: String,
+        name: String,
+        template: String,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::ProvisionProjectWorkspace {
+                req_id: req_id.clone(),
+                project_id,
+                user_id,
+                name,
+                template,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+
+        match tokio::time::timeout(Duration::from_secs(120), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!("agent disconnected before provisioning response")),
+            Err(_) => Err(anyhow!("project workspace provisioning timeout (120s)")),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

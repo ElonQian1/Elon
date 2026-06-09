@@ -10,8 +10,8 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_mobile::ensure_mobile_project,
+    project_workspace_provision,
     project_ws_session::handle_project_ws,
-    tools,
     types::AppState,
 };
 
@@ -20,6 +20,10 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub template: Option<String>,
+    /// 新项目默认只能创建在当前用户的 PC 节点上；多节点在线时必须显式指定。
+    pub node_id: Option<String>,
+    /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
+    pub execution_target: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -94,6 +98,19 @@ pub async fn create_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
+    let execution_target = req
+        .execution_target
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("pc_node");
+    if !["pc_node", "pc"].contains(&execution_target) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "服务器磁盘不再承载新代码项目，请选择在线 PC 节点创建项目",
+        );
+    }
+
     let create_result = match state.store.create_project(
         &user.id,
         &req.name,
@@ -106,17 +123,87 @@ pub async fn create_project(
 
     let reused_existing = create_result.reused_existing;
     let project = create_result.project;
-    if !reused_existing {
-        let workspace = state.get_project_workspace(&project.workspace_key);
-        if let Err(e) =
-            tools::create_project_workspace(&workspace, &project.template, &project.name, &user.id)
+    if reused_existing {
+        if project
+            .node_id
+            .as_deref()
+            .is_some_and(|value| !value.is_empty())
+            && project
+                .workspace_path
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
         {
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+            let existing_node_id = project.node_id.clone();
+            return Json(serde_json::json!({
+                "project": project,
+                "reused_existing": true,
+                "node_id": existing_node_id,
+                "provisioned": false,
+            }))
+            .into_response();
         }
+        return json_error(
+            StatusCode::CONFLICT,
+            "同名项目已存在但尚未绑定 PC 工作区，请先绑定 PC 节点或更换项目名称",
+        );
     }
 
-    Json(serde_json::json!({ "project": project, "reused_existing": reused_existing }))
-        .into_response()
+    let node_id = match project_workspace_provision::resolve_pc_project_node(
+        &state,
+        &user.id,
+        req.node_id.as_deref(),
+    )
+    .await
+    {
+        Ok(node_id) => node_id,
+        Err((status, message)) => {
+            let _ = state.store.purge_project_records(&user.id, &project.id);
+            return json_error(status, message);
+        }
+    };
+
+    let provisioned = match project_workspace_provision::provision_project_workspace(
+        &state,
+        &node_id,
+        &user.id,
+        &project.id,
+        &project.name,
+        &project.template,
+    )
+    .await
+    {
+        Ok(workspace) => workspace,
+        Err(e) => {
+            let _ = state.store.purge_project_records(&user.id, &project.id);
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("PC 节点创建项目工作区失败：{e}"),
+            );
+        }
+    };
+
+    let project = match state.store.bind_project_to_pc_workspace(
+        &user.id,
+        &project.id,
+        &provisioned.workspace_path,
+        &node_id,
+        provisioned.git_head.as_deref(),
+    ) {
+        Ok(project) => project,
+        Err(e) => {
+            let _ = state.store.purge_project_records(&user.id, &project.id);
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+        }
+    };
+
+    Json(serde_json::json!({
+        "project": project,
+        "reused_existing": false,
+        "node_id": node_id,
+        "provisioned": true,
+        "workspace_created": provisioned.created,
+    }))
+    .into_response()
 }
 
 /// 注册一个指向外部本地路径的项目（如本机 D:\rust\active-projects\bb64a）。

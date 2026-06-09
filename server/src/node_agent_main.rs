@@ -36,6 +36,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
 mod cli_usage;
+mod pc_workspace_provisioner;
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
 
@@ -1264,6 +1265,45 @@ async fn run_session(
                         }
                         ServerToAgent::Ping { nonce } => {
                             let _ = out_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
+                        }
+                        ServerToAgent::ProvisionProjectWorkspace {
+                            req_id,
+                            project_id,
+                            user_id,
+                            name,
+                            template,
+                        } => {
+                            info!(
+                                "📁 ProvisionProjectWorkspace: {} project={}",
+                                req_id, project_id
+                            );
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                let project_id_for_error = project_id.clone();
+                                let response =
+                                    match pc_workspace_provisioner::provision_project_workspace(
+                                        pc_workspace_provisioner::ProjectWorkspaceRequest {
+                                            project_id,
+                                            user_id,
+                                            name,
+                                            template,
+                                        },
+                                    ) {
+                                        Ok(result) => AgentToServer::ProjectWorkspaceProvisioned {
+                                            req_id,
+                                            project_id: project_id_for_error,
+                                            workspace_path: result.workspace_path,
+                                            git_head: result.git_head,
+                                            created: result.created,
+                                        },
+                                        Err(e) => AgentToServer::ProjectWorkspaceProvisionError {
+                                            req_id,
+                                            project_id: project_id_for_error,
+                                            message: e.to_string(),
+                                        },
+                                    };
+                                let _ = tx_c.send(ws_text(&response));
+                            });
                         }
                         ServerToAgent::CliPrompt {
                             req_id,

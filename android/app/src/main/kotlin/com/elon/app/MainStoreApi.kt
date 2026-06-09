@@ -36,9 +36,9 @@ internal fun StoreProject.toJointAppProject(): AppProject {
 }
 
 /**
- * 将服务器项目还原为"个人独立项目"（适用于用户自己创建的 owner 项目）。
- * id 直接用服务器项目 ID，collaborationProjectId 不设置，这样 resolveProjectId()
- * 仍能通过 id 找到服务器项目，同时 isJointDevelopmentProject() 返回 false，
+ * 将 PC 托管项目还原为"个人独立项目"（适用于用户自己创建的 owner 项目）。
+ * id 直接用服务端项目 ID，collaborationProjectId 不设置，这样 resolveProjectId()
+ * 仍能通过 id 找到项目档案，同时 isJointDevelopmentProject() 返回 false，
  * 项目出现在"个人独立项目"分组。
  */
 internal fun StoreProject.toOwnerAppProject(): AppProject {
@@ -84,7 +84,7 @@ internal fun fetchStoreProjects(
     return parseStoreProjectList(JSONObject(body))
 }
 
-/** POST /api/projects — 创建私有服务器项目，发布为联合项目时再设置公开 */
+/** POST /api/projects — 创建私有 PC 托管项目，发布为联合项目时再设置公开 */
 internal fun createStoreProject(
     http: OkHttpClient,
     serverUrl: String,
@@ -97,6 +97,7 @@ internal fun createStoreProject(
         put("name", name)
         put("description", description ?: "")
         put("template", "android")
+        put("execution_target", "pc_node")
     }
     val resp = http.newCall(
         Request.Builder()
@@ -106,10 +107,18 @@ internal fun createStoreProject(
             .build()
     ).execute()
     val body = resp.body?.string().orEmpty()
-    if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
+    if (!resp.isSuccessful) error(apiErrorMessage(body, resp.code))
     val project = JSONObject(body).optJSONObject("project")
         ?: error("响应缺少 project")
     return parseCreatedStoreProject(project, ownerAccount)
+}
+
+private fun apiErrorMessage(body: String, code: Int): String {
+    if (body.isBlank()) return "HTTP $code"
+    return runCatching {
+        val obj = JSONObject(body)
+        obj.optString("error").ifBlank { obj.optString("message") }.ifBlank { body }
+    }.getOrDefault(body)
 }
 
 /** POST /api/projects/:id/join — 需要 Bearer token */
@@ -170,7 +179,7 @@ internal fun leaveStoreProject(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
-/** DELETE /api/projects/:id 或旧匿名 /api/user/:user_id/projects/:id — 删除服务器项目和托管文件 */
+/** DELETE /api/projects/:id 或旧匿名 /api/user/:user_id/projects/:id — 删除项目档案和服务器托管文件 */
 internal fun deleteServerProject(
     http: OkHttpClient,
     serverUrl: String,

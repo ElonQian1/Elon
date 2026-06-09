@@ -751,11 +751,47 @@ internal class MainProjectActions(
     }
 
     private fun createProject(title: String) {
-        projects.add(newAppProject(title, "新项目 · 点击进入会话"))
-        setActiveProjectIndex(projects.lastIndex)
-        setActiveConversationIndex(0)
-        saveProjects()
-        renderProjectList()
+        val token = tokenProvider() ?: run {
+            Toast.makeText(activity, "请先登录并启动 PC 节点后新建项目", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(activity, "正在通过 PC 节点创建项目...", Toast.LENGTH_SHORT).show()
+        val ownerAccount = AuthManager.displayName(activity)
+        Thread {
+            try {
+                val created = createStoreProject(
+                    http = http,
+                    serverUrl = serverUrl,
+                    name = title,
+                    description = "个人开发项目",
+                    token = token,
+                    ownerAccount = ownerAccount
+                )
+                activity.runOnUiThread {
+                    val appProject = created.toOwnerAppProject()
+                    val existingIndex = projects.indexOfFirst {
+                        it.id == created.id || it.projectSpaceId() == created.id
+                    }
+                    val index = if (existingIndex >= 0) {
+                        projects[existingIndex] = appProject
+                        existingIndex
+                    } else {
+                        projects.add(appProject)
+                        projects.lastIndex
+                    }
+                    setActiveProjectIndex(index)
+                    setActiveConversationIndex(0)
+                    saveProjects()
+                    renderProjectList()
+                    openProjectSpace(projects[index])
+                    Toast.makeText(activity, "项目已在 PC 节点创建", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread {
+                    Toast.makeText(activity, "创建项目失败：${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun createJointProject(title: String) {
@@ -763,7 +799,7 @@ internal class MainProjectActions(
             Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(activity, "正在创建联合项目...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "正在通过 PC 节点创建联合项目...", Toast.LENGTH_SHORT).show()
         val ownerAccount = AuthManager.displayName(activity)
         Thread {
             try {

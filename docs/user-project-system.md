@@ -235,17 +235,38 @@ Authorization: Bearer <token>
 
 ## 5. 如何新建项目
 
+> 2026-06 更新：服务器磁盘不再承载普通用户的新代码项目。新建用户项目必须创建在用户自己的在线 PC 节点上；服务器只保存项目档案、成员权限、会话消息、任务状态和 artifact 索引。
+
 新建项目流程：
 
 1. 用户在 Web 或 APK 点击“新建项目”。
 2. 输入项目名，选择模板，比如 Android。
-3. 客户端请求 `/api/projects`。
-4. 服务端创建项目数据库记录。
-5. 服务端创建工作区目录。
-6. 服务端复制模板代码。
-7. 服务端初始化 Git。
-8. 服务端创建项目成员记录，把创建人设为 owner。
-9. 返回项目详情。
+3. 客户端请求 `/api/projects`，默认 `execution_target = "pc_node"`。
+4. 服务端选择当前用户的在线 PC 节点；没有在线节点则拒绝创建，有多个在线节点则要求客户端显式传 `node_id`。
+5. 服务端创建项目数据库记录和 owner 成员记录。
+6. 服务端通过 PC relay 发送 `ProvisionProjectWorkspace`。
+7. PC 节点在自己的受控根目录下创建项目目录、初始化 Git 仓库、写入项目说明文件。
+8. PC 节点回传 `workspace_path` 和 `git_head`。
+9. 服务端把项目标记为 `source_type = pc_managed`，写入 `node_id + workspace_path`。
+10. 返回项目详情。
+
+PC 节点默认目录结构：
+
+```text
+ELON_NODE_WORKSPACE_ROOT/
+  usr_xxx/
+    prj_xxx/
+      repo/
+      worktrees/
+      artifacts/
+      logs/
+```
+
+如果 PC 节点创建失败，服务端应清理本次新建的项目档案，不给客户端返回一个不能执行的假项目。
+
+手机端不能直接传任意 PC 路径。路径必须由 PC 节点根据 `project_id` 在受控根目录内生成。
+
+服务端不能把 `workspace_path` 当作本机路径处理。只要项目有 `node_id`，代码、编译、部署都必须通过该 PC 节点执行。
 
 接口：
 
@@ -260,9 +281,13 @@ Authorization: Bearer <token>
 {
   "name": "记账小工具",
   "description": "给自己用的安卓记账 APK",
-  "template": "android"
+  "template": "android",
+  "execution_target": "pc_node",
+  "node_id": "node-xxx"
 }
 ```
+
+`node_id` 在用户只有一个在线 PC 节点时可省略。
 
 响应：
 
@@ -273,20 +298,34 @@ Authorization: Bearer <token>
     "name": "记账小工具",
     "role": "owner",
     "template": "android",
+    "source_type": "pc_managed",
+    "node_id": "node-xxx",
+    "workspace_path": "D:\\Elon\\workspaces\\usr_xxx\\prj_xxx\\repo",
     "status": "active"
-  }
+  },
+  "provisioned": true,
+  "workspace_created": true
 }
 ```
 
-## 6. 服务端如何建立 Git
+错误场景：
 
-服务端创建项目时执行下面的逻辑。
+- 没有在线 PC 节点：返回 503，提示用户先启动 PC 节点。
+- 多个在线 PC 节点但未指定 `node_id`：返回 409，提示选择节点。
+- PC 节点目录创建或 Git 初始化失败：返回 503，并清理本次项目记录。
+
+## 6. PC 节点如何建立 Git
+
+PC 节点收到 `ProvisionProjectWorkspace` 时执行下面的逻辑。
 
 伪代码：
 
 ```rust
 fn create_project_workspace(project: &Project, user: &User) -> Result<()> {
-    let workspace = workspace_root.join("projects").join(&project.workspace_key);
+    let workspace = pc_workspace_root
+        .join(safe(user.id))
+        .join(safe(project.id))
+        .join("repo");
 
     std::fs::create_dir_all(&workspace)?;
 

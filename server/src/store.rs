@@ -18,6 +18,7 @@ mod groups;
 mod join_requests;
 mod native_sessions;
 mod node_ledger;
+mod pc_project_binding;
 mod project_member_conversations;
 mod project_space;
 mod projects;

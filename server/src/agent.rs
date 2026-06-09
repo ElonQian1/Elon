@@ -143,7 +143,10 @@ pub async fn run_for_project_in_workspace(
     }
 
     let user_config_workspace = state.get_user_workspace(user_id);
-    let require_existing_git = matches!(project.source_type.as_str(), "local_path" | "github");
+    let require_existing_git = matches!(
+        project.source_type.as_str(),
+        "local_path" | "github" | "pc_managed"
+    );
     let decision = intent_router::classify(user_message);
     let requires_project_workflow = decision.route != CapabilityRoute::ChatAgent
         || is_short_resume_command(user_message, &workspace)

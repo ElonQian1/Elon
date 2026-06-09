@@ -213,6 +213,42 @@ async fn run_relay_session(
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&pong)?));
             }
 
+            ServerToAgent::ProvisionProjectWorkspace {
+                req_id,
+                project_id,
+                user_id,
+                name,
+                template,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let project_id_for_error = project_id.clone();
+                    let response =
+                        match crate::pc_workspace_provisioner::provision_project_workspace(
+                            crate::pc_workspace_provisioner::ProjectWorkspaceRequest {
+                                project_id,
+                                user_id,
+                                name,
+                                template,
+                            },
+                        ) {
+                            Ok(result) => AgentToServer::ProjectWorkspaceProvisioned {
+                                req_id,
+                                project_id: project_id_for_error,
+                                workspace_path: result.workspace_path,
+                                git_head: result.git_head,
+                                created: result.created,
+                            },
+                            Err(e) => AgentToServer::ProjectWorkspaceProvisionError {
+                                req_id,
+                                project_id: project_id_for_error,
+                                message: e.to_string(),
+                            },
+                        };
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
+
             // Exec 在本地 relay 模式下不支持（使用 CliPrompt 替代）
             ServerToAgent::Exec { task_id, .. } => {
                 let err = AgentToServer::TaskError {

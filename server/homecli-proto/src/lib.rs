@@ -69,6 +69,14 @@ pub enum ServerToAgent {
         #[serde(default)]
         max_tokens: Option<u32>,
     },
+    /// 云端要求 PC 节点在受控根目录下创建一个新项目工作区。
+    ProvisionProjectWorkspace {
+        req_id: String,
+        project_id: String,
+        user_id: String,
+        name: String,
+        template: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,6 +176,21 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点已创建或复用项目工作区。
+    ProjectWorkspaceProvisioned {
+        req_id: String,
+        project_id: String,
+        workspace_path: String,
+        #[serde(default)]
+        git_head: Option<String>,
+        created: bool,
+    },
+    /// PC 节点创建项目工作区失败。
+    ProjectWorkspaceProvisionError {
+        req_id: String,
+        project_id: String,
+        message: String,
+    },
 }
 
 impl AgentToServer {
@@ -187,7 +210,9 @@ impl AgentToServer {
             | Self::RegisterCapabilities { .. }
             | Self::LlmStreamChunk { .. }
             | Self::LlmStreamEnd { .. }
-            | Self::LlmStreamError { .. } => None,
+            | Self::LlmStreamError { .. }
+            | Self::ProjectWorkspaceProvisioned { .. }
+            | Self::ProjectWorkspaceProvisionError { .. } => None,
         }
     }
 
@@ -199,7 +224,9 @@ impl AgentToServer {
             | Self::CliDone { req_id, .. }
             | Self::LlmStreamChunk { req_id, .. }
             | Self::LlmStreamEnd { req_id, .. }
-            | Self::LlmStreamError { req_id, .. } => Some(req_id.as_str()),
+            | Self::LlmStreamError { req_id, .. }
+            | Self::ProjectWorkspaceProvisioned { req_id, .. }
+            | Self::ProjectWorkspaceProvisionError { req_id, .. } => Some(req_id.as_str()),
             _ => None,
         }
     }
