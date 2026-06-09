@@ -18,8 +18,8 @@ pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionSc
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
-use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
@@ -43,7 +43,6 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
 };
 use crate::{
-    cli_usage::{parse_cli_usage, usage_from_optional_parts},
     intent_router, tools,
     types::{AppState, WsMessage},
 };
@@ -135,10 +134,6 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
-    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow!("{}", msg));
-    }
-
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
     // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
@@ -151,7 +146,6 @@ async fn run_with_workspace_mode(
             let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
             match run_via_pc_agent(
                 &agent_id,
-                user_id,
                 None,
                 user_message,
                 preflight_note,
@@ -159,7 +153,7 @@ async fn run_with_workspace_mode(
                 None,
                 "copilot",
                 None,
-                None,
+                None, // codex_reasoning_effort
                 None,
                 state,
                 tx,
@@ -503,7 +497,7 @@ async fn run_with_workspace_mode(
                             message: String::new(),
                             apk_url: None,
                             image_url: None,
-                            model_used: Some(option.attribution_label()),
+                            model_used: None,
                             node_id: None,
                         }
                         .to_json(),
@@ -560,7 +554,7 @@ async fn run_with_workspace_mode(
             );
         }
     }
-    // 从 Codex CLI stdout/stderr 解析 token 用量并写入数据库。
+    // 从 Codex CLI stdout 解析 token 用量并写入数据库
     let cli_feature = if planning_task {
         "codex_cli_plan"
     } else if development_task {
@@ -568,13 +562,12 @@ async fn run_with_workspace_mode(
     } else {
         "codex_cli_chat"
     };
-    let combined_cli_output = format!("{}\n{}", output.stdout, output.stderr);
     crate::token_usage_api::record_codex_usage_from_stdout(
         &state.store,
         user_id,
         cli_feature,
-        option.model.as_deref().or(Some(option.id.as_str())),
-        &combined_cli_output,
+        Some(option.id.as_str()),
+        &output.stdout,
     );
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
@@ -607,7 +600,7 @@ async fn run_with_workspace_mode(
             message: reply,
             apk_url,
             image_url: None,
-            model_used: Some(option.attribution_label()),
+            model_used: None,
             node_id: None,
         }
         .to_json(),
@@ -635,7 +628,6 @@ pub async fn run_with_pc_agent_workspace(
 ) -> Result<()> {
     run_via_pc_agent(
         agent_id,
-        user_id,
         Some(workspace_path),
         user_message,
         preflight_note,
@@ -655,7 +647,6 @@ pub async fn run_with_pc_agent_workspace(
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
     agent_id: &str,
-    user_id: &str,
     cwd: Option<&str>,
     user_message: &str,
     preflight_note: Option<&str>,
@@ -668,10 +659,6 @@ async fn run_via_pc_agent(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow!("{}", msg));
-    }
-
     // prompt 构造
     let prompt = if request_mode.is_plan() {
         match preflight_note {
@@ -700,22 +687,17 @@ async fn run_via_pc_agent(
             let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
             let hash = sha2::Sha256::digest(seed.as_bytes());
             format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
                 hash[0], hash[1], hash[2], hash[3],
                 hash[4], hash[5],
-                hash[6] & 0x0f, hash[7],   // {:x} = 1 nibble = 1 hex char，合计 "4xxx" 4字符
+                hash[6] & 0x0f, hash[7],
                 (hash[8] & 0x3f) | 0x80, hash[9],
                 hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
             )
         })
     };
 
-    // extra_args：Copilot 用 --session-id + --model + --attachment（图片）
-    // Codex 用 --codex-model + --codex-effort + --attachment，node-agent 负责在 exec 前插入 -m/-c
-    // ⚠️  图片逻辑由 extract_attachment_urls / append_attachment_args 处理（有单元测试）
-    //    重构本函数时必须保留这两行调用，否则图片传递失效！
-    let attachment_urls = extract_attachment_urls(&prompt);
-
+    // extra_args：Copilot 用 --session-id + --model，Codex 用 --codex-model + --codex-effort
     let extra_args: Vec<String> = if cli_name == "copilot" {
         let mut args = if let Some(ref sid) = copilot_session_uuid {
             vec![format!("--session-id={}", sid)]
@@ -728,10 +710,9 @@ async fn run_via_pc_agent(
                 args.push(model.to_string());
             }
         }
-        append_attachment_args(&mut args, &attachment_urls);
         args
     } else {
-        // Codex：传模型和 reasoning effort，node-agent 会在 `exec` 前插入 `-m`/`-c`
+        // Codex：传模型和 reasoning effort，node-agent 在 `exec` 前插入 `-m`/`-c`
         let mut args = vec![];
         if let Some(model) = copilot_model {
             if !model.is_empty() && model != "auto" {
@@ -743,7 +724,6 @@ async fn run_via_pc_agent(
                 args.push(format!("--codex-effort={}", effort));
             }
         }
-        append_attachment_args(&mut args, &attachment_urls);
         args
     };
 
@@ -753,21 +733,14 @@ async fn run_via_pc_agent(
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
         for attempt in 0..MAX_ATTEMPTS {
-            match state
-                .agent_manager
-                .dispatch_cli_prompt_in_cwd(
-                    agent_id,
-                    cli_name.to_string(),
-                    extra_args.clone(),
-                    cwd.map(ToOwned::to_owned),
-                    prompt.clone(),
-                )
-                .await
-            {
-                Ok(r) => {
-                    result = Ok(r);
-                    break;
-                }
+            match state.agent_manager.dispatch_cli_prompt_in_cwd(
+                agent_id,
+                cli_name.to_string(),
+                extra_args.clone(),
+                cwd.map(ToOwned::to_owned),
+                prompt.clone(),
+            ).await {
+                Ok(r) => { result = Ok(r); break; }
                 Err(e) => {
                     last_err = e;
                     let msg = last_err.to_string();
@@ -799,13 +772,62 @@ async fn run_via_pc_agent(
         .unwrap_or_else(|| agent_id.to_string());
     let is_codex = cli_name == "codex";
 
+    // 进度心跳：每 5s 发一次"正在处理"，避免用户以为卡死（之前 15s 太长）
+    let progress_tx = tx.clone();
+    let cli_label = if is_codex { "Codex" } else { "Copilot" };
+    let disp_model_clone = display_model.clone();
+    let progress_handle = tokio::spawn(async move {
+        let mut elapsed: u64 = 0;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            elapsed += 5;
+            let _ = progress_tx.send(
+                WsMessage::progress(format!(
+                    "{} ({}) 正在处理中…（已等待 {}s）",
+                    cli_label, disp_model_clone, elapsed
+                ))
+                .to_json(),
+            );
+        }
+    });
+
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
                 if is_codex {
-                    // Codex exec 输出包含启动信息、对话回放、内容重复等，
-                    // 累积全部后统一在 CliDone 时解析提取
+                    // Codex 0.133+ 直接输出 AI 回复，逐行流式发送给 APK
+                    // 过滤掉启动信息行（header 区域），只发有效回复内容
+                    let trimmed = text.trim();
+                    let is_header = trimmed.is_empty()
+                        || trimmed.starts_with("OpenAI Codex")
+                        || trimmed.starts_with("--------")
+                        || trimmed.starts_with("workdir:")
+                        || trimmed.starts_with("model:")
+                        || trimmed.starts_with("provider:")
+                        || trimmed.starts_with("approval:")
+                        || trimmed.starts_with("sandbox:")
+                        || trimmed.starts_with("reasoning effort:")
+                        || trimmed.starts_with("reasoning summaries:")
+                        || trimmed.starts_with("session id:");
                     full_text.push_str(&text);
+                    if is_header {
+                        continue;
+                    }
+                    // 有效内容：流式发送
+                    progress_handle.abort(); // 收到第一行有效内容时停止心跳
+                    if !stream_started {
+                        stream_started = true;
+                        let _ = tx.send(WsMessage::AssistantMessage {
+                            text: text.clone(),
+                            model_used: Some(display_model.clone()),
+                            stream_id: Some(stream_id.clone()),
+                        }.to_json());
+                    } else {
+                        let _ = tx.send(WsMessage::AssistantChunk {
+                            stream_id: stream_id.clone(),
+                            text: text.clone(),
+                        }.to_json());
+                    }
                     continue;
                 }
                 if text.trim().is_empty() {
@@ -814,98 +836,48 @@ async fn run_via_pc_agent(
                 }
                 if !stream_started {
                     stream_started = true;
-                    let _ = tx.send(
-                        WsMessage::AssistantMessage {
-                            text: text.clone(),
-                            model_used: Some(display_model.clone()),
-                            stream_id: Some(stream_id.clone()),
-                            node_id: Some(agent_id.to_string()),
-                        }
-                        .to_json(),
-                    );
+                    progress_handle.abort();
+                    let _ = tx.send(WsMessage::AssistantMessage {
+                        text: text.clone(),
+                        model_used: Some(display_model.clone()),
+                        stream_id: Some(stream_id.clone()),
+                    }.to_json());
                 } else {
-                    let _ = tx.send(
-                        WsMessage::AssistantChunk {
-                            stream_id: stream_id.clone(),
-                            text: text.clone(),
-                        }
-                        .to_json(),
-                    );
+                    let _ = tx.send(WsMessage::AssistantChunk {
+                        stream_id: stream_id.clone(),
+                        text: text.clone(),
+                    }.to_json());
                 }
                 full_text.push_str(&text);
             }
-            AgentToServer::CliDone {
-                exit_ok,
-                error,
-                prompt_tokens,
-                cached_input_tokens,
-                completion_tokens,
-                reasoning_tokens,
-                total_tokens,
-                model,
-                ..
-            } => {
-                let usage = usage_from_optional_parts(
-                    prompt_tokens,
-                    cached_input_tokens,
-                    completion_tokens,
-                    reasoning_tokens,
-                    total_tokens,
-                    model.clone(),
-                )
-                .or_else(|| parse_cli_usage(&full_text));
-                if let Some(usage) = usage.as_ref() {
-                    let feature = if request_mode.is_plan() {
-                        "pc_cli_plan"
-                    } else if cwd.is_some() {
-                        "pc_cli_dev"
-                    } else {
-                        "pc_cli_chat"
-                    };
-                    crate::token_usage_api::record_trusted_usage(
-                        &state.store,
-                        user_id,
-                        feature,
-                        "pc_agent_cli",
-                        model.as_deref().or(Some(display_model.as_str())),
-                        usage,
-                    );
-                }
-                if exit_ok || (is_codex && !full_text.trim().is_empty() && error.as_deref().map(|e| !e.contains("断线") && !e.contains("超时")).unwrap_or(true)) {
-                    // Codex：提取回复段；Copilot：始终携带完整内容（断线重连时 APK 可从 Done 恢复）
-                    // Codex 在"聊天"类任务时会以 exit code 1 退出，但仍产生了有效输出，需要正常显示。
-                    let reply = if is_codex {
+            AgentToServer::CliDone { exit_ok, error, .. } => {
+                progress_handle.abort(); // 停止心跳
+                let has_useful_output = !full_text.trim().is_empty();
+                if exit_ok || (is_codex && has_useful_output
+                    && error.as_deref().map(|e| !e.contains("断线") && !e.contains("超时")).unwrap_or(true))
+                {
+                    // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
+                    let reply = if stream_started {
+                        String::new() // 已流式完毕，Done 不重复发
+                    } else if is_codex {
                         extract_codex_reply(&full_text)
                     } else {
                         full_text.trim().to_string()
                     };
-                    // AssistantMessage 只在"内容未被流式发送过"时补发：
-                    //   Codex 从不流式发送，始终通过 AssistantMessage 给 APK；
-                    //   Copilot 若 stream_started=true，流式已建立气泡，CliDone 不再重复发送。
-                    if !reply.is_empty() && (!stream_started || is_codex) {
-                        let _ = tx.send(
-                            WsMessage::AssistantMessage {
-                                text: reply.clone(),
-                                model_used: Some(display_model.clone()),
-                                stream_id: None,
-                                node_id: Some(agent_id.to_string()),
-                            }
-                            .to_json(),
-                        );
-                    }
-                    // Done.message 不携带内容：APK 已通过 AssistantMessage/AssistantChunk 收到回复，
-                    // 再在 Done 里携带会导致 Codex 回复出现两个气泡。
-                    // 断线重连恢复由 backlog replay（project_ws_session）负责，不依赖 Done.message。
-                    let _ = tx.send(
-                        WsMessage::Done {
-                            message: String::new(),
-                            apk_url: None,
-                            image_url: None,
+                    if !reply.is_empty() {
+                        let _ = tx.send(WsMessage::AssistantMessage {
+                            text: reply,
                             model_used: Some(display_model.clone()),
-                            node_id: Some(agent_id.to_string()),
-                        }
-                        .to_json(),
-                    );
+                            stream_id: None,
+                        }.to_json());
+                    }
+                    let _ = tx.send(WsMessage::Done {
+                        message: String::new(),
+                        apk_url: None,
+                        image_url: None,
+                        model_used: Some(display_model.clone()),
+                        node_id: Some(agent_id.to_string()),
+                    }.to_json());
                     return Ok(());
                 } else {
                     return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
@@ -915,13 +887,22 @@ async fn run_via_pc_agent(
         }
     }
 
+    progress_handle.abort();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }
 
-/// 从 Codex exec 的完整输出中提取 AI 回复文本。
-///
-/// Codex 0.133+ exec 模式直接输出 AI 回复，无 user/codex 分隔标记。
-/// 旧版格式（有 "codex\n<AI回复>\ntokens used" 结构）作为兼容路径。
+/// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。
+/// Codex exec 的输出格式：
+///   [启动信息头 ... ---]
+///   user
+///   <用户消息回放>
+///   [可能的错误日志]
+///   codex
+///   <AI 回复>          ← 只取这段
+///   tokens used
+///   <AI 回复重复>       ← 丢弃
+///   <数字>
+///   <AI 回复重复>       ← 丢弃
 fn extract_codex_reply(output: &str) -> String {
     let lines: Vec<&str> = output.lines().collect();
     let mut in_codex_reply = false;
@@ -942,116 +923,5 @@ fn extract_codex_reply(output: &str) -> String {
         }
     }
 
-    // 旧版格式成功提取
-    let old_format = reply_lines.join("\n").trim().to_string();
-    if !old_format.is_empty() {
-        return old_format;
-    }
-
-    // 新版 Codex 0.133+：直接输出 AI 回复，过滤掉启动信息行（包含 "codex" 字符的标题行）
-    // 启动信息特征：含 "OpenAI Codex"、"Model:" 等
-    let clean: Vec<&str> = lines
-        .iter()
-        .map(|l| *l)
-        .skip_while(|l| {
-            let t = l.trim();
-            t.is_empty()
-                || t.contains("OpenAI Codex")
-                || t.starts_with("Model:")
-                || t.starts_with("session id:")
-                || t.starts_with("---")
-        })
-        .collect();
-    clean.join("\n").trim().to_string()
-}
-
-// ── 图片附件提取（独立函数，防止重构时漏掉） ──────────────────────────────────
-//
-// ⚠️  关键功能：用户发送图片时必须走此路径传给 CLI！
-//   - 图片 URL 由 append_project_attachment_notes 注入 prompt，格式为 "(url: http://...)"
-//   - 提取后通过 --attachment <url> 传给 node-agent
-//   - node-agent 下载图片后：Copilot → --attachment <path>，Codex → -i <path>
-//
-// 任何对 run_via_pc_agent / run_with_pc_agent_workspace 的重构都 MUST 调用此函数。
-// 有单元测试 test_extract_attachment_urls 保证行为正确性。
-
-/// 从 prompt 字符串中提取所有图片附件 URL。
-/// prompt 中图片 URL 的格式由 `append_project_attachment_notes` 生成：
-///   `- 文件名 [...] -> path (url: https://...)`
-///   或单独一行 `  url: https://...`
-pub(crate) fn extract_attachment_urls(prompt: &str) -> Vec<String> {
-    prompt
-        .lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            // 格式1: 行内任意位置 "(url: http://...)"
-            // 例如: "- file.png [...] -> /path (url: https://cdn.example.com/img.png)"
-            let url = if let Some(start) = line.find("(url: ") {
-                let rest = &line[start + 6..]; // 跳过 "(url: "
-                rest.split(')').next().filter(|u| u.starts_with("http"))
-            } else {
-                // 格式2: "url: http://..."  → 独立行形式
-                line.strip_prefix("url: ")
-                    .filter(|url| url.starts_with("http"))
-            };
-            url.map(str::to_owned)
-        })
-        .collect()
-}
-
-/// 将图片附件 URL 转换为 `--attachment <url>` 参数，追加到 extra_args 末尾。
-/// 对 Copilot 和 Codex 均使用相同格式（node-agent 内部区分处理）。
-pub(crate) fn append_attachment_args(extra_args: &mut Vec<String>, attachment_urls: &[String]) {
-    for url in attachment_urls {
-        extra_args.push("--attachment".to_string());
-        extra_args.push(url.clone());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_attachment_urls_bracket_format() {
-        let prompt = "请修改如图所示的样式\n- screenshot.png [image/png; 1024 bytes] -> /tmp/x (url: https://example.com/img.png)\n继续其他内容";
-        let urls = extract_attachment_urls(prompt);
-        assert_eq!(urls, vec!["https://example.com/img.png"]);
-    }
-
-    #[test]
-    fn test_extract_attachment_urls_line_format() {
-        let prompt = "附件:\n  url: https://cdn.example.com/photo.jpg\n其他文字";
-        let urls = extract_attachment_urls(prompt);
-        assert_eq!(urls, vec!["https://cdn.example.com/photo.jpg"]);
-    }
-
-    #[test]
-    fn test_extract_attachment_urls_multiple() {
-        let prompt = "(url: https://a.com/1.png)\n(url: https://b.com/2.jpg)";
-        let urls = extract_attachment_urls(prompt);
-        assert_eq!(urls.len(), 2);
-    }
-
-    #[test]
-    fn test_extract_attachment_urls_empty() {
-        let prompt = "普通消息，没有图片附件";
-        assert!(extract_attachment_urls(prompt).is_empty());
-    }
-
-    #[test]
-    fn test_append_attachment_args() {
-        let mut args: Vec<String> = vec!["--model".into(), "gpt-4o".into()];
-        let urls = vec!["https://example.com/img.png".to_string()];
-        append_attachment_args(&mut args, &urls);
-        assert_eq!(
-            args,
-            vec![
-                "--model",
-                "gpt-4o",
-                "--attachment",
-                "https://example.com/img.png",
-            ]
-        );
-    }
+    reply_lines.join("\n").trim().to_string()
 }

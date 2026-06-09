@@ -404,13 +404,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
     // Phase 2 优化：本地分类置信度 >= 84 的明确代码任务跳过 codex 意图门控。
     // force_cli 模式（悬浮球手机控制）强制走意图门控，让 Codex 自己判断是闲聊还是生成脚本，
     // 不能跳过（否则 Codex 不读 AGENTS.md，无法生成手机控制 JSON）。
-    // PC 节点项目：workspace 在用户 PC 上，服务器无法访问，意图门控无法运行，必须跳过。
-    let is_pc_node_project = project.node_id.as_deref()
-        .map(|n| !n.is_empty())
-        .unwrap_or(false);
     let skip_intent_gate = needs_project_workflow
         && !execution_mode.is_force_cli()
-        && (routing_decision.confidence >= 84 || is_pc_node_project);
+        && routing_decision.confidence >= 84;
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,
@@ -426,6 +422,28 @@ pub(crate) async fn run_project_agent_with_scheduler(
     }
     // PC 节点项目（有 node_id）的路径在用户 PC 上，不在服务器本地。
     // 服务器上不应创建 worktree——直接透传给 agent 层，由 pc_project_binding 接管。
+    // 同时 bypass 整个 scheduler（PC项目无需 worktree/合并锁），减少不必要的等待。
+    let is_pc_node_project = project.node_id.as_deref()
+        .map(|n| !n.is_empty())
+        .unwrap_or(false);
+
+    if is_pc_node_project {
+        // PC 节点项目快速路径：跳过 worktree/调度器，直接交给 agent
+        agent::run_for_project(
+            &user_id,
+            &project,
+            &download_base,
+            Some(&conversation_id),
+            &message,
+            agent_name.as_deref(),
+            trace_id.as_deref(),
+            &state,
+            tx,
+        )
+        .await;
+        return;
+    }
+
     let prepared_execution_workspace = if needs_project_workflow && !execution_mode.is_plan() && !is_pc_node_project {
         match prepare_project_conversation_workspace(&state, &project, &conversation_id) {
             Ok(workspace) => Some(workspace),

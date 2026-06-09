@@ -48,9 +48,6 @@ pub async fn list_store_projects(
 
     match state.store.list_public_projects(
         q.q.as_deref(),
-        q.join_mode.as_deref(),
-        q.has_apk,
-        q.sort.as_deref(),
         limit,
         offset,
     ) {
