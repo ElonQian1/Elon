@@ -48,6 +48,8 @@ internal class ProjectSpaceController(
     private var activeChannel: ProjectChannel? = null
     private var activeMemberConversation: ActiveMemberConversation? = null
     private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
+    private var activeMemberListUserId: String? = null
+    private var pendingOpenSelfMemberList = false
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
@@ -88,12 +90,34 @@ internal class ProjectSpaceController(
         )
     }
 
-    private fun openProjectSpace(projectId: String, title: String, animate: Boolean, route: ProjectSpaceRoute) {
+    fun openProjectMemberConversations(projectId: String, title: String, animate: Boolean) {
+        openProjectSpace(projectId, title, animate, ProjectSpaceRoute(), openSelfMemberList = true)
+    }
+
+    fun openPersonalProjectMemberConversations(project: AppProject, userId: String, animate: Boolean) {
+        openProjectSpace(
+            projectId = project.id,
+            title = project.title,
+            animate = animate,
+            route = ProjectSpaceRoute(userId = userId, projectTitle = project.title),
+            openSelfMemberList = true
+        )
+    }
+
+    private fun openProjectSpace(
+        projectId: String,
+        title: String,
+        animate: Boolean,
+        route: ProjectSpaceRoute,
+        openSelfMemberList: Boolean = false
+    ) {
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
         activeChannel = null
         activeMemberConversation = null
         activeRoute = route
+        activeMemberListUserId = null
+        pendingOpenSelfMemberList = openSelfMemberList
         activeAdapter = null
         stopPolling()
         val cached = spaceCache[projectId]
@@ -102,7 +126,7 @@ internal class ProjectSpaceController(
             activeSpace = cached
             activeProjectTitle = cached.project.name
             showProjectSpace(activeProjectTitle, animate)
-            renderActiveSpace()
+            renderProjectSpaceLanding()
         } else {
             activeSpace = null
             showProjectSpace(activeProjectTitle, animate)
@@ -117,7 +141,7 @@ internal class ProjectSpaceController(
                     activeSpace = space
                     activeProjectTitle = space.project.name
                     showProjectSpace(activeProjectTitle, false)
-                    renderActiveSpace()
+                    renderProjectSpaceLanding()
                 }.onFailure { error ->
                     if (cached == null) renderError(error.message ?: "加载项目空间失败")
                     // 有缓存时静默失败，保留已显示的缓存内容
@@ -126,7 +150,40 @@ internal class ProjectSpaceController(
         }
     }
 
+    private fun renderProjectSpaceLanding() {
+        if (pendingOpenSelfMemberList) {
+            pendingOpenSelfMemberList = false
+            if (renderSelfMemberConversationList()) return
+        }
+        activeMemberListUserId?.let { userId ->
+            if (renderMemberConversationListByUserId(userId)) return
+        }
+        renderActiveSpace()
+    }
+
+    private fun renderSelfMemberConversationList(): Boolean {
+        val selfIds = listOfNotNull(
+            AuthManager.userId(activity),
+            AuthManager.effectiveUserId(activity)
+        ).toSet()
+        val space = activeSpace ?: return false
+        val member = space.members.firstOrNull { it.userId in selfIds }
+            ?: space.members.firstOrNull { activeRoute.isUserProject && it.role == "owner" }
+            ?: space.members.firstOrNull { activeRoute.isUserProject }
+        return member?.let {
+            renderMemberConversationList(it)
+            true
+        } ?: false
+    }
+
+    private fun renderMemberConversationListByUserId(userId: String): Boolean {
+        val member = activeSpace?.members?.firstOrNull { it.userId == userId } ?: return false
+        renderMemberConversationList(member)
+        return true
+    }
+
     fun renderActiveSpace() {
+        activeMemberListUserId = null
         // 从个人会话返回时，若来源是成员会话列表，恢复到成员会话列表而不是顶层空间
         val backMember = pendingMemberBack
         if (backMember != null) {
@@ -714,6 +771,9 @@ internal class ProjectSpaceController(
         val space = activeSpace ?: return
         val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
         val isSelf = member.userId == selfId
+        activeMemberListUserId = member.userId
+        activeChannel = null
+        activeMemberConversation = null
 
         val container = binding.projectContentLayout
         container.removeAllViews()

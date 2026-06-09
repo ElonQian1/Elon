@@ -797,6 +797,7 @@ class MainActivity : AppCompatActivity() {
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showProjectPlaza = { navigationController.showProjectPlaza() },
             openProject = { index -> openProjectSpaceForProject(index, true) },
+            openProjectConversations = { index -> openProjectConversationsForProject(index, true) },
             showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
@@ -906,6 +907,22 @@ class MainActivity : AppCompatActivity() {
             projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, animate)
         } else {
             projectSpaceController.openPersonalProjectSpace(
+                project,
+                AuthManager.effectiveUserId(this),
+                animate
+            )
+        }
+    }
+
+    private fun openProjectConversationsForProject(index: Int, animate: Boolean) {
+        if (index !in s.projects.indices) return
+        s.activeProjectIndex = index
+        projectStateActions.saveProjects()
+        val project = s.projects[index]
+        if (project.isJointDevelopmentProject()) {
+            projectSpaceController.openProjectMemberConversations(project.projectSpaceId(), project.title, animate)
+        } else {
+            projectSpaceController.openPersonalProjectMemberConversations(
                 project,
                 AuthManager.effectiveUserId(this),
                 animate

@@ -37,6 +37,7 @@ internal class MainHomeListActions(
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
     private val openProject: (Int) -> Unit,
+    private val openProjectConversations: (Int) -> Unit,
     private val showProjectActions: (Int, View?) -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
@@ -341,6 +342,8 @@ internal class MainHomeListActions(
             setJointProjectsExpanded = { jointProjectsExpanded = it },
             formatTime = formatTime,
             openProject = openProject,
+            openProjectConversations = openProjectConversations,
+            isProjectWorking = ::isProjectWorking,
             showProjectActions = showProjectActions,
             showCreateProjectDialog = showCreateProjectDialog,
             showProjectPlaza = showProjectPlaza,
@@ -380,6 +383,12 @@ internal class MainHomeListActions(
         val conversations = conversations()
         if (index !in conversations.indices || conversations[index].ended) return false
         return isTaskRunning(activeProject().id, conversations[index].id)
+    }
+
+    private fun isProjectWorking(project: AppProject): Boolean {
+        return project.conversations.any { conversation ->
+            !conversation.ended && isTaskRunning(project.projectSpaceId(), conversation.id)
+        }
     }
 
 }

@@ -7,9 +7,14 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import kotlin.math.sin
 
-internal fun startProjectConversationShimmer(row: View, background: GradientDrawable) {
-    val baseColor = Color.parseColor("#181B20")
-    val highlightColor = Color.parseColor("#283140")
+internal fun startProjectConversationShimmer(
+    row: View,
+    background: GradientDrawable,
+    baseColorHex: String = "#181B20",
+    highlightColorHex: String = "#283140"
+) {
+    val baseColor = Color.parseColor(baseColorHex)
+    val highlightColor = Color.parseColor(highlightColorHex)
     background.setColor(baseColor)
 
     val animator = ValueAnimator.ofFloat(0f, 1f).apply {
