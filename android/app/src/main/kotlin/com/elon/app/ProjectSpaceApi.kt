@@ -108,6 +108,29 @@ internal fun fetchProjectMemberConversationMessages(
     }
 }
 
+internal fun sendProjectMemberConversationMessage(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    memberUserId: String,
+    conversationId: String,
+    content: String
+): ProjectMemberConversationMessage {
+    val payload = JSONObject().put("content", content)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members/${projectSpaceUrlPart(memberUserId)}/conversations/${projectSpaceUrlPart(conversationId)}/messages")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "发送成员会话讨论失败"))
+        return parseProjectMemberConversationMessage(JSONObject(body).optJSONObject("message") ?: JSONObject())
+    }
+}
+
 internal fun fetchProjectInviteFriends(
     http: OkHttpClient,
     serverUrl: String,
@@ -399,9 +422,11 @@ private fun parseProjectMemberConversationMessage(json: JSONObject) = ProjectMem
     conversationId = json.optString("conversation_id").takeIf { it.isNotBlank() },
     taskId = json.optString("task_id").takeIf { it.isNotBlank() },
     userId = json.optString("user_id").takeIf { it.isNotBlank() },
+    senderName = json.optString("sender_name").takeIf { it.isNotBlank() },
     role = json.optString("role", "user"),
     content = json.optString("content", ""),
-    createdAt = json.optString("created_at", "")
+    createdAt = json.optString("created_at", ""),
+    outgoing = json.optBoolean("outgoing", false)
 )
 
 internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessage(

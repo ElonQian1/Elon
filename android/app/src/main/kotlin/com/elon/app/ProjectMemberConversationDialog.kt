@@ -222,7 +222,12 @@ internal object ProjectMemberConversationDialog {
             setPadding(dp(14), dp(12), dp(14), dp(12))
             background = panelBackground("#181B20", dp)
             addView(TextView(activity).apply {
-                text = "${roleLabel(message.role)} · ${message.createdAt}"
+                val label = if (message.role == "discussion") {
+                    message.senderName?.takeIf { it.isNotBlank() } ?: "讨论"
+                } else {
+                    roleLabel(message.role)
+                }
+                text = "$label · ${message.createdAt}"
                 textSize = 12f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(roleColor(message.role))
@@ -298,6 +303,7 @@ internal object ProjectMemberConversationDialog {
         "user" -> "成员"
         "assistant" -> "AI"
         "system" -> "系统"
+        "discussion" -> "讨论"
         else -> role
     }
 
@@ -306,6 +312,7 @@ internal object ProjectMemberConversationDialog {
             "user" -> "#93C5FD"
             "assistant" -> "#A7F3D0"
             "system" -> "#FCA5A5"
+            "discussion" -> "#C4B5FD"
             else -> "#A6AFBD"
         }
     )

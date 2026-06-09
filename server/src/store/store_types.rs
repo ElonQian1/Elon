@@ -291,9 +291,11 @@ pub struct ProjectMemberConversationMessage {
     pub conversation_id: Option<String>,
     pub task_id: Option<String>,
     pub user_id: Option<String>,
+    pub sender_name: Option<String>,
     pub role: String,
     pub content: String,
     pub created_at: String,
+    pub outgoing: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

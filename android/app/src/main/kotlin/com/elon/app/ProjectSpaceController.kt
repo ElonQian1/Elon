@@ -39,20 +39,37 @@ internal class ProjectSpaceController(
 ) {
     private val pollHandler = Handler(Looper.getMainLooper())
     private val messagesByChannel = linkedMapOf<String, MutableList<ChatMessage>>()
+    private val messagesByMemberConversation = linkedMapOf<String, MutableList<ChatMessage>>()
     private val spaceCache = linkedMapOf<String, ProjectSpace>()
     private var activeSpace: ProjectSpace? = null
     private var activeProjectId: String? = null
     private var activeProjectTitle: String = "项目空间"
     private var activeChannel: ProjectChannel? = null
+    private var activeMemberConversation: ActiveMemberConversation? = null
     private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
 
+    private data class ActiveMemberConversation(
+        val projectId: String,
+        val memberUserId: String,
+        val memberAccount: String,
+        val conversationId: String,
+        val title: String
+    ) {
+        val key: String = "$projectId:$memberUserId:$conversationId"
+    }
+
     private val pollRunnable = object : Runnable {
         override fun run() {
-            val channel = activeChannel ?: return
-            loadMessages(channel, silent = true, scrollToBottom = false)
+            val channel = activeChannel
+            if (channel != null) {
+                loadMessages(channel, silent = true, scrollToBottom = false)
+            } else {
+                val memberConversation = activeMemberConversation ?: return
+                loadMemberConversationMessages(memberConversation, silent = true, scrollToBottom = false)
+            }
             if (polling) pollHandler.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
@@ -74,6 +91,7 @@ internal class ProjectSpaceController(
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
         activeChannel = null
+        activeMemberConversation = null
         activeRoute = route
         activeAdapter = null
         stopPolling()
@@ -142,16 +160,17 @@ internal class ProjectSpaceController(
         }
     }
 
-    fun isChannelActive(): Boolean = activeChannel != null
+    fun isChannelActive(): Boolean = activeChannel != null || activeMemberConversation != null
 
     fun closeChannelChat() {
         activeChannel = null
+        activeMemberConversation = null
         activeAdapter = null
         stopPolling()
     }
 
     fun resumeIfActive() {
-        if (activeChannel != null) startPolling()
+        if (activeChannel != null || activeMemberConversation != null) startPolling()
     }
 
     fun stopPolling() {
@@ -160,6 +179,9 @@ internal class ProjectSpaceController(
     }
 
     fun trySendMessage(rawText: String, hasAttachments: Boolean): Boolean {
+        activeMemberConversation?.let { memberConversation ->
+            return trySendMemberConversationMessage(memberConversation, rawText, hasAttachments)
+        }
         val channel = activeChannel ?: return false
         val text = rawText.trim()
         if (hasAttachments) {
@@ -203,6 +225,62 @@ internal class ProjectSpaceController(
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+                }.onFailure { error ->
+                    pending.sendStatus = error.message ?: "发送失败"
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                }
+            }
+        }
+        return true
+    }
+
+    private fun trySendMemberConversationMessage(
+        memberConversation: ActiveMemberConversation,
+        rawText: String,
+        hasAttachments: Boolean
+    ): Boolean {
+        val text = rawText.trim()
+        if (hasAttachments) {
+            Toast.makeText(activity, "成员会话讨论暂不支持发送附件", Toast.LENGTH_SHORT).show()
+            return true
+        }
+        if (text.isBlank()) return true
+
+        val messages = messagesByMemberConversation.getOrPut(memberConversation.key) { mutableListOf() }
+        val pending = ChatMessage("user", text, sendStatus = SENDING_STATUS)
+        messages.add(pending)
+        activeAdapter?.notifyItemInserted(messages.lastIndex)
+        binding.chatList.scrollToPosition(messages.lastIndex)
+        binding.inputEdit.text.clear()
+        collapseInputComposer()
+
+        thread {
+            val result = runCatching {
+                sendProjectMemberConversationMessage(
+                    http = http,
+                    serverUrl = serverUrl,
+                    context = activity,
+                    projectId = memberConversation.projectId,
+                    memberUserId = memberConversation.memberUserId,
+                    conversationId = memberConversation.conversationId,
+                    content = text
+                )
+            }
+            activity.runOnUiThread {
+                if (activeMemberConversation?.key != memberConversation.key) return@runOnUiThread
+                result.onSuccess { sent ->
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) {
+                        messages[index] = sent.toChatMessage()
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    loadMemberConversationMessages(
+                        memberConversation,
+                        silent = true,
+                        scrollToBottom = true,
+                        allowPendingRefresh = true
+                    )
                 }.onFailure { error ->
                     pending.sendStatus = error.message ?: "发送失败"
                     val index = messages.indexOf(pending)
@@ -258,6 +336,7 @@ internal class ProjectSpaceController(
 
     private fun openChannel(channel: ProjectChannel, animate: Boolean = true) {
         activeChannel = channel
+        activeMemberConversation = null
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
@@ -316,6 +395,55 @@ internal class ProjectSpaceController(
                     if (!silent) Toast.makeText(
                         activity,
                         error.message ?: "加载频道消息失败",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun loadMemberConversationMessages(
+        memberConversation: ActiveMemberConversation,
+        silent: Boolean,
+        scrollToBottom: Boolean,
+        allowPendingRefresh: Boolean = false
+    ) {
+        val currentMessages = messagesByMemberConversation.getOrPut(memberConversation.key) { mutableListOf() }
+        if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
+        thread {
+            val result = runCatching {
+                fetchProjectMemberConversationMessages(
+                    http = http,
+                    serverUrl = serverUrl,
+                    context = activity,
+                    projectId = memberConversation.projectId,
+                    memberUserId = memberConversation.memberUserId,
+                    conversationId = memberConversation.conversationId
+                ).map { it.toChatMessage() }
+            }
+            activity.runOnUiThread {
+                if (activeMemberConversation?.key != memberConversation.key) return@runOnUiThread
+                result.onSuccess { remoteMessages ->
+                    val changed = currentMessages.size != remoteMessages.size ||
+                        currentMessages.zip(remoteMessages).any { (current, incoming) ->
+                            current.role != incoming.role ||
+                                current.content != incoming.content ||
+                                current.senderLabel != incoming.senderLabel ||
+                                current.id != incoming.id
+                        }
+                    currentMessages.clear()
+                    currentMessages.addAll(remoteMessages)
+                    activeAdapter?.notifyDataSetChanged()
+                    if (scrollToBottom && currentMessages.isNotEmpty()) {
+                        binding.chatList.scrollToPosition(currentMessages.lastIndex)
+                    }
+                    if (changed && !silent) {
+                        Toast.makeText(activity, "会话消息已更新", Toast.LENGTH_SHORT).show()
+                    }
+                }.onFailure { error ->
+                    if (!silent) Toast.makeText(
+                        activity,
+                        error.message ?: "加载会话消息失败",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -639,39 +767,31 @@ internal class ProjectSpaceController(
     private fun renderMemberConversationMessages(
         conversation: ProjectMemberConversation,
         member: ProjectMember,
-        space: ProjectSpace,
-        onBack: () -> Unit
+        space: ProjectSpace
     ) {
-        val container = binding.projectContentLayout
-        container.removeAllViews()
-        container.addView(backRow("← ${member.account} 的会话", onBack))
-        container.addView(sectionTitle(conversation.title?.takeIf { it.isNotBlank() } ?: "会话消息"))
-
-        val loadingView = inlineStatusRow("正在加载消息...", "#A6AFBD")
-        container.addView(loadingView)
-
-        thread {
-            val result = runCatching {
-                fetchProjectMemberConversationMessages(
-                    http = http, serverUrl = serverUrl, context = activity,
-                    projectId = space.project.id, memberUserId = member.userId,
-                    conversationId = conversation.id
-                )
-            }
-            activity.runOnUiThread {
-                if (container.indexOfChild(loadingView) < 0) return@runOnUiThread
-                container.removeView(loadingView)
-                result.onSuccess { messages ->
-                    if (messages.isEmpty()) {
-                        container.addView(inlineStatusRow("暂无消息", "#6F7785"))
-                    } else {
-                        messages.forEach { msg -> container.addView(messageInlineCard(msg)) }
-                    }
-                }.onFailure { error ->
-                    container.addView(inlineStatusRow(error.message ?: "加载失败", "#FF7A7A"))
-                }
-            }
-        }
+        val title = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
+        val memberConversation = ActiveMemberConversation(
+            projectId = space.project.id,
+            memberUserId = member.userId,
+            memberAccount = member.account,
+            conversationId = conversation.id,
+            title = title
+        )
+        activeChannel = null
+        activeMemberConversation = memberConversation
+        pendingMemberBack = member
+        val messages = messagesByMemberConversation.getOrPut(memberConversation.key) { mutableListOf() }
+        val adapter = ChatAdapter(
+            messages = messages,
+            onMessageLongPress = showMessageActions,
+            onProjectShareAction = onProjectShareAction
+        )
+        activeAdapter = adapter
+        setChatAdapter(adapter)
+        binding.chatList.adapter = adapter
+        showProjectChannelChat("${member.account.ifBlank { "成员" }} · $title", true)
+        loadMemberConversationMessages(memberConversation, silent = false, scrollToBottom = true)
+        startPolling()
     }
 
     private fun backRow(label: String, onClick: () -> Unit): LinearLayout {
@@ -730,10 +850,7 @@ internal class ProjectSpaceController(
                 if (isSelf) {
                     openPersonalConversationById(conversation.id)
                 } else {
-                    renderMemberConversationMessages(
-                        conversation, member, space,
-                        onBack = { renderMemberConversationList(member) }
-                    )
+                    renderMemberConversationMessages(conversation, member, space)
                 }
             }
             addView(TextView(activity).apply {
@@ -794,10 +911,10 @@ internal class ProjectSpaceController(
 
     private fun messageInlineCard(message: ProjectMemberConversationMessage): LinearLayout {
         val roleColor = when (message.role) {
-            "user" -> "#93C5FD"; "assistant" -> "#A7F3D0"; "system" -> "#FCA5A5"; else -> "#A6AFBD"
+            "user" -> "#93C5FD"; "assistant" -> "#A7F3D0"; "system" -> "#FCA5A5"; "discussion" -> "#C4B5FD"; else -> "#A6AFBD"
         }
         val roleText = when (message.role) {
-            "user" -> "成员"; "assistant" -> "AI"; "system" -> "系统"; else -> message.role
+            "user" -> "成员"; "assistant" -> "AI"; "system" -> "系统"; "discussion" -> message.senderName ?: "讨论"; else -> message.role
         }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -939,6 +1056,20 @@ internal class ProjectSpaceController(
             suggestionResolvedByName = suggestionResolvedByName,
             suggestionResolvedAt = suggestionResolvedAt,
             canResolveSuggestion = canResolveSuggestion(this),
+            createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
+        )
+    }
+
+    private fun ProjectMemberConversationMessage.toChatMessage(): ChatMessage {
+        val chatRole = when (role) {
+            "assistant", "system" -> "ai"
+            else -> if (outgoing) "user" else "friend"
+        }
+        return ChatMessage(
+            role = chatRole,
+            content = content,
+            senderLabel = if (chatRole == "friend") senderName ?: userId ?: "成员" else null,
+            id = id,
             createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
         )
     }

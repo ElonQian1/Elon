@@ -58,9 +58,11 @@ internal data class ProjectMemberConversationMessage(
     val conversationId: String?,
     val taskId: String?,
     val userId: String?,
+    val senderName: String?,
     val role: String,
     val content: String,
-    val createdAt: String
+    val createdAt: String,
+    val outgoing: Boolean
 )
 
 internal data class ProjectChannelMessage(

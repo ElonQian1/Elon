@@ -193,6 +193,33 @@ pub async fn list_member_conversation_messages(
     }
 }
 
+pub async fn send_member_conversation_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, member_user_id, conversation_id)): Path<(String, String, String)>,
+    Json(req): Json<SendChannelMessageRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    if let Err(e) = project_access(&state, &user.id, &project_id) {
+        return json_error(StatusCode::FORBIDDEN, e.to_string());
+    }
+    match state
+        .store
+        .insert_project_member_conversation_discussion_message(
+            &user.id,
+            &project_id,
+            &member_user_id,
+            &conversation_id,
+            &req.content,
+        ) {
+        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
 pub async fn list_channel_messages(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

@@ -46,6 +46,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (24, "user_memories 记忆作用域", migration_v24),
     (25, "收紧一龙自项目默认成员与加入权限", migration_v25),
     (26, "指定钱一龙账号为一龙自项目管理员", migration_v26),
+    (27, "项目成员会话人类讨论消息", migration_v27),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -984,6 +985,33 @@ fn migration_v26(conn: &Connection) -> Result<()> {
            AND u.id != p.created_by
         ON CONFLICT(project_id, user_id) DO UPDATE SET role = 'admin'
           WHERE project_members.role != 'owner';
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v27：项目成员会话人类讨论消息 ─────────────────────────────────────────────
+
+fn migration_v27(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_member_conversation_discussion_messages (
+          id              TEXT PRIMARY KEY,
+          project_id      TEXT NOT NULL,
+          member_user_id  TEXT NOT NULL,
+          conversation_id TEXT NOT NULL,
+          sender_user_id  TEXT NOT NULL,
+          content         TEXT NOT NULL,
+          created_at      TEXT NOT NULL,
+          FOREIGN KEY (project_id)     REFERENCES projects(id),
+          FOREIGN KEY (member_user_id) REFERENCES users(id),
+          FOREIGN KEY (sender_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_member_conversation_discussion_timeline
+          ON project_member_conversation_discussion_messages(
+            project_id, member_user_id, conversation_id, created_at
+          );
         "#,
     )?;
     Ok(())
