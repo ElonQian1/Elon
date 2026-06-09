@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     LAN 分发客户端 / 守护进程（多项目、多产物共享单一后台进程）
 
@@ -103,7 +103,9 @@ function Get-LanIp {
     # 优先 192.168.x.x
     $preferred = $candidates | Where-Object { $_.GetAddressBytes()[0] -eq 192 } | Select-Object -First 1
     if ($preferred) { return $preferred.ToString() }
-    return ($candidates | Select-Object -First 1)?.ToString()
+    $firstCandidate = $candidates | Select-Object -First 1
+    if ($firstCandidate) { return $firstCandidate.ToString() }
+    return $null
 }
 
 function Get-ActiveEntries {
@@ -255,7 +257,8 @@ if ($DaemonMode) {
                         $fname = Split-Path $entry.file_path -Leaf
                         $bytes = [System.IO.File]::ReadAllBytes($entry.file_path)
                         Send-HttpResponse $tcpClient 200 'application/octet-stream' $bytes $fname
-                        Write-Log "📤 $proj/$art → $remoteIp ($([math]::Round($bytes.Length/1MB,1)) MB)"
+                        $sizeMb = [math]::Round($bytes.Length / 1MB, 1)
+                        Write-Log "served $proj/$art -> $remoteIp ($sizeMb MB)"
                     } else {
                         $err = [System.Text.Encoding]::UTF8.GetBytes('{"error":"artifact not found or expired"}')
                         Send-HttpResponse $tcpClient 404 'application/json' $err $null
