@@ -12,7 +12,7 @@ pub struct PcProjectWorkspace {
 
 pub async fn resolve_pc_project_node(
     state: &AppState,
-    user_id: &str,
+    _user_id: &str,
     requested_node_id: Option<&str>,
 ) -> Result<String, (StatusCode, String)> {
     let cli_agents = connected_cli_agents(state).await;
@@ -21,7 +21,6 @@ pub async fn resolve_pc_project_node(
         .filter(|value| !value.is_empty());
 
     if let Some(node_id) = requested_node_id {
-        ensure_node_owned_by_user(state, user_id, node_id)?;
         let Some(agent) = cli_agents.iter().find(|agent| agent.agent_id == node_id) else {
             return Err((
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -37,25 +36,15 @@ pub async fn resolve_pc_project_node(
         return Ok(node_id.to_string());
     }
 
-    let mut owned = Vec::new();
-    for agent in cli_agents {
-        if matches!(
-            state.store.get_node_credential_owner(&agent.agent_id),
-            Ok(Some(owner)) if owner == user_id
-        ) {
-            owned.push(agent.agent_id);
-        }
-    }
-
-    match owned.len() {
-        1 => Ok(owned.remove(0)),
+    match cli_agents.len() {
+        1 => Ok(cli_agents[0].agent_id.clone()),
         0 => Err((
             StatusCode::SERVICE_UNAVAILABLE,
-            "当前没有属于你的在线 PC 节点，无法新建代码项目。请先启动 PC 节点后重试。".into(),
+            "当前没有在线 PC 节点，无法新建代码项目。请先启动 PC 节点后重试。".into(),
         )),
         _ => Err((
             StatusCode::CONFLICT,
-            "检测到多个属于你的在线 PC 节点，请在请求中指定 node_id".into(),
+            "检测到多个在线 PC 节点，请在请求中指定 node_id".into(),
         )),
     }
 }
@@ -117,20 +106,4 @@ fn supports_project_cli(agent: &AgentSummary) -> bool {
         .allowed_clis
         .iter()
         .any(|cli| cli.eq_ignore_ascii_case("copilot") || cli.eq_ignore_ascii_case("codex"))
-}
-
-fn ensure_node_owned_by_user(
-    state: &AppState,
-    user_id: &str,
-    node_id: &str,
-) -> Result<(), (StatusCode, String)> {
-    match state.store.get_node_credential_owner(node_id) {
-        Ok(Some(owner)) if owner == user_id => Ok(()),
-        Ok(Some(_)) => Err((StatusCode::FORBIDDEN, "不能使用其他用户的 PC 节点".into())),
-        Ok(None) => Err((
-            StatusCode::FORBIDDEN,
-            "该 PC 节点没有绑定到当前登录用户，请在 PC 节点管理页重新登录".into(),
-        )),
-        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
-    }
 }

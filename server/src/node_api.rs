@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 // ── /api/nodes ────────────────────────────────────────────────────────────────
 
-/// GET /api/nodes — 列出所有已知节点（含在线状态）
+/// GET /api/nodes — 列出所有用户可发现的在线节点（含在线状态）
 /// 需要有效用户 token（不要求管理员权限，普通用户可见）
 pub async fn list_nodes(
     State(state): State<Arc<AppState>>,
@@ -38,6 +38,26 @@ pub async fn list_nodes(
             .into_response();
     }
     let nodes = state.node_registry.list_online().await;
+    let nodes: Vec<_> = nodes
+        .into_iter()
+        .map(|node| {
+            let short_id = short_node_id(&node.node_id);
+            let device_name = clean_string(node.device_name.as_deref());
+            let display_name = display_node_name("", device_name.as_deref(), &short_id);
+            PublicNodeResponse {
+                agent_id: node.node_id.clone(),
+                node_id: node.node_id,
+                owner_user_id: node.owner_user_id,
+                device_name,
+                display_name,
+                short_id,
+                models: node.models,
+                tts_worker_url: node.tts_worker_url,
+                connected_at: node.connected_at,
+                online: node.online,
+            }
+        })
+        .collect();
     Json(serde_json::json!({ "nodes": nodes })).into_response()
 }
 
@@ -293,6 +313,20 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
     }
 
     Json(serde_json::json!({ "nodes": nodes })).into_response()
+}
+
+#[derive(Serialize)]
+struct PublicNodeResponse {
+    agent_id: String,
+    node_id: String,
+    owner_user_id: String,
+    device_name: Option<String>,
+    display_name: String,
+    short_id: String,
+    models: Vec<ModelCapability>,
+    tts_worker_url: Option<String>,
+    connected_at: u64,
+    online: bool,
 }
 
 #[derive(Serialize)]

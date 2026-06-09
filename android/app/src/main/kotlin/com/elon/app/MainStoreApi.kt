@@ -165,7 +165,7 @@ internal fun fetchProjectCreateNodes(
 ): List<ProjectCreateNodeOption> {
     val req = AuthManager.applyAuth(
         ctx,
-        Request.Builder().url("$serverUrl/api/me/nodes").get()
+        Request.Builder().url("$serverUrl/api/nodes").get()
     ).build()
     val resp = http.newCall(req).execute()
     val body = resp.body?.string().orEmpty()
