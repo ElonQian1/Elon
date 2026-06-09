@@ -4,6 +4,24 @@ use rusqlite::{params, OptionalExtension};
 use super::{new_id, now, ProjectSummary, Store};
 
 impl Store {
+    pub fn count_active_pc_projects_for_node(&self, node_id: &str) -> Result<i64> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return Ok(0);
+        }
+        self.conn()?
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM projects
+                 WHERE node_id = ?1
+                   AND status != 'deleted'
+                   AND source_type NOT IN ('agent_balloon', 'chat_memory')",
+                params![node_id],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
     pub fn bind_project_to_pc_workspace(
         &self,
         user_id: &str,

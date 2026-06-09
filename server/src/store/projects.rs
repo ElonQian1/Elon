@@ -532,6 +532,10 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_workspace_health_snapshots WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_channel_read_states WHERE project_id = ?1",
             params![project_id],
         )?;

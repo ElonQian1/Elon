@@ -5,10 +5,11 @@ use std::collections::HashMap;
 use crate::{
     conversation_router::{ensure_user_system_conversation_routes, ConversationRoute},
     node_runtime::user_node_runtimes,
+    pc_node_capacity::assess_pc_node_capacity,
     project_workspace_lifecycle::workspace_lifecycle,
     store::{
-        UserArchiveConversationRoute, UserArchiveNode, UserArchiveProject, UserArchiveSummary,
-        UserArchiveWorkspaceStatus, MEMORY_SCOPE_PROJECT,
+        ProjectWorkspaceHealthSnapshot, UserArchiveConversationRoute, UserArchiveNode,
+        UserArchiveProject, UserArchiveSummary, UserArchiveWorkspaceStatus, MEMORY_SCOPE_PROJECT,
     },
     types::AppState,
 };
@@ -39,8 +40,21 @@ pub async fn build_user_archive_response(
         .into_iter()
         .map(|route| (route.project_id.clone(), route))
         .collect::<HashMap<_, _>>();
+    let project_ids = projects
+        .iter()
+        .map(|project| project.project.id.clone())
+        .collect::<Vec<_>>();
+    let snapshots = state
+        .store
+        .latest_project_workspace_health_snapshots(&project_ids)?;
 
-    enrich_archive_projects(&mut projects, &node_by_id, &system_route_by_project, state);
+    enrich_archive_projects(
+        &mut projects,
+        &node_by_id,
+        &system_route_by_project,
+        &snapshots,
+        state,
+    );
 
     let mut system_projects = Vec::new();
     let mut owned_projects = Vec::new();
@@ -96,8 +110,21 @@ pub async fn build_user_archive_project_response(
         .into_iter()
         .map(|route| (route.project_id.clone(), route))
         .collect::<HashMap<_, _>>();
+    let project_ids = projects
+        .iter()
+        .map(|project| project.project.id.clone())
+        .collect::<Vec<_>>();
+    let snapshots = state
+        .store
+        .latest_project_workspace_health_snapshots(&project_ids)?;
 
-    enrich_archive_projects(&mut projects, &node_by_id, &system_route_by_project, state);
+    enrich_archive_projects(
+        &mut projects,
+        &node_by_id,
+        &system_route_by_project,
+        &snapshots,
+        state,
+    );
 
     Ok(projects
         .into_iter()
@@ -108,6 +135,7 @@ fn enrich_archive_projects(
     projects: &mut [UserArchiveProject],
     node_by_id: &HashMap<String, UserArchiveNode>,
     system_route_by_project: &HashMap<String, ConversationRoute>,
+    snapshots: &HashMap<String, ProjectWorkspaceHealthSnapshot>,
     state: &AppState,
 ) {
     for project in projects {
@@ -115,7 +143,12 @@ fn enrich_archive_projects(
             project,
             system_route_by_project.get(&project.project.id),
         ));
-        project.workspace_status = Some(workspace_status_for_project(project, node_by_id, state));
+        project.workspace_status = Some(workspace_status_for_project(
+            project,
+            node_by_id,
+            snapshots.get(&project.project.id),
+            state,
+        ));
     }
 }
 
@@ -149,6 +182,7 @@ fn conversation_route_for_project(
 fn workspace_status_for_project(
     project: &UserArchiveProject,
     node_by_id: &HashMap<String, UserArchiveNode>,
+    snapshot: Option<&ProjectWorkspaceHealthSnapshot>,
     state: &AppState,
 ) -> UserArchiveWorkspaceStatus {
     let node = project
@@ -201,7 +235,17 @@ fn workspace_status_for_project(
     ) {
         warnings.push("最近一次执行来自旧版节点，缺少工作区状态".to_string());
     }
+    if let Some(snapshot) = snapshot {
+        for warning in &snapshot.warnings {
+            push_warning(&mut warnings, warning.clone());
+        }
+        if snapshot.inspect_error.is_some() {
+            push_warning(&mut warnings, "最近一次 PC 工作区巡检失败".to_string());
+        }
+    }
 
+    let cached_verified_can_run_on_pc =
+        snapshot.and_then(|snapshot| snapshot.verified_can_run_on_pc);
     let can_run_on_pc = project.workspace_kind == "pc_node_workspace"
         && project
             .project
@@ -210,15 +254,17 @@ fn workspace_status_for_project(
             .is_some_and(|value| !value.trim().is_empty())
         && node
             .map(|node| node.cli_connected && node.cli_project_ready)
-            .unwrap_or(false);
+            .unwrap_or(false)
+        && cached_verified_can_run_on_pc.unwrap_or(true);
     let lifecycle = workspace_lifecycle(
         &project.workspace_kind,
         project.project.node_id.as_deref(),
         project.project.workspace_path.as_deref(),
         node.map(|node| node.online).unwrap_or(false),
         can_run_on_pc,
-        node.map(|node| node.cli_connected && node.cli_project_ready),
-        None,
+        cached_verified_can_run_on_pc
+            .or_else(|| node.map(|node| node.cli_connected && node.cli_project_ready)),
+        snapshot.and_then(|snapshot| snapshot.live_inspect.as_ref()),
         warnings.len(),
     );
 
@@ -235,6 +281,9 @@ fn workspace_status_for_project(
         node_cli_project_ready: node.map(|node| node.cli_project_ready).unwrap_or(false),
         node_display_name: node.map(|node| node.display_name.clone()),
         can_run_on_pc,
+        cached_verified_can_run_on_pc,
+        latest_health_checked_at: snapshot.map(|snapshot| snapshot.captured_at.clone()),
+        latest_health_disk_free_bytes: snapshot.and_then(|snapshot| snapshot.disk_free_bytes),
         latest_execution_status: latest_execution
             .as_ref()
             .map(|session| session.status.clone()),
@@ -264,6 +313,18 @@ async fn build_archive_nodes(state: &AppState, user_id: &str) -> Result<Vec<User
         .await?
         .into_iter()
         .map(|node| {
+            let global_project_count = state
+                .store
+                .count_active_pc_projects_for_node(&node.node_id)
+                .unwrap_or(node.project_count);
+            let mut capacity_node = node.clone();
+            capacity_node.project_count = global_project_count;
+            let latest_snapshot = state
+                .store
+                .latest_workspace_health_snapshot_for_node(&node.node_id)
+                .ok()
+                .flatten();
+            let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
             let cli_project_ready = node.cli_project_ready();
             UserArchiveNode {
                 node_id: node.node_id,
@@ -275,8 +336,20 @@ async fn build_archive_nodes(state: &AppState, user_id: &str) -> Result<Vec<User
                 cli_connected: node.cli_connected,
                 cli_project_ready,
                 allowed_clis: node.allowed_clis,
-                project_count: node.project_count,
+                project_count: capacity.project_count,
+                project_limit: capacity.project_limit,
+                project_slots_remaining: capacity.project_slots_remaining,
+                disk_free_bytes: capacity.disk_free_bytes,
+                capacity_label: capacity.label,
+                capacity_tone: capacity.tone,
+                capacity_warnings: capacity.warnings,
             }
         })
         .collect())
+}
+
+fn push_warning(warnings: &mut Vec<String>, warning: String) {
+    if !warnings.iter().any(|existing| existing == &warning) {
+        warnings.push(warning);
+    }
 }

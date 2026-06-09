@@ -3,6 +3,7 @@
 //! 所有 `Store` 方法的输入/输出类型集中在此文件，避免 store.rs 因类型膨胀超限。
 //! 外部代码仍通过 `crate::store::PublicUser` 等路径访问（store.rs 做 `pub use store_types::*`）。
 
+use homecli_proto::ProjectWorkspaceInspectStatus;
 use serde::Serialize;
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
@@ -369,6 +370,9 @@ pub struct UserArchiveWorkspaceStatus {
     pub node_cli_project_ready: bool,
     pub node_display_name: Option<String>,
     pub can_run_on_pc: bool,
+    pub cached_verified_can_run_on_pc: Option<bool>,
+    pub latest_health_checked_at: Option<String>,
+    pub latest_health_disk_free_bytes: Option<u64>,
     pub latest_execution_status: Option<String>,
     pub latest_execution_merge_status: Option<String>,
     pub latest_execution_active_workspace_path: Option<String>,
@@ -389,6 +393,12 @@ pub struct UserArchiveNode {
     pub cli_project_ready: bool,
     pub allowed_clis: Vec<String>,
     pub project_count: i64,
+    pub project_limit: i64,
+    pub project_slots_remaining: i64,
+    pub disk_free_bytes: Option<u64>,
+    pub capacity_label: String,
+    pub capacity_tone: String,
+    pub capacity_warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -399,6 +409,36 @@ pub struct UserArchiveSummary {
     pub shared_project_count: i64,
     pub node_count: i64,
     pub online_node_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectWorkspaceHealthSnapshot {
+    pub project_id: String,
+    pub node_id: Option<String>,
+    pub workspace_path: Option<String>,
+    pub can_run_on_pc: bool,
+    pub verified_can_run_on_pc: Option<bool>,
+    pub health_label: String,
+    pub health_tone: String,
+    pub recommended_action: String,
+    pub warning_count: i64,
+    pub warnings: Vec<String>,
+    pub live_inspect: Option<ProjectWorkspaceInspectStatus>,
+    pub inspect_error: Option<String>,
+    pub disk_free_bytes: Option<u64>,
+    pub path_exists: Option<bool>,
+    pub is_dir: Option<bool>,
+    pub is_git_worktree: Option<bool>,
+    pub cli_available: Option<bool>,
+    pub captured_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProjectWorkspaceHealthTarget {
+    pub project_id: String,
+    pub source_type: String,
+    pub node_id: String,
+    pub workspace_path: String,
 }
 
 #[derive(Debug, Clone)]

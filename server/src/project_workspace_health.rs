@@ -13,7 +13,10 @@ use crate::{
     node_runtime::node_runtime_by_id,
     project_auth::{auth_from_headers, json_error, project_access},
     project_workspace_lifecycle::{workspace_lifecycle, ProjectWorkspaceRecoveryAction},
-    store::{is_system_project_source_type, ProjectExecutionSession},
+    store::{
+        is_system_project_source_type, ProjectExecutionSession, ProjectWorkspaceHealthSnapshot,
+        ProjectWorkspaceHealthSnapshotWrite,
+    },
     types::AppState,
 };
 
@@ -26,6 +29,7 @@ pub struct ProjectWorkspaceHealthResponse {
     pub verified_can_run_on_pc: Option<bool>,
     pub live_inspect: Option<ProjectWorkspaceInspectStatus>,
     pub inspect_error: Option<String>,
+    pub latest_snapshot: Option<ProjectWorkspaceHealthSnapshot>,
     pub health_label: String,
     pub health_tone: String,
     pub recommended_action: String,
@@ -146,6 +150,35 @@ pub async fn get_project_workspace_health(
         live_inspect.as_ref(),
         warnings.len(),
     );
+    let latest_snapshot = match state.store.upsert_project_workspace_health_snapshot(
+        ProjectWorkspaceHealthSnapshotWrite {
+            project_id: &access.id,
+            node_id: access.node_id.as_deref(),
+            workspace_path: access.workspace_path.as_deref(),
+            can_run_on_pc,
+            verified_can_run_on_pc,
+            health_label: &lifecycle.health_label,
+            health_tone: lifecycle.health_tone,
+            recommended_action: &lifecycle.recommended_action,
+            warnings: &warnings,
+            live_inspect: live_inspect.as_ref(),
+            inspect_error: inspect_error.as_deref(),
+        },
+    ) {
+        Ok(snapshot) => Some(snapshot),
+        Err(e) => {
+            tracing::warn!(
+                project_id = %access.id,
+                error = %e,
+                "failed to persist project workspace health snapshot"
+            );
+            state
+                .store
+                .latest_project_workspace_health_snapshot(&access.id)
+                .ok()
+                .flatten()
+        }
+    };
 
     Json(ProjectWorkspaceHealthResponse {
         project: ProjectWorkspaceHealthProject {
@@ -163,6 +196,7 @@ pub async fn get_project_workspace_health(
         verified_can_run_on_pc,
         live_inspect,
         inspect_error,
+        latest_snapshot,
         health_label: lifecycle.health_label,
         health_tone: lifecycle.health_tone.to_string(),
         recommended_action: lifecycle.recommended_action,

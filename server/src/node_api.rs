@@ -22,7 +22,9 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     node_runtime::{
         clean_string, display_node_name, short_node_id, supports_project_cli, user_node_runtimes,
+        NodeRuntime,
     },
+    pc_node_capacity::{assess_pc_node_capacity, PcNodeCapacity},
     project_auth::auth_from_headers,
     types::AppState,
 };
@@ -70,6 +72,22 @@ pub async fn list_nodes(
                 .and_then(|agent| clean_string(agent.device_name.as_deref()))
         });
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
+        let project_count = state
+            .store
+            .count_active_pc_projects_for_node(&node_id)
+            .unwrap_or_else(|_| project_counts.get(&node_id).copied().unwrap_or(0));
+        let capacity = capacity_for_response(
+            &state,
+            &node_id,
+            &node.owner_user_id,
+            "",
+            device_name.as_deref(),
+            &display_name,
+            node.online || cli_agent.is_some(),
+            cli_agent.is_some(),
+            &allowed_clis,
+            project_count,
+        );
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -80,7 +98,13 @@ pub async fn list_nodes(
             models: node.models,
             allowed_clis: allowed_clis.clone(),
             cli_project_ready: supports_project_cli(&allowed_clis),
-            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
+            project_count,
+            project_limit: capacity.project_limit,
+            project_slots_remaining: capacity.project_slots_remaining,
+            disk_free_bytes: capacity.disk_free_bytes,
+            capacity_label: capacity.label,
+            capacity_tone: capacity.tone,
+            capacity_warnings: capacity.warnings,
             tts_worker_url: node.tts_worker_url,
             connected_at: node.connected_at,
             online: node.online || cli_agent.is_some(),
@@ -99,6 +123,22 @@ pub async fn list_nodes(
             .ok()
             .flatten()
             .unwrap_or_default();
+        let project_count = state
+            .store
+            .count_active_pc_projects_for_node(&node_id)
+            .unwrap_or_else(|_| project_counts.get(&node_id).copied().unwrap_or(0));
+        let capacity = capacity_for_response(
+            &state,
+            &node_id,
+            &owner_user_id,
+            "",
+            device_name.as_deref(),
+            &display_name,
+            true,
+            true,
+            &allowed_clis,
+            project_count,
+        );
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -109,7 +149,13 @@ pub async fn list_nodes(
             models: Vec::new(),
             allowed_clis: allowed_clis.clone(),
             cli_project_ready: supports_project_cli(&allowed_clis),
-            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
+            project_count,
+            project_limit: capacity.project_limit,
+            project_slots_remaining: capacity.project_slots_remaining,
+            disk_free_bytes: capacity.disk_free_bytes,
+            capacity_label: capacity.label,
+            capacity_tone: capacity.tone,
+            capacity_warnings: capacity.warnings,
             tts_worker_url: None,
             connected_at: agent.connected_at,
             online: true,
@@ -315,6 +361,18 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         .into_iter()
         .map(|node| {
             let cli_project_ready = node.cli_project_ready();
+            let global_project_count = state
+                .store
+                .count_active_pc_projects_for_node(&node.node_id)
+                .unwrap_or(node.project_count);
+            let mut capacity_node = node.clone();
+            capacity_node.project_count = global_project_count;
+            let latest_snapshot = state
+                .store
+                .latest_workspace_health_snapshot_for_node(&node.node_id)
+                .ok()
+                .flatten();
+            let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
             MyNodeResponse {
                 agent_id: node.node_id.clone(),
                 node_id: node.node_id,
@@ -327,7 +385,13 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 allowed_clis: node.allowed_clis,
                 allowed_cwds: node.allowed_cwds,
                 cli_project_ready,
-                project_count: node.project_count,
+                project_count: capacity.project_count,
+                project_limit: capacity.project_limit,
+                project_slots_remaining: capacity.project_slots_remaining,
+                disk_free_bytes: capacity.disk_free_bytes,
+                capacity_label: capacity.label,
+                capacity_tone: capacity.tone,
+                capacity_warnings: capacity.warnings,
                 connected_at: node.connected_at,
                 created_at: node.created_at,
                 online: node.online,
@@ -352,6 +416,12 @@ struct PublicNodeResponse {
     allowed_clis: Vec<String>,
     cli_project_ready: bool,
     project_count: i64,
+    project_limit: i64,
+    project_slots_remaining: i64,
+    disk_free_bytes: Option<u64>,
+    capacity_label: String,
+    capacity_tone: String,
+    capacity_warnings: Vec<String>,
     tts_worker_url: Option<String>,
     connected_at: u64,
     online: bool,
@@ -371,6 +441,12 @@ struct MyNodeResponse {
     allowed_cwds: Vec<String>,
     cli_project_ready: bool,
     project_count: i64,
+    project_limit: i64,
+    project_slots_remaining: i64,
+    disk_free_bytes: Option<u64>,
+    capacity_label: String,
+    capacity_tone: String,
+    capacity_warnings: Vec<String>,
     connected_at: u64,
     created_at: String,
     online: bool,
@@ -392,6 +468,43 @@ fn project_counts_for_user(state: &AppState, user_id: &str) -> HashMap<String, i
             HashMap::new()
         }
     }
+}
+
+fn capacity_for_response(
+    state: &AppState,
+    node_id: &str,
+    owner_user_id: &str,
+    label: &str,
+    device_name: Option<&str>,
+    display_name: &str,
+    online: bool,
+    cli_connected: bool,
+    allowed_clis: &[String],
+    project_count: i64,
+) -> PcNodeCapacity {
+    let latest_snapshot = state
+        .store
+        .latest_workspace_health_snapshot_for_node(node_id)
+        .ok()
+        .flatten();
+    let runtime = NodeRuntime {
+        node_id: node_id.to_string(),
+        owner_user_id: owner_user_id.to_string(),
+        label: label.to_string(),
+        device_name: device_name.map(ToOwned::to_owned),
+        display_name: display_name.to_string(),
+        short_id: short_node_id(node_id),
+        models: Vec::new(),
+        allowed_clis: allowed_clis.to_vec(),
+        allowed_cwds: Vec::new(),
+        connected_at: 0,
+        created_at: String::new(),
+        online,
+        registry_online: online,
+        cli_connected,
+        project_count,
+    };
+    assess_pc_node_capacity(&runtime, latest_snapshot.as_ref())
 }
 
 // ── /api/nodes/chat ───────────────────────────────────────────────────────────

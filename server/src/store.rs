@@ -25,6 +25,7 @@ mod pc_project_binding;
 mod project_execution_sessions;
 mod project_member_conversations;
 mod project_space;
+mod project_workspace_health_snapshots;
 mod projects;
 mod social_ai_messages;
 mod social_ai_pending;
@@ -51,6 +52,7 @@ pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
 };
+pub use project_workspace_health_snapshots::ProjectWorkspaceHealthSnapshotWrite;
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_FRIEND_ACCOUNT,
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,

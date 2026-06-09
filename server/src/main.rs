@@ -46,6 +46,7 @@ mod node_api;
 mod node_registry;
 mod node_router;
 mod node_runtime;
+mod pc_node_capacity;
 mod pc_relay;
 mod pc_relay_client;
 mod pc_workspace_provisioner;
@@ -78,6 +79,7 @@ mod project_store;
 mod project_task_scheduler;
 mod project_trace_events;
 mod project_workspace_health;
+mod project_workspace_health_monitor;
 mod project_workspace_inspect;
 pub(crate) mod project_workspace_lifecycle;
 mod project_workspace_provision;
@@ -145,6 +147,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState::new()?);
     codex_health::spawn_codex_network_monitor(state.clone());
     billing_lifecycle::spawn_reservation_janitor(state.clone());
+    project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();
 

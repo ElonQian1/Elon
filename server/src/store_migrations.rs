@@ -54,6 +54,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (32, "PC 项目执行会话 token 用量字段", migration_v32),
     (33, "计费调用预授权冻结与对账摘要", migration_v33),
     (34, "非 CLI 算力预授权配置", migration_v34),
+    (35, "PC 项目工作区健康快照", migration_v35),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1243,6 +1244,39 @@ fn migration_v34(conn: &Connection) -> Result<()> {
           VALUES ('billing_tts_min_reservation_fen', '1', datetime('now'));
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('billing_realtime_voice_min_reservation_fen', '1', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v35(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_workspace_health_snapshots (
+          id                         TEXT PRIMARY KEY,
+          project_id                 TEXT NOT NULL UNIQUE,
+          node_id                    TEXT,
+          workspace_path             TEXT,
+          can_run_on_pc              INTEGER NOT NULL DEFAULT 0,
+          verified_can_run_on_pc     INTEGER,
+          health_label               TEXT NOT NULL,
+          health_tone                TEXT NOT NULL,
+          recommended_action         TEXT NOT NULL,
+          warning_count              INTEGER NOT NULL DEFAULT 0,
+          warnings_json              TEXT NOT NULL DEFAULT '[]',
+          live_inspect_json          TEXT,
+          inspect_error              TEXT,
+          disk_free_bytes            INTEGER,
+          path_exists                INTEGER,
+          is_dir                     INTEGER,
+          is_git_worktree            INTEGER,
+          cli_available              INTEGER,
+          captured_at                TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_workspace_health_node_latest
+          ON project_workspace_health_snapshots(node_id, captured_at DESC)
+          WHERE node_id IS NOT NULL;
         "#,
     )?;
     Ok(())

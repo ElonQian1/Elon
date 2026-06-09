@@ -112,6 +112,13 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
                 .flatten()
         })
         .unwrap_or_default();
+    let project_count = state
+        .store
+        .count_active_pc_projects_for_node(node_id)
+        .unwrap_or_else(|e| {
+            tracing::warn!(node_id = %node_id, error = %e, "failed to count active PC projects for node");
+            0
+        });
 
     Ok(Some(build_runtime_for_parts(
         node_id,
@@ -121,7 +128,7 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
         String::new(),
         registry.as_ref(),
         cli,
-        0,
+        project_count,
     )))
 }
 
