@@ -1552,6 +1552,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
                 "/api/register-project",
                 axum::routing::post(admin_register_project),
             )
+            .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -1567,6 +1568,42 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
 
 async fn admin_index() -> axum::response::Html<&'static str> {
     axum::response::Html(include_str!("node_agent_admin.html"))
+}
+
+/// GET /api/tts-status — 探测本地 TTS Worker 健康状态
+/// 代理到 http://127.0.0.1:<TTS_PORT>/health，无论 Worker 是否在运行都不返回错误
+async fn admin_tts_status() -> axum::Json<serde_json::Value> {
+    let port = std::env::var("ELON_TTS_WORKER_PORT")
+        .or_else(|_| std::env::var("TTS_WORKER_PORT"))
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .unwrap_or(5011);
+    let enabled = std::env::var("TTS_WORKER_ENABLED")
+        .map(|v| matches!(v.trim().to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false);
+    let url = format!("http://127.0.0.1:{}/health", port);
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap_or_default();
+    match client.get(&url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(body) = resp.json::<serde_json::Value>().await {
+                return axum::Json(serde_json::json!({
+                    "running": true,
+                    "enabled_in_env": enabled,
+                    "port": port,
+                    "health": body,
+                }));
+            }
+            axum::Json(serde_json::json!({ "running": true, "enabled_in_env": enabled, "port": port }))
+        }
+        _ => axum::Json(serde_json::json!({
+            "running": false,
+            "enabled_in_env": enabled,
+            "port": port,
+        }))
+    }
 }
 
 async fn admin_status(

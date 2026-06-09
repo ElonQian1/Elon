@@ -143,6 +143,11 @@
     <tbody></tbody>
   </table>
 
+  <h3>情绪女声 TTS <button style="padding:4px 10px;font-size:12px" onclick="loadTts()">刷新</button></h3>
+  <div id="ttsStatus" class="card">
+    <span style="color:#8b949e">检查中…</span>
+  </div>
+
   <h3>环境变量参考（高级，普通用户无需配置）</h3>
   <pre>
 登录后所有凭证自动持久化到本地，普通用户不用设置任何变量。以下仅供高级/服务器场景：
@@ -281,6 +286,77 @@ async function registerProject() {
   }
 }
 
+// ── TTS Worker 状态 ──────────────────────────────────────────────────────────
+async function loadTts() {
+  const box = document.getElementById('ttsStatus');
+  const r = await fetch('/api/tts-status').then(r => r.json()).catch(() => null);
+  if (!r) { box.innerHTML = '<span style="color:#f85149">请求失败</span>'; return; }
+
+  const h = r.health || {};
+  const running = r.running;
+  const provider = (h.defaultProvider || '').replace('index_tts2','IndexTTS2').replace('cosyvoice3','CosyVoice3') || '—';
+  const rt = h.runtime || {};
+  const idxOk  = rt.indexTts2  && rt.indexTts2.importable;
+  const cosyOk = rt.cosyVoice  && rt.cosyVoice.importable;
+  const assets  = h.assets || {};
+  const missingVoices   = (assets.missingVoices   || []).length;
+  const missingEmotions = (assets.missingEmotions || []).length;
+  const totalVoices   = (assets.voices   || []).length;
+  const totalEmotions = (assets.emotions || []).length;
+
+  let html = '';
+
+  // 运行状态
+  if (running) {
+    html += `<div class="ok-toast" style="margin:0 0 12px">🟢 TTS Worker 正在运行（端口 ${r.port}，引擎 ${provider}）</div>`;
+  } else {
+    html += `<div class="err-toast" style="margin:0 0 12px">🔴 TTS Worker 未运行（端口 ${r.port}）</div>`;
+    if (!r.enabled_in_env) {
+      html += `<div class="warn">未启用。要在每次启动节点时自动拉起 TTS Worker，请在 <code>node-agent.env</code> 里加：<br><code>TTS_WORKER_ENABLED=true</code></div>`;
+    }
+  }
+
+  if (running) {
+    // 声音素材状态
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:12px">`;
+    const voiceOk = missingVoices === 0 && totalVoices > 0;
+    const emoOk   = missingEmotions === 0 && totalEmotions > 0;
+    html += `<div><span style="color:#8b949e">女声素材（${totalVoices} 个）</span><br>`;
+    html += voiceOk
+      ? `<span style="color:#2ea043">✅ 全部就绪</span>`
+      : `<span style="color:#f85149">❌ 缺少 ${missingVoices}/${totalVoices} 个 WAV</span>`;
+    html += `</div>`;
+    html += `<div><span style="color:#8b949e">情绪素材（${totalEmotions} 个）</span><br>`;
+    html += emoOk
+      ? `<span style="color:#2ea043">✅ 全部就绪</span>`
+      : `<span style="color:#f85149">❌ 缺少 ${missingEmotions}/${totalEmotions} 个 WAV</span>`;
+    html += `</div>`;
+
+    // 模型状态
+    html += `<div><span style="color:#8b949e">IndexTTS2 模型</span><br>`;
+    html += idxOk
+      ? `<span style="color:#2ea043">✅ 已加载</span>`
+      : `<span style="color:#d29922">⬜ 未安装</span>`;
+    html += `</div>`;
+    html += `<div><span style="color:#8b949e">CosyVoice3 模型</span><br>`;
+    html += cosyOk
+      ? `<span style="color:#2ea043">✅ 已加载</span>`
+      : `<span style="color:#d29922">⬜ 未安装</span>`;
+    html += `</div>`;
+    html += `</div>`;
+
+    // 素材缺失时给出操作提示
+    if (missingVoices > 0 || missingEmotions > 0) {
+      html += `<div class="warn">缺少声音素材 WAV 文件，不同女声选择将无法生效（会回退到系统 TTS）。<br>运行：<code>scripts\\import-tts-asset-pack.ps1 -AssetRoot &lt;你的素材目录&gt;</code></div>`;
+    }
+    if (!idxOk && !cosyOk) {
+      html += `<div class="warn">两个 TTS 引擎均未安装，语音合成无法工作。<br>安装 IndexTTS2：<code>scripts\\setup-indextts2-runtime.ps1</code></div>`;
+    }
+  }
+
+  box.innerHTML = html || '<span style="color:#8b949e">无数据</span>';
+}
+
 // ── AI 编码工具环境检查 ─────────────────────────────────────────────────────
 async function loadEnvCheck() {
   const r = await fetch('/api/env-check').then(r => r.json()).catch(() => null);
@@ -357,7 +433,9 @@ async function saveApiKey() {
 
 load();
 loadEnvCheck();
+loadTts();
 setInterval(load, 5000);
+setInterval(loadTts, 15000);
 </script>
 </body>
 </html>

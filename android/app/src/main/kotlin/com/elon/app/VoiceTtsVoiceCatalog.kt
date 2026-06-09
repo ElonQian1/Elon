@@ -21,6 +21,7 @@ internal object VoiceTtsVoiceCatalog {
         usesServerTts = false
     )
 
+    /** 内置预设，作为服务器目录加载前/失败时的兜底。 */
     val presetVoices: List<VoiceTtsVoiceOption> = listOf(
         VoiceTtsVoiceOption(
             id = "female_warm",
@@ -49,15 +50,40 @@ internal object VoiceTtsVoiceCatalog {
         )
     )
 
-    val allVoices: List<VoiceTtsVoiceOption> = listOf(systemVoice) + presetVoices
+    /**
+     * 从服务器目录动态加载的声线列表；null 表示尚未加载，此时 [allVoices] 使用 [presetVoices]。
+     * 只在主线程写入，读取可在任意线程。
+     */
+    @Volatile
+    private var dynamicVoices: List<VoiceTtsVoiceOption>? = null
+
+    /** 当前完整声线列表 = 系统 TTS + 动态服务器声线（或内置预设）。 */
+    val allVoices: List<VoiceTtsVoiceOption>
+        get() = listOf(systemVoice) + (dynamicVoices ?: presetVoices)
+
+    /** 用服务器返回的声线列表更新动态目录。每次打开声线选择器时调用。 */
+    fun updateFromServer(voices: List<VoiceTtsVoiceOption>) {
+        if (voices.isNotEmpty()) {
+            dynamicVoices = voices
+        }
+    }
 
     fun isSystemVoiceId(voiceId: String): Boolean =
         voiceId == SYSTEM_TTS_VOICE_ID
 
+    /**
+     * 判断 voiceId 是否有效：
+     * 1. 系统 TTS 永远有效
+     * 2. 在当前 [allVoices] 中存在
+     * 3. 或者 id 以 "female_" 开头（服务器标准前缀），允许在目录未加载前通过校验
+     */
     fun isKnownVoiceId(voiceId: String): Boolean =
-        allVoices.any { it.id == voiceId }
+        voiceId == SYSTEM_TTS_VOICE_ID ||
+            allVoices.any { it.id == voiceId } ||
+            voiceId.startsWith("female_")
 
     fun findById(voiceId: String): VoiceTtsVoiceOption =
         allVoices.firstOrNull { it.id == voiceId }
             ?: allVoices.first { it.id == VoiceTtsPreferences.DEFAULT_VOICE_ID }
 }
+

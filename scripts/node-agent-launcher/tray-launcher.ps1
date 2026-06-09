@@ -73,8 +73,61 @@ function Start-NodeIfNeeded {
 
 function Restart-Node {
     Stop-Process -Name "elon-node-agent" -Force -ErrorAction SilentlyContinue
+    Stop-TtsWorkerIfRunning
     Start-Sleep -Milliseconds 1000
     Start-NodeIfNeeded
+    Start-TtsWorkerIfNeeded
+}
+
+# ── TTS Worker（可选伴生进程）────────────────────────────────────────────
+$script:TtsProc = $null
+
+function Resolve-TtsPythonExe {
+    if ($env:TTS_PYTHON_EXE -and (Test-Path $env:TTS_PYTHON_EXE)) { return $env:TTS_PYTHON_EXE }
+    $repoRoot = try { (git -C $here rev-parse --show-toplevel 2>$null) } catch { $null }
+    if ($repoRoot) {
+        $venvPy = Join-Path $repoRoot.Trim() ".runtime\tts-worker-model\venv\Scripts\python.exe"
+        if (Test-Path $venvPy) { return $venvPy }
+    }
+    return $null
+}
+
+function Start-TtsWorkerIfNeeded {
+    if ($env:TTS_WORKER_ENABLED -notmatch '^(1|true|yes|on)$') { return }
+    if ($script:TtsProc -and -not $script:TtsProc.HasExited) { return }
+
+    $pyExe = Resolve-TtsPythonExe
+    if (-not $pyExe) { return }
+
+    $repoRoot = try { (git -C $here rev-parse --show-toplevel 2>$null).Trim() } catch { $null }
+    if (-not $repoRoot) { return }
+    $workerDir = Join-Path $repoRoot "server\tts_worker"
+    if (-not (Test-Path (Join-Path $workerDir "model_tts_worker.py"))) { return }
+
+    $port     = if ($env:TTS_WORKER_PORT) { $env:TTS_WORKER_PORT } else { "5011" }
+    $provider = if ($env:TTS_PROVIDER)    { $env:TTS_PROVIDER }    else { "index_tts2" }
+    $assets   = if ($env:TTS_ASSET_ROOT)  { $env:TTS_ASSET_ROOT }  else { Join-Path $repoRoot "server\assets\tts" }
+
+    [Environment]::SetEnvironmentVariable("ELON_TTS_WORKER_HOST",    "127.0.0.1",  'Process')
+    [Environment]::SetEnvironmentVariable("ELON_TTS_WORKER_PORT",    $port,        'Process')
+    [Environment]::SetEnvironmentVariable("ELON_TTS_PROVIDER",       $provider,    'Process')
+    [Environment]::SetEnvironmentVariable("ELON_TTS_MODEL_PROVIDER", $provider,    'Process')
+    [Environment]::SetEnvironmentVariable("ELON_TTS_ASSET_ROOT",     $assets,      'Process')
+    if ($env:TTS_INDEXTTS2_MODEL_DIR) { [Environment]::SetEnvironmentVariable("ELON_INDEXTTS2_MODEL_DIR", $env:TTS_INDEXTTS2_MODEL_DIR, 'Process') }
+    if ($env:TTS_INDEXTTS2_CFG_PATH)  { [Environment]::SetEnvironmentVariable("ELON_INDEXTTS2_CFG_PATH",  $env:TTS_INDEXTTS2_CFG_PATH,  'Process') }
+    if ($env:TTS_COSYVOICE_REPO_DIR)  { [Environment]::SetEnvironmentVariable("ELON_COSYVOICE_REPO_DIR",  $env:TTS_COSYVOICE_REPO_DIR,  'Process') }
+    if ($env:TTS_COSYVOICE_MODEL_DIR) { [Environment]::SetEnvironmentVariable("ELON_COSYVOICE_MODEL_DIR", $env:TTS_COSYVOICE_MODEL_DIR, 'Process') }
+
+    $script:TtsProc = Start-Process -FilePath $pyExe `
+        -ArgumentList "-m", "uvicorn", "model_tts_worker:app", "--host", "127.0.0.1", "--port", $port `
+        -WorkingDirectory $workerDir -WindowStyle Hidden -PassThru -ErrorAction SilentlyContinue
+}
+
+function Stop-TtsWorkerIfRunning {
+    if ($script:TtsProc -and -not $script:TtsProc.HasExited) {
+        try { $script:TtsProc.Kill() } catch {}
+    }
+    $script:TtsProc = $null
 }
 
 function Get-NodeStatus {
@@ -146,6 +199,7 @@ $cm.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 $miExit = New-Object System.Windows.Forms.ToolStripMenuItem("✖  退出（同时停止节点）")
 $miExit.add_Click({
     Stop-Process -Name "elon-node-agent" -Force -ErrorAction SilentlyContinue
+    Stop-TtsWorkerIfRunning
     $tray.Visible = $false
     [System.Windows.Forms.Application]::Exit()
 })
@@ -193,8 +247,7 @@ $timer.add_Tick({ Update-TrayStatus })
 $timer.Start()
 
 # ── 启动 ──────────────────────────────────────────────────────────────────────
-Start-NodeIfNeeded
-Start-Process $adminUrl          # 首次启动时自动打开管理页
+Start-NodeIfNeededStart-TtsWorkerIfNeededStart-Process $adminUrl          # 首次启动时自动打开管理页
 Start-Sleep -Milliseconds 2500
 Update-TrayStatus
 

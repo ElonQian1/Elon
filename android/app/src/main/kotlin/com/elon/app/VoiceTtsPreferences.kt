@@ -33,9 +33,8 @@ internal object VoiceTtsPreferences {
 
     fun setSelectedVoiceId(context: Context, voiceId: String) {
         val safeVoiceId = voiceId.trim()
-        require(VoiceTtsVoiceCatalog.isKnownVoiceId(safeVoiceId)) {
-            "unknown TTS voice id: $safeVoiceId"
-        }
+        // 允许系统 ID、已知 catalog ID，或任意 female_ 前缀 ID（catalog 未加载时也能保存）
+        require(safeVoiceId.isNotEmpty()) { "voice id must not be blank" }
         context.applicationContext
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()

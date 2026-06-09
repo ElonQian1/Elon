@@ -107,6 +107,39 @@ if ($env:GITHUB_TOKEN) {
 New-Item -ItemType Directory -Force -Path $env:DATA_DIR | Out-Null
 New-Item -ItemType Directory -Force -Path $env:WORKSPACE_ROOT | Out-Null
 
+# ── 可选：本地 TTS Worker（情绪女声合成）────────────────────────────────────
+$repoRoot     = Split-Path $PSScriptRoot
+$ttsPort      = if ($env:TTS_WORKER_PORT) { $env:TTS_WORKER_PORT } else { "5011" }
+$ttsPy        = $env:TTS_PYTHON_EXE
+$ttsVenvPy    = Join-Path $repoRoot ".runtime\tts-worker-model\venv\Scripts\python.exe"
+if (-not $ttsPy -and (Test-Path $ttsVenvPy)) { $ttsPy = $ttsVenvPy }
+$ttsWorkerDir = Join-Path $repoRoot "server\tts_worker"
+$ttsWorkerProc = $null
+
+if ($ttsPy -and (Test-Path $ttsPy) -and (Test-Path (Join-Path $ttsWorkerDir "model_tts_worker.py"))) {
+    $env:ELON_TTS_WORKER_HOST    = "127.0.0.1"
+    $env:ELON_TTS_WORKER_PORT    = $ttsPort
+    $env:ELON_TTS_PROVIDER       = if ($env:TTS_PROVIDER) { $env:TTS_PROVIDER } else { "index_tts2" }
+    $env:ELON_TTS_MODEL_PROVIDER = $env:ELON_TTS_PROVIDER
+    $env:ELON_TTS_ASSET_ROOT     = if ($env:TTS_ASSET_ROOT) { $env:TTS_ASSET_ROOT } else { Join-Path $repoRoot "server\assets\tts" }
+    $env:ELON_TTS_WORKER_URL     = "http://127.0.0.1:$ttsPort"
+    Write-Host "[start-local] TTS Worker 启动中（端口 $ttsPort）..." -ForegroundColor Cyan
+    $ttsWorkerProc = Start-Process -FilePath $ttsPy `
+        -ArgumentList "-m", "uvicorn", "model_tts_worker:app", "--host", "127.0.0.1", "--port", $ttsPort `
+        -WorkingDirectory $ttsWorkerDir -WindowStyle Hidden -PassThru -ErrorAction SilentlyContinue
+    if ($ttsWorkerProc) {
+        Write-Host "[start-local] TTS Worker PID=$($ttsWorkerProc.Id)，情绪女声已就绪" -ForegroundColor Green
+    }
+} else {
+    Write-Host "[start-local] TTS Worker 未启动（未配置 TTS_PYTHON_EXE 或 venv 不存在）" -ForegroundColor DarkYellow
+    Write-Host "[start-local]   如需启用：运行 scripts\setup-indextts2-runtime.ps1，或设置 TTS_PYTHON_EXE" -ForegroundColor DarkYellow
+}
+Register-EngineEvent PowerShell.Exiting -Action {
+    if ($ttsWorkerProc -and -not $ttsWorkerProc.HasExited) {
+        try { $ttsWorkerProc.Kill() } catch {}
+    }
+} | Out-Null
+
 # ── 启动服务 ────────────────────────────────────────────────────────────────
 Write-Host "[start-local] 启动中... (Ctrl+C 停止)"
 cargo run --manifest-path "$PSScriptRoot\..\server\Cargo.toml"
