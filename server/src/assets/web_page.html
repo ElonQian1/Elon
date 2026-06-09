@@ -1520,6 +1520,35 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </div>
 </div>
 
+<!-- ============ 项目协作权限对话框 ============ -->
+<div class="modal-mask" id="projectVisibilityMask">
+  <form class="modal" id="projectVisibilityForm">
+    <h2>协作权限 / 商城公开</h2>
+    <p id="projectVisibilityTitle" style="color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0">选择项目可见范围和加入方式。</p>
+    <div>
+      <label for="projectVisibilityMode">可见范围</label>
+      <select id="projectVisibilityMode">
+        <option value="private">私有邀请项目</option>
+        <option value="public">发布到项目商城</option>
+      </select>
+    </div>
+    <div>
+      <label for="projectVisibilityJoinMode">加入方式</label>
+      <select id="projectVisibilityJoinMode">
+        <option value="open">公开加入</option>
+        <option value="approval">申请审批</option>
+        <option value="readonly">只读加入</option>
+        <option value="invite">仅邀请</option>
+      </select>
+    </div>
+    <div class="error-text" id="projectVisibilityError"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="cancelProjectVisibilityBtn">取消</button>
+      <button type="submit" class="btn-confirm" id="saveProjectVisibilityBtn">保存</button>
+    </div>
+  </form>
+</div>
+
 <!-- ============ 网页原生能力提示 ============ -->
 <div class="modal-mask" id="nativeOnlyMask">
   <div class="modal">
@@ -1679,6 +1708,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectGitMask = $('projectGitMask');
   const projectGitContent = $('projectGitContent');
   const closeProjectGitBtn = $('closeProjectGitBtn');
+  const projectVisibilityMask = $('projectVisibilityMask');
+  const projectVisibilityForm = $('projectVisibilityForm');
+  const projectVisibilityTitle = $('projectVisibilityTitle');
+  const projectVisibilityMode = $('projectVisibilityMode');
+  const projectVisibilityJoinMode = $('projectVisibilityJoinMode');
+  const projectVisibilityError = $('projectVisibilityError');
+  const cancelProjectVisibilityBtn = $('cancelProjectVisibilityBtn');
+  const saveProjectVisibilityBtn = $('saveProjectVisibilityBtn');
   const nativeOnlyMask = $('nativeOnlyMask');
   const nativeOnlyText = $('nativeOnlyText');
   const nativeOnlyCloseBtn = $('nativeOnlyCloseBtn');
@@ -1704,6 +1741,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let appSocket = null;
   let busy = false;
   let progressLog = [];
+  let pendingVisibilityProject = null;
   let searchQuery = '';
   let selectedAgent = '';
   let agentOptions = [];
@@ -3528,7 +3566,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     openProject: (project) => {
       switchTab('chatPage');
       selectProject(project);
-    }
+    },
+    openProjectGit: openProjectGitDialog,
+    openProjectProgress: openProjectProgressDialog,
+    openProjectVisibility,
+    deleteProject: openDeleteConfirm,
+    leaveProject: confirmLeaveProject
   };
 
   // ====== AI 记忆列表 ======
@@ -3798,36 +3841,75 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     switchTab('chatPage');
     setBusy(true);
   });
-  projectRecordBtn.addEventListener('click', () => {
-    if (!progressLog.length) {
-      progressLogContent.textContent = '暂无进度记录。\n开始开发后，AI 每一步执行状态都会记录在这里。';
-    } else {
+  function projectNameOf(project) {
+    return (project && (project.name || project.title)) || '未命名项目';
+  }
+
+  function boolLike(value) {
+    return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+  }
+
+  function roleOfProject(project) {
+    return String((project && project.role) || '').trim().toLowerCase();
+  }
+
+  function closeActiveProjectIfMatches(project) {
+    if (!project || !currentProject || currentProject.id !== project.id) return;
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    currentProject = null;
+    progressLog = [];
+    chatView.classList.add('hidden');
+    conversationList.classList.remove('hidden');
+    inputBar.classList.remove('active');
+    backBtn.style.display = 'none';
+    resetProjectPage();
+    switchTab('chatPage');
+  }
+
+  function openProjectProgressDialog(project = currentProject) {
+    if (!project) {
+      window.alert('请先选择一个项目，再查看项目记录。');
+      return;
+    }
+    const isActiveProject = currentProject && currentProject.id === project.id;
+    if (isActiveProject && progressLog.length) {
       progressLogContent.textContent = progressLog
         .map((m, i) => '【步骤 ' + (i + 1) + '】\n' + m)
         .join('\n\n');
+    } else {
+      progressLogContent.textContent = [
+        '项目：' + projectNameOf(project),
+        '当前状态：' + (project.last_task_status || project.status || '准备就绪'),
+        project.updated_at ? '更新时间：' + project.updated_at : '',
+        '',
+        isActiveProject
+          ? '暂无进度记录。开始开发后，AI 每一步执行状态都会记录在这里。'
+          : '这是项目当前摘要。进入该项目并开始开发后，会显示本轮开发的详细进度记录。'
+      ].filter(Boolean).join('\n');
     }
     progressLogMask.classList.add('active');
-  });
+  }
+  projectRecordBtn.addEventListener('click', () => openProjectProgressDialog(currentProject));
   closeProgressLogBtn.addEventListener('click', () => progressLogMask.classList.remove('active'));
   progressLogMask.addEventListener('click', (e) => { if (e.target === progressLogMask) progressLogMask.classList.remove('active'); });
   closeProjectGitBtn.addEventListener('click', () => projectGitMask.classList.remove('active'));
   projectGitMask.addEventListener('click', (e) => { if (e.target === projectGitMask) projectGitMask.classList.remove('active'); });
-  projectGitBtn.addEventListener('click', async () => {
-    if (!currentProject || !currentUser) {
-      showNativeOnly('请先进入一个项目，再查看 Git 仓库。');
+  async function openProjectGitDialog(project = currentProject) {
+    if (!project || !currentUser) {
+      window.alert('请先登录并选择一个项目，再查看 Git 仓库。');
       return;
     }
     projectGitContent.textContent = '加载中...';
     projectGitMask.classList.add('active');
     try {
       const url = '/api/user/' + encodeURIComponent(currentUser.id)
-        + '/projects/' + encodeURIComponent(currentProject.id)
-        + '/git/status?title=' + encodeURIComponent(currentProject.name || '');
+        + '/projects/' + encodeURIComponent(project.id)
+        + '/git/status?title=' + encodeURIComponent(projectNameOf(project));
       const res = await api(url);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       projectGitContent.textContent = formatProjectGitStatus(data);
-      if (data.workflow && Array.isArray(data.workflow.steps)) {
+      if (currentProject && currentProject.id === project.id && data.workflow && Array.isArray(data.workflow.steps)) {
         projectWorkflowText.textContent = [
           data.workflow.title || '通用项目工作流',
           ...data.workflow.steps.map((step, index) => (index + 1) + '. ' + String(step).split('：')[0]),
@@ -3839,7 +3921,76 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     } catch (err) {
       projectGitContent.textContent = '读取 Git 状态失败：' + ((err && err.message) ? err.message : '请稍后重试');
     }
+  }
+  projectGitBtn.addEventListener('click', () => openProjectGitDialog(currentProject));
+
+  function syncProjectVisibilityControls() {
+    const isPublic = projectVisibilityMode.value === 'public';
+    projectVisibilityJoinMode.disabled = !isPublic;
+    if (!isPublic) projectVisibilityJoinMode.value = 'invite';
+    else if (projectVisibilityJoinMode.value === 'invite') projectVisibilityJoinMode.value = 'open';
+  }
+
+  function openProjectVisibility(project) {
+    if (!project) return;
+    const role = roleOfProject(project);
+    if (role && role !== 'owner') {
+      window.alert('只有项目 owner 可以修改协作权限和商城公开状态。');
+      return;
+    }
+    pendingVisibilityProject = project;
+    projectVisibilityTitle.textContent = '项目「' + projectNameOf(project) + '」的可见范围和加入方式。';
+    projectVisibilityMode.value = boolLike(project.is_public || project.isPublic) ? 'public' : 'private';
+    projectVisibilityJoinMode.value = project.join_mode || project.joinMode || (projectVisibilityMode.value === 'public' ? 'open' : 'invite');
+    projectVisibilityError.textContent = '';
+    saveProjectVisibilityBtn.disabled = false;
+    syncProjectVisibilityControls();
+    projectVisibilityMask.classList.add('active');
+  }
+
+  function closeProjectVisibility() {
+    projectVisibilityMask.classList.remove('active');
+    pendingVisibilityProject = null;
+  }
+
+  cancelProjectVisibilityBtn.addEventListener('click', closeProjectVisibility);
+  projectVisibilityMask.addEventListener('click', (e) => { if (e.target === projectVisibilityMask) closeProjectVisibility(); });
+  projectVisibilityMode.addEventListener('change', syncProjectVisibilityControls);
+  projectVisibilityForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!pendingVisibilityProject) return;
+    saveProjectVisibilityBtn.disabled = true;
+    projectVisibilityError.textContent = '';
+    const isPublic = projectVisibilityMode.value === 'public';
+    const joinMode = isPublic ? projectVisibilityJoinMode.value : 'invite';
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(pendingVisibilityProject.id) + '/visibility', {
+        method: 'PATCH',
+        body: JSON.stringify({ is_public: isPublic, join_mode: joinMode })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      closeProjectVisibility();
+      await loadProjects();
+    } catch (err) {
+      projectVisibilityError.textContent = '保存失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      saveProjectVisibilityBtn.disabled = false;
+    }
   });
+
+  async function confirmLeaveProject(project) {
+    if (!project) return;
+    if (!window.confirm('确定退出项目「' + projectNameOf(project) + '」吗？退出后它会从你的项目列表移除。')) return;
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(project.id) + '/leave', { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      closeActiveProjectIfMatches(project);
+      await loadProjects();
+    } catch (err) {
+      window.alert('退出项目失败：' + ((err && err.message) ? err.message : '请稍后重试'));
+    }
+  }
   projectSettingsBtn.addEventListener('click', openAgentDialog);
 
   // ====== 启动 ======

@@ -1,5 +1,12 @@
 (function () {
   const ROOT_ID = 'projectHomeRoot';
+  const LONG_PRESS_MS = 520;
+
+  const actionMenuState = {
+    projectId: '',
+    pressTimer: null,
+    suppressNextOpen: false
+  };
 
   function bridge() {
     return window.ElonWebApp || {};
@@ -19,6 +26,10 @@
   function projects() {
     const app = bridge();
     return typeof app.getProjects === 'function' ? app.getProjects() : [];
+  }
+
+  function projectById(id) {
+    return projects().find((item) => item && String(item.id) === String(id));
   }
 
   const plazaBannerState = {
@@ -213,7 +224,8 @@
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     return `
-      <button class="project-home-card ${active ? 'active' : ''}" type="button" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}">
+      <div class="project-home-card ${active ? 'active' : ''}" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
+        <button class="project-home-more" type="button" data-project-home-action="menu" data-project-id="${escapeHtml(project.id)}" aria-label="项目操作" title="项目操作">...</button>
         ${renderProjectThumb(project)}
         <span class="project-home-info">
           <span class="project-home-title-row">
@@ -222,7 +234,18 @@
           </span>
           <span class="project-home-meta">${escapeHtml(meta)}</span>
         </span>
-      </button>
+      </div>
+    `;
+  }
+
+  function renderProjectActionThumb(project) {
+    const iconUrl = iconUrlOf(project);
+    const label = escapeHtml(projectInitial(project));
+    return `
+      <span class="project-home-action-thumb" aria-hidden="true">
+        ${label}
+        ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+      </span>
     `;
   }
 
@@ -242,15 +265,128 @@
     root.innerHTML = [
       renderPlazaBanner(),
       renderSection('个人项目', personal, 'create'),
-      renderSection('联合项目', joint, null)
+      renderSection('联合项目', joint, null),
+      renderActionMenu()
     ].join('');
+  }
+
+  function renderActionMenu() {
+    const project = actionMenuState.projectId ? projectById(actionMenuState.projectId) : null;
+    if (!project) return '';
+    const joint = isJointProject(project);
+    const status = projectStatusText(project, joint);
+    return `
+      <div class="project-home-action-mask" data-project-home-action="close-menu" role="dialog" aria-modal="true" aria-label="项目操作">
+        <div class="project-home-action-panel" data-project-home-menu-panel>
+          <div class="project-home-action-header">
+            ${renderProjectActionThumb(project)}
+            <span class="project-home-action-head-text">
+              <span class="project-home-action-title">${escapeHtml(titleOf(project))}</span>
+              <span class="project-home-action-status ${joint ? 'joint' : 'personal'}">${escapeHtml(status)}</span>
+            </span>
+          </div>
+          <div class="project-home-action-list">
+            ${projectActionRows(project, joint).map(renderActionRow).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function projectStatusText(project, joint) {
+    if (!joint) return '个人项目 · 开发会话';
+    const joinMode = String(project.join_mode || project.joinMode || 'invite').trim();
+    if (joinMode === 'open') return '联合项目 · 商城公开';
+    if (joinMode === 'readonly') return '联合项目 · 广场只读';
+    if (joinMode === 'approval') return '联合项目 · 加入需审批';
+    return '联合项目 · 邀请协作';
+  }
+
+  function projectActionRows(project, joint) {
+    const role = roleOf(project);
+    const isOwner = !role || role === 'owner';
+    const rows = [
+      {
+        action: 'open',
+        icon: '开',
+        title: '打开项目空间',
+        subtitle: joint ? '进入联合协作空间' : '进入项目开发会话'
+      },
+      {
+        action: 'git',
+        icon: 'G',
+        title: 'Git 仓库',
+        subtitle: '查看或配置项目远端'
+      },
+      {
+        action: 'record',
+        icon: '记',
+        title: '项目记录',
+        subtitle: '查看开发进度和最近状态'
+      }
+    ];
+    if (isOwner) {
+      rows.push({
+        action: 'visibility',
+        icon: '权',
+        title: '协作权限 / 商城公开',
+        subtitle: '管理加入方式和可见范围'
+      });
+    }
+    if (isOwner && projects().length > 1 && project.id !== 'elon-self') {
+      rows.push({
+        action: 'delete',
+        icon: '删',
+        title: '删除项目',
+        subtitle: '从服务器和列表移除',
+        danger: true
+      });
+    } else if (!isOwner) {
+      rows.push({
+        action: 'leave',
+        icon: '退',
+        title: '退出项目',
+        subtitle: '移出我的项目列表',
+        danger: true
+      });
+    }
+    return rows;
+  }
+
+  function renderActionRow(row) {
+    return `
+      <button class="project-home-action-row ${row.danger ? 'danger' : ''}" type="button" data-project-home-action="${escapeHtml(row.action)}" data-project-id="${escapeHtml(actionMenuState.projectId)}">
+        <span class="project-home-action-icon" aria-hidden="true">${escapeHtml(row.icon)}</span>
+        <span class="project-home-action-copy">
+          <span class="project-home-action-name">${escapeHtml(row.title)}</span>
+          <span class="project-home-action-subtitle">${escapeHtml(row.subtitle)}</span>
+        </span>
+      </button>
+    `;
   }
 
   function attachEvents(root) {
     if (root.dataset.projectHomeReady === 'true') return;
     root.dataset.projectHomeReady = 'true';
     root.addEventListener('click', handleAction);
+    root.addEventListener('contextmenu', handleContextMenu);
+    root.addEventListener('pointerdown', handlePointerDown);
+    root.addEventListener('pointerup', clearLongPress);
+    root.addEventListener('pointercancel', clearLongPress);
+    root.addEventListener('pointerleave', clearLongPress);
     root.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && actionMenuState.projectId) {
+        event.preventDefault();
+        closeActionMenu();
+        return;
+      }
+      if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+        const card = event.target.closest('.project-home-card[data-project-id]');
+        if (!card) return;
+        event.preventDefault();
+        openActionMenu(card.dataset.projectId);
+        return;
+      }
       if (event.key !== 'Enter' && event.key !== ' ') return;
       const actionEl = event.target.closest('[data-project-home-action]');
       if (!actionEl) return;
@@ -262,12 +398,73 @@
   function handleAction(event) {
     const actionEl = event.target.closest('[data-project-home-action]');
     if (!actionEl) return;
+    if (
+      actionMenuState.suppressNextOpen &&
+      actionEl.dataset.projectHomeAction === 'open' &&
+      actionEl.classList.contains('project-home-card')
+    ) {
+      actionMenuState.suppressNextOpen = false;
+      event.preventDefault();
+      return;
+    }
+    if (
+      actionEl.dataset.projectHomeAction === 'close-menu' &&
+      event.target.closest('[data-project-home-menu-panel]')
+    ) {
+      return;
+    }
+    event.preventDefault();
     runAction(actionEl);
+  }
+
+  function handleContextMenu(event) {
+    const card = event.target.closest('.project-home-card[data-project-id]');
+    if (!card) return;
+    event.preventDefault();
+    clearLongPress();
+    openActionMenu(card.dataset.projectId);
+  }
+
+  function handlePointerDown(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const card = event.target.closest('.project-home-card[data-project-id]');
+    if (!card || event.target.closest('.project-home-more')) return;
+    clearLongPress();
+    actionMenuState.pressTimer = window.setTimeout(() => {
+      actionMenuState.pressTimer = null;
+      actionMenuState.suppressNextOpen = true;
+      openActionMenu(card.dataset.projectId);
+    }, LONG_PRESS_MS);
+  }
+
+  function clearLongPress() {
+    if (!actionMenuState.pressTimer) return;
+    window.clearTimeout(actionMenuState.pressTimer);
+    actionMenuState.pressTimer = null;
+  }
+
+  function openActionMenu(projectId) {
+    if (!projectById(projectId)) return;
+    actionMenuState.projectId = String(projectId);
+    render();
+  }
+
+  function closeActionMenu() {
+    actionMenuState.projectId = '';
+    render();
   }
 
   function runAction(actionEl) {
     const action = actionEl.dataset.projectHomeAction;
     const app = bridge();
+    if (action === 'close-menu') {
+      closeActionMenu();
+      return;
+    }
+    if (action === 'menu') {
+      openActionMenu(actionEl.dataset.projectId);
+      return;
+    }
     if (action === 'create') {
       if (typeof app.openNewProject === 'function') app.openNewProject();
       return;
@@ -278,8 +475,37 @@
     }
     if (action === 'open') {
       const id = actionEl.dataset.projectId;
-      const project = projects().find((item) => item && item.id === id);
+      const project = projectById(id);
+      if (actionMenuState.projectId) closeActionMenu();
       if (project && typeof app.openProject === 'function') app.openProject(project);
+      return;
+    }
+
+    const project = projectById(actionEl.dataset.projectId);
+    if (!project) {
+      closeActionMenu();
+      return;
+    }
+    closeActionMenu();
+    if (action === 'git' && typeof app.openProjectGit === 'function') {
+      app.openProjectGit(project);
+      return;
+    }
+    if (action === 'record' && typeof app.openProjectProgress === 'function') {
+      app.openProjectProgress(project);
+      return;
+    }
+    if (action === 'visibility' && typeof app.openProjectVisibility === 'function') {
+      app.openProjectVisibility(project);
+      return;
+    }
+    if (action === 'delete' && typeof app.deleteProject === 'function') {
+      app.deleteProject(project);
+      return;
+    }
+    if (action === 'leave' && typeof app.leaveProject === 'function') {
+      app.leaveProject(project);
+      return;
     }
   }
 
