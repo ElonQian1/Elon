@@ -465,6 +465,25 @@
       color: #f7d28a;
     }
     .workspace-health-warnings li + li { margin-top: 4px; }
+    .workspace-health-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .workspace-health-action {
+      border: 1px solid rgba(129,179,217,0.35);
+      border-radius: 6px;
+      background: rgba(129,179,217,0.12);
+      color: var(--ink);
+      padding: 7px 11px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .workspace-health-action:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
     @media (max-width: 640px) {
       .workspace-health-grid { grid-template-columns: 1fr; }
       .workspace-health-head { align-items: flex-start; flex-direction: column; }
@@ -1745,6 +1764,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectRecordBtn = $('projectRecordBtn');
   const projectGitBtn = $('projectGitBtn');
   const projectSettingsBtn = $('projectSettingsBtn');
+  if (projectWorkspaceHealth) {
+    projectWorkspaceHealth.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-workspace-recovery]');
+      if (!button) return;
+      event.preventDefault();
+      recoverProjectWorkspace(button.dataset.workspaceRecovery || '');
+    });
+  }
 
   const profileAvatar = $('profileAvatar');
   const profileNickname = $('profileNickname');
@@ -2702,15 +2729,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const inspect = data.live_inspect || null;
     const node = data.node || null;
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
-    let tone = 'warn';
-    let label = '待处理';
-    if (data.verified_can_run_on_pc === true) {
+    let tone = data.health_tone || data.healthTone || 'warn';
+    let label = data.health_label || data.healthLabel || '待处理';
+    if (!data.health_label && !data.healthLabel && data.verified_can_run_on_pc === true) {
       tone = warnings.length ? 'warn' : 'ok';
       label = warnings.length ? '可运行，有提醒' : '可运行';
-    } else if (data.verified_can_run_on_pc === false || data.can_run_on_pc === false) {
+    } else if (!data.health_label && !data.healthLabel && (data.verified_can_run_on_pc === false || data.can_run_on_pc === false)) {
       tone = 'bad';
       label = '不可运行';
-    } else if (data.can_run_on_pc) {
+    } else if (!data.health_label && !data.healthLabel && data.can_run_on_pc) {
       tone = 'warn';
       label = data.inspect_error ? '未验证' : '可调度';
     }
@@ -2746,11 +2773,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const warningHtml = warnings.length
       ? '<ul class="workspace-health-warnings">' + warnings.map((warning) => '<li>' + escapeHtml(warning) + '</li>').join('') + '</ul>'
       : '';
+    const actionHtml = renderWorkspaceRecoveryActions(data);
     projectWorkspaceHealth.innerHTML = [
       '<div class="workspace-health-head">',
       '<div class="workspace-health-title">PC 工作区</div>',
       '<div class="workspace-health-pill ' + tone + '">' + escapeHtml(label) + '</div>',
       '</div>',
+      data.recommended_action || data.recommendedAction
+        ? '<div>' + escapeHtml(data.recommended_action || data.recommendedAction) + '</div>'
+        : '',
       '<div class="workspace-health-grid">',
       rows.map((row) => [
         '<div class="workspace-health-item">',
@@ -2759,7 +2790,26 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         '</div>'
       ].join('')).join(''),
       '</div>',
-      warningHtml
+      warningHtml,
+      actionHtml
+    ].join('');
+  }
+  function renderWorkspaceRecoveryActions(data) {
+    const actions = Array.isArray(data.recovery_actions)
+      ? data.recovery_actions
+      : (Array.isArray(data.recoveryActions) ? data.recoveryActions : []);
+    const runnable = actions.filter((action) => action && action.available && action.key !== 'repair_cli');
+    if (!runnable.length) return '';
+    return [
+      '<div class="workspace-health-actions">',
+      runnable.map((action) => [
+        '<button class="workspace-health-action" type="button"',
+        ' data-workspace-recovery="' + escapeHtml(action.key) + '"',
+        ' title="' + escapeHtml(action.description || '') + '">',
+        escapeHtml(action.label || action.key),
+        '</button>'
+      ].join('')).join(''),
+      '</div>'
     ].join('');
   }
   async function loadProjectWorkspaceHealth(project) {
@@ -2775,6 +2825,28 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     } catch (err) {
       if (!currentProject || currentProject.id !== project.id || requestSeq !== projectHealthRequestSeq) return;
       resetProjectWorkspaceHealth('检查失败', 'bad', (err && err.message) ? err.message : '请稍后重试');
+    }
+  }
+  async function recoverProjectWorkspace(action) {
+    if (!currentProject || !currentProject.id || !token || !action) return;
+    if (action === 'migrate_workspace' || action === 'bind_pc_node') {
+      const ok = window.confirm('将通过你的在线 PC 节点重新准备项目目录并更新项目绑定，是否继续？');
+      if (!ok) return;
+    }
+    resetProjectWorkspaceHealth('处理中', 'warn', '正在通过 PC 节点处理项目工作区。');
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(currentProject.id) + '/workspace/recover', {
+        method: 'POST',
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      await loadProjects();
+      const latest = projects.find((item) => item.id === currentProject.id) || currentProject;
+      selectProject(latest);
+      window.alert(data.message || 'PC 工作区已处理');
+    } catch (err) {
+      resetProjectWorkspaceHealth('处理失败', 'bad', (err && err.message) ? err.message : '请稍后重试');
     }
   }
   function resetProjectPage() {

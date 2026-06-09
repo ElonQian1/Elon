@@ -12,7 +12,7 @@ pub struct PcProjectWorkspace {
 
 pub async fn resolve_pc_project_node(
     state: &AppState,
-    _user_id: &str,
+    user_id: &str,
     requested_node_id: Option<&str>,
 ) -> Result<String, (StatusCode, String)> {
     let cli_agents = connected_cli_agents(state).await;
@@ -33,19 +33,74 @@ pub async fn resolve_pc_project_node(
                 format!("PC 节点不支持 Codex/Copilot CLI: {node_id}"),
             ));
         }
+        ensure_pc_project_node_owner(state, user_id, node_id).await?;
         return Ok(node_id.to_string());
     }
 
-    match cli_agents.len() {
-        1 => Ok(cli_agents[0].agent_id.clone()),
-        0 => Err((
+    let mut owned = Vec::new();
+    let mut legacy = Vec::new();
+    for agent in &cli_agents {
+        match state.store.get_node_credential_owner(&agent.agent_id) {
+            Ok(Some(owner)) if owner == user_id => owned.push(agent.agent_id.clone()),
+            Ok(Some(_)) => {}
+            Ok(None) => legacy.push(agent.agent_id.clone()),
+            Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+        }
+    }
+
+    match owned.len() {
+        1 => return Ok(owned.remove(0)),
+        n if n > 1 => {
+            return Err((
+                StatusCode::CONFLICT,
+                "检测到多个属于你的在线 PC CLI 节点，请在请求中指定 node_id".into(),
+            ));
+        }
+        _ => {}
+    }
+
+    match legacy.len() {
+        1 => Ok(legacy.remove(0)),
+        n if n > 1 => Err((
+            StatusCode::CONFLICT,
+            "检测到多个未绑定账号的旧版在线 PC CLI 节点，请在请求中指定 node_id".into(),
+        )),
+        _ if cli_agents.is_empty() => Err((
             StatusCode::SERVICE_UNAVAILABLE,
             "当前没有在线 PC 节点，无法新建代码项目。请先启动 PC 节点后重试。".into(),
         )),
         _ => Err((
-            StatusCode::CONFLICT,
-            "检测到多个在线 PC 节点，请在请求中指定 node_id".into(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "当前没有属于你的在线 PC 节点，无法新建代码项目。请先启动你的 PC 节点后重试。".into(),
         )),
+    }
+}
+
+pub async fn ensure_pc_project_node_owner(
+    state: &AppState,
+    user_id: &str,
+    node_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    match state.store.get_node_credential_owner(node_id) {
+        Ok(Some(owner)) if owner == user_id => Ok(()),
+        Ok(Some(_)) => Err((StatusCode::FORBIDDEN, "该 PC 节点不属于当前用户".into())),
+        Ok(None) => {
+            let connected = state
+                .agent_manager
+                .list()
+                .await
+                .into_iter()
+                .any(|agent| agent.agent_id == node_id);
+            if connected {
+                Ok(())
+            } else {
+                Err((
+                    StatusCode::NOT_FOUND,
+                    format!("PC 节点未注册或不在线: {node_id}"),
+                ))
+            }
+        }
+        Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
 

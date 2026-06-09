@@ -7,9 +7,13 @@ internal fun ArchiveProjectRecord.toStoreProject(ownerAccountFallback: String?):
         name = name,
         description = description,
         template = "android",
-        ownerAccount = ownerAccount?.takeIf { it.isNotBlank() && it != "?" }
-            ?: ownerAccountFallback?.takeIf { it.isNotBlank() }
-            ?: "?",
+        ownerAccount = if (!systemKey.isNullOrBlank()) {
+            SYSTEM_ARCHIVE_OWNER_ACCOUNT
+        } else {
+            ownerAccount?.takeIf { it.isNotBlank() && it != "?" }
+                ?: ownerAccountFallback?.takeIf { it.isNotBlank() }
+                ?: "?"
+        },
         ownerUserId = ownerUserId.orEmpty(),
         memberCount = memberCount.coerceAtLeast(0),
         isPublic = isPublic,

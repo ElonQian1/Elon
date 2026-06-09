@@ -364,7 +364,7 @@ internal class ProjectManagementHomeView(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
 
-            projectCode(project)?.let { code ->
+            project.projectCardCode()?.let { code ->
                 addView(View(activity).apply {
                     setBackgroundColor(Color.parseColor("#A6AFBD"))
                     alpha = 0.72f
@@ -389,6 +389,22 @@ internal class ProjectManagementHomeView(
                 ).apply {
                     topMargin = dp(10)
                 })
+                project.projectCardIntroduction()?.let { intro ->
+                    addView(TextView(activity).apply {
+                        includeFontPadding = false
+                        text = intro
+                        maxLines = 2
+                        ellipsize = TextUtils.TruncateAt.END
+                        setTextColor(Color.parseColor("#7D8795"))
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                        setLineSpacing(dp(2).toFloat(), 1.0f)
+                    }, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = dp(6)
+                    })
+                }
             }
         }
     }
@@ -526,18 +542,14 @@ internal class ProjectManagementHomeView(
     }
 
     private fun projectOwner(project: AppProject): String {
+        if (project.isSystemArchiveProject()) return SYSTEM_ARCHIVE_OWNER_ACCOUNT
         cleanProjectText(project.ownerAccount)?.let { return it }
-        if (project.isSystemArchiveProject()) return "一龙"
         if (project.isJointDevelopmentProject()) return "未知"
         return AuthManager.displayName(activity).takeIf { it.isNotBlank() } ?: "未知"
     }
 
     private fun projectMemberCount(project: AppProject): Int {
         return project.memberCount?.coerceAtLeast(0) ?: if (project.isJointDevelopmentProject()) 0 else 1
-    }
-
-    private fun projectCode(project: AppProject): String? {
-        return cleanProjectText(project.projectDescription)
     }
 
     private fun cleanProjectText(value: String?): String? {

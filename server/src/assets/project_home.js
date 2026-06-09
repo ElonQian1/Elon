@@ -223,9 +223,9 @@
   }
 
   function ownerOf(project) {
+    if (isSystemProject(project)) return '系统';
     const owner = project.owner_account || project.ownerAccount || project.created_by_account || project.owner;
     if (owner) return owner;
-    if (isSystemProject(project)) return '一龙';
     return isJointProject(project) ? '未知' : currentDisplayName();
   }
 
@@ -237,7 +237,27 @@
   }
 
   function projectCodeOf(project) {
+    if (isSystemProject(project)) {
+      const key = systemKeyOf(project);
+      if (key) return key;
+      const sourceType = sourceTypeOf(project);
+      if (sourceType === 'agent_balloon') return 'phone_control';
+      if (sourceType === 'chat_memory') return 'chat_memory';
+    }
     return String(project.project_description || project.projectDescription || project.description || '').trim();
+  }
+
+  function projectIntroOf(project) {
+    if (!isSystemProject(project)) return '';
+    const key = systemKeyOf(project);
+    const sourceType = sourceTypeOf(project);
+    if (key === 'phone_control' || sourceType === 'agent_balloon') {
+      return '保存悬浮球手机控制的会话记录、自动化脚本和专属记忆。';
+    }
+    if (key === 'chat_memory' || sourceType === 'chat_memory') {
+      return '保存普通聊天的会话记录、用户偏好和长期记忆。';
+    }
+    return '保存系统固定入口的会话记录和专属记忆。';
   }
 
   function renderBannerIcon(project, slot, extraClass) {
@@ -321,6 +341,7 @@
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     const projectCode = projectCodeOf(project);
+    const projectIntro = projectIntroOf(project);
     return `
       <div class="project-home-card ${active ? 'active' : ''}" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
         <button class="project-home-more" type="button" data-project-home-action="menu" data-project-id="${escapeHtml(project.id)}" aria-label="项目操作" title="项目操作">...</button>
@@ -335,6 +356,7 @@
           ${projectCode ? `
             <span class="project-home-card-divider" aria-hidden="true"></span>
             <span class="project-home-code">项目代号：${escapeHtml(projectCode)}</span>
+            ${projectIntro ? `<span class="project-home-intro">${escapeHtml(projectIntro)}</span>` : ''}
           ` : ''}
         </span>
         <span class="project-home-info">

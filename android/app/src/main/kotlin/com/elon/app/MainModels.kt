@@ -2,6 +2,8 @@ package com.elon.app
 
 import java.io.File
 
+internal const val SYSTEM_ARCHIVE_OWNER_ACCOUNT = "系统"
+
 data class AppConversation(
     val id: String,
     var title: String,
@@ -80,6 +82,23 @@ internal fun AppProject.systemArchiveDisplayName(): String {
     }
 }
 
+internal fun AppProject.projectCardCode(): String? {
+    return if (isSystemArchiveProject()) {
+        normalizedSystemProjectKey()?.lowercase()
+    } else {
+        cleanProjectCardText(projectDescription)
+    }
+}
+
+internal fun AppProject.projectCardIntroduction(): String? {
+    return when (normalizedSystemProjectKey()?.lowercase()) {
+        "phone_control" -> "保存悬浮球手机控制的会话记录、自动化脚本和专属记忆。"
+        "chat_memory" -> "保存普通聊天的会话记录、用户偏好和长期记忆。"
+        null -> null
+        else -> "保存系统固定入口的会话记录和专属记忆。"
+    }
+}
+
 internal fun AppProject.projectSpaceId(): String {
     return collaborationProjectId?.trim()?.takeIf { it.isNotBlank() } ?: id
 }
@@ -102,6 +121,11 @@ internal fun AppProject.markPersonalDevelopment() {
     collaborationProjectId = null
     collaborationJoinMode = null
     updatedAt = System.currentTimeMillis()
+}
+
+private fun cleanProjectCardText(value: String?): String? {
+    val text = value?.trim().orEmpty()
+    return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
 
 data class ModelOption(

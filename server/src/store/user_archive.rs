@@ -78,9 +78,13 @@ fn archive_project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserArc
         updated_at: row.get(17)?,
     };
     let conversation_count = row.get(18)?;
-    let owner_account = row.get(19)?;
-    let owner_id = row.get(20)?;
     let system_key = system_project_key_for_source_type(&project.source_type).map(str::to_string);
+    let owner_account = if system_key.is_some() {
+        "系统".to_string()
+    } else {
+        row.get(19)?
+    };
+    let owner_id = row.get(20)?;
     let workspace_kind = workspace_kind_for_project(&project).to_string();
 
     Ok(UserArchiveProject {
@@ -167,6 +171,9 @@ mod tests {
         assert!(system_projects
             .iter()
             .all(|item| item.workspace_kind == "system_archive"));
+        assert!(system_projects
+            .iter()
+            .all(|item| item.owner_account == "系统"));
         assert!(system_projects
             .iter()
             .all(|item| item.conversation_count == 0));

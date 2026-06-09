@@ -13,9 +13,10 @@ use crate::{
     billing_api, billing_pay, chat_attachments, friend_api, global_ws, lan_peer, lm_chat, node_api,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_downloads, project_git, project_join_requests, project_membership,
-    project_space, project_store, project_workspace_health, release_claim, speech_translate,
-    token_usage_api, user_api, user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api,
-    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
+    project_space, project_store, project_workspace_health, project_workspace_recovery,
+    release_claim, speech_translate, token_usage_api, user_api, user_archive_api, user_memory_api,
+    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -259,6 +260,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/workspace/health",
             get(project_workspace_health::get_project_workspace_health),
+        )
+        .route(
+            "/api/projects/:project_id/workspace/recover",
+            post(project_workspace_recovery::recover_project_workspace),
         )
         .route(
             "/api/projects/:project_id/conversations/:conversation_id/identity",

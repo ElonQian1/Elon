@@ -95,7 +95,7 @@ pub fn workspace_lifecycle(
             "CLI 不可用",
             "bad",
             "在 PC 节点安装或修复 Codex/Copilot CLI 后重试",
-            vec![repair_cli_action(true), migrate_action(true)],
+            vec![repair_cli_action(false), migrate_action(true)],
         );
     }
     if low_disk {

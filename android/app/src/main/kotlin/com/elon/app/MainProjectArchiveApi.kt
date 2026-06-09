@@ -48,7 +48,11 @@ internal data class ArchiveProjectRecord(
             collaborationJoinMode = joinMode.takeIf { opensAsJoint },
             iconDataUrl = iconDataUrl,
             systemProjectKey = systemKey,
-            ownerAccount = ownerAccount?.takeIf { it.isNotBlank() && it != "?" },
+            ownerAccount = if (isSystem) {
+                SYSTEM_ARCHIVE_OWNER_ACCOUNT
+            } else {
+                ownerAccount?.takeIf { it.isNotBlank() && it != "?" }
+            },
             memberCount = memberCount.coerceAtLeast(0),
             projectDescription = description?.takeIf { it.isNotBlank() },
             remoteConversationCount = conversationCount,
