@@ -78,9 +78,6 @@ pub async fn list_my_projects(State(state): State<Arc<AppState>>, headers: Heade
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    if let Err(e) = ensure_mobile_project(&state, &user.id, "elon-self", Some("一龙项目")) {
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
-    }
 
     match state.store.list_projects_for_user(&user.id) {
         Ok(projects) => Json(serde_json::json!({ "projects": projects })).into_response(),

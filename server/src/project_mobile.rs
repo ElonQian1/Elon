@@ -12,6 +12,11 @@ pub fn ensure_mobile_project(
     project_title: Option<&str>,
 ) -> anyhow::Result<(PublicUser, ProjectAccess)> {
     let user = state.store.ensure_device_user(user_id)?;
+    if project_id == "elon-self" {
+        let project = state.store.get_project_access(&user.id, project_id)?;
+        return Ok((user, project));
+    }
+
     let spec = mobile_project_spec(project_id, project_title);
     let project = state.store.ensure_project_for_user(
         &user.id,

@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    project_auth::{auth_from_headers, json_error, project_access},
+    project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
     project_execution_mode::ProjectExecutionMode,
@@ -715,7 +715,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
 }
 
 fn can_start_channel_ai(role: &str) -> bool {
-    matches!(role, "owner" | "editor" | "member" | "observer")
+    can_edit(role)
 }
 
 fn can_mark_suggestion_updated(role: &str) -> bool {
@@ -761,5 +761,19 @@ impl BlankFallback for str {
         } else {
             self
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::can_start_channel_ai;
+
+    #[test]
+    fn channel_ai_requires_edit_role() {
+        assert!(can_start_channel_ai("owner"));
+        assert!(can_start_channel_ai("editor"));
+        assert!(!can_start_channel_ai("member"));
+        assert!(!can_start_channel_ai("observer"));
+        assert!(!can_start_channel_ai("viewer"));
     }
 }

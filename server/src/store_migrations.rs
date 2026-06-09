@@ -44,6 +44,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (22, "conversations.locked_agent_name 会话首次 CLI 锁定", migration_v22),
     (23, "node_credentials.device_name PC 设备展示名", migration_v23),
     (24, "user_memories 记忆作用域", migration_v24),
+    (25, "收紧一龙自项目默认成员与加入权限", migration_v25),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -923,6 +924,46 @@ fn migration_v24(conn: &Connection) -> Result<()> {
         r#"
         CREATE INDEX IF NOT EXISTS idx_user_memories_scope
           ON user_memories(user_id, scope_type, scope_id, importance DESC, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v25：一龙自项目不再默认让所有用户加入 ─────────────────────────────────────
+
+fn migration_v25(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        UPDATE projects
+           SET join_mode = 'readonly',
+               updated_at = datetime('now')
+         WHERE id = 'elon-self'
+           AND status != 'deleted';
+
+        INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
+        SELECT id, created_by, 'owner', datetime('now')
+          FROM projects
+         WHERE id = 'elon-self'
+           AND status != 'deleted';
+
+        UPDATE project_members
+           SET role = 'owner'
+         WHERE project_id = 'elon-self'
+           AND user_id IN (
+             SELECT created_by
+               FROM projects
+              WHERE id = 'elon-self'
+                AND status != 'deleted'
+           );
+
+        DELETE FROM project_members
+         WHERE project_id = 'elon-self'
+           AND user_id NOT IN (
+             SELECT created_by
+               FROM projects
+              WHERE id = 'elon-self'
+                AND status != 'deleted'
+           );
         "#,
     )?;
     Ok(())
