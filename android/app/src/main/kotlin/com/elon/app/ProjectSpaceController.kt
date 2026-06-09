@@ -47,6 +47,7 @@ internal class ProjectSpaceController(
     private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private var pendingMemberBack: ProjectMember? = null
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -107,6 +108,13 @@ internal class ProjectSpaceController(
     }
 
     fun renderActiveSpace() {
+        // 从个人会话返回时，若来源是成员会话列表，恢复到成员会话列表而不是顶层空间
+        val backMember = pendingMemberBack
+        if (backMember != null) {
+            pendingMemberBack = null
+            renderMemberConversationList(backMember)
+            return
+        }
         val space = activeSpace ?: return
         val container = binding.projectContentLayout
         container.removeAllViews()
@@ -520,12 +528,54 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun openPersonalConversationById(conversationId: String) {
+    private fun openPersonalConversationById(conversationId: String, fromMember: ProjectMember? = null) {
         val index = personalConversations().indexOfFirst { it.id == conversationId }
         if (index >= 0) {
+            if (fromMember != null) pendingMemberBack = fromMember
             openPersonalAiChat(index)
         } else {
             Toast.makeText(activity, "找不到该会话，可能已删除", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun localPersonalConversationCard(index: Int, conv: AppConversation, member: ProjectMember): LinearLayout {
+        val active = index == activePersonalConversationIndex()
+        val working = isPersonalConversationWorking(index)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+            val rowBackground = panelBackground(if (active) "#283140" else "#181B20")
+            background = rowBackground
+            if (working) startProjectConversationShimmer(this, rowBackground)
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener {
+                pendingMemberBack = member
+                openPersonalAiChat(index)
+            }
+            setOnLongClickListener {
+                showPersonalConversationActions(index)
+                true
+            }
+            addView(TextView(activity).apply {
+                text = buildString {
+                    append(conv.title.ifBlank { "个人会话 ${index + 1}" })
+                    if (active) append("  ·  当前")
+                    if (conv.ended) append("  ·  已结束")
+                }
+                textSize = 16f
+                setTextColor(Color.parseColor("#F2F5FA"))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+            addView(TextView(activity).apply {
+                text = personalConversationHint(conv)
+                textSize = 12f
+                setTextColor(Color.parseColor("#6F7785"))
+                setPadding(0, dp(5), 0, 0)
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
         }
     }
 
@@ -538,7 +588,10 @@ internal class ProjectSpaceController(
 
         val container = binding.projectContentLayout
         container.removeAllViews()
-        container.addView(backRow("← 项目空间") { renderActiveSpace() })
+        container.addView(backRow("← 项目空间") {
+            pendingMemberBack = null
+            renderActiveSpace()
+        })
         container.addView(memberPageHeader(member))
         container.addView(sectionTitle("项目 AI 会话"))
 
