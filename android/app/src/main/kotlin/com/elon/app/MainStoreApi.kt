@@ -33,7 +33,8 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         collaborationJoinMode = normalizeProjectJoinMode(joinMode),
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
-        memberCount = memberCount.coerceAtLeast(1)
+        memberCount = memberCount.coerceAtLeast(0),
+        projectDescription = description?.takeIf { it.isNotBlank() }
     )
 }
 
@@ -50,7 +51,8 @@ internal fun StoreProject.toOwnerAppProject(): AppProject {
         collaborationProjectId = null,
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
-        memberCount = memberCount.coerceAtLeast(1)
+        memberCount = memberCount.coerceAtLeast(0),
+        projectDescription = description?.takeIf { it.isNotBlank() }
     )
 }
 
@@ -285,9 +287,11 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     name = obj.optString("name", "联合项目"),
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "android"),
-    ownerAccount = ownerAccount?.takeIf { it.isNotBlank() } ?: "?",
+    ownerAccount = obj.optString("owner_account").takeIf { it.isNotBlank() }
+        ?: ownerAccount?.takeIf { it.isNotBlank() }
+        ?: "?",
     ownerUserId = "",
-    memberCount = 1,
+    memberCount = obj.optInt("member_count", 1).coerceAtLeast(0),
     isPublic = false,
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
     lastTaskStatus = null,

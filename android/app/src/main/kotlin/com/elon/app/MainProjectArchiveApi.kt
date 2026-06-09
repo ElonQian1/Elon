@@ -14,6 +14,9 @@ internal data class ArchiveProjectRecord(
     val isPublic: Boolean,
     val joinMode: String,
     val lastTaskStatus: String?,
+    val ownerAccount: String?,
+    val ownerUserId: String?,
+    val memberCount: Int,
     val updatedAtMs: Long,
     val conversationCount: Int,
     val iconDataUrl: String? = null,
@@ -41,6 +44,9 @@ internal data class ArchiveProjectRecord(
             collaborationJoinMode = joinMode.takeIf { opensAsJoint },
             iconDataUrl = iconDataUrl,
             systemProjectKey = systemKey,
+            ownerAccount = ownerAccount?.takeIf { it.isNotBlank() && it != "?" },
+            memberCount = memberCount.coerceAtLeast(0),
+            projectDescription = description?.takeIf { it.isNotBlank() },
             remoteConversationCount = conversationCount,
             conversations = mutableListOf()
         )
@@ -89,21 +95,25 @@ private fun parseArchiveProjectList(arr: JSONArray?): List<ArchiveProjectRecord>
 }
 
 private fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
+    val project = obj.optJSONObject("project") ?: obj
     return ArchiveProjectRecord(
-        id = obj.getJSONObject("project").getString("id"),
-        name = obj.getJSONObject("project").optString("name", "未命名项目"),
-        description = obj.getJSONObject("project").optString("description").takeIf { it.isNotBlank() },
-        role = obj.getJSONObject("project").optString("role", "member"),
-        isPublic = obj.getJSONObject("project").optBoolean("is_public", false),
+        id = project.getString("id"),
+        name = project.optString("name", "未命名项目"),
+        description = project.optString("description").takeIf { it.isNotBlank() },
+        role = project.optString("role", "member"),
+        isPublic = project.optBoolean("is_public", false),
         joinMode = normalizeProjectJoinMode(
-            obj.getJSONObject("project").optString("join_mode", "invite")
+            project.optString("join_mode", "invite")
         ),
-        lastTaskStatus = obj.getJSONObject("project").optString("last_task_status").takeIf { it.isNotBlank() },
+        lastTaskStatus = project.optString("last_task_status").takeIf { it.isNotBlank() },
+        ownerAccount = project.optString("owner_account").takeIf { it.isNotBlank() },
+        ownerUserId = project.optString("owner_id").takeIf { it.isNotBlank() },
+        memberCount = project.optInt("member_count", 0).coerceAtLeast(0),
         updatedAtMs = parseChatMessageCreatedAt(
-            obj.getJSONObject("project").optString("updated_at", "").trim()
+            project.optString("updated_at", "").trim()
         ) ?: 0L,
         conversationCount = obj.optInt("conversation_count", 0),
-        iconDataUrl = obj.getJSONObject("project").optArchiveProjectIconDataUrl(),
+        iconDataUrl = project.optArchiveProjectIconDataUrl(),
         systemKey = obj.optString("system_key").trim().ifBlank { null }
     )
 }

@@ -199,15 +199,21 @@
   }
 
   function ownerOf(project) {
-    return project.owner_account || project.ownerAccount || project.created_by_account || project.owner || (isSystemProject(project) ? '一龙' : currentDisplayName());
+    const owner = project.owner_account || project.ownerAccount || project.created_by_account || project.owner;
+    if (owner) return owner;
+    if (isSystemProject(project)) return '一龙';
+    return isJointProject(project) ? '未知' : currentDisplayName();
   }
 
   function cardMemberCount(project) {
-    return Number(project.member_count || project.memberCount || 0) || 1;
+    const raw = project.member_count ?? project.memberCount ?? project.members;
+    const count = Array.isArray(raw) ? raw.length : Number(raw);
+    if (Number.isFinite(count) && count >= 0) return count;
+    return isJointProject(project) ? 0 : 1;
   }
 
   function projectCodeOf(project) {
-    return project.description || project.subtitle || project.code_name || project.codeName || project.id || '项目';
+    return String(project.project_description || project.projectDescription || project.description || '').trim();
   }
 
   function renderBannerIcon(project, slot, extraClass) {
@@ -289,6 +295,7 @@
     const meta = `${kind} · ${conversationCount(project)}个会话 · ${stageOf(project)}`;
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
+    const projectCode = projectCodeOf(project);
     return `
       <div class="project-home-card ${active ? 'active' : ''}" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
         <button class="project-home-more" type="button" data-project-home-action="menu" data-project-id="${escapeHtml(project.id)}" aria-label="项目操作" title="项目操作">...</button>
@@ -300,8 +307,10 @@
               <span>成员：${escapeHtml(cardMemberCount(project))}</span>
             </span>
           </span>
-          <span class="project-home-card-divider" aria-hidden="true"></span>
-          <span class="project-home-code">项目代号：${escapeHtml(projectCodeOf(project))}</span>
+          ${projectCode ? `
+            <span class="project-home-card-divider" aria-hidden="true"></span>
+            <span class="project-home-code">项目代号：${escapeHtml(projectCode)}</span>
+          ` : ''}
         </span>
         <span class="project-home-info">
           <span class="project-home-title-row">

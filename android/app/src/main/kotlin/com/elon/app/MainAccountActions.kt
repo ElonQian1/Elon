@@ -95,6 +95,7 @@ internal class MainAccountActions(
         update(local.systemProjectKey, remote.systemProjectKey) { local.systemProjectKey = it }
         update(local.ownerAccount, remote.ownerAccount) { local.ownerAccount = it }
         update(local.memberCount, remote.memberCount) { local.memberCount = it }
+        update(local.projectDescription, remote.projectDescription) { local.projectDescription = it }
         update(local.remoteConversationCount, remote.remoteConversationCount) { local.remoteConversationCount = it }
 
         val remoteSubtitle = remote.subtitle.trim()

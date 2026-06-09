@@ -32,7 +32,6 @@ internal class ProjectManagementHomeView(
     private val container: LinearLayout,
     private val projects: () -> List<AppProject>,
     private val plazaProjects: () -> List<StoreProject>,
-    private val activeProjectIndex: () -> Int,
     private val personalProjectsExpanded: () -> Boolean,
     private val jointProjectsExpanded: () -> Boolean,
     private val setPersonalProjectsExpanded: (Boolean) -> Unit,
@@ -322,7 +321,6 @@ internal class ProjectManagementHomeView(
 
     private fun createProjectCard(item: IndexedProject): View {
         val project = item.project
-        val isActive = item.index == activeProjectIndex()
         return SquareProjectCardFrame(activity).apply {
             background = rect("#181B20")
             isClickable = true
@@ -340,7 +338,7 @@ internal class ProjectManagementHomeView(
                 bottomMargin = dp(CARD_INFO_BAR_HEIGHT_DP)
             })
 
-            addView(createProjectInfoBar(project, isActive), FrameLayout.LayoutParams(
+            addView(createProjectInfoBar(project), FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 dp(CARD_INFO_BAR_HEIGHT_DP),
                 Gravity.BOTTOM
@@ -370,30 +368,32 @@ internal class ProjectManagementHomeView(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
 
-            addView(View(activity).apply {
-                setBackgroundColor(Color.parseColor("#A6AFBD"))
-                alpha = 0.72f
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1)
-            ).apply {
-                topMargin = dp(12)
-            })
+            projectCode(project)?.let { code ->
+                addView(View(activity).apply {
+                    setBackgroundColor(Color.parseColor("#A6AFBD"))
+                    alpha = 0.72f
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(1)
+                ).apply {
+                    topMargin = dp(12)
+                })
 
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = "项目代号：${projectCode(project)}"
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor("#A6AFBD"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
-                setLineSpacing(dp(2).toFloat(), 1.0f)
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(10)
-            })
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = "项目代号：$code"
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
+                    setLineSpacing(dp(2).toFloat(), 1.0f)
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(10)
+                })
+            }
         }
     }
 
@@ -445,12 +445,12 @@ internal class ProjectManagementHomeView(
         }
     }
 
-    private fun createProjectInfoBar(project: AppProject, active: Boolean): View {
+    private fun createProjectInfoBar(project: AppProject): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(5), dp(10), dp(5))
-            background = rect(if (active) CARD_INFO_BAR_ACTIVE_BG else CARD_INFO_BAR_BG)
+            background = rect(CARD_INFO_BAR_BG)
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -507,15 +507,16 @@ internal class ProjectManagementHomeView(
     private fun projectOwner(project: AppProject): String {
         project.ownerAccount?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
         if (project.isSystemArchiveProject()) return "一龙"
-        return AuthManager.displayName(activity).takeIf { it.isNotBlank() } ?: "未登录"
+        if (project.isJointDevelopmentProject()) return "未知"
+        return AuthManager.displayName(activity).takeIf { it.isNotBlank() } ?: "未知"
     }
 
     private fun projectMemberCount(project: AppProject): Int {
-        return project.memberCount?.takeIf { it > 0 } ?: 1
+        return project.memberCount?.coerceAtLeast(0) ?: if (project.isJointDevelopmentProject()) 0 else 1
     }
 
-    private fun projectCode(project: AppProject): String {
-        return project.subtitle.trim().takeIf { it.isNotBlank() } ?: project.id.take(8)
+    private fun projectCode(project: AppProject): String? {
+        return project.projectDescription?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun projectTime(project: AppProject): String {
@@ -567,7 +568,6 @@ internal class ProjectManagementHomeView(
         const val SECTION_ANIMATION_MS = 260L
         const val CARD_INFO_BAR_HEIGHT_DP = 47
         const val CARD_INFO_BAR_BG = "#303338"
-        const val CARD_INFO_BAR_ACTIVE_BG = "#303338"
         const val SECTION_TITLE_TEXT_SP = 16f
         const val CARD_TITLE_TEXT_SP = 14.2f
         const val CARD_TIME_TEXT_SP = 12.2f

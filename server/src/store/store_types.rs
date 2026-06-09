@@ -331,6 +331,8 @@ pub struct ProjectSummary {
 pub struct UserArchiveProject {
     #[serde(flatten)]
     pub project: ProjectSummary,
+    pub owner_account: String,
+    pub owner_id: String,
     pub conversation_count: i64,
     /// `system_archive` | `pc_node_workspace` | `external_workspace` | `server_workspace`
     pub workspace_kind: String,

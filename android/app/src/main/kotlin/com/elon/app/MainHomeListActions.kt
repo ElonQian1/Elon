@@ -335,7 +335,6 @@ internal class MainHomeListActions(
             container = binding.projectContentLayout,
             projects = projects,
             plazaProjects = { plazaBannerProjects },
-            activeProjectIndex = { activeProject().let { active -> projects().indexOfFirst { it.id == active.id } } },
             personalProjectsExpanded = { personalProjectsExpanded },
             jointProjectsExpanded = { jointProjectsExpanded },
             setPersonalProjectsExpanded = { personalProjectsExpanded = it },

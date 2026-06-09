@@ -26,6 +26,7 @@ data class AppProject(
     var systemProjectKey: String? = null,
     var ownerAccount: String? = null,
     var memberCount: Int? = null,
+    var projectDescription: String? = null,
     var remoteConversationCount: Int? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),

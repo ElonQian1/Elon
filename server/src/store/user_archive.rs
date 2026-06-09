@@ -33,9 +33,12 @@ impl Store {
                     (
                         SELECT COUNT(*) FROM conversations c
                         WHERE c.project_id = p.id
-                    ) AS conversation_count
+                    ) AS conversation_count,
+                    COALESCE(u.phone, u.email, p.created_by) AS owner_account,
+                    p.created_by AS owner_id
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
+             LEFT JOIN users u ON u.id = p.created_by
              WHERE pm.user_id = ?1 AND p.status != 'deleted'
              ORDER BY
                 CASE
@@ -75,11 +78,15 @@ fn archive_project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserArc
         updated_at: row.get(17)?,
     };
     let conversation_count = row.get(18)?;
+    let owner_account = row.get(19)?;
+    let owner_id = row.get(20)?;
     let system_key = system_project_key_for_source_type(&project.source_type).map(str::to_string);
     let workspace_kind = workspace_kind_for_project(&project).to_string();
 
     Ok(UserArchiveProject {
         project,
+        owner_account,
+        owner_id,
         conversation_count,
         workspace_kind,
         system_key,
