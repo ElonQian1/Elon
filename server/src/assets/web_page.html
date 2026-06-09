@@ -142,12 +142,12 @@
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
     .search-bar input::placeholder { color: var(--ink-soft); }
     .conversation-item {
-      height: 66px;
+      height: 76px;
       background: var(--panel-2);
       display: flex;
       align-items: center;
-      padding: 0 14px;
-      gap: 10px;
+      padding: 0 14px 0 16px;
+      gap: 12px;
       cursor: pointer;
       border: 0;
       width: 100%;
@@ -167,12 +167,72 @@
     .conversation-item .brand {
       width: 44px; height: 44px;
       flex: 0 0 44px;
-      border-radius: 6px;
-      overflow: hidden;
+      border-radius: 8px;
+      overflow: visible;
       background: var(--panel);
       display: flex; align-items: center; justify-content: center;
+      position: relative;
+      color: #283140;
+      font-weight: 700;
+      font-size: 17px;
     }
-    .conversation-item .brand img { width: 100%; height: 100%; object-fit: cover; }
+    .conversation-item .brand.round { border-radius: 50%; background: #d6d6d6; }
+    .conversation-item .brand.group { background: #f2f5fa; }
+    .conversation-item .brand img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+    .conversation-item .brand .avatar-badge {
+      position: absolute;
+      top: -5px;
+      right: -6px;
+      min-width: 19px;
+      height: 19px;
+      padding: 0 5px;
+      border-radius: 10px;
+      background: #f04b4f;
+      color: #f2f5fa;
+      font-size: 10px;
+      line-height: 19px;
+      text-align: center;
+      font-weight: 700;
+    }
+    .conversation-item .brand .online-dot {
+      position: absolute;
+      right: -1px;
+      bottom: -1px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--brand);
+      border: 2px solid var(--panel-2);
+    }
+    .group-avatar-grid {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: #f2f5fa;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 2px;
+      padding: 5px;
+    }
+    .group-avatar-grid.compact {
+      grid-template-columns: repeat(2, 1fr);
+      padding: 6px;
+      gap: 3px;
+    }
+    .group-avatar-tile {
+      min-width: 0;
+      border-radius: 3px;
+      background: #efefef;
+      color: #283140;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      font-weight: 700;
+      overflow: hidden;
+    }
+    .group-avatar-tile img { width: 100%; height: 100%; object-fit: cover; }
     .conversation-item .text { flex: 1; min-width: 0; }
     .conversation-item .title {
       font-size: 16px; color: var(--ink);
@@ -243,8 +303,29 @@
       padding: 8px 0 2px;
       user-select: none;
     }
-    .bubble-row { display: flex; align-items: flex-end; gap: 8px; }
+    .bubble-row { display: flex; align-items: flex-start; gap: 8px; }
     .bubble-row.user { justify-content: flex-end; }
+    .chat-avatar {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 36px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #d6d6d6;
+      color: #283140;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      user-select: none;
+    }
+    .chat-avatar.round { border-radius: 50%; }
+    .chat-avatar.user {
+      background: var(--panel-3);
+      color: var(--ink);
+    }
+    .chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .bubble {
       max-width: 76%;
       padding: 10px 14px;
@@ -265,6 +346,12 @@
       border: 1px solid var(--bubble-ai-border);
       border-top-left-radius: 2px;
     }
+    .bubble.friend {
+      background: var(--bubble-ai-bg);
+      color: var(--bubble-ai-ink);
+      border: 1px solid var(--bubble-ai-border);
+      border-top-left-radius: 2px;
+    }
     .bubble.progress {
       background: var(--bubble-progress-bg);
       color: var(--bubble-progress-ink);
@@ -278,6 +365,8 @@
       border: 1px solid var(--bubble-error-border);
     }
     .bubble .meta { display: block; font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+    .bubble .status { display: block; font-size: 12px; color: rgba(7,18,10,0.54); margin-top: 5px; }
+    .bubble .status.read { color: var(--brand); }
     .bubble a { color: inherit; text-decoration: underline; }
 
     @media (min-width: 720px) {
@@ -1044,6 +1133,9 @@
     <button class="icon-btn" id="addBtn" title="新建项目">
       <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="13" cy="13" r="9.4"/><path d="M13 8.5 L13 17.5 M8.5 13 L17.5 13"/></svg>
     </button>
+    <button class="icon-btn" id="moreBtn" title="聊天设置" style="display:none">
+      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 13h.1M13 13h.1M19.5 13h.1"/></svg>
+    </button>
   </header>
 
   <section class="content">
@@ -1052,7 +1144,7 @@
     <div id="chatPage" class="page active">
       <!-- 列表状态 -->
       <div id="searchBar" class="search-bar hidden">
-        <input id="searchInput" type="search" placeholder="搜索项目名称…" />
+        <input id="searchInput" type="search" placeholder="搜索好友、群聊、最近消息" />
       </div>
       <div id="conversationList" class="conversation-list"></div>
       <!-- 项目内聊天视图 -->
@@ -1343,6 +1435,33 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </form>
 </div>
 
+<!-- ============ 添加好友对话框 ============ -->
+<div class="modal-mask" id="addFriendMask">
+  <form class="modal" id="addFriendForm">
+    <h2>添加好友</h2>
+    <p style="color:var(--ink-soft);font-size:14px;line-height:1.65;margin:0">选择搜索方式后输入关键词，只能搜索到已注册一龙账号的用户。</p>
+    <div>
+      <label for="friendSearchType">搜索类型</label>
+      <select id="friendSearchType">
+        <option value="auto">自动识别</option>
+        <option value="phone">手机号</option>
+        <option value="email">邮箱</option>
+        <option value="account_id">账号 ID</option>
+        <option value="nickname">昵称</option>
+      </select>
+    </div>
+    <div>
+      <label for="friendSearchInput">关键词</label>
+      <input id="friendSearchInput" placeholder="手机号、邮箱、账号 ID 或昵称" autocomplete="off" />
+    </div>
+    <div class="error-text" id="addFriendResult"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="cancelAddFriendBtn">取消</button>
+      <button type="submit" class="btn-confirm" id="confirmAddFriendBtn">添加</button>
+    </div>
+  </form>
+</div>
+
 <!-- ============ 删除项目确认对话框 ============ -->
 <div class="modal-mask" id="deleteConfirmMask">
   <div class="modal">
@@ -1459,7 +1578,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const backBtn = $('backBtn');
   const voiceCallBtn = $('voiceCallBtn');
   const addBtn = $('addBtn');
+  const moreBtn = $('moreBtn');
   const searchBtn = $('searchBtn');
+  const tabsBar = document.querySelector('.tabs-bar');
 
   const conversationList = $('conversationList');
   const chatView = $('chatView');
@@ -1534,6 +1655,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const newProjectError = $('newProjectError');
   const createProjectBtn = $('createProjectBtn');
   const cancelNewProjectBtn = $('cancelNewProjectBtn');
+  const addFriendMask = $('addFriendMask');
+  const addFriendForm = $('addFriendForm');
+  const friendSearchType = $('friendSearchType');
+  const friendSearchInput = $('friendSearchInput');
+  const addFriendResult = $('addFriendResult');
+  const cancelAddFriendBtn = $('cancelAddFriendBtn');
+  const confirmAddFriendBtn = $('confirmAddFriendBtn');
 
   const agentMask = $('agentMask');
   const agentList = $('agentList');
@@ -1565,9 +1693,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let authMode = 'login';
   let currentUser = null;
   let projects = [];
+  let friends = [];
+  let groups = [];
   let currentProject = null;
+  let currentFriend = null;
+  let currentGroup = null;
   let currentTab = 'chatPage';
   let socket = null;
+  let appSocket = null;
   let busy = false;
   let progressLog = [];
   let searchQuery = '';
@@ -1577,6 +1710,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let agentLoading = false;
   let codexCliOnly = false;
   let lastChatTimelineMs = 0;
+  let friendPollTimer = null;
+  let typingResetTimer = null;
+  let lastTypingSentMs = 0;
+  const SOCIAL_AI_USER_ID = 'usr_elon_ai';
 
   // ====== 工具 ======
   function api(path, options = {}) {
@@ -1601,8 +1738,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function setBusy(value) {
     busy = !!value;
-    sendBtn.disabled = busy || !currentProject;
+    updateSendButtonState();
     if (!busy) stageHint.textContent = '点击输入需求，开发进度会自动记录到项目页。';
+  }
+  function isContactChatActive() {
+    return !!currentFriend || !!currentGroup;
+  }
+  function isAnyChatActive() {
+    return !!currentProject || isContactChatActive();
+  }
+  function updateSendButtonState() {
+    sendBtn.disabled = !!busy || !isAnyChatActive();
   }
   function showNativeOnly(message) {
     nativeOnlyText.textContent = message || '这个能力需要在 Android APK 中使用。';
@@ -1660,6 +1806,60 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       }
       return (d.getMonth() + 1) + '/' + d.getDate();
     } catch { return ''; }
+  }
+  function parseServerTime(value) {
+    if (!value) return 0;
+    const t = new Date(value).getTime();
+    return Number.isFinite(t) ? t : 0;
+  }
+  function formatListTimeMs(ms) {
+    if (!ms) return '';
+    return formatTime(new Date(ms).toISOString());
+  }
+  function normalizeSearch(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+  function avatarInitial(value, fallback) {
+    const text = String(value || fallback || '友').trim();
+    const first = Array.from(text)[0] || '友';
+    return first.toUpperCase();
+  }
+  function friendDisplayName(friend) {
+    return (friend && (friend.nickname || friend.name || friend.account || friend.phone || friend.id)) || '好友';
+  }
+  function friendSubtitle(friend) {
+    return (friend && (friend.last_message || friend.lastMessage || friend.phone || friend.account)) || '暂无消息';
+  }
+  function groupDisplayName(group) {
+    return (group && (group.name || group.id)) || '群聊';
+  }
+  function groupSubtitle(group) {
+    const count = Number(group && (group.member_count || group.memberCount || 0));
+    return (group && (group.last_message || group.lastMessage)) || (count > 0 ? count + ' 位成员' : '群聊');
+  }
+  function contactSortTime(item) {
+    const data = item.data || {};
+    return parseServerTime(data.last_message_at || data.lastMessageAt || data.created_at || data.createdAt);
+  }
+  function contactMatches(item, query) {
+    if (!query) return true;
+    const data = item.data || {};
+    if (item.kind === 'friend') {
+      return [
+        friendDisplayName(data),
+        data.account,
+        data.phone,
+        data.last_message,
+        data.lastMessage
+      ].some((value) => normalizeSearch(value).includes(query));
+    }
+    return [
+      groupDisplayName(data),
+      data.last_message,
+      data.lastMessage,
+      groupSubtitle(data),
+      ...(Array.isArray(data.members) ? data.members.map((m) => m.display_name || m.displayName) : [])
+    ].some((value) => normalizeSearch(value).includes(query));
   }
   function isWorkingStatus(status) {
     const normalized = String(status || '').toLowerCase();
@@ -1754,6 +1954,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   function showLogin() {
     if (socket) { try { socket.close(); } catch {} socket = null; }
+    if (appSocket) { try { appSocket.close(); } catch {} appSocket = null; }
+    stopContactPolling();
     appView.classList.add('hidden');
     loginView.classList.remove('hidden');
   }
@@ -1767,29 +1969,50 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentTab = tabId;
     tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabId));
     pages.forEach((p) => p.classList.toggle('active', p.id === tabId));
-    const inChat = tabId === 'chatPage' && !!currentProject;
+    const inProjectChat = tabId === 'chatPage' && !!currentProject;
+    const inFriendChat = tabId === 'chatPage' && !!currentFriend;
+    const inGroupChat = tabId === 'chatPage' && !!currentGroup;
+    const inChat = inProjectChat || inFriendChat || inGroupChat;
     const inProjectHome = tabId === 'projectPage';
-    // 顶栏标题：项目内保留项目名，列表态使用 tab 静态名
+    if (tabId !== 'chatPage') {
+      searchBar.classList.add('hidden');
+      searchQuery = '';
+      searchInput.value = '';
+    }
+    // 顶栏标题：项目/好友聊天保留对象名，列表态使用 tab 静态名
     const t = Array.prototype.find.call(tabs, (x) => x.dataset.tab === tabId);
-    if (inChat) {
+    if (inProjectChat) {
       topTitle.textContent = currentProject.name || '会话';
+    } else if (inFriendChat) {
+      topTitle.textContent = friendDisplayName(currentFriend);
+    } else if (inGroupChat) {
+      topTitle.textContent = groupDisplayName(currentGroup);
     } else {
       topTitle.textContent = t ? t.dataset.title : '';
     }
-    // 兜底：chatPage 且没有项目 → 强制回到列表态，避免出现"气泡可见但输入栏消失"的半残 UI
-    if (tabId === 'chatPage' && !currentProject) {
+    // 兜底：chatPage 且没有激活聊天 → 强制回到好友/群聊列表态
+    if (tabId === 'chatPage' && !inChat) {
       chatView.classList.add('hidden');
       conversationList.classList.remove('hidden');
+      stageHint.classList.add('hidden');
+      loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
     }
     if (inProjectHome) renderProjectHomePage();
-    // 输入栏：仅聊天页且已进入项目时显示
+    // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
-    // 返回按钮：仅聊天页进入项目后显示
+    messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
+    modelBtn.style.display = inGroupChat ? 'none' : '';
+    stageHint.classList.toggle('hidden', !inProjectChat);
+    if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
+    // 返回按钮：聊天详情页显示
     backBtn.style.display = inChat ? '' : 'none';
-    voiceCallBtn.style.display = 'none';
+    voiceCallBtn.style.display = (inFriendChat && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
+    moreBtn.style.display = isContactChatActive() ? '' : 'none';
     // 新建按钮：聊天首页和项目首页都显示；项目首页同时有页内入口，保持与 APK 一致。
-    addBtn.style.display = ((tabId === 'chatPage' && !currentProject) || inProjectHome) ? '' : 'none';
-    searchBtn.style.display = (tabId === 'chatPage' && !currentProject) ? '' : 'none';
+    addBtn.style.display = ((tabId === 'chatPage' && !inChat) || inProjectHome) ? '' : 'none';
+    addBtn.title = (tabId === 'chatPage' && !inChat) ? '添加好友' : '新建项目';
+    searchBtn.style.display = (tabId === 'chatPage' && !inChat) ? '' : 'none';
+    updateSendButtonState();
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
       refreshDownloadPage();
@@ -1799,11 +2022,25 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       loadMemories().catch((e) => console.warn('loadMemories failed:', e));
     }
   }
-  tabs.forEach((t) => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+  tabs.forEach((t) => t.addEventListener('click', () => {
+    if (t.dataset.tab === 'chatPage') {
+      if (socket) { try { socket.close(); } catch {} socket = null; }
+      stopContactPolling();
+      currentProject = null;
+      currentFriend = null;
+      currentGroup = null;
+      progressLog = [];
+    }
+    switchTab(t.dataset.tab);
+  }));
 
   backBtn.addEventListener('click', () => {
     if ($('agentPage') && $('agentPage').classList.contains('active')) {
       switchTab('profilePage');
+      return;
+    }
+    if (currentFriend || currentGroup) {
+      closeContactChat();
       return;
     }
     // 退出当前项目，回到会话列表
@@ -1815,8 +2052,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     inputBar.classList.remove('active');
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
+    moreBtn.style.display = 'none';
     addBtn.style.display = '';
     searchBtn.style.display = '';
+    if (tabsBar) tabsBar.classList.remove('hidden');
+    stageHint.classList.add('hidden');
     topTitle.textContent = '好友';
     resetProjectPage();
     renderConversationList();
@@ -1831,6 +2071,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   });
   voiceCallMask.addEventListener('click', (e) => {
     if (e.target === voiceCallMask) voiceCallMask.classList.remove('active');
+  });
+  moreBtn.addEventListener('click', () => {
+    const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
+    showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
   });
   ttsVoiceRow.addEventListener('click', () => {
     ttsVoiceMask.classList.add('active');
@@ -1855,6 +2099,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     inputBar.classList.remove('active');
     backBtn.style.display = '';
     voiceCallBtn.style.display = 'none';
+    moreBtn.style.display = 'none';
     addBtn.style.display = 'none';
     searchBtn.style.display = 'none';
     topTitle.textContent = 'Agent 自动化';
@@ -1874,49 +2119,137 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     showNativeOnly('导入游客记录需要读取本机 APK 游客数据，请在 Android APK 的“我的”页处理。');
   });
 
-  // ====== 会话/项目列表 ======
+  // ====== 好友/群聊列表 ======
+  function updateChatTabBadge() {
+    const badge = $('tabChatBadge');
+    if (!badge) return;
+    const count = friends.reduce((sum, item) => sum + Number(item.unread_count || 0), 0)
+      + groups.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
+    if (count <= 0) {
+      badge.style.display = 'none';
+      return;
+    }
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.style.display = '';
+  }
+
+  function createFriendAvatarElement(friend, sizeClass) {
+    const avatar = document.createElement('span');
+    avatar.className = (sizeClass || 'brand') + ' round';
+    const src = friend && (friend.avatar_data_url || friend.avatarDataUrl);
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = avatarInitial(friendDisplayName(friend), '友');
+    }
+    const unread = Number(friend && (friend.unread_count || friend.unreadCount || 0));
+    if (sizeClass !== 'chat-avatar' && unread > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'avatar-badge';
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      avatar.appendChild(badge);
+    }
+    if (sizeClass !== 'chat-avatar' && friend && friend.is_online) {
+      const dot = document.createElement('span');
+      dot.className = 'online-dot';
+      avatar.appendChild(dot);
+    }
+    return avatar;
+  }
+
+  function createGroupAvatarElement(group, sizeClass) {
+    const outer = document.createElement('span');
+    outer.className = (sizeClass || 'brand') + ' group';
+    const members = Array.isArray(group && group.members) ? group.members.slice(0, 9) : [];
+    if (members.length) {
+      const grid = document.createElement('span');
+      grid.className = 'group-avatar-grid' + (members.length <= 4 ? ' compact' : '');
+      members.forEach((member) => {
+        const tile = document.createElement('span');
+        tile.className = 'group-avatar-tile';
+        const src = member.avatar_data_url || member.avatarDataUrl;
+        if (src) {
+          const img = document.createElement('img');
+          img.src = src;
+          img.alt = '';
+          tile.appendChild(img);
+        } else {
+          tile.textContent = avatarInitial(member.display_name || member.displayName, '群');
+        }
+        grid.appendChild(tile);
+      });
+      outer.appendChild(grid);
+    } else {
+      outer.textContent = '群';
+    }
+    const unread = Number(group && (group.unread_count || group.unreadCount || 0));
+    if (sizeClass !== 'chat-avatar' && unread > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'avatar-badge';
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      outer.appendChild(badge);
+    }
+    return outer;
+  }
+
+  function createContactRow(item) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'conversation-item';
+    const data = item.data;
+    row.appendChild(item.kind === 'friend'
+      ? createFriendAvatarElement(data)
+      : createGroupAvatarElement(data));
+    const text = document.createElement('span');
+    text.className = 'text';
+    const title = document.createElement('span');
+    title.className = 'title';
+    title.textContent = item.kind === 'friend' ? friendDisplayName(data) : groupDisplayName(data);
+    const sub = document.createElement('span');
+    sub.className = 'sub';
+    sub.textContent = item.kind === 'friend' ? friendSubtitle(data) : groupSubtitle(data);
+    text.appendChild(title);
+    text.appendChild(sub);
+    row.appendChild(text);
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = formatListTimeMs(contactSortTime(item));
+    row.appendChild(time);
+    row.addEventListener('click', () => {
+      if (item.kind === 'friend') openFriendChat(data);
+      else openGroupChat(data);
+    });
+    return row;
+  }
+
   function renderConversationList() {
-    const filtered = searchQuery
-      ? projects.filter((p) => (p.name || '').toLowerCase().includes(searchQuery))
-      : projects;
-    if (!filtered.length) {
+    const query = normalizeSearch(searchQuery);
+    const allItems = groups.map((group) => ({ kind: 'group', data: group }))
+      .concat(friends.map((friend) => ({ kind: 'friend', data: friend })))
+      .filter((item) => contactMatches(item, query))
+      .sort((a, b) => (contactSortTime(b) - contactSortTime(a)) || String(
+        a.kind === 'friend' ? friendDisplayName(a.data) : groupDisplayName(a.data)
+      ).localeCompare(String(
+        b.kind === 'friend' ? friendDisplayName(b.data) : groupDisplayName(b.data)
+      ), 'zh-Hans-CN'));
+    if (!allItems.length) {
       conversationList.innerHTML = searchQuery
-        ? '<div class="empty-tip">没有匹配的项目</div>'
-        : '<div class="empty-tip">还没有项目<br/>点击右上角 ＋ 新建你的第一个 App'
-          + '<br/><button id="emptyCreateBtn">新建项目</button></div>';
+        ? '<div class="empty-tip">没有匹配的好友或群聊</div>'
+        : '<div class="empty-tip">还没有好友<br/>点击右上角 ＋ 添加一位好友'
+          + '<br/><button id="emptyAddFriendBtn">添加好友</button></div>';
       if (!searchQuery) {
-        const b = $('emptyCreateBtn');
-        if (b) b.addEventListener('click', openNewProject);
+        const b = $('emptyAddFriendBtn');
+        if (b) b.addEventListener('click', openAddFriendDialog);
       }
+      updateChatTabBadge();
       return;
     }
     conversationList.innerHTML = '';
-    filtered.forEach((p) => {
-      const item = document.createElement('div');
-      item.className = 'conversation-item' + (currentProject && currentProject.id === p.id ? ' active' : '');
-      item.style.cssText = 'cursor:pointer';
-      const status = p.last_task_status || p.status || '准备就绪';
-      if (isWorkingStatus(status)) item.classList.add('working');
-      item.innerHTML =
-        '<span class="brand"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" /></span>'
-        + '<span class="text">'
-        + '<span class="title"></span>'
-        + '<span class="sub"></span>'
-        + '</span>'
-        + '<span class="time"></span>'
-        + '<button class="item-delete" title="删除项目" type="button">'
-        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>'
-        + '</button>';
-      item.querySelector('.title').textContent = p.name || '未命名项目';
-      item.querySelector('.sub').textContent = status;
-      item.querySelector('.time').textContent = formatTime(p.updated_at);
-      item.querySelector('.item-delete').addEventListener('click', (e) => {
-        e.stopPropagation();
-        openDeleteConfirm(p);
-      });
-      item.addEventListener('click', () => selectProject(p));
-      conversationList.appendChild(item);
-    });
+    allItems.forEach((item) => conversationList.appendChild(createContactRow(item)));
+    updateChatTabBadge();
   }
 
   function renderProjectHomePage() {
@@ -1926,10 +2259,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function selectProject(project) {
+    stopContactPolling();
+    currentFriend = null;
+    currentGroup = null;
     searchBar.classList.add('hidden');
     searchQuery = '';
     searchInput.value = '';
     currentProject = project;
+    currentTab = 'chatPage';
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'chatPage'));
+    pages.forEach((p) => p.classList.toggle('active', p.id === 'chatPage'));
     progressLog = [];
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
@@ -1938,10 +2277,219 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
     inputBar.classList.add('active');
     backBtn.style.display = '';
+    addBtn.style.display = 'none';
+    searchBtn.style.display = 'none';
+    voiceCallBtn.style.display = 'none';
+    moreBtn.style.display = 'none';
+    if (tabsBar) tabsBar.classList.add('hidden');
+    stageHint.classList.remove('hidden');
+    modelBtn.style.display = '';
+    messageInput.placeholder = '描述你想开发的 App 功能';
     topTitle.textContent = project.name || '会话';
     renderProjectPage(project);
     connectSocket();
     setBusy(false);
+  }
+
+  function stopContactPolling() {
+    if (friendPollTimer) {
+      clearInterval(friendPollTimer);
+      friendPollTimer = null;
+    }
+    if (typingResetTimer) {
+      clearTimeout(typingResetTimer);
+      typingResetTimer = null;
+    }
+  }
+
+  function closeContactChat() {
+    stopContactPolling();
+    currentFriend = null;
+    currentGroup = null;
+    chatView.classList.add('hidden');
+    conversationList.classList.remove('hidden');
+    inputBar.classList.remove('active');
+    backBtn.style.display = 'none';
+    voiceCallBtn.style.display = 'none';
+    moreBtn.style.display = 'none';
+    addBtn.style.display = '';
+    searchBtn.style.display = '';
+    if (tabsBar) tabsBar.classList.remove('hidden');
+    stageHint.classList.add('hidden');
+    modelBtn.style.display = '';
+    messageInput.placeholder = '描述你想开发的 App 功能';
+    topTitle.textContent = '好友';
+    renderConversationList();
+    loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
+    updateSendButtonState();
+  }
+
+  function applyContactChatChrome() {
+    conversationList.classList.add('hidden');
+    chatView.classList.remove('hidden');
+    stageHint.classList.add('hidden');
+    inputBar.classList.add('active');
+    backBtn.style.display = '';
+    addBtn.style.display = 'none';
+    searchBtn.style.display = 'none';
+    moreBtn.style.display = '';
+    voiceCallBtn.style.display = (currentFriend && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
+    if (tabsBar) tabsBar.classList.add('hidden');
+    modelBtn.style.display = currentGroup ? 'none' : '';
+    messageInput.placeholder = '发消息';
+    topTitle.textContent = currentFriend ? friendDisplayName(currentFriend) : groupDisplayName(currentGroup);
+    updateSendButtonState();
+  }
+
+  function openFriendChat(friend) {
+    if (!friend || !friend.id) return;
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    currentProject = null;
+    currentGroup = null;
+    currentFriend = friend;
+    currentTab = 'chatPage';
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'chatPage'));
+    pages.forEach((p) => p.classList.toggle('active', p.id === 'chatPage'));
+    progressLog = [];
+    searchBar.classList.add('hidden');
+    searchQuery = '';
+    searchInput.value = '';
+    chatList.innerHTML = '';
+    lastChatTimelineMs = 0;
+    applyContactChatChrome();
+    loadFriendMessages(true).catch((e) => appendBubble('error', e.message || '加载好友消息失败'));
+    stopContactPolling();
+    friendPollTimer = setInterval(() => {
+      if (currentFriend) loadFriendMessages(false).catch(() => {});
+    }, 3000);
+  }
+
+  function openGroupChat(group) {
+    if (!group || !group.id) return;
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    currentProject = null;
+    currentFriend = null;
+    currentGroup = group;
+    currentTab = 'chatPage';
+    tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'chatPage'));
+    pages.forEach((p) => p.classList.toggle('active', p.id === 'chatPage'));
+    progressLog = [];
+    searchBar.classList.add('hidden');
+    searchQuery = '';
+    searchInput.value = '';
+    chatList.innerHTML = '';
+    lastChatTimelineMs = 0;
+    applyContactChatChrome();
+    loadGroupMessages(true).catch((e) => appendBubble('error', e.message || '加载群聊消息失败'));
+    stopContactPolling();
+    friendPollTimer = setInterval(() => {
+      if (currentGroup) loadGroupMessages(false).catch(() => {});
+    }, 3000);
+  }
+
+  async function loadFriendMessages(scrollToBottom) {
+    if (!currentFriend) return;
+    const friend = currentFriend;
+    const res = await api('/api/me/friends/' + encodeURIComponent(friend.id) + '/messages?limit=120');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载好友消息失败');
+    if (!currentFriend || currentFriend.id !== friend.id) return;
+    renderContactMessages(data.messages || [], 'friend', friend, scrollToBottom);
+    await loadSocialChats();
+  }
+
+  async function loadGroupMessages(scrollToBottom) {
+    if (!currentGroup) return;
+    const group = currentGroup;
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/messages?limit=120');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载群聊消息失败');
+    if (!currentGroup || currentGroup.id !== group.id) return;
+    renderContactMessages(data.messages || [], 'group', group, scrollToBottom);
+    await loadSocialChats();
+  }
+
+  function renderContactMessages(messages, chatKind, contact, scrollToBottom) {
+    chatList.innerHTML = '';
+    lastChatTimelineMs = 0;
+    messages.forEach((msg) => {
+      const outgoing = !!msg.outgoing;
+      const senderId = msg.sender_user_id || '';
+      const kind = outgoing ? 'user' : senderId === SOCIAL_AI_USER_ID ? 'ai' : 'friend';
+      const avatarSource = chatKind === 'friend'
+        ? contact
+        : (Array.isArray(contact.members)
+          ? contact.members.find((member) => member.id === senderId)
+          : null);
+      appendBubble(kind, msg.content || '', null, null, null, {
+        createdAtMs: parseServerTime(msg.created_at) || Date.now(),
+        senderName: msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : ''),
+        avatarDataUrl: avatarSource && (avatarSource.avatar_data_url || avatarSource.avatarDataUrl),
+        avatarFallback: kind === 'user'
+          ? ((currentUser && (currentUser.nickname || currentUser.account)) || '我')
+          : (msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : groupDisplayName(contact))),
+      });
+    });
+    if (scrollToBottom !== false) chatList.scrollTop = chatList.scrollHeight;
+  }
+
+  async function sendFriendMessage(text) {
+    const friend = currentFriend;
+    if (!friend) return;
+    appendBubble('user', text, null, null, null, {
+      avatarFallback: (currentUser && (currentUser.nickname || currentUser.account)) || '我',
+    });
+    const res = await api('/api/me/friends/' + encodeURIComponent(friend.id) + '/messages', {
+      method: 'POST',
+      body: JSON.stringify({ content: text })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '发送失败');
+    if (currentFriend && currentFriend.id === friend.id) await loadFriendMessages(true);
+  }
+
+  async function sendGroupMessage(text) {
+    const group = currentGroup;
+    if (!group) return;
+    appendBubble('user', text, null, null, null, {
+      avatarFallback: (currentUser && (currentUser.nickname || currentUser.account)) || '我',
+    });
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/messages', {
+      method: 'POST',
+      body: JSON.stringify({ content: text })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '发送失败');
+    if (currentGroup && currentGroup.id === group.id) await loadGroupMessages(true);
+  }
+
+  async function loadFriends() {
+    const res = await api('/api/me/friends');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载好友失败');
+    friends = data.friends || [];
+    if (currentFriend) {
+      currentFriend = friends.find((item) => item.id === currentFriend.id) || currentFriend;
+    }
+  }
+
+  async function loadGroups() {
+    const res = await api('/api/me/groups');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载群聊失败');
+    groups = data.groups || [];
+    if (currentGroup) {
+      currentGroup = groups.find((item) => item.id === currentGroup.id) || currentGroup;
+    }
+  }
+
+  async function loadSocialChats() {
+    await Promise.all([
+      loadFriends().catch((e) => console.warn('loadFriends failed:', e)),
+      loadGroups().catch((e) => console.warn('loadGroups failed:', e)),
+    ]);
+    if (currentTab === 'chatPage' && !isAnyChatActive()) renderConversationList();
+    updateChatTabBadge();
   }
 
   // ====== 4阶段进度更新 ======
@@ -1997,8 +2545,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   // ====== 聊天气泡 ======
-  function appendBubble(kind, text, links, modelUsed, nodeId) {
-    const nowMs = Date.now();
+  function appendBubble(kind, text, links, modelUsed, nodeId, options = {}) {
+    const nowMs = options.createdAtMs || Date.now();
     const block = document.createElement('div');
     block.className = 'chat-message-block';
     const showTimeline = !lastChatTimelineMs ||
@@ -2013,11 +2561,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     lastChatTimelineMs = nowMs;
 
     const row = document.createElement('div');
-    row.className = 'bubble-row' + (kind === 'user' ? ' user' : '');
+    row.className = 'bubble-row' + (kind === 'user' ? ' user' : kind === 'friend' ? ' friend' : kind === 'ai' ? ' ai' : '');
     const bubble = document.createElement('div');
     bubble.className = 'bubble ' + (kind === 'user' ? 'user' :
       kind === 'progress' ? 'progress' :
-      kind === 'error' ? 'error' : 'ai');
+      kind === 'error' ? 'error' :
+      kind === 'friend' ? 'friend' : 'ai');
     bubble.textContent = text || '';
     bubble.title = formatChatExactTime(nowMs);
     if (links && links.length) {
@@ -2036,7 +2585,24 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       attr.textContent = (nodeId ? '🖥️ ' : '✦ ') + modelUsed;
       bubble.appendChild(attr);
     }
+    if (kind === 'ai') {
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar';
+      avatar.innerHTML = '<img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" />';
+      row.appendChild(avatar);
+    } else if (kind === 'friend') {
+      row.appendChild(createFriendAvatarElement({
+        nickname: options.avatarFallback || options.senderName || '好友',
+        avatar_data_url: options.avatarDataUrl
+      }, 'chat-avatar'));
+    }
     row.appendChild(bubble);
+    if (kind === 'user') {
+      const avatar = document.createElement('span');
+      avatar.className = 'chat-avatar user round';
+      avatar.textContent = avatarInitial(options.avatarFallback || (currentUser && (currentUser.nickname || currentUser.account)), '我');
+      row.appendChild(avatar);
+    }
     block.appendChild(row);
     chatList.appendChild(block);
     chatList.scrollTop = chatList.scrollHeight;
@@ -2100,10 +2666,72 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     });
   }
 
+  function connectAppSocket() {
+    if (appSocket) { try { appSocket.close(); } catch {} appSocket = null; }
+    if (!token) return;
+    const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    const url = scheme + '://' + location.host + '/ws/app?token=' + encodeURIComponent(token);
+    try {
+      appSocket = new WebSocket(url);
+    } catch (e) {
+      console.warn('app websocket failed:', e);
+      return;
+    }
+    appSocket.addEventListener('message', (ev) => {
+      let data = null;
+      try { data = JSON.parse(ev.data); } catch { return; }
+      handleAppEvent(data);
+    });
+    appSocket.addEventListener('close', () => {
+      if (!token) return;
+      setTimeout(() => {
+        if (token && (!appSocket || appSocket.readyState === WebSocket.CLOSED)) connectAppSocket();
+      }, 5000);
+    });
+  }
+
+  function handleAppEvent(data) {
+    if (!data || !data.type) return;
+    if (data.type === 'friend_message') {
+      loadSocialChats().catch(() => {});
+      if (currentFriend && data.fromUserId === currentFriend.id) {
+        loadFriendMessages(true).catch(() => {});
+      }
+    } else if (data.type === 'group_message') {
+      loadSocialChats().catch(() => {});
+      if (currentGroup && data.groupId === currentGroup.id) {
+        loadGroupMessages(true).catch(() => {});
+      }
+    } else if (data.type === 'presence') {
+      loadSocialChats().catch(() => {});
+    } else if (data.type === 'typing') {
+      if (currentFriend && data.fromUserId === currentFriend.id) {
+        topTitle.textContent = '正在输入…';
+        if (typingResetTimer) clearTimeout(typingResetTimer);
+        typingResetTimer = setTimeout(() => {
+          if (currentFriend) topTitle.textContent = friendDisplayName(currentFriend);
+        }, 3000);
+      }
+    } else if (data.type === 'read_receipt') {
+      if (currentFriend && data.fromUserId === currentFriend.id) {
+        loadFriendMessages(false).catch(() => {});
+      }
+    } else if (data.type === 'project_task_done') {
+      loadProjects().catch(() => {});
+    }
+  }
+
   inputBar.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || busy) return;
+    if (currentFriend || currentGroup) {
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+      const send = currentFriend ? sendFriendMessage(text) : sendGroupMessage(text);
+      send.catch((err) => appendBubble('error', (err && err.message) || '发送失败'));
+      return;
+    }
     if (!currentProject) { appendBubble('error', '请先选择或新建项目。'); return; }
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       appendBubble('error', '项目通道未连接，正在重连…');
@@ -2127,6 +2755,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    if (currentFriend && appSocket && appSocket.readyState === WebSocket.OPEN) {
+      const now = Date.now();
+      if (now - lastTypingSentMs >= 2000) {
+        lastTypingSentMs = now;
+        appSocket.send(JSON.stringify({ type: 'typing', toUserId: currentFriend.id }));
+      }
+    }
   });
 
   // ====== 加载用户/项目 ======
@@ -2158,7 +2793,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         renderProjectPage(refreshed);
       }
     }
-    renderConversationList();
+    if (currentTab === 'chatPage' && !isAnyChatActive()) renderConversationList();
     renderProjectHomePage();
   }
   function friendlyModelName(model) {
@@ -2564,7 +3199,24 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     setTimeout(() => projectNameInput.focus(), 50);
   }
   function closeNewProject() { newProjectMask.classList.remove('active'); }
-  addBtn.addEventListener('click', openNewProject);
+  function openAddFriendDialog() {
+    addFriendResult.textContent = '';
+    friendSearchType.value = 'auto';
+    friendSearchInput.value = '';
+    confirmAddFriendBtn.disabled = false;
+    addFriendMask.classList.add('active');
+    setTimeout(() => friendSearchInput.focus(), 50);
+  }
+  function closeAddFriendDialog() {
+    addFriendMask.classList.remove('active');
+  }
+  addBtn.addEventListener('click', () => {
+    if (currentTab === 'chatPage' && !isAnyChatActive()) {
+      openAddFriendDialog();
+      return;
+    }
+    openNewProject();
+  });
   cancelNewProjectBtn.addEventListener('click', closeNewProject);
   newProjectMask.addEventListener('click', (e) => { if (e.target === newProjectMask) closeNewProject(); });
   newProjectForm.addEventListener('submit', async (e) => {
@@ -2590,6 +3242,39 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       newProjectError.textContent = err.message;
     } finally {
       createProjectBtn.disabled = false;
+    }
+  });
+  cancelAddFriendBtn.addEventListener('click', closeAddFriendDialog);
+  addFriendMask.addEventListener('click', (e) => { if (e.target === addFriendMask) closeAddFriendDialog(); });
+  addFriendForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const query = friendSearchInput.value.trim();
+    if (!query) {
+      addFriendResult.textContent = '请输入搜索内容';
+      return;
+    }
+    confirmAddFriendBtn.disabled = true;
+    addFriendResult.textContent = '正在添加...';
+    try {
+      const res = await api('/api/me/friends', {
+        method: 'POST',
+        body: JSON.stringify({
+          search_type: friendSearchType.value,
+          query
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '添加失败');
+      closeAddFriendDialog();
+      await loadSocialChats();
+      const friend = data.friend && data.friend.id
+        ? friends.find((item) => item.id === data.friend.id) || data.friend
+        : null;
+      if (friend) openFriendChat(friend);
+    } catch (err) {
+      addFriendResult.textContent = (err && err.message) ? err.message : '添加失败';
+    } finally {
+      confirmAddFriendBtn.disabled = false;
     }
   });
 
@@ -2683,9 +3368,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function fmtBal(v) { return Number.isInteger(v) ? v : v.toFixed(2); }
-  function isLoggedIn() { return !!localStorage.getItem('elon_token'); }
+  function isLoggedIn() { return !!token; }
   function authHeaders() {
-    const t = localStorage.getItem('elon_token');
+    const t = token;
     return t ? { 'Authorization': 'Bearer ' + t } : {};
   }
 
@@ -3009,8 +3694,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     token = '';
     currentUser = null;
     currentProject = null;
+    currentFriend = null;
+    currentGroup = null;
     projects = [];
+    friends = [];
+    groups = [];
     if (socket) { try { socket.close(); } catch {} socket = null; }
+    if (appSocket) { try { appSocket.close(); } catch {} appSocket = null; }
+    stopContactPolling();
     switchTab('chatPage');
     showLogin();
   });
@@ -3159,9 +3850,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     showApp();
     switchTab('chatPage');
+    connectAppSocket();
     // 后续数据加载失败不踢回登录页，仅在控制台告警
     Promise.all([
       loadProjects().catch((e) => console.warn('loadProjects failed:', e)),
+      loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e)),
       loadVersion().catch((e) => console.warn('loadVersion failed:', e)),
     ]).then(() => loadAgents()).catch((e) => console.warn('loadAgents failed:', e));
   }
