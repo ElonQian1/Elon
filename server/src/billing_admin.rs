@@ -6,6 +6,8 @@
 //! - GET  /api/admin/billing/users?page=1&size=20  用户余额列表
 //! - GET  /api/admin/billing/users/:user_id        单用户计费详情
 //! - GET  /api/admin/billing/reservations          预授权明细
+//! - GET  /api/admin/billing/price-rules           查询模型/算力计价规则
+//! - PUT  /api/admin/billing/price-rules           新增或更新计价规则
 //! - GET  /api/admin/billing/config               查询计费配置
 //! - PUT  /api/admin/billing/config               修改计费配置
 
@@ -19,7 +21,9 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::{admin::check_auth, project_auth::json_error, types::AppState};
+use crate::{
+    admin::check_auth, project_auth::json_error, store::BillingPriceRuleUpsert, types::AppState,
+};
 
 // ── POST /api/admin/billing/recharge ─────────────────────────────────────────
 
@@ -175,6 +179,50 @@ pub async fn list_reservations(
     }
 }
 
+// ── GET/PUT /api/admin/billing/price-rules ─────────────────────────────────
+
+pub async fn list_price_rules(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    match state.store.billing_list_price_rules() {
+        Ok(rows) => Json(json!({ "rules": rows })).into_response(),
+        Err(e) => {
+            tracing::warn!("admin billing list price rules error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+pub async fn upsert_price_rule(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<BillingPriceRuleUpsert>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    if body.pattern.trim().is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "匹配规则不能为空");
+    }
+    if !body.input_usd_per_m.is_finite()
+        || !body.cached_usd_per_m.is_finite()
+        || !body.output_usd_per_m.is_finite()
+        || body.input_usd_per_m < 0.0
+        || body.cached_usd_per_m < 0.0
+        || body.output_usd_per_m < 0.0
+    {
+        return json_error(StatusCode::BAD_REQUEST, "计价金额必须是非负数字");
+    }
+    match state.store.billing_upsert_price_rule(&body) {
+        Ok(rule) => Json(json!({ "ok": true, "rule": rule })).into_response(),
+        Err(e) => {
+            tracing::warn!("admin billing upsert price rule error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "保存失败")
+        }
+    }
+}
+
 // ── GET /api/admin/billing/config ─────────────────────────────────────────────
 
 pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -202,6 +250,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
         "billing_asr_min_reservation_fen": config_int("billing_asr_min_reservation_fen", 1),
         "billing_tts_min_reservation_fen": config_int("billing_tts_min_reservation_fen", 1),
         "billing_realtime_voice_min_reservation_fen": config_int("billing_realtime_voice_min_reservation_fen", 1),
+        "billing_open_reservation_alert_threshold": config_int("billing_open_reservation_alert_threshold", 100),
         "note": {
             "usd_to_rmb_rate_x10000": "汇率×10000，73000 = 7.3000",
             "markup_x1000": "加价率×1000，1200 = ×1.2（收费 = 成本 × 1.2）",
@@ -213,7 +262,8 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
             "billing_image_min_reservation_fen": "图片生成最低预授权冻结金额（分）",
             "billing_asr_min_reservation_fen": "ASR 语音识别最低预授权冻结金额（分）",
             "billing_tts_min_reservation_fen": "TTS 语音合成最低预授权冻结金额（分）",
-            "billing_realtime_voice_min_reservation_fen": "实时语音每轮最低预授权冻结金额（分）"
+            "billing_realtime_voice_min_reservation_fen": "实时语音每轮最低预授权冻结金额（分）",
+            "billing_open_reservation_alert_threshold": "冻结中预授权数量超过该值时产生对账告警"
         }
     }))
     .into_response()
@@ -239,6 +289,7 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "billing_asr_min_reservation_fen",
     "billing_tts_min_reservation_fen",
     "billing_realtime_voice_min_reservation_fen",
+    "billing_open_reservation_alert_threshold",
 ];
 
 pub async fn set_config(

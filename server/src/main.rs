@@ -24,6 +24,7 @@ mod billing_admin;
 mod billing_api;
 mod billing_events;
 mod billing_lifecycle;
+mod billing_monitor;
 mod billing_pay;
 mod chat_attachments;
 mod cli_config;
@@ -147,6 +148,7 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState::new()?);
     codex_health::spawn_codex_network_monitor(state.clone());
     billing_lifecycle::spawn_reservation_janitor(state.clone());
+    billing_monitor::spawn_reconciliation_monitor(state.clone());
     project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();

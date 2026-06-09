@@ -9,6 +9,7 @@
 //!   GET /api/admin/token-stats/trend?days=30
 //!   GET /api/admin/token-stats/accounting-audit?days=30&limit=100
 //!   GET /api/admin/token-stats/reconciliation-summary?days=30
+//!   GET /api/admin/token-stats/billing-alerts?include_resolved=false&limit=100
 //!   GET /api/admin/token-stats/compute-meter-summary?days=30&limit=100
 //!   GET /api/admin/token-stats/compute-meter-events?days=30&limit=100
 
@@ -35,6 +36,14 @@ fn default_days() -> i64 {
 }
 fn default_limit() -> i64 {
     50
+}
+
+#[derive(Deserialize)]
+pub struct AlertQuery {
+    #[serde(default)]
+    pub include_resolved: bool,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
 }
 
 /// GET /api/admin/token-stats/summary?days=30
@@ -154,6 +163,34 @@ pub async fn get_reconciliation_summary(
         Ok(summary) => Json(summary).into_response(),
         Err(e) => {
             tracing::warn!("admin_billing_reconciliation_summary error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+/// GET /api/admin/token-stats/billing-alerts?include_resolved=false&limit=100
+pub async fn get_billing_alerts(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<AlertQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    if let Err(e) = state.store.refresh_billing_alerts() {
+        tracing::warn!("refresh_billing_alerts error: {}", e);
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "刷新对账告警失败");
+    }
+    let limit = q.limit.clamp(1, 500);
+    match state.store.billing_list_alerts(q.include_resolved, limit) {
+        Ok(rows) => Json(serde_json::json!({
+            "alerts": rows,
+            "include_resolved": q.include_resolved,
+            "limit": limit,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::warn!("billing_list_alerts error: {}", e);
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
         }
     }

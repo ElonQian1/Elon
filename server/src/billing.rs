@@ -72,7 +72,25 @@ pub fn calc_cost_fen(
     rate_x10000: i64,
     markup_x1000: i64,
 ) -> i64 {
-    let (inp, cac, out) = model_price(model);
+    calc_cost_fen_with_price(
+        model_price(model),
+        input_tokens,
+        cached_input_tokens,
+        output_tokens,
+        rate_x10000,
+        markup_x1000,
+    )
+}
+
+fn calc_cost_fen_with_price(
+    price: (f64, f64, f64),
+    input_tokens: i64,
+    cached_input_tokens: i64,
+    output_tokens: i64,
+    rate_x10000: i64,
+    markup_x1000: i64,
+) -> i64 {
+    let (inp, cac, out) = price;
     let usd = (input_tokens as f64 / 1_000_000.0) * inp
         + (cached_input_tokens as f64 / 1_000_000.0) * cac
         + (output_tokens as f64 / 1_000_000.0) * out;
@@ -81,6 +99,20 @@ pub fn calc_cost_fen(
     // 转分并向上取整（最低 1 分，避免 0 分调用不扣费）
     let fen = (marked_up * 100.0).ceil() as i64;
     fen.max(0)
+}
+
+fn model_price_for_store(store: &Store, model: &str) -> (f64, f64, f64) {
+    match store.billing_find_price_rule(model) {
+        Ok(Some(rule)) => rule.price_tuple(),
+        Ok(None) => model_price(model),
+        Err(e) => {
+            warn!(
+                model,
+                "billing price rule lookup failed, using built-in fallback: {}", e
+            );
+            model_price(model)
+        }
+    }
 }
 
 // ── 公开钩子 ──────────────────────────────────────────────────────────────────
@@ -229,8 +261,8 @@ pub fn estimate_cost_for_tokens(
     output_tokens: i64,
 ) -> i64 {
     let (rate, markup) = store.billing_get_rate_and_markup();
-    calc_cost_fen(
-        model,
+    calc_cost_fen_with_price(
+        model_price_for_store(store, model),
         input_tokens.max(0),
         cached_input_tokens.max(0),
         output_tokens.max(0),
@@ -246,8 +278,8 @@ pub fn account_trusted_usage(
 ) -> anyhow::Result<TokenUsageAccountingResult> {
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = record.model.unwrap_or("unknown");
-    let cost_fen = calc_cost_fen(
-        model,
+    let cost_fen = calc_cost_fen_with_price(
+        model_price_for_store(store, model),
         record.input_tokens.max(0),
         record.cached_input_tokens.max(0),
         record.output_tokens.max(0),
@@ -291,8 +323,8 @@ pub fn deduct_usage(
 
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = model.unwrap_or("unknown");
-    let cost_fen = calc_cost_fen(
-        model,
+    let cost_fen = calc_cost_fen_with_price(
+        model_price_for_store(store, model),
         input_tokens.max(0),
         cached_input_tokens.max(0),
         output_tokens.max(0),
@@ -424,4 +456,43 @@ fn billing_required_for_all_users(store: &Store) -> bool {
 fn truthy(value: &str) -> bool {
     let value = value.trim().to_ascii_lowercase();
     value == "1" || value == "true" || value == "yes" || value == "on"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::BillingPriceRuleUpsert;
+    use uuid::Uuid;
+
+    fn temp_store() -> (Store, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "elon_billing_runtime_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        (Store::open(&path).expect("store should open"), path)
+    }
+
+    #[test]
+    fn estimate_cost_uses_configured_price_rule() {
+        let (store, path) = temp_store();
+        store
+            .billing_set_config("usd_to_rmb_rate_x10000", "10000")
+            .unwrap();
+        store.billing_set_config("markup_x1000", "1000").unwrap();
+        store
+            .billing_upsert_price_rule(&BillingPriceRuleUpsert {
+                pattern: "custom-expensive".to_string(),
+                input_usd_per_m: 0.0,
+                cached_usd_per_m: 0.0,
+                output_usd_per_m: 1000.0,
+                priority: 999,
+                enabled: true,
+                note: None,
+            })
+            .unwrap();
+
+        let cost = estimate_cost_for_tokens(&store, "custom-expensive-v1", 0, 0, 1_000_000);
+        assert_eq!(cost, 100_000);
+        let _ = std::fs::remove_file(path);
+    }
 }

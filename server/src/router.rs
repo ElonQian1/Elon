@@ -457,6 +457,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(admin_token_stats::get_reconciliation_summary),
         )
         .route(
+            "/api/admin/token-stats/billing-alerts",
+            get(admin_token_stats::get_billing_alerts),
+        )
+        .route(
             "/api/admin/token-stats/compute-meter-summary",
             get(admin_token_stats::get_compute_meter_summary),
         )
@@ -520,6 +524,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/billing/reservations",
             get(billing_admin::list_reservations),
+        )
+        .route(
+            "/api/admin/billing/price-rules",
+            get(billing_admin::list_price_rules).put(billing_admin::upsert_price_rule),
         )
         .route(
             "/api/admin/billing/config",

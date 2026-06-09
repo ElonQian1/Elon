@@ -56,6 +56,8 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (34, "非 CLI 算力预授权配置", migration_v34),
     (35, "PC 项目工作区健康快照", migration_v35),
     (36, "算力多单位计量明细账本", migration_v36),
+    (37, "模型与算力计价规则配置表", migration_v37),
+    (38, "计费自动对账告警表", migration_v38),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1316,6 +1318,79 @@ fn migration_v36(conn: &Connection) -> Result<()> {
           ON compute_meter_events(user_id, compute_call_id);
         CREATE INDEX IF NOT EXISTS idx_compute_meter_events_feature_mode
           ON compute_meter_events(feature, usage_mode, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v37(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS billing_price_rules (
+          id               TEXT PRIMARY KEY,
+          pattern          TEXT NOT NULL UNIQUE,
+          input_usd_per_m  REAL NOT NULL,
+          cached_usd_per_m REAL NOT NULL,
+          output_usd_per_m REAL NOT NULL,
+          priority         INTEGER NOT NULL DEFAULT 0,
+          enabled          INTEGER NOT NULL DEFAULT 1,
+          note             TEXT,
+          updated_at       TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_billing_price_rules_enabled_priority
+          ON billing_price_rules(enabled, priority DESC);
+
+        INSERT OR IGNORE INTO billing_price_rules
+          (id, pattern, input_usd_per_m, cached_usd_per_m, output_usd_per_m, priority, enabled, note, updated_at)
+        VALUES
+          ('bpr_seed_gpt_4o_mini_dash', 'gpt-4o-mini', 0.15, 0.075, 0.60, 100, 1, '默认 OpenAI mini 定价', datetime('now')),
+          ('bpr_seed_gpt4o_mini', 'gpt4o-mini', 0.15, 0.075, 0.60, 100, 1, '默认 OpenAI mini 定价别名', datetime('now')),
+          ('bpr_seed_gpt_4o_dash', 'gpt-4o', 2.5, 1.25, 10.0, 90, 1, '默认 OpenAI 4o 定价', datetime('now')),
+          ('bpr_seed_gpt4o', 'gpt4o', 2.5, 1.25, 10.0, 90, 1, '默认 OpenAI 4o 定价别名', datetime('now')),
+          ('bpr_seed_o3_mini', 'o3-mini', 1.1, 0.55, 4.4, 100, 1, '默认 o3-mini 定价', datetime('now')),
+          ('bpr_seed_claude_35_haiku_dash', 'claude-3-5-haiku', 0.25, 0.03, 1.25, 100, 1, '默认 Claude Haiku 定价', datetime('now')),
+          ('bpr_seed_claude_35_haiku_dot', 'claude-3.5-haiku', 0.25, 0.03, 1.25, 100, 1, '默认 Claude Haiku 定价别名', datetime('now')),
+          ('bpr_seed_claude_3_haiku', 'claude-3-haiku', 0.25, 0.03, 1.25, 90, 1, '默认 Claude 3 Haiku 定价', datetime('now')),
+          ('bpr_seed_claude_opus', 'claude-opus', 15.0, 1.5, 75.0, 80, 1, '默认 Claude Opus 定价', datetime('now')),
+          ('bpr_seed_claude_sonnet', 'claude-sonnet', 3.0, 0.3, 15.0, 80, 1, '默认 Claude Sonnet 定价', datetime('now')),
+          ('bpr_seed_claude_37_dash', 'claude-3-7', 3.0, 0.3, 15.0, 90, 1, '默认 Claude 3.7 定价', datetime('now')),
+          ('bpr_seed_claude_37_dot', 'claude-3.7', 3.0, 0.3, 15.0, 90, 1, '默认 Claude 3.7 定价别名', datetime('now')),
+          ('bpr_seed_claude_35_sonnet_dash', 'claude-3-5-sonnet', 3.0, 0.3, 15.0, 90, 1, '默认 Claude 3.5 Sonnet 定价', datetime('now')),
+          ('bpr_seed_claude_35_sonnet_dot', 'claude-3.5-sonnet', 3.0, 0.3, 15.0, 90, 1, '默认 Claude 3.5 Sonnet 定价别名', datetime('now')),
+          ('bpr_seed_claude', 'claude', 3.0, 0.3, 15.0, 10, 1, 'Claude 默认兜底定价', datetime('now')),
+          ('bpr_seed_deepseek', 'deepseek', 0.14, 0.014, 0.28, 80, 1, '默认 DeepSeek 定价', datetime('now')),
+          ('bpr_seed_metered_image', 'metered-image', 0.0, 0.0, 5.0, 100, 1, '图片算力内部计量单位', datetime('now')),
+          ('bpr_seed_metered_realtime', 'metered-realtime', 1.0, 0.0, 2.0, 100, 1, '实时语音内部计量单位', datetime('now')),
+          ('bpr_seed_metered_asr', 'metered-asr', 1.0, 0.0, 1.0, 100, 1, 'ASR 内部计量单位', datetime('now')),
+          ('bpr_seed_metered_tts', 'metered-tts', 1.0, 0.0, 1.0, 100, 1, 'TTS 内部计量单位', datetime('now')),
+          ('bpr_seed_default', '*', 3.0, 0.3, 15.0, -100, 1, '未知模型保守兜底定价', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v38(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS billing_alerts (
+          id             TEXT PRIMARY KEY,
+          fingerprint    TEXT NOT NULL UNIQUE,
+          severity       TEXT NOT NULL,
+          status         TEXT NOT NULL DEFAULT 'open',
+          title          TEXT NOT NULL,
+          detail         TEXT NOT NULL,
+          metric_value   INTEGER NOT NULL DEFAULT 0,
+          first_seen_at  TEXT NOT NULL,
+          updated_at     TEXT NOT NULL,
+          resolved_at    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_billing_alerts_status_updated
+          ON billing_alerts(status, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_billing_alerts_severity
+          ON billing_alerts(severity, status);
+
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_open_reservation_alert_threshold', '100', datetime('now'));
         "#,
     )?;
     Ok(())
