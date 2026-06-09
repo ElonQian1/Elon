@@ -469,7 +469,7 @@ class MainActivity : AppCompatActivity() {
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList,
-            renderProjectSpace = { projectSpaceController.renderActiveSpace() },
+            renderProjectSpace = { projectSpaceController.renderProjectSpaceLanding() },
             refreshServerVersion = { profileQuickActions.refreshServerVersion() },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
@@ -649,7 +649,7 @@ class MainActivity : AppCompatActivity() {
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
             setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
-            onConversationsChanged = { projectSpaceController.renderActiveSpace() }
+            onConversationsChanged = { projectSpaceController.renderProjectSpaceLanding() }
         )
     }
 
@@ -663,7 +663,7 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderConversationList = homeListActions::renderConversationList,
             openConversation = conversationOpenActions::openConversation,
-            renderProjectSpace = { projectSpaceController.renderActiveSpace() }
+            renderProjectSpace = { projectSpaceController.renderProjectSpaceLanding() }
         )
     }
 

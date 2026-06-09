@@ -4,8 +4,12 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.PathInterpolator
+import android.widget.ImageView
 
 internal object WechatPageTransition {
     private const val DURATION_MS = 260L
@@ -191,6 +195,104 @@ internal object WechatPageTransition {
                     onEnd()
                 }
             )
+        }
+    }
+
+    fun replaceContentFromRight(
+        container: View,
+        page: View,
+        updateContent: () -> Unit,
+        onEnd: () -> Unit
+    ) {
+        replaceContent(
+            container = container,
+            page = page,
+            incomingFrom = Direction.RIGHT,
+            updateContent = updateContent,
+            onEnd = onEnd
+        )
+    }
+
+    fun replaceContentToRight(
+        container: View,
+        page: View,
+        updateContent: () -> Unit,
+        onEnd: () -> Unit
+    ) {
+        replaceContent(
+            container = container,
+            page = page,
+            incomingFrom = Direction.LEFT,
+            updateContent = updateContent,
+            onEnd = onEnd
+        )
+    }
+
+    private enum class Direction {
+        LEFT,
+        RIGHT
+    }
+
+    private fun replaceContent(
+        container: View,
+        page: View,
+        incomingFrom: Direction,
+        updateContent: () -> Unit,
+        onEnd: () -> Unit
+    ) {
+        runWhenMeasured(container) {
+            val parent = container as? ViewGroup
+            val overlay = parent?.let { capturePageOverlay(page) }
+            updateContent()
+            page.visibility = View.VISIBLE
+            if (overlay == null || container.width <= 0) {
+                page.translationX = 0f
+                onEnd()
+                return@runWhenMeasured
+            }
+
+            val width = container.width.toFloat()
+            val incomingStart = if (incomingFrom == Direction.RIGHT) width else -width * UNDER_PAGE_SHIFT
+            val overlayEnd = if (incomingFrom == Direction.RIGHT) -width * UNDER_PAGE_SHIFT else width
+            page.translationX = incomingStart
+            overlay.translationX = 0f
+
+            parent.addView(overlay)
+            if (incomingFrom == Direction.RIGHT) page.bringToFront() else overlay.bringToFront()
+            parent.invalidate()
+            play(
+                animators = listOf(
+                    slide(page, incomingStart, 0f),
+                    slide(overlay, 0f, overlayEnd)
+                ),
+                onEnd = {
+                    page.translationX = 0f
+                    parent.removeView(overlay)
+                    (overlay.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap?.recycle()
+                    page.bringToFront()
+                    onEnd()
+                }
+            )
+        }
+    }
+
+    private fun capturePageOverlay(page: View): ImageView? {
+        val width = page.width
+        val height = page.height
+        if (width <= 0 || height <= 0) return null
+        val bitmap = runCatching {
+            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+                page.draw(Canvas(bitmap))
+            }
+        }.getOrNull() ?: return null
+        return ImageView(page.context).apply {
+            setImageBitmap(bitmap)
+            scaleType = ImageView.ScaleType.FIT_XY
+            layoutParams = ViewGroup.LayoutParams(width, height)
+            x = page.x
+            y = page.y
+            elevation = page.elevation + 1f
+            visibility = View.VISIBLE
         }
     }
 

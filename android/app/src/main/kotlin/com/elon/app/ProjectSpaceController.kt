@@ -150,7 +150,7 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun renderProjectSpaceLanding() {
+    fun renderProjectSpaceLanding() {
         if (pendingOpenSelfMemberList) {
             pendingOpenSelfMemberList = false
             if (renderSelfMemberConversationList()) return
@@ -706,7 +706,7 @@ internal class ProjectSpaceController(
                 result.onSuccess { space ->
                     activeSpace = space
                     activeProjectTitle = space.project.name
-                    renderActiveSpace()
+                    renderProjectSpaceLanding()
                 }.onFailure { error ->
                     Toast.makeText(activity, error.message ?: "刷新项目空间失败", Toast.LENGTH_SHORT).show()
                 }
