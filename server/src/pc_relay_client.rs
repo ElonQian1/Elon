@@ -123,7 +123,7 @@ async fn run_relay_session(
         allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
         owner_user_id: None,
-        device_name: None,
+        device_name: local_device_name(),
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");
@@ -277,6 +277,14 @@ async fn run_relay_session(
     drop(out_tx);
     let _ = writer.await;
     Ok(())
+}
+
+fn local_device_name() -> Option<String> {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 // ── CliPrompt 处理 ────────────────────────────────────────────────────────────

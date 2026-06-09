@@ -179,6 +179,7 @@ async function load() {
     ['版本', r.version],
     ['登录状态', r.logged_in ? '✅ 已登录' : '❌ 未登录'],
     ['节点 ID', r.agent_id || '(登录后自动生成)'],
+    ['设备名称', r.device_name || '(未知 PC)'],
     ['云端', r.cloud_url],
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],

@@ -15,8 +15,9 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use homecli_proto::ModelCapability;
 use sha2::Digest as _;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{project_auth::auth_from_headers, types::AppState};
 use serde::{Deserialize, Serialize};
@@ -221,8 +222,115 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         }
     };
 
-    let nodes = state.node_registry.list_by_owner(&user.id).await;
+    let credentials = match state.store.list_node_credentials(&user.id) {
+        Ok(nodes) => nodes,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
+    };
+    let mut online_by_id: HashMap<_, _> = state
+        .node_registry
+        .list_by_owner(&user.id)
+        .await
+        .into_iter()
+        .map(|node| (node.node_id.clone(), node))
+        .collect();
+
+    let mut nodes = Vec::new();
+    for credential in credentials {
+        let node_id = credential.agent_id.clone();
+        let online = online_by_id.remove(&node_id);
+        let short_id = short_node_id(&node_id);
+        let label = credential.label.trim().to_string();
+        let device_name = online
+            .as_ref()
+            .and_then(|node| clean_string(node.device_name.as_deref()))
+            .or_else(|| clean_string(credential.device_name.as_deref()));
+        let display_label = if label == node_id { "" } else { &label };
+        let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
+        let models = online
+            .as_ref()
+            .map(|node| node.models.clone())
+            .unwrap_or_default();
+        let connected_at = online.as_ref().map(|node| node.connected_at).unwrap_or(0);
+        let is_online = online.as_ref().map(|node| node.online).unwrap_or(false);
+        nodes.push(MyNodeResponse {
+            agent_id: node_id.clone(),
+            node_id,
+            owner_user_id: credential.owner_user_id,
+            label,
+            device_name,
+            display_name,
+            short_id,
+            models,
+            connected_at,
+            created_at: credential.created_at,
+            online: is_online,
+        });
+    }
+
+    for node in online_by_id.into_values() {
+        let short_id = short_node_id(&node.node_id);
+        let device_name = clean_string(node.device_name.as_deref());
+        let display_name = display_node_name("", device_name.as_deref(), &short_id);
+        nodes.push(MyNodeResponse {
+            agent_id: node.node_id.clone(),
+            node_id: node.node_id,
+            owner_user_id: node.owner_user_id,
+            label: String::new(),
+            device_name,
+            display_name,
+            short_id,
+            models: node.models,
+            connected_at: node.connected_at,
+            created_at: String::new(),
+            online: node.online,
+        });
+    }
+
     Json(serde_json::json!({ "nodes": nodes })).into_response()
+}
+
+#[derive(Serialize)]
+struct MyNodeResponse {
+    agent_id: String,
+    node_id: String,
+    owner_user_id: String,
+    label: String,
+    device_name: Option<String>,
+    display_name: String,
+    short_id: String,
+    models: Vec<ModelCapability>,
+    connected_at: u64,
+    created_at: String,
+    online: bool,
+}
+
+fn clean_string(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn display_node_name(label: &str, device_name: Option<&str>, short_id: &str) -> String {
+    clean_string(Some(label))
+        .or_else(|| clean_string(device_name))
+        .unwrap_or_else(|| short_id.to_string())
+}
+
+fn short_node_id(id: &str) -> String {
+    let chars: Vec<char> = id.chars().collect();
+    if chars.len() > 16 {
+        let tail: String = chars[chars.len() - 14..].iter().collect();
+        format!("...{tail}")
+    } else {
+        id.to_string()
+    }
 }
 
 // ── /api/nodes/chat ───────────────────────────────────────────────────────────

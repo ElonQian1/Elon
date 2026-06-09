@@ -328,9 +328,19 @@ class NodeActivity : Activity() {
         val arr = json.optJSONArray("nodes") ?: return@withContext emptyList()
         (0 until arr.length()).map { i ->
             val n = arr.getJSONObject(i)
+            val agentId = n.optString("agent_id", n.optString("node_id"))
+            val nodeId = n.optString("node_id", agentId)
+            val shortId = n.optString("short_id").ifBlank { formatNodeId(nodeId) }
+            val deviceName = n.optString("device_name").trim()
+            val displayName = n.optString("display_name")
+                .ifBlank { n.optString("label") }
+                .ifBlank { deviceName }
+                .ifBlank { shortId }
             NodeInfo(
-                agentId = n.optString("agent_id"),
-                label = n.optString("label", n.optString("agent_id")),
+                agentId = agentId,
+                displayName = displayName,
+                shortId = shortId,
+                deviceName = deviceName,
                 online = n.optBoolean("online", false),
                 models = run {
                     val ms = n.optJSONArray("models")
@@ -381,7 +391,7 @@ class NodeActivity : Activity() {
                 })
 
                 addView(TextView(context).apply {
-                    text = node.label.ifBlank { node.agentId }
+                    text = node.displayName.ifBlank { node.shortId.ifBlank { node.agentId } }
                     textSize = 15f
                     setTypeface(null, Typeface.BOLD)
                     setTextColor(Color.parseColor(TEXT_PRIMARY))
@@ -395,17 +405,29 @@ class NodeActivity : Activity() {
                 })
             })
 
-            if (node.models.isNotEmpty()) {
-                addView(TextView(context).apply {
-                    text = "模型: ${node.models.joinToString(", ")}"
-                    textSize = 12f
-                    setTextColor(Color.parseColor(TEXT_SECONDARY))
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).also { it.topMargin = 6 }
-                })
-            }
+            addView(TextView(context).apply {
+                text = node.subtitle()
+                textSize = 12f
+                setTextColor(Color.parseColor(TEXT_TERTIARY))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.topMargin = 6 }
+            })
+
+            addView(TextView(context).apply {
+                text = if (node.models.isNotEmpty()) {
+                    "模型: ${node.models.joinToString(", ")}"
+                } else {
+                    "暂无可用模型，确认 PC 端 Ollama / LM Studio 已启动"
+                }
+                textSize = 12f
+                setTextColor(Color.parseColor(TEXT_SECONDARY))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.topMargin = 6 }
+            })
         }
     }
 
@@ -413,7 +435,7 @@ class NodeActivity : Activity() {
 
     private fun showRegisterDialog() {
         val editLabel = EditText(this).apply {
-            hint = "节点昵称（可选，如：我的游戏 PC）"
+            hint = "节点昵称（可选，如：工作台 / 游戏主机）"
             setTextColor(Color.parseColor(TEXT_PRIMARY))
             setHintTextColor(Color.parseColor(TEXT_TERTIARY))
             setBackgroundColor(Color.parseColor(SECONDARY_BG))
@@ -422,7 +444,7 @@ class NodeActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle("注册新 PC 节点")
-            .setMessage("注册后你将获得 agent_id 和 secret，填入 node-agent 配置即可运行。")
+            .setMessage("普通用户建议直接在 PC 端登录管理页，系统会自动读取电脑名作为设备名称。这里填写的是额外昵称，不填也能通过电脑名区分。")
             .setView(editLabel)
             .setPositiveButton("注册") { _, _ ->
                 val label = editLabel.text.toString().trim()
@@ -521,6 +543,10 @@ class NodeActivity : Activity() {
         Toast.makeText(this, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
     }
 
+    private fun formatNodeId(id: String): String {
+        return if (id.length > 16) "...${id.takeLast(14)}" else id
+    }
+
     private fun setLoading(loading: Boolean) {
         mainHandler.post {
             progressBar.visibility = if (loading) View.VISIBLE else View.GONE
@@ -538,10 +564,23 @@ class NodeActivity : Activity() {
 
     data class NodeInfo(
         val agentId: String,
-        val label: String,
+        val displayName: String,
+        val shortId: String,
+        val deviceName: String,
         val online: Boolean,
         val models: List<String>
-    )
+    ) {
+        fun subtitle(): String {
+            val idText = shortId.ifBlank {
+                if (agentId.length > 16) "...${agentId.takeLast(14)}" else agentId
+            }
+            return if (deviceName.isNotBlank() && !deviceName.equals(displayName, ignoreCase = true)) {
+                "设备: $deviceName · ID: $idText"
+            } else {
+                "ID: $idText"
+            }
+        }
+    }
 
     data class RegisterResult(
         val agentId: String,
