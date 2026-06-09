@@ -705,6 +705,7 @@
     .my-node-info { flex: 1; min-width: 0; }
     .my-node-id { font-size: 13px; font-weight: 700; color: #F2F5FA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .my-node-id.offline { color: #6F7785; }
+    .my-node-subtitle { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .my-node-models { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .my-node-badge { font-size: 11px; color: #81B3D9; flex-shrink: 0; margin-left: 8px; }
     .my-node-badge.offline { color: #6F7785; }
@@ -3472,16 +3473,24 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       nodes.forEach((node) => {
         const online = !!node.online;
         const nodeId = node.node_id || '';
-        const shortId = nodeId.length > 16 ? '…' + nodeId.slice(-14) : nodeId;
+        const shortId = node.short_id || (nodeId.length > 16 ? '…' + nodeId.slice(-14) : nodeId);
+        const deviceName = (node.device_name || '').trim();
+        const displayName = (node.display_name || node.label || deviceName || shortId).trim();
+        const subtitle = deviceName && deviceName.toLowerCase() !== displayName.toLowerCase()
+          ? `设备: ${deviceName} · ID: ${shortId}`
+          : `ID: ${shortId}`;
         const models = (node.models || []).map((m) => m.model_id).filter(Boolean);
-        const modelText = models.slice(0, 3).join('  ·  ') + (models.length > 3 ? `  +${models.length - 3}` : '');
+        const modelText = models.length
+          ? models.slice(0, 3).join('  ·  ') + (models.length > 3 ? `  +${models.length - 3}` : '')
+          : '暂无可用模型';
         const row = document.createElement('div');
         row.className = 'my-node-row';
         row.innerHTML = `
           <div class="my-node-dot ${online ? 'online' : 'offline'}"></div>
           <div class="my-node-info">
-            <div class="my-node-id ${online ? '' : 'offline'}">${shortId}</div>
-            ${models.length ? `<div class="my-node-models">${modelText}</div>` : ''}
+            <div class="my-node-id ${online ? '' : 'offline'}">${escapeHtml(displayName)}</div>
+            <div class="my-node-subtitle">${escapeHtml(subtitle)}</div>
+            <div class="my-node-models">${escapeHtml(modelText)}</div>
           </div>
           <div class="my-node-badge ${online ? '' : 'offline'}">${models.length} 模型</div>
         `;

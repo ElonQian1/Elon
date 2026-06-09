@@ -94,6 +94,9 @@ internal class MyNodesCard(
 
     private data class NodeItem(
         val nodeId: String,
+        val displayName: String,
+        val shortId: String,
+        val deviceName: String,
         val models: List<String>,
         val connectedAt: Long,
         val online: Boolean
@@ -108,12 +111,22 @@ internal class MyNodesCard(
         val arr: JSONArray = JSONObject(body).optJSONArray("nodes") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
+            val nodeId = o.optString("node_id", o.optString("agent_id", ""))
+            val shortId = o.optString("short_id").ifBlank { formatNodeId(nodeId) }
+            val deviceName = o.optString("device_name").trim()
+            val displayName = o.optString("display_name")
+                .ifBlank { o.optString("label") }
+                .ifBlank { deviceName }
+                .ifBlank { shortId }
             val modelsArr = o.optJSONArray("models") ?: JSONArray()
             val modelIds = (0 until modelsArr.length()).map { j ->
                 modelsArr.getJSONObject(j).optString("model_id", "")
             }.filter { it.isNotEmpty() }
             NodeItem(
-                nodeId = o.optString("node_id", ""),
+                nodeId = nodeId,
+                displayName = displayName,
+                shortId = shortId,
+                deviceName = deviceName,
                 models = modelIds,
                 connectedAt = o.optLong("connected_at", 0),
                 online = o.optBoolean("online", false)
@@ -205,17 +218,30 @@ internal class MyNodesCard(
             }
         })
 
-        // 节点 ID（缩短显示）+ 模型列表
+        // 节点展示名 + 设备/短 ID + 模型列表
         addView(LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             orientation = LinearLayout.VERTICAL
 
             addView(TextView(activity).apply {
                 includeFontPadding = false
-                text = formatNodeId(node.nodeId)
+                text = node.displayName
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor(if (node.online) "#F2F5FA" else "#6F7785"))
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+
+            addView(TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.topMargin = dp(2) }
+                includeFontPadding = false
+                text = nodeSubtitle(node)
+                textSize = 11f
+                setTextColor(Color.parseColor("#6F7785"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -233,6 +259,18 @@ internal class MyNodesCard(
                     setTextColor(Color.parseColor("#6F7785"))
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
+                })
+            } else {
+                addView(TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.topMargin = dp(2) }
+                    includeFontPadding = false
+                    text = "暂无可用模型"
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#6F7785"))
+                    maxLines = 1
                 })
             }
         })
@@ -265,6 +303,15 @@ internal class MyNodesCard(
     private fun formatNodeId(id: String): String {
         // 节点 ID 格式通常是 "node-XXXX" 或 UUID，截取后半段方便阅读
         return if (id.length > 16) "…${id.takeLast(14)}" else id
+    }
+
+    private fun nodeSubtitle(node: NodeItem): String {
+        val idText = node.shortId.ifBlank { formatNodeId(node.nodeId) }
+        return if (node.deviceName.isNotBlank() && !node.deviceName.equals(node.displayName, ignoreCase = true)) {
+            "设备: ${node.deviceName} · ID: $idText"
+        } else {
+            "ID: $idText"
+        }
     }
 
     private fun dp(n: Int): Int =

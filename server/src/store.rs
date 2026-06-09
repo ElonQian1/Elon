@@ -203,6 +203,9 @@ impl Store {
                 node_id: None,
                 status: "active".into(),
                 role: "owner".into(),
+                member_count: 1,
+                is_public: false,
+                join_mode: "open".into(),
                 last_task_status: None,
                 last_apk_url: None,
                 updated_at: now,
@@ -381,6 +384,9 @@ impl Store {
                 node_id: node_id.map(ToOwned::to_owned),
                 status: "active".into(),
                 role: "owner".into(),
+                member_count: 1,
+                is_public: false,
+                join_mode: "open".into(),
                 last_task_status: None,
                 last_apk_url: None,
                 updated_at: now,
@@ -543,6 +549,9 @@ impl Store {
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     pm.role,
+                    (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
+                    p.is_public,
+                    p.join_mode,
                     (
                         SELECT t.status FROM tasks t
                         WHERE t.project_id = p.id
@@ -726,9 +735,12 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         node_id: row.get(9)?,
         status: row.get(10)?,
         role: row.get(11)?,
-        last_task_status: row.get(12)?,
-        last_apk_url: row.get(13)?,
-        updated_at: row.get(14)?,
+        member_count: row.get(12)?,
+        is_public: row.get::<_, i64>(13)? != 0,
+        join_mode: row.get(14)?,
+        last_task_status: row.get(15)?,
+        last_apk_url: row.get(16)?,
+        updated_at: row.get(17)?,
     })
 }
 
@@ -742,6 +754,9 @@ fn find_owner_project_by_name(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     COALESCE(pm.role, 'owner') AS role,
+                    (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
+                    p.is_public,
+                    p.join_mode,
                     (
                         SELECT t.status FROM tasks t
                         WHERE t.project_id = p.id
@@ -776,6 +791,9 @@ fn find_project_by_id_for_user(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     pm.role,
+                    (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
+                    p.is_public,
+                    p.join_mode,
                     (
                         SELECT t.status FROM tasks t
                         WHERE t.project_id = p.id

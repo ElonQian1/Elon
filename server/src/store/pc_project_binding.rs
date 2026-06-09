@@ -66,6 +66,9 @@ impl Store {
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
                     pm.role,
+                    (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
+                    p.is_public,
+                    p.join_mode,
                     (SELECT t.status FROM tasks t WHERE t.project_id = p.id
                      ORDER BY t.created_at DESC LIMIT 1) AS last_task_status,
                     (SELECT t.apk_url FROM tasks t
@@ -90,9 +93,12 @@ impl Store {
                     node_id: row.get(9)?,
                     status: row.get(10)?,
                     role: row.get(11)?,
-                    last_task_status: row.get(12)?,
-                    last_apk_url: row.get(13)?,
-                    updated_at: row.get(14)?,
+                    member_count: row.get(12)?,
+                    is_public: row.get::<_, i64>(13)? != 0,
+                    join_mode: row.get(14)?,
+                    last_task_status: row.get(15)?,
+                    last_apk_url: row.get(16)?,
+                    updated_at: row.get(17)?,
                 })
             },
         )

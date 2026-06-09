@@ -125,14 +125,21 @@
     return String(project.role || '').trim().toLowerCase();
   }
 
+  function boolOf(value) {
+    return value === true || value === 1 || value === '1' || String(value || '').toLowerCase() === 'true';
+  }
+
   function isJointProject(project) {
     const role = roleOf(project);
+    const memberCount = Number(project.member_count || project.memberCount || 0) || 0;
     return Boolean(
       project.isJointProject ||
       project.is_joint_project ||
       project.collaborationProjectId ||
       project.collaboration_project_id ||
-      (role && role !== 'owner')
+      (role && role !== 'owner') ||
+      boolOf(project.is_public || project.isPublic) ||
+      memberCount > 1
     );
   }
 
