@@ -107,29 +107,8 @@ pub async fn synthesize_handler(
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
-    // 优先走本地 TTS Worker（云端部署的）
-    if let Some(worker) = TtsWorkerConfig::from_env() {
-        match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
-            Ok(audio) => {
-                if audio.cache_status != "hit" {
-                    crate::compute_usage::record_tts_synthesis(
-                        &state.store,
-                        &caller.id,
-                        "voice_tts_synthesis",
-                        style.provider.as_worker_id(),
-                        &spoken_text,
-                        audio.bytes.len(),
-                    );
-                }
-                return audio_response(audio, &style);
-            }
-            Err(err) => {
-                warn!(target: "voice_tts", "云端 TTS Worker 失败，尝试 PC 节点: {err:#}");
-            }
-        }
-    }
-
-    // 回退：查找用户的 PC 节点是否有 TTS Worker
+    // ── 优先级：PC 节点 GPU 模型 TTS > 云端 Worker TTS ──────────────────────
+    // 若用户有在线 PC 节点且配置了 TTS Worker URL，优先走 PC 节点（高质量模型 TTS）
     if let Some((node_id, _tts_url)) = state
         .node_registry
         .find_tts_node_for_user(&caller.id)
@@ -180,10 +159,32 @@ pub async fn synthesize_handler(
                 }
             }
             Ok(homecli_proto::AgentToServer::TtsSynthesizeError { message, .. }) => {
-                warn!(target: "voice_tts", "PC 节点 TTS 失败: {message}");
+                warn!(target: "voice_tts", "PC 节点 TTS 失败，回退到云端 Worker: {message}");
             }
             Ok(_) => {}
-            Err(e) => warn!(target: "voice_tts", "PC 节点 TTS 请求失败: {e:#}"),
+            Err(e) => warn!(target: "voice_tts", "PC 节点 TTS 请求失败，回退到云端 Worker: {e:#}"),
+        }
+    }
+
+    // 回退：云端本地 TTS Worker（edge-tts 等）
+    if let Some(worker) = TtsWorkerConfig::from_env() {
+        match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
+            Ok(audio) => {
+                if audio.cache_status != "hit" {
+                    crate::compute_usage::record_tts_synthesis(
+                        &state.store,
+                        &caller.id,
+                        "voice_tts_synthesis",
+                        style.provider.as_worker_id(),
+                        &spoken_text,
+                        audio.bytes.len(),
+                    );
+                }
+                return audio_response(audio, &style);
+            }
+            Err(err) => {
+                warn!(target: "voice_tts", "云端 TTS Worker 失败，尝试 PC 节点: {err:#}");
+            }
         }
     }
 
