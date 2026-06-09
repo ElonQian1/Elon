@@ -123,6 +123,7 @@ async fn run_relay_session(
         allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
         owner_user_id: None,
+        device_name: None,
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");

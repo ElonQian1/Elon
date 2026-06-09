@@ -22,6 +22,8 @@ pub struct NodeEntry {
     pub node_id: String,
     /// 节点属主的用户 ID（积分归属）
     pub owner_user_id: String,
+    /// PC 设备名，仅用于展示。
+    pub device_name: Option<String>,
     /// 该节点支持的 LLM 模型列表
     pub models: Vec<ModelCapability>,
     /// 首次连接时间戳（Unix 秒）
@@ -35,6 +37,7 @@ pub struct NodeEntry {
 pub struct NodeSummary {
     pub node_id: String,
     pub owner_user_id: String,
+    pub device_name: Option<String>,
     pub models: Vec<ModelCapability>,
     pub connected_at: u64,
     /// 在 90s TTL 内 = online
@@ -58,12 +61,14 @@ impl NodeRegistry {
         &self,
         node_id: String,
         owner_user_id: String,
+        device_name: Option<String>,
         models: Vec<ModelCapability>,
         connected_at: u64,
     ) {
         let entry = NodeEntry {
             node_id: node_id.clone(),
             owner_user_id,
+            device_name,
             models,
             connected_at,
             last_seen: Instant::now(),
@@ -110,6 +115,7 @@ impl NodeRegistry {
             .map(|e| NodeSummary {
                 node_id: e.node_id.clone(),
                 owner_user_id: e.owner_user_id.clone(),
+                device_name: e.device_name.clone(),
                 models: e.models.clone(),
                 connected_at: e.connected_at,
                 online: e.last_seen.elapsed() < NODE_TIMEOUT,
@@ -161,6 +167,7 @@ impl NodeRegistry {
             .map(|e| NodeSummary {
                 node_id: e.node_id.clone(),
                 owner_user_id: e.owner_user_id.clone(),
+                device_name: e.device_name.clone(),
                 models: e.models.clone(),
                 connected_at: e.connected_at,
                 online: e.last_seen.elapsed() < NODE_TIMEOUT,

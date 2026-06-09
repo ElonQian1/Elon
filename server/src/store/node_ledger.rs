@@ -235,6 +235,30 @@ impl Store {
         Ok(owner)
     }
 
+    /// 回填节点设备名。当前表结构复用 label 展示名；只在用户尚未自定义 label 时更新。
+    pub fn update_node_credential_device_name(
+        &self,
+        agent_id: &str,
+        owner_user_id: &str,
+        device_name: &str,
+    ) -> Result<()> {
+        let device_name = device_name.trim();
+        if device_name.is_empty() {
+            return Ok(());
+        }
+
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_credentials
+             SET label = ?3
+             WHERE agent_id = ?1
+               AND owner_user_id = ?2
+               AND (label = '' OR label = agent_id)",
+            params![agent_id, owner_user_id, device_name],
+        )?;
+        Ok(())
+    }
+
     /// 列出某用户注册的所有节点凭证（不含 secret_hash）。
     pub fn list_node_credentials(&self, owner_user_id: &str) -> Result<Vec<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
