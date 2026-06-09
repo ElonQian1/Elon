@@ -143,6 +143,96 @@ complete_release() {
   RELEASE_FINISHED=1
 }
 
+find_aapt() {
+  local sdk_root candidate
+  for sdk_root in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Android/Sdk"; do
+    [[ -z "$sdk_root" || ! -d "$sdk_root/build-tools" ]] && continue
+    candidate=$(find "$sdk_root/build-tools" -type f -name aapt 2>/dev/null | sort -V | tail -1)
+    if [[ -n "$candidate" && -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  if command -v aapt >/dev/null 2>&1; then
+    command -v aapt
+    return 0
+  fi
+
+  return 1
+}
+
+apk_manifest_version() {
+  local apk_path="$1"
+  local aapt_bin badging package_line actual_code actual_name
+
+  [[ -f "$apk_path" ]] || {
+    echo "APK 文件不存在，无法校验版本: $apk_path" >&2
+    return 1
+  }
+
+  aapt_bin=$(find_aapt) || {
+    echo "未找到 aapt，无法校验 APK manifest 版本。请确认 Android SDK build-tools 已安装。" >&2
+    return 1
+  }
+
+  badging=$("$aapt_bin" dump badging "$apk_path" 2>&1) || {
+    echo "aapt dump badging 失败: $badging" >&2
+    return 1
+  }
+
+  package_line=$(printf '%s\n' "$badging" | grep "^package:" | head -1)
+  actual_code=$(printf '%s\n' "$package_line" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p")
+  actual_name=$(printf '%s\n' "$package_line" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
+
+  if [[ -z "$actual_code" || -z "$actual_name" ]]; then
+    echo "aapt package 行缺少 versionCode/versionName: $package_line" >&2
+    return 1
+  fi
+
+  printf '%s\t%s\n' "$actual_code" "$actual_name"
+}
+
+assert_apk_manifest_version() {
+  local apk_path="$1"
+  local expected_code="$2"
+  local expected_name="$3"
+  local label="${4:-APK}"
+  local actual actual_code actual_name
+
+  actual=$(apk_manifest_version "$apk_path") || {
+    complete_release "false" "" 0 "" "failed to read apk manifest version"
+    exit 1
+  }
+  actual_code="${actual%%$'\t'*}"
+  actual_name="${actual#*$'\t'}"
+
+  if [[ "$actual_code" != "$expected_code" || "$actual_name" != "$expected_name" ]]; then
+    echo -e "${RED}❌ ${label} manifest 版本不匹配：期望 v${expected_name} (build ${expected_code})，实际 v${actual_name} (build ${actual_code})。已停止发布，避免手机端重复更新。${NC}" >&2
+    complete_release "false" "" 0 "" "${label} manifest mismatch: expected ${expected_name}/${expected_code}, actual ${actual_name}/${actual_code}"
+    exit 1
+  fi
+
+  echo -e "${GREEN}   ✅ ${label} manifest: v${actual_name} (build ${actual_code})${NC}"
+}
+
+assert_remote_apk_manifest_version() {
+  local expected_code="$1"
+  local expected_name="$2"
+  local tmp_apk
+
+  tmp_apk=$(mktemp /tmp/elon-remote-apk.XXXXXX.apk)
+  if ! curl -sS --noproxy '*' -f -L --max-time 120 -o "$tmp_apk" "$SERVER_URL/app/ElonSpeed-latest.apk"; then
+    rm -f "$tmp_apk"
+    complete_release "false" "" 0 "" "failed to download remote apk for manifest validation"
+    echo -e "${RED}❌ 下载线上 APK 校验包体失败${NC}" >&2
+    exit 1
+  fi
+
+  assert_apk_manifest_version "$tmp_apk" "$expected_code" "$expected_name" "线上 APK"
+  rm -f "$tmp_apk"
+}
+
 # ── Trap 清理 ────────────────────────────────────────────────
 restore_gradle() {
   [[ -z "$ORIGINAL_GRADLE_CONTENT" ]] && return 0
@@ -426,6 +516,7 @@ if [[ -z "$APK_PATH" ]]; then
   echo -e "${RED}❌ 未找到 APK 文件: $APK_DIR${NC}" >&2; exit 1
 fi
 FILE_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH")
+assert_apk_manifest_version "$APK_PATH" "$NEW_CODE" "$NEW_NAME" "本地 release APK"
 echo -e "${GREEN}📦 APK: $(basename "$APK_PATH") ($(python3 -c "print(round($FILE_SIZE/1024/1024,2))") MB)${NC}"
 
 # ═══════════════════════════════════════════════════════════════
@@ -618,6 +709,7 @@ if [[ -n "$RESP" ]]; then
     echo -e "${YELLOW}   ⚠️  服务器 versionCode=$RESP_CODE，期望 $NEW_CODE${NC}"
   fi
 fi
+assert_remote_apk_manifest_version "$NEW_CODE" "$NEW_NAME"
 
 # 广播在线客户端更新
 echo -e "${CYAN}📣 广播在线客户端更新提醒...${NC}"

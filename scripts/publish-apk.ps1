@@ -141,8 +141,8 @@ trap {
             Complete-Release -Success:$false -ErrorMessage ("uncaught error: " + ($_ | Out-String))
         }
     } catch {}
-    # 让原始错误继续抛出（脚本仍按 $ErrorActionPreference=Stop 终止）
-    continue
+    # 让原始错误继续终止脚本；发布脚本不能在构建失败后继续上传旧 APK。
+    break
 }
 
 # ── 路径配置 ──────────────────────────────────────────────────────────────────
@@ -163,6 +163,100 @@ $UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
 $OriginalGradleContent = $null
 $BuildBaseSha = $null
 $LocalHeadSha = $null
+
+function Get-AaptExecutable {
+    $candidatePaths = @()
+    $sdkRoots = @(
+        $env:ANDROID_HOME,
+        $env:ANDROID_SDK_ROOT,
+        $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA "Android\Sdk" } else { $null })
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+
+    foreach ($sdkRoot in $sdkRoots) {
+        $buildTools = Join-Path $sdkRoot "build-tools"
+        if (Test-Path -LiteralPath $buildTools) {
+            $candidatePaths += Get-ChildItem -LiteralPath $buildTools -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Join-Path $_.FullName "aapt.exe" }
+            $candidatePaths += Get-ChildItem -LiteralPath $buildTools -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Join-Path $_.FullName "aapt" }
+        }
+    }
+
+    $pathAapt = Get-Command aapt.exe,aapt -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($pathAapt) { $candidatePaths += $pathAapt.Source }
+
+    foreach ($candidate in ($candidatePaths | Where-Object { $_ } | Select-Object -Unique)) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+
+    throw "未找到 aapt，无法校验 APK manifest 版本。请确认 Android SDK build-tools 已安装。"
+}
+
+function Get-ApkManifestVersion {
+    param([Parameter(Mandatory)] [string]$ApkPath)
+
+    if (-not (Test-Path -LiteralPath $ApkPath)) {
+        throw "APK 文件不存在，无法校验版本: $ApkPath"
+    }
+
+    $aapt = Get-AaptExecutable
+    $badging = & $aapt dump badging $ApkPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "aapt dump badging 失败: $($badging -join "`n")"
+    }
+
+    $packageLine = ($badging | Where-Object { $_ -match "^package:" } | Select-Object -First 1)
+    if (-not $packageLine) {
+        throw "aapt 输出中未找到 package 行，无法校验 APK 版本。"
+    }
+
+    $codeMatch = [regex]::Match($packageLine, "versionCode='([^']+)'")
+    $nameMatch = [regex]::Match($packageLine, "versionName='([^']*)'")
+    if (-not $codeMatch.Success -or -not $nameMatch.Success) {
+        throw "aapt package 行缺少 versionCode/versionName: $packageLine"
+    }
+
+    [PSCustomObject]@{
+        VersionCode = [int64]$codeMatch.Groups[1].Value
+        VersionName = [string]$nameMatch.Groups[1].Value
+    }
+}
+
+function Assert-ApkManifestVersion {
+    param(
+        [Parameter(Mandatory)] [string]$ApkPath,
+        [Parameter(Mandatory)] [int]$ExpectedVersionCode,
+        [Parameter(Mandatory)] [string]$ExpectedVersionName,
+        [string]$Label = "APK"
+    )
+
+    $actual = Get-ApkManifestVersion -ApkPath $ApkPath
+    if ($actual.VersionCode -ne $ExpectedVersionCode -or $actual.VersionName -ne $ExpectedVersionName) {
+        throw "$Label manifest 版本不匹配：期望 v$ExpectedVersionName (build $ExpectedVersionCode)，实际 v$($actual.VersionName) (build $($actual.VersionCode))。已停止发布，避免手机端重复更新。"
+    }
+
+    Write-Host "   ✅ $Label manifest: v$($actual.VersionName) (build $($actual.VersionCode))" -ForegroundColor Green
+}
+
+function Assert-RemoteApkManifestVersion {
+    param(
+        [Parameter(Mandatory)] [int]$ExpectedVersionCode,
+        [Parameter(Mandatory)] [string]$ExpectedVersionName
+    )
+
+    $tmpApk = Join-Path $env:TEMP ("elon-remote-apk-" + [Guid]::NewGuid().ToString("N") + ".apk")
+    try {
+        & curl.exe --noproxy '*' -f -L -sS --max-time 120 -o $tmpApk "$ServerUrl/app/ElonSpeed-latest.apk" 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "下载线上 APK 校验包体失败，curl exit=$LASTEXITCODE"
+        }
+        Assert-ApkManifestVersion -ApkPath $tmpApk -ExpectedVersionCode $ExpectedVersionCode -ExpectedVersionName $ExpectedVersionName -Label "线上 APK"
+    } finally {
+        Remove-Item -LiteralPath $tmpApk -Force -ErrorAction SilentlyContinue
+    }
+}
 
 function Get-UserGradleProperty {
     param([string]$Name)
@@ -698,6 +792,7 @@ if (-not $apk) {
 
 $fileSize = $apk.Length
 Write-Host "📦 APK: $($apk.Name) ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
+Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -ExpectedVersionName $versionName -Label "本地 release APK"
 
 # ── Step 4: 还原 build.gradle（版本号不进 git） ──────────────────────────────
 
@@ -808,6 +903,7 @@ try {
 } catch {
     Write-Warning "   ⚠️  验证请求失败: $_（可能服务端重启中，稍后手动验证）"
 }
+Assert-RemoteApkManifestVersion -ExpectedVersionCode $newCode -ExpectedVersionName $versionName
 
 Write-Host "📣 广播在线客户端更新提醒..." -ForegroundColor Cyan
 try {
