@@ -176,7 +176,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/projects/:id/members",
-            get(project_membership::list_members),
+            get(project_membership::list_members).post(project_membership::add_member),
         )
         .route(
             "/api/projects/:id/visibility",

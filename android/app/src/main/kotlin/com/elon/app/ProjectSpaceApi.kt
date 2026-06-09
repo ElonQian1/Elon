@@ -107,6 +107,71 @@ internal fun fetchProjectMemberConversationMessages(
     }
 }
 
+internal fun inviteProjectMember(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    account: String,
+    role: String
+): ProjectMember {
+    val payload = JSONObject()
+        .put("account", account)
+        .put("role", role)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "邀请成员失败"))
+        return parseProjectMember(JSONObject(body).optJSONObject("member") ?: JSONObject())
+    }
+}
+
+internal fun updateProjectMemberRole(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    memberUserId: String,
+    role: String
+): ProjectMember {
+    val payload = JSONObject().put("role", role)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members/${projectSpaceUrlPart(memberUserId)}")
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "修改权限失败"))
+        return parseProjectMember(JSONObject(body).optJSONObject("member") ?: JSONObject())
+    }
+}
+
+internal fun removeProjectMember(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    memberUserId: String
+) {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${projectSpaceUrlPart(projectId)}/members/${projectSpaceUrlPart(memberUserId)}")
+            .delete()
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "移除成员失败"))
+    }
+}
+
 internal fun sendProjectChannelMessage(
     http: OkHttpClient,
     serverUrl: String,

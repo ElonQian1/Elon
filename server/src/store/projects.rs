@@ -8,9 +8,11 @@
 ///   - 列出项目成员
 ///   - 列出用户已加入（非自建）的项目
 use anyhow::{anyhow, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
-use super::{now, ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store};
+use super::{
+    normalize_account, now, ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
+};
 
 impl Store {
     // ─── 商店浏览 ────────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ impl Store {
 
     // ─── 成员管理 ────────────────────────────────────────────────────────────
 
-    /// 设置项目公开可见性（仅 owner 调用前需在 handler 层校验 role）
+    /// 设置项目公开可见性（调用前需在 handler 层校验 owner/admin）
     pub fn set_project_visibility(
         &self,
         project_id: &str,
@@ -198,7 +200,7 @@ impl Store {
             anyhow::bail!("该项目不对外公开");
         }
         if join_mode == "approval" {
-            anyhow::bail!("该项目需要审批才能加入，请联系项目 owner");
+            anyhow::bail!("该项目需要审批才能加入，请联系项目管理员");
         }
         if join_mode != "open" && join_mode != "invite" && join_mode != "readonly" {
             anyhow::bail!("该项目只能通过邀请加入");
@@ -240,22 +242,59 @@ impl Store {
         Ok(())
     }
 
-    /// 修改成员角色（仅 viewer/editor/member/observer 之间互转；不可改 owner，不可改自己）
+    /// 管理员邀请/添加已注册用户为项目成员；若已是非 owner 成员则更新角色。
+    pub fn add_project_member_by_account(
+        &self,
+        project_id: &str,
+        account: &str,
+        role: &str,
+    ) -> Result<ProjectMemberEntry> {
+        let account = normalize_account(account)?;
+        let role_db = normalize_project_member_role(role)?;
+        let conn = self.conn()?;
+        let now = now();
+        let target_user_id: String = conn
+            .query_row(
+                "SELECT id
+                 FROM users
+                 WHERE status = 'active'
+                   AND (phone = ?1 OR email = ?1 OR id = ?1 OR nickname = ?1)
+                 ORDER BY CASE WHEN phone = ?1 OR email = ?1 OR id = ?1 THEN 0 ELSE 1 END
+                 LIMIT 1",
+                params![account],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("目标账号不存在或未激活"))?;
+
+        let current_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, target_user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if current_role.as_deref() == Some("owner") {
+            anyhow::bail!("不能修改 owner 的角色");
+        }
+
+        conn.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(project_id, user_id) DO UPDATE SET role = excluded.role",
+            params![project_id, target_user_id, role_db, now],
+        )?;
+        project_member_entry(&conn, project_id, &target_user_id)
+    }
+
+    /// 修改成员角色（仅 admin/editor/member/observer 之间互转；不可改 owner，不可改自己）
     pub fn update_member_role(
         &self,
         project_id: &str,
         target_user_id: &str,
         new_role: &str,
     ) -> Result<()> {
-        if !["editor", "member", "observer", "viewer"].contains(&new_role) {
-            anyhow::bail!("role 必须为 editor / member / observer / viewer");
-        }
-        // viewer 是 APK 端展示别名，落库统一为 observer（保持与 join_mode=readonly 一致）
-        let role_db = if new_role == "viewer" {
-            "observer"
-        } else {
-            new_role
-        };
+        let role_db = normalize_project_member_role(new_role)?;
         let conn = self.conn()?;
         let current_role: Option<String> = conn
             .query_row(
@@ -276,7 +315,7 @@ impl Store {
         Ok(())
     }
 
-    /// 移除成员（owner 不可被移除，需要由 handler 层确保调用者是 owner）
+    /// 移除成员（owner 不可被移除，需要由 handler 层确保调用者可管理成员）
     pub fn remove_member(&self, project_id: &str, target_user_id: &str) -> Result<()> {
         let conn = self.conn()?;
         let current_role: Option<String> = conn
@@ -310,7 +349,7 @@ impl Store {
              FROM project_members pm
              LEFT JOIN users u ON u.id = pm.user_id
              WHERE pm.project_id = ?1
-             ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 WHEN 'member' THEN 2 WHEN 'observer' THEN 3 ELSE 4 END, pm.created_at",
+             ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 WHEN 'member' THEN 3 WHEN 'observer' THEN 4 ELSE 5 END, pm.created_at",
         )?;
         let rows = stmt
             .query_map(params![project_id], |row| {
@@ -506,6 +545,44 @@ impl Store {
     }
 }
 
+fn normalize_project_member_role(role: &str) -> Result<&'static str> {
+    match role.trim() {
+        "admin" => Ok("admin"),
+        "editor" => Ok("editor"),
+        "member" => Ok("member"),
+        "observer" | "viewer" => Ok("observer"),
+        _ => anyhow::bail!("role 必须为 admin / editor / member / observer / viewer"),
+    }
+}
+
+fn project_member_entry(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<ProjectMemberEntry> {
+    conn.query_row(
+        "SELECT pm.user_id,
+                COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
+                u.avatar_data_url,
+                pm.role,
+                pm.created_at
+         FROM project_members pm
+         LEFT JOIN users u ON u.id = pm.user_id
+         WHERE pm.project_id = ?1 AND pm.user_id = ?2",
+        params![project_id, user_id],
+        |row| {
+            Ok(ProjectMemberEntry {
+                user_id: row.get(0)?,
+                account: row.get(1)?,
+                avatar_data_url: row.get(2)?,
+                role: row.get(3)?,
+                joined_at: row.get(4)?,
+            })
+        },
+    )
+    .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -576,6 +653,49 @@ mod tests {
             .get_project_access(&invited.id, &project.id)
             .expect("joined user should have project access");
         assert_eq!(access.role, "member");
+    }
+
+    #[test]
+    fn add_project_member_by_account_supports_admin_role() {
+        let store = temp_store();
+        let owner = store
+            .create_user("member-admin-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let target = store
+            .create_user("15692409892", "secret1", Some("钱一龙"), None)
+            .expect("target user should be created");
+        let project = store
+            .create_project(&owner.id, "Admin Invite", None, None)
+            .expect("project should be created")
+            .project;
+
+        let member = store
+            .add_project_member_by_account(&project.id, "15692409892", "admin")
+            .expect("phone account should be invited as admin");
+        assert_eq!(member.user_id, target.id);
+        assert_eq!(member.role, "admin");
+
+        store
+            .update_member_role(&project.id, &target.id, "observer")
+            .expect("admin member should be demotable");
+        let access = store
+            .get_project_access(&target.id, &project.id)
+            .expect("target should keep project access");
+        assert_eq!(access.role, "observer");
+
+        let member = store
+            .add_project_member_by_account(&project.id, "钱一龙", "admin")
+            .expect("nickname account should update the member role");
+        assert_eq!(member.user_id, target.id);
+        assert_eq!(member.role, "admin");
+
+        store
+            .update_member_role(&project.id, &target.id, "admin")
+            .expect("member should be promotable to admin");
+        let access = store
+            .get_project_access(&target.id, &project.id)
+            .expect("target should keep project access");
+        assert_eq!(access.role, "admin");
     }
 
     #[test]

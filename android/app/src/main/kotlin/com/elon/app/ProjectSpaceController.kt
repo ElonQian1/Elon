@@ -413,6 +413,19 @@ internal class ProjectSpaceController(
     private fun renderMemberList(container: LinearLayout, members: List<ProjectMember>) {
         val space = activeSpace ?: return
         val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
+        val canManageMembers = canManageProjectMembers(space.project.role) && !activeRoute.isUserProject
+        if (canManageMembers) {
+            container.addView(ProjectSpaceMemberManagement.inviteRow(activity, dp, selectableForeground) {
+                ProjectSpaceMemberManagement.showInviteDialog(
+                    activity = activity,
+                    http = http,
+                    serverUrl = serverUrl,
+                    projectId = space.project.id,
+                    dp = dp,
+                    onChanged = { reloadActiveSpace() }
+                )
+            })
+        }
         if (members.isEmpty()) {
             container.addView(emptyPersonalConversationRow().apply { text = "暂无成员" })
             if (space.project.role != "observer") container.addView(createPersonalConversationRow())
@@ -457,6 +470,55 @@ internal class ProjectSpaceController(
                 setTextColor(Color.parseColor("#6F7785"))
                 setPadding(0, dp(5), 0, 0)
             })
+            if (canManageProjectMembers(space.project.role) &&
+                !activeRoute.isUserProject &&
+                !isSelf &&
+                member.role != "owner"
+            ) {
+                addView(ProjectSpaceMemberManagement.actionRow(
+                    activity = activity,
+                    dp = dp,
+                    selectableForeground = selectableForeground,
+                    onChangeRole = {
+                        ProjectSpaceMemberManagement.showRoleDialog(
+                            activity = activity,
+                            http = http,
+                            serverUrl = serverUrl,
+                            projectId = space.project.id,
+                            member = member,
+                            dp = dp,
+                            onChanged = { reloadActiveSpace() }
+                        )
+                    },
+                    onRemove = {
+                        ProjectSpaceMemberManagement.confirmRemove(
+                            activity = activity,
+                            http = http,
+                            serverUrl = serverUrl,
+                            projectId = space.project.id,
+                            member = member,
+                            onChanged = { reloadActiveSpace() }
+                        )
+                    }
+                ))
+            }
+        }
+    }
+
+    private fun reloadActiveSpace() {
+        val projectId = activeProjectId ?: return
+        val route = activeRoute
+        thread(name = "project-space-reload") {
+            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
+            activity.runOnUiThread {
+                result.onSuccess { space ->
+                    activeSpace = space
+                    activeProjectTitle = space.project.name
+                    renderActiveSpace()
+                }.onFailure { error ->
+                    Toast.makeText(activity, error.message ?: "刷新项目空间失败", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -902,6 +964,7 @@ internal class ProjectSpaceController(
 
     private fun roleLabel(role: String): String = when (role) {
         "owner" -> "所有者"
+        "admin" -> "管理员"
         "editor" -> "协作者"
         "member" -> "成员"
         "observer" -> "只读成员"
@@ -952,8 +1015,4 @@ internal class ProjectSpaceController(
         const val AI_CHANNEL_KIND = "ai_development"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
     }
-}
-
-private fun canResolveProjectSuggestion(role: String?): Boolean {
-    return role == "owner" || role == "editor" || role == "member"
 }

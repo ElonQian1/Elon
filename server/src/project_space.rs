@@ -719,7 +719,7 @@ fn can_start_channel_ai(role: &str) -> bool {
 }
 
 fn can_mark_suggestion_updated(role: &str) -> bool {
-    matches!(role, "owner" | "editor" | "member")
+    matches!(role, "owner" | "admin" | "editor" | "member")
 }
 
 fn latest_project_apk_url(
@@ -771,6 +771,7 @@ mod tests {
     #[test]
     fn channel_ai_requires_edit_role() {
         assert!(can_start_channel_ai("owner"));
+        assert!(can_start_channel_ai("admin"));
         assert!(can_start_channel_ai("editor"));
         assert!(!can_start_channel_ai("member"));
         assert!(!can_start_channel_ai("observer"));

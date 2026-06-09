@@ -2,8 +2,8 @@
 ///
 /// 路由（均需登录）：
 ///   POST  /api/projects/:id/request-join          提交加入申请（join_mode=approval）
-///   GET   /api/projects/:id/join-requests         owner 查看项目申请列表
-///   PATCH /api/projects/:id/join-requests/:req_id owner 审批（approve/reject）
+///   GET   /api/projects/:id/join-requests         owner/admin 查看项目申请列表
+///   PATCH /api/projects/:id/join-requests/:req_id owner/admin 审批（approve/reject）
 ///   GET   /api/me/join-requests                   用户查看自己的申请状态
 use axum::{
     extract::{Path, Query, State},
@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::{
     join_request_events,
-    project_auth::{auth_from_headers, json_error},
+    project_auth::{auth_from_headers, can_manage_project_members, json_error},
     types::AppState,
 };
 
@@ -60,12 +60,14 @@ pub async fn request_join(
         .create_join_request(&user.id, &project_id, message)
     {
         Ok(record) => {
-            // 查询项目 owner，推送通知
+            // 查询项目 owner/admin，推送通知
             if let Ok(members) = state.store.list_project_members(&project_id) {
-                let owner = members.iter().find(|m| m.role == "owner");
-                if let Some(owner) = owner {
+                for manager in members
+                    .iter()
+                    .filter(|m| can_manage_project_members(&m.role))
+                {
                     join_request_events::publish_new_request(
-                        &owner.user_id,
+                        &manager.user_id,
                         &record.id,
                         &record.project_id,
                         &record.project_name,
@@ -75,7 +77,7 @@ pub async fn request_join(
             }
             Json(serde_json::json!({
                 "ok": true,
-                "message": "申请已提交，等待 owner 审核",
+                "message": "申请已提交，等待项目管理员审核",
                 "request": record,
             }))
             .into_response()
@@ -96,7 +98,7 @@ pub async fn request_join(
     }
 }
 
-/// GET /api/projects/:id/join-requests — owner 查看申请列表
+/// GET /api/projects/:id/join-requests — owner/admin 查看申请列表
 pub async fn list_join_requests(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -108,10 +110,10 @@ pub async fn list_join_requests(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    // 仅 owner 可查看申请列表
+    // 仅 owner/admin 可查看申请列表
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access) if access.role == "owner" => {}
-        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可管理加入申请"),
+        Ok(access) if can_manage_project_members(&access.role) => {}
+        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可管理加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 
@@ -130,7 +132,7 @@ pub async fn list_join_requests(
     }
 }
 
-/// PATCH /api/projects/:id/join-requests/:req_id — owner 审批
+/// PATCH /api/projects/:id/join-requests/:req_id — owner/admin 审批
 pub async fn review_join_request(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -142,10 +144,10 @@ pub async fn review_join_request(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    // 仅 owner 可审批
+    // 仅 owner/admin 可审批
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access) if access.role == "owner" => {}
-        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可审批加入申请"),
+        Ok(access) if can_manage_project_members(&access.role) => {}
+        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可审批加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 

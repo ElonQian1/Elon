@@ -125,7 +125,11 @@ pub fn project_access(
 }
 
 pub fn can_edit(role: &str) -> bool {
-    matches!(role, "owner" | "editor")
+    matches!(role, "owner" | "admin" | "editor")
+}
+
+pub fn can_manage_project_members(role: &str) -> bool {
+    matches!(role, "owner" | "admin")
 }
 
 pub fn json_error(status: StatusCode, message: impl ToString) -> Response {

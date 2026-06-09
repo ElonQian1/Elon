@@ -205,7 +205,7 @@ internal fun deleteServerProject(
     return true
 }
 
-/** PATCH /api/projects/:id/visibility — 仅 owner；需要 Bearer token */
+/** PATCH /api/projects/:id/visibility — 仅 owner/admin；需要 Bearer token */
 internal fun setProjectVisibility(
     http: OkHttpClient,
     serverUrl: String,

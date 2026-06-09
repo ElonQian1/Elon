@@ -218,7 +218,7 @@ pub struct ProjectMemberEntry {
     pub user_id: String,
     pub account: String,
     pub avatar_data_url: Option<String>,
-    pub role: String, // "owner" | "member" | "observer"
+    pub role: String, // "owner" | "admin" | "editor" | "member" | "observer"
     pub joined_at: String,
 }
 

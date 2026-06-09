@@ -4,9 +4,10 @@
 ///   POST   /api/projects/:id/join                          加入公开项目（open=成员，readonly=只读成员）
 ///   DELETE /api/projects/:id/leave                         退出已加入的项目（owner 不可退出）
 ///   GET    /api/projects/:id/members                       列出项目所有成员（公开项目无需成员身份）
-///   PATCH  /api/projects/:id/visibility                    设置公开/私有（仅 owner）
-///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner，不可改 owner/自己）
-///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner，不可踢 owner/自己）
+///   POST   /api/projects/:id/members                       管理员邀请/添加成员
+///   PATCH  /api/projects/:id/visibility                    设置公开/私有（仅 owner/admin）
+///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
+///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
@@ -17,7 +18,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
-    project_auth::{auth_from_headers, json_error},
+    project_auth::{auth_from_headers, can_manage_project_members, json_error},
     types::AppState,
 };
 
@@ -33,8 +34,16 @@ pub struct VisibilityRequest {
 
 #[derive(Deserialize)]
 pub struct UpdateMemberRoleRequest {
-    /// "editor" | "member" | "observer" | "viewer"（viewer 别名 → observer）
+    /// "admin" | "editor" | "member" | "observer" | "viewer"（viewer 别名 → observer）
     pub role: String,
+}
+
+#[derive(Deserialize)]
+pub struct AddMemberRequest {
+    /// 已注册用户的手机号、邮箱或 user_id
+    pub account: String,
+    /// 缺省为 member；支持 admin/editor/member/observer/viewer
+    pub role: Option<String>,
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -67,7 +76,7 @@ pub async fn join_project(
                 return Json(serde_json::json!({
                     "ok": false,
                     "code": "approval_required",
-                    "message": "该项目需要 owner 审批才能加入，请使用「申请加入」功能",
+                    "message": "该项目需要项目管理员审批才能加入，请使用「申请加入」功能",
                     "hint": "POST /api/projects/{id}/request-join"
                 }))
                 .into_response();
@@ -151,7 +160,51 @@ pub async fn list_members(
     }
 }
 
-/// PATCH /api/projects/:id/visibility — 设置项目公开/私有（仅 owner）
+/// POST /api/projects/:id/members — 管理员邀请/添加已注册成员
+pub async fn add_member(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(req): Json<AddMemberRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !can_manage_project_members(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可邀请成员");
+    }
+
+    match state.store.add_project_member_by_account(
+        &project_id,
+        req.account.trim(),
+        req.role.as_deref().unwrap_or("member").trim(),
+    ) {
+        Ok(member) => Json(serde_json::json!({
+            "ok": true,
+            "project_id": project_id,
+            "member": member,
+        }))
+        .into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不存在") || msg.contains("账号") {
+                StatusCode::NOT_FOUND
+            } else if msg.contains("owner") || msg.contains("role 必须") {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            json_error(status, msg)
+        }
+    }
+}
+
+/// PATCH /api/projects/:id/visibility — 设置项目公开/私有（仅 owner/admin）
 pub async fn update_visibility(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -162,13 +215,13 @@ pub async fn update_visibility(
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    // 仅 owner 可修改
+    // 仅 owner/admin 可修改
     let access = match state.store.get_project_access(&user.id, &project_id) {
         Ok(a) => a,
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
-    if access.role != "owner" {
-        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可修改可见性");
+    if !can_manage_project_members(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可修改可见性");
     }
 
     let join_mode = req.join_mode.as_deref().unwrap_or("open");
@@ -193,7 +246,7 @@ pub async fn update_visibility(
     }
 }
 
-/// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner）
+/// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner/admin）
 pub async fn update_member_role(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -208,8 +261,8 @@ pub async fn update_member_role(
         Ok(a) => a,
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
-    if access.role != "owner" {
-        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可修改成员角色");
+    if !can_manage_project_members(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可修改成员角色");
     }
     if target_user_id == user.id {
         return json_error(StatusCode::BAD_REQUEST, "不能修改自己的角色");
@@ -239,7 +292,7 @@ pub async fn update_member_role(
     }
 }
 
-/// DELETE /api/projects/:id/members/:user_id — 移除成员（仅 owner）
+/// DELETE /api/projects/:id/members/:user_id — 移除成员（仅 owner/admin）
 pub async fn remove_member(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -253,8 +306,8 @@ pub async fn remove_member(
         Ok(a) => a,
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
-    if access.role != "owner" {
-        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 才可移除成员");
+    if !can_manage_project_members(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可移除成员");
     }
     if target_user_id == user.id {
         return json_error(

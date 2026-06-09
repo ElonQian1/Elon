@@ -45,6 +45,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (23, "node_credentials.device_name PC 设备展示名", migration_v23),
     (24, "user_memories 记忆作用域", migration_v24),
     (25, "收紧一龙自项目默认成员与加入权限", migration_v25),
+    (26, "指定钱一龙账号为一龙自项目管理员", migration_v26),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -964,6 +965,25 @@ fn migration_v25(conn: &Connection) -> Result<()> {
               WHERE id = 'elon-self'
                 AND status != 'deleted'
            );
+        "#,
+    )?;
+    Ok(())
+}
+
+// ── v26：指定钱一龙账号为一龙自项目管理员 ─────────────────────────────────────
+
+fn migration_v26(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        INSERT INTO project_members (project_id, user_id, role, created_at)
+        SELECT 'elon-self', u.id, 'admin', datetime('now')
+          FROM users u
+          JOIN projects p ON p.id = 'elon-self' AND p.status != 'deleted'
+         WHERE u.status = 'active'
+           AND (u.phone = '15692409892' OR u.nickname = '钱一龙')
+           AND u.id != p.created_by
+        ON CONFLICT(project_id, user_id) DO UPDATE SET role = 'admin'
+          WHERE project_members.role != 'owner';
         "#,
     )?;
     Ok(())

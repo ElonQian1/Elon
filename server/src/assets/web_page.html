@@ -3874,6 +3874,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return String((project && project.role) || '').trim().toLowerCase();
   }
 
+  function canManageProject(project) {
+    const role = roleOfProject(project);
+    return !role || role === 'owner' || role === 'admin';
+  }
+
   function closeActiveProjectIfMatches(project) {
     if (!project || !currentProject || currentProject.id !== project.id) return;
     if (socket) { try { socket.close(); } catch {} socket = null; }
@@ -3954,9 +3959,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   function openProjectVisibility(project) {
     if (!project) return;
-    const role = roleOfProject(project);
-    if (role && role !== 'owner') {
-      window.alert('只有项目 owner 可以修改协作权限和商城公开状态。');
+    if (!canManageProject(project)) {
+      window.alert('只有项目 owner 或管理员可以修改协作权限和商城公开状态。');
       return;
     }
     pendingVisibilityProject = project;

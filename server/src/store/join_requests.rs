@@ -1,6 +1,6 @@
 //! store/join_requests.rs — 项目加入申请 DB 操作
 //!
-//! 当项目 join_mode='approval' 时，用户提交申请，owner 审批通过后自动添加成员。
+//! 当项目 join_mode='approval' 时，用户提交申请，owner/admin 审批通过后自动添加成员。
 
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
@@ -117,7 +117,7 @@ impl Store {
         .map_err(|_| anyhow!("申请记录不存在"))
     }
 
-    /// 列出项目所有待审批（或全部）申请（owner 使用）
+    /// 列出项目所有待审批（或全部）申请（owner/admin 使用）
     pub fn list_join_requests(
         &self,
         project_id: &str,
@@ -200,7 +200,7 @@ impl Store {
     ///
     /// 安全要求：
     /// - req_id 必须属于 project_id（防止跨项目审批）
-    /// - reviewer_user_id 必须是该项目 owner
+    /// - reviewer_user_id 必须是该项目 owner/admin
     pub fn approve_join_request(
         &self,
         req_id: &str,
@@ -223,7 +223,7 @@ impl Store {
             anyhow::bail!("申请记录不属于当前项目");
         }
 
-        // 仅 owner 可审批
+        // 仅 owner/admin 可审批
         let reviewer_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
@@ -231,8 +231,8 @@ impl Store {
                 |row| row.get(0),
             )
             .optional()?;
-        if reviewer_role.as_deref() != Some("owner") {
-            anyhow::bail!("仅项目 owner 可审批加入申请");
+        if !matches!(reviewer_role.as_deref(), Some("owner" | "admin")) {
+            anyhow::bail!("仅项目 owner 或管理员可审批加入申请");
         }
 
         if status != "pending" {
@@ -262,7 +262,7 @@ impl Store {
     ///
     /// 安全要求：
     /// - req_id 必须属于 project_id（防止跨项目审批）
-    /// - reviewer_user_id 必须是该项目 owner
+    /// - reviewer_user_id 必须是该项目 owner/admin
     pub fn reject_join_request(
         &self,
         req_id: &str,
@@ -284,7 +284,7 @@ impl Store {
             anyhow::bail!("申请记录不属于当前项目");
         }
 
-        // 仅 owner 可审批
+        // 仅 owner/admin 可审批
         let reviewer_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
@@ -292,8 +292,8 @@ impl Store {
                 |row| row.get(0),
             )
             .optional()?;
-        if reviewer_role.as_deref() != Some("owner") {
-            anyhow::bail!("仅项目 owner 可审批加入申请");
+        if !matches!(reviewer_role.as_deref(), Some("owner" | "admin")) {
+            anyhow::bail!("仅项目 owner 或管理员可审批加入申请");
         }
 
         if status != "pending" {
@@ -325,12 +325,12 @@ impl Store {
             .unwrap_or(0)
     }
 
-    /// 列出某 owner 名下所有项目的待审批数（含 0 也返回，便于前端展示项目列表）
+    /// 列出某 owner/admin 管理项目的待审批数（含 0 也返回，便于前端展示项目列表）
     ///
     /// 返回 `Vec<(project_id, project_name, pending_count)>`
     pub fn list_owned_projects_with_pending_counts(
         &self,
-        owner_user_id: &str,
+        manager_user_id: &str,
     ) -> Result<Vec<(String, String, i64)>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
@@ -339,12 +339,12 @@ impl Store {
                      WHERE jr.project_id = p.id AND jr.status = 'pending') AS pending
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
-             WHERE pm.user_id = ?1 AND pm.role = 'owner'
+             WHERE pm.user_id = ?1 AND pm.role IN ('owner', 'admin')
                    AND p.status != 'deleted'
              ORDER BY pending DESC, p.created_at DESC",
         )?;
         let rows = stmt
-            .query_map(params![owner_user_id], |row| {
+            .query_map(params![manager_user_id], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -376,5 +376,56 @@ impl Store {
             params![req_id],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn temp_store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon_join_request_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn admin_can_approve_join_request() {
+        let store = temp_store();
+        let owner = store
+            .create_user("join-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let admin = store
+            .create_user("join-admin@example.com", "secret1", None, None)
+            .expect("admin should be created");
+        let applicant = store
+            .create_user("join-applicant@example.com", "secret1", None, None)
+            .expect("applicant should be created");
+        let project = store
+            .create_project(&owner.id, "Admin Approval", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .set_project_visibility(&project.id, true, "approval")
+            .expect("project should require approval");
+        store
+            .add_project_member_by_account(&project.id, &admin.id, "admin")
+            .expect("admin should be added");
+
+        let request = store
+            .create_join_request(&applicant.id, &project.id, Some("please add me"))
+            .expect("request should be created");
+        let approved = store
+            .approve_join_request(&request.id, &project.id, &admin.id)
+            .expect("admin should approve request");
+
+        assert_eq!(approved.status, "approved");
+        let access = store
+            .get_project_access(&applicant.id, &project.id)
+            .expect("applicant should join after approval");
+        assert_eq!(access.role, "member");
     }
 }
