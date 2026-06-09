@@ -123,6 +123,8 @@ internal class MainChatProjectShareActions(
                         val currentIndex = findProjectIndex(share.id)
                         if (currentIndex >= 0) {
                             projects[currentIndex].markJointDevelopment(created.id, "invite")
+                            projects[currentIndex].ownerAccount = created.ownerAccount.takeIf { it != "?" }
+                            projects[currentIndex].memberCount = created.memberCount.coerceAtLeast(1)
                             saveProjects()
                             renderProjectList()
                         }
@@ -152,7 +154,9 @@ internal class MainChatProjectShareActions(
             id = share.id,
             isJointProject = share.source != "local",
             collaborationProjectId = share.id.takeIf { share.source != "local" },
-            collaborationJoinMode = normalizeProjectJoinMode(share.joinMode)
+            collaborationJoinMode = normalizeProjectJoinMode(share.joinMode),
+            ownerAccount = share.ownerAccount,
+            memberCount = share.memberCount.coerceAtLeast(1)
         )
         projects.add(project)
         saveProjects()

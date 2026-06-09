@@ -588,6 +588,8 @@ internal class MainProjectActions(
                 setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 activity.runOnUiThread {
                     project.markJointDevelopment(created.id, "invite")
+                    project.ownerAccount = created.ownerAccount.takeIf { it != "?" }
+                    project.memberCount = created.memberCount.coerceAtLeast(1)
                     projects.indexOfFirst { it.id == project.id }
                         .takeIf { it >= 0 }
                         ?.let { setActiveProjectIndex(it) }
@@ -837,6 +839,8 @@ internal class MainProjectActions(
                         projects.lastIndex
                     }
                     projects[index].markJointDevelopment(created.id, "invite")
+                    projects[index].ownerAccount = created.ownerAccount.takeIf { it != "?" }
+                    projects[index].memberCount = created.memberCount.coerceAtLeast(1)
                     setActiveProjectIndex(index)
                     setActiveConversationIndex(0)
                     saveProjects()

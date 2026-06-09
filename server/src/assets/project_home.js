@@ -192,6 +192,24 @@
     return formatTime(project.updated_at || project.updatedAt || project.updated_at_ms) || '时间';
   }
 
+  function currentDisplayName() {
+    const app = bridge();
+    const user = typeof app.getCurrentUser === 'function' ? app.getCurrentUser() : null;
+    return (user && (user.nickname || user.account)) || '未登录';
+  }
+
+  function ownerOf(project) {
+    return project.owner_account || project.ownerAccount || project.created_by_account || project.owner || (isSystemProject(project) ? '一龙' : currentDisplayName());
+  }
+
+  function cardMemberCount(project) {
+    return Number(project.member_count || project.memberCount || 0) || 1;
+  }
+
+  function projectCodeOf(project) {
+    return project.description || project.subtitle || project.code_name || project.codeName || project.id || '项目';
+  }
+
   function renderBannerIcon(project, slot, extraClass) {
     const iconUrl = project ? iconUrlOf(project) : '';
     const label = project ? escapeHtml(projectInitial(project)) : '';
@@ -274,7 +292,17 @@
     return `
       <div class="project-home-card ${active ? 'active' : ''}" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
         <button class="project-home-more" type="button" data-project-home-action="menu" data-project-id="${escapeHtml(project.id)}" aria-label="项目操作" title="项目操作">...</button>
-        ${renderProjectThumb(project)}
+        <span class="project-home-card-body">
+          <span class="project-home-card-head">
+            ${renderProjectThumb(project)}
+            <span class="project-home-card-details">
+              <span>创建者：${escapeHtml(ownerOf(project))}</span>
+              <span>成员：${escapeHtml(cardMemberCount(project))}</span>
+            </span>
+          </span>
+          <span class="project-home-card-divider" aria-hidden="true"></span>
+          <span class="project-home-code">项目代号：${escapeHtml(projectCodeOf(project))}</span>
+        </span>
         <span class="project-home-info">
           <span class="project-home-title-row">
             <span class="project-home-name">${escapeHtml(titleOf(project))}</span>

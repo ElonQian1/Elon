@@ -93,6 +93,8 @@ internal class MainAccountActions(
         update(local.collaborationJoinMode, remote.collaborationJoinMode) { local.collaborationJoinMode = it }
         update(local.iconDataUrl, remote.iconDataUrl) { local.iconDataUrl = it }
         update(local.systemProjectKey, remote.systemProjectKey) { local.systemProjectKey = it }
+        update(local.ownerAccount, remote.ownerAccount) { local.ownerAccount = it }
+        update(local.memberCount, remote.memberCount) { local.memberCount = it }
         update(local.remoteConversationCount, remote.remoteConversationCount) { local.remoteConversationCount = it }
 
         val remoteSubtitle = remote.subtitle.trim()

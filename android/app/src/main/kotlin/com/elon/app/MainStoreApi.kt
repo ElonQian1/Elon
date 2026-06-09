@@ -31,7 +31,9 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         isJointProject = true,
         collaborationProjectId = id,
         collaborationJoinMode = normalizeProjectJoinMode(joinMode),
-        iconDataUrl = iconDataUrl
+        iconDataUrl = iconDataUrl,
+        ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
+        memberCount = memberCount.coerceAtLeast(1)
     )
 }
 
@@ -46,7 +48,9 @@ internal fun StoreProject.toOwnerAppProject(): AppProject {
         id = id,
         isJointProject = false,
         collaborationProjectId = null,
-        iconDataUrl = iconDataUrl
+        iconDataUrl = iconDataUrl,
+        ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
+        memberCount = memberCount.coerceAtLeast(1)
     )
 }
 

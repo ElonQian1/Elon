@@ -109,19 +109,19 @@ internal class ProjectManagementHomeView(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "项目广场"
-                setPadding(dp(4), dp(3), dp(4), dp(3))
-                background = rect("#660F1217")
+                setPadding(dp(14), dp(9), dp(14), dp(9))
+                background = rect("#990F1217", 6)
                 setTextColor(Color.parseColor("#F2F5FA"))
                 alpha = 0.92f
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, SECTION_TITLE_TEXT_SP)
                 setShadowLayer(dp(2).toFloat(), 0f, dp(1).toFloat(), Color.parseColor("#AA000000"))
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 gravity = Gravity.START or Gravity.TOP
-                leftMargin = dp(3)
-                topMargin = dp(8)
+                leftMargin = dp(12)
+                topMargin = dp(14)
             })
 
         }
@@ -202,7 +202,7 @@ internal class ProjectManagementHomeView(
                 includeFontPadding = false
                 text = title
                 setTextColor(Color.parseColor("#F2F5FA"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, SECTION_TITLE_TEXT_SP)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(arrow, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.MATCH_PARENT))
         }
@@ -333,18 +333,84 @@ internal class ProjectManagementHomeView(
                 true
             }
 
-            addView(projectThumbnail(project), FrameLayout.LayoutParams(dp(38), dp(38)).apply {
-                gravity = Gravity.START or Gravity.TOP
-                leftMargin = dp(10)
-                topMargin = dp(17)
+            addView(createProjectCardContent(project), FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ).apply {
+                bottomMargin = dp(CARD_INFO_BAR_HEIGHT_DP)
             })
 
             addView(createProjectInfoBar(project, isActive), FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(47),
+                dp(CARD_INFO_BAR_HEIGHT_DP),
                 Gravity.BOTTOM
             ))
         }
+    }
+
+    private fun createProjectCardContent(project: AppProject): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(17), dp(10), 0)
+
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                    marginEnd = dp(12)
+                })
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addProjectDetailText("创建者：${projectOwner(project)}")
+                    addProjectDetailText("成员：${projectMemberCount(project)}")
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+
+            addView(View(activity).apply {
+                setBackgroundColor(Color.parseColor("#A6AFBD"))
+                alpha = 0.72f
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)
+            ).apply {
+                topMargin = dp(12)
+            })
+
+            addView(TextView(activity).apply {
+                includeFontPadding = false
+                text = "项目代号：${projectCode(project)}"
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
+                setLineSpacing(dp(2).toFloat(), 1.0f)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(10)
+            })
+        }
+    }
+
+    private fun LinearLayout.addProjectDetailText(value: String) {
+        addView(TextView(activity).apply {
+            includeFontPadding = false
+            text = value
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(6)
+        })
     }
 
     private fun projectThumbnail(project: AppProject): View {
@@ -384,7 +450,7 @@ internal class ProjectManagementHomeView(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(5), dp(10), dp(5))
-            background = rect(if (active) "#283345" else "#253140")
+            background = rect(if (active) "#283345" else "#283140")
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -395,7 +461,7 @@ internal class ProjectManagementHomeView(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setTextColor(Color.parseColor("#F2F5FA"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14.2f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TITLE_TEXT_SP)
                     setTypeface(typeface, Typeface.BOLD)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                 addView(TextView(activity).apply {
@@ -403,7 +469,7 @@ internal class ProjectManagementHomeView(
                     text = projectTime(project)
                     maxLines = 1
                     setTextColor(Color.parseColor("#DDE8FC"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.2f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TIME_TEXT_SP)
                 }, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -421,7 +487,7 @@ internal class ProjectManagementHomeView(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor("#DDE8FC"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.8f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_META_TEXT_SP)
                 setAutoSizeTextTypeUniformWithConfiguration(9, 11, 1, TypedValue.COMPLEX_UNIT_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -436,6 +502,20 @@ internal class ProjectManagementHomeView(
         val kind = project.projectKindLabel()
         val stage = project.stage.takeIf { it.isNotBlank() } ?: "待提交需求"
         return "$kind · ${project.displayConversationCount()}个会话 · $stage"
+    }
+
+    private fun projectOwner(project: AppProject): String {
+        project.ownerAccount?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
+        if (project.isSystemArchiveProject()) return "一龙"
+        return AuthManager.displayName(activity).takeIf { it.isNotBlank() } ?: "未登录"
+    }
+
+    private fun projectMemberCount(project: AppProject): Int {
+        return project.memberCount?.takeIf { it > 0 } ?: 1
+    }
+
+    private fun projectCode(project: AppProject): String {
+        return project.subtitle.trim().takeIf { it.isNotBlank() } ?: project.id.take(8)
     }
 
     private fun projectTime(project: AppProject): String {
@@ -474,16 +554,23 @@ internal class ProjectManagementHomeView(
         }
     }
 
-    private fun rect(color: String): GradientDrawable {
+    private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(Color.parseColor(color))
+            if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
         }
     }
 
     private companion object {
         const val COLLAPSED_PROJECT_LIMIT = 4
         const val SECTION_ANIMATION_MS = 260L
+        const val CARD_INFO_BAR_HEIGHT_DP = 58
+        const val SECTION_TITLE_TEXT_SP = 16f
+        const val CARD_TITLE_TEXT_SP = 14.2f
+        const val CARD_TIME_TEXT_SP = 12.2f
+        const val CARD_META_TEXT_SP = 10.8f
+        const val CARD_DETAIL_TEXT_SP = 10.8f
     }
 }
 

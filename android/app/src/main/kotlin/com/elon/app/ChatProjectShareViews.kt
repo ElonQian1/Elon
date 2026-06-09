@@ -29,8 +29,8 @@ internal fun AppProject.toChatProjectShare(): ChatProjectShare {
         id = if (isJoint) projectSpaceId() else id,
         name = title,
         description = subtitle.takeIf { it.isNotBlank() },
-        ownerAccount = null,
-        memberCount = conversations.size.coerceAtLeast(1),
+        ownerAccount = ownerAccount?.takeIf { it.isNotBlank() },
+        memberCount = memberCount?.coerceAtLeast(1) ?: conversations.size.coerceAtLeast(1),
         joinMode = if (isJoint) projectJoinMode() else "invite",
         latestLog = events.firstOrNull()?.trim()?.takeIf { it.isNotBlank() },
         source = if (isJoint) "store" else "local"
