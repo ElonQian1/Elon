@@ -220,7 +220,7 @@ async fn run_with_workspace_mode(
         },
         if development_task { 100 } else { 10 },
     );
-    billing::reserve_trusted_call(
+    let mut billing_call = crate::billing_lifecycle::TrustedBillingCall::reserve(
         &state.store,
         user_id,
         &accounting_key,
@@ -598,6 +598,7 @@ async fn run_with_workspace_mode(
         &usage_text,
         Some(&accounting_key),
     );
+    billing_call.mark_settled();
 
     let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
     tracing::info!(
@@ -832,7 +833,7 @@ async fn run_via_pc_agent(
         },
         if cwd.is_some() { 100 } else { 10 },
     );
-    billing::reserve_trusted_call(
+    let mut pc_billing_call = crate::billing_lifecycle::TrustedBillingCall::reserve(
         &state.store,
         user_id,
         &pc_accounting_key,
@@ -992,6 +993,9 @@ async fn run_via_pc_agent(
                         &usage,
                         accounting_result.as_ref(),
                     );
+                    if accounting_result.is_some() {
+                        pc_billing_call.mark_settled();
+                    }
                     cli_usage = Some(usage);
                 }
                 record_pc_execution_finished(
@@ -1037,6 +1041,9 @@ async fn run_via_pc_agent(
                             }
                             .to_json(),
                         );
+                    }
+                    if cli_usage.is_none() {
+                        pc_billing_call.release_no_usage();
                     }
                     let _ = tx.send(
                         WsMessage::Done {

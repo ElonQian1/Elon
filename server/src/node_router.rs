@@ -10,10 +10,9 @@ use tokio::sync::mpsc;
 use crate::types::AppState;
 use std::sync::Arc;
 
-/// 向节点发起 LLM 流式推理请求，返回一个 receiver，
-/// 流中依次输出 `LlmStreamChunk`、最终 `LlmStreamEnd` 或 `LlmStreamError`。
-pub async fn dispatch_to_node(
+pub async fn dispatch_to_node_with_req_id(
     state: &Arc<AppState>,
+    req_id: String,
     model_id: &str,
     messages: Vec<serde_json::Value>,
     max_tokens: Option<u32>,
@@ -27,7 +26,13 @@ pub async fn dispatch_to_node(
 
     let (req_id, rx) = state
         .agent_manager
-        .dispatch_llm_stream(&node_id, model_id.to_string(), messages, max_tokens)
+        .dispatch_llm_stream_with_req_id(
+            &node_id,
+            req_id,
+            model_id.to_string(),
+            messages,
+            max_tokens,
+        )
         .await?;
 
     Ok((req_id, node_id, rx))
@@ -69,7 +74,7 @@ pub fn settle_after_stream(
             total_tokens: (prompt_tokens + completion_tokens) as i64,
             model: Some(model.clone()),
         };
-        crate::token_usage_api::record_trusted_usage_with_key(
+        let accounting_result = crate::token_usage_api::record_trusted_usage_with_key(
             &state.store,
             &consumer,
             "node_llm",
@@ -78,6 +83,19 @@ pub fn settle_after_stream(
             &usage,
             accounting_key.as_deref(),
         );
+        if accounting_result
+            .as_ref()
+            .map(|result| result.deduplicated)
+            .unwrap_or(true)
+        {
+            tracing::warn!(
+                consumer,
+                node,
+                model,
+                "节点推理用量未新增扣费事件，跳过节点积分结算"
+            );
+            return;
+        }
 
         let Some(provider) = provider else {
             tracing::warn!(

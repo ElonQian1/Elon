@@ -453,20 +453,40 @@ async fn run_dispatch_with_workspace(
 
     // ImageThenCode 两步管道：先文生图，把 URL 注入消息，再走代码 Agent 集成
     if is_image_then_code {
-        if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
-            return Err(anyhow::anyhow!(msg));
-        }
+        let image_model = state.image_model.as_ref().map(|cfg| cfg.model.clone());
+        let mut image_billing_call = if let Some(model) = image_model.as_deref() {
+            let key = crate::billing_lifecycle::new_compute_call_id("image_then_code");
+            Some(
+                crate::compute_usage::reserve_image_generation(
+                    &state.store,
+                    user_id,
+                    &key,
+                    "image_then_code",
+                    model,
+                    user_message,
+                )
+                .map_err(|msg| anyhow::anyhow!(msg))?,
+            )
+        } else {
+            crate::billing::check_can_call(&state.store, user_id)
+                .map_err(|msg| anyhow::anyhow!(msg))?;
+            None
+        };
         let _ = tx.send(WsMessage::progress("正在生成图片资源...").to_json());
         match crate::image_generation::generate_text_to_image(state, user_message).await {
             Ok(img) => {
-                if let Some(cfg) = state.image_model.as_ref() {
-                    crate::compute_usage::record_image_generation(
+                if let (Some(model), Some(billing_call)) =
+                    (image_model.as_deref(), image_billing_call.as_mut())
+                {
+                    crate::compute_usage::record_image_generation_with_key(
                         &state.store,
                         user_id,
                         "image_then_code",
-                        &cfg.model,
+                        model,
                         user_message,
+                        Some(billing_call.key()),
                     );
+                    billing_call.mark_settled();
                 }
                 let injected_message = format!(
                     "{}\n\n[已生成图片: {}]\n请将上方图片 URL 下载后集成到项目中作为所需的图片资源。",

@@ -244,6 +244,7 @@ async fn handle(
 
     // 4. 并发：客户端循环 + 转写事件循环 + AI 回复流
     let mut turn_pcm_bytes: usize = 0;
+    let mut turn_billing_call: Option<crate::billing_lifecycle::TrustedBillingCall<'_>> = None;
     loop {
         tokio::select! {
             biased;
@@ -266,6 +267,28 @@ async fn handle(
                                     message: "单帧过大".into(),
                                 }.to_json())).await;
                                 continue;
+                            }
+                        }
+                        if turn_billing_call.is_none() {
+                            let key = crate::billing_lifecycle::new_compute_call_id("voice_transcribe_realtime");
+                            match crate::compute_usage::reserve_pcm_asr(
+                                &state.store,
+                                &target.user_id,
+                                &key,
+                                "voice_transcribe_realtime",
+                                &cfg.model,
+                                bytes.len(),
+                                sample_rate,
+                                channels,
+                            ) {
+                                Ok(call) => turn_billing_call = Some(call),
+                                Err(message) => {
+                                    let _ = sender.send(Message::Text(ServerEvent::Error {
+                                        code: "payment_required",
+                                        message,
+                                    }.to_json())).await;
+                                    break;
+                                }
                             }
                         }
                         turn_pcm_bytes += bytes.len();
@@ -296,15 +319,30 @@ async fn handle(
                     }
                     TranscriptEvent::Final(text) => {
                         if turn_pcm_bytes > 0 {
-                            crate::compute_usage::record_pcm_asr(
-                                &state.store,
-                                &target.user_id,
-                                "voice_transcribe_realtime",
-                                &cfg.model,
-                                turn_pcm_bytes,
-                                sample_rate,
-                                channels,
-                            );
+                            if let Some(call) = turn_billing_call.as_mut() {
+                                crate::compute_usage::record_pcm_asr_with_key(
+                                    &state.store,
+                                    &target.user_id,
+                                    "voice_transcribe_realtime",
+                                    &cfg.model,
+                                    turn_pcm_bytes,
+                                    sample_rate,
+                                    channels,
+                                    Some(call.key()),
+                                );
+                                call.mark_settled();
+                            } else {
+                                crate::compute_usage::record_pcm_asr(
+                                    &state.store,
+                                    &target.user_id,
+                                    "voice_transcribe_realtime",
+                                    &cfg.model,
+                                    turn_pcm_bytes,
+                                    sample_rate,
+                                    channels,
+                                );
+                            }
+                            turn_billing_call = None;
                             turn_pcm_bytes = 0;
                         }
                         let _ = sender.send(Message::Text(
@@ -327,6 +365,9 @@ async fn handle(
                         }
                     }
                     TranscriptEvent::Error(msg) => {
+                        if let Some(mut call) = turn_billing_call.take() {
+                            call.release_error();
+                        }
                         let _ = sender.send(Message::Text(ServerEvent::Error {
                             code: "realtime",
                             message: msg,
@@ -394,9 +435,29 @@ async fn run_buffered_loop(
                                 if pcm_buf.is_empty() { continue; }
                                 let pcm = std::mem::take(&mut pcm_buf);
                                 let pcm_len = pcm.len();
+                                let asr_key = crate::billing_lifecycle::new_compute_call_id("voice_transcribe_buffered");
+                                let mut asr_billing_call = match crate::compute_usage::reserve_pcm_asr(
+                                    &state.store,
+                                    &target.user_id,
+                                    &asr_key,
+                                    "voice_transcribe_buffered",
+                                    &usage_model,
+                                    pcm_len,
+                                    sample_rate,
+                                    channels,
+                                ) {
+                                    Ok(call) => call,
+                                    Err(message) => {
+                                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                                            code: "payment_required",
+                                            message,
+                                        }.to_json())).await;
+                                        continue;
+                                    }
+                                };
                                 let transcript = match transcribe(pcm).await {
                                     Ok(t) if t.trim().is_empty() => {
-                                        crate::compute_usage::record_pcm_asr(
+                                        crate::compute_usage::record_pcm_asr_with_key(
                                             &state.store,
                                             &target.user_id,
                                             "voice_transcribe_buffered",
@@ -404,7 +465,9 @@ async fn run_buffered_loop(
                                             pcm_len,
                                             sample_rate,
                                             channels,
+                                            Some(asr_billing_call.key()),
                                         );
+                                        asr_billing_call.mark_settled();
                                         continue;
                                     }
                                     Ok(t) => t,
@@ -417,7 +480,7 @@ async fn run_buffered_loop(
                                         continue;
                                     }
                                 };
-                                crate::compute_usage::record_pcm_asr(
+                                crate::compute_usage::record_pcm_asr_with_key(
                                     &state.store,
                                     &target.user_id,
                                     "voice_transcribe_buffered",
@@ -425,7 +488,9 @@ async fn run_buffered_loop(
                                     pcm_len,
                                     sample_rate,
                                     channels,
+                                    Some(asr_billing_call.key()),
                                 );
+                                asr_billing_call.mark_settled();
                                 let _ = sender.send(Message::Text(
                                     ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
                                 )).await;

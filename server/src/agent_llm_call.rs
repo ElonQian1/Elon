@@ -262,16 +262,8 @@ pub(crate) async fn try_casual_chat_via_node(
     // 如果没有在线节点支持该模型，立即返回 None
     let node_id = state.node_registry.find_node_for_model(model).await?;
 
-    let dispatch =
-        crate::node_router::dispatch_to_node(state, model, messages.to_vec(), Some(1024)).await;
-
-    let (req_id, actual_node_id, mut rx) = match dispatch {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::warn!("节点路由失败，降级到云端 LLM: {e}");
-            return None;
-        }
-    };
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let accounting_key = format!("node_llm:{req_id}");
     let node_reserve_fen =
         crate::billing::estimate_cost_for_tokens(&state.store, model, 0, 0, 1024).max(
             crate::billing::configured_reservation_fen(
@@ -283,7 +275,7 @@ pub(crate) async fn try_casual_chat_via_node(
     if let Err(msg) = crate::billing::reserve_trusted_call(
         &state.store,
         user_id,
-        &format!("node_llm:{req_id}"),
+        &accounting_key,
         "node_llm",
         "server_node_llm",
         Some(model),
@@ -292,6 +284,29 @@ pub(crate) async fn try_casual_chat_via_node(
         tracing::warn!(user_id, model, "节点推理预授权失败: {}", msg);
         return None;
     }
+
+    let dispatch = crate::node_router::dispatch_to_node_with_req_id(
+        state,
+        req_id,
+        model,
+        messages.to_vec(),
+        Some(1024),
+    )
+    .await;
+
+    let (req_id, actual_node_id, mut rx) = match dispatch {
+        Ok(t) => t,
+        Err(e) => {
+            crate::billing::release_trusted_call(
+                &state.store,
+                user_id,
+                &accounting_key,
+                "released_error",
+            );
+            tracing::warn!("节点路由失败，降级到云端 LLM: {e}");
+            return None;
+        }
+    };
 
     let mut content = String::new();
     let mut prompt_tokens: u32 = 0;
@@ -312,6 +327,12 @@ pub(crate) async fn try_casual_chat_via_node(
                 break;
             }
             homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                crate::billing::release_trusted_call(
+                    &state.store,
+                    user_id,
+                    &accounting_key,
+                    "released_error",
+                );
                 tracing::warn!("节点推理错误，降级到云端 LLM: {message}");
                 return None;
             }
@@ -320,6 +341,12 @@ pub(crate) async fn try_casual_chat_via_node(
     }
 
     if content.is_empty() {
+        crate::billing::release_trusted_call(
+            &state.store,
+            user_id,
+            &accounting_key,
+            "released_no_usage",
+        );
         return None;
     }
 

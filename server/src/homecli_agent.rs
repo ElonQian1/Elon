@@ -213,6 +213,18 @@ impl AgentManager {
         max_tokens: Option<u32>,
     ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
         let req_id = Uuid::new_v4().to_string();
+        self.dispatch_llm_stream_with_req_id(agent_id, req_id, model, messages, max_tokens)
+            .await
+    }
+
+    pub async fn dispatch_llm_stream_with_req_id(
+        &self,
+        agent_id: &str,
+        req_id: String,
+        model: String,
+        messages: Vec<serde_json::Value>,
+        max_tokens: Option<u32>,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
         let agents = self.agents.read().await;
         let agent = agents
             .get(agent_id)

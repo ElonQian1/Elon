@@ -1,4 +1,4 @@
-use crate::{billing, project_auth::auth_from_headers, types::AppState};
+use crate::{project_auth::auth_from_headers, types::AppState};
 use axum::{
     extract::{Path as AxumPath, Query, State},
     http::{HeaderMap, StatusCode},
@@ -133,12 +133,6 @@ pub async fn generate_image(
             Json(serde_json::json!({"error": "未登录"})),
         )
     })?;
-    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
-        return Err((
-            StatusCode::PAYMENT_REQUIRED,
-            Json(serde_json::json!({"error": msg})),
-        ));
-    }
     let prompt = req.prompt.trim();
     if prompt.is_empty() {
         return Err((
@@ -152,18 +146,38 @@ pub async fn generate_image(
             Json(serde_json::json!({"error": "文生图模型未配置，请设置 IMAGE_API_KEY"})),
         ));
     }
+    let image_model = state
+        .image_model
+        .as_ref()
+        .map(|cfg| cfg.model.clone())
+        .unwrap_or_else(|| "image".to_string());
+    let image_key = crate::billing_lifecycle::new_compute_call_id("image_generate_api");
+    let mut image_billing_call = crate::compute_usage::reserve_image_generation(
+        &state.store,
+        &user.id,
+        &image_key,
+        "image_generate_api",
+        &image_model,
+        prompt,
+    )
+    .map_err(|msg| {
+        (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(serde_json::json!({"error": msg})),
+        )
+    })?;
 
     match crate::image_generation::generate_text_to_image(&state, prompt).await {
         Ok(image) => {
-            if let Some(cfg) = state.image_model.as_ref() {
-                crate::compute_usage::record_image_generation(
-                    &state.store,
-                    &user.id,
-                    "image_generate_api",
-                    &cfg.model,
-                    prompt,
-                );
-            }
+            crate::compute_usage::record_image_generation_with_key(
+                &state.store,
+                &user.id,
+                "image_generate_api",
+                &image_model,
+                prompt,
+                Some(image_billing_call.key()),
+            );
+            image_billing_call.mark_settled();
             Ok(Json(ImageGenerateResponse {
                 job_id: image.job_id,
                 url: image.url,

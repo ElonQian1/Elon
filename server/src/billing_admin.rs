@@ -142,32 +142,39 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
     if !check_auth(&headers, &state.admin_token) {
         return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
     }
-    let rate = state
-        .store
-        .billing_get_config("usd_to_rmb_rate_x10000")
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| "73000".to_string());
-    let markup = state
-        .store
-        .billing_get_config("markup_x1000")
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| "1200".to_string());
-    let threshold = state
-        .store
-        .billing_get_config("low_balance_threshold_fen")
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| "100".to_string());
+    let config_int = |key: &str, default: i64| {
+        state
+            .store
+            .billing_get_config(key)
+            .ok()
+            .flatten()
+            .and_then(|value| value.parse::<i64>().ok())
+            .unwrap_or(default)
+    };
     Json(json!({
-        "usd_to_rmb_rate_x10000": rate.parse::<i64>().unwrap_or(73000),
-        "markup_x1000": markup.parse::<i64>().unwrap_or(1200),
-        "low_balance_threshold_fen": threshold.parse::<i64>().unwrap_or(100),
+        "usd_to_rmb_rate_x10000": config_int("usd_to_rmb_rate_x10000", 73000),
+        "markup_x1000": config_int("markup_x1000", 1200),
+        "low_balance_threshold_fen": config_int("low_balance_threshold_fen", 100),
+        "billing_default_reservation_fen": config_int("billing_default_reservation_fen", 1),
+        "billing_cli_dev_reservation_fen": config_int("billing_cli_dev_reservation_fen", 100),
+        "billing_cli_chat_reservation_fen": config_int("billing_cli_chat_reservation_fen", 10),
+        "billing_node_llm_min_reservation_fen": config_int("billing_node_llm_min_reservation_fen", 1),
+        "billing_image_min_reservation_fen": config_int("billing_image_min_reservation_fen", 1),
+        "billing_asr_min_reservation_fen": config_int("billing_asr_min_reservation_fen", 1),
+        "billing_tts_min_reservation_fen": config_int("billing_tts_min_reservation_fen", 1),
+        "billing_realtime_voice_min_reservation_fen": config_int("billing_realtime_voice_min_reservation_fen", 1),
         "note": {
             "usd_to_rmb_rate_x10000": "汇率×10000，73000 = 7.3000",
             "markup_x1000": "加价率×1000，1200 = ×1.2（收费 = 成本 × 1.2）",
-            "low_balance_threshold_fen": "低余额阈值（分），低于此值推送 WS 警告"
+            "low_balance_threshold_fen": "低余额阈值（分），低于此值推送 WS 警告",
+            "billing_default_reservation_fen": "默认最低预授权冻结金额（分）",
+            "billing_cli_dev_reservation_fen": "开发类 CLI 调用预授权冻结金额（分）",
+            "billing_cli_chat_reservation_fen": "轻量聊天 CLI 调用预授权冻结金额（分）",
+            "billing_node_llm_min_reservation_fen": "节点 LLM 调用最低预授权冻结金额（分）",
+            "billing_image_min_reservation_fen": "图片生成最低预授权冻结金额（分）",
+            "billing_asr_min_reservation_fen": "ASR 语音识别最低预授权冻结金额（分）",
+            "billing_tts_min_reservation_fen": "TTS 语音合成最低预授权冻结金额（分）",
+            "billing_realtime_voice_min_reservation_fen": "实时语音每轮最低预授权冻结金额（分）"
         }
     }))
     .into_response()
@@ -185,6 +192,14 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "usd_to_rmb_rate_x10000",
     "markup_x1000",
     "low_balance_threshold_fen",
+    "billing_default_reservation_fen",
+    "billing_cli_dev_reservation_fen",
+    "billing_cli_chat_reservation_fen",
+    "billing_node_llm_min_reservation_fen",
+    "billing_image_min_reservation_fen",
+    "billing_asr_min_reservation_fen",
+    "billing_tts_min_reservation_fen",
+    "billing_realtime_voice_min_reservation_fen",
 ];
 
 pub async fn set_config(

@@ -53,6 +53,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (31, "token 用量可信记账幂等键", migration_v31),
     (32, "PC 项目执行会话 token 用量字段", migration_v32),
     (33, "计费调用预授权冻结与对账摘要", migration_v33),
+    (34, "非 CLI 算力预授权配置", migration_v34),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1226,6 +1227,22 @@ fn migration_v33(conn: &Connection) -> Result<()> {
           VALUES ('billing_cli_chat_reservation_fen', '10', datetime('now'));
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('billing_node_llm_min_reservation_fen', '1', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v34(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_image_min_reservation_fen', '1', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_asr_min_reservation_fen', '1', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_tts_min_reservation_fen', '1', datetime('now'));
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('billing_realtime_voice_min_reservation_fen', '1', datetime('now'));
         "#,
     )?;
     Ok(())

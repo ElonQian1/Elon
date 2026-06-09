@@ -176,6 +176,7 @@ async fn handle(
     let mut turn_output_pcm_bytes: usize = 0;
     let accounting_session_id = uuid::Uuid::new_v4().simple().to_string();
     let mut accounting_turn_index: u64 = 0;
+    let mut turn_billing_call: Option<crate::billing_lifecycle::TrustedBillingCall<'_>> = None;
     loop {
         tokio::select! {
             biased;
@@ -185,6 +186,28 @@ async fn handle(
                     Ok(Message::Binary(bytes)) => {
                         match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
                             PcmCheck::Ok => {
+                                if turn_billing_call.is_none() {
+                                    accounting_turn_index += 1;
+                                    let key = format!(
+                                        "voice_realtime_chat:{user_id}:{accounting_session_id}:{accounting_turn_index}"
+                                    );
+                                    match crate::compute_usage::reserve_realtime_voice_turn(
+                                        &state.store,
+                                        &user_id,
+                                        &key,
+                                        "voice_realtime_chat",
+                                        &cfg.model,
+                                    ) {
+                                        Ok(call) => turn_billing_call = Some(call),
+                                        Err(message) => {
+                                            let _ = sender.send(Message::Text(ServerEvent::Error {
+                                                code: "payment_required",
+                                                message,
+                                            }.to_json())).await;
+                                            break;
+                                        }
+                                    }
+                                }
                                 turn_input_pcm_bytes += bytes.len();
                                 if let Err(err) = session.append_pcm(bytes.to_vec()) {
                                     warn!(target: "voice", "Realtime Chat 上行音频失败: {err:#}");
@@ -255,11 +278,16 @@ async fn handle(
                         let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
                     }
                     RealtimeChatEvent::ResponseDone { response_id, usage } => {
-                        accounting_turn_index += 1;
-                        let accounting_key = response_id
-                            .as_deref()
-                            .map(|id| format!("voice_realtime_chat:{user_id}:{id}"))
+                        let accounting_key = turn_billing_call
+                            .as_ref()
+                            .map(|call| call.key().to_string())
+                            .or_else(|| {
+                                response_id
+                                    .as_deref()
+                                    .map(|id| format!("voice_realtime_chat:{user_id}:{id}"))
+                            })
                             .unwrap_or_else(|| {
+                                accounting_turn_index += 1;
                                 format!(
                                     "voice_realtime_chat:{user_id}:{accounting_session_id}:{accounting_turn_index}"
                                 )
@@ -275,6 +303,9 @@ async fn handle(
                                     &usage,
                                     Some(&accounting_key),
                                 );
+                                if let Some(call) = turn_billing_call.as_mut() {
+                                    call.mark_settled();
+                                }
                             }
                             None if turn_input_pcm_bytes > 0 || turn_output_pcm_bytes > 0 => {
                                 crate::compute_usage::record_realtime_voice_estimate_with_key(
@@ -288,14 +319,25 @@ async fn handle(
                                     1,
                                     Some(&accounting_key),
                                 );
+                                if let Some(call) = turn_billing_call.as_mut() {
+                                    call.mark_settled();
+                                }
                             }
-                            None => {}
+                            None => {
+                                if let Some(call) = turn_billing_call.as_mut() {
+                                    call.release_no_usage();
+                                }
+                            }
                         }
+                        turn_billing_call = None;
                         turn_input_pcm_bytes = 0;
                         turn_output_pcm_bytes = 0;
                         let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
                     }
                     RealtimeChatEvent::Error(message) => {
+                        if let Some(mut call) = turn_billing_call.take() {
+                            call.release_error();
+                        }
                         let _ = sender.send(Message::Text(ServerEvent::Error {
                             code: "realtime_chat",
                             message,

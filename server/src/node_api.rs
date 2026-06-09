@@ -463,24 +463,8 @@ pub async fn chat_with_node(
     }
 
     let max_output_tokens = req.max_tokens.unwrap_or(1024) as i64;
-    // 找节点、发起请求
-    let (req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node(
-        &state,
-        &req.model_id,
-        req.messages,
-        req.max_tokens,
-    )
-    .await
-    {
-        Ok(t) => t,
-        Err(e) => {
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response();
-        }
-    };
+    let req_id = uuid::Uuid::new_v4().to_string();
+    let accounting_key = format!("node_llm:{req_id}");
     let node_reserve_fen = crate::billing::estimate_cost_for_tokens(
         &state.store,
         &req.model_id,
@@ -496,7 +480,7 @@ pub async fn chat_with_node(
     if let Err(msg) = crate::billing::reserve_trusted_call(
         &state.store,
         &user.id,
-        &format!("node_llm:{req_id}"),
+        &accounting_key,
         "node_llm",
         "server_node_llm",
         Some(&req.model_id),
@@ -508,6 +492,32 @@ pub async fn chat_with_node(
         )
             .into_response();
     }
+
+    // 找节点、发起请求。预授权成功后才派发，避免余额不足用户先消耗节点算力。
+    let (req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node_with_req_id(
+        &state,
+        req_id,
+        &req.model_id,
+        req.messages,
+        req.max_tokens,
+    )
+    .await
+    {
+        Ok(t) => t,
+        Err(e) => {
+            crate::billing::release_trusted_call(
+                &state.store,
+                &user.id,
+                &accounting_key,
+                "released_error",
+            );
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
 
     // 收集流式块
     let mut content = String::new();
@@ -529,6 +539,12 @@ pub async fn chat_with_node(
                 break;
             }
             homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                crate::billing::release_trusted_call(
+                    &state.store,
+                    &user.id,
+                    &accounting_key,
+                    "released_error",
+                );
                 return (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(serde_json::json!({"error": message})),

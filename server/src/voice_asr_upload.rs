@@ -135,6 +135,18 @@ pub async fn asr_upload_handler(
         Some(b) if !b.is_empty() => b,
         _ => return json_error(StatusCode::BAD_REQUEST, "请求中缺少 audio 字段"),
     };
+    let asr_key = crate::billing_lifecycle::new_compute_call_id("voice_asr_upload");
+    let mut asr_billing_call = match crate::compute_usage::reserve_encoded_asr(
+        &state.store,
+        &caller.id,
+        &asr_key,
+        "voice_asr_upload",
+        "upload",
+        audio.len(),
+    ) {
+        Ok(call) => call,
+        Err(msg) => return json_error(StatusCode::PAYMENT_REQUIRED, msg),
+    };
 
     info!(target: "voice_asr", "收到 ASR 上传请求，音频 {} 字节，格式 {}，语言 {:?}，beam_size {:?}，vad_filter {:?}，condition_prev {:?}",
           audio.len(), mime_hint, language_override, beam_size_override, vad_filter_override, condition_on_previous_override);
@@ -153,13 +165,15 @@ pub async fn asr_upload_handler(
 
     match text {
         Ok(t) if t.trim().is_empty() => {
-            crate::compute_usage::record_encoded_asr(
+            crate::compute_usage::record_encoded_asr_with_key(
                 &state.store,
                 &caller.id,
                 "voice_asr_upload",
                 "upload",
                 audio.len(),
+                Some(asr_billing_call.key()),
             );
+            asr_billing_call.mark_settled();
             // Whisper 返回空串：可能是纯噪声/静音，不算错误
             Json(AsrResponse {
                 text: String::new(),
@@ -167,13 +181,15 @@ pub async fn asr_upload_handler(
             .into_response()
         }
         Ok(t) => {
-            crate::compute_usage::record_encoded_asr(
+            crate::compute_usage::record_encoded_asr_with_key(
                 &state.store,
                 &caller.id,
                 "voice_asr_upload",
                 "upload",
                 audio.len(),
+                Some(asr_billing_call.key()),
             );
+            asr_billing_call.mark_settled();
             info!(target: "voice_asr", "ASR 转写成功：{}", &t[..t.len().min(80)]);
             Json(AsrResponse { text: t }).into_response()
         }

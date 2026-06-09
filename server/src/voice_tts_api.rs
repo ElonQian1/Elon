@@ -21,7 +21,6 @@ use tracing::warn;
 use crate::{
     agent_api_loop::resolve_agent,
     agent_llm_call::call_chat_llm,
-    billing,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
     voice_tts_catalog::{self, ResolvedTtsStyle, TtsProvider},
@@ -103,16 +102,22 @@ pub async fn synthesize_handler(
     if req.rewrite.unwrap_or(true) && llm_rewrite_enabled() {
         spoken_text = rewrite_with_llm(&state, &caller.id, &req, &style, &spoken_text).await;
     }
-    if let Err(msg) = billing::check_can_call(&state.store, &caller.id) {
-        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
-    }
+    let tts_key = crate::billing_lifecycle::new_compute_call_id("voice_tts_synthesis");
+    let mut tts_billing_call = match crate::compute_usage::reserve_tts_synthesis(
+        &state.store,
+        &caller.id,
+        &tts_key,
+        "voice_tts_synthesis",
+        style.provider.as_worker_id(),
+        &spoken_text,
+    ) {
+        Ok(call) => call,
+        Err(msg) => return json_error(StatusCode::PAYMENT_REQUIRED, msg),
+    };
 
     // ── 优先级：PC 节点 GPU 模型 TTS > 云端 Worker TTS ──────────────────────
     // 若用户有在线 PC 节点且配置了 TTS Worker URL，优先走 PC 节点（高质量模型 TTS）
-    if let Some((node_id, _tts_url)) = state
-        .node_registry
-        .find_tts_node_for_user(&caller.id)
-        .await
+    if let Some((node_id, _tts_url)) = state.node_registry.find_tts_node_for_user(&caller.id).await
     {
         match state
             .agent_manager
@@ -136,14 +141,16 @@ pub async fn synthesize_handler(
                 use base64::Engine as _;
                 match B64.decode(audio_b64.as_bytes()) {
                     Ok(bytes) => {
-                        crate::compute_usage::record_tts_synthesis(
+                        crate::compute_usage::record_tts_synthesis_with_key(
                             &state.store,
                             &caller.id,
                             "voice_tts_synthesis",
                             "pc_node",
                             &spoken_text,
                             bytes.len(),
+                            Some(tts_billing_call.key()),
                         );
+                        tts_billing_call.mark_settled();
                         let audio = voice_tts_worker::TtsAudio {
                             bytes,
                             content_type: mime,
@@ -168,17 +175,23 @@ pub async fn synthesize_handler(
 
     // 回退：云端本地 TTS Worker（edge-tts 等）
     if let Some(worker) = TtsWorkerConfig::from_env() {
-        match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
+        match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text)
+            .await
+        {
             Ok(audio) => {
                 if audio.cache_status != "hit" {
-                    crate::compute_usage::record_tts_synthesis(
+                    crate::compute_usage::record_tts_synthesis_with_key(
                         &state.store,
                         &caller.id,
                         "voice_tts_synthesis",
                         style.provider.as_worker_id(),
                         &spoken_text,
                         audio.bytes.len(),
+                        Some(tts_billing_call.key()),
                     );
+                    tts_billing_call.mark_settled();
+                } else {
+                    tts_billing_call.release_no_usage();
                 }
                 return audio_response(audio, &style);
             }
@@ -188,7 +201,10 @@ pub async fn synthesize_handler(
         }
     }
 
-    json_error(StatusCode::SERVICE_UNAVAILABLE, "TTS 服务暂不可用（云端 Worker 未配置，且无在线 PC 节点提供 TTS）")
+    json_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "TTS 服务暂不可用（云端 Worker 未配置，且无在线 PC 节点提供 TTS）",
+    )
 }
 
 async fn rewrite_with_llm(
