@@ -148,6 +148,25 @@
     <span style="color:#8b949e">检查中…</span>
   </div>
 
+  <h3>TTS 中继配置（把本机 GPU 贡献给用户）</h3>
+  <div class="card">
+    <p style="font-size:13px;color:#8b949e;margin-top:0">
+      配置后，当用户请求 AI 回复语音时，云端服务器会通过 WebSocket 隧道把请求转发到本机 TTS Worker 处理，
+      GPU 算力贡献给平台用户。<br>
+      本机需先运行模型 TTS Worker（默认端口 5011）。
+    </p>
+    <div class="form-row">
+      <label>本机 TTS Worker 地址（留空则禁用 TTS 中继）</label>
+      <input id="ttsWorkerUrlInput" placeholder="http://127.0.0.1:5011" />
+    </div>
+    <button id="saveTtsRelayBtn" onclick="saveTtsRelay()">保存并生效</button>
+    <div id="ttsRelayResult"></div>
+    <p style="font-size:12px;color:#8b949e;margin-top:10px">
+      模型 TTS Worker 启动命令：<code>scripts\start-local-model-tts-worker.ps1</code><br>
+      安装 IndexTTS2 运行时：<code>scripts\setup-indextts2-runtime.ps1</code>
+    </p>
+  </div>
+
   <h3>环境变量参考（高级，普通用户无需配置）</h3>
   <pre>
 登录后所有凭证自动持久化到本地，普通用户不用设置任何变量。以下仅供高级/服务器场景：
@@ -283,6 +302,40 @@ async function registerProject() {
   } finally {
     btn.disabled = false;
     btn.textContent = '注册到云端';
+  }
+}
+
+// ── TTS 中继配置 ─────────────────────────────────────────────────────────────
+async function loadTtsRelayConfig() {
+  const r = await fetch('/api/tts-relay-config').then(r => r.json()).catch(() => null);
+  if (!r) return;
+  const input = document.getElementById('ttsWorkerUrlInput');
+  if (input) input.value = r.ttsWorkerUrl || '';
+}
+
+async function saveTtsRelay() {
+  const url = (document.getElementById('ttsWorkerUrlInput')?.value || '').trim();
+  const out = document.getElementById('ttsRelayResult');
+  out.innerHTML = '';
+  const btn = document.getElementById('saveTtsRelayBtn');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const resp = await fetch('/api/tts-relay-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tts_worker_url: url || null }),
+    });
+    const j = await resp.json();
+    if (j.ok) {
+      out.innerHTML = `<div class="ok-toast" style="margin-top:8px">${url ? '✅ TTS 中继已启用: ' + j.ttsWorkerUrl : '✅ TTS 中继已禁用'}。云端重连后生效。</div>`;
+      setTimeout(loadTts, 1000);
+    } else {
+      out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ ${j.error || 'HTTP ' + resp.status}</div>`;
+    }
+  } catch(e) {
+    out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ 请求失败: ${e}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '保存并生效';
   }
 }
 
@@ -434,6 +487,7 @@ async function saveApiKey() {
 load();
 loadEnvCheck();
 loadTts();
+loadTtsRelayConfig();
 setInterval(load, 5000);
 setInterval(loadTts, 15000);
 </script>

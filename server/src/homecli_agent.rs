@@ -250,6 +250,43 @@ impl AgentManager {
             Err(_) => Err(anyhow!("project workspace provisioning timeout (120s)")),
         }
     }
+
+    /// 向 PC 节点发起 TTS 合成请求，返回 TtsSynthesizeResponse 或 TtsSynthesizeError。
+    /// timeout 设 180s（模型首次加载可能需要较长时间）。
+    pub async fn dispatch_tts(
+        &self,
+        agent_id: &str,
+        text: String,
+        voice_id: Option<String>,
+        emotion_id: Option<String>,
+        intensity: Option<String>,
+        provider: Option<String>,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("TTS agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::TtsSynthesizeRequest {
+                req_id: req_id.clone(),
+                text,
+                voice_id,
+                emotion_id,
+                intensity,
+                provider,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+        match tokio::time::timeout(Duration::from_secs(180), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!("TTS agent disconnected before response")),
+            Err(_) => Err(anyhow!("TTS synthesis timeout (180s)")),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -545,10 +582,10 @@ async fn run_agent_session(
                         } else {
                             // Register/Pong without task_id — 处理节点专属消息
                             match &msg {
-                                AgentToServer::RegisterCapabilities { models } => {
+                                AgentToServer::RegisterCapabilities { models, tts_worker_url } => {
                                     state
                                         .node_registry
-                                        .update_capabilities(&agent_id, models.clone())
+                                        .update_capabilities(&agent_id, models.clone(), tts_worker_url.clone())
                                         .await;
                                 }
                                 AgentToServer::Pong { .. } => {

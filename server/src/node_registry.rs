@@ -26,6 +26,8 @@ pub struct NodeEntry {
     pub device_name: Option<String>,
     /// 该节点支持的 LLM 模型列表
     pub models: Vec<ModelCapability>,
+    /// 本机 TTS Worker URL（如 http://127.0.0.1:5011）——空表示无 TTS 能力
+    pub tts_worker_url: Option<String>,
     /// 首次连接时间戳（Unix 秒）
     pub connected_at: u64,
     /// 最后一次收到心跳的时刻（用于 TTL 判断）
@@ -39,6 +41,7 @@ pub struct NodeSummary {
     pub owner_user_id: String,
     pub device_name: Option<String>,
     pub models: Vec<ModelCapability>,
+    pub tts_worker_url: Option<String>,
     pub connected_at: u64,
     /// 在 90s TTL 内 = online
     pub online: bool,
@@ -70,6 +73,7 @@ impl NodeRegistry {
             owner_user_id,
             device_name,
             models,
+            tts_worker_url: None,
             connected_at,
             last_seen: Instant::now(),
         };
@@ -82,9 +86,17 @@ impl NodeRegistry {
     }
 
     /// 节点更新能力列表（RegisterCapabilities 消息触发）。
-    pub async fn update_capabilities(&self, node_id: &str, models: Vec<ModelCapability>) {
+    pub async fn update_capabilities(
+        &self,
+        node_id: &str,
+        models: Vec<ModelCapability>,
+        tts_worker_url: Option<String>,
+    ) {
         if let Some(entry) = self.nodes.write().await.get_mut(node_id) {
             entry.models = models;
+            if tts_worker_url.is_some() {
+                entry.tts_worker_url = tts_worker_url;
+            }
             entry.last_seen = Instant::now();
         }
     }
@@ -117,10 +129,32 @@ impl NodeRegistry {
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
                 models: e.models.clone(),
+                tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
                 online: e.last_seen.elapsed() < NODE_TIMEOUT,
             })
             .collect()
+    }
+
+    /// 找到某用户的在线节点中，第一个有 TTS Worker 的节点。
+    /// 返回 (node_id, tts_worker_url)。
+    pub async fn find_tts_node_for_user(
+        &self,
+        owner_user_id: &str,
+    ) -> Option<(String, String)> {
+        let nodes = self.nodes.read().await;
+        nodes
+            .values()
+            .filter(|e| {
+                e.last_seen.elapsed() < NODE_TIMEOUT
+                    && e.owner_user_id == owner_user_id
+                    && e.tts_worker_url.is_some()
+            })
+            .find_map(|e| {
+                e.tts_worker_url
+                    .clone()
+                    .map(|url| (e.node_id.clone(), url))
+            })
     }
 
     /// 仅列出在线节点中所有可用模型的去重列表。

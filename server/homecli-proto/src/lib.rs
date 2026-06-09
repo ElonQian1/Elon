@@ -77,6 +77,19 @@ pub enum ServerToAgent {
         name: String,
         template: String,
     },
+    /// 云端把 TTS 合成请求转发给有 GPU 的 PC 节点处理
+    TtsSynthesizeRequest {
+        req_id: String,
+        text: String,
+        #[serde(default)]
+        voice_id: Option<String>,
+        #[serde(default)]
+        emotion_id: Option<String>,
+        #[serde(default)]
+        intensity: Option<String>,
+        #[serde(default)]
+        provider: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +174,9 @@ pub enum AgentToServer {
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {
         models: Vec<ModelCapability>,
+        /// 本机 TTS Worker HTTP 地址（如 http://127.0.0.1:5011），为空表示无 TTS 能力
+        #[serde(default)]
+        tts_worker_url: Option<String>,
     },
     /// LLM 推理流式输出片段
     LlmStreamChunk {
@@ -192,6 +208,21 @@ pub enum AgentToServer {
     ProjectWorkspaceProvisionError {
         req_id: String,
         project_id: String,
+        message: String,
+    },
+    /// PC 节点 TTS 合成完成
+    TtsSynthesizeResponse {
+        req_id: String,
+        /// base64 编码的音频字节
+        audio_b64: String,
+        /// MIME 类型，如 "audio/wav"
+        mime: String,
+        #[serde(default)]
+        worker_voice: Option<String>,
+    },
+    /// PC 节点 TTS 合成失败
+    TtsSynthesizeError {
+        req_id: String,
         message: String,
     },
 }
@@ -229,7 +260,9 @@ impl AgentToServer {
             | Self::LlmStreamEnd { req_id, .. }
             | Self::LlmStreamError { req_id, .. }
             | Self::ProjectWorkspaceProvisioned { req_id, .. }
-            | Self::ProjectWorkspaceProvisionError { req_id, .. } => Some(req_id.as_str()),
+            | Self::ProjectWorkspaceProvisionError { req_id, .. }
+            | Self::TtsSynthesizeResponse { req_id, .. }
+            | Self::TtsSynthesizeError { req_id, .. } => Some(req_id.as_str()),
             _ => None,
         }
     }

@@ -80,10 +80,6 @@ pub async fn synthesize_handler(
         Ok(user) => user,
         Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
     };
-    let worker = match TtsWorkerConfig::from_env() {
-        Some(cfg) => cfg,
-        None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器 TTS Worker 未配置"),
-    };
 
     let original_text = req.text.trim();
     if original_text.is_empty() {
@@ -111,28 +107,87 @@ pub async fn synthesize_handler(
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
-    match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
-        Ok(audio) => {
-            if audio.cache_status != "hit" {
-                crate::compute_usage::record_tts_synthesis(
-                    &state.store,
-                    &caller.id,
-                    "voice_tts_synthesis",
-                    style.provider.as_worker_id(),
-                    &spoken_text,
-                    audio.bytes.len(),
-                );
+    // 优先走本地 TTS Worker（云端部署的）
+    if let Some(worker) = TtsWorkerConfig::from_env() {
+        match voice_tts_worker::synthesize(&state, &worker, &style, original_text, &spoken_text).await {
+            Ok(audio) => {
+                if audio.cache_status != "hit" {
+                    crate::compute_usage::record_tts_synthesis(
+                        &state.store,
+                        &caller.id,
+                        "voice_tts_synthesis",
+                        style.provider.as_worker_id(),
+                        &spoken_text,
+                        audio.bytes.len(),
+                    );
+                }
+                return audio_response(audio, &style);
             }
-            audio_response(audio, &style)
-        }
-        Err(err) => {
-            warn!(target: "voice_tts", "TTS 合成失败: {err:#}");
-            json_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                format!("语音合成服务暂不可用：{err}"),
-            )
+            Err(err) => {
+                warn!(target: "voice_tts", "云端 TTS Worker 失败，尝试 PC 节点: {err:#}");
+            }
         }
     }
+
+    // 回退：查找用户的 PC 节点是否有 TTS Worker
+    if let Some((node_id, _tts_url)) = state
+        .node_registry
+        .find_tts_node_for_user(&caller.id)
+        .await
+    {
+        match state
+            .agent_manager
+            .dispatch_tts(
+                &node_id,
+                spoken_text.clone(),
+                req.voice_id.clone(),
+                req.emotion_id.clone(),
+                req.intensity.clone(),
+                req.provider.map(|p| p.as_worker_id().to_string()),
+            )
+            .await
+        {
+            Ok(homecli_proto::AgentToServer::TtsSynthesizeResponse {
+                audio_b64,
+                mime,
+                worker_voice,
+                ..
+            }) => {
+                use base64::engine::general_purpose::STANDARD as B64;
+                use base64::Engine as _;
+                match B64.decode(audio_b64.as_bytes()) {
+                    Ok(bytes) => {
+                        crate::compute_usage::record_tts_synthesis(
+                            &state.store,
+                            &caller.id,
+                            "voice_tts_synthesis",
+                            "pc_node",
+                            &spoken_text,
+                            bytes.len(),
+                        );
+                        let audio = voice_tts_worker::TtsAudio {
+                            bytes,
+                            content_type: mime,
+                            cache_status: "miss",
+                            worker: Some(node_id),
+                            worker_voice,
+                            worker_requested_voice: req.voice_id.clone(),
+                            worker_fallback: None,
+                        };
+                        return audio_response(audio, &style);
+                    }
+                    Err(e) => warn!(target: "voice_tts", "PC 节点音频 base64 解码失败: {e}"),
+                }
+            }
+            Ok(homecli_proto::AgentToServer::TtsSynthesizeError { message, .. }) => {
+                warn!(target: "voice_tts", "PC 节点 TTS 失败: {message}");
+            }
+            Ok(_) => {}
+            Err(e) => warn!(target: "voice_tts", "PC 节点 TTS 请求失败: {e:#}"),
+        }
+    }
+
+    json_error(StatusCode::SERVICE_UNAVAILABLE, "TTS 服务暂不可用（云端 Worker 未配置，且无在线 PC 节点提供 TTS）")
 }
 
 async fn rewrite_with_llm(

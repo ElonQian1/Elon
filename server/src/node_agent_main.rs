@@ -1131,6 +1131,81 @@ async fn run_exec(
     let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
 }
 
+// ── 本机 TTS 合成（代理到本地 model-tts-worker）────────────────────────────
+
+async fn run_tts_synthesis(
+    req_id: String,
+    worker_base_url: String,
+    text: String,
+    voice_id: Option<String>,
+    emotion_id: Option<String>,
+    intensity: Option<String>,
+    provider: Option<String>,
+) -> AgentToServer {
+    let url = format!("{}/synthesize", worker_base_url.trim_end_matches('/'));
+    let mut body = serde_json::json!({
+        "text": text,
+        "cacheVersion": "pc_relay_v1",
+    });
+    if let Some(v) = &voice_id  { body["voiceId"]    = serde_json::json!(v); }
+    if let Some(e) = &emotion_id { body["emotionId"]  = serde_json::json!(e); }
+    if let Some(i) = &intensity  { body["intensity"]  = serde_json::json!(i); }
+    if let Some(p) = &provider   { body["provider"]   = serde_json::json!(p); }
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(180))
+        .build()
+        .unwrap_or_default();
+
+    let resp = match client.post(&url).json(&body).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            return AgentToServer::TtsSynthesizeError {
+                req_id,
+                message: format!("本机 TTS Worker 请求失败: {e}"),
+            }
+        }
+    };
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let msg = resp.text().await.unwrap_or_default();
+        return AgentToServer::TtsSynthesizeError {
+            req_id,
+            message: format!("TTS Worker 返回 {status}: {msg}"),
+        };
+    }
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("audio/wav")
+        .to_string();
+    let worker_voice = resp
+        .headers()
+        .get("x-elon-tts-worker-voice")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+
+    if content_type.starts_with("application/json") {
+        match resp.json::<serde_json::Value>().await {
+            Ok(j) => {
+                let b64 = j.get("audioBase64").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let mime = j.get("mime").and_then(|v| v.as_str()).unwrap_or("audio/wav").to_string();
+                AgentToServer::TtsSynthesizeResponse { req_id, audio_b64: b64, mime, worker_voice }
+            }
+            Err(e) => AgentToServer::TtsSynthesizeError { req_id, message: format!("JSON 解析失败: {e}") },
+        }
+    } else {
+        match resp.bytes().await {
+            Ok(bytes) => {
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                AgentToServer::TtsSynthesizeResponse { req_id, audio_b64: b64, mime: content_type, worker_voice }
+            }
+            Err(e) => AgentToServer::TtsSynthesizeError { req_id, message: format!("读取音频失败: {e}") },
+        }
+    }
+}
+
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
 async fn run_session(
@@ -1206,9 +1281,11 @@ async fn run_session(
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
-    // 发送 RegisterCapabilities
+    // 发送 RegisterCapabilities（含 TTS Worker URL）
+    let tts_url = runtime.tts_worker_url.read().await.clone();
     out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
         models: models.clone(),
+        tts_worker_url: tts_url,
     }))?;
 
     // WS ping 定时器
@@ -1357,6 +1434,31 @@ async fn run_session(
                                 run_exec(task_id, cli, args, cwd, env, tx_c).await;
                             });
                         }
+                        ServerToAgent::TtsSynthesizeRequest {
+                            req_id,
+                            text,
+                            voice_id,
+                            emotion_id,
+                            intensity,
+                            provider,
+                        } => {
+                            info!("🎙️  TTS 合成请求: {}", req_id);
+                            let tx_c = out_tx_r.clone();
+                            let rt_c = runtime.clone();
+                            tokio::spawn(async move {
+                                let worker_url = rt_c.tts_worker_url.read().await.clone();
+                                let reply = match worker_url {
+                                    None => AgentToServer::TtsSynthesizeError {
+                                        req_id,
+                                        message: "本机 TTS Worker 未配置".to_string(),
+                                    },
+                                    Some(url) => {
+                                        run_tts_synthesis(req_id, url, text, voice_id, emotion_id, intensity, provider).await
+                                    }
+                                };
+                                let _ = tx_c.send(ws_text(&reply));
+                            });
+                        }
                         _ => {
                             // 其他消息类型暂不处理
                         }
@@ -1475,17 +1577,25 @@ struct NodeRuntime {
     status: RwLock<NodeStatus>,
     /// CLI 名称 → 完整路径映射（启动时检测，避免 PATH 不完整导致 program not found）
     cli_paths: RwLock<Vec<(String, String)>>,
+    /// 本地 TTS Worker URL（如 http://127.0.0.1:5011）；由管理页或环境变量设置
+    tts_worker_url: RwLock<Option<String>>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
 }
 
 impl NodeRuntime {
     fn new(cfg: NodeConfig, creds: Option<Credentials>) -> Self {
+        // 从环境变量读取 TTS Worker URL 初始值
+        let tts_url = std::env::var("NODE_TTS_WORKER_URL")
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| !v.is_empty());
         Self {
             cfg,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),
             cli_paths: RwLock::new(Vec::new()),
+            tts_worker_url: RwLock::new(tts_url),
             wake: Notify::new(),
         }
     }
@@ -1553,6 +1663,8 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
                 axum::routing::post(admin_register_project),
             )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
+            .route("/api/tts-relay-config", axum::routing::get(admin_tts_relay_get)
+                .post(admin_tts_relay_set))
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
@@ -1566,7 +1678,33 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
     });
 }
 
-async fn admin_index() -> axum::response::Html<&'static str> {
+/// GET /api/tts-relay-config — 返回当前 TTS Worker URL 配置
+async fn admin_tts_relay_get(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let url = rt.tts_worker_url.read().await.clone();
+    axum::Json(serde_json::json!({ "ttsWorkerUrl": url }))
+}
+
+#[derive(serde::Deserialize)]
+struct TtsRelaySetReq {
+    tts_worker_url: Option<String>,
+}
+
+/// POST /api/tts-relay-config — 设置本机 TTS Worker URL。空字符串表示清除。
+async fn admin_tts_relay_set(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<TtsRelaySetReq>,
+) -> axum::Json<serde_json::Value> {
+    let url = req
+        .tts_worker_url
+        .map(|v| v.trim().trim_end_matches('/').to_string())
+        .filter(|v| !v.is_empty());
+    *rt.tts_worker_url.write().await = url.clone();
+    // 唤醒连接循环重新注册能力（让云端尽快知晓有 TTS 能力）
+    rt.wake.notify_one();
+    axum::Json(serde_json::json!({ "ok": true, "ttsWorkerUrl": url }))
+}
     axum::response::Html(include_str!("node_agent_admin.html"))
 }
 
