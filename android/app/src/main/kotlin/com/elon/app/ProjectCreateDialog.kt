@@ -30,7 +30,7 @@ internal object ProjectCreateDialog {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         }
         val nodeStatus = TextView(activity).apply {
-            text = "正在加载你的 PC 节点..."
+            text = "正在加载可用 PC 节点..."
             textSize = 13f
         }
         val nodeSpinner = Spinner(activity).apply {
@@ -123,7 +123,8 @@ internal object ProjectCreateDialog {
                             android.R.layout.simple_spinner_dropdown_item,
                             nodes.map { node ->
                                 val cli = node.allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "CLI"
-                                "${node.displayName} · ${node.shortId} · ${node.projectCount}个项目 · $cli"
+                                val projectSuffix = node.projectCount.takeIf { it > 0 }?.let { " · ${it}个项目" }.orEmpty()
+                                "${node.displayName} · ${node.shortId}$projectSuffix · $cli"
                             }
                         )
                     }

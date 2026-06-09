@@ -22,7 +22,7 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub template: Option<String>,
-    /// 新项目默认只能创建在当前用户的 PC 节点上；多节点在线时必须显式指定。
+    /// 新项目可创建到任意在线 PC CLI 节点；多节点在线时必须显式指定。
     pub node_id: Option<String>,
     /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
     pub execution_target: Option<String>,

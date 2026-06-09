@@ -30,34 +30,86 @@ pub async fn list_nodes(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if let Err(e) = auth_from_headers(&state, &headers) {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response();
-    }
-    let nodes = state.node_registry.list_online().await;
-    let nodes: Vec<_> = nodes
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response()
+        }
+    };
+    let project_counts = project_counts_for_user(&state, &user.id);
+    let mut cli_by_id: HashMap<_, _> = state
+        .agent_manager
+        .list()
+        .await
         .into_iter()
-        .map(|node| {
-            let short_id = short_node_id(&node.node_id);
-            let device_name = clean_string(node.device_name.as_deref());
-            let display_name = display_node_name("", device_name.as_deref(), &short_id);
-            PublicNodeResponse {
-                agent_id: node.node_id.clone(),
-                node_id: node.node_id,
-                owner_user_id: node.owner_user_id,
-                device_name,
-                display_name,
-                short_id,
-                models: node.models,
-                tts_worker_url: node.tts_worker_url,
-                connected_at: node.connected_at,
-                online: node.online,
-            }
-        })
+        .map(|agent| (agent.agent_id.clone(), agent))
         .collect();
+
+    let mut nodes = Vec::new();
+    for node in state.node_registry.list_online().await {
+        let node_id = node.node_id.clone();
+        let cli_agent = cli_by_id.remove(&node_id);
+        let allowed_clis = cli_agent
+            .as_ref()
+            .map(|agent| agent.allowed_clis.clone())
+            .unwrap_or_default();
+        let short_id = short_node_id(&node_id);
+        let device_name = clean_string(node.device_name.as_deref()).or_else(|| {
+            cli_agent
+                .as_ref()
+                .and_then(|agent| clean_string(agent.device_name.as_deref()))
+        });
+        let display_name = display_node_name("", device_name.as_deref(), &short_id);
+        nodes.push(PublicNodeResponse {
+            agent_id: node_id.clone(),
+            node_id: node_id.clone(),
+            owner_user_id: node.owner_user_id,
+            device_name,
+            display_name,
+            short_id,
+            models: node.models,
+            allowed_clis: allowed_clis.clone(),
+            cli_project_ready: supports_project_cli(&allowed_clis),
+            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
+            tts_worker_url: node.tts_worker_url,
+            connected_at: node.connected_at,
+            online: node.online || cli_agent.is_some(),
+        });
+    }
+
+    for agent in cli_by_id.into_values() {
+        let node_id = agent.agent_id.clone();
+        let allowed_clis = agent.allowed_clis;
+        let short_id = short_node_id(&node_id);
+        let device_name = clean_string(agent.device_name.as_deref());
+        let display_name = display_node_name("", device_name.as_deref(), &short_id);
+        let owner_user_id = state
+            .store
+            .get_node_credential_owner(&node_id)
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        nodes.push(PublicNodeResponse {
+            agent_id: node_id.clone(),
+            node_id: node_id.clone(),
+            owner_user_id,
+            device_name,
+            display_name,
+            short_id,
+            models: Vec::new(),
+            allowed_clis: allowed_clis.clone(),
+            cli_project_ready: supports_project_cli(&allowed_clis),
+            project_count: project_counts.get(&node_id).copied().unwrap_or(0),
+            tts_worker_url: None,
+            connected_at: agent.connected_at,
+            online: true,
+        });
+    }
+
     Json(serde_json::json!({ "nodes": nodes })).into_response()
 }
 
@@ -266,19 +318,7 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         .into_iter()
         .map(|agent| (agent.agent_id.clone(), agent))
         .collect();
-    let project_counts = match state.store.list_projects_for_user(&user.id) {
-        Ok(projects) => projects
-            .into_iter()
-            .filter_map(|project| project.node_id)
-            .fold(HashMap::<String, i64>::new(), |mut counts, node_id| {
-                *counts.entry(node_id).or_insert(0) += 1;
-                counts
-            }),
-        Err(e) => {
-            tracing::warn!(user_id = %user.id, error = %e, "failed to count user projects per node");
-            HashMap::new()
-        }
-    };
+    let project_counts = project_counts_for_user(&state, &user.id);
 
     let mut nodes = Vec::new();
     for credential in credentials {
@@ -330,7 +370,11 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
 
     for node in online_by_id.into_values() {
         let node_id = node.node_id.clone();
-        let short_id = short_node_id(&node.node_id);
+        let cli_agent = cli_by_id.get(&node_id);
+        let allowed_clis = cli_agent
+            .map(|agent| agent.allowed_clis.clone())
+            .unwrap_or_default();
+        let short_id = short_node_id(&node_id);
         let device_name = clean_string(node.device_name.as_deref());
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
         nodes.push(MyNodeResponse {
@@ -342,8 +386,8 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
             display_name,
             short_id,
             models: node.models,
-            allowed_clis: Vec::new(),
-            cli_project_ready: false,
+            allowed_clis: allowed_clis.clone(),
+            cli_project_ready: supports_project_cli(&allowed_clis),
             project_count: project_counts.get(&node_id).copied().unwrap_or(0),
             connected_at: node.connected_at,
             created_at: String::new(),
@@ -363,6 +407,9 @@ struct PublicNodeResponse {
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
+    allowed_clis: Vec<String>,
+    cli_project_ready: bool,
+    project_count: i64,
     tts_worker_url: Option<String>,
     connected_at: u64,
     online: bool,
@@ -384,6 +431,22 @@ struct MyNodeResponse {
     connected_at: u64,
     created_at: String,
     online: bool,
+}
+
+fn project_counts_for_user(state: &AppState, user_id: &str) -> HashMap<String, i64> {
+    match state.store.list_projects_for_user(user_id) {
+        Ok(projects) => projects
+            .into_iter()
+            .filter_map(|project| project.node_id)
+            .fold(HashMap::<String, i64>::new(), |mut counts, node_id| {
+                *counts.entry(node_id).or_insert(0) += 1;
+                counts
+            }),
+        Err(e) => {
+            tracing::warn!(user_id = %user_id, error = %e, "failed to count user projects per node");
+            HashMap::new()
+        }
+    }
 }
 
 fn supports_project_cli(allowed_clis: &[String]) -> bool {
