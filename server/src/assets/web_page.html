@@ -476,6 +476,22 @@
       color: var(--ink-dim);
       margin-top: 3px;
     }
+    .profile-qr-thumb {
+      width: 34px;
+      height: 34px;
+      border-radius: 4px;
+      background: #f2f5fa;
+      color: #101010;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .profile-qr-thumb svg {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
     /* Token 消耗统计 */
     .usage-section {
       background: #181b20;
@@ -1246,6 +1262,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <div class="profile-nickname" id="profileNickname">加载中…</div>
           <div class="profile-account" id="profileAccount"></div>
           <div class="profile-workspace-hint">云端工作区已就绪</div>
+        </div>
+        <div class="profile-qr-thumb" title="我的二维码" aria-label="我的二维码">
+          <svg viewBox="0 0 28 28" aria-hidden="true">
+            <path fill="currentColor" d="M2 2h8v8H2V2Zm2 2v4h4V4H4Zm14-2h8v8h-8V2Zm2 2v4h4V4h-4ZM2 18h8v8H2v-8Zm2 2v4h4v-4H4Zm11-7h3v3h-3v-3Zm5 0h2v2h-2v-2Zm4 1h2v4h-2v-4Zm-11 5h2v3h-2v-3Zm4-2h3v2h-3v-2Zm4 3h5v2h-5v-2Zm-5 4h2v2h-2v-2Zm4-1h2v3h-2v-3Zm4 1h2v2h-2v-2Zm-11-12h2v2h-2v-2Zm0 4h2v2h-2v-2Z"/>
+          </svg>
         </div>
       </div>
 

@@ -142,14 +142,7 @@ internal object UserProfileViews {
                 layoutParams = LinearLayout.LayoutParams(context.dp(64), context.dp(64))
             })
             addView(profileTextBlock(context, profile))
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(context.dp(34), context.dp(34))
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = "▦"
-                setTextColor(Color.parseColor("#A6AFBD"))
-                textSize = 24f
-            })
+            addView(qrThumbnail(context))
             addView(arrow(context))
         }
     }
@@ -185,6 +178,24 @@ internal object UserProfileViews {
                 textSize = 13f
                 setPadding(0, context.dp(14), 0, 0)
             })
+        }
+    }
+
+    private fun qrThumbnail(context: Context): ImageView {
+        val size = context.dp(34)
+        val bitmap = QrCodeBitmap.create(
+            UserProfileStore.personalQrPayload(context),
+            size,
+            foreground = Color.parseColor("#101010"),
+            background = Color.TRANSPARENT
+        )
+        return ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            background = roundedRect(Color.parseColor("#F2F5FA"), context.dp(4))
+            contentDescription = "我的二维码"
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(context.dp(3), context.dp(3), context.dp(3), context.dp(3))
+            setImageBitmap(bitmap)
         }
     }
 
