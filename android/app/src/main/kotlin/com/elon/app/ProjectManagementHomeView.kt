@@ -503,7 +503,15 @@ internal class ProjectManagementHomeView(
     private fun projectMeta(project: AppProject): String {
         val kind = project.projectKindLabel()
         val stage = projectStageText(project.stage)
-        return "$kind · ${project.displayConversationCount()}个会话 · $stage"
+        val workspace = projectWorkspaceText(project, stage)
+        return "$kind · ${project.displayConversationCount()}个会话 · $workspace"
+    }
+
+    private fun projectWorkspaceText(project: AppProject, stage: String): String {
+        if (stage == "运行中") return stage
+        val label = cleanProjectText(project.workspaceHealthLabel)
+        if (!label.isNullOrBlank()) return label
+        return stage
     }
 
     private fun projectStageText(stage: String): String {

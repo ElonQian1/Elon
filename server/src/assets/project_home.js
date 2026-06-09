@@ -183,6 +183,28 @@
     return project.last_task_status || project.status || project.stage || '待提交需求';
   }
 
+  function workspaceStatusOf(project) {
+    const status = project.workspace_status || project.workspaceStatus;
+    if (!status || typeof status !== 'object') return '';
+    const latest = String(status.latest_execution_status || status.latestExecutionStatus || '').trim().toLowerCase();
+    if (latest === 'running') return '运行中';
+    const kind = String(status.workspace_kind || status.workspaceKind || '').trim();
+    if (kind === 'system_archive') return systemProjectLabel(project) + '归档';
+    if (kind === 'pc_node_workspace') {
+      const canRun = boolOf(status.can_run_on_pc || status.canRunOnPc);
+      const nodeOnline = boolOf(status.node_online || status.nodeOnline);
+      const hasNode = Boolean(status.node_id || status.nodeId);
+      const warnings = Number(status.warning_count || status.warningCount || 0) || 0;
+      if (canRun && warnings <= 0) return 'PC在线';
+      if (canRun) return 'PC有提醒';
+      if (hasNode && !nodeOnline) return 'PC离线';
+      return 'PC需配置';
+    }
+    if (kind === 'external_workspace') return '外部工作区';
+    if (kind === 'server_workspace') return '服务器工作区';
+    return '';
+  }
+
   function conversationCount(project) {
     if (Array.isArray(project.conversations)) return project.conversations.length || 1;
     return project.conversation_count || project.conversationCount || project.chat_count || 1;
@@ -292,7 +314,8 @@
     const system = isSystemProject(project);
     const joint = !system && isJointProject(project);
     const kind = system ? '系统档案' : joint ? '联合开发' : '个人独立';
-    const meta = `${kind} · ${conversationCount(project)}个会话 · ${stageOf(project)}`;
+    const status = workspaceStatusOf(project) || stageOf(project);
+    const meta = `${kind} · ${conversationCount(project)}个会话 · ${status}`;
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     const projectCode = projectCodeOf(project);

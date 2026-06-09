@@ -28,6 +28,11 @@ data class AppProject(
     var memberCount: Int? = null,
     var projectDescription: String? = null,
     var remoteConversationCount: Int? = null,
+    var workspaceKind: String? = null,
+    var workspaceHealthLabel: String? = null,
+    var workspaceHealthTone: String? = null,
+    var archiveEntryKey: String? = null,
+    var memoryScopeType: String? = null,
     var activeConversationIndex: Int = 0,
     val events: MutableList<String> = mutableListOf(),
     val conversations: MutableList<AppConversation> = mutableListOf()

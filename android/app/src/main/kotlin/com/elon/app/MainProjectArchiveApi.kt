@@ -20,7 +20,10 @@ internal data class ArchiveProjectRecord(
     val updatedAtMs: Long,
     val conversationCount: Int,
     val iconDataUrl: String? = null,
-    val systemKey: String? = null
+    val systemKey: String? = null,
+    val workspaceKind: String? = null,
+    val conversationRoute: ArchiveConversationRoute? = null,
+    val workspaceStatus: ArchiveWorkspaceStatus? = null
 ) {
     fun toAppProject(): AppProject {
         val systemKey = systemKey?.trim()
@@ -49,8 +52,61 @@ internal data class ArchiveProjectRecord(
             memberCount = memberCount.coerceAtLeast(0),
             projectDescription = description?.takeIf { it.isNotBlank() },
             remoteConversationCount = conversationCount,
+            workspaceKind = workspaceKind?.takeIf { it.isNotBlank() },
+            workspaceHealthLabel = workspaceStatus?.displayLabel(systemKey),
+            workspaceHealthTone = workspaceStatus?.displayTone(),
+            archiveEntryKey = conversationRoute?.entryKey,
+            memoryScopeType = conversationRoute?.memoryScopeType,
             conversations = mutableListOf()
         )
+    }
+}
+
+internal data class ArchiveConversationRoute(
+    val entryKey: String,
+    val projectId: String,
+    val projectName: String,
+    val conversationTitle: String,
+    val memoryScopeType: String,
+    val memoryScopeId: String?
+)
+
+internal data class ArchiveWorkspaceStatus(
+    val workspaceKind: String,
+    val executionTarget: String,
+    val nodeId: String?,
+    val nodeOnline: Boolean,
+    val nodeDisplayName: String?,
+    val canRunOnPc: Boolean,
+    val latestExecutionStatus: String?,
+    val latestExecutionMergeStatus: String?,
+    val warningCount: Int,
+    val warnings: List<String>
+) {
+    fun displayLabel(systemKey: String?): String {
+        if (latestExecutionStatus.equals("running", ignoreCase = true)) return "运行中"
+        return when (workspaceKind) {
+            "system_archive" -> "${systemDisplayName(systemKey)}归档"
+            "pc_node_workspace" -> when {
+                canRunOnPc && warningCount <= 0 -> "PC在线"
+                canRunOnPc -> "PC有提醒"
+                !nodeId.isNullOrBlank() && !nodeOnline -> "PC离线"
+                else -> "PC需配置"
+            }
+            "external_workspace" -> "外部工作区"
+            else -> "服务器工作区"
+        }
+    }
+
+    fun displayTone(): String {
+        if (latestExecutionStatus.equals("running", ignoreCase = true)) return "active"
+        return when {
+            workspaceKind == "system_archive" -> "neutral"
+            workspaceKind == "pc_node_workspace" && canRunOnPc && warningCount <= 0 -> "ok"
+            workspaceKind == "pc_node_workspace" && !canRunOnPc -> "bad"
+            warningCount > 0 -> "warn"
+            else -> "neutral"
+        }
     }
 }
 
@@ -115,7 +171,43 @@ private fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
         ) ?: 0L,
         conversationCount = obj.optInt("conversation_count", 0),
         iconDataUrl = project.optArchiveProjectIconDataUrl(),
-        systemKey = obj.optCleanString("system_key")
+        systemKey = obj.optCleanString("system_key"),
+        workspaceKind = obj.optCleanString("workspace_kind"),
+        conversationRoute = parseArchiveConversationRoute(obj.optJSONObject("conversation_route")),
+        workspaceStatus = parseArchiveWorkspaceStatus(obj.optJSONObject("workspace_status"))
+    )
+}
+
+private fun parseArchiveConversationRoute(obj: JSONObject?): ArchiveConversationRoute? {
+    if (obj == null) return null
+    return ArchiveConversationRoute(
+        entryKey = obj.optCleanString("entry_key") ?: return null,
+        projectId = obj.optCleanString("project_id") ?: return null,
+        projectName = obj.optCleanString("project_name") ?: "",
+        conversationTitle = obj.optCleanString("conversation_title") ?: "",
+        memoryScopeType = obj.optCleanString("memory_scope_type") ?: "",
+        memoryScopeId = obj.optCleanString("memory_scope_id")
+    )
+}
+
+private fun parseArchiveWorkspaceStatus(obj: JSONObject?): ArchiveWorkspaceStatus? {
+    if (obj == null) return null
+    val warnings = obj.optJSONArray("warnings")?.let { arr ->
+        (0 until arr.length()).mapNotNull { index ->
+            arr.optString(index).trim().takeIf { it.isNotBlank() }
+        }
+    }.orEmpty()
+    return ArchiveWorkspaceStatus(
+        workspaceKind = obj.optCleanString("workspace_kind") ?: return null,
+        executionTarget = obj.optCleanString("execution_target") ?: "",
+        nodeId = obj.optCleanString("node_id"),
+        nodeOnline = obj.optBoolean("node_online", false),
+        nodeDisplayName = obj.optCleanString("node_display_name"),
+        canRunOnPc = obj.optBoolean("can_run_on_pc", false),
+        latestExecutionStatus = obj.optCleanString("latest_execution_status"),
+        latestExecutionMergeStatus = obj.optCleanString("latest_execution_merge_status"),
+        warningCount = obj.optInt("warning_count", warnings.size).coerceAtLeast(0),
+        warnings = warnings
     )
 }
 

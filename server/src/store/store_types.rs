@@ -338,6 +338,37 @@ pub struct UserArchiveProject {
     pub workspace_kind: String,
     /// `phone_control` | `chat_memory`
     pub system_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversation_route: Option<UserArchiveConversationRoute>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_status: Option<UserArchiveWorkspaceStatus>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserArchiveConversationRoute {
+    pub entry_key: String,
+    pub project_id: String,
+    pub project_name: String,
+    pub conversation_title: String,
+    pub memory_scope_type: String,
+    pub memory_scope_id: Option<String>,
+    pub project_created: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserArchiveWorkspaceStatus {
+    pub project_id: String,
+    pub workspace_kind: String,
+    pub execution_target: String,
+    pub node_id: Option<String>,
+    pub node_online: bool,
+    pub node_display_name: Option<String>,
+    pub can_run_on_pc: bool,
+    pub latest_execution_status: Option<String>,
+    pub latest_execution_merge_status: Option<String>,
+    pub latest_execution_active_workspace_path: Option<String>,
+    pub warning_count: i64,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

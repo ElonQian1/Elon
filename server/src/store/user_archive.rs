@@ -90,6 +90,8 @@ fn archive_project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserArc
         conversation_count,
         workspace_kind,
         system_key,
+        conversation_route: None,
+        workspace_status: None,
     })
 }
 
