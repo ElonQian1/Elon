@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -19,9 +18,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import androidx.recyclerview.widget.RecyclerView
-import io.noties.markwon.Markwon
-import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
-import io.noties.markwon.ext.tables.TablePlugin
 import kotlin.math.sin
 
 data class ChatMessage(
@@ -49,16 +45,7 @@ data class ChatMessage(
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
     var nodeId: String? = null,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
-    var streamId: String? = null,
-    /**
-     * Copilot CLI 工具块状态机：true 表示当前正在接收工具块内容（● 到 └ 之间）。
-     * 工具块内所有行（含空行）全部路由到 evidenceDetails。
-     */
-    var copilotInToolBlock: Boolean = false,
-    /** 已完成的工具调用数量，用于生成折叠标题 */
-    var copilotToolCallCount: Int = 0,
-    /** 当前正在执行的工具名（用于 └ 结束时把占位行替换成结果摘要） */
-    var copilotLastToolName: String? = null
+    var streamId: String? = null
 )
 
 class ChatAdapter(
@@ -69,18 +56,6 @@ class ChatAdapter(
     private val onProjectShareAction: ((ChatProjectShare) -> Unit)? = null,
     private val onProjectShareLongPress: ((View, ChatMessage, ChatProjectShare) -> Unit)? = null
 ) : RecyclerView.Adapter<ChatAdapter.VH>() {
-    private var markwon: Markwon? = null
-
-    private fun getMarkwon(context: Context): Markwon {
-        return markwon ?: Markwon.builder(context)
-            .usePlugin(StrikethroughPlugin.create())
-            .usePlugin(TablePlugin.create(context))
-            .build().also { markwon = it }
-    }
-
-    private fun renderMarkdown(textView: TextView, content: String) {
-        getMarkwon(textView.context).setMarkdown(textView, content)
-    }
     /** 处理消息气泡上的 APK 操作按钮（安装 / 复制链接 / 分享），由 Activity 注入。 */
     var onApkAction: ((action: String, url: String) -> Unit)? = null
     var onSuggestionResolve: ((ChatMessage) -> Unit)? = null
@@ -188,21 +163,14 @@ class ChatAdapter(
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
-            val isAiRole = message.role in setOf("ai", "ai-intent", "ai-working", "ai-progress", "ai-cli-log")
-            // Copilot CLI（来自 PC 节点、nodeId 不为空）的回复使用 Markdown 渲染；
-            // Codex CLI 和其他模型保持纯文本（Codex 输出不含 MD 格式）
-            val isCopilotReply = !message.nodeId.isNullOrBlank()
-            if (isAiRole && isCopilotReply && message.content.isNotBlank()) {
-                renderMarkdown(holder.text, message.content)
-            } else {
-                holder.text.text = message.content
-            }
+            holder.text.text = message.content
             holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
                 View.GONE
             } else {
                 View.VISIBLE
             }
             holder.text.setTextColor(messageTextColor(message.role))
+            Linkify.addLinks(holder.text, Linkify.WEB_URLS)
             holder.text.movementMethod = LinkMovementMethod.getInstance()
         }
         bindSendStatus(holder, message)
@@ -377,106 +345,11 @@ class ChatAdapter(
      * 流式追加：找到具有相同 streamId 的最后一条消息，把 [chunk] 追加到它的 content，
      * 然后 notifyItemChanged 触发气泡原地刷新（打字机效果）。
      * 若找不到对应气泡则忽略（容错：可能先到 chunk 后到 AssistantMessage）。
-     *
-     * Copilot CLI 的工具调用输出（以 ●、│、└ 开头的行）路由到 evidenceDetails 折叠区域，
-     * 普通文字内容追加到主内容区域。
      */
     fun streamAppendChunk(streamId: String, chunk: String) {
         val idx = messages.indexOfLast { it.streamId == streamId }
         if (idx < 0) return
-        val msg = messages[idx]
-        // 只有来自 PC 节点（nodeId 不为空）的 Copilot CLI 回复才需要工具块状态机
-        val isCopilotMsg = !msg.nodeId.isNullOrBlank()
-        if (!isCopilotMsg) {
-            msg.content += chunk
-            notifyItemChanged(idx)
-            return
-        }
-
-        // ── 状态机：交织式叙述 + 工具块处理 ──────────────────────────
-        // 工具块结构：
-        //   ● 操作名称 (type)\n  ← 起始行（唯一可靠标记）
-        //   │ 参数/内容\n        ← 块内行（折叠到详情区，不进主气泡）
-        //   └ 结果摘要\n         ← 结束行
-        // 叙述文字（非工具块）直接追加到主气泡，保持叙事顺序。
-        // 每个工具块起始时在主气泡插入一行内联占位：「⚙️ Search…」
-        // 工具块结束时把占位行替换为带摘要的结果：「⚙️ Search → 104 files found」
-        // 这样主气泡内容完整呈现：文字 → ⚙️ 工具结果 → 文字 → ⚙️ 工具结果 → 文字
-        val trimmed = chunk.trimStart()
-        val isToolBlockStart = trimmed.startsWith("● ")
-        val isToolBlockEnd   = trimmed.startsWith("└ ") || trimmed.startsWith("  └ ")
-        val isStatsLine      = trimmed.startsWith("Changes ") || trimmed.startsWith("Requests ") ||
-                               trimmed.startsWith("Tokens ")
-
-        when {
-            isToolBlockStart -> {
-                // ① 提取工具名："● Search (grep)" → "Search"；"● Edit file.ts +3" → "Edit"
-                val toolName = trimmed
-                    .removePrefix("● ")
-                    .substringBefore(" ").substringBefore("(").trim()
-                    .ifBlank { "操作" }
-                msg.copilotLastToolName = toolName
-                msg.copilotInToolBlock  = true
-                msg.copilotToolCallCount += 1
-
-                // ② 在主气泡原位插入内联占位行，保持叙事顺序
-                if (msg.content.isNotBlank() && !msg.content.endsWith("\n")) {
-                    msg.content += "\n"
-                }
-                msg.content += "⚙️ $toolName…\n"
-
-                // ③ 起始行本身也折叠到详情区（供展开查看参数）
-                val prev = msg.evidenceDetails ?: ""
-                msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-                msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
-                    "已执行 ${msg.copilotToolCallCount} 个操作" else "执行详情"
-                notifyItemChanged(idx)
-                return
-            }
-            isToolBlockEnd -> {
-                // ④ 解析结果摘要："└ 104 files found" → "104 files found"
-                val rawResult = trimmed
-                    .removePrefix("└ ").removePrefix("  └ ").trim()
-                val summary = when {
-                    rawResult.contains("files found")  -> rawResult
-                    rawResult.contains("lines found")  -> rawResult
-                    rawResult.contains("lines read")   -> rawResult
-                    rawResult.contains('\\') || rawResult.contains('/') ->
-                        rawResult.substringAfterLast('\\').substringAfterLast('/')
-                    else -> rawResult.take(50)
-                }
-
-                // ⑤ 把主气泡里的占位行「⚙️ ToolName…」替换为结果行「⚙️ ToolName → summary」
-                val toolName    = msg.copilotLastToolName ?: "操作"
-                val placeholder = "⚙️ $toolName…"
-                val resultLine  = "⚙️ $toolName → $summary"
-                val lastIdx     = msg.content.lastIndexOf(placeholder)
-                if (lastIdx >= 0) {
-                    msg.content = msg.content.substring(0, lastIdx) + resultLine +
-                        msg.content.substring(lastIdx + placeholder.length)
-                }
-
-                // ⑥ 结束行也折叠到详情区
-                val prev = msg.evidenceDetails ?: ""
-                msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-                msg.copilotInToolBlock = false
-                msg.evidenceTitle = if (msg.copilotToolCallCount > 1)
-                    "已执行 ${msg.copilotToolCallCount} 个操作" else "执行详情"
-                notifyItemChanged(idx)
-                return
-            }
-        }
-
-        if (msg.copilotInToolBlock || isStatsLine) {
-            // 工具块内行 / 统计行 → 只进详情折叠区，不进主气泡
-            val prev = msg.evidenceDetails ?: ""
-            msg.evidenceDetails = if (prev.isBlank()) chunk.trimEnd('\n') else "$prev\n${chunk.trimEnd('\n')}"
-        } else {
-            // 叙述文字 → 主气泡（跳过空白行，避免多余空行）
-            if (chunk.isNotBlank()) {
-                msg.content += chunk
-            }
-        }
+        messages[idx].content += chunk
         notifyItemChanged(idx)
     }
 
