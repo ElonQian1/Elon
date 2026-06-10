@@ -39,6 +39,10 @@ internal class MainChatProjectShareActions(
     fun handleCardAction(share: ChatProjectShare) {
         val existingIndex = findProjectIndex(share.id)
         if (existingIndex >= 0) {
+            if (applyShareIcon(projects[existingIndex], share)) {
+                saveProjects()
+                renderProjectList()
+            }
             activateAndOpen(existingIndex, share)
             return
         }
@@ -114,6 +118,7 @@ internal class MainChatProjectShareActions(
                     token = token,
                     ownerAccount = ownerAccount
                 )
+                syncProjectIconToRemote(project, created.id)
                 setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 created
             }
@@ -131,6 +136,7 @@ internal class MainChatProjectShareActions(
                         sendShareMessage(
                             created.toChatProjectShare().copy(
                                 ownerAccount = ownerAccount,
+                                iconDataUrl = project.iconDataUrl?.takeIf { it.isNotBlank() },
                                 latestLog = share.latestLog
                             )
                         )
@@ -156,7 +162,8 @@ internal class MainChatProjectShareActions(
             collaborationProjectId = share.id.takeIf { share.source != "local" },
             collaborationJoinMode = normalizeProjectJoinMode(share.joinMode),
             ownerAccount = share.ownerAccount,
-            memberCount = share.memberCount.coerceAtLeast(1)
+            memberCount = share.memberCount.coerceAtLeast(1),
+            iconDataUrl = share.iconDataUrl?.takeIf { it.isNotBlank() }
         )
         projects.add(project)
         saveProjects()
@@ -190,6 +197,20 @@ internal class MainChatProjectShareActions(
     private fun findProjectIndex(projectId: String): Int {
         return projects.indexOfFirst {
             it.id == projectId || it.projectSpaceId() == projectId
+        }
+    }
+
+    private fun applyShareIcon(project: AppProject, share: ChatProjectShare): Boolean {
+        val icon = share.iconDataUrl?.trim()?.takeIf { it.isNotBlank() } ?: return false
+        if (project.iconDataUrl == icon) return false
+        project.iconDataUrl = icon
+        return true
+    }
+
+    private fun syncProjectIconToRemote(project: AppProject, remoteProjectId: String) {
+        val icon = project.iconDataUrl?.trim()?.takeIf { it.isNotBlank() } ?: return
+        runCatching {
+            updateProjectIconDataUrl(http, serverUrl, activity, remoteProjectId, icon)
         }
     }
 }

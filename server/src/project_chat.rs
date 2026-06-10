@@ -6,6 +6,7 @@ use axum::{
 };
 use futures::stream;
 use std::convert::Infallible;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -128,6 +129,7 @@ pub async fn chat_project(
             download_base,
             conversation_id.clone(),
             message,
+            req.project_icon_data_url,
             req.agent,
             attachments,
             ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
@@ -303,6 +305,7 @@ pub async fn chat_project_stream(
         format!("{}/api/projects/{}/download", state.public_url, project_id),
         conversation_id,
         message,
+        req.project_icon_data_url,
         req.agent,
         attachments,
         ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
@@ -357,6 +360,67 @@ pub async fn chat_project_stream(
         .into_response()
 }
 
+const MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES: usize = 512 * 1024;
+
+fn append_project_icon_context(
+    state: &AppState,
+    project: &ProjectAccess,
+    workspace: &Path,
+    message: String,
+    project_icon_data_url: Option<&str>,
+) -> String {
+    let Some(icon_data_url) = clean_project_icon_context_data_url(project_icon_data_url) else {
+        return message;
+    };
+    if can_edit(&project.role) {
+        let _ = state
+            .store
+            .set_project_icon_data_url(&project.id, Some(&icon_data_url));
+    }
+    let wrote_metadata = write_project_icon_metadata(workspace, project, &icon_data_url);
+    let note = if wrote_metadata {
+        "用户已上传这个项目的 APK 图标。图标元数据已写入 `.elon/project-icon.json`；后续生成、修改或打包 Android APK 时，必须读取该文件并把其中的 `icon_data_url` 用作 launcher icon（含 `android:icon` / `android:roundIcon` / adaptive icon），应用内所有展示该用户 APK 的位置也使用同一图标。".to_string()
+    } else {
+        format!(
+            "用户已上传这个项目的 APK 图标。后续生成、修改或打包 Android APK 时，必须把下面的 `icon_data_url` 用作 launcher icon（含 `android:icon` / `android:roundIcon` / adaptive icon），应用内所有展示该用户 APK 的位置也使用同一图标。\n\nicon_data_url:\n{}",
+            icon_data_url
+        )
+    };
+    format!("{message}\n\n[项目 APK 图标]\n{note}")
+}
+
+fn clean_project_icon_context_data_url(project_icon_data_url: Option<&str>) -> Option<String> {
+    let value = project_icon_data_url?.trim();
+    if value.is_empty() || value.len() > MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES {
+        return None;
+    }
+    if !value.starts_with("data:image/") || !value.contains(";base64,") {
+        return None;
+    }
+    Some(value.to_string())
+}
+
+fn write_project_icon_metadata(
+    workspace: &Path,
+    project: &ProjectAccess,
+    icon_data_url: &str,
+) -> bool {
+    let dir = workspace.join(".elon");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return false;
+    }
+    let payload = serde_json::json!({
+        "project_id": &project.id,
+        "project_name": &project.name,
+        "icon_data_url": icon_data_url,
+        "usage": "Use this image as the Android APK launcher icon, including android:icon, android:roundIcon, adaptive icon foreground/background if present, and all in-app surfaces that represent this user APK."
+    });
+    serde_json::to_string_pretty(&payload)
+        .ok()
+        .and_then(|json| std::fs::write(dir.join("project-icon.json"), json).ok())
+        .is_some()
+}
+
 pub(crate) async fn run_project_agent_with_scheduler(
     state: Arc<AppState>,
     user_id: String,
@@ -364,6 +428,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     download_base: String,
     conversation_id: String,
     message: String,
+    project_icon_data_url: Option<String>,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
@@ -374,6 +439,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
         let _ = tx.send(WsMessage::error(msg).to_json());
         return;
     }
+    let project_icon_data_url = project_icon_data_url.or_else(|| {
+        state
+            .store
+            .project_space_summary(&user_id, &project.id)
+            .ok()
+            .and_then(|project| project.icon_data_url)
+    });
 
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
@@ -384,6 +456,9 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 "user_id": &user_id,
                 "conversation_id": &conversation_id,
                 "message_chars": message.chars().count(),
+                "has_project_icon": project_icon_data_url
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty()),
                 "agent": agent_name.as_deref(),
                 "execution_mode": execution_mode.as_str(),
             }),
@@ -459,6 +534,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
             )
             .to_json(),
         );
+        let message = append_project_icon_context(
+            &state,
+            &project,
+            &base_workspace,
+            message,
+            project_icon_data_url.as_deref(),
+        );
         agent::run_for_project(
             &user_id,
             &project,
@@ -523,6 +605,14 @@ pub(crate) async fn run_project_agent_with_scheduler(
         .await;
         return;
     }
+
+    let message = append_project_icon_context(
+        &state,
+        &project,
+        workspace,
+        message,
+        project_icon_data_url.as_deref(),
+    );
 
     if execution_mode.is_plan() {
         let _ =

@@ -29,6 +29,7 @@ impl Store {
                         ORDER BY t.created_at DESC
                         LIMIT 1
                     ) AS last_apk_url,
+                    p.icon_data_url,
                     p.updated_at,
                     (
                         SELECT COUNT(*) FROM conversations c
@@ -81,18 +82,19 @@ fn archive_project_from_row(
         join_mode: row.get(14)?,
         last_task_status: row.get(15)?,
         last_apk_url: row.get(16)?,
-        updated_at: row.get(17)?,
+        icon_data_url: row.get(17)?,
+        updated_at: row.get(18)?,
     };
-    let conversation_count = row.get(18)?;
+    let conversation_count = row.get(19)?;
     let system_key = system_project_key_for_source_type(&project.source_type).map(str::to_string);
     let owner_account = if system_key.is_some() {
         "系统".to_string()
     } else {
-        row.get(19)?
+        row.get(20)?
     };
-    let owner_id: String = row.get(20)?;
+    let owner_id: String = row.get(21)?;
     let workspace_kind = workspace_kind_for_project(&project).to_string();
-    let creator_role: String = row.get(21)?;
+    let creator_role: String = row.get(22)?;
     let (project_origin_type, project_origin_label) = project_origin_for(
         system_key.as_deref(),
         &owner_id,

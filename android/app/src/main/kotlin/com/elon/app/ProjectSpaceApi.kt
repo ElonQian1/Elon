@@ -387,14 +387,7 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
     val channels = json.optJSONArray("channels") ?: JSONArray()
     val members = json.optJSONArray("members") ?: JSONArray()
     return ProjectSpace(
-        project = ProjectSpaceSummary(
-            id = project.optString("id", ""),
-            name = project.optString("name", "项目空间"),
-            description = project.optString("description").takeIf { it.isNotBlank() },
-            role = project.optString("role", "member"),
-            memberCount = project.optInt("member_count", 0),
-            updatedAt = project.optString("updated_at", "")
-        ),
+        project = parseProjectSpaceSummary(project),
         channels = List(channels.length()) { parseProjectChannel(channels.optJSONObject(it) ?: JSONObject()) },
         members = List(members.length()) { parseProjectMember(members.optJSONObject(it) ?: JSONObject()) },
         latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() }
@@ -407,8 +400,18 @@ private fun parseProjectSpaceSummary(project: JSONObject) = ProjectSpaceSummary(
     description = project.optString("description").takeIf { it.isNotBlank() },
     role = project.optString("role", "member"),
     memberCount = project.optInt("member_count", 0),
+    iconDataUrl = project.optProjectSpaceIconDataUrl(),
     updatedAt = project.optString("updated_at", "")
 )
+
+private fun JSONObject.optProjectSpaceIconDataUrl(): String? {
+    val keys = arrayOf("iconDataUrl", "icon_data_url", "iconUrl", "icon_url", "icon", "avatar", "logo")
+    for (key in keys) {
+        val value = optString(key, "").trim()
+        if (value.isNotBlank()) return value
+    }
+    return null
+}
 
 private fun parseProjectChannel(json: JSONObject) = ProjectChannel(
     id = json.optString("id", ""),

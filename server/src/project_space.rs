@@ -752,6 +752,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 download_base,
                 run_conversation_id,
                 run_content,
+                None,
                 run_agent,
                 None,
                 ProjectExecutionMode::Execute,

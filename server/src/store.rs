@@ -195,6 +195,7 @@ impl Store {
                 join_mode: "open".into(),
                 last_task_status: None,
                 last_apk_url: None,
+                icon_data_url: None,
                 updated_at: now,
             },
             reused_existing: false,
@@ -382,6 +383,7 @@ impl Store {
                 join_mode: "open".into(),
                 last_task_status: None,
                 last_apk_url: None,
+                icon_data_url: None,
                 updated_at: now,
             },
             reused_existing: false,
@@ -557,6 +559,7 @@ impl Store {
                         ORDER BY t.created_at DESC
                         LIMIT 1
                     ) AS last_apk_url,
+                    p.icon_data_url,
                     p.updated_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
@@ -733,7 +736,8 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         join_mode: row.get(14)?,
         last_task_status: row.get(15)?,
         last_apk_url: row.get(16)?,
-        updated_at: row.get(17)?,
+        icon_data_url: row.get(17)?,
+        updated_at: row.get(18)?,
     })
 }
 
@@ -762,6 +766,7 @@ fn find_owner_project_by_name(
                         ORDER BY t.created_at DESC
                         LIMIT 1
                     ) AS last_apk_url,
+                    p.icon_data_url,
                     p.updated_at
              FROM projects p
              LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
@@ -799,6 +804,7 @@ fn find_project_by_id_for_user(
                         ORDER BY t.created_at DESC
                         LIMIT 1
                     ) AS last_apk_url,
+                    p.icon_data_url,
                     p.updated_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2

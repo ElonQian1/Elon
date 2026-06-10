@@ -646,7 +646,11 @@ internal class MainMarketplaceActions(
             visibility = android.view.View.GONE
         }
         avatarFrame.addView(avatarImg)
-        if (project.ownerUserId.isNotBlank()) {
+        val projectIcon = UserProfileStore.decodeAvatar(project.iconDataUrl)
+        if (projectIcon != null) {
+            avatarImg.setImageBitmap(projectIcon)
+            avatarImg.visibility = android.view.View.VISIBLE
+        } else if (project.ownerUserId.isNotBlank()) {
             loadAvatarAsync(project.ownerUserId, avatarImg)
         }
         headerRow.addView(avatarFrame)

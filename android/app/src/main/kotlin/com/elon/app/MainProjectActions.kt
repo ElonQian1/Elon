@@ -40,6 +40,7 @@ internal class MainProjectActions(
     private val renderProjectList: () -> Unit,
     private val openProject: (Int) -> Unit,
     private val openProjectSpace: (AppProject) -> Unit,
+    private val openProjectIconPicker: (AppProject) -> Unit,
     private val showGitProjectDialog: () -> Unit,
     private val http: OkHttpClient,
     private val serverUrl: String,
@@ -393,7 +394,7 @@ internal class MainProjectActions(
             }
             setPadding(0, dp(18), 0, dp(8))
 
-            addView(createProjectActionsHeader(project, isJoint))
+            addView(createProjectActionsHeader(project, isJoint, dismissDialog))
             addView(createProjectActionsDivider(marginStart = dp(18), marginEnd = dp(18)))
 
             addView(ScrollView(activity).apply {
@@ -415,22 +416,17 @@ internal class MainProjectActions(
         }
     }
 
-    private fun createProjectActionsHeader(project: AppProject, isJoint: Boolean): View {
+    private fun createProjectActionsHeader(
+        project: AppProject,
+        isJoint: Boolean,
+        dismissDialog: (() -> Unit) -> Unit
+    ): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(18), 0, dp(18), dp(16))
 
-            addView(FrameLayout(activity).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor(MENU_ICON_BACKGROUND))
-                }
-                addView(ImageView(activity).apply {
-                    setImageResource(R.drawable.ic_popup_project)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
-                }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
-            }, LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(createProjectIconButton(project, dismissDialog), LinearLayout.LayoutParams(dp(48), dp(48)))
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -462,6 +458,53 @@ internal class MainProjectActions(
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
                 marginStart = dp(14)
             })
+        }
+    }
+
+    private fun createProjectIconButton(
+        project: AppProject,
+        dismissDialog: (() -> Unit) -> Unit
+    ): View {
+        return FrameLayout(activity).apply {
+            contentDescription = "上传 APK 图标"
+            isClickable = true
+            foreground = selectableForeground()
+            clipToOutline = true
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor(MENU_ICON_BACKGROUND))
+            }
+            val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
+            if (iconBitmap != null) {
+                addView(ImageView(activity).apply {
+                    setImageBitmap(iconBitmap)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            } else {
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_popup_project)
+                    imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
+                }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+            }
+            addView(FrameLayout(activity).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.parseColor("#1D2632"))
+                    setStroke(dp(1), Color.parseColor("#3A4554"))
+                }
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_attach_photos)
+                    imageTintList = ColorStateList.valueOf(Color.parseColor("#DDE8FC"))
+                }, FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
+            }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END))
+            setOnClickListener {
+                dismissDialog {
+                    openProjectIconPicker(project)
+                }
+            }
         }
     }
 
@@ -561,6 +604,13 @@ internal class MainProjectActions(
         return (value * activity.resources.displayMetrics.density + 0.5f).toInt()
     }
 
+    private fun syncProjectIconToRemote(project: AppProject, remoteProjectId: String) {
+        val icon = project.iconDataUrl?.trim()?.takeIf { it.isNotBlank() } ?: return
+        runCatching {
+            updateProjectIconDataUrl(http, serverUrl, activity, remoteProjectId, icon)
+        }
+    }
+
     private fun confirmUpgradeToJoint(index: Int) {
         if (!isLoggedIn()) {
             Toast.makeText(activity, "请先登录再升级为联合项目", Toast.LENGTH_SHORT).show()
@@ -591,6 +641,7 @@ internal class MainProjectActions(
                     token = token,
                     ownerAccount = AuthManager.displayName(activity)
                 )
+                syncProjectIconToRemote(project, created.id)
                 setProjectVisibility(http, serverUrl, created.id, true, "invite", token)
                 activity.runOnUiThread {
                     project.markJointDevelopment(created.id, "invite")
@@ -740,10 +791,12 @@ internal class MainProjectActions(
                         token = token,
                         ownerAccount = AuthManager.displayName(activity)
                     )
+                    syncProjectIconToRemote(project, created.id)
                     setProjectVisibility(http, serverUrl, created.id, true, joinMode, token)
                     created.id
                 } else {
                     val targetId = project.projectSpaceId()
+                    syncProjectIconToRemote(project, targetId)
                     setProjectVisibility(http, serverUrl, targetId, isPublic, joinMode, token)
                     targetId
                 }

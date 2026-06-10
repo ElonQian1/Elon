@@ -18,6 +18,8 @@ pub struct ProjectChatRequest {
     pub plan_mode: Option<bool>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
+    #[serde(default, alias = "projectIconDataUrl")]
+    pub project_icon_data_url: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
     /// 方案8: 客户端声明的 WS 协议版本，旧客户端为 None（服务器按 v1 处理）
     pub protocol_version: Option<u32>,
@@ -200,6 +202,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         plan_mode: None,
         conversation_id: None,
         conversation_title: None,
+        project_icon_data_url: None,
         attachments: None,
         protocol_version: None,
         chat_only: None,

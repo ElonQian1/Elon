@@ -13,6 +13,7 @@ internal data class ProjectSpaceSummary(
     val description: String?,
     val role: String,
     val memberCount: Int,
+    val iconDataUrl: String?,
     val updatedAt: String
 )
 

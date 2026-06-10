@@ -14,6 +14,7 @@ internal class MainPreparedMessageActions(
     private val isConversationTaskRunning: (SendTarget) -> Boolean,
     private val setSendEnabled: (Boolean) -> Unit,
     private val userId: () -> String,
+    private val projectIconDataUrl: (String) -> String?,
     private val selectedAgentForRequest: () -> String?,
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
@@ -127,6 +128,9 @@ internal class MainPreparedMessageActions(
             addProperty("user_id", userId())
             addProperty("project_id", target.projectId)
             addProperty("project_title", target.projectTitle)
+            projectIconDataUrl(target.projectId)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { addProperty("project_icon_data_url", it) }
             addProperty("conversation_id", target.conversationId)
             addProperty("conversation_title", target.conversationTitle)
             addProperty("message", outgoingText)

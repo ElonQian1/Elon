@@ -61,6 +61,7 @@ impl Store {
               (SELECT t.apk_url FROM tasks t
                WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                ORDER BY t.created_at DESC LIMIT 1) AS latest_apk_url,
+              p.icon_data_url,
               p.created_at,
               p.updated_at,
               p.created_by AS owner_id
@@ -113,9 +114,10 @@ impl Store {
                         join_mode: row.get(7)?,
                         last_task_status: row.get(8)?,
                         latest_apk_url: row.get(9)?,
-                        created_at: row.get(10)?,
-                        updated_at: row.get(11)?,
-                        owner_id: row.get(12).unwrap_or_default(),
+                        icon_data_url: row.get(10)?,
+                        created_at: row.get(11)?,
+                        updated_at: row.get(12)?,
+                        owner_id: row.get(13).unwrap_or_default(),
                     })
                 },
             )?
@@ -138,6 +140,7 @@ impl Store {
                (SELECT t.apk_url FROM tasks t
                 WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                 ORDER BY t.created_at DESC LIMIT 1),
+               p.icon_data_url,
                p.created_at,
                p.updated_at,
                p.created_by AS owner_id
@@ -161,9 +164,10 @@ impl Store {
                     join_mode: row.get(7)?,
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
-                    created_at: row.get(10)?,
-                    updated_at: row.get(11)?,
-                    owner_id: row.get(12).unwrap_or_default(),
+                    icon_data_url: row.get(10)?,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                    owner_id: row.get(13).unwrap_or_default(),
                 })
             },
         )
@@ -193,6 +197,27 @@ impl Store {
     }
 
     /// 加入项目（open/invite 作为 member；readonly 作为 observer；返回 Err 表示无法加入）
+    pub fn set_project_icon_data_url(
+        &self,
+        project_id: &str,
+        icon_data_url: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn()?;
+        ensure_project_not_system(&conn, project_id, "系统归档项目不能设置 APK 图标")?;
+        let icon_data_url = icon_data_url
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let n = conn.execute(
+            "UPDATE projects SET icon_data_url = ?1, updated_at = ?2
+             WHERE id = ?3 AND status != 'deleted'",
+            params![icon_data_url, now(), project_id],
+        )?;
+        if n == 0 {
+            anyhow::bail!("项目不存在");
+        }
+        Ok(())
+    }
+
     pub fn join_project(&self, user_id: &str, project_id: &str) -> Result<()> {
         let conn = self.conn()?;
         // 检查项目存在且公开
@@ -403,6 +428,7 @@ impl Store {
                (SELECT t.apk_url FROM tasks t
                 WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                 ORDER BY t.created_at DESC LIMIT 1),
+               p.icon_data_url,
                p.created_at, p.updated_at,
                p.created_by AS owner_id
              FROM projects p
@@ -426,9 +452,10 @@ impl Store {
                     join_mode: row.get(7)?,
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
-                    created_at: row.get(10)?,
-                    updated_at: row.get(11)?,
-                    owner_id: row.get(12).unwrap_or_default(),
+                    icon_data_url: row.get(10)?,
+                    created_at: row.get(11)?,
+                    updated_at: row.get(12)?,
+                    owner_id: row.get(13).unwrap_or_default(),
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

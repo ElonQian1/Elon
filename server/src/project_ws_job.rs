@@ -51,6 +51,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     download_base: String,
     conversation_id: String,
     message: String,
+    project_icon_data_url: Option<String>,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
@@ -219,6 +220,7 @@ pub(crate) async fn get_or_start_project_ws_job(
             download_base,
             conversation_id,
             message,
+            project_icon_data_url,
             agent_name,
             attachments,
             execution_mode,
@@ -241,6 +243,7 @@ async fn run_project_ws_job(
     download_base: String,
     conversation_id: String,
     message: String,
+    project_icon_data_url: Option<String>,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
@@ -303,6 +306,7 @@ async fn run_project_ws_job(
     let project_for_task = project.clone();
     let task_conversation_id = conversation_id.clone();
     let task_message = message.clone();
+    let task_project_icon_data_url = project_icon_data_url.clone();
     let task_agent_name = agent_name.clone();
     let task_attachments = attachments.clone();
     let task_trace_id = trace_id.clone();
@@ -314,6 +318,7 @@ async fn run_project_ws_job(
             download_base,
             task_conversation_id,
             task_message,
+            task_project_icon_data_url,
             task_agent_name,
             task_attachments,
             execution_mode,

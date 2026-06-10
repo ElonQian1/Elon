@@ -164,6 +164,7 @@ pub(crate) async fn handle_project_ws(
             &conversation_id,
             request.agent.as_deref(),
             execution_mode.as_str(),
+            request.project_icon_data_url.as_deref(),
             &message,
         );
         let job = get_or_start_project_ws_job(
@@ -173,6 +174,7 @@ pub(crate) async fn handle_project_ws(
             download_base.clone(),
             conversation_id.clone(),
             message,
+            request.project_icon_data_url,
             request.agent,
             attachments,
             execution_mode,

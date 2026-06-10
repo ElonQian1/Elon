@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.text.InputFilter
@@ -10,6 +11,8 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -582,36 +585,6 @@ internal class ProjectSpaceController(
         })
     }
 
-    private fun spaceHeader(space: ProjectSpace): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(18))
-            background = panelBackground("#181B20")
-            addView(TextView(activity).apply {
-                text = space.project.name
-                textSize = 20f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append("${space.project.memberCount} 位成员")
-                    append(" · ")
-                    append(projectRoleLabel(space.project.role))
-                    space.project.description?.let { append("\n").append(it) }
-                }
-                textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
-                setPadding(0, dp(8), 0, 0)
-            })
-            space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
-                addView(projectSpaceDownloadButton(activity, apkUrl, dp, selectableForeground))
-            }
-        }
-    }
-
     private fun projectIntroHeader(space: ProjectSpace): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -620,6 +593,9 @@ internal class ProjectSpaceController(
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                addView(projectSpaceIconView(space.project), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                    marginEnd = dp(12)
+                })
                 addView(LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -637,7 +613,7 @@ internal class ProjectSpaceController(
                         setTextColor(Color.parseColor("#A6AFBD"))
                         setPadding(0, dp(8), 0, 0)
                     })
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.85f))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.9f))
                 addView(projectDescriptionCard(space), LinearLayout.LayoutParams(
                     0,
                     dp(92),
@@ -651,6 +627,38 @@ internal class ProjectSpaceController(
             ))
             space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
                 addView(projectSpaceDownloadButton(activity, apkUrl, dp, selectableForeground))
+            }
+        }
+    }
+
+    private fun projectSpaceIconView(project: ProjectSpaceSummary): View {
+        return FrameLayout(activity).apply {
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(Color.parseColor("#283140"))
+            }
+            clipToOutline = true
+            val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
+            if (iconBitmap != null) {
+                addView(ImageView(activity).apply {
+                    setImageBitmap(iconBitmap)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            } else {
+                addView(TextView(activity).apply {
+                    text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(Color.parseColor("#DDE8FC"))
+                    textSize = 18f
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
             }
         }
     }

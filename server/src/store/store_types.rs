@@ -209,6 +209,7 @@ pub struct PublicProjectItem {
     pub join_mode: String, // "open" | "approval" | "invite" | "readonly"
     pub last_task_status: Option<String>,
     pub latest_apk_url: Option<String>,
+    pub icon_data_url: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -232,6 +233,7 @@ pub struct ProjectSpaceSummary {
     pub description: Option<String>,
     pub role: String,
     pub member_count: i64,
+    pub icon_data_url: Option<String>,
     pub updated_at: String,
 }
 
@@ -325,6 +327,7 @@ pub struct ProjectSummary {
     pub join_mode: String,
     pub last_task_status: Option<String>,
     pub last_apk_url: Option<String>,
+    pub icon_data_url: Option<String>,
     pub updated_at: String,
 }
 

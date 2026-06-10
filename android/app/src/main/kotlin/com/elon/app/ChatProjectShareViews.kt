@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -7,6 +8,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.json.JSONObject
@@ -20,6 +22,7 @@ data class ChatProjectShare(
     val memberCount: Int,
     val joinMode: String,
     val latestLog: String?,
+    val iconDataUrl: String?,
     val source: String
 )
 
@@ -33,6 +36,7 @@ internal fun AppProject.toChatProjectShare(): ChatProjectShare {
         memberCount = memberCount?.coerceAtLeast(1) ?: conversations.size.coerceAtLeast(1),
         joinMode = if (isJoint) projectJoinMode() else "invite",
         latestLog = events.firstOrNull()?.trim()?.takeIf { it.isNotBlank() },
+        iconDataUrl = iconDataUrl?.takeIf { it.isNotBlank() },
         source = if (isJoint) "store" else "local"
     )
 }
@@ -46,6 +50,7 @@ internal fun StoreProject.toChatProjectShare(): ChatProjectShare {
         memberCount = memberCount,
         joinMode = joinMode,
         latestLog = lastTaskStatus?.takeIf { it.isNotBlank() },
+        iconDataUrl = iconDataUrl?.takeIf { it.isNotBlank() },
         source = "store"
     )
 }
@@ -60,6 +65,9 @@ internal fun ChatProjectShare.toMessageText(): String {
         .put("join_mode", joinMode)
         .put("latest_log", latestLog ?: "")
         .put("source", source)
+    if (!iconDataUrl.isNullOrBlank()) {
+        json.put("icon_data_url", iconDataUrl)
+    }
     return "$PROJECT_SHARE_MARKER\n$json"
 }
 
@@ -78,6 +86,7 @@ internal fun parseChatProjectShareMessage(content: String): ChatProjectShare? {
             memberCount = json.optInt("member_count", 1).coerceAtLeast(1),
             joinMode = normalizeProjectJoinMode(json.optString("join_mode", "open")),
             latestLog = json.optString("latest_log").trim().takeIf { it.isNotBlank() },
+            iconDataUrl = json.optProjectShareIconDataUrl(),
             source = json.optString("source", "store").ifBlank { "store" }
         ).takeIf { it.id.isNotBlank() && it.name.isNotBlank() }
     }.getOrNull()
@@ -175,17 +184,7 @@ private fun buildChatProjectShareCard(
         }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, context.projectDp(58))
     }
-    banner.addView(TextView(context).apply {
-        text = share.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
-        gravity = Gravity.CENTER
-        includeFontPadding = false
-        setTextColor(Color.parseColor("#F2F5FA"))
-        textSize = 20f
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#55000000"))
-        }
-    }, FrameLayout.LayoutParams(context.projectDp(42), context.projectDp(42)).apply {
+    banner.addView(projectShareIconView(context, share), FrameLayout.LayoutParams(context.projectDp(42), context.projectDp(42)).apply {
         gravity = Gravity.START or Gravity.CENTER_VERTICAL
         leftMargin = context.projectDp(14)
     })
@@ -248,6 +247,46 @@ private fun buildChatProjectShareCard(
     }
     card.addView(body)
     return card
+}
+
+private fun projectShareIconView(context: Context, share: ChatProjectShare): View {
+    return FrameLayout(context).apply {
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor("#55000000"))
+        }
+        clipToOutline = true
+        val iconBitmap = UserProfileStore.decodeAvatar(share.iconDataUrl)
+        if (iconBitmap != null) {
+            addView(ImageView(context).apply {
+                setImageBitmap(iconBitmap)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+        } else {
+            addView(TextView(context).apply {
+                text = share.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#F2F5FA"))
+                textSize = 20f
+            }, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+        }
+    }
+}
+
+private fun JSONObject.optProjectShareIconDataUrl(): String? {
+    val keys = arrayOf("iconDataUrl", "icon_data_url", "iconUrl", "icon_url", "icon", "avatar", "logo")
+    for (key in keys) {
+        val value = optString(key, "").trim()
+        if (value.isNotBlank()) return value
+    }
+    return null
 }
 
 private fun projectShareMetaText(share: ChatProjectShare): String {

@@ -64,6 +64,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (42, "节点收益提现申请表", migration_v42),
     (43, "节点收益整数资金账本", migration_v43),
     (44, "节点算力执行证明与质量评分基础表", migration_v44),
+    (45, "项目 APK 图标数据", migration_v45),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1655,5 +1656,10 @@ fn migration_v44(conn: &Connection) -> Result<()> {
           ON node_compute_runs(status, started_at DESC);
         "#,
     )?;
+    Ok(())
+}
+
+fn migration_v45(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "projects", "icon_data_url", "icon_data_url TEXT")?;
     Ok(())
 }

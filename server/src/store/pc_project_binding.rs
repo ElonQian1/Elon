@@ -95,6 +95,7 @@ impl Store {
                     (SELECT t.apk_url FROM tasks t
                      WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                      ORDER BY t.created_at DESC LIMIT 1) AS last_apk_url,
+                    p.icon_data_url,
                     p.updated_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
@@ -119,7 +120,8 @@ impl Store {
                     join_mode: row.get(14)?,
                     last_task_status: row.get(15)?,
                     last_apk_url: row.get(16)?,
-                    updated_at: row.get(17)?,
+                    icon_data_url: row.get(17)?,
+                    updated_at: row.get(18)?,
                 })
             },
         )

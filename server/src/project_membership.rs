@@ -33,6 +33,12 @@ pub struct VisibilityRequest {
 }
 
 #[derive(Deserialize)]
+pub struct UpdateProjectIconRequest {
+    #[serde(default, alias = "iconDataUrl")]
+    pub icon_data_url: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct UpdateMemberRoleRequest {
     /// "admin" | "editor" | "member" | "observer" | "viewer"（viewer 别名 → observer）
     pub role: String,
@@ -49,6 +55,8 @@ pub struct AddMemberRequest {
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 /// POST /api/projects/:id/join — 加入公开项目
+const MAX_PROJECT_ICON_DATA_URL_BYTES: usize = 512 * 1024;
+
 pub async fn join_project(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -221,7 +229,10 @@ pub async fn update_visibility(
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
     if !can_manage_project_members(&access.role) {
-        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可修改可见性");
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "只有项目 owner 或管理员才可修改可见性",
+        );
     }
 
     let join_mode = req.join_mode.as_deref().unwrap_or("open");
@@ -256,6 +267,79 @@ pub async fn update_visibility(
     }
 }
 
+/// PATCH /api/projects/:id/icon — 修改项目 APK 图标（仅 owner/admin）
+pub async fn update_project_icon(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(req): Json<UpdateProjectIconRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !can_manage_project_members(&access.role) {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "只有项目 owner 或管理员才能修改 APK 图标",
+        );
+    }
+    let icon_data_url = match clean_project_icon_data_url(req.icon_data_url) {
+        Ok(value) => value,
+        Err((status, message)) => return json_error(status, message),
+    };
+    match state
+        .store
+        .set_project_icon_data_url(&project_id, icon_data_url.as_deref())
+    {
+        Ok(()) => Json(serde_json::json!({
+            "ok": true,
+            "project_id": project_id,
+            "icon_data_url": icon_data_url,
+        }))
+        .into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不存在") {
+                StatusCode::NOT_FOUND
+            } else if msg.contains("系统归档项目") {
+                StatusCode::FORBIDDEN
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            json_error(status, msg)
+        }
+    }
+}
+
+fn clean_project_icon_data_url(
+    icon_data_url: Option<String>,
+) -> Result<Option<String>, (StatusCode, String)> {
+    let Some(value) = icon_data_url.map(|value| value.trim().to_string()) else {
+        return Ok(None);
+    };
+    if value.is_empty() {
+        return Ok(None);
+    }
+    if value.len() > MAX_PROJECT_ICON_DATA_URL_BYTES {
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "APK 图标图片太大，请换一张较小的图片".into(),
+        ));
+    }
+    if !value.starts_with("data:image/") || !value.contains(";base64,") {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "APK 图标必须是 data:image/*;base64 格式".into(),
+        ));
+    }
+    Ok(Some(value))
+}
+
 /// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner/admin）
 pub async fn update_member_role(
     State(state): State<Arc<AppState>>,
@@ -272,7 +356,10 @@ pub async fn update_member_role(
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
     if !can_manage_project_members(&access.role) {
-        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可修改成员角色");
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "只有项目 owner 或管理员才可修改成员角色",
+        );
     }
     if target_user_id == user.id {
         return json_error(StatusCode::BAD_REQUEST, "不能修改自己的角色");

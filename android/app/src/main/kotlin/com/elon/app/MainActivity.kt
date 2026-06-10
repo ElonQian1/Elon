@@ -11,11 +11,14 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.PopupWindow
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import java.util.Date
+import kotlin.concurrent.thread
 
 private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
 
@@ -29,6 +32,26 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             refreshSocialSummaries()
             socialSummaryHandler.postDelayed(this, SOCIAL_SUMMARY_REFRESH_MS)
+        }
+    }
+    private var pendingProjectIconId: String? = null
+    private val projectIconPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val projectId = pendingProjectIconId
+        pendingProjectIconId = null
+        if (uri == null || projectId.isNullOrBlank()) {
+            Toast.makeText(this, "已取消选择图标", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+        Toast.makeText(this, "正在处理 APK 图标...", Toast.LENGTH_SHORT).show()
+        thread(name = "project-icon-picker") {
+            val result = runCatching { UserProfileStore.avatarDataUrlFromUri(this, uri) }
+            runOnUiThread {
+                result.onSuccess { dataUrl ->
+                    saveProjectIcon(projectId, dataUrl)
+                }.onFailure {
+                    Toast.makeText(this, "图标处理失败：${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
@@ -366,6 +389,9 @@ class MainActivity : AppCompatActivity() {
             },
             setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
             userId = { userId },
+            projectIconDataUrl = { projectId ->
+                s.projects.firstOrNull { it.id == projectId }?.iconDataUrl
+            },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
@@ -961,6 +987,7 @@ class MainActivity : AppCompatActivity() {
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
             openProjectSpace = { project -> openProjectSpaceForProject(project, true) },
+            openProjectIconPicker = ::openProjectIconPicker,
             showGitProjectDialog = ::showGitProjectDialog,
             http = s.http,
             serverUrl = serverUrl,
@@ -971,6 +998,50 @@ class MainActivity : AppCompatActivity() {
                     groupChatActions.removeProjectShareCards(projectIds)
             }
         )
+    }
+
+    private fun openProjectIconPicker(project: AppProject) {
+        pendingProjectIconId = project.id
+        runCatching {
+            projectIconPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }.onFailure {
+            pendingProjectIconId = null
+            Toast.makeText(this, "无法打开相册", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveProjectIcon(projectId: String, dataUrl: String) {
+        val project = s.projects.firstOrNull { it.id == projectId } ?: return
+        project.iconDataUrl = dataUrl
+        project.updatedAt = System.currentTimeMillis()
+        projectStateActions.saveProjects()
+        homeListActions.renderProjectList()
+        Toast.makeText(this, "APK 图标已更新", Toast.LENGTH_SHORT).show()
+        if (AuthManager.isLoggedIn(this)) {
+            remoteProjectIdForIconSync(project)?.let { remoteProjectId ->
+                syncProjectIconToServer(remoteProjectId, dataUrl)
+            }
+        }
+    }
+
+    private fun remoteProjectIdForIconSync(project: AppProject): String? {
+        val remoteId = project.projectSpaceId().trim()
+        if (remoteId.isBlank()) return null
+        if (remoteId == project.id && !remoteId.startsWith("prj")) return null
+        return remoteId
+    }
+
+    private fun syncProjectIconToServer(projectId: String, dataUrl: String) {
+        thread(name = "project-icon-sync") {
+            val result = runCatching {
+                updateProjectIconDataUrl(s.http, serverUrl, this, projectId, dataUrl)
+            }
+            runOnUiThread {
+                result.onFailure {
+                    Toast.makeText(this, "图标已本机保存，云端同步失败：${it.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private val uiTools: MainUiTools by lazy { MainUiTools(this) }

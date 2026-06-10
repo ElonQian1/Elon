@@ -366,7 +366,29 @@ internal fun setProjectVisibility(
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
 }
 
-/** DELETE /api/me/project-share-messages/:project_id — 撤回自己发出的好友/群聊项目卡片 */
+/** PATCH /api/projects/:id/icon — 同步项目 APK 图标 */
+internal fun updateProjectIconDataUrl(
+    http: OkHttpClient,
+    serverUrl: String,
+    ctx: android.content.Context,
+    projectId: String,
+    iconDataUrl: String?
+) {
+    val payload = JSONObject().apply {
+        if (iconDataUrl.isNullOrBlank()) put("icon_data_url", JSONObject.NULL)
+        else put("icon_data_url", iconDataUrl)
+    }
+    val req = AuthManager.applyAuth(
+        ctx,
+        Request.Builder()
+            .url("$serverUrl/api/projects/${storeUrlPart(projectId)}/icon")
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    val resp = http.newCall(req).execute()
+    val body = resp.body?.string().orEmpty()
+    if (!resp.isSuccessful) error(apiErrorMessage(body, resp.code))
+}
+
 internal fun revokeProjectShareMessages(
     http: OkHttpClient,
     serverUrl: String,

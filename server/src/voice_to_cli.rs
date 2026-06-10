@@ -84,6 +84,7 @@ pub async fn dispatch_transcript(
         download_base,
         conversation_id,
         message,
+        None, // project_icon_data_url
         None, // agent_name
         None, // attachments
         ProjectExecutionMode::Execute,

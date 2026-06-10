@@ -30,7 +30,7 @@ impl Store {
         conn.query_row(
             "SELECT p.id, p.name, p.description, pm.role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
-                    p.updated_at
+                    p.icon_data_url, p.updated_at
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -42,7 +42,8 @@ impl Store {
                     description: row.get(2)?,
                     role: row.get(3)?,
                     member_count: row.get(4)?,
-                    updated_at: row.get(5)?,
+                    icon_data_url: row.get(5)?,
+                    updated_at: row.get(6)?,
                 })
             },
         )
