@@ -13,7 +13,7 @@ use crate::{
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
     },
-    ai_cli,
+    ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     source_hygiene,
     store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
@@ -566,8 +566,18 @@ async fn run_backend_with_workspace(
     } else {
         source_hygiene::source_size_preflight_note(workspace)
     };
-    let combined_preflight_note =
+    let base_preflight_note =
         combine_preflight_notes(preflight_note, source_hygiene_note.as_deref());
+    let context_compiler_note = if route == CapabilityRoute::ChatAgent {
+        None
+    } else {
+        context_compiler::compile_preflight_note(state, workspace, user_id, user_message, trace_id)
+            .await
+    };
+    let combined_preflight_note = combine_preflight_notes(
+        base_preflight_note.as_deref(),
+        context_compiler_note.as_deref(),
+    );
     let memory_scope_project_id = native_session_scope
         .as_ref()
         .map(|scope| scope.project_id.as_str());

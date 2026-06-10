@@ -1,0 +1,91 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ContextCompilerMode {
+    Shadow,
+    Inject,
+}
+
+impl ContextCompilerMode {
+    pub(crate) fn from_env_value(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "inject" | "injected" | "on" => Self::Inject,
+            _ => Self::Shadow,
+        }
+    }
+
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Shadow => "shadow",
+            Self::Inject => "inject",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ContextCompilerConfig {
+    pub(crate) enabled: bool,
+    pub(crate) mode: ContextCompilerMode,
+    pub(crate) agent_name: String,
+    pub(crate) llm_brief_enabled: bool,
+    pub(crate) max_relevant_files: usize,
+    pub(crate) max_pack_chars: usize,
+}
+
+impl ContextCompilerConfig {
+    pub(crate) fn from_env() -> Self {
+        Self {
+            enabled: env_bool("ELON_CONTEXT_COMPILER_ENABLED", false),
+            mode: std::env::var("ELON_CONTEXT_COMPILER_MODE")
+                .ok()
+                .map(|value| ContextCompilerMode::from_env_value(&value))
+                .unwrap_or(ContextCompilerMode::Shadow),
+            agent_name: std::env::var("ELON_CONTEXT_COMPILER_AGENT")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "hunyuan".to_string()),
+            llm_brief_enabled: env_bool("ELON_CONTEXT_COMPILER_LLM_BRIEF", true),
+            max_relevant_files: env_usize("ELON_CONTEXT_COMPILER_MAX_FILES", 8),
+            max_pack_chars: env_usize("ELON_CONTEXT_COMPILER_MAX_CHARS", 12_000),
+        }
+    }
+}
+
+fn env_bool(name: &str, default: bool) -> bool {
+    std::env::var(name)
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(default)
+}
+
+fn env_usize(name: &str, default: usize) -> usize {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(default)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_mode_values() {
+        assert_eq!(
+            ContextCompilerMode::from_env_value("inject"),
+            ContextCompilerMode::Inject
+        );
+        assert_eq!(
+            ContextCompilerMode::from_env_value("shadow"),
+            ContextCompilerMode::Shadow
+        );
+        assert_eq!(
+            ContextCompilerMode::from_env_value("unknown"),
+            ContextCompilerMode::Shadow
+        );
+    }
+}
