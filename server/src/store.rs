@@ -45,9 +45,9 @@ pub use admin_stats::{
     estimate_cost_cny, AdminAccountingAuditRow, AdminDayRow, AdminFeatureRow, AdminModelRow,
     AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
 };
-pub use billing::{AdminBalanceRow, BillingEvent, RechargeRecord};
+pub use billing::{AdminBalanceRow, AdminBillingEventRow, BillingEvent, RechargeRecord};
 pub use billing_alerts::BillingAlertRow;
-pub use billing_price_rules::{BillingPriceRule, BillingPriceRuleUpsert};
+pub use billing_price_rules::{BillingPriceRule, BillingPriceRuleUpsert, BillingPriceSnapshot};
 pub use billing_reservations::{BillingReservationOutcome, BillingReservationRequest};
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,

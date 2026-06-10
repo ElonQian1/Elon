@@ -5,6 +5,7 @@
 //! - POST /api/admin/billing/recharge          充值
 //! - GET  /api/admin/billing/users?page=1&size=20  用户余额列表
 //! - GET  /api/admin/billing/users/:user_id        单用户计费详情
+//! - GET  /api/admin/billing/events                最近扣费解释
 //! - GET  /api/admin/billing/reservations          预授权明细
 //! - GET  /api/admin/billing/price-rules           查询模型/算力计价规则
 //! - PUT  /api/admin/billing/price-rules           新增或更新计价规则
@@ -104,6 +105,13 @@ fn default_reservation_limit() -> i64 {
     100
 }
 
+#[derive(Deserialize)]
+pub struct BillingEventsQuery {
+    pub user_id: Option<String>,
+    #[serde(default = "default_reservation_limit")]
+    pub limit: i64,
+}
+
 pub async fn list_users(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -146,6 +154,36 @@ pub async fn get_user(
         Ok(None) => json_error(StatusCode::NOT_FOUND, "该用户未开通计费"),
         Err(e) => {
             tracing::warn!("admin get_user billing error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
+        }
+    }
+}
+
+// ── GET /api/admin/billing/events ───────────────────────────────────────────
+
+pub async fn list_events(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(q): Query<BillingEventsQuery>,
+) -> Response {
+    if !check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+    let limit = q.limit.clamp(1, 500);
+    let user_id = q
+        .user_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    match state.store.admin_billing_events(user_id, limit) {
+        Ok(rows) => Json(json!({
+            "user_id": user_id,
+            "limit": limit,
+            "rows": rows,
+        }))
+        .into_response(),
+        Err(e) => {
+            tracing::warn!("admin billing events error: {}", e);
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "查询失败")
         }
     }

@@ -58,6 +58,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (36, "算力多单位计量明细账本", migration_v36),
     (37, "模型与算力计价规则配置表", migration_v37),
     (38, "计费自动对账告警表", migration_v38),
+    (39, "扣费计价规则版本与价格快照", migration_v39),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1391,6 +1392,59 @@ fn migration_v38(conn: &Connection) -> Result<()> {
 
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('billing_open_reservation_alert_threshold', '100', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v39(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "billing_price_rules",
+        "version",
+        "version INTEGER NOT NULL DEFAULT 1",
+    )?;
+    add_column_if_missing(conn, "billing_events", "price_rule_id", "price_rule_id TEXT")?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "price_rule_version",
+        "price_rule_version INTEGER",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "price_rule_pattern",
+        "price_rule_pattern TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "input_usd_per_m",
+        "input_usd_per_m REAL",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "cached_usd_per_m",
+        "cached_usd_per_m REAL",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "output_usd_per_m",
+        "output_usd_per_m REAL",
+    )?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "price_source",
+        "price_source TEXT NOT NULL DEFAULT 'legacy'",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_billing_events_price_rule
+          ON billing_events(price_rule_id, price_rule_version);
         "#,
     )?;
     Ok(())

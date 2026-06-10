@@ -947,6 +947,7 @@ function closeConvModal() {
             <th style="padding:8px 10px;text-align:right">输入 USD/1M</th>
             <th style="padding:8px 10px;text-align:right">缓存 USD/1M</th>
             <th style="padding:8px 10px;text-align:right">输出 USD/1M</th>
+            <th style="padding:8px 10px;text-align:right">版本</th>
             <th style="padding:8px 10px;text-align:right">优先级</th>
             <th style="padding:8px 10px">状态</th>
             <th style="padding:8px 10px">备注</th>
@@ -954,7 +955,37 @@ function closeConvModal() {
           </tr>
         </thead>
         <tbody id="billingPriceRulesBody">
-          <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+          <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <!-- 扣费解释 -->
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">最近扣费解释</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">每笔扣费的模型、命中计价规则、单价快照、汇率和加价倍率</div>
+      </div>
+      <span id="billingEventsCount" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">时间</th>
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px">功能/来源</th>
+            <th style="padding:8px 10px">模型</th>
+            <th style="padding:8px 10px">规则快照</th>
+            <th style="padding:8px 10px">单价 USD/1M</th>
+            <th style="padding:8px 10px;text-align:right">Token</th>
+            <th style="padding:8px 10px">汇率/加价</th>
+            <th style="padding:8px 10px;text-align:right">扣费</th>
+          </tr>
+        </thead>
+        <tbody id="billingEventsBody">
+          <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1081,6 +1112,7 @@ function closeConvModal() {
     <div class="form-group">
       <label>匹配规则</label>
       <input id="pricePattern" placeholder="例如 gpt-4o-mini / metered-image / *" autocomplete="off" />
+      <div id="priceRuleVersionHint" style="font-size:11px;color:var(--text-dim);margin-top:6px"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
       <div class="form-group">
@@ -1591,11 +1623,12 @@ async function loadBilling() {
   const tbody = document.getElementById('billingUsersBody');
   tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center"><div class="loader"></div></td></tr>';
   try {
-    const [usersRes, configRes, reservationsRes, priceRulesRes] = await Promise.all([
+    const [usersRes, configRes, reservationsRes, priceRulesRes, eventsRes] = await Promise.all([
       apiFetch('GET', '/api/admin/billing/users?page=1&size=200'),
       apiFetch('GET', '/api/admin/billing/config'),
       apiFetch('GET', '/api/admin/billing/reservations?limit=100'),
       apiFetch('GET', '/api/admin/billing/price-rules'),
+      apiFetch('GET', '/api/admin/billing/events?limit=100'),
     ]);
     if (configRes.ok) {
       const cfg = await configRes.json();
@@ -1608,6 +1641,10 @@ async function loadBilling() {
     if (priceRulesRes.ok) {
       const d = await priceRulesRes.json();
       renderBillingPriceRules(d.rules || []);
+    }
+    if (eventsRes.ok) {
+      const d = await eventsRes.json();
+      renderBillingEvents(d.rows || []);
     }
     if (usersRes.ok) {
       const d = await usersRes.json();
@@ -1666,6 +1703,56 @@ function renderBillingReservations(rows) {
   }).join('');
 }
 
+function renderBillingEvents(rows) {
+  const tbody = document.getElementById('billingEventsBody');
+  const countEl = document.getElementById('billingEventsCount');
+  if (countEl) countEl.textContent = '最近 ' + rows.length + ' 条';
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim)">暂无扣费记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const ruleName = row.price_rule_pattern
+      ? row.price_rule_pattern + ' v' + (row.price_rule_version || 1)
+      : (row.price_source || 'legacy');
+    const unitPrice = [
+      row.input_usd_per_m,
+      row.cached_usd_per_m,
+      row.output_usd_per_m,
+    ].map(v => v === null || v === undefined ? '-' : Number(v || 0).toFixed(4)).join(' / ');
+    const tokens = [
+      '入 ' + fmtNum(row.input_tokens || 0),
+      '缓 ' + fmtNum(row.cached_input_tokens || 0),
+      '出 ' + fmtNum(row.output_tokens || 0),
+    ].join(' · ');
+    const rate = row.exchange_rate_x10000 ? (Number(row.exchange_rate_x10000) / 10000).toFixed(4) : '-';
+    const markup = row.markup_x1000 ? (Number(row.markup_x1000) / 1000).toFixed(3) : '-';
+    const eventId = row.token_usage_event_id || row.id || '';
+    const shortEventId = eventId.length > 32 ? eventId.slice(0, 14) + '…' + eventId.slice(-10) : eventId;
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(row.created_at || '')}</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(row.account || row.user_id || '')}</div>
+        ${row.nickname ? '<div style="font-size:11px;color:var(--text-dim)">' + esc(row.nickname) + '</div>' : ''}
+      </td>
+      <td style="padding:8px 10px">
+        <div>${esc(row.feature || '')}</div>
+        <div style="font-size:10px;color:var(--text-dim)" title="${esc(eventId)}">${esc(row.usage_mode || '')}${shortEventId ? ' · ' + esc(shortEventId) : ''}</div>
+      </td>
+      <td style="padding:8px 10px">${esc(row.model || '')}</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(ruleName)}</div>
+        <div style="font-size:10px;color:var(--text-dim)">${esc(row.price_source || '')}</div>
+      </td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(unitPrice)}</td>
+      <td style="padding:8px 10px;text-align:right;font-size:12px">${esc(tokens)}</td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(rate)} × ${esc(markup)}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:#fbbf24">¥${((row.cost_rmb_fen || 0) / 100).toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
 function reservationStatusBadge(status) {
   const s = status || 'unknown';
   if (s === 'reserved') return '<span style="color:#38bdf8;font-size:12px">冻结中</span>';
@@ -1698,7 +1785,7 @@ function renderBillingPriceRules(rows) {
   if (countEl) countEl.textContent = '共 ' + rows.length + ' 条';
   if (!tbody) return;
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">暂无计价规则</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim)">暂无计价规则</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(row => {
@@ -1711,6 +1798,7 @@ function renderBillingPriceRules(rows) {
       <td style="padding:8px 10px;text-align:right">${Number(row.input_usd_per_m || 0).toFixed(4)}</td>
       <td style="padding:8px 10px;text-align:right">${Number(row.cached_usd_per_m || 0).toFixed(4)}</td>
       <td style="padding:8px 10px;text-align:right">${Number(row.output_usd_per_m || 0).toFixed(4)}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--text-dim)">v${row.version || 1}</td>
       <td style="padding:8px 10px;text-align:right">${row.priority || 0}</td>
       <td style="padding:8px 10px">${enabled}</td>
       <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(row.note || '')}</td>
@@ -1792,6 +1880,8 @@ function openPriceRuleModal(encodedRule) {
     try { rule = JSON.parse(decodeURIComponent(encodedRule)); } catch (_) { rule = null; }
   }
   document.getElementById('pricePattern').value = rule?.pattern || '';
+  const versionHint = document.getElementById('priceRuleVersionHint');
+  if (versionHint) versionHint.textContent = rule ? '当前版本 v' + (rule.version || 1) : '新规则保存后从 v1 开始';
   document.getElementById('priceInput').value = rule ? Number(rule.input_usd_per_m || 0) : '';
   document.getElementById('priceCached').value = rule ? Number(rule.cached_usd_per_m || 0) : '';
   document.getElementById('priceOutput').value = rule ? Number(rule.output_usd_per_m || 0) : '';

@@ -13,8 +13,8 @@ use serde_json::Value;
 use tracing::warn;
 
 use crate::store::{
-    BillingReservationOutcome, BillingReservationRequest, Store, TokenUsageAccountingResult,
-    TokenUsageBillingCharge, TokenUsageRecord,
+    BillingPriceSnapshot, BillingReservationOutcome, BillingReservationRequest, Store,
+    TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord,
 };
 
 // ── 模型定价表（USD / 1M tokens）─────────────────────────────────────────────
@@ -101,16 +101,20 @@ fn calc_cost_fen_with_price(
     fen.max(0)
 }
 
-fn model_price_for_store(store: &Store, model: &str) -> (f64, f64, f64) {
+fn price_snapshot_for_store(store: &Store, model: &str) -> BillingPriceSnapshot {
     match store.billing_find_price_rule(model) {
-        Ok(Some(rule)) => rule.price_tuple(),
-        Ok(None) => model_price(model),
+        Ok(Some(rule)) => rule.snapshot(),
+        Ok(None) => {
+            let (input, cached, output) = model_price(model);
+            BillingPriceSnapshot::fallback(input, cached, output)
+        }
         Err(e) => {
             warn!(
                 model,
                 "billing price rule lookup failed, using built-in fallback: {}", e
             );
-            model_price(model)
+            let (input, cached, output) = model_price(model);
+            BillingPriceSnapshot::fallback(input, cached, output)
         }
     }
 }
@@ -261,8 +265,9 @@ pub fn estimate_cost_for_tokens(
     output_tokens: i64,
 ) -> i64 {
     let (rate, markup) = store.billing_get_rate_and_markup();
+    let price = price_snapshot_for_store(store, model);
     calc_cost_fen_with_price(
-        model_price_for_store(store, model),
+        price.price_tuple(),
         input_tokens.max(0),
         cached_input_tokens.max(0),
         output_tokens.max(0),
@@ -278,8 +283,9 @@ pub fn account_trusted_usage(
 ) -> anyhow::Result<TokenUsageAccountingResult> {
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = record.model.unwrap_or("unknown");
+    let price = price_snapshot_for_store(store, model);
     let cost_fen = calc_cost_fen_with_price(
-        model_price_for_store(store, model),
+        price.price_tuple(),
         record.input_tokens.max(0),
         record.cached_input_tokens.max(0),
         record.output_tokens.max(0),
@@ -294,6 +300,7 @@ pub fn account_trusted_usage(
         cost_rmb_fen: cost_fen,
         exchange_rate_x10000: rate,
         markup_x1000: markup,
+        price_snapshot: price,
         bill_missing_balance: billing_required_for_all_users(store),
     };
     let result = store.record_token_usage_with_billing(record, &charge)?;
@@ -323,8 +330,9 @@ pub fn deduct_usage(
 
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = model.unwrap_or("unknown");
+    let price = price_snapshot_for_store(store, model);
     let cost_fen = calc_cost_fen_with_price(
-        model_price_for_store(store, model),
+        price.price_tuple(),
         input_tokens.max(0),
         cached_input_tokens.max(0),
         output_tokens.max(0),
@@ -344,6 +352,7 @@ pub fn deduct_usage(
         output_tokens.max(0),
         rate,
         markup,
+        price,
     )?;
 
     let threshold = store
@@ -479,20 +488,65 @@ mod tests {
             .billing_set_config("usd_to_rmb_rate_x10000", "10000")
             .unwrap();
         store.billing_set_config("markup_x1000", "1000").unwrap();
-        store
+        let rule = store
             .billing_upsert_price_rule(&BillingPriceRuleUpsert {
                 pattern: "custom-expensive".to_string(),
-                input_usd_per_m: 0.0,
-                cached_usd_per_m: 0.0,
+                input_usd_per_m: 1.0,
+                cached_usd_per_m: 0.5,
                 output_usd_per_m: 1000.0,
                 priority: 999,
                 enabled: true,
-                note: None,
+                note: Some("snapshot test".to_string()),
             })
             .unwrap();
 
         let cost = estimate_cost_for_tokens(&store, "custom-expensive-v1", 0, 0, 1_000_000);
         assert_eq!(cost, 100_000);
+        let user = store
+            .create_user(
+                &format!("billing-price-{}@example.com", Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 200_000, "test", "test", None)
+            .unwrap();
+
+        let record = TokenUsageRecord {
+            user_id: &user.id,
+            feature: "price_rule_feature",
+            usage_mode: "server_codex_cli",
+            model: Some("custom-expensive-v1"),
+            input_tokens: 0,
+            cached_input_tokens: 0,
+            output_tokens: 1_000_000,
+            reasoning_tokens: 0,
+            total_tokens: 1_000_000,
+            idempotency_key: Some("price-snapshot-key-1"),
+        };
+        let result = account_trusted_usage(&store, &record).unwrap();
+        assert_eq!(result.accounting_status, "billed");
+        assert_eq!(result.cost_rmb_fen, 100_000);
+
+        let (events, total) = store.billing_list_events(&user.id, 1, 10).unwrap();
+        assert_eq!(total, 1);
+        let event = &events[0];
+        assert_eq!(
+            event.token_usage_event_id.as_deref(),
+            Some(result.token_usage_event_id.as_str())
+        );
+        assert_eq!(event.price_rule_id.as_deref(), Some(rule.id.as_str()));
+        assert_eq!(event.price_rule_version, Some(rule.version));
+        assert_eq!(
+            event.price_rule_pattern.as_deref(),
+            Some("custom-expensive")
+        );
+        assert_eq!(event.input_usd_per_m, Some(1.0));
+        assert_eq!(event.cached_usd_per_m, Some(0.5));
+        assert_eq!(event.output_usd_per_m, Some(1000.0));
+        assert_eq!(event.price_source.as_str(), "rule");
         let _ = std::fs::remove_file(path);
     }
 }

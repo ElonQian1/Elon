@@ -1,7 +1,8 @@
 use rusqlite::params;
 
 use super::{
-    BillingReservationRequest, PublicUser, Store, TokenUsageBillingCharge, TokenUsageRecord,
+    BillingPriceSnapshot, BillingReservationRequest, PublicUser, Store, TokenUsageBillingCharge,
+    TokenUsageRecord,
 };
 
 fn temp_store() -> (Store, std::path::PathBuf) {
@@ -68,6 +69,7 @@ fn reservation_settles_with_refund_and_idempotency() {
         cost_rmb_fen: 60,
         exchange_rate_x10000: 73_000,
         markup_x1000: 1_200,
+        price_snapshot: BillingPriceSnapshot::legacy(),
         bill_missing_balance: true,
     };
     let first = store

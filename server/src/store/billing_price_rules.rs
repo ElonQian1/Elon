@@ -13,6 +13,7 @@ use super::{new_id, now, Store};
 pub struct BillingPriceRule {
     pub id: String,
     pub pattern: String,
+    pub version: i64,
     pub input_usd_per_m: f64,
     pub cached_usd_per_m: f64,
     pub output_usd_per_m: f64,
@@ -20,6 +21,17 @@ pub struct BillingPriceRule {
     pub enabled: bool,
     pub note: Option<String>,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BillingPriceSnapshot {
+    pub price_rule_id: Option<String>,
+    pub price_rule_version: Option<i64>,
+    pub price_rule_pattern: Option<String>,
+    pub input_usd_per_m: f64,
+    pub cached_usd_per_m: f64,
+    pub output_usd_per_m: f64,
+    pub price_source: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,13 +59,59 @@ impl BillingPriceRule {
             self.output_usd_per_m,
         )
     }
+
+    pub fn snapshot(&self) -> BillingPriceSnapshot {
+        BillingPriceSnapshot {
+            price_rule_id: Some(self.id.clone()),
+            price_rule_version: Some(self.version),
+            price_rule_pattern: Some(self.pattern.clone()),
+            input_usd_per_m: self.input_usd_per_m,
+            cached_usd_per_m: self.cached_usd_per_m,
+            output_usd_per_m: self.output_usd_per_m,
+            price_source: "rule".to_string(),
+        }
+    }
+}
+
+impl BillingPriceSnapshot {
+    pub fn fallback(input_usd_per_m: f64, cached_usd_per_m: f64, output_usd_per_m: f64) -> Self {
+        Self {
+            price_rule_id: None,
+            price_rule_version: None,
+            price_rule_pattern: None,
+            input_usd_per_m,
+            cached_usd_per_m,
+            output_usd_per_m,
+            price_source: "fallback".to_string(),
+        }
+    }
+
+    pub fn legacy() -> Self {
+        Self {
+            price_rule_id: None,
+            price_rule_version: None,
+            price_rule_pattern: None,
+            input_usd_per_m: 0.0,
+            cached_usd_per_m: 0.0,
+            output_usd_per_m: 0.0,
+            price_source: "legacy".to_string(),
+        }
+    }
+
+    pub fn price_tuple(&self) -> (f64, f64, f64) {
+        (
+            self.input_usd_per_m,
+            self.cached_usd_per_m,
+            self.output_usd_per_m,
+        )
+    }
 }
 
 impl Store {
     pub fn billing_list_price_rules(&self) -> Result<Vec<BillingPriceRule>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, pattern, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
+            "SELECT id, pattern, version, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
                     priority, enabled, note, updated_at
              FROM billing_price_rules
              ORDER BY enabled DESC, priority DESC, length(pattern) DESC, pattern ASC",
@@ -68,7 +126,7 @@ impl Store {
         let model = model.trim().to_ascii_lowercase();
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
-            "SELECT id, pattern, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
+            "SELECT id, pattern, version, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
                     priority, enabled, note, updated_at
              FROM billing_price_rules
              WHERE enabled = 1
@@ -111,6 +169,16 @@ impl Store {
                priority = excluded.priority,
                enabled = excluded.enabled,
                note = excluded.note,
+               version = CASE
+                 WHEN input_usd_per_m != excluded.input_usd_per_m
+                   OR cached_usd_per_m != excluded.cached_usd_per_m
+                   OR output_usd_per_m != excluded.output_usd_per_m
+                   OR priority != excluded.priority
+                   OR enabled != excluded.enabled
+                   OR COALESCE(note, '') != COALESCE(excluded.note, '')
+                 THEN version + 1
+                 ELSE version
+               END,
                updated_at = excluded.updated_at",
             params![
                 id,
@@ -125,7 +193,7 @@ impl Store {
             ],
         )?;
         conn.query_row(
-            "SELECT id, pattern, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
+            "SELECT id, pattern, version, input_usd_per_m, cached_usd_per_m, output_usd_per_m,
                     priority, enabled, note, updated_at
              FROM billing_price_rules
              WHERE pattern = ?1",
@@ -158,17 +226,18 @@ fn valid_price(value: f64) -> bool {
 }
 
 fn read_rule_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<BillingPriceRule> {
-    let enabled: i64 = row.get(6)?;
+    let enabled: i64 = row.get(7)?;
     Ok(BillingPriceRule {
         id: row.get(0)?,
         pattern: row.get(1)?,
-        input_usd_per_m: row.get(2)?,
-        cached_usd_per_m: row.get(3)?,
-        output_usd_per_m: row.get(4)?,
-        priority: row.get(5)?,
+        version: row.get(2)?,
+        input_usd_per_m: row.get(3)?,
+        cached_usd_per_m: row.get(4)?,
+        output_usd_per_m: row.get(5)?,
+        priority: row.get(6)?,
         enabled: enabled != 0,
-        note: row.get(7)?,
-        updated_at: row.get(8)?,
+        note: row.get(8)?,
+        updated_at: row.get(9)?,
     })
 }
 
@@ -193,6 +262,7 @@ mod tests {
             .unwrap()
             .expect("rule should match");
         assert_eq!(rule.pattern, "gpt-4o-mini");
+        assert_eq!(rule.version, 1);
         assert_eq!(rule.price_tuple(), (0.15, 0.075, 0.60));
         let _ = std::fs::remove_file(path);
     }
@@ -200,7 +270,7 @@ mod tests {
     #[test]
     fn higher_priority_custom_rule_wins() {
         let (store, path) = temp_store();
-        store
+        let updated = store
             .billing_upsert_price_rule(&BillingPriceRuleUpsert {
                 pattern: "gpt-4o-mini".to_string(),
                 input_usd_per_m: 9.0,
@@ -211,11 +281,13 @@ mod tests {
                 note: Some("test override".to_string()),
             })
             .unwrap();
+        assert_eq!(updated.version, 2);
         let rule = store
             .billing_find_price_rule("gpt-4o-mini")
             .unwrap()
             .expect("rule should match");
         assert_eq!(rule.price_tuple(), (9.0, 8.0, 7.0));
+        assert_eq!(rule.version, 2);
         let _ = std::fs::remove_file(path);
     }
 }

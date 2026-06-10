@@ -521,6 +521,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/admin/billing/recharge", post(billing_admin::recharge_user))
         .route("/api/admin/billing/users", get(billing_admin::list_users))
         .route("/api/admin/billing/users/:user_id", get(billing_admin::get_user))
+        .route("/api/admin/billing/events", get(billing_admin::list_events))
         .route(
             "/api/admin/billing/reservations",
             get(billing_admin::list_reservations),

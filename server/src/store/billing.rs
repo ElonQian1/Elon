@@ -7,7 +7,7 @@ use anyhow::Result;
 use rusqlite::params;
 use serde::Serialize;
 
-use super::{new_id, now, Store};
+use super::{new_id, now, BillingPriceSnapshot, Store};
 
 // ── 对外公开类型 ──────────────────────────────────────────────────────────────
 
@@ -21,6 +21,41 @@ pub struct BillingEvent {
     pub cached_input_tokens: i64,
     pub output_tokens: i64,
     pub cost_rmb_fen: i64,
+    pub exchange_rate_x10000: i64,
+    pub markup_x1000: i64,
+    pub price_rule_id: Option<String>,
+    pub price_rule_version: Option<i64>,
+    pub price_rule_pattern: Option<String>,
+    pub input_usd_per_m: Option<f64>,
+    pub cached_usd_per_m: Option<f64>,
+    pub output_usd_per_m: Option<f64>,
+    pub price_source: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AdminBillingEventRow {
+    pub id: String,
+    pub user_id: String,
+    pub account: Option<String>,
+    pub nickname: Option<String>,
+    pub token_usage_event_id: Option<String>,
+    pub feature: Option<String>,
+    pub usage_mode: Option<String>,
+    pub model: Option<String>,
+    pub input_tokens: i64,
+    pub cached_input_tokens: i64,
+    pub output_tokens: i64,
+    pub cost_rmb_fen: i64,
+    pub exchange_rate_x10000: i64,
+    pub markup_x1000: i64,
+    pub price_rule_id: Option<String>,
+    pub price_rule_version: Option<i64>,
+    pub price_rule_pattern: Option<String>,
+    pub input_usd_per_m: Option<f64>,
+    pub cached_usd_per_m: Option<f64>,
+    pub output_usd_per_m: Option<f64>,
+    pub price_source: String,
     pub created_at: String,
 }
 
@@ -79,6 +114,7 @@ impl Store {
         output_tokens: i64,
         exchange_rate_x10000: i64,
         markup_x1000: i64,
+        price_snapshot: BillingPriceSnapshot,
     ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
@@ -100,8 +136,10 @@ impl Store {
         tx.execute(
             r#"INSERT INTO billing_events
                (id, user_id, model, input_tokens, cached_input_tokens, output_tokens,
-                cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at)
-               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)"#,
+                cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at,
+                price_rule_id, price_rule_version, price_rule_pattern,
+                input_usd_per_m, cached_usd_per_m, output_usd_per_m, price_source)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)"#,
             params![
                 event_id,
                 user_id,
@@ -113,6 +151,13 @@ impl Store {
                 exchange_rate_x10000,
                 markup_x1000,
                 ts,
+                price_snapshot.price_rule_id.as_deref(),
+                price_snapshot.price_rule_version,
+                price_snapshot.price_rule_pattern.as_deref(),
+                price_snapshot.input_usd_per_m,
+                price_snapshot.cached_usd_per_m,
+                price_snapshot.output_usd_per_m,
+                price_snapshot.price_source.as_str(),
             ],
         )?;
         tx.commit()?;
@@ -181,7 +226,10 @@ impl Store {
         let offset = (page - 1).max(0) * size;
         let mut stmt = conn.prepare_cached(
             r#"SELECT id, token_usage_event_id, model, input_tokens, cached_input_tokens, output_tokens,
-                      cost_rmb_fen, created_at
+                      cost_rmb_fen, exchange_rate_x10000, markup_x1000,
+                      price_rule_id, price_rule_version, price_rule_pattern,
+                      input_usd_per_m, cached_usd_per_m, output_usd_per_m,
+                      COALESCE(price_source, 'legacy'), created_at
                FROM billing_events
                WHERE user_id = ?1
                ORDER BY created_at DESC
@@ -197,7 +245,16 @@ impl Store {
                     cached_input_tokens: row.get(4)?,
                     output_tokens: row.get(5)?,
                     cost_rmb_fen: row.get(6)?,
-                    created_at: row.get(7)?,
+                    exchange_rate_x10000: row.get(7)?,
+                    markup_x1000: row.get(8)?,
+                    price_rule_id: row.get(9)?,
+                    price_rule_version: row.get(10)?,
+                    price_rule_pattern: row.get(11)?,
+                    input_usd_per_m: row.get(12)?,
+                    cached_usd_per_m: row.get(13)?,
+                    output_usd_per_m: row.get(14)?,
+                    price_source: row.get(15)?,
+                    created_at: row.get(16)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -349,6 +406,66 @@ impl Store {
             .filter_map(|r| r.ok())
             .collect();
         Ok(Some((row.unwrap(), records)))
+    }
+
+    pub fn admin_billing_events(
+        &self,
+        user_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<AdminBillingEventRow>> {
+        let conn = self.conn.lock().unwrap();
+        let limit = limit.clamp(1, 500);
+        let base_select = r#"SELECT
+                 b.id, b.user_id, COALESCE(u.phone, u.email, u.account), u.nickname,
+                 b.token_usage_event_id, t.feature, t.usage_mode, b.model,
+                 b.input_tokens, b.cached_input_tokens, b.output_tokens, b.cost_rmb_fen,
+                 b.exchange_rate_x10000, b.markup_x1000,
+                 b.price_rule_id, b.price_rule_version, b.price_rule_pattern,
+                 b.input_usd_per_m, b.cached_usd_per_m, b.output_usd_per_m,
+                 COALESCE(b.price_source, 'legacy'), b.created_at
+               FROM billing_events b
+               LEFT JOIN users u ON u.id = b.user_id
+               LEFT JOIN token_usage_events t ON t.id = b.token_usage_event_id"#;
+        let sql = if user_id.is_some() {
+            format!("{base_select} WHERE b.user_id = ?1 ORDER BY b.created_at DESC LIMIT ?2")
+        } else {
+            format!("{base_select} ORDER BY b.created_at DESC LIMIT ?1")
+        };
+        let mut stmt = conn.prepare_cached(&sql)?;
+        let read_row = |row: &rusqlite::Row<'_>| {
+            Ok(AdminBillingEventRow {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                account: row.get(2)?,
+                nickname: row.get(3)?,
+                token_usage_event_id: row.get(4)?,
+                feature: row.get(5)?,
+                usage_mode: row.get(6)?,
+                model: row.get(7)?,
+                input_tokens: row.get(8)?,
+                cached_input_tokens: row.get(9)?,
+                output_tokens: row.get(10)?,
+                cost_rmb_fen: row.get(11)?,
+                exchange_rate_x10000: row.get(12)?,
+                markup_x1000: row.get(13)?,
+                price_rule_id: row.get(14)?,
+                price_rule_version: row.get(15)?,
+                price_rule_pattern: row.get(16)?,
+                input_usd_per_m: row.get(17)?,
+                cached_usd_per_m: row.get(18)?,
+                output_usd_per_m: row.get(19)?,
+                price_source: row.get(20)?,
+                created_at: row.get(21)?,
+            })
+        };
+        let rows = if let Some(user_id) = user_id {
+            stmt.query_map(params![user_id, limit], read_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        } else {
+            stmt.query_map(params![limit], read_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        Ok(rows)
     }
 
     /// 确保 user_balance 行存在（Admin 开通计费时调用）。

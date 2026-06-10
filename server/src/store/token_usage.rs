@@ -47,6 +47,7 @@ pub struct TokenUsageBillingCharge<'a> {
     pub cost_rmb_fen: i64,
     pub exchange_rate_x10000: i64,
     pub markup_x1000: i64,
+    pub price_snapshot: super::BillingPriceSnapshot,
     pub bill_missing_balance: bool,
 }
 
@@ -251,8 +252,10 @@ impl Store {
                     r#"INSERT INTO billing_events
                        (id, user_id, model, input_tokens, cached_input_tokens, output_tokens,
                         cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at,
-                        token_usage_event_id)
-                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)"#,
+                        token_usage_event_id, price_rule_id, price_rule_version,
+                        price_rule_pattern, input_usd_per_m, cached_usd_per_m,
+                        output_usd_per_m, price_source)
+                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)"#,
                     params![
                         event_id,
                         r.user_id,
@@ -265,6 +268,13 @@ impl Store {
                         charge.markup_x1000,
                         created,
                         token_event_id,
+                        charge.price_snapshot.price_rule_id.as_deref(),
+                        charge.price_snapshot.price_rule_version,
+                        charge.price_snapshot.price_rule_pattern.as_deref(),
+                        charge.price_snapshot.input_usd_per_m,
+                        charge.price_snapshot.cached_usd_per_m,
+                        charge.price_snapshot.output_usd_per_m,
+                        charge.price_snapshot.price_source.as_str(),
                     ],
                 )?;
                 mark_reservation_settled(
@@ -310,8 +320,10 @@ impl Store {
                     r#"INSERT INTO billing_events
                        (id, user_id, model, input_tokens, cached_input_tokens, output_tokens,
                         cost_rmb_fen, exchange_rate_x10000, markup_x1000, created_at,
-                        token_usage_event_id)
-                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)"#,
+                        token_usage_event_id, price_rule_id, price_rule_version,
+                        price_rule_pattern, input_usd_per_m, cached_usd_per_m,
+                        output_usd_per_m, price_source)
+                       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)"#,
                     params![
                         event_id,
                         r.user_id,
@@ -324,6 +336,13 @@ impl Store {
                         charge.markup_x1000,
                         created,
                         token_event_id,
+                        charge.price_snapshot.price_rule_id.as_deref(),
+                        charge.price_snapshot.price_rule_version,
+                        charge.price_snapshot.price_rule_pattern.as_deref(),
+                        charge.price_snapshot.input_usd_per_m,
+                        charge.price_snapshot.cached_usd_per_m,
+                        charge.price_snapshot.output_usd_per_m,
+                        charge.price_snapshot.price_source.as_str(),
                     ],
                 )?;
                 billing_event_id = Some(event_id);
