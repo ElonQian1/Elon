@@ -184,7 +184,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#DDE8FC"))
-            background = roundedRect("#283140", 8, "#1E2126")
+            background = roundedRect("#283140", 8, "#24282F")
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()

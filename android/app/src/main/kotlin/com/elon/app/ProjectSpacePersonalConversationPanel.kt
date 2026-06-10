@@ -33,6 +33,7 @@ internal class ProjectSpacePersonalConversationPanel(
                     )
                 )
             }
+            container.addView(projectSpaceDivider(activity, dp))
         }
         container.addView(createRow())
     }

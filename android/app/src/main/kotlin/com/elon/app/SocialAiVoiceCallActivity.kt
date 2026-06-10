@@ -46,7 +46,7 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     private val bgColor = Color.parseColor("#101010")
     private val cardColor = Color.parseColor("#181B20")
     private val subtleColor = Color.parseColor("#0F1217")
-    private val borderColor = Color.parseColor("#1E2126")
+    private val borderColor = Color.parseColor("#24282F")
     private val primaryTextColor = Color.parseColor("#F2F5FA")
     private val secondaryTextColor = Color.parseColor("#A6AFBD")
     private val tertiaryTextColor = Color.parseColor("#6F7785")

@@ -37,7 +37,7 @@ private const val PRIMARY_BG = "#58BE6A"
 private const val PRIMARY_TEXT = "#07120A"
 private const val SECONDARY_BG = "#283140"
 private const val SECONDARY_TEXT = "#DDE8FC"
-private const val BORDER = "#1E2126"
+private const val BORDER = "#24282F"
 private const val PENDING_COLOR = "#F0A030"
 private const val DANGER = "#D97A7A"
 

@@ -224,7 +224,7 @@ internal class MainMarketplaceActions(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             setPadding(dp(12), 0, dp(8), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -572,7 +572,7 @@ internal class MainMarketplaceActions(
         // 外层卡片容器（圆角 + 深色背景）
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

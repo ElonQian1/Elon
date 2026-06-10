@@ -138,7 +138,7 @@ internal class MainFriendActions(
             setTextColor(Color.parseColor("#F2F5FA"))
             setHintTextColor(Color.parseColor("#6F7785"))
             backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             minimumHeight = dp(54)
             setPadding(dp(16), 0, dp(16), 0)
         }
@@ -147,7 +147,7 @@ internal class MainFriendActions(
             gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             isFocusable = true
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             minimumHeight = dp(58)
             setPadding(dp(16), dp(9), dp(14), dp(9))
             setOnClickListener {
@@ -323,7 +323,7 @@ internal class MainFriendActions(
         }
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             setPadding(dp(16), dp(14), dp(16), dp(14))
         }
         val name = TextView(activity).apply {

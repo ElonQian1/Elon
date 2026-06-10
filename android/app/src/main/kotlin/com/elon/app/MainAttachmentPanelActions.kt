@@ -94,7 +94,7 @@ internal class MainAttachmentPanelActions(
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
                 setColor(Color.parseColor("#181B20"))
-                setStroke(dp(1), Color.parseColor("#1E2126"))
+                setStroke(dp(1), Color.parseColor("#24282F"))
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL

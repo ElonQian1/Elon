@@ -3,7 +3,7 @@
     <color name="elon_bg_app">#101010</color>
     <color name="elon_surface_card">#181B20</color>
     <color name="elon_surface_subtle">#0F1217</color>
-    <color name="elon_border_subtle">#1E2126</color>
+    <color name="elon_border_subtle">#24282F</color>
 
     <color name="elon_text_primary">#F2F5FA</color>
     <color name="elon_text_secondary">#A6AFBD</color>

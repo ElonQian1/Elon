@@ -194,7 +194,7 @@ internal class NodeTransactionSheet(
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
         )
-        setBackgroundColor(Color.parseColor("#1E2126"))
+        setBackgroundColor(Color.parseColor("#24282F"))
     }
 
     private fun emptyLabel() = TextView(activity).apply {

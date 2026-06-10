@@ -32,7 +32,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid #1e2126;
+  border-bottom: 1px solid #24282f;
 }
 
 .project-plaza-title {
@@ -73,7 +73,7 @@
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
-  border-bottom: 1px solid #1e2126;
+  border-bottom: 1px solid #24282f;
 }
 
 .project-plaza-search {
@@ -110,14 +110,14 @@
 }
 
 .project-plaza-detail {
-  border-left: 1px solid #1e2126;
+  border-left: 1px solid #24282f;
   background: #11151b;
   padding: 18px;
 }
 
 .project-plaza-card {
   width: 100%;
-  border: 1px solid #1e2126;
+  border: 1px solid #24282f;
   border-radius: 8px;
   background: #181b20;
   color: #dde8fc;
@@ -310,7 +310,7 @@
 }
 
 .project-plaza-detail-section {
-  border-top: 1px solid #1e2126;
+  border-top: 1px solid #24282f;
   padding-top: 14px;
   margin-top: 14px;
 }
@@ -382,7 +382,7 @@
 
   .project-plaza-detail {
     border-left: 0;
-    border-top: 1px solid #1e2126;
+    border-top: 1px solid #24282f;
     max-height: 34vh;
   }
 }

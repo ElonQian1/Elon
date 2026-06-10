@@ -328,7 +328,7 @@ internal class MainEmojiActions(
     }
 
     private fun TextView.applyTabStyle(selected: Boolean) {
-        background = rounded("#283140", if (selected) "#F2F5FA" else "#1E2126")
+        background = rounded("#283140", if (selected) "#F2F5FA" else "#24282F")
         setTextColor(Color.parseColor(if (selected) "#F2F5FA" else "#A6AFBD"))
     }
 
@@ -389,7 +389,7 @@ internal class MainEmojiActions(
             layoutParams = LinearLayout.LayoutParams(0, dp(38), 1f).apply {
                 marginEnd = dp(8)
             }
-            background = rounded("#283140", "#1E2126")
+            background = rounded("#283140", "#24282F")
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = label
@@ -445,7 +445,7 @@ internal class MainEmojiActions(
     private fun createImportTile(label: String, icon: String, onClick: () -> Unit): View {
         return LinearLayout(activity).apply {
             layoutParams = customTileLayoutParams()
-            background = rounded("#181B20", "#1E2126")
+            background = rounded("#181B20", "#24282F")
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL
             isClickable = true
@@ -471,7 +471,7 @@ internal class MainEmojiActions(
     private fun createCustomEmojiTile(item: CustomEmojiItem): View {
         return FrameLayout(activity).apply {
             layoutParams = customTileLayoutParams()
-            background = rounded("#181B20", "#1E2126")
+            background = rounded("#181B20", "#24282F")
             isClickable = true
             foreground = selectableForeground()
             contentDescription = "自定义表情 ${item.displayName}，长按删除"

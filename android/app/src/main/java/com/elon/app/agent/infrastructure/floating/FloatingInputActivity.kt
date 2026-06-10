@@ -107,7 +107,7 @@ class FloatingInputActivity : AppCompatActivity() {
             val bg = GradientDrawable().apply {
                 setColor(Color.parseColor("#0F1217"))
                 cornerRadius = 12 * density
-                setStroke((1 * density).toInt(), Color.parseColor("#1E2126"))
+                setStroke((1 * density).toInt(), Color.parseColor("#24282F"))
             }
             background = bg
             setPadding(

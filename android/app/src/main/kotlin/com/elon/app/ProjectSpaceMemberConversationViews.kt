@@ -57,6 +57,9 @@ internal class ProjectSpaceMemberConversationViews(
                         }
                     }
                     if (isSelf && space.project.role != "observer") {
+                        if (conversations.isNotEmpty()) {
+                            container.addView(projectSpaceDivider(activity, dp))
+                        }
                         container.addView(createPersonalConversationRow())
                     }
                 }.onFailure { error ->

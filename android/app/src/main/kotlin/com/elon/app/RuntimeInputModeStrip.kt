@@ -79,7 +79,7 @@ internal class RuntimeInputModeStrip(
             button.background = if (active) {
                 roundedBg("#F2F5FA", "#F2F5FA")
             } else {
-                roundedBg("#283140", "#1E2126")
+                roundedBg("#283140", "#24282F")
             }
         }
     }

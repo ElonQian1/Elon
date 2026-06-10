@@ -61,7 +61,7 @@ internal class MainPlanModeActions(
         view.background = GradientDrawable().apply {
             cornerRadius = dp(16).toFloat()
             setColor(Color.parseColor(if (enabled) "#BDEFD3" else "#283140"))
-            setStroke(dp(1), Color.parseColor(if (enabled) "#D9FFE8" else "#1E2126"))
+            setStroke(dp(1), Color.parseColor(if (enabled) "#D9FFE8" else "#24282F"))
         }
     }
 }

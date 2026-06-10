@@ -37,7 +37,7 @@ private const val PRIMARY_TEXT = "#07120A"
 private const val ACCENT_BG = "#1A237E"
 private const val SECONDARY_BG = "#283140"
 private const val SECONDARY_TEXT = "#DDE8FC"
-private const val BORDER = "#1E2126"
+private const val BORDER = "#24282F"
 
 /**
  * 节点管理界面：

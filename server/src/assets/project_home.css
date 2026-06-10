@@ -398,7 +398,7 @@
   width: min(360px, calc(100vw - 40px));
   max-height: min(72vh, 620px);
   overflow: hidden;
-  border: 1px solid #1e2126;
+  border: 1px solid #24282f;
   border-radius: 8px;
   background: #181b20;
   color: #f2f5fa;

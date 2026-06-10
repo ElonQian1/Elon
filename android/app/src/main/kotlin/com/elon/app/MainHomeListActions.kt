@@ -225,7 +225,7 @@ internal class MainHomeListActions(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            background = roundedRect("#181B20", 8, "#1E2126")
+            background = roundedRect("#181B20", 8, "#24282F")
             addView(TextView(activity).apply {
                 text = "⌕"
                 textSize = 18f

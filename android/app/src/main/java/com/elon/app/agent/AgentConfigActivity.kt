@@ -25,7 +25,7 @@ private const val ACCENT2     = "#81B3D9"
 private const val TEXT_PRIM   = "#F2F5FA"
 private const val TEXT_SEC    = "#A6AFBD"
 private const val TEXT_DIM    = "#6F7785"
-private const val DIVIDER     = "#1E2126"
+private const val DIVIDER     = "#24282F"
 private const val BTN_PRIMARY = "#58BE6A"
 private const val BTN_DANGER  = "#B71C1C"
 

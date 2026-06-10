@@ -18,7 +18,7 @@ import com.elon.app.agent.infrastructure.auth.AuthService
 
 private const val SETTINGS_BG = "#101010"
 private const val SETTINGS_CARD = "#181B20"
-private const val SETTINGS_BORDER = "#1E2126"
+private const val SETTINGS_BORDER = "#24282F"
 private const val SETTINGS_TEXT_PRIMARY = "#F2F5FA"
 private const val SETTINGS_TEXT_SECONDARY = "#A6AFBD"
 private const val SETTINGS_TEXT_TERTIARY = "#6F7785"

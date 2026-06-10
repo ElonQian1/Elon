@@ -411,7 +411,7 @@ internal class MainHomeRows(
             ).apply {
                 marginStart = dp(68)
             }
-            setBackgroundColor(Color.parseColor("#1E2126"))
+            setBackgroundColor(Color.parseColor("#24282F"))
         }
     }
 

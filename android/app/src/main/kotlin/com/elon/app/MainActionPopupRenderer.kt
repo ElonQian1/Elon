@@ -22,7 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 
 internal const val WECHAT_POPUP_PANEL_COLOR = "#262626"
 internal const val WECHAT_POPUP_TEXT_COLOR = "#F2F5FA"
-internal const val WECHAT_POPUP_DIVIDER_COLOR = "#1E2126"
+internal const val WECHAT_POPUP_DIVIDER_COLOR = "#24282F"
 internal const val LEGACY_MESSAGE_POPUP_COLOR = "#262626"
 
 private const val MESSAGE_POPUP_DEFAULT_COLUMNS = 5

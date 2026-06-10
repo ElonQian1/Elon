@@ -389,7 +389,7 @@ internal class MainProjectActions(
             background = GradientDrawable().apply {
                 cornerRadius = dp(18).toFloat()
                 setColor(Color.parseColor("#181B20"))
-                setStroke(dp(1), Color.parseColor("#1E2126"))
+                setStroke(dp(1), Color.parseColor("#24282F"))
             }
             setPadding(0, dp(18), 0, dp(8))
 
@@ -527,7 +527,7 @@ internal class MainProjectActions(
     private fun createProjectActionsDivider(marginStart: Int = 0, marginEnd: Int = 0): View {
         return View(activity).apply {
             alpha = 0.75f
-            setBackgroundColor(Color.parseColor("#1E2126"))
+            setBackgroundColor(Color.parseColor("#24282F"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1
