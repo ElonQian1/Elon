@@ -38,6 +38,7 @@ internal class ProjectSpaceController(
     private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
     private val onProjectDescriptionUpdated: (projectId: String, description: String?) -> Unit,
+    private val pickPostImage: (ProjectSpaceSummary, (Result<String>) -> Unit) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
@@ -78,6 +79,7 @@ internal class ProjectSpaceController(
         dp = dp,
         selectableForeground = selectableForeground,
         onBack = { renderProjectSpaceLanding() },
+        onPickLocalImage = pickPostImage,
         onSubmit = { channel, title, body, onComplete ->
             feedData.submit(channel, title, body, onComplete)
         }

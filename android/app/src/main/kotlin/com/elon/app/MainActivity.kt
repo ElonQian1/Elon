@@ -54,6 +54,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+    private val projectPostImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        projectPostImageUploader.handlePickedImage(uri)
+    }
 
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
@@ -85,6 +88,18 @@ class MainActivity : AppCompatActivity() {
     private val s = MainActivityState()
     private val prefs by lazy { AuthManager.userDataPrefs(this) }
     private val serverUrl get() = ServerUrlManager.getActive(this)
+    private val projectPostImageUploader: ProjectSpacePostImageUploader by lazy {
+        ProjectSpacePostImageUploader(
+            activity = this,
+            http = s.http,
+            serverUrl = { serverUrl },
+            launchPicker = {
+                projectPostImagePicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            }
+        )
+    }
     /** 返回当前活跃服务器对应的 token：备用服务器使用本地静态 token，云端使用 session token。 */
     private fun activeToken(): String? {
         val activeUrl = ServerUrlManager.getActive(this)
@@ -612,6 +627,7 @@ class MainActivity : AppCompatActivity() {
             showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.showCreateConversationDialog(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             onProjectDescriptionUpdated = ::updateProjectDescriptionFromSpace,
+            pickPostImage = projectPostImageUploader::pickLocalImage,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )

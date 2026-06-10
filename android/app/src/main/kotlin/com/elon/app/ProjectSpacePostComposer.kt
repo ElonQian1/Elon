@@ -20,6 +20,7 @@ internal class ProjectSpacePostComposer(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val onBack: () -> Unit,
+    private val onPickLocalImage: (ProjectSpaceSummary, (Result<String>) -> Unit) -> Unit,
     private val onSubmit: (
         channel: ProjectChannel,
         title: String,
@@ -84,10 +85,32 @@ internal class ProjectSpacePostComposer(
         container.addView(submitButton)
 
         imageTile.setOnClickListener {
-            showImageUrlDialog(imageUrl) { next ->
-                imageUrl = next
-                imageTile.text = if (next.isNullOrBlank()) "+" else "已添加图片链接\n${next.take(42)}"
-            }
+            showImagePickerDialog(
+                current = imageUrl,
+                onUploadLocal = {
+                    imageTile.text = "正在上传图片..."
+                    imageTile.textSize = 13f
+                    onPickLocalImage(space.project) { result ->
+                        result.onSuccess { next ->
+                            imageUrl = next
+                            setImageTileState(imageTile, next, "已上传本地图片")
+                        }.onFailure {
+                            setImageTileState(imageTile, imageUrl, "已添加图片")
+                            toast(it.message ?: "图片上传失败")
+                        }
+                    }
+                },
+                onPasteUrl = {
+                    showImageUrlDialog(imageUrl) { next ->
+                        imageUrl = next
+                        setImageTileState(imageTile, next, "已添加图片链接")
+                    }
+                },
+                onRemove = {
+                    imageUrl = null
+                    setImageTileState(imageTile, null, "已添加图片")
+                }
+            )
         }
 
         submitButton.setOnClickListener {
@@ -158,6 +181,19 @@ internal class ProjectSpacePostComposer(
             layoutParams = LinearLayout.LayoutParams(dp(96), dp(96)).apply {
                 setMargins(dp(14), dp(72), dp(14), dp(24))
             }
+        }
+    }
+
+    private fun setImageTileState(imageTile: TextView, imageUrl: String?, label: String) {
+        val cleanUrl = imageUrl?.trim()?.takeIf { it.isNotBlank() }
+        if (cleanUrl == null) {
+            imageTile.text = "+"
+            imageTile.textSize = 34f
+            imageTile.setTextColor(Color.parseColor("#8C8C8C"))
+        } else {
+            imageTile.text = "$label\n${cleanUrl.take(42)}"
+            imageTile.textSize = 12f
+            imageTile.setTextColor(Color.parseColor("#DDE8FC"))
         }
     }
 
@@ -261,6 +297,30 @@ internal class ProjectSpacePostComposer(
             .show()
     }
 
+    private fun showImagePickerDialog(
+        current: String?,
+        onUploadLocal: () -> Unit,
+        onPasteUrl: () -> Unit,
+        onRemove: () -> Unit
+    ) {
+        val labels = if (current.isNullOrBlank()) {
+            arrayOf("上传本地图片", "粘贴图片 URL")
+        } else {
+            arrayOf("上传本地图片", "粘贴图片 URL", "移除图片")
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("添加图片")
+            .setItems(labels) { dialog, which ->
+                when (labels[which]) {
+                    "上传本地图片" -> onUploadLocal()
+                    "粘贴图片 URL" -> onPasteUrl()
+                    "移除图片" -> onRemove()
+                }
+                dialog.dismiss()
+            }
+            .show()
+    }
+
     private fun showImageUrlDialog(current: String?, onSelected: (String?) -> Unit) {
         val input = EditText(activity).apply {
             hint = "粘贴图片 URL（可选）"
@@ -272,7 +332,7 @@ internal class ProjectSpacePostComposer(
             setSelection(text?.length ?: 0)
         }
         AlertDialog.Builder(activity)
-            .setTitle("添加图片")
+            .setTitle("粘贴图片 URL")
             .setView(LinearLayout(activity).apply {
                 setPadding(dp(20), dp(8), dp(20), 0)
                 addView(input)
@@ -287,7 +347,7 @@ internal class ProjectSpacePostComposer(
     private fun showContentStatement() {
         AlertDialog.Builder(activity)
             .setTitle("内容声明")
-            .setMessage("请发布与当前项目相关的讨论、需求、意见或问题反馈。包含图片链接时，请确认图片可公开展示且不含敏感信息。")
+            .setMessage("请发布与当前项目相关的讨论、需求、意见或问题反馈。上传本地图片或包含图片链接时，请确认图片可公开展示且不含敏感信息。")
             .setPositiveButton("知道了", null)
             .show()
     }
