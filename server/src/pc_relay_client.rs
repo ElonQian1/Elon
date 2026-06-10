@@ -124,6 +124,7 @@ async fn run_relay_session(
         allowed_cwds: vec![],
         owner_user_id: None,
         device_name: local_device_name(),
+        hardware: Some(crate::node_hardware_probe::collect_hardware_profile()),
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");

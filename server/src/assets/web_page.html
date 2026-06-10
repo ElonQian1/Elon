@@ -2751,6 +2751,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const label = formatBytes(raw);
     return label ? `磁盘 ${label}` : '磁盘未知';
   }
+  function nodeHardwareText(node) {
+    const direct = String((node && (node.hardware_summary || node.hardwareSummary)) || '').trim();
+    if (direct && direct !== '硬件未知') return direct;
+    const h = node && (node.hardware || node.hardwareProfile);
+    if (!h) return '';
+    const parts = [];
+    const gpus = Array.isArray(h.gpu_names || h.gpuNames) ? (h.gpu_names || h.gpuNames).filter(Boolean) : [];
+    if (gpus.length) parts.push('GPU ' + gpus.slice(0, 2).join(' / '));
+    const gpuMem = formatBytes(h.gpu_memory_total_bytes ?? h.gpuMemoryTotalBytes);
+    if (gpuMem) parts.push('显存 ' + gpuMem);
+    const mem = formatBytes(h.memory_total_bytes ?? h.memoryTotalBytes);
+    if (mem) parts.push('内存 ' + mem);
+    const cores = Number(h.cpu_cores ?? h.cpuCores);
+    if (Number.isFinite(cores) && cores > 0) parts.push(`CPU ${cores} 核`);
+    return parts.join(' · ');
+  }
   function nodeCanAcceptProject(node) {
     if (!node) return false;
     const explicit = node.can_accept_project ?? node.canAcceptProject;
@@ -2764,6 +2780,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return [
       nodeCapacityLabel(node) || '容量未知',
       nodeProjectSlotsText(node),
+      nodeHardwareText(node),
       nodeDiskText(node)
     ].filter(Boolean).join(' · ');
   }
@@ -3732,7 +3749,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     try {
       const [balResp, modResp] = await Promise.allSettled([
         fetch('/api/me/node-balance', { headers: authHeaders() }),
-        fetch('/api/nodes/models')
+        fetch('/api/nodes', { headers: authHeaders() })
       ]);
 
       // 余额
@@ -3744,22 +3761,33 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         balEl.textContent = '积分余额：' + (isLoggedIn() ? '加载失败' : '未登录');
       }
 
-      // 模型列表
+      // 节点模型列表
       const modEl = dlg.querySelector('#_nmModels');
       if (modResp.status === 'fulfilled' && modResp.value.ok) {
-        const modelPayload = await modResp.value.json();
-        const models = Array.isArray(modelPayload) ? modelPayload : (modelPayload.models || []);
-        if (!models.length) {
+        const nodePayload = await modResp.value.json();
+        const nodes = Array.isArray(nodePayload) ? nodePayload : (nodePayload.nodes || []);
+        const cards = [];
+        nodes.forEach(node => {
+          const nodeId = node.node_id || node.agent_id || '';
+          const nodeName = node.display_name || node.device_name || node.short_id || (nodeId ? nodeId.slice(0, 8) : '在线节点');
+          const hw = nodeHardwareText(node) || '硬件未知';
+          const capacity = nodeCapacityLabel(node) || (node.online ? '在线' : '离线');
+          (node.models || []).forEach(model => {
+            cards.push({ node, nodeId, nodeName, hw, capacity, model });
+          });
+        });
+        if (!cards.length) {
           modEl.innerHTML = '<div style="color:#6F7785;padding:40px 20px;text-align:center">暂无在线节点</div>';
         } else {
-          modEl.innerHTML = `<div style="color:#6F7785;font-size:12px;padding:10px 20px 4px">在线模型 (${models.length})</div>` +
-            models.map(m => `<div class="_nm-card" data-id="${m.model_id}" data-node="${m.node_id || ''}"
+          modEl.innerHTML = `<div style="color:#6F7785;font-size:12px;padding:10px 20px 4px">在线节点模型 (${cards.length})</div>` +
+            cards.map(({ nodeId, nodeName, hw, capacity, model: m }) => `<div class="_nm-card" data-id="${m.model_id}" data-node="${nodeId}"
               style="margin:4px 12px;padding:12px 16px;background:#181B20;border-radius:8px;cursor:pointer">
               <div style="display:flex;align-items:center">
                 <span style="flex:1;font-size:15px;font-weight:600;color:#F2F5FA">${m.display_name || m.model_id}</span>
                 <span style="font-size:11px;padding:2px 8px;background:#152C3E;color:#58BE6A;border-radius:10px">${m.price_per_1k_credits} /千词</span>
               </div>
-              <div style="font-size:12px;color:#6F7785;margin-top:4px">${m.node_id ? `节点：${m.node_id.slice(0,8)}…` : '自动匹配在线节点'} · 上下文 ${m.context_len} tokens</div>
+              <div style="font-size:12px;color:#6F7785;margin-top:4px">${escapeHtml(nodeName)} · ${escapeHtml(capacity)} · 上下文 ${m.context_len} tokens</div>
+              <div style="font-size:12px;color:#8B949E;margin-top:3px">${escapeHtml(hw)}</div>
             </div>`).join('');
           modEl.querySelectorAll('._nm-card').forEach(card => {
             card.addEventListener('click', () => openNodeChatBox(card.dataset.id, card.dataset.node, dlg));
@@ -3782,7 +3810,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const resp = await fetch('/api/nodes/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ model_id: modelId, messages: [{ role: 'user', content: msg }], max_tokens: 512 })
+        body: JSON.stringify({
+          model_id: modelId,
+          node_id: nodeId || undefined,
+          messages: [{ role: 'user', content: msg }],
+          max_tokens: 512
+        })
       });
       const data = await resp.json();
       if (!resp.ok) { alert('请求失败：' + (data.error || resp.status)); return; }
@@ -3916,6 +3949,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         const modelText = models.length
           ? models.slice(0, 3).join('  ·  ') + (models.length > 3 ? `  +${models.length - 3}` : '')
           : '暂无可用模型';
+        const hardwareText = nodeHardwareText(node);
         const capacityTone = nodeCapacityTone(node) || (online ? 'warn' : 'bad');
         const capacityLabel = nodeCapacityLabel(node) || (online ? '容量未知' : '离线');
         const capacityClass = online ? capacityTone : 'offline';
@@ -3933,6 +3967,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
             <div class="my-node-subtitle">${escapeHtml(subtitle)}</div>
             <div class="my-node-models">${escapeHtml(modelText)}</div>
             <div class="my-node-metrics">
+              ${hardwareText ? `<span>${escapeHtml(hardwareText)}</span>` : ''}
               <span>${escapeHtml(nodeProjectSlotsText(node) || '项目位未知')}</span>
               <span>${escapeHtml(nodeDiskText(node))}</span>
               ${alertText ? `<span class="my-node-alert">${escapeHtml(alertText)}</span>` : ''}

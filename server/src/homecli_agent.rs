@@ -20,7 +20,7 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, ServerToAgent};
+use homecli_proto::{AgentToServer, NodeHardwareProfile, ServerToAgent};
 use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::{
@@ -41,6 +41,7 @@ pub struct AgentEntry {
     pub agent_id: String,
     pub version: String,
     pub device_name: Option<String>,
+    pub hardware: Option<NodeHardwareProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -130,6 +131,7 @@ impl AgentManager {
                 agent_id: a.agent_id.clone(),
                 version: a.version.clone(),
                 device_name: a.device_name.clone(),
+                hardware: a.hardware.clone(),
                 allowed_clis: a.allowed_clis.clone(),
                 allowed_cwds: a.allowed_cwds.clone(),
                 connected_at: a.connected_at,
@@ -395,6 +397,7 @@ pub struct AgentSummary {
     pub agent_id: String,
     pub version: String,
     pub device_name: Option<String>,
+    pub hardware: Option<NodeHardwareProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -479,27 +482,37 @@ async fn run_agent_session(
         _ => return Err(anyhow!("expected text register frame")),
     };
     let register: AgentToServer = serde_json::from_str(&text)?;
-    let (agent_id, version, allowed_clis, allowed_cwds, _proto_ver, owner_user_id, device_name) =
-        match register {
-            AgentToServer::Register {
-                agent_id,
-                version,
-                proto_version,
-                allowed_clis,
-                allowed_cwds,
-                owner_user_id,
-                device_name,
-            } => (
-                agent_id,
-                version,
-                allowed_clis,
-                allowed_cwds,
-                proto_version,
-                owner_user_id,
-                clean_optional(device_name),
-            ),
-            _ => return Err(anyhow!("first frame must be register")),
-        };
+    let (
+        agent_id,
+        version,
+        allowed_clis,
+        allowed_cwds,
+        _proto_ver,
+        owner_user_id,
+        device_name,
+        hardware,
+    ) = match register {
+        AgentToServer::Register {
+            agent_id,
+            version,
+            proto_version,
+            allowed_clis,
+            allowed_cwds,
+            owner_user_id,
+            device_name,
+            hardware,
+        } => (
+            agent_id,
+            version,
+            allowed_clis,
+            allowed_cwds,
+            proto_version,
+            owner_user_id,
+            clean_optional(device_name),
+            hardware,
+        ),
+        _ => return Err(anyhow!("first frame must be register")),
+    };
 
     // Auth check: presented token must equal the secret bound to agent_id.
     // Priority: env var secrets (static, for legacy/admin agents) → DB credentials (dynamic, user-registered nodes).
@@ -538,6 +551,16 @@ async fn run_agent_session(
             tracing::warn!(%agent_id, error = %e, "failed to update node device name");
         }
     }
+    if let (Some(owner), Some(hardware)) = (&resolved_owner_user_id, hardware.as_ref()) {
+        if let Err(e) = state.store.upsert_node_hardware_snapshot(
+            &agent_id,
+            owner,
+            device_name.as_deref(),
+            hardware,
+        ) {
+            tracing::warn!(%agent_id, error = %e, "failed to update node hardware snapshot");
+        }
+    }
 
     tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
 
@@ -548,6 +571,7 @@ async fn run_agent_session(
         agent_id: agent_id.clone(),
         version,
         device_name: device_name.clone(),
+        hardware: hardware.clone(),
         allowed_clis,
         allowed_cwds,
         connected_at: SystemTime::now()
@@ -594,12 +618,15 @@ async fn run_agent_session(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
+    let session_device_name = device_name.clone();
+    let session_owner_user_id = resolved_owner_user_id.clone().unwrap_or_default();
     state
         .node_registry
         .register(
             agent_id.clone(),
-            resolved_owner_user_id.clone().unwrap_or_default(),
+            session_owner_user_id.clone(),
             device_name,
+            hardware,
             vec![],
             connected_at,
         )
@@ -687,13 +714,33 @@ async fn run_agent_session(
                                 AgentToServer::RegisterCapabilities {
                                     models,
                                     tts_worker_url,
+                                    hardware,
                                 } => {
+                                    if let Some(hardware) = hardware.as_ref() {
+                                        if !session_owner_user_id.is_empty() {
+                                            if let Err(e) =
+                                                state.store.upsert_node_hardware_snapshot(
+                                                    &agent_id,
+                                                    &session_owner_user_id,
+                                                    session_device_name.as_deref(),
+                                                    hardware,
+                                                )
+                                            {
+                                                tracing::warn!(
+                                                    %agent_id,
+                                                    error = %e,
+                                                    "failed to update node hardware snapshot"
+                                                );
+                                            }
+                                        }
+                                    }
                                     state
                                         .node_registry
                                         .update_capabilities(
                                             &agent_id,
                                             models.clone(),
                                             tts_worker_url.clone(),
+                                            hardware.clone(),
                                         )
                                         .await;
                                 }

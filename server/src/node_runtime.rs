@@ -1,5 +1,5 @@
 use anyhow::Result;
-use homecli_proto::ModelCapability;
+use homecli_proto::{ModelCapability, NodeHardwareProfile};
 use std::collections::HashMap;
 
 use crate::{
@@ -12,6 +12,7 @@ pub struct NodeRuntime {
     pub owner_user_id: String,
     pub label: String,
     pub device_name: Option<String>,
+    pub hardware: Option<NodeHardwareProfile>,
     pub display_name: String,
     pub short_id: String,
     pub models: Vec<ModelCapability>,
@@ -208,6 +209,9 @@ fn build_runtime_for_parts(
     let display_label = if label == node_id { "" } else { &label };
     let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
     let models = registry.map(|node| node.models.clone()).unwrap_or_default();
+    let hardware = registry
+        .and_then(|node| node.hardware.clone())
+        .or_else(|| cli.and_then(|agent| agent.hardware.clone()));
     let registry_online = registry.map(|node| node.online).unwrap_or(false);
     let cli_connected = cli.is_some();
     let connected_at = registry
@@ -219,6 +223,7 @@ fn build_runtime_for_parts(
         owner_user_id,
         label,
         device_name,
+        hardware,
         display_name,
         short_id,
         models,

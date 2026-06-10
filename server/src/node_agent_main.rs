@@ -38,6 +38,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
 mod cli_usage;
+mod node_hardware_probe;
 mod pc_workspace_provisioner;
 mod project_workspace_inspect;
 
@@ -1431,6 +1432,7 @@ async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
+    let hardware = crate::node_hardware_probe::collect_hardware_profile();
 
     // 发送 Register
     out_tx.send(ws_text(&AgentToServer::Register {
@@ -1441,6 +1443,7 @@ async fn run_session(
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
         device_name: Some(machine_label()),
+        hardware: Some(hardware.clone()),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
@@ -1449,6 +1452,7 @@ async fn run_session(
     out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
         models: models.clone(),
         tts_worker_url: tts_url,
+        hardware: Some(hardware),
     }))?;
 
     // WS ping 定时器
@@ -2002,6 +2006,7 @@ async fn admin_status(
     rt.set_models(live.clone()).await;
     let creds = rt.creds().await;
     let st = rt.status.read().await;
+    let hardware = crate::node_hardware_probe::collect_hardware_profile();
     axum::Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "logged_in": creds.is_some(),
@@ -2017,6 +2022,7 @@ async fn admin_status(
         "price_per_1k": rt.cfg.price_per_1k,
         "connected": st.connected,
         "last_event": st.last_event,
+        "hardware": hardware,
         "models": live,
     }))
 }

@@ -15,7 +15,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use homecli_proto::ModelCapability;
+use homecli_proto::{ModelCapability, NodeHardwareProfile};
 use sha2::Digest as _;
 use std::{collections::HashMap, sync::Arc};
 
@@ -88,11 +88,15 @@ pub async fn list_nodes(
             &allowed_clis,
             project_count,
         );
+        let hardware = hardware_for_response(&state, &node_id, node.hardware);
+        let hardware_summary = hardware_summary(hardware.as_ref());
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
             owner_user_id: node.owner_user_id,
             device_name,
+            hardware,
+            hardware_summary,
             display_name,
             short_id,
             models: node.models,
@@ -140,11 +144,15 @@ pub async fn list_nodes(
             &allowed_clis,
             project_count,
         );
+        let hardware = hardware_for_response(&state, &node_id, agent.hardware);
+        let hardware_summary = hardware_summary(hardware.as_ref());
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
             owner_user_id,
             device_name,
+            hardware,
+            hardware_summary,
             display_name,
             short_id,
             models: Vec::new(),
@@ -383,12 +391,16 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 .ok()
                 .flatten();
             let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
+            let hardware = hardware_for_response(&state, &node.node_id, node.hardware);
+            let hardware_summary = hardware_summary(hardware.as_ref());
             MyNodeResponse {
                 agent_id: node.node_id.clone(),
                 node_id: node.node_id,
                 owner_user_id: node.owner_user_id,
                 label: node.label,
                 device_name: node.device_name,
+                hardware,
+                hardware_summary,
                 display_name: node.display_name,
                 short_id: node.short_id,
                 models: node.models,
@@ -421,6 +433,8 @@ struct PublicNodeResponse {
     node_id: String,
     owner_user_id: String,
     device_name: Option<String>,
+    hardware: Option<NodeHardwareProfile>,
+    hardware_summary: String,
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
@@ -446,6 +460,8 @@ struct MyNodeResponse {
     owner_user_id: String,
     label: String,
     device_name: Option<String>,
+    hardware: Option<NodeHardwareProfile>,
+    hardware_summary: String,
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
@@ -505,6 +521,7 @@ fn capacity_for_response(
         owner_user_id: owner_user_id.to_string(),
         label: label.to_string(),
         device_name: device_name.map(ToOwned::to_owned),
+        hardware: None,
         display_name: display_name.to_string(),
         short_id: short_node_id(node_id),
         models: Vec::new(),
@@ -520,10 +537,75 @@ fn capacity_for_response(
     assess_pc_node_capacity(&runtime, latest_snapshot.as_ref())
 }
 
+fn hardware_for_response(
+    state: &AppState,
+    node_id: &str,
+    live: Option<NodeHardwareProfile>,
+) -> Option<NodeHardwareProfile> {
+    live.or_else(|| {
+        state
+            .store
+            .get_node_hardware_snapshot(node_id)
+            .ok()
+            .flatten()
+            .map(|snapshot| snapshot.hardware)
+    })
+}
+
+fn hardware_summary(profile: Option<&NodeHardwareProfile>) -> String {
+    let Some(profile) = profile else {
+        return "硬件未知".to_string();
+    };
+    let mut parts = Vec::new();
+    if !profile.gpu_names.is_empty() {
+        parts.push(format!("GPU {}", profile.gpu_names.join(" / ")));
+    }
+    if let Some(bytes) = profile.gpu_memory_total_bytes.and_then(format_bytes) {
+        parts.push(format!("显存 {bytes}"));
+    }
+    if let Some(bytes) = profile.memory_total_bytes.and_then(format_bytes) {
+        parts.push(format!("内存 {bytes}"));
+    }
+    if let Some(cores) = profile.cpu_cores.filter(|cores| *cores > 0) {
+        parts.push(format!("CPU {cores} 核"));
+    } else if let Some(cpu) = profile
+        .cpu_brand
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        parts.push(cpu.trim().to_string());
+    }
+    if parts.is_empty() {
+        "硬件未知".to_string()
+    } else {
+        parts.join(" · ")
+    }
+}
+
+fn format_bytes(bytes: u64) -> Option<String> {
+    if bytes == 0 {
+        return None;
+    }
+    let units = ["B", "KB", "MB", "GB", "TB"];
+    let mut value = bytes as f64;
+    let mut idx = 0usize;
+    while value >= 1024.0 && idx < units.len() - 1 {
+        value /= 1024.0;
+        idx += 1;
+    }
+    Some(if idx >= 3 {
+        format!("{value:.1} {}", units[idx])
+    } else {
+        format!("{} {}", value.round() as u64, units[idx])
+    })
+}
+
 // ── /api/nodes/chat ───────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 pub struct NodeChatRequest {
+    /// 可选目标节点 ID；为空时自动匹配在线节点。
+    pub node_id: Option<String>,
     /// 目标模型 ID，如 "llama3:8b"（需匹配在线节点已上报的 model_id）
     pub model_id: String,
     /// OpenAI 格式的 messages 数组
@@ -624,6 +706,7 @@ pub async fn chat_with_node(
         &state,
         req_id,
         &req.model_id,
+        req.node_id.as_deref(),
         req.messages,
         req.max_tokens,
     )

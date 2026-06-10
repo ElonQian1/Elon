@@ -152,6 +152,7 @@ mod tests {
             owner_user_id: "user-a".to_string(),
             label: "PC-A".to_string(),
             device_name: Some("PC-A".to_string()),
+            hardware: None,
             display_name: "PC-A".to_string(),
             short_id: "node-a".to_string(),
             models: Vec::new(),

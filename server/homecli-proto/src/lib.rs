@@ -17,6 +17,27 @@ pub struct ModelCapability {
     pub price_per_1k_credits: f64,
 }
 
+/// PC 节点硬件画像。所有字段都是可选的，便于旧节点/受限环境渐进上报。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NodeHardwareProfile {
+    #[serde(default)]
+    pub os: Option<String>,
+    #[serde(default)]
+    pub arch: Option<String>,
+    #[serde(default)]
+    pub cpu_brand: Option<String>,
+    #[serde(default)]
+    pub cpu_cores: Option<u32>,
+    #[serde(default)]
+    pub memory_total_bytes: Option<u64>,
+    #[serde(default)]
+    pub gpu_names: Vec<String>,
+    #[serde(default)]
+    pub gpu_memory_total_bytes: Option<u64>,
+    #[serde(default)]
+    pub disk_free_bytes: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CliProjectContext {
     pub project_id: String,
@@ -166,6 +187,9 @@ pub enum AgentToServer {
         /// PC 设备名，仅用于展示
         #[serde(default)]
         device_name: Option<String>,
+        /// PC 硬件画像，用于市场展示和算力供给筛选。
+        #[serde(default)]
+        hardware: Option<NodeHardwareProfile>,
     },
     TaskStarted {
         task_id: String,
@@ -236,6 +260,9 @@ pub enum AgentToServer {
         /// 本机 TTS Worker HTTP 地址（如 http://127.0.0.1:5011），为空表示无 TTS 能力
         #[serde(default)]
         tts_worker_url: Option<String>,
+        /// 能力刷新时顺带更新硬件画像，旧节点不发送也兼容。
+        #[serde(default)]
+        hardware: Option<NodeHardwareProfile>,
     },
     /// LLM 推理流式输出片段
     LlmStreamChunk {

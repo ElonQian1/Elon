@@ -44,6 +44,7 @@ mod join_request_events;
 mod lan_peer;
 mod lm_chat;
 mod node_api;
+mod node_hardware_probe;
 mod node_registry;
 mod node_router;
 mod node_runtime;

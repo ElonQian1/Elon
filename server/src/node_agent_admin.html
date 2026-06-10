@@ -182,6 +182,25 @@ NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
 NODE_ADMIN_PORT      本管理页端口（默认 7799）</pre>
 
 <script>
+function fmtBytes(v) {
+  const n = Number(v || 0);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let value = n;
+  let idx = 0;
+  while (value >= 1024 && idx < units.length - 1) { value /= 1024; idx += 1; }
+  return (idx >= 3 ? value.toFixed(1) : Math.round(value).toString()) + ' ' + units[idx];
+}
+function hardwareLine(h) {
+  if (!h) return '未探测';
+  const parts = [];
+  if (h.cpu_brand) parts.push(h.cpu_brand);
+  if (h.cpu_cores) parts.push(h.cpu_cores + ' 核');
+  if (h.memory_total_bytes) parts.push('内存 ' + fmtBytes(h.memory_total_bytes));
+  if (Array.isArray(h.gpu_names) && h.gpu_names.length) parts.push('GPU ' + h.gpu_names.join(' / '));
+  if (h.gpu_memory_total_bytes) parts.push('显存 ' + fmtBytes(h.gpu_memory_total_bytes));
+  return parts.filter(Boolean).join(' · ') || '未探测';
+}
 async function load() {
   if (window.__elonDup) return;
   const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
@@ -204,6 +223,7 @@ async function load() {
     ['登录状态', r.logged_in ? '✅ 已登录' : '❌ 未登录'],
     ['节点 ID', r.agent_id || '(登录后自动生成)'],
     ['设备名称', r.device_name || '(未知 PC)'],
+    ['硬件画像', hardwareLine(r.hardware)],
     ['云端', r.cloud_url],
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],

@@ -289,6 +289,7 @@ pub(crate) async fn try_casual_chat_via_node(
         state,
         req_id,
         model,
+        None,
         messages.to_vec(),
         Some(1024),
     )

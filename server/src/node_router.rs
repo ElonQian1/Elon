@@ -29,15 +29,24 @@ pub async fn dispatch_to_node_with_req_id(
     state: &Arc<AppState>,
     req_id: String,
     model_id: &str,
+    target_node_id: Option<&str>,
     messages: Vec<serde_json::Value>,
     max_tokens: Option<u32>,
 ) -> Result<(String, String, mpsc::UnboundedReceiver<AgentToServer>)> {
     // 找到一个支持该模型的在线节点
     let node_id = state
         .node_registry
-        .find_node_for_model(model_id)
+        .find_node_for_model_target(model_id, target_node_id)
         .await
-        .ok_or_else(|| anyhow!("没有在线节点支持模型 {model_id}"))?;
+        .ok_or_else(|| {
+            match target_node_id
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                Some(node_id) => anyhow!("节点 {node_id} 当前离线或不支持模型 {model_id}"),
+                None => anyhow!("没有在线节点支持模型 {model_id}"),
+            }
+        })?;
 
     let (req_id, rx) = state
         .agent_manager

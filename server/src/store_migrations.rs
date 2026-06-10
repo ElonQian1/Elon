@@ -60,6 +60,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (38, "计费自动对账告警表", migration_v38),
     (39, "扣费计价规则版本与价格快照", migration_v39),
     (40, "节点收益流水绑定真实扣费事件", migration_v40),
+    (41, "PC 节点硬件画像快照", migration_v41),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1512,6 +1513,24 @@ fn migration_v40(conn: &Connection) -> Result<()> {
 
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('node_provider_revenue_share_x1000', '800', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v41(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS node_hardware_snapshots (
+          node_id       TEXT PRIMARY KEY,
+          owner_user_id TEXT NOT NULL,
+          device_name   TEXT,
+          hardware_json TEXT NOT NULL,
+          created_at    TEXT NOT NULL,
+          updated_at    TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_node_hardware_owner_updated
+          ON node_hardware_snapshots(owner_user_id, updated_at DESC);
         "#,
     )?;
     Ok(())

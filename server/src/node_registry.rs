@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use homecli_proto::ModelCapability;
+use homecli_proto::{ModelCapability, NodeHardwareProfile};
 use serde::Serialize;
 use tokio::sync::RwLock;
 
@@ -24,6 +24,8 @@ pub struct NodeEntry {
     pub owner_user_id: String,
     /// PC 设备名，仅用于展示。
     pub device_name: Option<String>,
+    /// PC 硬件画像，用于算力市场展示。
+    pub hardware: Option<NodeHardwareProfile>,
     /// 该节点支持的 LLM 模型列表
     pub models: Vec<ModelCapability>,
     /// 本机 TTS Worker URL（如 http://127.0.0.1:5011）——空表示无 TTS 能力
@@ -40,6 +42,7 @@ pub struct NodeSummary {
     pub node_id: String,
     pub owner_user_id: String,
     pub device_name: Option<String>,
+    pub hardware: Option<NodeHardwareProfile>,
     pub models: Vec<ModelCapability>,
     pub tts_worker_url: Option<String>,
     pub connected_at: u64,
@@ -65,6 +68,7 @@ impl NodeRegistry {
         node_id: String,
         owner_user_id: String,
         device_name: Option<String>,
+        hardware: Option<NodeHardwareProfile>,
         models: Vec<ModelCapability>,
         connected_at: u64,
     ) {
@@ -72,6 +76,7 @@ impl NodeRegistry {
             node_id: node_id.clone(),
             owner_user_id,
             device_name,
+            hardware,
             models,
             tts_worker_url: None,
             connected_at,
@@ -91,11 +96,15 @@ impl NodeRegistry {
         node_id: &str,
         models: Vec<ModelCapability>,
         tts_worker_url: Option<String>,
+        hardware: Option<NodeHardwareProfile>,
     ) {
         if let Some(entry) = self.nodes.write().await.get_mut(node_id) {
             entry.models = models;
             if tts_worker_url.is_some() {
                 entry.tts_worker_url = tts_worker_url;
+            }
+            if hardware.is_some() {
+                entry.hardware = hardware;
             }
             entry.last_seen = Instant::now();
         }
@@ -119,6 +128,27 @@ impl NodeRegistry {
             .map(|e| e.node_id.clone())
     }
 
+    /// 指定节点时严格校验该节点在线且支持模型；未指定时走自动匹配。
+    pub async fn find_node_for_model_target(
+        &self,
+        model_id: &str,
+        target_node_id: Option<&str>,
+    ) -> Option<String> {
+        let target = target_node_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if target.is_none() {
+            return self.find_node_for_model(model_id).await;
+        }
+        let target = target?;
+        let nodes = self.nodes.read().await;
+        nodes
+            .get(target)
+            .filter(|entry| entry.last_seen.elapsed() < NODE_TIMEOUT)
+            .filter(|entry| entry.models.iter().any(|m| m.model_id == model_id))
+            .map(|entry| entry.node_id.clone())
+    }
+
     /// 列出所有已知节点（含 online 状态标记）。
     pub async fn list_online(&self) -> Vec<NodeSummary> {
         let nodes = self.nodes.read().await;
@@ -128,6 +158,7 @@ impl NodeRegistry {
                 node_id: e.node_id.clone(),
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
+                hardware: e.hardware.clone(),
                 models: e.models.clone(),
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
@@ -138,10 +169,7 @@ impl NodeRegistry {
 
     /// 找到某用户的在线节点中，第一个有 TTS Worker 的节点。
     /// 返回 (node_id, tts_worker_url)。
-    pub async fn find_tts_node_for_user(
-        &self,
-        owner_user_id: &str,
-    ) -> Option<(String, String)> {
+    pub async fn find_tts_node_for_user(&self, owner_user_id: &str) -> Option<(String, String)> {
         let nodes = self.nodes.read().await;
         nodes
             .values()
@@ -150,11 +178,7 @@ impl NodeRegistry {
                     && e.owner_user_id == owner_user_id
                     && e.tts_worker_url.is_some()
             })
-            .find_map(|e| {
-                e.tts_worker_url
-                    .clone()
-                    .map(|url| (e.node_id.clone(), url))
-            })
+            .find_map(|e| e.tts_worker_url.clone().map(|url| (e.node_id.clone(), url)))
     }
 
     /// 仅列出在线节点中所有可用模型的去重列表。
@@ -202,6 +226,7 @@ impl NodeRegistry {
                 node_id: e.node_id.clone(),
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
+                hardware: e.hardware.clone(),
                 models: e.models.clone(),
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
@@ -213,3 +238,63 @@ impl NodeRegistry {
 
 /// 全局单例，通过 Arc<NodeRegistry> 放入 AppState。
 pub type SharedNodeRegistry = Arc<NodeRegistry>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn model(id: &str) -> ModelCapability {
+        ModelCapability {
+            model_id: id.to_string(),
+            display_name: id.to_string(),
+            context_len: 4096,
+            provider: "test".to_string(),
+            price_per_1k_credits: 1.0,
+        }
+    }
+
+    #[tokio::test]
+    async fn target_node_must_be_online_and_support_model() {
+        let registry = NodeRegistry::new();
+        registry
+            .register(
+                "node-a".to_string(),
+                "user-a".to_string(),
+                Some("PC-A".to_string()),
+                None,
+                vec![model("qwen")],
+                1,
+            )
+            .await;
+        registry
+            .register(
+                "node-b".to_string(),
+                "user-b".to_string(),
+                Some("PC-B".to_string()),
+                None,
+                vec![model("llama")],
+                1,
+            )
+            .await;
+
+        assert_eq!(
+            registry
+                .find_node_for_model_target("qwen", Some("node-a"))
+                .await
+                .as_deref(),
+            Some("node-a")
+        );
+        assert_eq!(
+            registry
+                .find_node_for_model_target("qwen", Some("node-b"))
+                .await,
+            None
+        );
+        assert_eq!(
+            registry
+                .find_node_for_model_target("qwen", Some("missing"))
+                .await,
+            None
+        );
+    }
+}
