@@ -278,10 +278,16 @@ pub async fn register_node(
 struct NodeBalanceResp {
     /// 当前可用余额（与 Android/Web 约定的字段名）
     balance: f64,
+    /// 当前可用余额（人民币分），用于资金对账。
+    balance_fen: i64,
     /// 累计历史总收益
     lifetime_earned: f64,
+    /// 累计历史总收益（人民币分）。
+    lifetime_earned_fen: i64,
     /// 已申请、等待运营处理的提现金额。
     pending_payouts: f64,
+    /// 已申请、等待运营处理的提现金额（人民币分）。
+    pending_payout_fen: i64,
     /// 最低提现金额（分），由后台配置。
     payout_min_fen: i64,
     /// 节点提供者分账比例 × 1000（800 = 80%）
@@ -306,7 +312,7 @@ pub async fn my_node_balance(
         }
     };
 
-    let balance = match state.store.get_node_balance(&user.id) {
+    let balance_fen = match state.store.get_node_balance_fen(&user.id) {
         Ok(v) => v,
         Err(e) => {
             return (
@@ -316,18 +322,24 @@ pub async fn my_node_balance(
                 .into_response()
         }
     };
-    let lifetime_earned = state.store.get_lifetime_earned(&user.id).unwrap_or(0.0);
-    let pending_payouts = state
+    let balance = balance_fen as f64 / 100.0;
+    let lifetime_earned_fen = state.store.get_lifetime_earned_fen(&user.id).unwrap_or(0);
+    let lifetime_earned = lifetime_earned_fen as f64 / 100.0;
+    let pending_payout_fen = state
         .store
-        .get_pending_node_payout_total(&user.id)
-        .unwrap_or(0.0);
+        .get_pending_node_payout_total_fen(&user.id)
+        .unwrap_or(0);
+    let pending_payouts = pending_payout_fen as f64 / 100.0;
     let payout_min_fen = node_payout_min_fen(&state);
     let provider_revenue_share_x1000 =
         crate::node_router::provider_revenue_share_x1000(&state.store);
     Json(NodeBalanceResp {
         balance,
+        balance_fen,
         lifetime_earned,
+        lifetime_earned_fen,
         pending_payouts,
+        pending_payout_fen,
         payout_min_fen,
         provider_revenue_share_x1000,
         provider_revenue_share_percent: provider_revenue_share_x1000 as f64 / 10.0,

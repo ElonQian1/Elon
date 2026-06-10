@@ -106,8 +106,8 @@
   <h1>馃悏 涓€榫?AI 閰嶇疆涓績</h1>
   <span class="subtitle">绠＄悊 AI 浠ｇ悊鍙傛暟锛屼慨鏀瑰悗绔嬪嵆鐢熸晥锛堟棤闇€閲嶅惎鏈嶅姟鍣級</span>
   <div class="token-badge">
-    <span id="tokenLabel">鏈櫥褰?/span>
-    <button onclick="showTokenModal()">鏇存崲浠ょ墝</button>
+    <span id="tokenLabel">未登录</span>
+    <button onclick="showTokenModal()">更换令牌</button>
   </div>
 </header>
 
@@ -252,7 +252,7 @@
     <div class="form-group">
       <label>鍒濆瀵嗙爜</label>
       <div class="input-wrap">
-        <input id="uPassword" type="password" placeholder="鑷冲皯 6 浣? autocomplete="new-password" />
+        <input id="uPassword" type="password" placeholder="至少 6 位" autocomplete="new-password" />
         <button type="button" onclick="toggleKeyVis('uPassword',this)" title="鏄剧ず/闅愯棌">馃憗</button>
       </div>
     </div>
@@ -270,10 +270,10 @@
 <!-- 浠ょ墝 Modal -->
 <div class="modal-overlay" id="tokenModal">
   <div class="modal token-modal">
-    <h3>杈撳叆绠＄悊鍛樹护鐗?/h3>
-    <p>浠ょ墝鍦ㄦ湇鍔″櫒 .env 鏂囦欢涓€氳繃 <code style="background:var(--input-bg);padding:2px 6px;border-radius:4px">ADMIN_TOKEN</code> 璁剧疆锛岄粯璁ゅ€间负 <code style="background:var(--input-bg);padding:2px 6px;border-radius:4px">elon-admin</code>銆?/p>
+    <h3>输入管理员令牌</h3>
+    <p>令牌在服务器 .env 文件中通过 <code style="background:var(--input-bg);padding:2px 6px;border-radius:4px">ADMIN_TOKEN</code> 设置，默认值为 <code style="background:var(--input-bg);padding:2px 6px;border-radius:4px">elon-admin</code>。</p>
     <div class="form-group">
-      <label>绠＄悊鍛樹护鐗?/label>
+      <label>管理员令牌</label>
       <div class="input-wrap">
         <input id="tokenInput" type="password" placeholder="elon-admin" autocomplete="off" />
         <button type="button" onclick="toggleKeyVis('tokenInput',this)" title="鏄剧ず/闅愯棌">馃憗</button>
@@ -309,7 +309,7 @@ function showTokenModal() {
 }
 function applyToken() {
   const v = document.getElementById('tokenInput').value.trim();
-  if (!v) return toast('璇疯緭鍏ヤ护鐗?, 'err');
+  if (!v) return toast('请输入令牌', 'err');
   token = v;
   localStorage.setItem('elon_admin_token', token);
   document.getElementById('tokenModal').classList.remove('open');
@@ -318,9 +318,9 @@ function applyToken() {
 }
 function updateTokenLabel() {
   const masked = token.length > 6
-    ? token.slice(0, 2) + '鈥⑩€⑩€⑩€? + token.slice(-2)
-    : '鈥⑩€⑩€⑩€?;
-  document.getElementById('tokenLabel').textContent = '浠ょ墝: ' + masked;
+    ? token.slice(0, 2) + '••••' + token.slice(-2)
+    : '••••';
+  document.getElementById('tokenLabel').textContent = '令牌: ' + masked;
 }
 
 // 鈹€鈹€鈹€ 鍔犺浇浠ｇ悊鍒楄〃 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -331,7 +331,7 @@ async function loadAgents() {
     const res = await apiFetch('GET', '/api/admin/agents');
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      if (res.status === 401) { grid.innerHTML = '<p class="empty">浠ょ墝鏃犳晥锛岃鐐瑰嚮鍙充笂瑙掓洿鎹护鐗?/p>'; return; }
+      if (res.status === 401) { grid.innerHTML = '<p class="empty">令牌无效，请点击右上角更换令牌</p>'; return; }
       grid.innerHTML = `<p class="empty">鍔犺浇澶辫触: ${j.error || res.status}</p>`;
       return;
     }
@@ -347,7 +347,7 @@ function renderAgents(data) {
   const agents = data.agents || [];
   document.getElementById('agentCount').textContent = `宸查厤缃?${agents.length} 涓?AI 浠ｇ悊`;
   if (agents.length === 0) {
-    grid.innerHTML = '<p class="empty">杩樻病鏈夐厤缃换浣曚唬鐞嗭紝鐐瑰嚮鍙充笂瑙掋€屾坊鍔犱唬鐞嗐€嶅紑濮?/p>';
+    grid.innerHTML = '<p class="empty">还没有配置任何代理，点击右上角添加代理开始</p>';
     return;
   }
   grid.innerHTML = agents.map(a => `
@@ -358,11 +358,11 @@ function renderAgents(data) {
       </div>
       <div class="card-row">
         <span class="card-label">API 鍦板潃</span>
-        <span class="card-value">${esc(a.api_base || '鏈缃?)}</span>
+        <span class="card-value">${esc(a.api_base || '未设置')}</span>
       </div>
       <div class="card-row">
         <span class="card-label">妯″瀷</span>
-        <span class="card-value"><code>${esc(a.model || '鏈缃?)}</code></span>
+        <span class="card-value"><code>${esc(a.model || '未设置')}</code></span>
       </div>
       <div class="card-row">
         <span class="card-label">API 瀵嗛挜</span>
@@ -415,7 +415,7 @@ function openAddModal() {
 }
 async function openEditModal(name) {
   editingName = name;
-  document.getElementById('modalTitle').textContent = '缂栬緫 AI 浠ｇ悊锛? + name;
+  document.getElementById('modalTitle').textContent = '编辑 AI 代理：' + name;
   // 浠庨〉闈笂璇诲彇宸茬煡淇℃伅
   const card = document.getElementById('card-' + name);
   const rows = card.querySelectorAll('.card-row');
@@ -457,7 +457,7 @@ async function saveAgent() {
 
 // 鈹€鈹€鈹€ 鍒犻櫎浠ｇ悊 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 async function deleteAgent(name) {
-  if (!confirm(`纭畾鍒犻櫎浠ｇ悊 "${name}" 鍚楋紵姝ゆ搷浣滄棤娉曟挙閿€銆俙)) return;
+  if (!confirm(`确定删除代理 "${name}" 吗？此操作无法撤销。`)) return;
   try {
     const res = await apiFetch('DELETE', `/api/admin/agents/${encodeURIComponent(name)}`);
     const j = await res.json();
@@ -513,7 +513,8 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-// Enter 閿敮鎸?document.addEventListener('keydown', e => {
+// Enter 键支持
+document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     if (document.getElementById('tokenModal').classList.contains('open')) applyToken();
     else if (document.getElementById('userModal').classList.contains('open')) createUser();
@@ -558,13 +559,13 @@ async function createUser() {
   const password = document.getElementById('uPassword').value;
   const role = document.getElementById('uRole').value.trim() || 'user';
   if (!account) return toast('璐﹀彿涓嶈兘涓虹┖', 'err');
-  if (password.length < 6) return toast('瀵嗙爜鑷冲皯 6 浣?, 'err');
+  if (password.length < 6) return toast('密码至少 6 位', 'err');
   try {
     const res = await apiFetch('POST', '/api/admin/users', { account, nickname, password, role });
     const j = await res.json();
     if (!res.ok) return toast(j.error || '鍒涘缓澶辫触', 'err');
     closeUserModal();
-    toast('鐢ㄦ埛宸插垱寤?, 'ok');
+    toast('用户已创建', 'ok');
     loadUsers();
   } catch(e) {
     toast('缃戠粶閿欒', 'err');
@@ -617,9 +618,9 @@ async function loadSessions() {
       return;
     }
     const data = await res.json();
-    // 鏄剧ず鏈嶅姟鍣ㄩ厤缃姸鎬?    const banner = document.getElementById('sessionEnvBanner');
-    const rl = data.require_login ? '馃敶 寮哄埗鐧诲綍宸插紑鍚? : '馃煛 寮哄埗鐧诲綍鏈紑鍚紙鏃х増 APK 鍙笉鐧诲綍鐩存帴鐢級';
-    const minVc = data.min_apk_version_code > 0 ? `路 鏈€浣庣増鏈? ${data.min_apk_version_code}` : '路 娌℃湁鐗堟湰闄愬埗';
+    const banner = document.getElementById('sessionEnvBanner');
+    const rl = data.require_login ? '强制登录已开启' : '强制登录未开启';
+    const minVc = data.min_apk_version_code > 0 ? `最低版本 ${data.min_apk_version_code}` : '没有版本限制';
     const apkUrl = data.platform_apk_url || '';
     banner.innerHTML = `${rl} ${minVc} &nbsp;路 骞冲彴 APK: <a href="${esc(apkUrl)}" target="_blank" style="color:var(--accent)">${esc(apkUrl)}</a>`;
     // 鍚屾椂鏇存柊椤圭洰椤电殑骞冲彴 APK 閾炬帴
@@ -636,7 +637,7 @@ async function loadSessions() {
 function renderSessions(data) {
   const tbody = document.getElementById('sessionTableBody');
   const sessions = data.sessions || [];
-  document.getElementById('sessionCount').textContent = `娲昏穬璁惧 鍏?${sessions.length} 鏉¤褰昤;
+  document.getElementById('sessionCount').textContent = `活跃设备 共 ${sessions.length} 条记录`;
   if (sessions.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-dim)">鏆傛棤娲昏穬鐧诲綍</td></tr>';
     return;
@@ -657,7 +658,7 @@ function renderSessions(data) {
 function renderProjects(data) {
   const tbody = document.getElementById('projectTableBody');
   const projects = data.projects || [];
-  document.getElementById('projectCount').textContent = `鍏?${projects.length} 涓敤鎴烽」鐩甡;
+  document.getElementById('projectCount').textContent = `共 ${projects.length} 个用户项目`;
   if (projects.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-dim)">鏆傛棤椤圭洰</td></tr>';
     return;
@@ -666,15 +667,15 @@ function renderProjects(data) {
   tbody.innerHTML = projects.map(p => {
     const apkCell = p.last_apk_url
       ? `<a href="${esc(p.last_apk_url)}" target="_blank" style="color:var(--accent)">猬?涓嬭浇</a>`
-      : '<span style="color:var(--text-dim)">鈥?/span>';
+      : '<span style="color:var(--text-dim)">—</span>';
     const taskStatus = p.last_task_status
       ? `<span style="color:${statusColor(p.last_task_status)}">${esc(p.last_task_status)}</span>`
-      : '<span style="color:var(--text-dim)">鈥?/span>';
-    const path = p.workspace_dir || '鈥?;
+      : '<span style="color:var(--text-dim)">—</span>';
+    const path = p.workspace_dir || '—';
     const typeLabel = [p.source_type, p.template].filter(Boolean).join(' / ');
     const deviceCell = p.last_device_name
       ? `${esc(p.last_device_name)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(p.last_apk_version || '')}</span>`
-      : '<span style="color:var(--text-dim)">鈥?/span>';
+      : '<span style="color:var(--text-dim)">—</span>';
     return `<tr style="border-top:1px solid var(--border)">
       <td style="padding:8px 12px;font-weight:500">${esc(p.name)}<br><span style="font-size:11px;color:var(--text-dim)">${esc(p.id)}</span></td>
       <td style="padding:8px 12px">${esc(p.created_by_account)}</td>
@@ -692,15 +693,15 @@ function renderProjects(data) {
 function renderUsers(data) {
   const list = document.getElementById('userList');
   const users = data.users || [];
-  document.getElementById('userCount').textContent = `鍏?${users.length} 涓敤鎴穈;
+  document.getElementById('userCount').textContent = `共 ${users.length} 个用户`;
   if (users.length === 0) {
-    list.innerHTML = '<p class="empty">鏆傛棤鐢ㄦ埛锛岀偣鍑汇€屽垱寤虹敤鎴枫€嶆坊鍔犳湅鍙嬭处鍙?/p>';
+    list.innerHTML = '<p class="empty">暂无用户，点击创建用户添加账号</p>';
     return;
   }
   list.innerHTML = users.map(u => {
     const nicknameText = u.nickname ? ` <span style="color:var(--accent)">${esc(u.nickname)}</span>` : '';
     const updatedText = u.updated_at ? `鏇存柊: ${esc(u.updated_at)}` : '';
-    const projectText = `${Number(u.project_count || 0)} 涓」鐩甡;
+    const projectText = `${Number(u.project_count || 0)} 个项目`;
     const roleText = `${esc(u.role || 'user')} 路 ${esc(u.status || '')}`;
     return `<div class="user-card">
       <span class="user-id">${esc(u.account || u.id)}${nicknameText}</span>
@@ -714,7 +715,7 @@ function renderUsers(data) {
 function loadConvs(pid, pname) {
   const overlay = document.getElementById('convModal');
   overlay.style.display = 'flex';
-  document.getElementById('convModalTitle').textContent = '馃挰 ' + pname + ' 鈥?浼氳瘽鍒楄〃';
+  document.getElementById('convModalTitle').textContent = '💬 ' + pname + ' - 会话列表';
   document.getElementById('convTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px"><div class="loader"></div></td></tr>';
   fetch('/api/admin/projects/' + encodeURIComponent(pid) + '/conversations', {
     headers: {'Authorization': 'Bearer ' + token}
@@ -725,14 +726,14 @@ function loadConvs(pid, pname) {
 function renderConvs(data) {
   const tbody = document.getElementById('convTableBody');
   const convs = data.conversations || [];
-  if (convs.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">璇ラ」鐩殏鏃犱細璇?/td></tr>'; return; }
+  if (convs.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">该项目暂无会话</td></tr>'; return; }
   const sc = s => s === 'active' ? '#52b788' : s === 'error' ? '#e76f51' : '#aaa';
   tbody.innerHTML = convs.map(c => {
-    const ls = c.last_task_status ? `<span style="color:${sc(c.last_task_status)}">${esc(c.last_task_status)}</span>` : '鈥?;
+    const ls = c.last_task_status ? `<span style="color:${sc(c.last_task_status)}">${esc(c.last_task_status)}</span>` : '—';
     return `<tr style="border-top:1px solid var(--border)">
       <td style="padding:6px 10px;font-size:11px;word-break:break-all">${esc(c.id)}</td>
       <td style="padding:6px 10px">${esc(c.user_account)}</td>
-      <td style="padding:6px 10px">${esc(c.title || '鈥?)}</td>
+      <td style="padding:6px 10px">${esc(c.title || '—')}</td>
       <td style="padding:6px 10px">${esc(c.status)}</td>
       <td style="padding:6px 10px;text-align:right">${c.message_count}</td>
       <td style="padding:6px 10px;text-align:right">${c.task_count}</td>
@@ -927,6 +928,45 @@ function closeConvModal() {
   </div>
   <!-- 计费配置概览 -->
   <div id="billingConfigCard" style="margin-bottom:24px"></div>
+  <!-- 节点提现申请 -->
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">节点提现申请</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">处理 PC 节点收益提现，拒绝会自动退回冻结余额</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="nodePayoutStatus" onchange="loadNodePayouts()" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px">
+          <option value="pending">待处理</option>
+          <option value="paid">已打款</option>
+          <option value="rejected">已拒绝</option>
+          <option value="cancelled">已取消</option>
+          <option value="all">全部</option>
+        </select>
+        <span id="nodePayoutsCount" style="font-size:12px;color:var(--text-dim)"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">状态</th>
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px;text-align:right">金额</th>
+            <th style="padding:8px 10px">收款方式</th>
+            <th style="padding:8px 10px">收款账号</th>
+            <th style="padding:8px 10px">联系信息</th>
+            <th style="padding:8px 10px">时间</th>
+            <th style="padding:8px 10px">备注</th>
+            <th style="padding:8px 10px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="nodePayoutsBody">
+          <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
   <!-- 计价规则 -->
   <div class="card" style="margin-bottom:24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1101,6 +1141,10 @@ function closeConvModal() {
     <div class="form-group">
       <label>节点提供者分账比例（%，如 80）</label>
       <input type="number" id="cfgNodeProviderShare" placeholder="80" min="0" max="100" step="1" />
+    </div>
+    <div class="form-group">
+      <label>节点收益最低提现金额（元）</label>
+      <input type="number" id="cfgNodePayoutMin" placeholder="1.00" min="0.01" step="0.01" />
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeConfigModal()">取消</button>
@@ -1627,12 +1671,15 @@ async function loadBilling() {
   const tbody = document.getElementById('billingUsersBody');
   tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center"><div class="loader"></div></td></tr>';
   try {
-    const [usersRes, configRes, reservationsRes, priceRulesRes, eventsRes] = await Promise.all([
+    const payoutStatusEl = document.getElementById('nodePayoutStatus');
+    const payoutStatus = payoutStatusEl ? (payoutStatusEl.value || 'pending') : 'pending';
+    const [usersRes, configRes, reservationsRes, priceRulesRes, eventsRes, nodePayoutsRes] = await Promise.all([
       apiFetch('GET', '/api/admin/billing/users?page=1&size=200'),
       apiFetch('GET', '/api/admin/billing/config'),
       apiFetch('GET', '/api/admin/billing/reservations?limit=100'),
       apiFetch('GET', '/api/admin/billing/price-rules'),
       apiFetch('GET', '/api/admin/billing/events?limit=100'),
+      apiFetch('GET', '/api/admin/node-payouts?status=' + encodeURIComponent(payoutStatus) + '&limit=100'),
     ]);
     if (configRes.ok) {
       const cfg = await configRes.json();
@@ -1649,6 +1696,14 @@ async function loadBilling() {
     if (eventsRes.ok) {
       const d = await eventsRes.json();
       renderBillingEvents(d.rows || []);
+    }
+    if (nodePayoutsRes.ok) {
+      const d = await nodePayoutsRes.json();
+      renderNodePayouts(d.payouts || []);
+    } else {
+      const tbodyPayouts = document.getElementById('nodePayoutsBody');
+      const j = await nodePayoutsRes.json().catch(() => ({}));
+      if (tbodyPayouts) tbodyPayouts.innerHTML = '<tr><td colspan="9" style="color:var(--danger);padding:16px">' + esc(j.error || '加载失败') + '</td></tr>';
     }
     if (usersRes.ok) {
       const d = await usersRes.json();
@@ -1705,6 +1760,111 @@ function renderBillingReservations(rows) {
       <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(row.updated_at || '')}</td>
     </tr>`;
   }).join('');
+}
+
+async function loadNodePayouts() {
+  const tbody = document.getElementById('nodePayoutsBody');
+  if (!tbody) return;
+  const status = document.getElementById('nodePayoutStatus').value || 'pending';
+  tbody.innerHTML = '<tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>';
+  try {
+    const res = await apiFetch('GET', '/api/admin/node-payouts?status=' + encodeURIComponent(status) + '&limit=100');
+    const d = await res.json();
+    if (!res.ok) {
+      tbody.innerHTML = '<tr><td colspan="9" style="color:var(--danger);padding:16px">' + esc(d.error || '加载失败') + '</td></tr>';
+      return;
+    }
+    renderNodePayouts(d.payouts || []);
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="9" style="color:var(--danger);padding:16px">' + esc(String(e)) + '</td></tr>';
+  }
+}
+
+function renderNodePayouts(rows) {
+  const tbody = document.getElementById('nodePayoutsBody');
+  const countEl = document.getElementById('nodePayoutsCount');
+  if (countEl) countEl.textContent = '共 ' + rows.length + ' 条';
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--text-dim)">暂无节点提现申请</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const amountFen = Number(row.amount_fen || Math.round(Number(row.amount_credits || 0) * 100));
+    const status = row.status || 'pending';
+    const id = encodeURIComponent(row.id || '');
+    const canResolve = status === 'pending';
+    const actions = canResolve
+      ? `<button class="btn btn-success" style="padding:4px 10px;font-size:12px" onclick="markNodePayoutPaid('${id}')">已打款</button>
+         <button class="btn btn-danger" style="padding:4px 10px;font-size:12px;margin-left:6px" onclick="rejectNodePayout('${id}')">拒绝</button>`
+      : '<span style="font-size:12px;color:var(--text-dim)">已处理</span>';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px">${nodePayoutStatusBadge(status)}</td>
+      <td style="padding:8px 10px">
+        <div style="font-weight:600">${esc(row.provider_user_id || '')}</div>
+        <div style="font-size:10px;color:var(--text-dim)" title="${esc(row.id || '')}">${esc((row.id || '').slice(0, 28))}</div>
+      </td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700;color:#fbbf24">¥${(amountFen / 100).toFixed(2)}</td>
+      <td style="padding:8px 10px">${esc(row.payout_method || '')}</td>
+      <td style="padding:8px 10px;max-width:240px;word-break:break-all">${esc(row.payout_account || '')}</td>
+      <td style="padding:8px 10px">${esc(row.contact || '')}</td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">
+        <div>${esc(row.created_at || '')}</div>
+        ${row.resolved_at ? '<div>' + esc(row.resolved_at) + '</div>' : ''}
+      </td>
+      <td style="padding:8px 10px;max-width:220px;color:var(--text-dim)">${esc(row.admin_note || '')}</td>
+      <td style="padding:8px 10px;white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+function nodePayoutStatusBadge(status) {
+  const s = status || 'pending';
+  if (s === 'pending') return '<span style="color:#38bdf8;font-size:12px">待处理</span>';
+  if (s === 'paid') return '<span style="color:#4ade80;font-size:12px">已打款</span>';
+  if (s === 'rejected') return '<span style="color:#f87171;font-size:12px">已拒绝</span>';
+  if (s === 'cancelled') return '<span style="color:#94a3b8;font-size:12px">已取消</span>';
+  return '<span style="color:#ff4d6d;font-size:12px">' + esc(s) + '</span>';
+}
+
+async function markNodePayoutPaid(encodedId) {
+  const payoutId = decodeURIComponent(encodedId || '');
+  if (!payoutId) return toast('提现申请 ID 无效', 'err');
+  const note = prompt('请输入打款备注或流水号');
+  if (note === null) return;
+  try {
+    const res = await apiFetch('POST', '/api/admin/node-payouts/' + encodeURIComponent(payoutId) + '/paid', {
+      operator_id: 'admin-web',
+      admin_note: note.trim() || null,
+    });
+    const j = await res.json();
+    if (!res.ok) return toast(j.error || '确认打款失败', 'err');
+    toast('节点提现已标记为已打款', 'ok');
+    loadBilling();
+  } catch(e) {
+    toast('确认打款失败：' + e.message, 'err');
+  }
+}
+
+async function rejectNodePayout(encodedId) {
+  const payoutId = decodeURIComponent(encodedId || '');
+  if (!payoutId) return toast('提现申请 ID 无效', 'err');
+  const note = prompt('请输入拒绝原因');
+  if (note === null) return;
+  if (!note.trim()) return toast('拒绝原因不能为空', 'err');
+  if (!confirm('确认拒绝并退回冻结余额？')) return;
+  try {
+    const res = await apiFetch('POST', '/api/admin/node-payouts/' + encodeURIComponent(payoutId) + '/reject', {
+      operator_id: 'admin-web',
+      admin_note: note.trim(),
+    });
+    const j = await res.json();
+    if (!res.ok) return toast(j.error || '拒绝提现失败', 'err');
+    toast('节点提现已拒绝，冻结余额已退回', 'ok');
+    loadBilling();
+  } catch(e) {
+    toast('拒绝提现失败：' + e.message, 'err');
+  }
 }
 
 function renderBillingEvents(rows) {
@@ -1775,12 +1935,14 @@ function renderBillingConfig(cfg) {
   const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
   const reservationAlert = cfg.billing_open_reservation_alert_threshold || 100;
   const nodeShare = ((cfg.node_provider_revenue_share_x1000 || 800) / 10).toFixed(0);
+  const nodePayoutMin = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
   card.innerHTML = `<div class="card" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;padding:16px 20px">
     <div><span style="font-size:12px;color:var(--text-dim)">汇率 &nbsp;</span><strong>1 USD = ${rate} CNY</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">加价 &nbsp;</span><strong>×${markup}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">低余额预警 &nbsp;</span><strong>¥${threshold}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">冻结告警 &nbsp;</span><strong>${reservationAlert} 条</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">节点分账 &nbsp;</span><strong>${nodeShare}%</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">最低提现 &nbsp;</span><strong>¥${nodePayoutMin}</strong></div>
     <button class="btn btn-ghost" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="openConfigModal()">修改配置</button>
   </div>`;
 }
@@ -1939,6 +2101,7 @@ function openConfigModal() {
     document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
     document.getElementById('cfgReservationAlert').value = String(cfg.billing_open_reservation_alert_threshold || 100);
     document.getElementById('cfgNodeProviderShare').value = String(Math.round((cfg.node_provider_revenue_share_x1000 || 800) / 10));
+    document.getElementById('cfgNodePayoutMin').value = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
     document.getElementById('billingConfigModal').classList.add('open');
   }).catch(() => {
     document.getElementById('billingConfigModal').classList.add('open');
@@ -1955,21 +2118,25 @@ async function saveConfig() {
   const threshStr = document.getElementById('cfgThreshold').value.trim();
   const reservationAlertStr = document.getElementById('cfgReservationAlert').value.trim();
   const nodeShareStr = document.getElementById('cfgNodeProviderShare').value.trim();
+  const nodePayoutMinStr = document.getElementById('cfgNodePayoutMin').value.trim();
   if (!rateStr || isNaN(parseFloat(rateStr))) return toast('汇率格式无效', 'err');
   if (!markupStr || isNaN(parseFloat(markupStr))) return toast('加价倍数格式无效', 'err');
   if (nodeShareStr && (isNaN(parseFloat(nodeShareStr)) || parseFloat(nodeShareStr) < 0 || parseFloat(nodeShareStr) > 100)) return toast('节点分账比例需为 0-100', 'err');
+  if (nodePayoutMinStr && (isNaN(parseFloat(nodePayoutMinStr)) || parseFloat(nodePayoutMinStr) <= 0)) return toast('最低提现金额必须大于 0', 'err');
   const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
   const markup_x1000 = String(Math.round(parseFloat(markupStr) * 1000));
   const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
   const reservation_alert = String(Math.max(1, Math.round(parseFloat(reservationAlertStr || '100'))));
   const node_provider_share = String(Math.round(parseFloat(nodeShareStr || '80') * 10));
+  const node_payout_min = String(Math.max(1, Math.round(parseFloat(nodePayoutMinStr || '1') * 100)));
   try {
     const r1 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'usd_to_rmb_rate_x10000', value: rate_x10000 });
     const r2 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'markup_x1000', value: markup_x1000 });
     const r3 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'low_balance_threshold_fen', value: threshold_fen });
     const r4 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'billing_open_reservation_alert_threshold', value: reservation_alert });
     const r5 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_provider_revenue_share_x1000', value: node_provider_share });
-    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok) return toast('部分配置保存失败', 'err');
+    const r6 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_payout_min_fen', value: node_payout_min });
+    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok || !r6.ok) return toast('部分配置保存失败', 'err');
     closeConfigModal();
     toast('配置已保存', 'ok');
     loadBilling();

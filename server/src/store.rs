@@ -25,6 +25,8 @@ mod join_requests;
 mod native_sessions;
 mod node_hardware;
 mod node_ledger;
+#[cfg(test)]
+mod node_payout_tests;
 mod node_payouts;
 mod pc_project_binding;
 mod project_execution_sessions;

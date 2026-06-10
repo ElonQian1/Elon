@@ -83,28 +83,40 @@ pub struct NodeCredential {
 impl Store {
     /// 获取节点提供者的积分余额，不存在则返回 0.0。
     pub fn get_node_balance(&self, user_id: &str) -> Result<f64> {
-        let conn = self.conn.lock().unwrap();
-        let balance: f64 = conn
-            .query_row(
-                "SELECT credits FROM node_balances WHERE user_id = ?1",
-                params![user_id],
-                |row| row.get(0),
-            )
-            .unwrap_or(0.0);
-        Ok(balance)
+        Ok(fen_to_credits(self.get_node_balance_fen(user_id)?))
     }
 
-    /// 查询某提供者用户的累计历史总收益（SUM settled_credits）。
-    pub fn get_lifetime_earned(&self, user_id: &str) -> Result<f64> {
+    /// 获取节点提供者当前可提现余额（人民币分），用于资金对账。
+    pub fn get_node_balance_fen(&self, user_id: &str) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
-        let total: f64 = conn
+        let balance_fen: i64 = conn
             .query_row(
-                "SELECT COALESCE(SUM(settled_credits), 0.0) FROM node_transactions WHERE provider_user_id = ?1",
+                "SELECT available_fen FROM node_balances WHERE user_id = ?1",
                 params![user_id],
                 |row| row.get(0),
             )
-            .unwrap_or(0.0);
-        Ok(total)
+            .unwrap_or(0);
+        Ok(balance_fen.max(0))
+    }
+
+    /// 查询某提供者用户的累计历史总收益。
+    pub fn get_lifetime_earned(&self, user_id: &str) -> Result<f64> {
+        Ok(fen_to_credits(self.get_lifetime_earned_fen(user_id)?))
+    }
+
+    /// 查询某提供者用户的累计历史总收益（人民币分）。
+    pub fn get_lifetime_earned_fen(&self, user_id: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        let total_fen: i64 = conn
+            .query_row(
+                "SELECT COALESCE(SUM(provider_earned_fen), 0)
+                 FROM node_transactions
+                 WHERE provider_user_id = ?1",
+                params![user_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        Ok(total_fen.max(0))
     }
 
     /// 结算一次 LLM 推理：
@@ -194,12 +206,13 @@ impl Store {
         if provider_earned_fen > 0 {
             // 累加提供者余额（UPSERT）。
             tx.execute(
-                "INSERT INTO node_balances (user_id, credits, updated_at)
-                 VALUES (?1, ?2, ?3)
+                "INSERT INTO node_balances (user_id, credits, available_fen, updated_at)
+                 VALUES (?1, ?2, ?3, ?4)
                  ON CONFLICT(user_id) DO UPDATE SET
-                   credits    = credits + excluded.credits,
-                   updated_at = excluded.updated_at",
-                params![p.provider_user_id, settled, ts],
+                   available_fen = node_balances.available_fen + excluded.available_fen,
+                   credits       = (node_balances.available_fen + excluded.available_fen) / 100.0,
+                   updated_at    = excluded.updated_at",
+                params![p.provider_user_id, settled, provider_earned_fen, ts],
             )?;
         }
         tx.commit()?;
@@ -479,7 +492,10 @@ mod tests {
         assert_eq!(first.settled_credits, 0.98);
         assert_eq!(first.billing_event_id.as_deref(), Some("bev-real-1"));
         assert_eq!(first.token_usage_event_id.as_deref(), Some("tok-real-1"));
+        assert_eq!(store.get_node_balance_fen(&provider.id).unwrap(), 98);
         assert_eq!(store.get_node_balance(&provider.id).unwrap(), 0.98);
+        assert_eq!(store.get_lifetime_earned_fen(&provider.id).unwrap(), 98);
+        assert_eq!(store.get_lifetime_earned(&provider.id).unwrap(), 0.98);
 
         let txs = store.list_node_transactions(&provider.id, 10).unwrap();
         assert_eq!(txs.len(), 1);

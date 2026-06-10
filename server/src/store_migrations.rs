@@ -62,6 +62,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (40, "节点收益流水绑定真实扣费事件", migration_v40),
     (41, "PC 节点硬件画像快照", migration_v41),
     (42, "节点收益提现申请表", migration_v42),
+    (43, "节点收益整数资金账本", migration_v43),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1563,6 +1564,55 @@ fn migration_v42(conn: &Connection) -> Result<()> {
 
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('node_payout_min_fen', '100', datetime('now'));
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v43(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "node_balances",
+        "available_fen",
+        "available_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_balances",
+        "frozen_fen",
+        "frozen_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_balances",
+        "paid_fen",
+        "paid_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    conn.execute_batch(
+        r#"
+        UPDATE node_balances
+           SET available_fen = CAST(ROUND(credits * 100.0) AS INTEGER)
+         WHERE available_fen = 0
+           AND ABS(credits) > 0.000001;
+
+        UPDATE node_balances
+           SET frozen_fen = COALESCE((
+                 SELECT SUM(amount_fen)
+                   FROM node_payout_requests
+                  WHERE provider_user_id = node_balances.user_id
+                    AND status = 'pending'
+               ), 0);
+
+        UPDATE node_balances
+           SET paid_fen = COALESCE((
+                 SELECT SUM(amount_fen)
+                   FROM node_payout_requests
+                  WHERE provider_user_id = node_balances.user_id
+                    AND status = 'paid'
+               ), 0);
+
+        UPDATE node_balances
+           SET credits = available_fen / 100.0;
         "#,
     )?;
     Ok(())
