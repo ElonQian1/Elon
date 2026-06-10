@@ -290,6 +290,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
         "billing_realtime_voice_min_reservation_fen": config_int("billing_realtime_voice_min_reservation_fen", 1),
         "billing_open_reservation_alert_threshold": config_int("billing_open_reservation_alert_threshold", 100),
         "node_provider_revenue_share_x1000": config_int("node_provider_revenue_share_x1000", 800),
+        "node_payout_min_fen": config_int("node_payout_min_fen", 100),
         "note": {
             "usd_to_rmb_rate_x10000": "汇率×10000，73000 = 7.3000",
             "markup_x1000": "加价率×1000，1200 = ×1.2（收费 = 成本 × 1.2）",
@@ -303,7 +304,8 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
             "billing_tts_min_reservation_fen": "TTS 语音合成最低预授权冻结金额（分）",
             "billing_realtime_voice_min_reservation_fen": "实时语音每轮最低预授权冻结金额（分）",
             "billing_open_reservation_alert_threshold": "冻结中预授权数量超过该值时产生对账告警",
-            "node_provider_revenue_share_x1000": "节点提供者分账比例×1000，800 = 消费者真实扣费的 80%"
+            "node_provider_revenue_share_x1000": "节点提供者分账比例×1000，800 = 消费者真实扣费的 80%",
+            "node_payout_min_fen": "节点收益最低提现金额（分），100 = 1 元"
         }
     }))
     .into_response()
@@ -331,6 +333,7 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "billing_realtime_voice_min_reservation_fen",
     "billing_open_reservation_alert_threshold",
     "node_provider_revenue_share_x1000",
+    "node_payout_min_fen",
 ];
 
 pub async fn set_config(

@@ -25,6 +25,7 @@ mod join_requests;
 mod native_sessions;
 mod node_hardware;
 mod node_ledger;
+mod node_payouts;
 mod pc_project_binding;
 mod project_execution_sessions;
 mod project_member_conversations;
@@ -56,6 +57,7 @@ use common::{
 };
 pub use compute_metering::ComputeMeterEvent;
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
+pub use node_payouts::CreateNodePayout;
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
 };

@@ -11,11 +11,12 @@ use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, friend_api, global_ws, lan_peer, lm_chat, node_api,
-    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
-    project_deletion, project_downloads, project_git, project_join_requests, project_membership,
-    project_space, project_store, project_workspace_health, project_workspace_recovery,
-    release_claim, speech_translate, token_usage_api, user_api, user_archive_api, user_memory_api,
-    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    node_payout_admin, peer_relay, project_api, project_attachments, project_chat,
+    project_conversation_identity, project_deletion, project_downloads, project_git,
+    project_join_requests, project_membership, project_space, project_store,
+    project_workspace_health, project_workspace_recovery, release_claim, speech_translate,
+    token_usage_api, user_api, user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api,
+    voice_ws_realtime_chat, voice_ws_transcribe,
     voice_ws_virtual_mic, web,
 };
 
@@ -103,6 +104,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/me/nodes/register", post(node_api::register_node))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
+        .route(
+            "/api/me/node-payouts",
+            get(node_api::my_node_payouts).post(node_api::create_node_payout),
+        )
+        .route(
+            "/api/me/node-payouts/:payout_id/cancel",
+            post(node_api::cancel_node_payout),
+        )
         // ───────────────────────────────────────────────────────────────────────
         .route(
             "/api/me/friends",
@@ -533,6 +542,18 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/billing/config",
             get(billing_admin::get_config).put(billing_admin::set_config),
+        )
+        .route(
+            "/api/admin/node-payouts",
+            get(node_payout_admin::list_payouts),
+        )
+        .route(
+            "/api/admin/node-payouts/:payout_id/paid",
+            post(node_payout_admin::mark_paid),
+        )
+        .route(
+            "/api/admin/node-payouts/:payout_id/reject",
+            post(node_payout_admin::reject),
         )
         .layer(cors)
         .with_state(state)

@@ -725,7 +725,8 @@
     }
     .node-balance-metrics {
       display: flex;
-      gap: 40px;
+      gap: 24px;
+      flex-wrap: wrap;
       margin-bottom: 12px;
     }
     .node-balance-metric label {
@@ -758,6 +759,15 @@
       cursor: pointer;
     }
     .node-balance-tx-btn:hover { background: #152C3E; }
+    .node-balance-payout-btn {
+      font-size: 12px;
+      color: #58BE6A;
+      background: rgba(61, 139, 72, 0.14);
+      border-radius: 8px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    .node-balance-payout-btn:hover { background: rgba(61, 139, 72, 0.2); }
     /* 积分流水弹窗 */
     .node-tx-mask {
       display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:9999;
@@ -785,6 +795,19 @@
     .node-tx-earned { font-size:14px; font-weight:700; color:#58BE6A; }
     .node-tx-meta { font-size:11px; color:#6F7785; }
     .node-tx-empty { text-align:center; padding:40px 0; color:#6F7785; font-size:14px; }
+    .node-payout-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .node-payout-row {
+      display:flex; justify-content:space-between; gap:12px;
+      padding: 12px 0; border-bottom: 1px solid var(--line);
+    }
+    .node-payout-main { min-width:0; }
+    .node-payout-title { font-size:14px; color:#F2F5FA; font-weight:700; }
+    .node-payout-meta { font-size:11px; color:#6F7785; margin-top:4px; word-break:break-word; }
+    .node-payout-status { font-size:12px; color:#81B3D9; white-space:nowrap; }
+    .node-payout-cancel {
+      border:0; border-radius:8px; background:#2A1F1F; color:#E99191;
+      padding:4px 9px; cursor:pointer; margin-top:6px; font-size:12px;
+    }
     /* 我的节点卡片 */
     .my-nodes-card {
       background: #0F1217;
@@ -1445,10 +1468,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
             <label>累计收益</label>
             <span class="val" id="nodeLifetimeVal">—</span>
           </div>
+          <div class="node-balance-metric">
+            <label>提现处理中</label>
+            <span class="val" id="nodePendingPayoutVal">—</span>
+          </div>
         </div>
         <div class="node-balance-cta-row">
           <span class="node-balance-cta" onclick="openNodeMarketDialog()">进入节点算力市场  →</span>
-          <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
+          <span class="node-payout-actions">
+            <span class="node-balance-payout-btn" onclick="openNodePayoutDialog()">申请提现</span>
+            <span class="node-balance-tx-btn" onclick="openNodePayoutsDialog()">提现记录</span>
+            <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
+          </span>
         </div>
       </div>
 
@@ -3876,16 +3907,172 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   }
 
+  async function openNodePayoutDialog() {
+    if (!isLoggedIn()) { alert('请先登录'); return; }
+    let balance = 0;
+    let minFen = 100;
+    try {
+      const res = await fetch('/api/me/node-balance', { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        balance = Number(data.balance || 0);
+        minFen = Number(data.payout_min_fen || 100);
+      }
+    } catch {}
+    const dlg = document.createElement('div');
+    dlg.className = 'modal-mask active';
+    dlg.innerHTML = `<div class="modal">
+      <h2>申请节点收益提现</h2>
+      <div class="usage-row"><span class="usage-label">可用余额</span><span class="usage-value">${fmtBal(balance)} 积分</span></div>
+      <div>
+        <label for="_nodePayoutAmount">提现金额（元）</label>
+        <input id="_nodePayoutAmount" type="number" min="${(minFen / 100).toFixed(2)}" step="0.01" placeholder="最低 ${fmtFen(minFen)}" />
+      </div>
+      <div>
+        <label for="_nodePayoutMethod">收款方式</label>
+        <select id="_nodePayoutMethod">
+          <option value="wechat">微信</option>
+          <option value="alipay">支付宝</option>
+          <option value="bank">银行卡</option>
+          <option value="usdt">USDT</option>
+        </select>
+      </div>
+      <div>
+        <label for="_nodePayoutAccount">收款账号</label>
+        <input id="_nodePayoutAccount" placeholder="账号、银行卡或钱包地址" />
+      </div>
+      <div>
+        <label for="_nodePayoutContact">联系方式</label>
+        <input id="_nodePayoutContact" placeholder="手机或微信，可留空" />
+      </div>
+      <div class="error-text" id="_nodePayoutError"></div>
+      <div class="actions">
+        <button class="btn-cancel" id="_nodePayoutCancel" type="button">取消</button>
+        <button class="btn-confirm" id="_nodePayoutSubmit" type="button">提交申请</button>
+      </div>
+    </div>`;
+    document.body.appendChild(dlg);
+    const close = () => dlg.remove();
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    dlg.querySelector('#_nodePayoutCancel').addEventListener('click', close);
+    dlg.querySelector('#_nodePayoutSubmit').addEventListener('click', async () => {
+      const errEl = dlg.querySelector('#_nodePayoutError');
+      const amount = Number(dlg.querySelector('#_nodePayoutAmount').value);
+      const amountFen = Math.round(amount * 100);
+      const payoutAccount = dlg.querySelector('#_nodePayoutAccount').value.trim();
+      if (!Number.isFinite(amount) || amountFen <= 0) { errEl.textContent = '请输入提现金额'; return; }
+      if (amountFen < minFen) { errEl.textContent = `最低提现 ¥${fmtFen(minFen)}`; return; }
+      if (!payoutAccount) { errEl.textContent = '请输入收款账号'; return; }
+      errEl.textContent = '';
+      try {
+        const resp = await fetch('/api/me/node-payouts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({
+            amount_fen: amountFen,
+            payout_method: dlg.querySelector('#_nodePayoutMethod').value,
+            payout_account: payoutAccount,
+            contact: dlg.querySelector('#_nodePayoutContact').value.trim() || undefined
+          })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) { errEl.textContent = data.error || `提交失败 ${resp.status}`; return; }
+        close();
+        await loadNodeBalance();
+        openNodePayoutsDialog();
+      } catch (e) {
+        errEl.textContent = '网络错误：' + e.message;
+      }
+    });
+  }
+
+  async function openNodePayoutsDialog() {
+    if (!isLoggedIn()) { alert('请先登录'); return; }
+    const dlg = document.createElement('div');
+    dlg.className = 'node-tx-mask active';
+    dlg.innerHTML = `<div class="node-tx-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span class="node-tx-title" style="margin-bottom:0">提现记录</span>
+        <button id="_nodePayoutsClose" style="background:none;border:none;color:#6F7785;font-size:22px;cursor:pointer;padding:0">×</button>
+      </div>
+      <div class="node-tx-list" id="_nodePayoutsList"><div class="node-tx-empty">加载中…</div></div>
+    </div>`;
+    document.body.appendChild(dlg);
+    const close = () => dlg.remove();
+    dlg.querySelector('#_nodePayoutsClose').addEventListener('click', close);
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    const list = dlg.querySelector('#_nodePayoutsList');
+    try {
+      const res = await fetch('/api/me/node-payouts', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const payouts = data.payouts || [];
+      if (!payouts.length) {
+        list.innerHTML = '<div class="node-tx-empty">暂无提现记录</div>';
+        return;
+      }
+      list.innerHTML = payouts.map(p => {
+        const created = (p.created_at || '').replace('T', ' ').substring(5, 16);
+        const contact = p.contact ? ` · ${escapeHtml(p.contact)}` : '';
+        const canCancel = p.status === 'pending';
+        return `<div class="node-payout-row">
+          <div class="node-payout-main">
+            <div class="node-payout-title">¥${fmtFen(p.amount_fen)} · ${escapeHtml(p.payout_method)}</div>
+            <div class="node-payout-meta">${escapeHtml(p.payout_account)}${contact} · ${created}</div>
+            ${p.admin_note ? `<div class="node-payout-meta">${escapeHtml(p.admin_note)}</div>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div class="node-payout-status">${payoutStatusText(p.status)}</div>
+            ${canCancel ? `<button class="node-payout-cancel" data-payout-id="${escapeHtml(p.id)}">取消</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.node-payout-cancel').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.payoutId;
+          btn.disabled = true;
+          try {
+            const resp = await fetch(`/api/me/node-payouts/${encodeURIComponent(id)}/cancel`, {
+              method: 'POST',
+              headers: authHeaders()
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) { alert(data.error || '取消失败'); btn.disabled = false; return; }
+            await loadNodeBalance();
+            close();
+            openNodePayoutsDialog();
+          } catch (e) {
+            alert('网络错误：' + e.message);
+            btn.disabled = false;
+          }
+        });
+      });
+    } catch (e) {
+      list.innerHTML = `<div class="node-tx-empty" style="color:#EF4444">加载失败：${e.message}</div>`;
+    }
+  }
+
+  function payoutStatusText(status) {
+    return ({
+      pending: '待处理',
+      paid: '已打款',
+      rejected: '已拒绝',
+      cancelled: '已取消'
+    })[status] || status || '未知';
+  }
+
   // ====== 节点积分内联卡片 ======
   async function loadNodeBalance() {
     const statusEl = document.getElementById('nodeBalanceStatus');
     const balEl    = document.getElementById('nodeBalanceVal');
     const lifEl    = document.getElementById('nodeLifetimeVal');
+    const pendingEl = document.getElementById('nodePendingPayoutVal');
     if (!balEl) return;
     if (!isLoggedIn()) {
       if (statusEl) statusEl.textContent = '未登录';
       balEl.textContent = '--';
       lifEl.textContent = '--';
+      if (pendingEl) pendingEl.textContent = '--';
       return;
     }
     if (statusEl) statusEl.textContent = '加载中…';
@@ -3895,10 +4082,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const b = await res.json();
       balEl.textContent = fmtBal(b.balance || 0);
       lifEl.textContent = fmtBal(b.lifetime_earned || 0);
+      if (pendingEl) pendingEl.textContent = fmtBal(b.pending_payouts || 0);
       if (statusEl) statusEl.textContent = `分账 ${fmtShare(b.provider_revenue_share_x1000)}`;
     } catch {
       balEl.textContent = '--';
       lifEl.textContent = '--';
+      if (pendingEl) pendingEl.textContent = '--';
       if (statusEl) statusEl.textContent = '暂不可用';
     }
   }

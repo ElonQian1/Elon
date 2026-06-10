@@ -61,6 +61,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (39, "扣费计价规则版本与价格快照", migration_v39),
     (40, "节点收益流水绑定真实扣费事件", migration_v40),
     (41, "PC 节点硬件画像快照", migration_v41),
+    (42, "节点收益提现申请表", migration_v42),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1531,6 +1532,37 @@ fn migration_v41(conn: &Connection) -> Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_node_hardware_owner_updated
           ON node_hardware_snapshots(owner_user_id, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v42(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS node_payout_requests (
+          id               TEXT PRIMARY KEY,
+          provider_user_id TEXT NOT NULL,
+          amount_fen       INTEGER NOT NULL,
+          amount_credits   REAL NOT NULL,
+          payout_method    TEXT NOT NULL,
+          payout_account   TEXT NOT NULL,
+          contact          TEXT,
+          status           TEXT NOT NULL DEFAULT 'pending',
+          admin_note       TEXT,
+          created_at       TEXT NOT NULL,
+          updated_at       TEXT NOT NULL,
+          resolved_at      TEXT,
+          resolved_by      TEXT,
+          FOREIGN KEY (provider_user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_node_payout_provider_time
+          ON node_payout_requests(provider_user_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_node_payout_status_time
+          ON node_payout_requests(status, created_at DESC);
+
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('node_payout_min_fen', '100', datetime('now'));
         "#,
     )?;
     Ok(())
