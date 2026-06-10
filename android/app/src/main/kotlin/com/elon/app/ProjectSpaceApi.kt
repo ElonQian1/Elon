@@ -38,6 +38,28 @@ internal fun fetchProjectSpace(
     }
 }
 
+internal fun updateProjectSpaceDescription(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    description: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
+): ProjectSpaceSummary {
+    val payload = JSONObject().put("description", description)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url(projectSpaceUrl(serverUrl, projectId, route, "space/description"))
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "保存项目简介失败"))
+        return parseProjectSpaceSummary(JSONObject(body).optJSONObject("project") ?: JSONObject())
+    }
+}
+
 internal fun fetchProjectChannelMessages(
     http: OkHttpClient,
     serverUrl: String,
@@ -378,6 +400,15 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
         latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() }
     )
 }
+
+private fun parseProjectSpaceSummary(project: JSONObject) = ProjectSpaceSummary(
+    id = project.optString("id", ""),
+    name = project.optString("name", "项目空间"),
+    description = project.optString("description").takeIf { it.isNotBlank() },
+    role = project.optString("role", "member"),
+    memberCount = project.optInt("member_count", 0),
+    updatedAt = project.optString("updated_at", "")
+)
 
 private fun parseProjectChannel(json: JSONObject) = ProjectChannel(
     id = json.optString("id", ""),

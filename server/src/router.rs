@@ -229,6 +229,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_space::get_project_space),
         )
         .route(
+            "/api/projects/:project_id/space/description",
+            axum::routing::patch(project_space::update_project_description),
+        )
+        .route(
             "/api/projects/:project_id/members/:member_user_id/conversations",
             get(project_space::list_member_conversations),
         )
@@ -322,6 +326,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/space",
             get(project_space::get_user_project_space),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/space/description",
+            axum::routing::patch(project_space::update_user_project_description),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/messages",

@@ -44,6 +44,11 @@ pub struct UpdateMemberConversationVisibilityRequest {
 }
 
 #[derive(Deserialize)]
+pub struct UpdateProjectDescriptionRequest {
+    pub description: String,
+}
+
+#[derive(Deserialize)]
 pub struct StartChannelAiTaskRequest {
     pub content: String,
     pub agent: Option<String>,
@@ -91,6 +96,61 @@ pub async fn get_project_space(
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
     project_space_response(state, user, access)
+}
+
+pub async fn update_user_project_description(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<UpdateProjectDescriptionRequest>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    update_project_description_response(state, user.id, project, req)
+}
+
+pub async fn update_project_description(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(req): Json<UpdateProjectDescriptionRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    update_project_description_response(state, user.id, project, req)
+}
+
+fn update_project_description_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    req: UpdateProjectDescriptionRequest,
+) -> Response {
+    if !can_edit(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能编辑项目简介");
+    }
+    match state
+        .store
+        .update_project_description(&user_id, &project.id, &req.description)
+    {
+        Ok(project) => Json(serde_json::json!({ "project": project })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
 }
 
 fn project_space_response(

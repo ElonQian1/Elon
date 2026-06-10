@@ -103,11 +103,14 @@ internal fun AppProject.projectCardCode(): String? {
     return if (isSystemArchiveProject()) {
         normalizedSystemProjectKey()?.lowercase()
     } else {
-        cleanProjectCardText(projectDescription)
+        cleanProjectCardText(title) ?: cleanProjectCardText(id)
     }
 }
 
 internal fun AppProject.projectCardIntroduction(): String? {
+    if (!isSystemArchiveProject()) {
+        return cleanProjectCardText(projectDescription)
+    }
     return when (normalizedSystemProjectKey()?.lowercase()) {
         "phone_control" -> "保存悬浮球手机控制的会话记录、自动化脚本和专属记忆。"
         "chat_memory" -> "保存普通聊天的会话记录、用户偏好和长期记忆。"

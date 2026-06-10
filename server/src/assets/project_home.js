@@ -256,11 +256,13 @@
       if (sourceType === 'agent_balloon') return 'phone_control';
       if (sourceType === 'chat_memory') return 'chat_memory';
     }
-    return String(project.project_description || project.projectDescription || project.description || '').trim();
+    return String(project.project_code || project.projectCode || project.name || project.id || '').trim();
   }
 
   function projectIntroOf(project) {
-    if (!isSystemProject(project)) return '';
+    if (!isSystemProject(project)) {
+      return String(project.project_description || project.projectDescription || project.description || '').trim();
+    }
     const key = systemKeyOf(project);
     const sourceType = sourceTypeOf(project);
     if (key === 'phone_control' || sourceType === 'agent_balloon') {

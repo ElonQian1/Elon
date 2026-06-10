@@ -395,6 +395,58 @@
       white-space: pre-wrap;
       min-height: 104px;
     }
+    .project-space-summary {
+      background: var(--panel);
+      padding: 18px 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
+      gap: 14px;
+      align-items: center;
+    }
+    .project-space-title {
+      min-width: 0;
+    }
+    .project-space-name {
+      color: var(--ink);
+      font-size: 20px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-meta {
+      margin-top: 8px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-intro-card {
+      min-height: 92px;
+      border: 0;
+      border-radius: 14px;
+      background: #22262C;
+      color: var(--ink);
+      padding: 12px 14px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      cursor: pointer;
+    }
+    .project-space-intro-card.empty {
+      color: var(--ink-faint);
+    }
+    .project-space-intro-card:disabled {
+      cursor: default;
+      opacity: 0.86;
+    }
+    @media (max-width: 520px) {
+      .project-space-summary {
+        grid-template-columns: 1fr;
+      }
+    }
     .project-workspace-health {
       background: var(--panel);
       padding: 18px 22px;
@@ -1305,6 +1357,13 @@
     <div id="projectPage" class="page project-page">
       <div id="projectHomeRoot" class="project-home-root" aria-live="polite"></div>
       <div id="projectProgressPanel" class="project-progress-panel hidden" aria-hidden="true">
+        <div class="project-space-summary" id="projectSpaceSummary">
+          <div class="project-space-title">
+            <div class="project-space-name" id="projectSpaceName">项目</div>
+            <div class="project-space-meta" id="projectSpaceMeta">1 位成员 · 所有者</div>
+          </div>
+          <button class="project-space-intro-card empty" id="projectIntroCard" type="button">添加项目简介</button>
+        </div>
         <div class="project-stage" id="currentStageText">待提交需求</div>
         <div class="project-overview" id="projectOverviewText">项目管理
 当前没有正在执行的开发任务。</div>
@@ -1792,6 +1851,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const searchInput = $('searchInput');
 
   const projectOverviewText = $('projectOverviewText');
+  const projectSpaceName = $('projectSpaceName');
+  const projectSpaceMeta = $('projectSpaceMeta');
+  const projectIntroCard = $('projectIntroCard');
   const projectWorkspaceHealth = $('projectWorkspaceHealth');
   const currentStageText = $('currentStageText');
   const stagePlanText = $('stagePlanText');
@@ -1812,6 +1874,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       event.preventDefault();
       recoverProjectWorkspace(button.dataset.workspaceRecovery || '');
     });
+  }
+  if (projectIntroCard) {
+    projectIntroCard.addEventListener('click', editProjectDescription);
   }
 
   const profileAvatar = $('profileAvatar');
@@ -2951,6 +3016,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectHealthRequestSeq += 1;
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
+    renderProjectIntroCard(null);
     resetProjectWorkspaceHealth();
     projectWorkflowText.textContent = defaultWorkflowText('待提交需求');
     STAGE_ELS().forEach((el, i) => {
@@ -2959,8 +3025,67 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     });
     projectHistoryText.textContent = '暂无进度记录';
   }
+  function canEditProjectDescription(project) {
+    const role = String((project && project.role) || '').toLowerCase();
+    return role === 'owner' || role === 'admin' || role === 'editor';
+  }
+  function renderProjectIntroCard(project) {
+    if (!projectIntroCard) return;
+    if (!project) {
+      if (projectSpaceName) projectSpaceName.textContent = '项目';
+      if (projectSpaceMeta) projectSpaceMeta.textContent = '1 位成员 · 所有者';
+      projectIntroCard.textContent = '添加项目简介';
+      projectIntroCard.classList.add('empty');
+      projectIntroCard.disabled = true;
+      return;
+    }
+    const description = String(project.description || project.project_description || project.projectDescription || '').trim();
+    const editable = canEditProjectDescription(project);
+    if (projectSpaceName) projectSpaceName.textContent = project.name || '项目';
+    if (projectSpaceMeta) {
+      const members = project.member_count || project.memberCount || 1;
+      projectSpaceMeta.textContent = members + ' 位成员 · ' + (project.role || 'owner');
+    }
+    projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
+    projectIntroCard.classList.toggle('empty', !description);
+    projectIntroCard.disabled = !editable;
+  }
+  async function editProjectDescription() {
+    if (!currentProject || !canEditProjectDescription(currentProject)) return;
+    const current = String(currentProject.description || currentProject.project_description || currentProject.projectDescription || '').trim();
+    const next = window.prompt('项目简介', current);
+    if (next == null) return;
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(currentProject.id) + '/space/description', {
+        method: 'PATCH',
+        body: JSON.stringify({ description: next.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '保存项目简介失败');
+      const project = data.project || {};
+      const description = project.description || '';
+      currentProject.description = description;
+      currentProject.project_description = description;
+      currentProject.projectDescription = description;
+      currentProject.updated_at = project.updated_at || currentProject.updated_at;
+      projects = projects.map((item) => {
+        if (item.id !== currentProject.id) return item;
+        return Object.assign({}, item, {
+          description,
+          project_description: description,
+          projectDescription: description,
+          updated_at: currentProject.updated_at
+        });
+      });
+      renderProjectPage(currentProject);
+      renderProjectHomePage();
+    } catch (err) {
+      alert(err.message || '保存项目简介失败');
+    }
+  }
   function renderProjectPage(p) {
     if (!p) { resetProjectPage(); return; }
+    renderProjectIntroCard(p);
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';
       el.textContent = STAGE_NAMES[i] + '：等待';

@@ -597,6 +597,7 @@ class MainActivity : AppCompatActivity() {
             showCreatePersonalConversation = { conversationActions.showCreateConversationDialog() },
             showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.showCreateConversationDialog(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
+            onProjectDescriptionUpdated = ::updateProjectDescriptionFromSpace,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )
@@ -911,6 +912,24 @@ class MainActivity : AppCompatActivity() {
                 AuthManager.effectiveUserId(this),
                 animate
             )
+        }
+    }
+
+    private fun updateProjectDescriptionFromSpace(projectId: String, description: String?) {
+        val clean = description?.trim()?.takeIf { it.isNotBlank() }
+        var changed = false
+        s.projects.forEach { project ->
+            if (project.id == projectId || project.projectSpaceId() == projectId) {
+                if (project.projectDescription != clean) {
+                    project.projectDescription = clean
+                    project.updatedAt = System.currentTimeMillis()
+                    changed = true
+                }
+            }
+        }
+        if (changed) {
+            projectStateActions.saveProjects()
+            homeListActions.renderProjectList()
         }
     }
 

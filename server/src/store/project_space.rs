@@ -50,6 +50,36 @@ impl Store {
         .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))
     }
 
+    pub fn update_project_description(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        description: &str,
+    ) -> Result<ProjectSpaceSummary> {
+        let clean = description.trim();
+        if clean.chars().count() > 240 {
+            anyhow::bail!("项目简介不能超过 240 个字");
+        }
+        let _ = self.project_space_summary(user_id, project_id)?;
+        let description_value = if clean.is_empty() {
+            None
+        } else {
+            Some(clean.to_string())
+        };
+        let conn = self.conn()?;
+        let updated = conn.execute(
+            "UPDATE projects
+                SET description = ?1, updated_at = ?2
+              WHERE id = ?3 AND status != 'deleted'",
+            params![description_value, now(), project_id],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("项目不存在");
+        }
+        drop(conn);
+        self.project_space_summary(user_id, project_id)
+    }
+
     pub fn list_project_space_channels(
         &self,
         user_id: &str,
@@ -441,5 +471,30 @@ mod tests {
             updated.suggestion_resolved_by.as_deref(),
             Some(owner.id.as_str())
         );
+    }
+
+    #[test]
+    fn project_description_can_be_updated_and_cleared() {
+        let store = temp_store();
+        let owner = store
+            .create_user("intro-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "Intro Project", Some("旧简介"), None)
+            .expect("project should be created")
+            .project;
+
+        let updated = store
+            .update_project_description(&owner.id, &project.id, "  一款太逃杀类型的卡牌游戏  ")
+            .expect("description should update");
+        assert_eq!(
+            updated.description.as_deref(),
+            Some("一款太逃杀类型的卡牌游戏")
+        );
+
+        let cleared = store
+            .update_project_description(&owner.id, &project.id, "   ")
+            .expect("description should clear");
+        assert!(cleared.description.is_none());
     }
 }

@@ -4,11 +4,16 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.text.InputFilter
+import android.text.InputType
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
@@ -33,6 +38,7 @@ internal class ProjectSpaceController(
     private val showCreatePersonalConversation: () -> Unit,
     private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
+    private val onProjectDescriptionUpdated: (projectId: String, description: String?) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
@@ -237,7 +243,7 @@ internal class ProjectSpaceController(
         val space = activeSpace ?: return
         val container = prepareProjectContent()
         container.removeAllViews()
-        container.addView(spaceHeader(space))
+        container.addView(projectIntroHeader(space))
         container.addView(sectionTitle("频道"))
         space.channels.forEach { channel ->
             container.addView(channelRow(channel))
@@ -606,6 +612,147 @@ internal class ProjectSpaceController(
         }
     }
 
+    private fun projectIntroHeader(space: ProjectSpace): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(18))
+            background = panelBackground("#181B20")
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(activity).apply {
+                        text = space.project.name
+                        textSize = 20f
+                        setTypeface(typeface, Typeface.BOLD)
+                        setTextColor(Color.parseColor("#F2F5FA"))
+                        maxLines = 2
+                        ellipsize = TextUtils.TruncateAt.END
+                    })
+                    addView(TextView(activity).apply {
+                        text = "${space.project.memberCount} 位成员 · ${projectRoleLabel(space.project.role)}"
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#A6AFBD"))
+                        setPadding(0, dp(8), 0, 0)
+                    })
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.85f))
+                addView(projectDescriptionCard(space), LinearLayout.LayoutParams(
+                    0,
+                    dp(92),
+                    1.35f
+                ).apply {
+                    marginStart = dp(14)
+                })
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+            space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
+                addView(projectSpaceDownloadButton(activity, apkUrl, dp, selectableForeground))
+            }
+        }
+    }
+
+    private fun projectDescriptionCard(space: ProjectSpace): TextView {
+        val editable = canEditProjectDescription(space.project.role)
+        val description = space.project.description?.trim().orEmpty()
+        return TextView(activity).apply {
+            text = description.ifBlank { if (editable) "添加项目简介" else "暂无项目简介" }
+            textSize = 13f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(Color.parseColor(if (description.isBlank()) "#6F7785" else "#F2F5FA"))
+            setLineSpacing(dp(3).toFloat(), 1.0f)
+            maxLines = 4
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = panelBackground("#22262C").apply {
+                cornerRadius = dp(14).toFloat()
+            }
+            if (editable) {
+                isClickable = true
+                foreground = selectableForeground()
+                contentDescription = "编辑项目简介"
+                setOnClickListener { showProjectDescriptionDialog(space) }
+            }
+        }
+    }
+
+    private fun showProjectDescriptionDialog(space: ProjectSpace) {
+        if (!canEditProjectDescription(space.project.role)) {
+            Toast.makeText(activity, "当前成员角色不能编辑项目简介", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val input = EditText(activity).apply {
+            setText(space.project.description.orEmpty())
+            hint = "一款太逃杀类型的卡牌游戏"
+            minLines = 4
+            maxLines = 6
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            filters = arrayOf(InputFilter.LengthFilter(PROJECT_DESCRIPTION_MAX_CHARS))
+            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#6F7785"))
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = panelBackground("#181B20").apply {
+                cornerRadius = dp(8).toFloat()
+            }
+            setSelection(text?.length ?: 0)
+        }
+        val wrapper = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(6), dp(20), 0)
+            addView(input, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("项目简介")
+            .setView(wrapper)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                saveProjectDescription(input.text?.toString().orEmpty(), dialog)
+            }
+            input.requestFocus()
+        }
+        dialog.show()
+    }
+
+    private fun saveProjectDescription(description: String, dialog: AlertDialog) {
+        val projectId = activeProjectId ?: return
+        val route = activeRoute
+        val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        saveButton?.isEnabled = false
+        thread(name = "project-description-save") {
+            val result = runCatching {
+                updateProjectSpaceDescription(http, serverUrl, activity, projectId, description, route)
+            }
+            activity.runOnUiThread {
+                saveButton?.isEnabled = true
+                result.onSuccess { updated ->
+                    val current = activeSpace
+                    if (current != null && current.project.id == updated.id) {
+                        val next = current.copy(project = updated)
+                        activeSpace = next
+                        spaceCache[updated.id] = next
+                        activeProjectTitle = updated.name
+                        onProjectDescriptionUpdated(updated.id, updated.description)
+                        renderProjectSpaceLanding()
+                    }
+                    dialog.dismiss()
+                    Toast.makeText(activity, "项目简介已保存", Toast.LENGTH_SHORT).show()
+                }.onFailure { error ->
+                    Toast.makeText(activity, error.message ?: "保存项目简介失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     private fun sectionTitle(textValue: String): TextView {
         return TextView(activity).apply {
             text = textValue
@@ -781,5 +928,10 @@ internal class ProjectSpaceController(
         const val SENDING_STATUS = "发送中..."
         const val AI_CHANNEL_KIND = "ai_development"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
+        const val PROJECT_DESCRIPTION_MAX_CHARS = 240
+
+        fun canEditProjectDescription(role: String?): Boolean {
+            return role == "owner" || role == "admin" || role == "editor"
+        }
     }
 }
