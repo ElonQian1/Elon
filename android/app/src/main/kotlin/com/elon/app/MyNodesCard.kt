@@ -15,6 +15,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 import kotlin.concurrent.thread
 
 /**
@@ -99,7 +100,14 @@ internal class MyNodesCard(
         val deviceName: String,
         val models: List<String>,
         val connectedAt: Long,
-        val online: Boolean
+        val online: Boolean,
+        val projectCount: Int,
+        val projectLimit: Int,
+        val projectSlotsRemaining: Int,
+        val capacityLabel: String,
+        val capacityTone: String,
+        val capacityWarnings: List<String>,
+        val diskFreeBytes: Long?
     )
 
     private fun fetchMyNodes(ctx: Context): List<NodeItem> {
@@ -122,6 +130,12 @@ internal class MyNodesCard(
             val modelIds = (0 until modelsArr.length()).map { j ->
                 modelsArr.getJSONObject(j).optString("model_id", "")
             }.filter { it.isNotEmpty() }
+            val warningsArr = o.optJSONArray("capacity_warnings") ?: JSONArray()
+            val warnings = (0 until warningsArr.length()).mapNotNull { j ->
+                warningsArr.optString(j).trim().takeIf { it.isNotBlank() }
+            }
+            val projectCount = o.optInt("project_count", 0).coerceAtLeast(0)
+            val projectLimit = o.optInt("project_limit", 0).coerceAtLeast(0)
             NodeItem(
                 nodeId = nodeId,
                 displayName = displayName,
@@ -129,7 +143,21 @@ internal class MyNodesCard(
                 deviceName = deviceName,
                 models = modelIds,
                 connectedAt = o.optLong("connected_at", 0),
-                online = o.optBoolean("online", false)
+                online = o.optBoolean("online", false),
+                projectCount = projectCount,
+                projectLimit = projectLimit,
+                projectSlotsRemaining = o.optInt(
+                    "project_slots_remaining",
+                    (projectLimit - projectCount).coerceAtLeast(0)
+                ).coerceAtLeast(0),
+                capacityLabel = o.optString("capacity_label").trim(),
+                capacityTone = o.optString("capacity_tone").trim(),
+                capacityWarnings = warnings,
+                diskFreeBytes = if (o.has("disk_free_bytes") && !o.isNull("disk_free_bytes")) {
+                    o.optLong("disk_free_bytes").takeIf { it > 0L }
+                } else {
+                    null
+                }
             )
         }
     }
@@ -205,6 +233,10 @@ internal class MyNodesCard(
         background = GradientDrawable().apply {
             setColor(Color.parseColor("#181B20"))
             cornerRadius = dp(6).toFloat()
+            when (node.capacityTone.lowercase(Locale.US)) {
+                "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
+                "warn" -> setStroke(dp(1), Color.parseColor("#6A5628"))
+            }
         }
 
         // 状态指示圆点
@@ -273,14 +305,27 @@ internal class MyNodesCard(
                     maxLines = 1
                 })
             }
+
+            addView(TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.topMargin = dp(4) }
+                includeFontPadding = false
+                text = nodeCapacityLine(node)
+                textSize = 11f
+                setTextColor(nodeCapacityTextColor(node))
+                maxLines = 2
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
         })
 
-        // 模型数量 badge
+        // 容量 badge
         addView(TextView(activity).apply {
             includeFontPadding = false
-            text = "${node.models.size} 模型"
+            text = nodeCapacityBadge(node)
             textSize = 11f
-            setTextColor(Color.parseColor(if (node.online) "#81B3D9" else "#6F7785"))
+            setTextColor(nodeCapacityTextColor(node))
             gravity = Gravity.CENTER
         })
     }
@@ -311,6 +356,50 @@ internal class MyNodesCard(
             "设备: ${node.deviceName} · ID: $idText"
         } else {
             "ID: $idText"
+        }
+    }
+
+    private fun nodeCapacityBadge(node: NodeItem): String {
+        return node.capacityLabel.ifBlank {
+            if (node.online) "容量未知" else "离线"
+        }
+    }
+
+    private fun nodeCapacityLine(node: NodeItem): String {
+        val slotText = if (node.projectLimit > 0) {
+            "项目 ${node.projectCount}/${node.projectLimit}，剩余 ${node.projectSlotsRemaining.coerceAtLeast(0)}"
+        } else {
+            "项目 ${node.projectCount}"
+        }
+        val diskText = formatBytes(node.diskFreeBytes).takeIf { it.isNotBlank() }?.let { "磁盘 $it" }
+        val warning = node.capacityWarnings.firstOrNull()
+        return listOfNotNull(slotText, diskText, warning).joinToString(" · ")
+    }
+
+    private fun nodeCapacityTextColor(node: NodeItem): Int {
+        if (!node.online) return Color.parseColor("#6F7785")
+        return when (node.capacityTone.lowercase(Locale.US)) {
+            "ok" -> Color.parseColor("#58BE6A")
+            "bad" -> Color.parseColor("#E99191")
+            "warn" -> Color.parseColor("#F7D28A")
+            else -> Color.parseColor("#81B3D9")
+        }
+    }
+
+    private fun formatBytes(value: Long?): String {
+        val bytes = value ?: return ""
+        if (bytes <= 0L) return ""
+        val units = listOf("B", "KB", "MB", "GB", "TB")
+        var amount = bytes.toDouble()
+        var index = 0
+        while (amount >= 1024.0 && index < units.lastIndex) {
+            amount /= 1024.0
+            index += 1
+        }
+        return if (index >= 3) {
+            String.format(Locale.US, "%.1f %s", amount, units[index])
+        } else {
+            "${amount.toInt()} ${units[index]}"
         }
     }
 

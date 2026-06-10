@@ -12,6 +12,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
+import java.util.Locale
 import kotlin.concurrent.thread
 
 internal object ProjectCreateDialog {
@@ -70,7 +71,7 @@ internal object ProjectCreateDialog {
                 }
                 val selected = onlineNodes.getOrNull(nodeSpinner.selectedItemPosition)
                 if (selected == null) {
-                    nodeStatus.text = "请先启动并选择一个在线 PC 节点"
+                    nodeStatus.text = "请先选择一个可创建项目的 PC 节点"
                     return@setOnClickListener
                 }
                 dialog.dismiss()
@@ -100,20 +101,27 @@ internal object ProjectCreateDialog {
         thread(name = "project-create-nodes") {
             val result = runCatching {
                 fetchProjectCreateNodes(http, serverUrl, activity)
-                    .filter { it.online && it.cliProjectReady }
-                    .sortedBy { it.displayName }
+                    .sortedWith(
+                        compareBy<ProjectCreateNodeOption> { !it.canAcceptProject }
+                            .thenBy { it.displayName }
+                    )
             }
             activity.runOnUiThread {
                 result
                     .onSuccess { nodes ->
-                        onLoaded(nodes)
-                        if (nodes.isEmpty()) {
+                        val selectableNodes = nodes.filter { it.canAcceptProject }
+                        onLoaded(selectableNodes)
+                        if (selectableNodes.isEmpty()) {
                             nodeSpinner.visibility = View.GONE
-                            nodeStatus.text = "没有可用于项目的在线 PC 节点。请先启动已配置 Codex/Copilot 的 PC 节点。"
+                            nodeStatus.text = if (nodes.isEmpty()) {
+                                "没有在线 PC 节点。请先启动已配置 Codex/Copilot 的 PC 节点。"
+                            } else {
+                                "没有可创建项目的 PC 节点：${nodes.first().capacityHint()}"
+                            }
                             return@onSuccess
                         }
                         nodeSpinner.visibility = View.VISIBLE
-                        nodeStatus.text = if (nodes.size == 1) {
+                        nodeStatus.text = if (selectableNodes.size == 1) {
                             "将创建到这个在线 PC 节点"
                         } else {
                             "选择项目代码要创建到哪个 PC 节点"
@@ -121,11 +129,7 @@ internal object ProjectCreateDialog {
                         nodeSpinner.adapter = ArrayAdapter(
                             activity,
                             android.R.layout.simple_spinner_dropdown_item,
-                            nodes.map { node ->
-                                val cli = node.allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "CLI"
-                                val projectSuffix = node.projectCount.takeIf { it > 0 }?.let { " · ${it}个项目" }.orEmpty()
-                                "${node.displayName} · ${node.shortId}$projectSuffix · $cli"
-                            }
+                            selectableNodes.map { it.spinnerLabel() }
                         )
                     }
                     .onFailure { error ->
@@ -139,5 +143,57 @@ internal object ProjectCreateDialog {
 
     private fun dp(context: Context, value: Int): Int {
         return (value * context.resources.displayMetrics.density).toInt()
+    }
+
+    private fun ProjectCreateNodeOption.spinnerLabel(): String {
+        val cli = allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "CLI"
+        return listOf(
+            displayName,
+            shortId,
+            capacityLabel.ifBlank { "可创建项目" },
+            projectSlotText(),
+            diskText(),
+            cli
+        ).filter { it.isNotBlank() }.joinToString(" · ")
+    }
+
+    private fun ProjectCreateNodeOption.capacityHint(): String {
+        return capacityWarnings.firstOrNull()
+            ?: capacityLabel.takeIf { it.isNotBlank() }
+            ?: when {
+                !online -> "PC 节点离线"
+                !cliProjectReady -> "PC CLI 通道不可用"
+                projectLimit > 0 && projectSlotsRemaining <= 0 -> "项目数已满"
+                else -> "容量暂不可用"
+            }
+    }
+
+    private fun ProjectCreateNodeOption.projectSlotText(): String {
+        return if (projectLimit > 0) {
+            "项目 ${projectCount}/${projectLimit}，剩余 ${projectSlotsRemaining.coerceAtLeast(0)}"
+        } else {
+            "项目 ${projectCount}"
+        }
+    }
+
+    private fun ProjectCreateNodeOption.diskText(): String {
+        return formatBytes(diskFreeBytes).takeIf { it.isNotBlank() }?.let { "磁盘 $it" }.orEmpty()
+    }
+
+    private fun formatBytes(value: Long?): String {
+        val bytes = value ?: return ""
+        if (bytes <= 0L) return ""
+        val units = listOf("B", "KB", "MB", "GB", "TB")
+        var amount = bytes.toDouble()
+        var index = 0
+        while (amount >= 1024.0 && index < units.lastIndex) {
+            amount /= 1024.0
+            index += 1
+        }
+        return if (index >= 3) {
+            String.format(Locale.US, "%.1f %s", amount, units[index])
+        } else {
+            "${amount.toInt()} ${units[index]}"
+        }
     }
 }

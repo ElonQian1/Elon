@@ -41,8 +41,15 @@ internal data class ProjectCreateNodeOption(
     val shortId: String,
     val online: Boolean,
     val projectCount: Int = 0,
+    val projectLimit: Int = 0,
+    val projectSlotsRemaining: Int = 0,
     val cliProjectReady: Boolean = false,
-    val allowedClis: List<String> = emptyList()
+    val allowedClis: List<String> = emptyList(),
+    val canAcceptProject: Boolean = false,
+    val capacityLabel: String = "",
+    val capacityTone: String = "",
+    val capacityWarnings: List<String> = emptyList(),
+    val diskFreeBytes: Long? = null
 )
 
 internal fun StoreProject.toJointAppProject(): AppProject {
@@ -193,14 +200,46 @@ internal fun fetchProjectCreateNodes(
         }.orEmpty()
         val cliReady = obj.optBoolean("cli_project_ready", false) ||
             allowedClis.any { it.equals("codex", ignoreCase = true) || it.equals("copilot", ignoreCase = true) }
+        val projectCount = obj.optInt("project_count", 0).coerceAtLeast(0)
+        val projectLimit = obj.optInt("project_limit", 0).coerceAtLeast(0)
+        val projectSlotsRemaining = obj.optInt(
+            "project_slots_remaining",
+            (projectLimit - projectCount).coerceAtLeast(0)
+        ).coerceAtLeast(0)
+        val capacityTone = obj.optString("capacity_tone").trim()
+        val capacityWarnings = obj.optJSONArray("capacity_warnings")?.let { warnings ->
+            (0 until warnings.length()).mapNotNull { idx ->
+                warnings.optString(idx).trim().takeIf { it.isNotBlank() }
+            }
+        }.orEmpty()
+        val canAcceptProject = when {
+            obj.has("can_accept_project") -> obj.optBoolean("can_accept_project", false)
+            obj.has("canAcceptProject") -> obj.optBoolean("canAcceptProject", false)
+            else -> obj.optBoolean("online", false) &&
+                cliReady &&
+                projectSlotsRemaining > 0 &&
+                !capacityTone.equals("bad", ignoreCase = true)
+        }
+        val diskFreeBytes = if (obj.has("disk_free_bytes") && !obj.isNull("disk_free_bytes")) {
+            obj.optLong("disk_free_bytes").takeIf { it > 0L }
+        } else {
+            null
+        }
         ProjectCreateNodeOption(
             nodeId = nodeId,
             displayName = displayName,
             shortId = shortId,
             online = obj.optBoolean("online", false),
-            projectCount = obj.optInt("project_count", 0).coerceAtLeast(0),
+            projectCount = projectCount,
+            projectLimit = projectLimit,
+            projectSlotsRemaining = projectSlotsRemaining,
             cliProjectReady = cliReady,
-            allowedClis = allowedClis
+            allowedClis = allowedClis,
+            canAcceptProject = canAcceptProject,
+            capacityLabel = obj.optString("capacity_label").trim(),
+            capacityTone = capacityTone,
+            capacityWarnings = capacityWarnings,
+            diskFreeBytes = diskFreeBytes
         )
     }
 }
