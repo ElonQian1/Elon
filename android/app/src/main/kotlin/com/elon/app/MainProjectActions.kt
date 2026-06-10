@@ -426,7 +426,10 @@ internal class MainProjectActions(
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(18), 0, dp(18), dp(16))
 
-            addView(createProjectIconButton(project, dismissDialog), LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(
+                createProjectIconButton(project, canEditProjectIcon(project, isJoint), dismissDialog),
+                LinearLayout.LayoutParams(dp(48), dp(48))
+            )
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
@@ -463,12 +466,15 @@ internal class MainProjectActions(
 
     private fun createProjectIconButton(
         project: AppProject,
+        canEdit: Boolean,
         dismissDialog: (() -> Unit) -> Unit
     ): View {
         return FrameLayout(activity).apply {
-            contentDescription = "上传 APK 图标"
-            isClickable = true
-            foreground = selectableForeground()
+            contentDescription = if (canEdit) "上传 APK 图标" else "项目 APK 图标"
+            if (canEdit) {
+                isClickable = true
+                foreground = selectableForeground()
+            }
             clipToOutline = true
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
@@ -489,22 +495,37 @@ internal class MainProjectActions(
                     imageTintList = ColorStateList.valueOf(Color.parseColor(MENU_ICON_COLOR))
                 }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
             }
-            addView(FrameLayout(activity).apply {
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#1D2632"))
-                    setStroke(dp(1), Color.parseColor("#3A4554"))
-                }
-                addView(ImageView(activity).apply {
-                    setImageResource(R.drawable.ic_attach_photos)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#DDE8FC"))
-                }, FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
-            }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END))
-            setOnClickListener {
-                dismissDialog {
-                    openProjectIconPicker(project)
+            if (canEdit) {
+                addView(FrameLayout(activity).apply {
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#1D2632"))
+                        setStroke(dp(1), Color.parseColor("#3A4554"))
+                    }
+                    addView(ImageView(activity).apply {
+                        setImageResource(R.drawable.ic_attach_photos)
+                        imageTintList = ColorStateList.valueOf(Color.parseColor("#DDE8FC"))
+                    }, FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
+                }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END))
+                setOnClickListener {
+                    dismissDialog {
+                        openProjectIconPicker(project)
+                    }
                 }
             }
+        }
+    }
+
+    private fun canEditProjectIcon(project: AppProject, isJoint: Boolean): Boolean {
+        if (project.isSystemArchiveProject()) return false
+        if (!isJoint) return true
+        val originType = project.projectOriginType?.trim()?.lowercase()
+        val originLabel = project.projectOriginLabel?.trim()
+        return when {
+            originType == "self" || originLabel == "我创建" -> true
+            originType == "member" || originType == "admin" -> false
+            originLabel == "他人创建" || originLabel == "管理员创建" -> false
+            else -> true
         }
     }
 

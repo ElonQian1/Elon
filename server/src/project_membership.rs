@@ -6,6 +6,7 @@
 ///   GET    /api/projects/:id/members                       列出项目所有成员（公开项目无需成员身份）
 ///   POST   /api/projects/:id/members                       管理员邀请/添加成员
 ///   PATCH  /api/projects/:id/visibility                    设置公开/私有（仅 owner/admin）
+///   PATCH  /api/projects/:id/icon                          修改项目 APK 图标（仅 owner）
 ///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
 ///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
 use axum::{
@@ -267,7 +268,7 @@ pub async fn update_visibility(
     }
 }
 
-/// PATCH /api/projects/:id/icon — 修改项目 APK 图标（仅 owner/admin）
+/// PATCH /api/projects/:id/icon — 修改项目 APK 图标（仅 owner）
 pub async fn update_project_icon(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -282,11 +283,8 @@ pub async fn update_project_icon(
         Ok(a) => a,
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     };
-    if !can_manage_project_members(&access.role) {
-        return json_error(
-            StatusCode::FORBIDDEN,
-            "只有项目 owner 或管理员才能修改 APK 图标",
-        );
+    if !can_update_project_icon(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目创建者才能修改 APK 图标");
     }
     let icon_data_url = match clean_project_icon_data_url(req.icon_data_url) {
         Ok(value) => value,
@@ -316,6 +314,10 @@ pub async fn update_project_icon(
     }
 }
 
+fn can_update_project_icon(role: &str) -> bool {
+    role.trim().eq_ignore_ascii_case("owner")
+}
+
 fn clean_project_icon_data_url(
     icon_data_url: Option<String>,
 ) -> Result<Option<String>, (StatusCode, String)> {
@@ -338,6 +340,20 @@ fn clean_project_icon_data_url(
         ));
     }
     Ok(Some(value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::can_update_project_icon;
+
+    #[test]
+    fn project_icon_update_is_owner_only() {
+        assert!(can_update_project_icon("owner"));
+        assert!(!can_update_project_icon("admin"));
+        assert!(!can_update_project_icon("editor"));
+        assert!(!can_update_project_icon("member"));
+        assert!(!can_update_project_icon("observer"));
+    }
 }
 
 /// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner/admin）
