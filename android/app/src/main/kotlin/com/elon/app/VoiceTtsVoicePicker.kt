@@ -89,12 +89,28 @@ internal object VoiceTtsVoicePicker {
             onVoiceChanged?.invoke(option)
         }
 
-        fun buildVoiceRows(voices: List<VoiceTtsVoiceOption>, workerConfigured: Boolean) {
-            if (voices == currentVoices) return   // 内容无变化不重建
+        fun buildVoiceRows(voices: List<VoiceTtsVoiceOption>, workerConfigured: Boolean, catalog: TtsCatalogResult? = null) {
+            if (voices == currentVoices) return
             currentVoices = voices
             radios.clear()
             selectButtons.clear()
             voiceRowsContainer.removeAllViews()
+
+            val isAiActive = catalog?.pcModelTtsAvailable == true
+            val aiLabel = catalog?.pcModelProvider
+                ?.replace("cosyvoice3", "CosyVoice3")
+                ?.replace("index_tts2", "IndexTTS2")
+                ?: "AI"
+
+            // 如果高级AI可用，先加一行分组标题
+            if (isAiActive) {
+                voiceRowsContainer.addView(TextView(context).apply {
+                    text = "🤖 高级AI声线（$aiLabel）"
+                    textSize = 12f
+                    setTextColor(0xFF2EA043.toInt())
+                    setPadding(0, dp(context, 4), 0, dp(context, 4))
+                })
+            }
 
             voices.forEachIndexed { index, option ->
                 val row = LinearLayout(context).apply {
@@ -116,13 +132,18 @@ internal object VoiceTtsVoicePicker {
                     addView(TextView(context).apply {
                         // 若 worker 未配置且不是系统TTS，用淡色暗示不可用
                         val unavailable = !workerConfigured && option.usesServerTts
-                        text = option.displayName + if (unavailable) "  (引擎未配置)" else ""
+                        val aiTag = if (isAiActive && option.usesServerTts) "  🤖" else
+                            if (!isAiActive && option.usesServerTts && workerConfigured) "  ☁️" else ""
+                        text = option.displayName + aiTag + if (unavailable) "  (引擎未配置)" else ""
                         textSize = 16f
                         typeface = Typeface.DEFAULT_BOLD
                         alpha = if (unavailable) 0.5f else 1.0f
                     })
                     addView(TextView(context).apply {
-                        text = option.description
+                        text = if (isAiActive && option.usesServerTts)
+                            option.description + "（高级AI合成）"
+                        else
+                            option.description
                         textSize = 13f
                         alpha = 0.72f
                     })
@@ -167,13 +188,20 @@ internal object VoiceTtsVoicePicker {
             listOf(VoiceTtsVoiceCatalog.systemVoice) + serverVoices
 
         fun applyResult(result: TtsCatalogResult) {
-            val statusText = when {
+            val engineLabel = when {
+                result.pcModelTtsAvailable -> {
+                    val model = result.pcModelProvider
+                        ?.replace("cosyvoice3", "CosyVoice3")
+                        ?.replace("index_tts2", "IndexTTS2")
+                        ?: "高级AI"
+                    "🤖 高级AI就绪（$model · 你的PC节点）"
+                }
                 result.isFallback && VoiceTtsCatalogFetcher.getCachedOrNull() == null ->
                     "⚠️ 无法连接服务器，使用内置声线预设（共 ${result.voices.size} 个）"
-                result.isFallback ->
-                    "⚠️ 服务器未响应，显示缓存数据"
-                !result.workerConfigured ->
-                    "⚠️ 服务器 TTS 引擎未配置 — 选服务器声线时将回退到系统 TTS"
+                result.isFallback -> "⚠️ 服务器未响应，显示缓存数据"
+                !result.workerConfigured -> "⚠️ 服务器 TTS 引擎未配置 — 将回退到系统 TTS"
+                result.defaultProvider == "edge_tts" ->
+                    "☁️ 微软云TTS就绪（${result.voices.size} 个声线）"
                 else -> {
                     val engine = result.defaultProvider
                         .replace("index_tts2", "IndexTTS2")
@@ -183,8 +211,11 @@ internal object VoiceTtsVoicePicker {
             }
             mainHandler.post {
                 if (!dialog.isShowing) return@post
-                statusView.text = statusText
-                buildVoiceRows(voicesWithSystem(result.voices), result.workerConfigured)
+                statusView.text = engineLabel
+                statusView.setBackgroundColor(
+                    if (result.pcModelTtsAvailable) 0x1A2EA043.toInt() else 0x1A58A6FF.toInt()
+                )
+                buildVoiceRows(voicesWithSystem(result.voices), result.workerConfigured, result)
             }
         }
 
@@ -196,7 +227,7 @@ internal object VoiceTtsVoicePicker {
         } else {
             // 无缓存：先用完整 allVoices（含系统TTS）占位，让用户不面对空列表
             mainHandler.post {
-                if (dialog.isShowing) buildVoiceRows(VoiceTtsVoiceCatalog.allVoices, false)
+                if (dialog.isShowing) buildVoiceRows(VoiceTtsVoiceCatalog.allVoices, false, null)
             }
         }
 

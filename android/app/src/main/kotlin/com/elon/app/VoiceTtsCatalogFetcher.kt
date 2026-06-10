@@ -19,8 +19,12 @@ internal data class TtsCatalogResult(
     val voices: List<VoiceTtsVoiceOption>,
     /** 服务器是否已配置 TTS Worker（若为 false，选任何服务器声线都会静默回退到系统 TTS）。 */
     val workerConfigured: Boolean,
-    /** 服务器使用的默认 TTS 引擎名称（如 "index_tts2"、"cosyvoice3"）。 */
+    /** 服务器使用的默认 TTS 引擎名称（如 "edge_tts"、"cosyvoice3"）。 */
     val defaultProvider: String,
+    /** 用户有在线 PC 节点且配置了高质量 AI 模型 TTS Worker（CosyVoice3 / IndexTTS2）。 */
+    val pcModelTtsAvailable: Boolean = false,
+    /** PC 节点使用的具体模型名称，如 "cosyvoice3"、"index_tts2"。 */
+    val pcModelProvider: String? = null,
     /** 此结果是否来自本地缓存/回退（true = 未能联系服务器）。 */
     val isFallback: Boolean = false,
 )
@@ -109,6 +113,8 @@ internal object VoiceTtsCatalogFetcher {
         val json = JSONObject(body)
         val workerConfigured = json.optBoolean("workerConfigured", false)
         val defaultProvider = json.optString("defaultProvider", "auto")
+        val pcModelTtsAvailable = json.optBoolean("pcModelTtsAvailable", false)
+        val pcModelProvider = json.optString("pcModelProvider").takeIf { it.isNotEmpty() }
         val arr = json.optJSONArray("voices")
         val voices = mutableListOf<VoiceTtsVoiceOption>()
         if (arr != null) {
@@ -131,6 +137,8 @@ internal object VoiceTtsCatalogFetcher {
             voices = voices.ifEmpty { VoiceTtsVoiceCatalog.presetVoices },
             workerConfigured = workerConfigured,
             defaultProvider = defaultProvider,
+            pcModelTtsAvailable = pcModelTtsAvailable,
+            pcModelProvider = pcModelProvider,
             isFallback = false,
         )
     }
@@ -144,6 +152,8 @@ internal object VoiceTtsCatalogFetcher {
                 voices = VoiceTtsVoiceCatalog.presetVoices,
                 workerConfigured = false,
                 defaultProvider = "auto",
+                pcModelTtsAvailable = false,
+                pcModelProvider = null,
                 isFallback = true,
             )
         }

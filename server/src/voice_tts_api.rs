@@ -49,21 +49,69 @@ pub struct TtsCatalogResponse {
     pub worker_url: Option<String>,
     pub default_provider: String,
     pub llm_rewrite_enabled: bool,
+    /// 用户有在线 PC 节点且配置了模型 TTS Worker（CosyVoice3 / IndexTTS2 等高质量 AI 合成）
+    pub pc_model_tts_available: bool,
+    /// PC 节点实际使用的模型引擎（如 cosyvoice3），无 PC 节点时为 None
+    pub pc_model_provider: Option<String>,
     pub voices: Vec<voice_tts_catalog::TtsVoicePreset>,
     pub emotions: Vec<voice_tts_catalog::TtsEmotionPreset>,
     pub intensities: Vec<voice_tts_catalog::TtsIntensityPreset>,
 }
 
-pub async fn catalog_handler() -> Json<TtsCatalogResponse> {
+pub async fn catalog_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Json<TtsCatalogResponse> {
     let worker = TtsWorkerConfig::from_env();
+    // 尝试鉴权，成功则查询该用户是否有在线 PC 节点提供模型 TTS
+    let (pc_model_tts_available, pc_model_provider) = if let Ok(user) = auth_from_headers(&state, &headers) {
+        match state.node_registry.find_tts_node_for_user(&user.id).await {
+            Some((_node_id, _url)) => {
+                // 查询该节点的具体提供方
+                let provider = state.node_registry
+                    .list_online().await
+                    .into_iter()
+                    .find(|n| n.owner_user_id == user.id && n.tts_worker_url.is_some())
+                    .and_then(|n| {
+                        // 根据服务器 env ELON_TTS_MODEL_PROVIDER 或默认 cosyvoice3
+                        n.tts_worker_url.map(|_| 
+                            std::env::var("ELON_TTS_MODEL_PROVIDER")
+                                .unwrap_or_else(|_| "cosyvoice3".to_string())
+                        )
+                    });
+                (true, provider)
+            }
+            None => (false, None),
+        }
+    } else {
+        (false, None)
+    };
+
+    // 云端 worker 的 provider 标签：优先读实际 ELON_TTS_EDGE_DEFAULT_VOICE（如果配置了 edge-tts）
+    // 否则记为实际的 worker type
+    let effective_provider = if pc_model_tts_available {
+        pc_model_provider.clone().unwrap_or_else(|| "cosyvoice3".to_string())
+    } else {
+        worker.as_ref()
+            .map(|cfg| {
+                // 如果 worker URL 是 edge-tts，返回 edge_tts，不再用 env ELON_TTS_PROVIDER
+                let url = &cfg.base_url;
+                if url.contains("5010") || url.contains("edge") {
+                    "edge_tts".to_string()
+                } else {
+                    cfg.default_provider.as_worker_id().to_string()
+                }
+            })
+            .unwrap_or_else(|| "auto".to_string())
+    };
+
     Json(TtsCatalogResponse {
-        worker_configured: worker.is_some(),
+        worker_configured: worker.is_some() || pc_model_tts_available,
         worker_url: worker.as_ref().map(|cfg| cfg.base_url.clone()),
-        default_provider: worker
-            .as_ref()
-            .map(|cfg| cfg.default_provider.as_worker_id().to_string())
-            .unwrap_or_else(|| "auto".to_string()),
+        default_provider: effective_provider,
         llm_rewrite_enabled: llm_rewrite_enabled(),
+        pc_model_tts_available,
+        pc_model_provider,
         voices: voice_tts_catalog::voices(),
         emotions: voice_tts_catalog::emotions(),
         intensities: voice_tts_catalog::intensities(),
