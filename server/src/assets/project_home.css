@@ -187,6 +187,8 @@
 
 .project-home-card {
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
 }
 
 .project-home-more {
@@ -255,16 +257,13 @@
 }
 
 .project-home-card-body {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 47px;
-  padding: 11px 10px 0;
+  position: relative;
+  flex: 1 0 auto;
+  padding: 11px 10px 8px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   color: #a6afbd;
 }
 
@@ -332,13 +331,12 @@
 }
 
 .project-home-info {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: relative;
+  flex: none;
   height: 47px;
   background: #303338;
   padding: 5px 10px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;

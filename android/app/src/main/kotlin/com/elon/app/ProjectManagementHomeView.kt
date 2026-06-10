@@ -315,7 +315,7 @@ internal class ProjectManagementHomeView(
 
     private fun createProjectCard(item: IndexedProject): View {
         val project = item.project
-        return SquareProjectCardFrame(activity).apply {
+        return AdaptiveProjectCardFrame(activity, dp(CARD_INFO_BAR_HEIGHT_DP)).apply {
             background = rect("#181B20")
             isClickable = true
             foreground = selectableForeground()
@@ -327,10 +327,8 @@ internal class ProjectManagementHomeView(
 
             addView(createProjectCardContent(project), FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ).apply {
-                bottomMargin = dp(CARD_INFO_BAR_HEIGHT_DP)
-            })
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ))
 
             addView(createProjectInfoBar(project, isProjectWorking(project)) {
                 openProjectConversations(item.index)
@@ -345,7 +343,7 @@ internal class ProjectManagementHomeView(
     private fun createProjectCardContent(project: AppProject): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(11), dp(10), 0)
+            setPadding(dp(10), dp(11), dp(10), dp(8))
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -564,7 +562,7 @@ internal class ProjectManagementHomeView(
     }
 
     private fun createEmptyProjectSlot(emptyAction: (() -> Unit)?): View {
-        return SquareProjectCardFrame(activity).apply {
+        return AdaptiveProjectCardFrame(activity).apply {
             background = rect("#181B20")
             emptyAction?.let { action ->
                 contentDescription = "新建项目"
@@ -616,10 +614,32 @@ internal class ProjectManagementHomeView(
     }
 }
 
-private class SquareProjectCardFrame(context: Context) : FrameLayout(context) {
+private class AdaptiveProjectCardFrame(
+    context: Context,
+    private val infoBarHeight: Int = 0
+) : FrameLayout(context) {
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        val exactHeight = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY)
+        val desiredHeight = adaptiveHeight(width, widthMeasureSpec)
+        val exactHeight = MeasureSpec.makeMeasureSpec(desiredHeight, MeasureSpec.EXACTLY)
         super.onMeasure(widthMeasureSpec, exactHeight)
+    }
+
+    private fun adaptiveHeight(width: Int, widthMeasureSpec: Int): Int {
+        if (width <= 0 || infoBarHeight <= 0 || childCount == 0) return width
+        val content = getChildAt(0)
+        val lp = content.layoutParams as? FrameLayout.LayoutParams
+            ?: return width
+        val contentWidthSpec = getChildMeasureSpec(
+            widthMeasureSpec,
+            paddingLeft + paddingRight + lp.leftMargin + lp.rightMargin,
+            lp.width
+        )
+        content.measure(
+            contentWidthSpec,
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        )
+        val contentHeight = content.measuredHeight + lp.topMargin + lp.bottomMargin
+        return (contentHeight + infoBarHeight).coerceAtLeast(width)
     }
 }
