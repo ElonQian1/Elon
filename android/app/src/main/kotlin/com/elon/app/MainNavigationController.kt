@@ -61,9 +61,9 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
-        binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = true) }
-        binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = true) }
-        binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = true) }
+        binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
+        binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
+        binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
