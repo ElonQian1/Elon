@@ -429,6 +429,7 @@ internal class ProjectManagementHomeView(
                 cornerRadius = dp(6).toFloat()
                 setColor(Color.parseColor("#D2D2D2"))
             }
+            clipToOutline = true
             val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
             if (iconBitmap != null) {
                 addView(ImageView(activity).apply {
