@@ -50,7 +50,7 @@ impl Store {
               p.name,
               p.description,
               p.template,
-              COALESCE(u.phone, u.email, p.created_by) AS owner_account,
+              COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
               (SELECT COUNT(*) FROM project_members pm2
                WHERE pm2.project_id = p.id) AS member_count,
               p.is_public,
@@ -74,6 +74,7 @@ impl Store {
                 ?1 IS NULL
                 OR LOWER(p.name) LIKE ?1
                 OR LOWER(COALESCE(p.description,'')) LIKE ?1
+                OR LOWER(COALESCE(u.nickname, '')) LIKE ?1
                 OR LOWER(COALESCE(u.phone, u.email, p.created_by)) LIKE ?1
               )
               AND (?2 IS NULL OR p.join_mode = ?2)
@@ -128,7 +129,7 @@ impl Store {
         conn.query_row(
             "SELECT
                p.id, p.name, p.description, p.template,
-               COALESCE(u.phone, u.email, p.created_by) AS owner_account,
+               COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id),
                p.is_public,
                p.join_mode,
@@ -394,7 +395,7 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT
                p.id, p.name, p.description, p.template,
-               COALESCE(u.phone, u.email, p.created_by) AS owner_account,
+               COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id),
                p.is_public, p.join_mode,
                (SELECT t.status FROM tasks t WHERE t.project_id = p.id
@@ -787,6 +788,50 @@ mod tests {
             .get_project_access(&viewer.id, &project.id)
             .expect("viewer should have project access");
         assert_eq!(access.role, "observer");
+    }
+
+    #[test]
+    fn project_owner_display_prefers_nickname() {
+        let store = temp_store();
+        let owner = store
+            .create_user("named-owner@example.com", "secret1", Some("项目主人"), None)
+            .expect("owner should be created");
+        let member = store
+            .create_user("named-member@example.com", "secret1", None, None)
+            .expect("member should be created");
+        let project = store
+            .create_project(&owner.id, "Named Owner Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should become public");
+
+        let public_projects = store
+            .list_public_projects(None, None, None, None, 10, 0)
+            .expect("store projects should list");
+        assert_eq!(public_projects[0].owner_account, "项目主人");
+        assert_eq!(
+            store
+                .get_public_project(&project.id)
+                .expect("public project should load")
+                .owner_account,
+            "项目主人"
+        );
+
+        let account_matches = store
+            .list_public_projects(Some("named-owner"), None, None, None, 10, 0)
+            .expect("owner account search should still list");
+        assert_eq!(account_matches.len(), 1);
+
+        store
+            .join_project(&member.id, &project.id)
+            .expect("member should join");
+        let joined = store
+            .list_joined_projects(&member.id)
+            .expect("joined projects should list");
+        assert_eq!(joined[0].owner_account, "项目主人");
     }
 
     #[test]

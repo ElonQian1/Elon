@@ -34,7 +34,7 @@ impl Store {
                         SELECT COUNT(*) FROM conversations c
                         WHERE c.project_id = p.id
                     ) AS conversation_count,
-                    COALESCE(u.phone, u.email, p.created_by) AS owner_account,
+                    COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                     p.created_by AS owner_id,
                     COALESCE(u.role, 'user') AS creator_role
              FROM projects p
@@ -170,7 +170,7 @@ mod tests {
     fn archive_lists_system_and_regular_projects() {
         let store = temp_store();
         let user = store
-            .create_user("archive@example.com", "secret1", None, None)
+            .create_user("archive@example.com", "secret1", Some("归档用户"), None)
             .expect("user should be created");
 
         store
@@ -221,6 +221,7 @@ mod tests {
             .iter()
             .find(|item| item.project.name == "工作台")
             .expect("regular project should be present");
+        assert_eq!(regular.owner_account, "归档用户");
         assert_eq!(regular.project_origin_type, "self");
         assert_eq!(regular.project_origin_label, "我创建");
     }
