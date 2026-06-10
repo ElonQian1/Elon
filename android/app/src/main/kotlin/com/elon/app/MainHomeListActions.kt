@@ -379,6 +379,26 @@ internal class MainHomeListActions(
         }
     }
 
+    fun updatePlazaProjectIcon(projectIds: Set<String>, iconDataUrl: String?) {
+        val ids = projectIds.mapNotNull { it.trim().takeIf(String::isNotBlank) }.toSet()
+        if (ids.isEmpty() || plazaBannerProjects.isEmpty()) return
+        val cleanIcon = iconDataUrl?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        var changed = false
+        plazaBannerProjects = plazaBannerProjects.map { project ->
+            if (project.id !in ids) return@map project
+            changed = true
+            project.copy(iconDataUrl = cleanIcon)
+        }
+        if (changed && binding.projectPage.visibility == View.VISIBLE) {
+            renderProjectList()
+        }
+    }
+
+    fun refreshPlazaBannerProjects() {
+        plazaBannerLoaded = false
+        ensurePlazaBannerProjects()
+    }
+
     fun isConversationWorking(index: Int): Boolean {
         val conversations = conversations()
         if (index !in conversations.indices || conversations[index].ended) return false

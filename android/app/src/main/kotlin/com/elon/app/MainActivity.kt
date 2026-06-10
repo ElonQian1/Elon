@@ -931,7 +931,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openProjectSpaceForProject(project: AppProject, animate: Boolean) {
         if (project.isJointDevelopmentProject()) {
-            projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, animate)
+            projectSpaceController.openProjectSpace(project.projectSpaceId(), project.title, animate, project.iconDataUrl)
         } else {
             projectSpaceController.openPersonalProjectSpace(
                 project,
@@ -1015,12 +1015,22 @@ class MainActivity : AppCompatActivity() {
         project.iconDataUrl = dataUrl
         project.updatedAt = System.currentTimeMillis()
         projectStateActions.saveProjects()
+        val iconProjectIds = projectIconSyncIds(project)
+        projectSpaceController.updateProjectIcon(iconProjectIds, dataUrl)
+        homeListActions.updatePlazaProjectIcon(iconProjectIds, dataUrl)
         homeListActions.renderProjectList()
         Toast.makeText(this, "APK 图标已更新", Toast.LENGTH_SHORT).show()
         if (AuthManager.isLoggedIn(this)) {
             remoteProjectIdForIconSync(project)?.let { remoteProjectId ->
                 syncProjectIconToServer(remoteProjectId, dataUrl)
             }
+        }
+    }
+
+    private fun projectIconSyncIds(project: AppProject): Set<String> {
+        return linkedSetOf<String>().apply {
+            project.id.trim().takeIf { it.isNotBlank() }?.let(::add)
+            project.projectSpaceId().trim().takeIf { it.isNotBlank() }?.let(::add)
         }
     }
 
@@ -1037,6 +1047,9 @@ class MainActivity : AppCompatActivity() {
                 updateProjectIconDataUrl(s.http, serverUrl, this, projectId, dataUrl)
             }
             runOnUiThread {
+                result.onSuccess {
+                    homeListActions.refreshPlazaBannerProjects()
+                }
                 result.onFailure {
                     Toast.makeText(this, "图标已本机保存，云端同步失败：${it.message}", Toast.LENGTH_LONG).show()
                 }

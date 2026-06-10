@@ -77,7 +77,19 @@
   }
 
   function sortedBannerProjects() {
+    const localProjectsById = new Map(
+      projects()
+        .filter((project) => project && project.id)
+        .map((project) => [String(project.id), project])
+    );
     return plazaBannerState.projects
+      .map((project) => {
+        const localProject = localProjectsById.get(String(project && project.id));
+        const localIcon = localProject ? iconUrlOf(localProject) : '';
+        return localIcon
+          ? Object.assign({}, project, { iconDataUrl: localIcon, icon_data_url: localIcon })
+          : project;
+      })
       .slice()
       .sort((a, b) => memberCountOf(b) - memberCountOf(a) || String(titleOf(a)).localeCompare(String(titleOf(b))))
       .slice(0, plazaBannerSlots.length + 1);

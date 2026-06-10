@@ -125,8 +125,8 @@ internal class ProjectSpaceController(
         }
     }
 
-    fun openProjectSpace(projectId: String, title: String, animate: Boolean) {
-        openProjectSpace(projectId, title, animate, ProjectSpaceRoute())
+    fun openProjectSpace(projectId: String, title: String, animate: Boolean, iconDataUrl: String? = null) {
+        openProjectSpace(projectId, title, animate, ProjectSpaceRoute(), localIconDataUrl = iconDataUrl)
     }
 
     fun openPersonalProjectSpace(project: AppProject, userId: String, animate: Boolean) {
@@ -134,7 +134,8 @@ internal class ProjectSpaceController(
             projectId = project.id,
             title = project.title,
             animate = animate,
-            route = ProjectSpaceRoute(userId = userId, projectTitle = project.title)
+            route = ProjectSpaceRoute(userId = userId, projectTitle = project.title),
+            localIconDataUrl = project.iconDataUrl
         )
     }
 
@@ -157,7 +158,8 @@ internal class ProjectSpaceController(
         title: String,
         animate: Boolean,
         route: ProjectSpaceRoute,
-        openSelfMemberList: Boolean = false
+        openSelfMemberList: Boolean = false,
+        localIconDataUrl: String? = null
     ) {
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
@@ -168,9 +170,10 @@ internal class ProjectSpaceController(
         pendingOpenSelfMemberList = openSelfMemberList
         activeAdapter = null
         stopPolling()
-        val cached = spaceCache[projectId]
+        val cached = spaceCache[projectId]?.withProjectIcon(localIconDataUrl)
         if (cached != null) {
             // 命中缓存：立即渲染，同时后台静默刷新
+            spaceCache[projectId] = cached
             activeSpace = cached
             activeProjectTitle = cached.project.name
             showProjectSpace(activeProjectTitle, animate)
@@ -185,9 +188,10 @@ internal class ProjectSpaceController(
             activity.runOnUiThread {
                 if (activeProjectId != projectId) return@runOnUiThread  // 用户已切走
                 result.onSuccess { space ->
-                    spaceCache[projectId] = space
-                    activeSpace = space
-                    activeProjectTitle = space.project.name
+                    val nextSpace = space.withProjectIcon(localIconDataUrl)
+                    spaceCache[projectId] = nextSpace
+                    activeSpace = nextSpace
+                    activeProjectTitle = nextSpace.project.name
                     showProjectSpace(activeProjectTitle, false)
                     renderProjectSpaceLanding()
                 }.onFailure { error ->
@@ -195,6 +199,35 @@ internal class ProjectSpaceController(
                     // 有缓存时静默失败，保留已显示的缓存内容
                 }
             }
+        }
+    }
+
+    fun updateProjectIcon(projectIds: Set<String>, iconDataUrl: String?) {
+        val ids = projectIds.mapNotNull { it.trim().takeIf(String::isNotBlank) }.toSet()
+        if (ids.isEmpty()) return
+        val cleanIcon = iconDataUrl.cleanProjectIconDataUrl()
+        var shouldRender = false
+
+        spaceCache.keys.toList().forEach { key ->
+            val space = spaceCache[key] ?: return@forEach
+            if (key in ids || space.project.id in ids) {
+                val next = space.withProjectIcon(cleanIcon, force = true)
+                spaceCache[key] = next
+                if (activeProjectId == key || activeSpace?.project?.id in ids) {
+                    activeSpace = next
+                    shouldRender = true
+                }
+            }
+        }
+
+        val current = activeSpace
+        if (current != null && current.project.id in ids) {
+            activeSpace = current.withProjectIcon(cleanIcon, force = true)
+            shouldRender = true
+        }
+
+        if (shouldRender && activeChannel == null && activeMemberConversation == null) {
+            renderProjectSpaceLanding()
         }
     }
 
@@ -661,6 +694,18 @@ internal class ProjectSpaceController(
                 ))
             }
         }
+    }
+
+    private fun ProjectSpace.withProjectIcon(iconDataUrl: String?, force: Boolean = false): ProjectSpace {
+        val cleanIcon = iconDataUrl.cleanProjectIconDataUrl()
+        if (cleanIcon == null && !force) return this
+        if (!force && !project.iconDataUrl.isNullOrBlank()) return this
+        if (project.iconDataUrl == cleanIcon) return this
+        return copy(project = project.copy(iconDataUrl = cleanIcon))
+    }
+
+    private fun String?.cleanProjectIconDataUrl(): String? {
+        return this?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun projectDescriptionCard(space: ProjectSpace): TextView {

@@ -406,6 +406,31 @@
     .project-space-title {
       min-width: 0;
     }
+    .project-space-heading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .project-space-icon {
+      flex: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 8px;
+      background: #283140;
+      color: #DDE8FC;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .project-space-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
     .project-space-name {
       color: var(--ink);
       font-size: 20px;
@@ -1364,9 +1389,12 @@
       <div id="projectHomeRoot" class="project-home-root" aria-live="polite"></div>
       <div id="projectProgressPanel" class="project-progress-panel hidden" aria-hidden="true">
         <div class="project-space-summary" id="projectSpaceSummary">
-          <div class="project-space-title">
-            <div class="project-space-name" id="projectSpaceName">项目</div>
-            <div class="project-space-meta" id="projectSpaceMeta">1 位成员 · 所有者</div>
+          <div class="project-space-heading">
+            <div class="project-space-icon" id="projectSpaceIcon" aria-hidden="true">项</div>
+            <div class="project-space-title">
+              <div class="project-space-name" id="projectSpaceName">项目</div>
+              <div class="project-space-meta" id="projectSpaceMeta">1 位成员 · 所有者</div>
+            </div>
           </div>
           <button class="project-space-intro-card empty" id="projectIntroCard" type="button">添加项目简介</button>
         </div>
@@ -1857,6 +1885,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const searchInput = $('searchInput');
 
   const projectOverviewText = $('projectOverviewText');
+  const projectSpaceIcon = $('projectSpaceIcon');
   const projectSpaceName = $('projectSpaceName');
   const projectSpaceMeta = $('projectSpaceMeta');
   const projectIntroCard = $('projectIntroCard');
@@ -3035,9 +3064,38 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const role = String((project && project.role) || '').toLowerCase();
     return role === 'owner' || role === 'admin' || role === 'editor';
   }
+  function projectTitleOf(project) {
+    return String((project && (project.name || project.title)) || '项目').trim() || '项目';
+  }
+  function projectInitialOf(project) {
+    const title = projectTitleOf(project);
+    if (title.startsWith('一龙')) return '龙';
+    return Array.from(title)[0] || '项';
+  }
+  function projectIconUrlOf(project) {
+    if (!project) return '';
+    return [
+      project.iconDataUrl,
+      project.icon_data_url,
+      project.iconUrl,
+      project.icon_url,
+      project.icon,
+      project.avatar,
+      project.logo
+    ].find((value) => typeof value === 'string' && value.trim()) || '';
+  }
+  function renderProjectSpaceIcon(project) {
+    if (!projectSpaceIcon) return;
+    const iconUrl = projectIconUrlOf(project);
+    const label = escapeHtml(projectInitialOf(project));
+    projectSpaceIcon.innerHTML = iconUrl
+      ? '<img src="' + escapeHtml(iconUrl) + '" alt="" loading="lazy" onerror="this.remove()" />'
+      : label;
+  }
   function renderProjectIntroCard(project) {
     if (!projectIntroCard) return;
     if (!project) {
+      renderProjectSpaceIcon(null);
       if (projectSpaceName) projectSpaceName.textContent = '项目';
       if (projectSpaceMeta) projectSpaceMeta.textContent = '1 位成员 · 所有者';
       projectIntroCard.textContent = '添加项目简介';
@@ -3047,7 +3105,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     const description = String(project.description || project.project_description || project.projectDescription || '').trim();
     const editable = canEditProjectDescription(project);
-    if (projectSpaceName) projectSpaceName.textContent = project.name || '项目';
+    renderProjectSpaceIcon(project);
+    if (projectSpaceName) projectSpaceName.textContent = projectTitleOf(project);
     if (projectSpaceMeta) {
       const members = project.member_count || project.memberCount || 1;
       projectSpaceMeta.textContent = members + ' 位成员 · ' + (project.role || 'owner');
