@@ -356,6 +356,7 @@ internal class ProjectManagementHomeView(
                 addView(LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_VERTICAL
+                    addProjectDetailText("来源：${project.projectOriginLabel()}")
                     addProjectDetailText("创建者：${projectOwner(project)}")
                     addProjectDetailText("成员：${projectMemberCount(project)}")
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -520,7 +521,7 @@ internal class ProjectManagementHomeView(
         val kind = project.projectKindLabel()
         val stage = projectStageText(project.stage)
         val workspace = projectWorkspaceText(project, stage)
-        return "$kind · ${project.displayConversationCount()}个会话 · $workspace"
+        return "$kind · ${project.projectOriginLabel()} · ${project.displayConversationCount()}个会话 · $workspace"
     }
 
     private fun projectWorkspaceText(project: AppProject, stage: String): String {

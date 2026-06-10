@@ -27,6 +27,8 @@ data class AppProject(
     var iconDataUrl: String? = null,
     var systemProjectKey: String? = null,
     var ownerAccount: String? = null,
+    var projectOriginType: String? = null,
+    var projectOriginLabel: String? = null,
     var memberCount: Int? = null,
     var projectDescription: String? = null,
     var remoteConversationCount: Int? = null,
@@ -71,6 +73,21 @@ internal fun AppProject.projectKindLabel(): String {
         isSystemArchiveProject() -> "个人归档"
         isJointDevelopmentProject() -> "联合开发"
         else -> "个人项目"
+    }
+}
+
+internal fun AppProject.projectOriginLabel(): String {
+    cleanProjectCardText(projectOriginLabel)?.let { return it }
+    return when (cleanProjectCardText(projectOriginType)?.lowercase()) {
+        "system" -> "系统创建"
+        "self" -> "我创建"
+        "admin" -> "管理员创建"
+        "member" -> "他人创建"
+        else -> when {
+            isSystemArchiveProject() -> "系统创建"
+            !isJointDevelopmentProject() -> "我创建"
+            else -> "他人创建"
+        }
     }
 }
 

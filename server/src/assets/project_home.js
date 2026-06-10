@@ -229,6 +229,18 @@
     return isJointProject(project) ? '未知' : currentDisplayName();
   }
 
+  function projectOriginLabelOf(project) {
+    const explicit = project.project_origin_label || project.projectOriginLabel;
+    if (explicit) return String(explicit);
+    const type = String(project.project_origin_type || project.projectOriginType || '').trim().toLowerCase();
+    if (type === 'system') return '系统创建';
+    if (type === 'self') return '我创建';
+    if (type === 'admin') return '管理员创建';
+    if (type === 'member') return '他人创建';
+    if (isSystemProject(project)) return '系统创建';
+    return isJointProject(project) ? '他人创建' : '我创建';
+  }
+
   function cardMemberCount(project) {
     const raw = project.member_count ?? project.memberCount ?? project.members;
     const count = Array.isArray(raw) ? raw.length : Number(raw);
@@ -337,11 +349,11 @@
     const joint = !system && isJointProject(project);
     const kind = system ? '个人归档' : joint ? '联合开发' : '个人项目';
     const status = workspaceStatusOf(project) || stageOf(project);
-    const meta = `${kind} · ${conversationCount(project)}个会话 · ${status}`;
     const app = bridge();
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     const projectCode = projectCodeOf(project);
     const projectIntro = projectIntroOf(project);
+    const originLabel = projectOriginLabelOf(project);
     return `
       <div class="project-home-card ${active ? 'active' : ''}" role="button" tabindex="0" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
         <button class="project-home-more" type="button" data-project-home-action="menu" data-project-id="${escapeHtml(project.id)}" aria-label="项目操作" title="项目操作">...</button>
@@ -349,6 +361,7 @@
           <span class="project-home-card-head">
             ${renderProjectThumb(project)}
             <span class="project-home-card-details">
+              <span>来源：${escapeHtml(originLabel)}</span>
               <span>创建者：${escapeHtml(ownerOf(project))}</span>
               <span>成员：${escapeHtml(cardMemberCount(project))}</span>
             </span>
@@ -364,7 +377,7 @@
             <span class="project-home-name">${escapeHtml(titleOf(project))}</span>
             <span class="project-home-time">${escapeHtml(projectTime(project))}</span>
           </span>
-          <span class="project-home-meta">${escapeHtml(meta)}</span>
+          <span class="project-home-meta">${escapeHtml(`${kind} · ${originLabel} · ${conversationCount(project)}个会话 · ${status}`)}</span>
         </span>
       </div>
     `;

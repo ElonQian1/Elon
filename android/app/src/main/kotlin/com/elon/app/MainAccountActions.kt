@@ -94,6 +94,8 @@ internal class MainAccountActions(
         update(local.iconDataUrl, remote.iconDataUrl) { local.iconDataUrl = it }
         update(local.systemProjectKey, remote.systemProjectKey) { local.systemProjectKey = it }
         update(local.ownerAccount, remote.ownerAccount) { local.ownerAccount = it }
+        update(local.projectOriginType, remote.projectOriginType) { local.projectOriginType = it }
+        update(local.projectOriginLabel, remote.projectOriginLabel) { local.projectOriginLabel = it }
         update(local.memberCount, remote.memberCount) { local.memberCount = it }
         update(local.projectDescription, remote.projectDescription) { local.projectDescription = it }
         update(local.remoteConversationCount, remote.remoteConversationCount) { local.remoteConversationCount = it }

@@ -9,6 +9,8 @@ internal class MainProjectHygieneActions(
     fun normalizeProject(project: AppProject) {
         project.systemProjectKey = cleanNullableText(project.systemProjectKey)
         project.ownerAccount = cleanNullableText(project.ownerAccount)
+        project.projectOriginType = cleanNullableText(project.projectOriginType)
+        project.projectOriginLabel = cleanNullableText(project.projectOriginLabel)
         project.projectDescription = cleanNullableText(project.projectDescription)
         if (project.stage.trim().equals("null", ignoreCase = true)) project.stage = ""
         if (project.conversations.isEmpty()) project.conversations.add(defaultAppConversation())

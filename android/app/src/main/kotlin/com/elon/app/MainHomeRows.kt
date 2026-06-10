@@ -283,7 +283,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             val projectKind = project.projectKindLabel()
-            text = "$projectKind · ${project.displayConversationCount()} 个会话 · ${project.stage}"
+            text = "$projectKind · ${project.projectOriginLabel()} · ${project.displayConversationCount()} 个会话 · ${project.stage}"
             setTextColor(Color.parseColor("#A6AFBD"))
             textSize = 13f
         })

@@ -22,6 +22,8 @@ internal fun ArchiveProjectRecord.toStoreProject(ownerAccountFallback: String?):
         latestApkUrl = null,
         iconDataUrl = iconDataUrl,
         role = role,
+        projectOriginType = projectOriginType,
+        projectOriginLabel = projectOriginLabel,
         remoteConversationCount = conversationCount,
         workspaceKind = workspaceKind,
         workspaceHealthLabel = workspaceStatus?.displayLabel(systemKey),

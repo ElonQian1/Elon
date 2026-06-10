@@ -334,6 +334,9 @@ pub struct UserArchiveProject {
     pub project: ProjectSummary,
     pub owner_account: String,
     pub owner_id: String,
+    /// `self` | `admin` | `system` | `member`
+    pub project_origin_type: String,
+    pub project_origin_label: String,
     pub conversation_count: i64,
     /// `system_archive` | `pc_node_workspace` | `external_workspace` | `server_workspace`
     pub workspace_kind: String,

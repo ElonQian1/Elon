@@ -35,7 +35,8 @@ impl Store {
                         WHERE c.project_id = p.id
                     ) AS conversation_count,
                     COALESCE(u.phone, u.email, p.created_by) AS owner_account,
-                    p.created_by AS owner_id
+                    p.created_by AS owner_id,
+                    COALESCE(u.role, 'user') AS creator_role
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -50,13 +51,18 @@ impl Store {
         )?;
 
         let projects = stmt
-            .query_map(params![user_id], archive_project_from_row)?
+            .query_map(params![user_id], |row| {
+                archive_project_from_row(row, user_id)
+            })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(projects)
     }
 }
 
-fn archive_project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserArchiveProject> {
+fn archive_project_from_row(
+    row: &rusqlite::Row<'_>,
+    current_user_id: &str,
+) -> rusqlite::Result<UserArchiveProject> {
     let project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -84,13 +90,22 @@ fn archive_project_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserArc
     } else {
         row.get(19)?
     };
-    let owner_id = row.get(20)?;
+    let owner_id: String = row.get(20)?;
     let workspace_kind = workspace_kind_for_project(&project).to_string();
+    let creator_role: String = row.get(21)?;
+    let (project_origin_type, project_origin_label) = project_origin_for(
+        system_key.as_deref(),
+        &owner_id,
+        &creator_role,
+        current_user_id,
+    );
 
     Ok(UserArchiveProject {
         project,
         owner_account,
         owner_id,
+        project_origin_type: project_origin_type.to_string(),
+        project_origin_label: project_origin_label.to_string(),
         conversation_count,
         workspace_kind,
         system_key,
@@ -117,6 +132,24 @@ fn workspace_kind_for_project(project: &ProjectSummary) -> &'static str {
     } else {
         "server_workspace"
     }
+}
+
+fn project_origin_for(
+    system_key: Option<&str>,
+    owner_id: &str,
+    creator_role: &str,
+    current_user_id: &str,
+) -> (&'static str, &'static str) {
+    if system_key.is_some() {
+        return ("system", "系统创建");
+    }
+    if owner_id == current_user_id {
+        return ("self", "我创建");
+    }
+    if creator_role.trim().eq_ignore_ascii_case("admin") {
+        return ("admin", "管理员创建");
+    }
+    ("member", "他人创建")
 }
 
 #[cfg(test)]
@@ -176,6 +209,63 @@ mod tests {
             .all(|item| item.owner_account == "系统"));
         assert!(system_projects
             .iter()
+            .all(|item| item.project_origin_type == "system"));
+        assert!(system_projects
+            .iter()
+            .all(|item| item.project_origin_label == "系统创建"));
+        assert!(system_projects
+            .iter()
             .all(|item| item.conversation_count == 0));
+
+        let regular = archive
+            .iter()
+            .find(|item| item.project.name == "工作台")
+            .expect("regular project should be present");
+        assert_eq!(regular.project_origin_type, "self");
+        assert_eq!(regular.project_origin_label, "我创建");
+    }
+
+    #[test]
+    fn archive_marks_admin_created_member_projects() {
+        let store = temp_store();
+        let admin = store
+            .create_user(
+                "admin-created@example.com",
+                "secret1",
+                Some("Admin"),
+                Some("admin"),
+            )
+            .expect("admin should be created");
+        let user = store
+            .create_user(
+                "member-created@example.com",
+                "secret1",
+                Some("Member"),
+                None,
+            )
+            .expect("member should be created");
+        let project = store
+            .create_project(
+                &admin.id,
+                "管理员项目",
+                Some("由管理员创建"),
+                Some("android"),
+            )
+            .expect("admin project should create")
+            .project;
+        store
+            .add_project_member_by_account(&project.id, "member-created@example.com", "member")
+            .expect("member should be added");
+
+        let archive = store
+            .list_archive_projects_for_user(&user.id)
+            .expect("archive should load");
+        let item = archive
+            .iter()
+            .find(|item| item.project.id == project.id)
+            .expect("admin-created project should be visible");
+
+        assert_eq!(item.project_origin_type, "admin");
+        assert_eq!(item.project_origin_label, "管理员创建");
     }
 }

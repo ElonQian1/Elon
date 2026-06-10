@@ -25,6 +25,8 @@ internal data class StoreProject(
     val latestApkUrl: String? = null,
     val iconDataUrl: String? = null,
     val role: String = "member",
+    val projectOriginType: String? = null,
+    val projectOriginLabel: String? = null,
     val remoteConversationCount: Int? = null,
     val workspaceKind: String? = null,
     val workspaceHealthLabel: String? = null,
@@ -60,6 +62,8 @@ internal fun StoreProject.toJointAppProject(): AppProject {
         collaborationJoinMode = normalizeProjectJoinMode(joinMode),
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
+        projectOriginType = projectOriginType,
+        projectOriginLabel = projectOriginLabel,
         memberCount = memberCount.coerceAtLeast(0),
         projectDescription = description?.takeIf { it.isNotBlank() },
         remoteConversationCount = remoteConversationCount,
@@ -86,6 +90,8 @@ internal fun StoreProject.toOwnerAppProject(): AppProject {
         collaborationProjectId = null,
         iconDataUrl = iconDataUrl,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
+        projectOriginType = projectOriginType ?: "self",
+        projectOriginLabel = projectOriginLabel ?: "我创建",
         memberCount = memberCount.coerceAtLeast(0),
         projectDescription = description?.takeIf { it.isNotBlank() },
         remoteConversationCount = remoteConversationCount,
@@ -405,6 +411,10 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
         ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
     iconDataUrl = obj.optProjectIconDataUrl(),
     role = obj.optString("role", "member"),
+    projectOriginType = obj.optCleanStoreString("project_origin_type")
+        ?: obj.optCleanStoreString("projectOriginType"),
+    projectOriginLabel = obj.optCleanStoreString("project_origin_label")
+        ?: obj.optCleanStoreString("projectOriginLabel"),
     remoteConversationCount = obj.optNullableInt("conversation_count"),
     workspaceKind = obj.optCleanStoreString("workspace_kind"),
     workspaceHealthLabel = obj.optCleanStoreString("workspace_health_label"),
@@ -430,6 +440,12 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     lastTaskStatus = null,
     latestApkUrl = null,
     iconDataUrl = obj.optProjectIconDataUrl(),
+    projectOriginType = obj.optCleanStoreString("project_origin_type")
+        ?: obj.optCleanStoreString("projectOriginType")
+        ?: "self",
+    projectOriginLabel = obj.optCleanStoreString("project_origin_label")
+        ?: obj.optCleanStoreString("projectOriginLabel")
+        ?: "我创建",
     workspaceKind = obj.optCleanStoreString("workspace_kind"),
     workspaceHealthLabel = obj.optCleanStoreString("workspace_health_label"),
     workspaceHealthTone = obj.optCleanStoreString("workspace_health_tone"),

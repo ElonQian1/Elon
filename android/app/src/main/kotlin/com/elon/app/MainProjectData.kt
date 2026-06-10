@@ -124,6 +124,9 @@ private fun elonSelfProject(): AppProject {
         subtitle = "修改平台自身 · AI 云端迭代",
         updatedAt = 0L,
         isJointProject = true,
+        ownerAccount = SYSTEM_ARCHIVE_OWNER_ACCOUNT,
+        projectOriginType = "system",
+        projectOriginLabel = "系统创建",
         conversations = mutableListOf(
             AppConversation(
                 id = "elon-self-default",

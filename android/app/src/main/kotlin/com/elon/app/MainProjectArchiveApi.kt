@@ -16,6 +16,8 @@ internal data class ArchiveProjectRecord(
     val lastTaskStatus: String?,
     val ownerAccount: String?,
     val ownerUserId: String?,
+    val projectOriginType: String?,
+    val projectOriginLabel: String?,
     val memberCount: Int,
     val updatedAtMs: Long,
     val conversationCount: Int,
@@ -53,6 +55,10 @@ internal data class ArchiveProjectRecord(
             } else {
                 ownerAccount?.takeIf { it.isNotBlank() && it != "?" }
             },
+            projectOriginType = projectOriginType?.takeIf { it.isNotBlank() }
+                ?: if (isSystem) "system" else null,
+            projectOriginLabel = projectOriginLabel?.takeIf { it.isNotBlank() }
+                ?: if (isSystem) "系统创建" else null,
             memberCount = memberCount.coerceAtLeast(0),
             projectDescription = description?.takeIf { it.isNotBlank() },
             remoteConversationCount = conversationCount,
@@ -176,6 +182,14 @@ internal fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
         lastTaskStatus = project.optCleanString("last_task_status"),
         ownerAccount = project.optCleanString("owner_account") ?: obj.optCleanString("owner_account"),
         ownerUserId = project.optCleanString("owner_id") ?: obj.optCleanString("owner_id"),
+        projectOriginType = project.optCleanString("project_origin_type")
+            ?: obj.optCleanString("project_origin_type")
+            ?: project.optCleanString("projectOriginType")
+            ?: obj.optCleanString("projectOriginType"),
+        projectOriginLabel = project.optCleanString("project_origin_label")
+            ?: obj.optCleanString("project_origin_label")
+            ?: project.optCleanString("projectOriginLabel")
+            ?: obj.optCleanString("projectOriginLabel"),
         memberCount = project.optInt("member_count", 0).coerceAtLeast(0),
         updatedAtMs = parseChatMessageCreatedAt(
             project.optCleanString("updated_at").orEmpty()
