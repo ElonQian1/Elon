@@ -81,6 +81,24 @@ pub struct ProjectWorkspaceInspectStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDocumentEntry {
+    pub path: String,
+    pub title: String,
+    pub content: String,
+    pub truncated: bool,
+    pub byte_len: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDocumentsSnapshot {
+    pub workspace_path: String,
+    #[serde(default)]
+    pub documents: Vec<ProjectDocumentEntry>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
     Exec {
@@ -146,6 +164,11 @@ pub enum ServerToAgent {
     },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {
+        req_id: String,
+        workspace_path: String,
+    },
+    /// 云端要求 PC 节点读取项目内固定 AI/说明文档。
+    ReadProjectDocuments {
         req_id: String,
         workspace_path: String,
     },
@@ -306,6 +329,16 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点返回项目文档频道快照。
+    ProjectDocumentsRead {
+        req_id: String,
+        snapshot: ProjectDocumentsSnapshot,
+    },
+    /// PC 节点读取项目文档失败。
+    ProjectDocumentsReadError {
+        req_id: String,
+        message: String,
+    },
     /// PC 节点已清理项目工作区。
     ProjectWorkspaceCleaned {
         req_id: String,
@@ -358,6 +391,8 @@ impl AgentToServer {
             | Self::ProjectWorkspaceProvisionError { .. }
             | Self::ProjectWorkspaceInspected { .. }
             | Self::ProjectWorkspaceInspectError { .. }
+            | Self::ProjectDocumentsRead { .. }
+            | Self::ProjectDocumentsReadError { .. }
             | Self::ProjectWorkspaceCleaned { .. }
             | Self::ProjectWorkspaceCleanupError { .. }
             | Self::TtsSynthesizeResponse { .. }
@@ -378,6 +413,8 @@ impl AgentToServer {
             | Self::ProjectWorkspaceProvisionError { req_id, .. }
             | Self::ProjectWorkspaceInspected { req_id, .. }
             | Self::ProjectWorkspaceInspectError { req_id, .. }
+            | Self::ProjectDocumentsRead { req_id, .. }
+            | Self::ProjectDocumentsReadError { req_id, .. }
             | Self::ProjectWorkspaceCleaned { req_id, .. }
             | Self::ProjectWorkspaceCleanupError { req_id, .. }
             | Self::TtsSynthesizeResponse { req_id, .. }

@@ -332,6 +332,7 @@ internal class ProjectSpaceController(
     }
 
     fun resumeIfActive() {
+        if (activeChannel?.kind == DOCS_CHANNEL_KIND) return
         if (activeChannel != null || activeMemberConversation != null) startPolling()
     }
 
@@ -348,6 +349,10 @@ internal class ProjectSpaceController(
         val text = rawText.trim()
         if (hasAttachments) {
             Toast.makeText(activity, "项目频道暂不支持发送附件", Toast.LENGTH_SHORT).show()
+            return true
+        }
+        if (channel.kind == DOCS_CHANNEL_KIND) {
+            Toast.makeText(activity, "文档频道为固定只读频道", Toast.LENGTH_SHORT).show()
             return true
         }
         if (text.isBlank()) return true
@@ -455,6 +460,7 @@ internal class ProjectSpaceController(
 
     fun summarizeSelectedDiscussion(summary: SelectedDiscussionSummary): Boolean {
         val channel = activeChannel ?: return false
+        if (channel.kind == DOCS_CHANNEL_KIND) return false
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
         val route = activeRoute
         val pending = ChatMessage("user", summary.channelPost, sendStatus = SENDING_STATUS)
@@ -499,6 +505,7 @@ internal class ProjectSpaceController(
     private fun openChannel(channel: ProjectChannel, animate: Boolean = true) {
         activeChannel = channel
         activeMemberConversation = null
+        if (channel.kind == DOCS_CHANNEL_KIND) stopPolling()
         val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
@@ -511,7 +518,7 @@ internal class ProjectSpaceController(
         binding.chatList.adapter = adapter
         showProjectChannelChat("#${channel.name}", animate)
         loadMessages(channel, silent = false, scrollToBottom = true)
-        startPolling()
+        if (channel.kind != DOCS_CHANNEL_KIND) startPolling()
     }
 
     private fun startPolling() {
@@ -978,6 +985,8 @@ internal class ProjectSpaceController(
         const val SENDING_STATUS = "发送中..."
         const val AI_CHANNEL_KIND = "ai_development"
         const val PROJECT_DESCRIPTION_MAX_CHARS = 240
+        const val DOCS_CHANNEL_KIND = "docs"
+        const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
 
         fun canEditProjectDescription(role: String?): Boolean {
             return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")

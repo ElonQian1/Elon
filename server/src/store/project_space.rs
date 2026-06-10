@@ -9,8 +9,9 @@ use rusqlite::{params, OptionalExtension};
 
 use super::{new_id, now, ProjectChannel, ProjectChannelMessage, ProjectSpaceSummary, Store};
 
-const DEFAULT_CHANNELS: [(&str, &str, i64); 7] = [
+const DEFAULT_CHANNELS: [(&str, &str, i64); 8] = [
     ("公告", "announcements", 10),
+    ("文档", "docs", 15),
     ("讨论", "discussion", 20),
     ("需求", "requirements", 30),
     ("意见", "suggestions", 35),
@@ -432,6 +433,7 @@ mod tests {
             .expect("channels should list");
 
         assert!(channels.iter().any(|channel| channel.kind == "suggestions"));
+        assert!(channels.iter().any(|channel| channel.kind == "docs"));
     }
 
     #[test]

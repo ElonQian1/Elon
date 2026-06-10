@@ -316,6 +316,40 @@ impl AgentManager {
         outcome
     }
 
+    /// Ask a PC node to read fixed project documentation from a workspace.
+    pub async fn dispatch_project_documents_read(
+        &self,
+        agent_id: &str,
+        workspace_path: String,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::ReadProjectDocuments {
+                req_id: req_id.clone(),
+                workspace_path,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+
+        let outcome = match tokio::time::timeout(Duration::from_secs(8), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!("agent disconnected before project docs response")),
+            Err(_) => Err(anyhow!("project docs read timeout (8s)")),
+        };
+        if outcome.is_err() {
+            pending.lock().await.remove(&req_id);
+        }
+        outcome
+    }
+
     /// Ask a PC node to cleanup a managed project workspace and return a single status frame.
     pub async fn dispatch_project_workspace_cleanup(
         &self,

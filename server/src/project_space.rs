@@ -15,6 +15,7 @@ use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
+    project_docs_channel,
     project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
     project_mobile::ensure_mobile_project,
@@ -22,6 +23,8 @@ use crate::{
     tools,
     types::AppState,
 };
+
+const DOCS_CHANNEL_KIND: &str = "docs";
 
 #[derive(Deserialize)]
 pub struct ChannelMessagesQuery {
@@ -201,10 +204,11 @@ pub async fn list_user_project_channel_messages(
     list_channel_messages_response(
         state,
         user.id,
-        project.id,
+        project,
         channel_id,
         query_limit(&query, 120),
     )
+    .await
 }
 
 pub async fn list_member_conversations(
@@ -321,30 +325,43 @@ pub async fn list_channel_messages(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    if let Err(e) = project_access(&state, &user.id, &project_id) {
-        return json_error(StatusCode::FORBIDDEN, e.to_string());
-    }
-    match state.store.list_project_channel_messages(
-        &user.id,
-        &project_id,
-        &channel_id,
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    list_channel_messages_response(
+        state,
+        user.id,
+        project,
+        channel_id,
         query.limit.unwrap_or(120),
-    ) {
-        Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
-        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
-    }
+    )
+    .await
 }
 
-fn list_channel_messages_response(
+async fn list_channel_messages_response(
     state: Arc<AppState>,
     user_id: String,
-    project_id: String,
+    project: ProjectAccess,
     channel_id: String,
     limit: i64,
 ) -> Response {
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project.id, &channel_id)
+    {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    if channel_kind == DOCS_CHANNEL_KIND {
+        let messages =
+            project_docs_channel::load_project_doc_messages(state, &user_id, &project, &channel_id)
+                .await;
+        return Json(serde_json::json!({ "messages": messages })).into_response();
+    }
     match state
         .store
-        .list_project_channel_messages(&user_id, &project_id, &channel_id, limit)
+        .list_project_channel_messages(&user_id, &project.id, &channel_id, limit)
     {
         Ok(messages) => Json(serde_json::json!({ "messages": messages })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -405,6 +422,9 @@ fn send_channel_message_response(
     if channel_kind == "announcements" && !can_edit_project_announcement(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "只有项目创建者可以编辑公告");
     }
+    if channel_kind == DOCS_CHANNEL_KIND {
+        return json_error(StatusCode::BAD_REQUEST, "文档频道是固定只读频道，不能发帖");
+    }
     let message_kind = if channel_kind == "suggestions" {
         "suggestion"
     } else {
@@ -424,7 +444,10 @@ fn send_channel_message_response(
 }
 
 fn can_edit_project_announcement(role: &str) -> bool {
-    matches!(role.trim().to_ascii_lowercase().as_str(), "owner" | "creator")
+    matches!(
+        role.trim().to_ascii_lowercase().as_str(),
+        "owner" | "creator"
+    )
 }
 
 pub async fn mark_user_project_suggestion_updated(
@@ -664,6 +687,19 @@ fn summarize_channel_selection_response(
     let summary_prompt = req.summary_prompt.trim().to_string();
     if post_content.is_empty() || summary_prompt.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "summary content 不能为空");
+    }
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project_id, &channel_id)
+    {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    if channel_kind == DOCS_CHANNEL_KIND {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "文档频道是固定只读频道，不能发帖总结",
+        );
     }
 
     let post_message = match state.store.insert_project_channel_message(

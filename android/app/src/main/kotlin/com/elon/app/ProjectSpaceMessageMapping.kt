@@ -46,6 +46,7 @@ internal fun projectChannelHint(channel: ProjectChannel, projectRole: String?): 
     return when (channel.kind) {
         "announcements" -> "项目公告、规则和重要更新。"
         "discussion" -> "成员日常讨论和协作交流。"
+        "docs" -> "固定展示项目里的 AGENTS、CODEX、README、GitHub Copilot 指令和 docs 文档。"
         "requirements" -> "集中提出功能想法，后续可转为 AI 开发任务。"
         "suggestions" -> "游客和成员在这里发布建议，开发者完成后可标记已更新。"
         "issues" -> "反馈 bug、安装问题和体验问题。"

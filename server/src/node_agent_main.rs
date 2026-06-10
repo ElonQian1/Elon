@@ -40,6 +40,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_hardware_probe;
 mod pc_workspace_provisioner;
+mod project_docs_scan;
 mod project_workspace_inspect;
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
@@ -1566,6 +1567,27 @@ async fn run_session(
                                             status,
                                         },
                                         Err(e) => AgentToServer::ProjectWorkspaceInspectError {
+                                            req_id,
+                                            message: e.to_string(),
+                                        },
+                                    };
+                                let _ = tx_c.send(ws_text(&response));
+                            });
+                        }
+                        ServerToAgent::ReadProjectDocuments {
+                            req_id,
+                            workspace_path,
+                        } => {
+                            info!("📚 ReadProjectDocuments: {}", req_id);
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                let path = std::path::PathBuf::from(workspace_path);
+                                let response =
+                                    match project_docs_scan::collect_project_documents(&path) {
+                                        Ok(snapshot) => {
+                                            AgentToServer::ProjectDocumentsRead { req_id, snapshot }
+                                        }
+                                        Err(e) => AgentToServer::ProjectDocumentsReadError {
                                             req_id,
                                             message: e.to_string(),
                                         },

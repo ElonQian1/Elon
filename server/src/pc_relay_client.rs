@@ -279,6 +279,25 @@ async fn run_relay_session(
                 });
             }
 
+            ServerToAgent::ReadProjectDocuments {
+                req_id,
+                workspace_path,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let path = std::path::PathBuf::from(workspace_path);
+                    let response = match crate::project_docs_scan::collect_project_documents(&path)
+                    {
+                        Ok(snapshot) => AgentToServer::ProjectDocumentsRead { req_id, snapshot },
+                        Err(e) => AgentToServer::ProjectDocumentsReadError {
+                            req_id,
+                            message: e.to_string(),
+                        },
+                    };
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
+
             ServerToAgent::CleanupProjectWorkspace {
                 req_id,
                 project_id,
@@ -287,23 +306,22 @@ async fn run_relay_session(
                 let tx = out_tx.clone();
                 tokio::spawn(async move {
                     let project_id_for_error = project_id.clone();
-                    let response =
-                        match crate::pc_workspace_provisioner::cleanup_project_workspace(
-                            &project_id,
-                            &workspace_path,
-                        ) {
-                            Ok(result) => AgentToServer::ProjectWorkspaceCleaned {
-                                req_id,
-                                project_id: project_id_for_error,
-                                removed_paths: result.removed_paths,
-                                skipped_paths: result.skipped_paths,
-                            },
-                            Err(e) => AgentToServer::ProjectWorkspaceCleanupError {
-                                req_id,
-                                project_id: project_id_for_error,
-                                message: e.to_string(),
-                            },
-                        };
+                    let response = match crate::pc_workspace_provisioner::cleanup_project_workspace(
+                        &project_id,
+                        &workspace_path,
+                    ) {
+                        Ok(result) => AgentToServer::ProjectWorkspaceCleaned {
+                            req_id,
+                            project_id: project_id_for_error,
+                            removed_paths: result.removed_paths,
+                            skipped_paths: result.skipped_paths,
+                        },
+                        Err(e) => AgentToServer::ProjectWorkspaceCleanupError {
+                            req_id,
+                            project_id: project_id_for_error,
+                            message: e.to_string(),
+                        },
+                    };
                     let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
                 });
             }
