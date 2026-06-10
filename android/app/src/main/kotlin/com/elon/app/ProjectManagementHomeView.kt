@@ -345,7 +345,7 @@ internal class ProjectManagementHomeView(
     private fun createProjectCardContent(project: AppProject): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(17), dp(10), 0)
+            setPadding(dp(10), dp(11), dp(10), 0)
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -373,7 +373,7 @@ internal class ProjectManagementHomeView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     dp(1)
                 ).apply {
-                    topMargin = dp(12)
+                    topMargin = dp(6)
                 })
 
                 addView(TextView(activity).apply {
@@ -388,7 +388,7 @@ internal class ProjectManagementHomeView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(10)
+                    topMargin = dp(4)
                 })
                 project.projectCardIntroduction()?.let { intro ->
                     addView(TextView(activity).apply {
