@@ -890,6 +890,7 @@ pub async fn chat_with_node(
     let (req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node_with_req_id(
         &state,
         req_id,
+        &user.id,
         &req.model_id,
         req.node_id.as_deref(),
         req.messages,
@@ -933,6 +934,19 @@ pub async fn chat_with_node(
                 break;
             }
             homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                crate::node_router::finish_node_compute_run(
+                    &state,
+                    &accounting_key,
+                    crate::store::NodeComputeRunFinish {
+                        status: "failed",
+                        prompt_tokens: prompt_tokens as i64,
+                        completion_tokens: completion_tokens as i64,
+                        billed_cost_rmb_fen: 0,
+                        provider_earned_fen: 0,
+                        settlement_status: None,
+                        error_message: Some(&message),
+                    },
+                );
                 crate::billing::release_trusted_call(
                     &state.store,
                     &user.id,

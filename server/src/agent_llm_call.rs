@@ -288,6 +288,7 @@ pub(crate) async fn try_casual_chat_via_node(
     let dispatch = crate::node_router::dispatch_to_node_with_req_id(
         state,
         req_id,
+        user_id,
         model,
         None,
         messages.to_vec(),
@@ -328,6 +329,19 @@ pub(crate) async fn try_casual_chat_via_node(
                 break;
             }
             homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
+                crate::node_router::finish_node_compute_run(
+                    state,
+                    &accounting_key,
+                    crate::store::NodeComputeRunFinish {
+                        status: "failed",
+                        prompt_tokens: prompt_tokens as i64,
+                        completion_tokens: completion_tokens as i64,
+                        billed_cost_rmb_fen: 0,
+                        provider_earned_fen: 0,
+                        settlement_status: None,
+                        error_message: Some(&message),
+                    },
+                );
                 crate::billing::release_trusted_call(
                     &state.store,
                     user_id,
@@ -342,6 +356,19 @@ pub(crate) async fn try_casual_chat_via_node(
     }
 
     if content.is_empty() {
+        crate::node_router::finish_node_compute_run(
+            state,
+            &accounting_key,
+            crate::store::NodeComputeRunFinish {
+                status: "released_no_usage",
+                prompt_tokens: prompt_tokens as i64,
+                completion_tokens: completion_tokens as i64,
+                billed_cost_rmb_fen: 0,
+                provider_earned_fen: 0,
+                settlement_status: None,
+                error_message: Some("empty node LLM response"),
+            },
+        );
         crate::billing::release_trusted_call(
             &state.store,
             user_id,

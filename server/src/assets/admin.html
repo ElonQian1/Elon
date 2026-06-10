@@ -967,6 +967,47 @@ function closeConvModal() {
       </table>
     </div>
   </div>
+  <!-- 节点执行证明 -->
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">节点执行证明</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">查看 PC/Codex/节点 LLM 每次执行的调度、扣费、收益和异常状态</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="nodeComputeRunStatus" onchange="loadNodeComputeRuns()" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px">
+          <option value="all">全部</option>
+          <option value="started">执行中</option>
+          <option value="settled">已结算</option>
+          <option value="settlement_skipped">结算跳过</option>
+          <option value="settlement_failed">结算失败</option>
+          <option value="failed">执行失败</option>
+          <option value="released_no_usage">无用量释放</option>
+          <option value="deduplicated">幂等重复</option>
+        </select>
+        <span id="nodeComputeRunsCount" style="font-size:12px;color:var(--text-dim)"></span>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">状态</th>
+            <th style="padding:8px 10px">节点/模型</th>
+            <th style="padding:8px 10px">用户</th>
+            <th style="padding:8px 10px;text-align:right">Token</th>
+            <th style="padding:8px 10px;text-align:right">扣费</th>
+            <th style="padding:8px 10px;text-align:right">节点收益</th>
+            <th style="padding:8px 10px">调度/结算</th>
+            <th style="padding:8px 10px">时间/错误</th>
+          </tr>
+        </thead>
+        <tbody id="nodeComputeRunsBody">
+          <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
   <!-- 计价规则 -->
   <div class="card" style="margin-bottom:24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -1673,13 +1714,16 @@ async function loadBilling() {
   try {
     const payoutStatusEl = document.getElementById('nodePayoutStatus');
     const payoutStatus = payoutStatusEl ? (payoutStatusEl.value || 'pending') : 'pending';
-    const [usersRes, configRes, reservationsRes, priceRulesRes, eventsRes, nodePayoutsRes] = await Promise.all([
+    const computeStatusEl = document.getElementById('nodeComputeRunStatus');
+    const computeStatus = computeStatusEl ? (computeStatusEl.value || 'all') : 'all';
+    const [usersRes, configRes, reservationsRes, priceRulesRes, eventsRes, nodePayoutsRes, nodeComputeRunsRes] = await Promise.all([
       apiFetch('GET', '/api/admin/billing/users?page=1&size=200'),
       apiFetch('GET', '/api/admin/billing/config'),
       apiFetch('GET', '/api/admin/billing/reservations?limit=100'),
       apiFetch('GET', '/api/admin/billing/price-rules'),
       apiFetch('GET', '/api/admin/billing/events?limit=100'),
       apiFetch('GET', '/api/admin/node-payouts?status=' + encodeURIComponent(payoutStatus) + '&limit=100'),
+      apiFetch('GET', '/api/admin/node-compute-runs?status=' + encodeURIComponent(computeStatus) + '&limit=100'),
     ]);
     if (configRes.ok) {
       const cfg = await configRes.json();
@@ -1704,6 +1748,14 @@ async function loadBilling() {
       const tbodyPayouts = document.getElementById('nodePayoutsBody');
       const j = await nodePayoutsRes.json().catch(() => ({}));
       if (tbodyPayouts) tbodyPayouts.innerHTML = '<tr><td colspan="9" style="color:var(--danger);padding:16px">' + esc(j.error || '加载失败') + '</td></tr>';
+    }
+    if (nodeComputeRunsRes.ok) {
+      const d = await nodeComputeRunsRes.json();
+      renderNodeComputeRuns(d.runs || [], d.quality || {});
+    } else {
+      const tbodyRuns = document.getElementById('nodeComputeRunsBody');
+      const j = await nodeComputeRunsRes.json().catch(() => ({}));
+      if (tbodyRuns) tbodyRuns.innerHTML = '<tr><td colspan="8" style="color:var(--danger);padding:16px">' + esc(j.error || '加载失败') + '</td></tr>';
     }
     if (usersRes.ok) {
       const d = await usersRes.json();
@@ -1760,6 +1812,90 @@ function renderBillingReservations(rows) {
       <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(row.updated_at || '')}</td>
     </tr>`;
   }).join('');
+}
+
+async function loadNodeComputeRuns() {
+  const tbody = document.getElementById('nodeComputeRunsBody');
+  if (!tbody) return;
+  const status = document.getElementById('nodeComputeRunStatus').value || 'all';
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-dim)">加载中...</td></tr>';
+  try {
+    const res = await apiFetch('GET', '/api/admin/node-compute-runs?status=' + encodeURIComponent(status) + '&limit=100');
+    const d = await res.json();
+    if (!res.ok) {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--danger);padding:16px">' + esc(d.error || '加载失败') + '</td></tr>';
+      return;
+    }
+    renderNodeComputeRuns(d.runs || [], d.quality || {});
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--danger);padding:16px">' + esc(String(e)) + '</td></tr>';
+  }
+}
+
+function renderNodeComputeRuns(rows, quality) {
+  const tbody = document.getElementById('nodeComputeRunsBody');
+  const countEl = document.getElementById('nodeComputeRunsCount');
+  if (countEl) countEl.textContent = '最近 ' + rows.length + ' 条';
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-dim)">暂无节点执行记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(row => {
+    const q = quality[row.node_id] || {};
+    const qualityLine = q.total_runs
+      ? '质量 ' + ((Number(q.success_rate_x1000 || 0) / 10).toFixed(1)) + '% · ' + fmtNum(q.total_runs || 0) + ' 次'
+      : '质量 冷启动';
+    const tokens = Number(row.prompt_tokens || 0) + Number(row.completion_tokens || 0);
+    const callId = row.compute_call_id || '';
+    const shortCallId = callId.length > 34 ? callId.slice(0, 16) + '…' + callId.slice(-10) : callId;
+    const route = row.route_reason || '';
+    const shortRoute = route.length > 64 ? route.slice(0, 61) + '…' : route;
+    const error = row.error_message || '';
+    const shortError = error.length > 90 ? error.slice(0, 87) + '…' : error;
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px">${nodeComputeStatusBadge(row.status)}</td>
+      <td style="padding:8px 10px;min-width:180px">
+        <div style="font-weight:600">${esc(row.node_id || '')}</div>
+        <div style="font-size:11px;color:var(--text-dim)">${esc(row.model_id || '')}</div>
+        <div style="font-size:10px;color:var(--text-dim)">${esc(qualityLine)}</div>
+      </td>
+      <td style="padding:8px 10px;min-width:160px">
+        <div>用：${esc(row.consumer_user_id || '')}</div>
+        <div style="font-size:11px;color:var(--text-dim)">收：${esc(row.provider_user_id || '-')}</div>
+      </td>
+      <td style="padding:8px 10px;text-align:right">
+        <div>${fmtNum(tokens)}</div>
+        <div style="font-size:10px;color:var(--text-dim)">入 ${fmtNum(row.prompt_tokens || 0)} / 出 ${fmtNum(row.completion_tokens || 0)}</div>
+      </td>
+      <td style="padding:8px 10px;text-align:right;color:#fbbf24">¥${((row.billed_cost_rmb_fen || 0) / 100).toFixed(2)}</td>
+      <td style="padding:8px 10px;text-align:right;color:#4ade80">¥${((row.provider_earned_fen || 0) / 100).toFixed(2)}</td>
+      <td style="padding:8px 10px;max-width:260px">
+        <div title="${esc(route)}">${esc(shortRoute || '-')}</div>
+        <div style="font-size:10px;color:var(--text-dim)">${esc(row.settlement_status || '')}</div>
+        <div style="font-size:10px;color:var(--text-dim)" title="${esc(callId)}">${esc(shortCallId)}</div>
+      </td>
+      <td style="padding:8px 10px;max-width:260px">
+        <div style="font-size:12px;color:var(--text-dim)">${esc(row.started_at || '')}</div>
+        ${row.finished_at ? '<div style="font-size:11px;color:var(--text-dim)">' + esc(row.finished_at) + '</div>' : ''}
+        ${shortError ? '<div style="font-size:11px;color:var(--danger);margin-top:4px" title="' + esc(error) + '">' + esc(shortError) + '</div>' : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function nodeComputeStatusBadge(status) {
+  const s = status || 'started';
+  if (s === 'started') return '<span style="color:#38bdf8;font-size:12px">执行中</span>';
+  if (s === 'settled') return '<span style="color:#4ade80;font-size:12px">已结算</span>';
+  if (s === 'settled_no_provider') return '<span style="color:#fbbf24;font-size:12px">无节点属主</span>';
+  if (s === 'settlement_skipped') return '<span style="color:#fbbf24;font-size:12px">结算跳过</span>';
+  if (s === 'settlement_failed') return '<span style="color:#f87171;font-size:12px">结算失败</span>';
+  if (s === 'failed') return '<span style="color:#f87171;font-size:12px">执行失败</span>';
+  if (s === 'released_no_usage') return '<span style="color:#94a3b8;font-size:12px">无用量释放</span>';
+  if (s === 'released_error') return '<span style="color:#f87171;font-size:12px">异常释放</span>';
+  if (s === 'deduplicated') return '<span style="color:#94a3b8;font-size:12px">幂等重复</span>';
+  return '<span style="color:#ff4d6d;font-size:12px">' + esc(s) + '</span>';
 }
 
 async function loadNodePayouts() {

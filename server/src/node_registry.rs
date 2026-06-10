@@ -37,7 +37,7 @@ pub struct NodeEntry {
 }
 
 /// 供 HTTP API 返回的节点摘要（不含内部状态）
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NodeSummary {
     pub node_id: String,
     pub owner_user_id: String,
@@ -118,14 +118,13 @@ impl NodeRegistry {
     }
 
     /// 为指定模型寻找一个在线节点，返回 node_id。
-    /// 当前策略：随机选第一个在线且支持该模型的节点（后续可换成最低负载）。
+    /// 兼容旧调用；自动路由的新质量调度在 node_router 中完成。
     pub async fn find_node_for_model(&self, model_id: &str) -> Option<String> {
-        let nodes = self.nodes.read().await;
-        nodes
-            .values()
-            .filter(|e| e.last_seen.elapsed() < NODE_TIMEOUT)
-            .find(|e| e.models.iter().any(|m| m.model_id == model_id))
-            .map(|e| e.node_id.clone())
+        self.list_candidates_for_model(model_id)
+            .await
+            .into_iter()
+            .next()
+            .map(|entry| entry.node_id)
     }
 
     /// 指定节点时严格校验该节点在线且支持模型；未指定时走自动匹配。
@@ -163,6 +162,26 @@ impl NodeRegistry {
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
                 online: e.last_seen.elapsed() < NODE_TIMEOUT,
+            })
+            .collect()
+    }
+
+    /// 列出支持指定模型且在线的节点候选，供质量调度器排序。
+    pub async fn list_candidates_for_model(&self, model_id: &str) -> Vec<NodeSummary> {
+        let nodes = self.nodes.read().await;
+        nodes
+            .values()
+            .filter(|e| e.last_seen.elapsed() < NODE_TIMEOUT)
+            .filter(|e| e.models.iter().any(|m| m.model_id == model_id))
+            .map(|e| NodeSummary {
+                node_id: e.node_id.clone(),
+                owner_user_id: e.owner_user_id.clone(),
+                device_name: e.device_name.clone(),
+                hardware: e.hardware.clone(),
+                models: e.models.clone(),
+                tts_worker_url: e.tts_worker_url.clone(),
+                connected_at: e.connected_at,
+                online: true,
             })
             .collect()
     }

@@ -63,6 +63,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (41, "PC 节点硬件画像快照", migration_v41),
     (42, "节点收益提现申请表", migration_v42),
     (43, "节点收益整数资金账本", migration_v43),
+    (44, "节点算力执行证明与质量评分基础表", migration_v44),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1613,6 +1614,45 @@ fn migration_v43(conn: &Connection) -> Result<()> {
 
         UPDATE node_balances
            SET credits = available_fen / 100.0;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v44(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS node_compute_runs (
+          id                       TEXT PRIMARY KEY,
+          compute_call_id          TEXT NOT NULL UNIQUE,
+          consumer_user_id         TEXT NOT NULL,
+          provider_user_id         TEXT,
+          node_id                  TEXT NOT NULL,
+          model_id                 TEXT,
+          feature                  TEXT NOT NULL,
+          usage_mode               TEXT NOT NULL,
+          status                   TEXT NOT NULL DEFAULT 'started',
+          started_at               TEXT NOT NULL,
+          finished_at              TEXT,
+          duration_ms              INTEGER,
+          prompt_tokens            INTEGER NOT NULL DEFAULT 0,
+          completion_tokens        INTEGER NOT NULL DEFAULT 0,
+          billed_cost_rmb_fen      INTEGER NOT NULL DEFAULT 0,
+          provider_earned_fen      INTEGER NOT NULL DEFAULT 0,
+          settlement_status        TEXT,
+          route_reason             TEXT,
+          error_message            TEXT,
+          created_at               TEXT NOT NULL,
+          updated_at               TEXT NOT NULL,
+          FOREIGN KEY (consumer_user_id) REFERENCES users(id),
+          FOREIGN KEY (provider_user_id) REFERENCES users(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_node_compute_runs_node_time
+          ON node_compute_runs(node_id, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_node_compute_runs_provider_time
+          ON node_compute_runs(provider_user_id, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_node_compute_runs_status_time
+          ON node_compute_runs(status, started_at DESC);
         "#,
     )?;
     Ok(())

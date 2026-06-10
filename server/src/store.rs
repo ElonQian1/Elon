@@ -23,6 +23,7 @@ mod friends;
 mod groups;
 mod join_requests;
 mod native_sessions;
+mod node_compute_runs;
 mod node_hardware;
 mod node_ledger;
 #[cfg(test)]
@@ -58,6 +59,9 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub use compute_metering::ComputeMeterEvent;
+pub use node_compute_runs::{
+    NodeComputeRun, NodeComputeRunFinish, NodeComputeRunStart, NodeQualityScore,
+};
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use node_payouts::CreateNodePayout;
 pub use project_execution_sessions::{

@@ -843,6 +843,18 @@ async fn run_via_pc_agent(
         pc_reserve_fen,
     )
     .map_err(|msg| anyhow!(msg))?;
+    let display_model = model_label
+        .or(copilot_model)
+        .map(String::from)
+        .unwrap_or_else(|| agent_id.to_string());
+    start_pc_node_compute_run(
+        state,
+        user_id,
+        agent_id,
+        &pc_accounting_key,
+        pc_cli_feature,
+        Some(&display_model),
+    );
     record_pc_execution_started(
         state,
         native_session_scope.as_ref(),
@@ -855,10 +867,6 @@ async fn run_via_pc_agent(
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
     let mut stream_started = false;
-    let display_model = model_label
-        .or(copilot_model)
-        .map(String::from)
-        .unwrap_or_else(|| agent_id.to_string());
     let is_codex = cli_name == "codex";
 
     // 进度心跳：每 5s 发一次"正在处理"，避免用户以为卡死（之前 15s 太长）
@@ -968,6 +976,7 @@ async fn run_via_pc_agent(
                 progress_handle.abort(); // 停止心跳
                 let mut cli_usage = None;
                 let mut accounting_result = None;
+                let mut node_transaction = None;
                 if let Some(usage) = crate::cli_usage::usage_from_optional_parts(
                     prompt_tokens,
                     cached_input_tokens,
@@ -985,7 +994,7 @@ async fn run_via_pc_agent(
                         &usage,
                         Some(&pc_accounting_key),
                     );
-                    settle_pc_cli_node_usage(
+                    node_transaction = settle_pc_cli_node_usage(
                         state,
                         user_id,
                         agent_id,
@@ -1045,6 +1054,25 @@ async fn run_via_pc_agent(
                     }
                     if cli_usage.is_none() {
                         pc_billing_call.release_no_usage();
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "released_no_usage",
+                            None,
+                            None,
+                            None,
+                            Some("CLI completed without token usage"),
+                        );
+                    } else {
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "settled",
+                            cli_usage.as_ref(),
+                            accounting_result.as_ref(),
+                            node_transaction.as_ref(),
+                            None,
+                        );
                     }
                     let _ = tx.send(
                         WsMessage::Done {
@@ -1058,7 +1086,18 @@ async fn run_via_pc_agent(
                     );
                     return Ok(());
                 } else {
-                    return Err(anyhow!("PC CLI 执行失败: {}", error.unwrap_or_default()));
+                    let error_message = format!("PC CLI 执行失败: {}", error.unwrap_or_default());
+                    finish_pc_node_compute_run(
+                        state,
+                        &pc_accounting_key,
+                        "failed",
+                        cli_usage.as_ref(),
+                        accounting_result.as_ref(),
+                        node_transaction.as_ref(),
+                        Some(&error_message),
+                    );
+                    pc_billing_call.release_error();
+                    return Err(anyhow!(error_message));
                 }
             }
             _ => {}
@@ -1066,7 +1105,107 @@ async fn run_via_pc_agent(
     }
 
     progress_handle.abort();
+    finish_pc_node_compute_run(
+        state,
+        &pc_accounting_key,
+        "failed",
+        None,
+        None,
+        None,
+        Some("PC agent CLI 连接中断（未收到 CliDone）"),
+    );
+    pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn start_pc_node_compute_run(
+    state: &AppState,
+    consumer_user_id: &str,
+    node_id: &str,
+    compute_call_id: &str,
+    feature: &str,
+    model: Option<&str>,
+) {
+    let provider_user_id = match state.store.get_node_credential_owner(node_id) {
+        Ok(owner) => owner,
+        Err(e) => {
+            tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，执行证明仅记录消费者侧");
+            None
+        }
+    };
+    let model_id = pc_cli_model_id(model);
+    if let Err(e) = state
+        .store
+        .start_node_compute_run(crate::store::NodeComputeRunStart {
+            compute_call_id,
+            consumer_user_id,
+            provider_user_id: provider_user_id.as_deref(),
+            node_id,
+            model_id: Some(&model_id),
+            feature,
+            usage_mode: "pc_agent_cli",
+            route_reason: Some("pc_agent_selected"),
+        })
+    {
+        tracing::warn!(
+            consumer_user_id,
+            node_id,
+            compute_call_id,
+            "PC CLI 执行证明 start 记录失败: {e:#}"
+        );
+    }
+}
+
+fn finish_pc_node_compute_run(
+    state: &AppState,
+    compute_call_id: &str,
+    requested_status: &str,
+    usage: Option<&crate::cli_usage::CliTokenUsage>,
+    accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
+    node_transaction: Option<&crate::store::NodeTransaction>,
+    error_message: Option<&str>,
+) {
+    let (prompt_tokens, completion_tokens) = usage.map(pc_cli_usage_tokens).unwrap_or((0, 0));
+    let status = if requested_status == "settled" {
+        if accounting_result
+            .map(|result| result.deduplicated)
+            .unwrap_or(false)
+        {
+            "deduplicated"
+        } else if accounting_result.is_none() {
+            "settlement_failed"
+        } else if node_transaction.is_none() {
+            "settlement_skipped"
+        } else {
+            "settled"
+        }
+    } else {
+        requested_status
+    };
+    let billed_cost = node_transaction
+        .map(|tx| tx.billed_cost_rmb_fen)
+        .or_else(|| accounting_result.map(|result| result.cost_rmb_fen))
+        .unwrap_or(0);
+    let provider_earned = node_transaction
+        .map(|tx| tx.provider_earned_fen)
+        .unwrap_or(0);
+    let settlement_status = node_transaction
+        .map(|tx| tx.settlement_status.as_str())
+        .or_else(|| accounting_result.map(|result| result.accounting_status.as_str()));
+    if let Err(e) = state.store.finish_node_compute_run(
+        compute_call_id,
+        crate::store::NodeComputeRunFinish {
+            status,
+            prompt_tokens,
+            completion_tokens,
+            billed_cost_rmb_fen: billed_cost,
+            provider_earned_fen: provider_earned,
+            settlement_status,
+            error_message,
+        },
+    ) {
+        tracing::warn!(compute_call_id, "PC CLI 执行证明 finish 记录失败: {e:#}");
+    }
 }
 
 fn record_pc_execution_started(
@@ -1158,12 +1297,12 @@ fn settle_pc_cli_node_usage(
     model: Option<&str>,
     usage: &crate::cli_usage::CliTokenUsage,
     accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
-) {
+) -> Option<crate::store::NodeTransaction> {
     if accounting_result
         .map(|result| result.deduplicated)
         .unwrap_or(true)
     {
-        return;
+        return None;
     }
     let provider_user_id = match state.store.get_node_credential_owner(node_id) {
         Ok(Some(owner)) if !owner.trim().is_empty() => owner,
@@ -1172,26 +1311,20 @@ fn settle_pc_cli_node_usage(
                 node_id,
                 "PC CLI 用量已记录，但节点缺少 owner，跳过节点收益流水"
             );
-            return;
+            return None;
         }
         Err(e) => {
             tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，跳过节点收益流水");
-            return;
+            return None;
         }
     };
-    let prompt_tokens = clamp_i64_to_u32(usage.input_tokens.max(0));
-    let total_tokens = usage
-        .total_tokens
-        .max(usage.input_tokens.max(0) + usage.output_tokens.max(0));
-    let completion_tokens = clamp_i64_to_u32((total_tokens - usage.input_tokens.max(0)).max(0));
+    let (prompt_tokens_i64, completion_tokens_i64) = pc_cli_usage_tokens(usage);
+    let prompt_tokens = clamp_i64_to_u32(prompt_tokens_i64);
+    let completion_tokens = clamp_i64_to_u32(completion_tokens_i64);
     if prompt_tokens == 0 && completion_tokens == 0 {
-        return;
+        return None;
     }
-    let model_id = model
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| format!("pc-cli/{value}"))
-        .unwrap_or_else(|| "pc-cli/unknown".to_string());
+    let model_id = pc_cli_model_id(model);
     let params = crate::store::SettleParams {
         consumer_user_id,
         provider_user_id: &provider_user_id,
@@ -1215,23 +1348,46 @@ fn settle_pc_cli_node_usage(
         platform_fee_rate: 0.2,
     };
     match state.store.settle_node_inference(params) {
-        Ok(tx) => tracing::debug!(
-            consumer_user_id,
-            provider_user_id,
-            node_id,
-            tokens = prompt_tokens + completion_tokens,
-            billed_cost_rmb_fen = tx.billed_cost_rmb_fen,
-            provider_earned_fen = tx.provider_earned_fen,
-            settlement_status = tx.settlement_status,
-            "PC CLI 节点收益流水已记录"
-        ),
-        Err(e) => tracing::error!(
-            consumer_user_id,
-            provider_user_id,
-            node_id,
-            "PC CLI 节点收益流水记录失败: {e}"
-        ),
+        Ok(tx) => {
+            tracing::debug!(
+                consumer_user_id,
+                provider_user_id,
+                node_id,
+                tokens = prompt_tokens + completion_tokens,
+                billed_cost_rmb_fen = tx.billed_cost_rmb_fen,
+                provider_earned_fen = tx.provider_earned_fen,
+                settlement_status = tx.settlement_status,
+                "PC CLI 节点收益流水已记录"
+            );
+            Some(tx)
+        }
+        Err(e) => {
+            tracing::error!(
+                consumer_user_id,
+                provider_user_id,
+                node_id,
+                "PC CLI 节点收益流水记录失败: {e}"
+            );
+            None
+        }
     }
+}
+
+fn pc_cli_model_id(model: Option<&str>) -> String {
+    model
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("pc-cli/{value}"))
+        .unwrap_or_else(|| "pc-cli/unknown".to_string())
+}
+
+fn pc_cli_usage_tokens(usage: &crate::cli_usage::CliTokenUsage) -> (i64, i64) {
+    let prompt_tokens = usage.input_tokens.max(0);
+    let total_tokens = usage
+        .total_tokens
+        .max(usage.input_tokens.max(0) + usage.output_tokens.max(0));
+    let completion_tokens = (total_tokens - usage.input_tokens.max(0)).max(0);
+    (prompt_tokens, completion_tokens)
 }
 
 fn pc_cli_price_per_1k_credits() -> f64 {
