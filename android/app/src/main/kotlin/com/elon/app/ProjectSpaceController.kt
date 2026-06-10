@@ -39,6 +39,7 @@ internal class ProjectSpaceController(
     private val selectedAgentForRequest: () -> String?,
     private val onProjectDescriptionUpdated: (projectId: String, description: String?) -> Unit,
     private val pickPostImage: (ProjectSpaceSummary, (Result<String>) -> Unit) -> Unit,
+    private val localProjectIconDataUrl: (String) -> String?,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
@@ -175,7 +176,9 @@ internal class ProjectSpaceController(
         if (switchingProject) {
             feedData.reset()
         }
-        val cached = spaceCache[projectId]?.withProjectIcon(localIconDataUrl)
+        val resolvedLocalIcon = localIconDataUrl.cleanProjectIconDataUrl()
+            ?: localProjectIconDataUrl(projectId).cleanProjectIconDataUrl()
+        val cached = spaceCache[projectId]?.withProjectIcon(resolvedLocalIcon)
         if (cached != null) {
             // 命中缓存：立即渲染，同时后台静默刷新
             spaceCache[projectId] = cached
@@ -193,7 +196,7 @@ internal class ProjectSpaceController(
             activity.runOnUiThread {
                 if (activeProjectId != projectId) return@runOnUiThread  // 用户已切走
                 result.onSuccess { space ->
-                    val nextSpace = space.withProjectIcon(localIconDataUrl)
+                    val nextSpace = space.withProjectIcon(resolvedLocalIcon)
                     spaceCache[projectId] = nextSpace
                     activeSpace = nextSpace
                     activeProjectTitle = nextSpace.project.name

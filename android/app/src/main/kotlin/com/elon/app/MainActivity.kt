@@ -628,6 +628,7 @@ class MainActivity : AppCompatActivity() {
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             onProjectDescriptionUpdated = ::updateProjectDescriptionFromSpace,
             pickPostImage = projectPostImageUploader::pickLocalImage,
+            localProjectIconDataUrl = ::localProjectIconDataUrl,
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )
@@ -943,6 +944,13 @@ class MainActivity : AppCompatActivity() {
                 animate
             )
         }
+    }
+
+    private fun localProjectIconDataUrl(projectId: String): String? {
+        val id = projectId.trim().takeIf { it.isNotBlank() } ?: return null
+        return s.projects.firstOrNull { project ->
+            project.id == id || project.projectSpaceId() == id || project.collaborationProjectId?.trim() == id
+        }?.iconDataUrl?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun updateProjectDescriptionFromSpace(projectId: String, description: String?) {
