@@ -10,6 +10,7 @@ mod rust_analyzer;
 mod rust_project;
 mod rust_symbols;
 mod symbol_graph;
+mod validation;
 
 use std::{path::Path, sync::Arc};
 
@@ -62,6 +63,8 @@ pub(crate) async fn compile_preflight_note(
     };
     let relevant_files =
         relevance::find_relevant_files(workspace, user_message, config.max_relevant_files);
+    let validation_plan =
+        validation::build_validation_plan(&snapshot, rust_project.as_ref(), &relevant_files);
     let deterministic_pack = context_pack::build_context_pack(
         &config,
         user_message,
@@ -69,6 +72,7 @@ pub(crate) async fn compile_preflight_note(
         rust_project.as_ref(),
         repo_index.as_ref(),
         &relevant_files,
+        &validation_plan,
         None,
     );
     let llm_brief =
@@ -81,10 +85,23 @@ pub(crate) async fn compile_preflight_note(
         rust_project.as_ref(),
         repo_index.as_ref(),
         &relevant_files,
+        &validation_plan,
         llm_brief.as_deref(),
     );
-    let artifact =
-        artifact::save_context_pack(&state.data_dir, &config, trace_id, user_id, &final_pack);
+    let artifact = artifact::save_context_artifacts(artifact::ContextArtifactsInput {
+        data_dir: &state.data_dir,
+        config: &config,
+        trace_id,
+        user_id,
+        user_message,
+        pack: &final_pack,
+        llm_brief: llm_brief.as_deref(),
+        snapshot: &snapshot,
+        rust_project: rust_project.as_ref(),
+        repo_index: repo_index.as_ref(),
+        relevant_files: &relevant_files,
+        validation_plan: &validation_plan,
+    });
 
     if let Some(trace_id) = trace_id {
         state.server_traces.record(
@@ -107,7 +124,10 @@ pub(crate) async fn compile_preflight_note(
                 })),
                 "pack_chars": final_pack.chars().count(),
                 "artifact_path": artifact.as_ref().map(|item| item.path.display().to_string()),
+                "artifact_bundle_dir": artifact.as_ref().map(|item| item.bundle_dir.display().to_string()),
+                "artifact_file_count": artifact.as_ref().map(|item| item.files.len()),
                 "artifact_bytes": artifact.as_ref().map(|item| item.bytes),
+                "validation_commands": validation_plan.commands.len(),
             }),
         );
     }
@@ -128,6 +148,11 @@ pub(crate) async fn compile_preflight_note(
             .as_ref()
             .map(|item| item.path.display().to_string())
             .unwrap_or_default(),
+        artifact_bundle_dir = artifact
+            .as_ref()
+            .map(|item| item.bundle_dir.display().to_string())
+            .unwrap_or_default(),
+        validation_commands = validation_plan.commands.len(),
         "context compiler completed"
     );
 

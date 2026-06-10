@@ -9,7 +9,7 @@ const MAX_MANIFESTS: usize = 16;
 const MAX_MANIFEST_BYTES: u64 = 128 * 1024;
 const MAX_SCAN_DEPTH: usize = 4;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RustProjectSummary {
     pub(crate) root_package: Option<String>,
     pub(crate) workspace: bool,
@@ -18,7 +18,7 @@ pub(crate) struct RustProjectSummary {
     pub(crate) toolchain: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RustManifestSummary {
     pub(crate) path: String,
     pub(crate) package_name: Option<String>,

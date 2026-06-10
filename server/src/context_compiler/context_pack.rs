@@ -4,6 +4,7 @@ use super::{
     relevance::RelevantFile,
     repo_snapshot::RepoSnapshot,
     rust_project::RustProjectSummary,
+    validation::ValidationPlan,
 };
 
 pub(crate) fn build_context_pack(
@@ -13,6 +14,7 @@ pub(crate) fn build_context_pack(
     rust_project: Option<&RustProjectSummary>,
     repo_index: Option<&RepoContextIndex>,
     relevant_files: &[RelevantFile],
+    validation_plan: &ValidationPlan,
     llm_brief: Option<&str>,
 ) -> String {
     let mut out = String::new();
@@ -40,6 +42,13 @@ pub(crate) fn build_context_pack(
         snapshot.has_origin,
         snapshot.source_file_count
     ));
+    out.push_str(&format!("- git_dirty: {}\n", snapshot.git_dirty));
+    if !snapshot.git_status_short.is_empty() {
+        out.push_str("- git_status_short:\n");
+        for line in &snapshot.git_status_short {
+            out.push_str(&format!("  - {}\n", markdown_escape(line)));
+        }
+    }
     if !snapshot.top_level_entries.is_empty() {
         out.push_str("- top_level_entries: ");
         out.push_str(&snapshot.top_level_entries.join(", "));
@@ -145,6 +154,23 @@ pub(crate) fn build_context_pack(
     out.push_str("- 后端行为变化至少运行相关 cargo test 或 cargo check。\n");
     out.push_str("- Android/APK 变化先完成代码同步；只有用户明确要求发布时才运行发布脚本。\n");
     out.push_str("</output_contract>\n\n");
+
+    out.push_str("<validation_guidance>\n");
+    for command in &validation_plan.commands {
+        let required = if command.required {
+            "required"
+        } else {
+            "recommended"
+        };
+        out.push_str(&format!(
+            "- `{}` ({}) - {}\n",
+            command.command, required, command.reason
+        ));
+    }
+    for note in &validation_plan.notes {
+        out.push_str(&format!("- note: {note}\n"));
+    }
+    out.push_str("</validation_guidance>\n\n");
     out.push_str("</task_context_pack>");
 
     truncate_pack(out, config.max_pack_chars)
@@ -358,6 +384,8 @@ mod tests {
         let snapshot = RepoSnapshot {
             git_head: Some("abc123".to_string()),
             git_branch: Some("main".to_string()),
+            git_dirty: false,
+            git_status_short: Vec::new(),
             has_origin: true,
             top_level_entries: vec!["server/".to_string()],
             instruction_docs: vec!["AGENTS.md".to_string()],
@@ -373,6 +401,10 @@ mod tests {
             reasons: vec!["path contains `context`".to_string()],
             matches: Vec::new(),
         }];
+        let validation = ValidationPlan {
+            commands: Vec::new(),
+            notes: vec!["read files".to_string()],
+        };
 
         let pack = build_context_pack(
             &config,
@@ -381,6 +413,7 @@ mod tests {
             None,
             None,
             &relevant,
+            &validation,
             None,
         );
 
@@ -412,6 +445,8 @@ mod tests {
         let snapshot = RepoSnapshot {
             git_head: Some("abc123".to_string()),
             git_branch: Some("main".to_string()),
+            git_dirty: true,
+            git_status_short: vec![" M src/lib.rs".to_string()],
             has_origin: true,
             top_level_entries: Vec::new(),
             instruction_docs: Vec::new(),
@@ -426,10 +461,24 @@ mod tests {
             manifests: Vec::new(),
             toolchain: Some("stable".to_string()),
         };
+        let validation = ValidationPlan {
+            commands: Vec::new(),
+            notes: Vec::new(),
+        };
 
-        let pack = build_context_pack(&config, "任务", &snapshot, Some(&rust), None, &[], None);
+        let pack = build_context_pack(
+            &config,
+            "任务",
+            &snapshot,
+            Some(&rust),
+            None,
+            &[],
+            &validation,
+            None,
+        );
 
         assert!(pack.contains("<rust_project>"));
         assert!(pack.contains("root_package: elon-server"));
+        assert!(pack.contains("git_dirty: true"));
     }
 }

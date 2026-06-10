@@ -28,10 +28,12 @@ const SKIP_DIRS: &[&str] = &[
     "vendor",
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RepoSnapshot {
     pub(crate) git_head: Option<String>,
     pub(crate) git_branch: Option<String>,
+    pub(crate) git_dirty: bool,
+    pub(crate) git_status_short: Vec<String>,
     pub(crate) has_origin: bool,
     pub(crate) top_level_entries: Vec<String>,
     pub(crate) instruction_docs: Vec<String>,
@@ -40,7 +42,7 @@ pub(crate) struct RepoSnapshot {
     pub(crate) source_file_count: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct SourceFileStat {
     pub(crate) path: String,
     pub(crate) lines: usize,
@@ -61,6 +63,8 @@ pub(crate) fn collect_repo_snapshot(workspace: &Path) -> RepoSnapshot {
     RepoSnapshot {
         git_head: git_output(workspace, &["rev-parse", "--short", "HEAD"]),
         git_branch: git_output(workspace, &["rev-parse", "--abbrev-ref", "HEAD"]),
+        git_dirty: git_is_dirty(workspace),
+        git_status_short: git_status_short(workspace),
         has_origin: git_output(workspace, &["remote", "get-url", "origin"]).is_some(),
         top_level_entries: top_level_entries(workspace),
         instruction_docs: instruction_docs(workspace),
@@ -68,6 +72,24 @@ pub(crate) fn collect_repo_snapshot(workspace: &Path) -> RepoSnapshot {
         large_files,
         source_file_count,
     }
+}
+
+fn git_is_dirty(workspace: &Path) -> bool {
+    git_output(workspace, &["status", "--porcelain"])
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn git_status_short(workspace: &Path) -> Vec<String> {
+    git_output(workspace, &["status", "--short"])
+        .map(|value| {
+            value
+                .lines()
+                .map(|line| line.to_string())
+                .take(20)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn git_output(workspace: &Path, args: &[&str]) -> Option<String> {

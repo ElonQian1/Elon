@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct RepoContextIndex {
     pub(crate) cargo: CargoIndex,
     pub(crate) rust: RustIndex,
@@ -6,7 +6,7 @@ pub(crate) struct RepoContextIndex {
     pub(crate) rust_analyzer: RustAnalyzerReport,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct CargoIndex {
     pub(crate) manifest_path: Option<String>,
     pub(crate) workspace_root: Option<String>,
@@ -14,7 +14,7 @@ pub(crate) struct CargoIndex {
     pub(crate) warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct CargoPackageSummary {
     pub(crate) name: String,
     pub(crate) version: String,
@@ -23,14 +23,14 @@ pub(crate) struct CargoPackageSummary {
     pub(crate) features: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct RustIndex {
     pub(crate) files_scanned: usize,
     pub(crate) symbols: Vec<RustSymbol>,
     pub(crate) warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RustSymbol {
     pub(crate) id: String,
     pub(crate) name: String,
@@ -46,7 +46,8 @@ pub(crate) struct RustSymbol {
     pub(crate) safety_notes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum SymbolKind {
     Module,
     Struct,
@@ -77,7 +78,8 @@ impl SymbolKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum SymbolVisibility {
     Public,
     Crate,
@@ -94,7 +96,7 @@ impl SymbolVisibility {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct SymbolGraphSummary {
     pub(crate) ranked_files: Vec<RankedFile>,
     pub(crate) ranked_symbols: Vec<RankedSymbol>,
@@ -102,7 +104,7 @@ pub(crate) struct SymbolGraphSummary {
     pub(crate) warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RankedFile {
     pub(crate) path: String,
     pub(crate) role: &'static str,
@@ -112,7 +114,7 @@ pub(crate) struct RankedFile {
     pub(crate) reasons: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RankedSymbol {
     pub(crate) id: String,
     pub(crate) name: String,
@@ -124,7 +126,7 @@ pub(crate) struct RankedSymbol {
     pub(crate) reasons: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct CodeRelationship {
     pub(crate) from_path: String,
     pub(crate) to_symbol_id: String,
@@ -135,7 +137,8 @@ pub(crate) struct CodeRelationship {
     pub(crate) reason: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum RelationshipKind {
     CallsOrMentions,
     TypeReference,
@@ -156,7 +159,7 @@ impl RelationshipKind {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct RustAnalyzerReport {
     pub(crate) available: bool,
     pub(crate) version: Option<String>,
@@ -166,7 +169,7 @@ pub(crate) struct RustAnalyzerReport {
     pub(crate) warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RustAnalyzerSymbol {
     pub(crate) path: String,
     pub(crate) label: String,

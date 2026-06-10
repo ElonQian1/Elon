@@ -12,7 +12,7 @@ const SEARCH_EXTENSIONS: &[&str] = &[
     "yaml", "yml", "json",
 ];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RelevantFile {
     pub(crate) path: String,
     pub(crate) score: usize,
@@ -22,7 +22,7 @@ pub(crate) struct RelevantFile {
     pub(crate) matches: Vec<LineMatch>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct LineMatch {
     pub(crate) line: usize,
     pub(crate) text: String,
