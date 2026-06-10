@@ -275,7 +275,7 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(floatingButton(
-                iconRes = R.drawable.ic_popup_history,
+                iconRes = R.drawable.ic_project_document,
                 contentDescription = "项目文档",
                 onClick = openProjectDocuments
             ))

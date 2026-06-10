@@ -71,6 +71,7 @@ mod project_completion;
 mod project_conversation_identity;
 mod project_conversation_workspace;
 mod project_deletion;
+mod project_docs;
 mod project_downloads;
 mod project_events;
 mod project_execution_mode;

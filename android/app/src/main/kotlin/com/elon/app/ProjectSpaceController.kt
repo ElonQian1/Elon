@@ -580,18 +580,15 @@ internal class ProjectSpaceController(
 
     private fun showProjectDocumentsDialog() {
         val space = activeSpace ?: return
-        val items = arrayOf("项目简介", "成员列表", "话题入口")
-        AlertDialog.Builder(activity)
-            .setTitle("项目文档")
-            .setItems(items) { dialog, which ->
-                dialog.dismiss()
-                when (which) {
-                    0 -> showProjectDescriptionDialog(space)
-                    1 -> showMembers()
-                    2 -> showProjectChannelsDialog(space)
-                }
-            }
-            .show()
+        ProjectSpaceDocumentDialog.show(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            projectId = space.project.id,
+            route = activeRoute,
+            projectTitle = space.project.name,
+            dp = dp
+        )
     }
 
     private fun showProjectChannelsDialog(space: ProjectSpace) {

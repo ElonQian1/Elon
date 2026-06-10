@@ -12,8 +12,8 @@ use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, friend_api, global_ws, lan_peer, lm_chat, node_api,
     node_compute_admin, node_payout_admin, peer_relay, project_api, project_attachments,
-    project_chat, project_conversation_identity, project_deletion, project_downloads, project_git,
-    project_join_requests, project_membership, project_space, project_store,
+    project_chat, project_conversation_identity, project_deletion, project_docs, project_downloads,
+    project_git, project_join_requests, project_membership, project_space, project_store,
     project_workspace_health, project_workspace_recovery, release_claim, speech_translate,
     token_usage_api, user_api, user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api,
     voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
@@ -237,6 +237,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             axum::routing::patch(project_space::update_project_description),
         )
         .route(
+            "/api/projects/:project_id/docs",
+            get(project_docs::get_project_document),
+        )
+        .route(
             "/api/projects/:project_id/members/:member_user_id/conversations",
             get(project_space::list_member_conversations),
         )
@@ -334,6 +338,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/space/description",
             axum::routing::patch(project_space::update_user_project_description),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/docs",
+            get(project_docs::get_user_project_document),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/messages",

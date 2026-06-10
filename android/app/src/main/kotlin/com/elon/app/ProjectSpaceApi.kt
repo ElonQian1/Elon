@@ -514,7 +514,7 @@ private const val PROJECT_INVITE_SOCIAL_AI_USER_ID = "usr_elon_ai"
 
 private fun projectSpaceUrlPart(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 
-private fun projectSpaceUrl(
+internal fun projectSpaceUrl(
     serverUrl: String,
     projectId: String,
     route: ProjectSpaceRoute,

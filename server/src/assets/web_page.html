@@ -588,6 +588,11 @@
       font-size: 24px;
       cursor: pointer;
     }
+    .project-space-fab svg {
+      width: 26px;
+      height: 26px;
+      vertical-align: middle;
+    }
     @media (max-width: 520px) {
       .project-space-summary {
         grid-template-columns: 1fr;
@@ -1319,6 +1324,34 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .project-doc-modal {
+      max-width: 760px;
+      max-height: 78vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .project-document-path {
+      color: #81B3D9;
+      font-size: 12px;
+      min-height: 18px;
+    }
+    .project-document-content {
+      flex: 1;
+      min-height: 180px;
+      max-height: 56vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: var(--bg-hint);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.65;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
     .agent-list {
       display: grid;
       gap: 8px;
@@ -1522,7 +1555,11 @@
             <div class="project-space-feed-empty">正在加载帖子...</div>
           </div>
           <div class="project-space-feed-actions">
-            <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button">□</button>
+            <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
+              <svg viewBox="0 0 28 28" aria-hidden="true">
+                <path d="M8 4h8l4 4v16H8zM16 4v5h4M11 13h6M11 17h8M11 21h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+              </svg>
+            </button>
             <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button">+</button>
           </div>
         </div>
@@ -1913,6 +1950,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </div>
 </div>
 
+<!-- ============ 项目文档对话框 ============ -->
+<div class="modal-mask" id="projectDocumentMask">
+  <div class="modal project-doc-modal">
+    <h2 id="projectDocumentTitle">项目文档</h2>
+    <div class="project-document-path" id="projectDocumentPath"></div>
+    <div class="project-document-content" id="projectDocumentContent">加载中...</div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="closeProjectDocumentBtn">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ 项目协作权限对话框 ============ -->
 <div class="modal-mask" id="projectVisibilityMask">
   <form class="modal" id="projectVisibilityForm">
@@ -2033,6 +2082,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectBuildBtn = $('projectBuildBtn');
   const projectRecordBtn = $('projectRecordBtn');
   const projectGitBtn = $('projectGitBtn');
+  const projectDocumentMask = $('projectDocumentMask');
+  const projectDocumentTitle = $('projectDocumentTitle');
+  const projectDocumentPath = $('projectDocumentPath');
+  const projectDocumentContent = $('projectDocumentContent');
+  const closeProjectDocumentBtn = $('closeProjectDocumentBtn');
   const projectSettingsBtn = $('projectSettingsBtn');
   if (projectWorkspaceHealth) {
     projectWorkspaceHealth.addEventListener('click', (event) => {
@@ -2047,7 +2101,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectSpaceDocsBtn) {
     projectSpaceDocsBtn.addEventListener('click', () => {
-      showNativeOnly('项目文档、成员列表和话题入口请在 Android APK 的项目空间中使用。');
+      openProjectDocumentDialog(currentProject);
     });
   }
   if (projectSpacePostBtn) {
@@ -5024,6 +5078,30 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   projectRecordBtn.addEventListener('click', () => openProjectProgressDialog(currentProject));
   closeProgressLogBtn.addEventListener('click', () => progressLogMask.classList.remove('active'));
   progressLogMask.addEventListener('click', (e) => { if (e.target === progressLogMask) progressLogMask.classList.remove('active'); });
+  closeProjectDocumentBtn.addEventListener('click', () => projectDocumentMask.classList.remove('active'));
+  projectDocumentMask.addEventListener('click', (e) => { if (e.target === projectDocumentMask) projectDocumentMask.classList.remove('active'); });
+  async function openProjectDocumentDialog(project = currentProject) {
+    if (!project || !project.id) {
+      window.alert('请先选择一个项目，再查看项目文档。');
+      return;
+    }
+    projectDocumentTitle.textContent = projectNameOf(project) + ' · 项目文档';
+    projectDocumentPath.textContent = '';
+    projectDocumentContent.textContent = '正在读取仓库文档...';
+    projectDocumentMask.classList.add('active');
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(project.id) + '/docs');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      const doc = data.document || {};
+      const path = doc.path || doc.title || 'README.md';
+      projectDocumentPath.textContent = path + (doc.truncated ? ' · 已截断' : '');
+      projectDocumentContent.textContent = String(doc.content || '').trim() || '（文档为空）';
+    } catch (err) {
+      projectDocumentPath.textContent = '';
+      projectDocumentContent.textContent = '读取项目文档失败：' + ((err && err.message) ? err.message : '请稍后重试');
+    }
+  }
   closeProjectGitBtn.addEventListener('click', () => projectGitMask.classList.remove('active'));
   projectGitMask.addEventListener('click', (e) => { if (e.target === projectGitMask) projectGitMask.classList.remove('active'); });
   async function openProjectGitDialog(project = currentProject) {
