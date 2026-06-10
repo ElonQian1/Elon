@@ -905,6 +905,14 @@ mod tests {
         let user = store
             .create_user("system-guard@example.com", "secret1", None, None)
             .expect("user should be created");
+        let member = store
+            .create_user(
+                "system-guard-member@example.com",
+                "secret1",
+                Some("成员"),
+                None,
+            )
+            .expect("member should be created");
         let (project_id, _) = store
             .ensure_balloon_project_for_user(&user.id)
             .expect("system project should exist");
@@ -920,6 +928,42 @@ mod tests {
             .expect_err("system project visibility should be rejected")
             .to_string();
         assert!(visibility_err.contains("系统归档项目"));
+
+        let join_err = store
+            .join_project(&member.id, &project_id)
+            .expect_err("system project join should be rejected")
+            .to_string();
+        assert!(join_err.contains("系统归档项目不支持加入"));
+
+        let add_err = store
+            .add_project_member_by_account(&project_id, "system-guard-member@example.com", "member")
+            .expect_err("system project member add should be rejected")
+            .to_string();
+        assert!(add_err.contains("系统归档项目不能添加成员"));
+
+        let role_err = store
+            .update_member_role(&project_id, &member.id, "admin")
+            .expect_err("system project role change should be rejected")
+            .to_string();
+        assert!(role_err.contains("系统归档项目不能修改成员角色"));
+
+        let remove_err = store
+            .remove_member(&project_id, &member.id)
+            .expect_err("system project member removal should be rejected")
+            .to_string();
+        assert!(remove_err.contains("系统归档项目不能移除成员"));
+
+        let bind_err = store
+            .bind_project_to_pc_workspace(
+                &user.id,
+                &project_id,
+                "D:/Elon/workspaces/user/project/repo",
+                "node-a",
+                None,
+            )
+            .expect_err("system project PC binding should be rejected")
+            .to_string();
+        assert!(bind_err.contains("系统归档项目不能绑定"));
     }
 
     #[test]

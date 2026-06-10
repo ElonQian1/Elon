@@ -60,10 +60,9 @@ pub fn cleanup_project_workspace(
     };
 
     let Some(project_dir) = managed_project_dir(&root, &repo, &project_part)? else {
-        result.skipped_paths.push(format!(
-            "跳过非平台托管 PC 工作区：{}",
-            repo.display()
-        ));
+        result
+            .skipped_paths
+            .push(format!("跳过非平台托管 PC 工作区：{}", repo.display()));
         return Ok(result);
     };
     let worktree_root = root.join("conversation-worktrees").join(&project_part);
@@ -72,11 +71,7 @@ pub fn cleanup_project_workspace(
     Ok(result)
 }
 
-fn managed_project_dir(
-    root: &Path,
-    repo: &Path,
-    project_part: &str,
-) -> Result<Option<PathBuf>> {
+fn managed_project_dir(root: &Path, repo: &Path, project_part: &str) -> Result<Option<PathBuf>> {
     if repo.file_name().and_then(|value| value.to_str()) != Some("repo") {
         return Ok(None);
     }
@@ -107,7 +102,7 @@ fn remove_conversation_worktrees(
     }
     ensure_within_root(root, worktree_root)?;
     if repo.exists() && is_git_work_tree(repo) {
-        for entry in std::fs::read_dir(worktree_root)?.filter_map(Result::ok) {
+        for entry in std::fs::read_dir(worktree_root)?.filter_map(|entry| entry.ok()) {
             let path = entry.path();
             if path.is_dir() {
                 let _ = run_git_dynamic(

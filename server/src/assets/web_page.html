@@ -820,7 +820,17 @@
     .my-node-id.offline { color: #6F7785; }
     .my-node-subtitle { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .my-node-models { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-metrics {
+      display: flex; flex-wrap: wrap; gap: 4px 8px;
+      font-size: 11px; color: #8C96A5; margin-top: 4px;
+    }
+    .my-node-alert { color: #F7D28A; }
+    .my-node-row.warning { border: 1px solid rgba(201,150,48,0.28); }
+    .my-node-row.bad { border: 1px solid rgba(196,70,70,0.34); }
     .my-node-badge { font-size: 11px; color: #81B3D9; flex-shrink: 0; margin-left: 8px; }
+    .my-node-badge.ok { color: #58BE6A; }
+    .my-node-badge.warn { color: #F7D28A; }
+    .my-node-badge.bad { color: #E99191; }
     .my-node-badge.offline { color: #6F7785; }
     .my-nodes-empty { text-align: center; color: #6F7785; font-size: 12px; padding: 12px 0 4px; line-height: 1.6; }
     .profile-row {
@@ -2717,6 +2727,46 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     while (n >= 1024 && i < units.length - 1) { n /= 1024; i += 1; }
     return (i >= 3 ? n.toFixed(1) : Math.round(n).toString()) + ' ' + units[i];
   }
+  function nodeCapacityTone(node) {
+    const tone = String((node && (node.capacity_tone || node.capacityTone)) || '').trim().toLowerCase();
+    if (tone === 'ok' || tone === 'warn' || tone === 'bad') return tone;
+    return '';
+  }
+  function nodeCapacityLabel(node) {
+    return String((node && (node.capacity_label || node.capacityLabel)) || '').trim();
+  }
+  function nodeProjectSlotsText(node) {
+    const count = Number(node && (node.project_count ?? node.projectCount));
+    const limit = Number(node && (node.project_limit ?? node.projectLimit));
+    const remaining = Number(node && (node.project_slots_remaining ?? node.projectSlotsRemaining));
+    if (Number.isFinite(count) && Number.isFinite(limit) && limit > 0) {
+      const suffix = Number.isFinite(remaining) ? ` · 剩余 ${Math.max(remaining, 0)}` : '';
+      return `项目 ${count}/${limit}${suffix}`;
+    }
+    if (Number.isFinite(remaining)) return `剩余 ${Math.max(remaining, 0)} 个项目位`;
+    return '';
+  }
+  function nodeDiskText(node) {
+    const raw = node && (node.disk_free_bytes ?? node.diskFreeBytes);
+    const label = formatBytes(raw);
+    return label ? `磁盘 ${label}` : '磁盘未知';
+  }
+  function nodeCanAcceptProject(node) {
+    if (!node) return false;
+    const explicit = node.can_accept_project ?? node.canAcceptProject;
+    if (explicit === true || explicit === 1 || explicit === '1') return true;
+    if (explicit === false || explicit === 0 || explicit === '0') return false;
+    const remaining = Number(node.project_slots_remaining ?? node.projectSlotsRemaining);
+    if (Number.isFinite(remaining) && remaining <= 0) return false;
+    return nodeCapacityTone(node) !== 'bad';
+  }
+  function nodeCapacitySummary(node) {
+    return [
+      nodeCapacityLabel(node) || '容量未知',
+      nodeProjectSlotsText(node),
+      nodeDiskText(node)
+    ].filter(Boolean).join(' · ');
+  }
   function formatLatestExecution(session) {
     if (!session) return '暂无执行记录';
     const status = session.status || '未知';
@@ -3552,12 +3602,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       projectNodeSelect.innerHTML = '<option value="">没有在线 PC 节点</option>';
       return;
     }
-    projectNodeSelect.innerHTML = nodes.map((node) => {
+    const orderedNodes = nodes.slice().sort((left, right) => {
+      return Number(!nodeCanAcceptProject(left)) - Number(!nodeCanAcceptProject(right));
+    });
+    const selectableCount = orderedNodes.filter(nodeCanAcceptProject).length;
+    const options = orderedNodes.map((node) => {
       const nodeId = node.node_id || node.agent_id || '';
       const shortId = node.short_id || (nodeId.length > 16 ? '...' + nodeId.slice(-14) : nodeId);
       const label = node.display_name || node.label || node.device_name || shortId;
-      return `<option value="${escapeHtml(nodeId)}">${escapeHtml(label)} · ${escapeHtml(shortId)}</option>`;
+      const disabled = nodeCanAcceptProject(node) ? '' : ' disabled';
+      const summary = nodeCapacitySummary(node);
+      return `<option value="${escapeHtml(nodeId)}"${disabled}>${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(summary)}</option>`;
     }).join('');
+    projectNodeSelect.innerHTML = selectableCount > 0
+      ? options
+      : '<option value="">暂无可创建项目的 PC 节点</option>' + options;
     projectNodeSelect.disabled = false;
   }
   function openAddFriendDialog() {
@@ -3585,7 +3644,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     createProjectBtn.disabled = true;
     newProjectError.textContent = '';
     try {
-      if (!projectNodeSelect.value) throw new Error('请先选择一个在线 PC 节点');
+      if (!projectNodeSelect.value) throw new Error('请先选择一个可创建项目的 PC 节点');
       const res = await api('/api/projects', {
         method: 'POST',
         body: JSON.stringify({
@@ -3846,16 +3905,29 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         const modelText = models.length
           ? models.slice(0, 3).join('  ·  ') + (models.length > 3 ? `  +${models.length - 3}` : '')
           : '暂无可用模型';
+        const capacityTone = nodeCapacityTone(node) || (online ? 'warn' : 'bad');
+        const capacityLabel = nodeCapacityLabel(node) || (online ? '容量未知' : '离线');
+        const capacityClass = online ? capacityTone : 'offline';
+        const rowToneClass = capacityTone === 'bad' ? 'bad' : capacityTone === 'warn' ? 'warning' : '';
+        const warnings = Array.isArray(node.capacity_warnings || node.capacityWarnings)
+          ? (node.capacity_warnings || node.capacityWarnings).filter(Boolean)
+          : [];
+        const alertText = warnings[0] || '';
         const row = document.createElement('div');
-        row.className = 'my-node-row';
+        row.className = `my-node-row ${rowToneClass}`;
         row.innerHTML = `
           <div class="my-node-dot ${online ? 'online' : 'offline'}"></div>
           <div class="my-node-info">
             <div class="my-node-id ${online ? '' : 'offline'}">${escapeHtml(displayName)}</div>
             <div class="my-node-subtitle">${escapeHtml(subtitle)}</div>
             <div class="my-node-models">${escapeHtml(modelText)}</div>
+            <div class="my-node-metrics">
+              <span>${escapeHtml(nodeProjectSlotsText(node) || '项目位未知')}</span>
+              <span>${escapeHtml(nodeDiskText(node))}</span>
+              ${alertText ? `<span class="my-node-alert">${escapeHtml(alertText)}</span>` : ''}
+            </div>
           </div>
-          <div class="my-node-badge ${online ? '' : 'offline'}">${models.length} 模型</div>
+          <div class="my-node-badge ${capacityClass}">${escapeHtml(capacityLabel)}</div>
         `;
         listEl.appendChild(row);
       });
