@@ -176,7 +176,6 @@
 .project-home-empty-card {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 1;
   border: 0;
   background: #181b20;
   color: inherit;
@@ -189,6 +188,11 @@
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  min-height: clamp(170px, calc((100vw - 32px) / 2), 240px);
+}
+
+.project-home-empty-card {
+  aspect-ratio: 1 / 1;
 }
 
 .project-home-more {
@@ -312,14 +316,13 @@
 }
 
 .project-home-intro {
-  display: -webkit-box;
+  display: block;
   margin-top: 6px;
   color: #7d8795;
   font-size: 10px;
   line-height: 1.25;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  overflow: visible;
+  white-space: pre-wrap;
 }
 
 .project-home-thumb img {

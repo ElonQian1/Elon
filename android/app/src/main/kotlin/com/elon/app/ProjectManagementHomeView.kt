@@ -392,8 +392,6 @@ internal class ProjectManagementHomeView(
                     addView(TextView(activity).apply {
                         includeFontPadding = false
                         text = intro
-                        maxLines = 2
-                        ellipsize = TextUtils.TruncateAt.END
                         setTextColor(Color.parseColor("#7D8795"))
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                         setLineSpacing(dp(2).toFloat(), 1.0f)

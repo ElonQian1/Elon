@@ -613,13 +613,13 @@ internal class ProjectSpaceController(
                         setTextColor(Color.parseColor("#A6AFBD"))
                         setPadding(0, dp(8), 0, 0)
                     })
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.9f))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.78f))
                 addView(projectDescriptionCard(space), LinearLayout.LayoutParams(
                     0,
-                    dp(92),
-                    1.35f
+                    dp(136),
+                    1.7f
                 ).apply {
-                    marginStart = dp(14)
+                    marginStart = dp(12)
                 })
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -673,9 +673,9 @@ internal class ProjectSpaceController(
             includeFontPadding = false
             setTextColor(Color.parseColor(if (description.isBlank()) "#6F7785" else "#F2F5FA"))
             setLineSpacing(dp(3).toFloat(), 1.0f)
-            maxLines = 4
+            maxLines = 8
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setPadding(dp(16), dp(14), dp(16), dp(14))
             background = panelBackground("#22262C").apply {
                 cornerRadius = dp(14).toFloat()
             }

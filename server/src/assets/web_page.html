@@ -399,8 +399,8 @@
       background: var(--panel);
       padding: 18px 22px;
       display: grid;
-      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
-      gap: 14px;
+      grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.7fr);
+      gap: 12px;
       align-items: center;
     }
     .project-space-title {
@@ -423,16 +423,22 @@
       white-space: nowrap;
     }
     .project-space-intro-card {
-      min-height: 92px;
+      min-height: 136px;
       border: 0;
       border-radius: 14px;
       background: #22262C;
       color: var(--ink);
-      padding: 12px 14px;
+      padding: 14px 16px;
       text-align: center;
       font-size: 13px;
       line-height: 1.45;
       white-space: pre-wrap;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 8;
+      -webkit-box-orient: vertical;
+      -webkit-box-pack: center;
+      -webkit-box-align: center;
       cursor: pointer;
     }
     .project-space-intro-card.empty {
