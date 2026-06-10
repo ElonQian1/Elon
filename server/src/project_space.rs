@@ -368,7 +368,7 @@ pub async fn send_user_project_channel_message(
         Ok(pair) => pair,
         Err(response) => return response,
     };
-    send_channel_message_response(state, user.id, project.id, channel_id, req)
+    send_channel_message_response(state, user.id, project, channel_id, req)
 }
 
 pub async fn send_channel_message(
@@ -381,33 +381,37 @@ pub async fn send_channel_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    if let Err(e) = project_access(&state, &user.id, &project_id) {
-        return json_error(StatusCode::FORBIDDEN, e.to_string());
-    }
-    send_channel_message_response(state, user.id, project_id, channel_id, req)
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    send_channel_message_response(state, user.id, project, channel_id, req)
 }
 
 fn send_channel_message_response(
     state: Arc<AppState>,
     user_id: String,
-    project_id: String,
+    project: ProjectAccess,
     channel_id: String,
     req: SendChannelMessageRequest,
 ) -> Response {
     let channel_kind = match state
         .store
-        .get_project_channel_kind(&project_id, &channel_id)
+        .get_project_channel_kind(&project.id, &channel_id)
     {
         Ok(kind) => kind,
         Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
     };
+    if channel_kind == "announcements" && !can_edit_project_announcement(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目创建者可以编辑公告");
+    }
     let message_kind = if channel_kind == "suggestions" {
         "suggestion"
     } else {
         "text"
     };
     match state.store.insert_project_channel_message(
-        &project_id,
+        &project.id,
         &channel_id,
         Some(&user_id),
         message_kind,
@@ -417,6 +421,10 @@ fn send_channel_message_response(
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
+}
+
+fn can_edit_project_announcement(role: &str) -> bool {
+    matches!(role.trim().to_ascii_lowercase().as_str(), "owner" | "creator")
 }
 
 pub async fn mark_user_project_suggestion_updated(

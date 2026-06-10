@@ -1,6 +1,8 @@
 package com.elon.app
 
-internal fun projectRoleLabel(role: String?): String = when (role) {
+import java.util.Locale
+
+internal fun projectRoleLabel(role: String?): String = when (role.normalizedProjectRole()) {
     "owner" -> "所有者"
     "admin" -> "管理员"
     "editor" -> "协作者"
@@ -10,9 +12,17 @@ internal fun projectRoleLabel(role: String?): String = when (role) {
 }
 
 internal fun canManageProjectMembers(role: String?): Boolean {
-    return role == "owner" || role == "admin"
+    return role.normalizedProjectRole() in setOf("owner", "admin")
 }
 
 internal fun canResolveProjectSuggestion(role: String?): Boolean {
-    return role == "owner" || role == "admin" || role == "editor" || role == "member"
+    return role.normalizedProjectRole() in setOf("owner", "admin", "editor", "member")
+}
+
+internal fun canEditProjectAnnouncement(role: String?): Boolean {
+    return role.normalizedProjectRole() in setOf("owner", "creator")
+}
+
+private fun String?.normalizedProjectRole(): String? {
+    return this?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
 }

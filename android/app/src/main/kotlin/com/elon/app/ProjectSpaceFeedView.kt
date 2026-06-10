@@ -21,7 +21,8 @@ internal class ProjectSpaceFeedView(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val openChannel: (ProjectChannel) -> Unit,
     private val openPostComposer: () -> Unit,
-    private val openProjectDocuments: () -> Unit
+    private val openProjectDocuments: () -> Unit,
+    private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
 ) {
     fun render(
         container: LinearLayout,
@@ -73,6 +74,9 @@ internal class ProjectSpaceFeedView(
         val textValue = latest?.content?.trim()
             ?: announcement?.lastMessage?.trim()
             ?: "不得发布与主题内容不相关的帖子。"
+        val displayText = parseProjectSpacePostText(textValue).detailText
+        val announcementChannel = announcement
+        val editable = announcementChannel != null && canEditProjectAnnouncement(space.project.role)
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -84,6 +88,14 @@ internal class ProjectSpaceFeedView(
             ).apply {
                 setMargins(dp(10), dp(14), dp(10), dp(8))
             }
+            if (editable) {
+                isClickable = true
+                foreground = selectableForeground()
+                contentDescription = "编辑项目公告"
+                setOnClickListener {
+                    announcementChannel?.let { openAnnouncementEditor(it, displayText) }
+                }
+            }
             addView(TextView(activity).apply {
                 text = "公告"
                 textSize = 15f
@@ -91,7 +103,7 @@ internal class ProjectSpaceFeedView(
                 setTextColor(Color.parseColor("#F2F5FA"))
             })
             addView(TextView(activity).apply {
-                text = parseProjectSpacePostText(textValue).detailText
+                text = displayText
                 textSize = 14f
                 setTextColor(Color.parseColor("#A6AFBD"))
                 setLineSpacing(dp(3).toFloat(), 1f)

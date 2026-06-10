@@ -67,13 +67,23 @@ internal class ProjectSpaceController(
         isSpaceLandingActive = { activeChannel == null && activeMemberConversation == null },
         renderLanding = { renderProjectSpaceLanding() }
     )
+    private val announcementEditor = ProjectSpaceAnnouncementEditor(
+        activity = activity,
+        dp = dp,
+        onSubmit = { channel, content, onComplete ->
+            feedData.submitAnnouncement(channel, content, onComplete)
+        }
+    )
     private val feedView = ProjectSpaceFeedView(
         activity = activity,
         dp = dp,
         selectableForeground = selectableForeground,
         openChannel = { channel -> openChannel(channel) },
         openPostComposer = { renderPostComposer() },
-        openProjectDocuments = { showProjectDocumentsDialog() }
+        openProjectDocuments = { showProjectDocumentsDialog() },
+        openAnnouncementEditor = { channel, currentText ->
+            activeSpace?.let { announcementEditor.show(it, channel, currentText) }
+        }
     )
     private val postComposer = ProjectSpacePostComposer(
         activity = activity,
@@ -973,7 +983,7 @@ internal class ProjectSpaceController(
         const val PROJECT_DESCRIPTION_MAX_CHARS = 240
 
         fun canEditProjectDescription(role: String?): Boolean {
-            return role == "owner" || role == "admin" || role == "editor"
+            return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")
         }
     }
 }

@@ -67,6 +67,40 @@ internal class ProjectSpaceFeedData(
         }
     }
 
+    fun submitAnnouncement(
+        channel: ProjectChannel,
+        content: String,
+        onComplete: (Result<Unit>) -> Unit
+    ) {
+        val projectId = activeProjectId() ?: run {
+            onComplete(Result.failure(IllegalStateException("项目空间未就绪")))
+            return
+        }
+        val cleanContent = content.trim()
+        if (cleanContent.isBlank()) {
+            onComplete(Result.failure(IllegalArgumentException("公告内容不能为空")))
+            return
+        }
+        val requestRoute = route()
+        thread(name = "project-space-announcement-submit") {
+            val result = runCatching {
+                sendProjectChannelMessage(http, serverUrl, activity, projectId, channel.id, cleanContent, requestRoute)
+            }
+            activity.runOnUiThread {
+                result.onSuccess { sent ->
+                    val existing = mutableMessagesByChannel[channel.id].orEmpty()
+                    mutableMessagesByChannel[channel.id] = listOf(sent) + existing.filter { it.id != sent.id }
+                    loadedProjectId = projectId
+                    onComplete(Result.success(Unit))
+                    Toast.makeText(activity, "公告已更新", Toast.LENGTH_SHORT).show()
+                    renderLanding()
+                }.onFailure { error ->
+                    onComplete(Result.failure(error))
+                }
+            }
+        }
+    }
+
     private fun load(space: ProjectSpace) {
         val projectId = space.project.id
         val channels = space.channels.filter { it.kind == "announcements" || it.isProjectSpaceFeedChannel() }

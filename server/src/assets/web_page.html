@@ -486,6 +486,13 @@
       padding: 14px;
       color: var(--ink);
     }
+    .project-space-announcement.editable {
+      cursor: pointer;
+    }
+    .project-space-announcement.editable:focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+    }
     .project-space-announcement-title {
       color: var(--ink);
       font-size: 15px;
@@ -3200,6 +3207,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const role = String((project && project.role) || '').toLowerCase();
     return role === 'owner' || role === 'admin' || role === 'editor';
   }
+  function canEditProjectAnnouncement(project) {
+    const role = String((project && project.role) || '').trim().toLowerCase();
+    return role === 'owner' || role === 'creator';
+  }
   function projectTitleOf(project) {
     return String((project && (project.name || project.title)) || '项目').trim() || '项目';
   }
@@ -3276,20 +3287,47 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function renderProjectSpaceFeed(space, loading) {
     if (!projectSpaceAnnouncement || !projectSpacePostList) return;
+    const announcementCard = projectSpaceAnnouncement.closest('.project-space-announcement');
+    const resetAnnouncementAction = () => {
+      if (!announcementCard) return;
+      announcementCard.classList.remove('editable');
+      announcementCard.removeAttribute('role');
+      announcementCard.removeAttribute('tabindex');
+      announcementCard.onclick = null;
+      announcementCard.onkeydown = null;
+    };
     if (!space) {
       projectSpaceAnnouncement.textContent = '不得发布与主题内容不相关的帖子。';
+      resetAnnouncementAction();
       projectSpacePostList.innerHTML = '<div class="project-space-feed-empty">暂无帖子</div>';
       return;
     }
+    const project = space.project || currentProject;
     const channels = Array.isArray(space.channels) ? space.channels : [];
     const channelById = new Map(channels.map((channel) => [channel.id, channel]));
     const announcements = channels.filter((channel) => channel.kind === 'announcements');
     const announcementMessages = announcements.flatMap((channel) => channel.messages || []);
     const latestAnnouncement = announcementMessages[announcementMessages.length - 1];
-    projectSpaceAnnouncement.textContent =
+    const announcementText =
       (latestAnnouncement && latestAnnouncement.content) ||
       (announcements[0] && announcements[0].last_message) ||
       '不得发布与主题内容不相关的帖子。';
+    projectSpaceAnnouncement.textContent = parseProjectSpacePostText(announcementText).body || announcementText;
+    const editableAnnouncement = announcements[0] && canEditProjectAnnouncement(project);
+    if (announcementCard && editableAnnouncement) {
+      announcementCard.classList.add('editable');
+      announcementCard.setAttribute('role', 'button');
+      announcementCard.setAttribute('tabindex', '0');
+      announcementCard.onclick = () => editProjectAnnouncement(announcements[0], projectSpaceAnnouncement.textContent);
+      announcementCard.onkeydown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          editProjectAnnouncement(announcements[0], projectSpaceAnnouncement.textContent);
+        }
+      };
+    } else {
+      resetAnnouncementAction();
+    }
 
     const posts = channels
       .filter((channel) => ['discussion', 'requirements', 'suggestions', 'issues'].includes(channel.kind))
@@ -3351,7 +3389,31 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const msgData = await msgRes.json().catch(() => ({}));
       channel.messages = msgRes.ok && Array.isArray(msgData.messages) ? msgData.messages : [];
     }));
-    renderProjectSpaceFeed({ channels }, false);
+    renderProjectSpaceFeed({ project: data.project || project, channels }, false);
+  }
+  async function editProjectAnnouncement(channel, currentText) {
+    if (!currentProject || !channel || !canEditProjectAnnouncement(currentProject)) return;
+    const defaultText = '不得发布与主题内容不相关的帖子。';
+    const seed = String(currentText || '').trim() === defaultText ? '' : String(currentText || '').trim();
+    const next = window.prompt('编辑公告', seed);
+    if (next == null) return;
+    const content = next.trim();
+    if (!content) {
+      alert('公告内容不能为空');
+      return;
+    }
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(currentProject.id) +
+        '/channels/' + encodeURIComponent(channel.id) + '/messages', {
+          method: 'POST',
+          body: JSON.stringify({ content })
+        });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '保存公告失败');
+      await loadProjectSpaceFeed(currentProject);
+    } catch (err) {
+      alert(err.message || '保存公告失败');
+    }
   }
   async function editProjectDescription() {
     if (!currentProject || !canEditProjectDescription(currentProject)) return;
