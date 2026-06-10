@@ -57,7 +57,7 @@ internal object ChatImageViewer {
         )
 
         image.tag = source
-        ChatImagePreviewLoader.load(source) { bitmap ->
+        ChatImagePreviewLoader.load(context, source) { bitmap ->
             image.post {
                 if (image.tag == source) {
                     image.setImageBitmap(bitmap)

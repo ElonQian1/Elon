@@ -18,10 +18,7 @@ import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlin.math.max
 import kotlin.math.min
 
@@ -87,7 +84,7 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
         image.setImageBitmap(cached)
     } else {
         image.setImageResource(android.R.drawable.ic_menu_gallery)
-        ChatImagePreviewLoader.load(source) { bitmap ->
+        ChatImagePreviewLoader.load(context, source) { bitmap ->
             image.post {
                 if (image.tag == source) {
                     image.setImageBitmap(bitmap)
@@ -379,13 +376,16 @@ internal object ChatImagePreviewLoader {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
-    fun load(source: String, onReady: (Bitmap) -> Unit) {
+    fun load(context: Context, source: String, onReady: (Bitmap) -> Unit) {
         cache.get(source)?.let {
             onReady(it)
             return
         }
+        val appContext = context.applicationContext
         Thread {
-            val bitmap = runCatching { loadBitmap(source) }.getOrNull() ?: return@Thread
+            val bitmap = runCatching { loadBitmap(appContext, source) }
+                .onFailure { ChatImageDiskCache.remove(appContext, source) }
+                .getOrNull() ?: return@Thread
             cache.put(source, bitmap)
             onReady(bitmap)
         }.start()
@@ -393,33 +393,9 @@ internal object ChatImagePreviewLoader {
 
     fun cached(source: String): Bitmap? = cache.get(source)
 
-    private fun loadBitmap(source: String): Bitmap {
-        val bytes = if (source.startsWith("http://") || source.startsWith("https://")) {
-            readUrlBytes(source)
-        } else {
-            File(source).readBytes()
-        }
+    private fun loadBitmap(context: Context, source: String): Bitmap {
+        val bytes = ChatImageDiskCache.readBytes(context, source, MAX_IMAGE_BYTES)
         return decodeSampledBitmap(bytes)
-    }
-
-    private fun readUrlBytes(source: String): ByteArray {
-        val connection = (URL(source).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 8_000
-            readTimeout = 12_000
-        }
-        return connection.inputStream.use { input ->
-            val output = ByteArrayOutputStream()
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            var total = 0
-            while (true) {
-                val read = input.read(buffer)
-                if (read <= 0) break
-                total += read
-                if (total > MAX_IMAGE_BYTES) error("image preview is too large")
-                output.write(buffer, 0, read)
-            }
-            output.toByteArray()
-        }
     }
 
     private fun decodeSampledBitmap(bytes: ByteArray): Bitmap {
