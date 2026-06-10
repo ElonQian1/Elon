@@ -128,6 +128,12 @@ pub enum ServerToAgent {
         req_id: String,
         workspace_path: String,
     },
+    /// 云端要求 PC 节点清理一个由平台创建的项目工作区。
+    CleanupProjectWorkspace {
+        req_id: String,
+        project_id: String,
+        workspace_path: String,
+    },
     /// 云端把 TTS 合成请求转发给有 GPU 的 PC 节点处理
     TtsSynthesizeRequest {
         req_id: String,
@@ -273,6 +279,19 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点已清理项目工作区。
+    ProjectWorkspaceCleaned {
+        req_id: String,
+        project_id: String,
+        removed_paths: Vec<String>,
+        skipped_paths: Vec<String>,
+    },
+    /// PC 节点清理项目工作区失败。
+    ProjectWorkspaceCleanupError {
+        req_id: String,
+        project_id: String,
+        message: String,
+    },
     /// PC 节点 TTS 合成完成
     TtsSynthesizeResponse {
         req_id: String,
@@ -312,6 +331,8 @@ impl AgentToServer {
             | Self::ProjectWorkspaceProvisionError { .. }
             | Self::ProjectWorkspaceInspected { .. }
             | Self::ProjectWorkspaceInspectError { .. }
+            | Self::ProjectWorkspaceCleaned { .. }
+            | Self::ProjectWorkspaceCleanupError { .. }
             | Self::TtsSynthesizeResponse { .. }
             | Self::TtsSynthesizeError { .. } => None,
         }
@@ -330,6 +351,8 @@ impl AgentToServer {
             | Self::ProjectWorkspaceProvisionError { req_id, .. }
             | Self::ProjectWorkspaceInspected { req_id, .. }
             | Self::ProjectWorkspaceInspectError { req_id, .. }
+            | Self::ProjectWorkspaceCleaned { req_id, .. }
+            | Self::ProjectWorkspaceCleanupError { req_id, .. }
             | Self::TtsSynthesizeResponse { req_id, .. }
             | Self::TtsSynthesizeError { req_id, .. } => Some(req_id.as_str()),
             _ => None,

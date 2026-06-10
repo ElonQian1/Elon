@@ -1569,6 +1569,35 @@ async fn run_session(
                                 let _ = tx_c.send(ws_text(&response));
                             });
                         }
+                        ServerToAgent::CleanupProjectWorkspace {
+                            req_id,
+                            project_id,
+                            workspace_path,
+                        } => {
+                            info!("🧹 CleanupProjectWorkspace: {}", req_id);
+                            let tx_c = out_tx_r.clone();
+                            tokio::spawn(async move {
+                                let project_id_for_error = project_id.clone();
+                                let response =
+                                    match pc_workspace_provisioner::cleanup_project_workspace(
+                                        &project_id,
+                                        &workspace_path,
+                                    ) {
+                                        Ok(result) => AgentToServer::ProjectWorkspaceCleaned {
+                                            req_id,
+                                            project_id: project_id_for_error,
+                                            removed_paths: result.removed_paths,
+                                            skipped_paths: result.skipped_paths,
+                                        },
+                                        Err(e) => AgentToServer::ProjectWorkspaceCleanupError {
+                                            req_id,
+                                            project_id: project_id_for_error,
+                                            message: e.to_string(),
+                                        },
+                                    };
+                                let _ = tx_c.send(ws_text(&response));
+                            });
+                        }
                         ServerToAgent::CliPrompt {
                             req_id,
                             cli,

@@ -10,6 +10,8 @@ use std::{
     sync::Arc,
 };
 
+use homecli_proto::AgentToServer;
+
 use crate::{
     project_attachment_paths::safe_project_path_part,
     project_auth::{auth_from_headers, json_error},
@@ -19,6 +21,13 @@ use crate::{
 
 #[derive(Default, Serialize)]
 struct ProjectFilesystemCleanup {
+    removed_paths: Vec<String>,
+    skipped_paths: Vec<String>,
+}
+
+#[derive(Default, Serialize)]
+struct PcWorkspaceCleanup {
+    attempted: bool,
     removed_paths: Vec<String>,
     skipped_paths: Vec<String>,
 }
@@ -33,7 +42,7 @@ pub async fn delete_project(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    delete_project_for_user(state, &user.id, &project_id)
+    delete_project_for_user(state, &user.id, &project_id).await
 }
 
 /// DELETE /api/user/:user_id/projects/:project_id — APK 旧匿名身份兼容入口。
@@ -46,7 +55,7 @@ pub async fn delete_user_project(
         Ok(user_id) => user_id,
         Err((status, message)) => return json_error(status, message),
     };
-    delete_project_for_user(state, &user_id, &project_id)
+    delete_project_for_user(state, &user_id, &project_id).await
 }
 
 fn deletion_user_id(
@@ -85,7 +94,11 @@ fn has_authorization_header(headers: &HeaderMap) -> bool {
         .unwrap_or(false)
 }
 
-fn delete_project_for_user(state: Arc<AppState>, user_id: &str, project_id: &str) -> Response {
+async fn delete_project_for_user(
+    state: Arc<AppState>,
+    user_id: &str,
+    project_id: &str,
+) -> Response {
     let target = match state.store.project_deletion_target(user_id, project_id) {
         Ok(target) => target,
         Err(e) => return json_error(delete_error_status(&e.to_string()), e.to_string()),
@@ -100,6 +113,15 @@ fn delete_project_for_user(state: Arc<AppState>, user_id: &str, project_id: &str
             );
         }
     };
+    let pc_cleanup = match cleanup_pc_workspace(&state, &target).await {
+        Ok(cleanup) => cleanup,
+        Err(e) => {
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("PC 工作区清理失败，已停止删除以避免 PC 节点残留：{e}"),
+            );
+        }
+    };
 
     if let Err(e) = state.store.purge_project_records(user_id, project_id) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
@@ -110,6 +132,7 @@ fn delete_project_for_user(state: Arc<AppState>, user_id: &str, project_id: &str
         "project_id": target.id,
         "project_name": target.name,
         "cleanup": cleanup,
+        "pc_cleanup": pc_cleanup,
     }))
     .into_response()
 }
@@ -173,6 +196,62 @@ fn cleanup_project_files(
     }
 
     Ok(cleanup)
+}
+
+async fn cleanup_pc_workspace(
+    state: &AppState,
+    target: &ProjectDeletionTarget,
+) -> anyhow::Result<PcWorkspaceCleanup> {
+    let Some(node_id) = target
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(PcWorkspaceCleanup::default());
+    };
+    let Some(workspace_path) = target
+        .workspace_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(PcWorkspaceCleanup::default());
+    };
+    if target.source_type != "pc_managed" {
+        return Ok(PcWorkspaceCleanup {
+            attempted: false,
+            removed_paths: Vec::new(),
+            skipped_paths: vec![format!(
+                "跳过非平台托管 PC 工作区（{}）：{}",
+                target.source_type, workspace_path
+            )],
+        });
+    }
+
+    match state
+        .agent_manager
+        .dispatch_project_workspace_cleanup(
+            node_id,
+            target.id.clone(),
+            workspace_path.to_string(),
+        )
+        .await?
+    {
+        AgentToServer::ProjectWorkspaceCleaned {
+            removed_paths,
+            skipped_paths,
+            ..
+        } => Ok(PcWorkspaceCleanup {
+            attempted: true,
+            removed_paths,
+            skipped_paths,
+        }),
+        AgentToServer::ProjectWorkspaceCleanupError { message, .. } => {
+            anyhow::bail!(message)
+        }
+        other => anyhow::bail!("PC 节点返回了非预期清理消息: {other:?}"),
+    }
 }
 
 fn same_path(a: &FsPath, b: &FsPath) -> bool {

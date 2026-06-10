@@ -314,6 +314,44 @@ impl AgentManager {
         outcome
     }
 
+    /// Ask a PC node to cleanup a managed project workspace and return a single status frame.
+    pub async fn dispatch_project_workspace_cleanup(
+        &self,
+        agent_id: &str,
+        project_id: String,
+        workspace_path: String,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::CleanupProjectWorkspace {
+                req_id: req_id.clone(),
+                project_id,
+                workspace_path,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+
+        let outcome = match tokio::time::timeout(Duration::from_secs(45), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!(
+                "agent disconnected before workspace cleanup response"
+            )),
+            Err(_) => Err(anyhow!("project workspace cleanup timeout (45s)")),
+        };
+        if outcome.is_err() {
+            pending.lock().await.remove(&req_id);
+        }
+        outcome
+    }
+
     /// 向 PC 节点发起 TTS 合成请求，返回 TtsSynthesizeResponse 或 TtsSynthesizeError。
     /// timeout 设 180s（模型首次加载可能需要较长时间）。
     pub async fn dispatch_tts(

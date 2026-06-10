@@ -272,6 +272,7 @@ impl Store {
         let account = normalize_account(account)?;
         let role_db = normalize_project_member_role(role)?;
         let conn = self.conn()?;
+        ensure_project_not_system(&conn, project_id, "系统归档项目不能添加成员")?;
         let now = now();
         let target_user_id: String = conn
             .query_row(
@@ -316,6 +317,7 @@ impl Store {
     ) -> Result<()> {
         let role_db = normalize_project_member_role(new_role)?;
         let conn = self.conn()?;
+        ensure_project_not_system(&conn, project_id, "系统归档项目不能修改成员角色")?;
         let current_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
@@ -338,6 +340,7 @@ impl Store {
     /// 移除成员（owner 不可被移除，需要由 handler 层确保调用者可管理成员）
     pub fn remove_member(&self, project_id: &str, target_user_id: &str) -> Result<()> {
         let conn = self.conn()?;
+        ensure_project_not_system(&conn, project_id, "系统归档项目不能移除成员")?;
         let current_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",

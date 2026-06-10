@@ -15,6 +15,11 @@ pub struct ProjectWorkspaceResult {
     pub created: bool,
 }
 
+pub struct ProjectWorkspaceCleanupResult {
+    pub removed_paths: Vec<String>,
+    pub skipped_paths: Vec<String>,
+}
+
 pub struct ConversationWorkspaceResult {
     pub base_workspace_path: Option<String>,
     pub workspace_path: String,
@@ -40,6 +45,126 @@ pub fn provision_project_workspace(req: ProjectWorkspaceRequest) -> Result<Proje
         git_head: git_head(&repo).ok(),
         created,
     })
+}
+
+pub fn cleanup_project_workspace(
+    project_id: &str,
+    workspace_path: &str,
+) -> Result<ProjectWorkspaceCleanupResult> {
+    let root = workspace_root();
+    let project_part = safe_path_part(project_id, "project", 80);
+    let repo = PathBuf::from(workspace_path);
+    let mut result = ProjectWorkspaceCleanupResult {
+        removed_paths: Vec::new(),
+        skipped_paths: Vec::new(),
+    };
+
+    let Some(project_dir) = managed_project_dir(&root, &repo, &project_part)? else {
+        result.skipped_paths.push(format!(
+            "跳过非平台托管 PC 工作区：{}",
+            repo.display()
+        ));
+        return Ok(result);
+    };
+    let worktree_root = root.join("conversation-worktrees").join(&project_part);
+    remove_conversation_worktrees(&repo, &worktree_root, &root, &mut result)?;
+    remove_managed_path(&project_dir, &root, "PC 项目工作区", &mut result)?;
+    Ok(result)
+}
+
+fn managed_project_dir(
+    root: &Path,
+    repo: &Path,
+    project_part: &str,
+) -> Result<Option<PathBuf>> {
+    if repo.file_name().and_then(|value| value.to_str()) != Some("repo") {
+        return Ok(None);
+    }
+    let Some(project_dir) = repo.parent() else {
+        return Ok(None);
+    };
+    if project_dir.file_name().and_then(|value| value.to_str()) != Some(project_part) {
+        return Ok(None);
+    }
+    if !project_dir.exists() {
+        return Ok(None);
+    }
+    ensure_within_root(root, project_dir)?;
+    Ok(Some(project_dir.to_path_buf()))
+}
+
+fn remove_conversation_worktrees(
+    repo: &Path,
+    worktree_root: &Path,
+    root: &Path,
+    result: &mut ProjectWorkspaceCleanupResult,
+) -> Result<()> {
+    if !worktree_root.exists() {
+        result
+            .skipped_paths
+            .push(format!("会话 worktree 不存在：{}", worktree_root.display()));
+        return Ok(());
+    }
+    ensure_within_root(root, worktree_root)?;
+    if repo.exists() && is_git_work_tree(repo) {
+        for entry in std::fs::read_dir(worktree_root)?.filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_dir() {
+                let _ = run_git_dynamic(
+                    repo,
+                    &[
+                        "worktree",
+                        "remove",
+                        "--force",
+                        path.to_string_lossy().as_ref(),
+                    ],
+                );
+            }
+        }
+        let _ = run_git_dynamic(repo, &["worktree", "prune"]);
+    }
+    remove_managed_path(worktree_root, root, "会话 worktree", result)
+}
+
+fn remove_managed_path(
+    path: &Path,
+    root: &Path,
+    label: &str,
+    result: &mut ProjectWorkspaceCleanupResult,
+) -> Result<()> {
+    if !path.exists() {
+        result
+            .skipped_paths
+            .push(format!("{label}不存在：{}", path.display()));
+        return Ok(());
+    }
+    ensure_within_root(root, path)?;
+    if path.is_dir() {
+        std::fs::remove_dir_all(path)
+            .with_context(|| format!("failed to remove {}", path.display()))?;
+    } else {
+        std::fs::remove_file(path)
+            .with_context(|| format!("failed to remove {}", path.display()))?;
+    }
+    result
+        .removed_paths
+        .push(format!("{label}：{}", path.display()));
+    Ok(())
+}
+
+fn ensure_within_root(root: &Path, path: &Path) -> Result<()> {
+    let root = std::fs::canonicalize(root)
+        .with_context(|| format!("failed to canonicalize root {}", root.display()))?;
+    let target = std::fs::canonicalize(path)
+        .with_context(|| format!("failed to canonicalize target {}", path.display()))?;
+    if target == root || !target.starts_with(&root) {
+        return Err(anyhow!(
+            "refusing to cleanup path outside PC workspace root: {} (root: {})",
+            target.display(),
+            root.display()
+        ));
+    }
+    Ok(())
 }
 
 pub fn prepare_conversation_workspace(

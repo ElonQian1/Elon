@@ -50,6 +50,7 @@ impl Store {
                  status = 'active',
                  updated_at = ?3
              WHERE id = ?4
+               AND source_type NOT IN ('agent_balloon', 'chat_memory')
                AND EXISTS (
                  SELECT 1 FROM project_members pm
                  WHERE pm.project_id = projects.id
@@ -59,7 +60,7 @@ impl Store {
             params![workspace_path, node_id, now, project_id, user_id],
         )?;
         if updated == 0 {
-            return Err(anyhow!("项目不存在或当前用户不是 owner"));
+            return Err(anyhow!("项目不存在、当前用户不是 owner，或系统归档项目不能绑定 PC 工作区"));
         }
         tx.execute(
             "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
