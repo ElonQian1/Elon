@@ -473,6 +473,114 @@
       cursor: default;
       opacity: 0.86;
     }
+    .project-space-feed {
+      position: relative;
+      padding: 10px 8px 24px;
+      background: var(--bg);
+    }
+    .project-space-announcement,
+    .project-space-post-card {
+      background: var(--panel);
+      border-radius: 8px;
+      margin: 8px 2px;
+      padding: 14px;
+      color: var(--ink);
+    }
+    .project-space-announcement-title {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+    .project-space-announcement-body {
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+    .project-space-post-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .project-space-post-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #D8D8D8;
+      color: #101010;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      flex: none;
+    }
+    .project-space-post-user { min-width: 0; flex: 1; }
+    .project-space-post-name {
+      color: var(--ink);
+      font-size: 14px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-post-time {
+      color: var(--ink-faint);
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    .project-space-topic {
+      color: var(--ink-soft);
+      background: var(--panel-2);
+      border-radius: 8px;
+      font-size: 13px;
+      padding: 5px 10px;
+      white-space: nowrap;
+    }
+    .project-space-post-title {
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-post-body {
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1.55;
+      margin-top: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      white-space: pre-wrap;
+    }
+    .project-space-feed-empty {
+      color: var(--ink-faint);
+      text-align: center;
+      font-size: 14px;
+      padding: 34px 72px 34px 20px;
+    }
+    .project-space-feed-actions {
+      position: sticky;
+      float: right;
+      bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: -110px 6px 0 0;
+      z-index: 2;
+    }
+    .project-space-fab {
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 50%;
+      background: #7C8EA8;
+      color: var(--ink);
+      font-size: 24px;
+      cursor: pointer;
+    }
     @media (max-width: 520px) {
       .project-space-summary {
         grid-template-columns: 1fr;
@@ -1398,6 +1506,19 @@
           </div>
           <button class="project-space-intro-card empty" id="projectIntroCard" type="button">添加项目简介</button>
         </div>
+        <div class="project-space-feed" id="projectSpaceFeed">
+          <div class="project-space-announcement">
+            <div class="project-space-announcement-title">公告</div>
+            <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
+          </div>
+          <div id="projectSpacePostList" class="project-space-post-list">
+            <div class="project-space-feed-empty">正在加载帖子...</div>
+          </div>
+          <div class="project-space-feed-actions">
+            <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button">□</button>
+            <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button">+</button>
+          </div>
+        </div>
         <div class="project-stage" id="currentStageText">待提交需求</div>
         <div class="project-overview" id="projectOverviewText">项目管理
 当前没有正在执行的开发任务。</div>
@@ -1889,6 +2010,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectSpaceName = $('projectSpaceName');
   const projectSpaceMeta = $('projectSpaceMeta');
   const projectIntroCard = $('projectIntroCard');
+  const projectSpaceAnnouncement = $('projectSpaceAnnouncement');
+  const projectSpacePostList = $('projectSpacePostList');
+  const projectSpaceDocsBtn = $('projectSpaceDocsBtn');
+  const projectSpacePostBtn = $('projectSpacePostBtn');
   const projectWorkspaceHealth = $('projectWorkspaceHealth');
   const currentStageText = $('currentStageText');
   const stagePlanText = $('stagePlanText');
@@ -1912,6 +2037,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectIntroCard) {
     projectIntroCard.addEventListener('click', editProjectDescription);
+  }
+  if (projectSpaceDocsBtn) {
+    projectSpaceDocsBtn.addEventListener('click', () => {
+      showNativeOnly('项目文档、成员列表和话题入口请在 Android APK 的项目空间中使用。');
+    });
+  }
+  if (projectSpacePostBtn) {
+    projectSpacePostBtn.addEventListener('click', () => {
+      showNativeOnly('发布项目空间帖子请在 Android APK 中使用，网页版已同步帖子预览。');
+    });
   }
 
   const profileAvatar = $('profileAvatar');
@@ -3052,6 +3187,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
     renderProjectIntroCard(null);
+    renderProjectSpaceFeed(null, false);
     resetProjectWorkspaceHealth();
     projectWorkflowText.textContent = defaultWorkflowText('待提交需求');
     STAGE_ELS().forEach((el, i) => {
@@ -3115,6 +3251,108 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectIntroCard.classList.toggle('empty', !description);
     projectIntroCard.disabled = !editable;
   }
+  function projectSpaceTopicLabel(kind, name) {
+    if (kind === 'discussion') return '讨论';
+    if (kind === 'requirements') return '需求';
+    if (kind === 'suggestions') return '意见';
+    if (kind === 'issues') return '问题反馈';
+    if (kind === 'announcements') return '公告';
+    return name || '话题';
+  }
+  function parseProjectSpacePostText(content) {
+    const raw = String(content || '').trim();
+    if (!raw) return { title: '未命名帖子', body: '' };
+    const prefix = '标题：';
+    if (raw.startsWith(prefix)) {
+      const rest = raw.slice(prefix.length).trimStart();
+      const parts = rest.split(/\n\s*\n/);
+      return {
+        title: (parts.shift() || '未命名帖子').trim() || '未命名帖子',
+        body: parts.join('\n\n').trim()
+      };
+    }
+    const first = raw.split(/\n/).find((line) => line.trim()) || '未命名帖子';
+    return { title: first.replace(/^#\s*/, '').trim() || '未命名帖子', body: raw };
+  }
+  function renderProjectSpaceFeed(space, loading) {
+    if (!projectSpaceAnnouncement || !projectSpacePostList) return;
+    if (!space) {
+      projectSpaceAnnouncement.textContent = '不得发布与主题内容不相关的帖子。';
+      projectSpacePostList.innerHTML = '<div class="project-space-feed-empty">暂无帖子</div>';
+      return;
+    }
+    const channels = Array.isArray(space.channels) ? space.channels : [];
+    const channelById = new Map(channels.map((channel) => [channel.id, channel]));
+    const announcements = channels.filter((channel) => channel.kind === 'announcements');
+    const announcementMessages = announcements.flatMap((channel) => channel.messages || []);
+    const latestAnnouncement = announcementMessages[announcementMessages.length - 1];
+    projectSpaceAnnouncement.textContent =
+      (latestAnnouncement && latestAnnouncement.content) ||
+      (announcements[0] && announcements[0].last_message) ||
+      '不得发布与主题内容不相关的帖子。';
+
+    const posts = channels
+      .filter((channel) => ['discussion', 'requirements', 'suggestions', 'issues'].includes(channel.kind))
+      .flatMap((channel) => (channel.messages || []).map((message) => ({ channel, message })))
+      .sort((a, b) => String(b.message.created_at || '').localeCompare(String(a.message.created_at || '')))
+      .slice(0, 40);
+    if (!posts.length) {
+      projectSpacePostList.innerHTML = '<div class="project-space-feed-empty">' +
+        (loading ? '正在加载帖子...' : '还没有帖子，请在 Android APK 中发布第一条。') +
+        '</div>';
+      return;
+    }
+    projectSpacePostList.innerHTML = posts.map(({ channel, message }) => {
+      const post = parseProjectSpacePostText(message.content);
+      const name = message.sender_name || '项目成员';
+      const initial = Array.from(name)[0] || '成';
+      const topic = projectSpaceTopicLabel(channel.kind, channel.name);
+      const created = message.created_at ? new Date(message.created_at).toLocaleString('zh-CN', {
+        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      }) : '刚刚';
+      return [
+        '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) + '">',
+        '<div class="project-space-post-head">',
+        '<div class="project-space-post-avatar">' + escapeHtml(initial) + '</div>',
+        '<div class="project-space-post-user">',
+        '<div class="project-space-post-name">' + escapeHtml(name) + '</div>',
+        '<div class="project-space-post-time">回复于' + escapeHtml(created) + '</div>',
+        '</div>',
+        '<div class="project-space-topic">' + escapeHtml(topic) + '</div>',
+        '</div>',
+        '<div class="project-space-post-title">' + escapeHtml(post.title) + '</div>',
+        '<div class="project-space-post-body">' + escapeHtml(post.body || post.title) + '</div>',
+        '</article>'
+      ].join('');
+    }).join('');
+    projectSpacePostList.querySelectorAll('.project-space-post-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const channel = channelById.get(card.dataset.channel);
+        showNativeOnly('网页版已同步项目空间帖子预览；进入「' +
+          projectSpaceTopicLabel(channel && channel.kind, channel && channel.name) +
+          '」帖内讨论请在 Android APK 中使用。');
+      });
+    });
+  }
+  async function loadProjectSpaceFeed(project) {
+    if (!project || !project.id || !token) {
+      renderProjectSpaceFeed(null, false);
+      return;
+    }
+    renderProjectSpaceFeed({ channels: [] }, true);
+    const res = await api('/api/projects/' + encodeURIComponent(project.id) + '/space');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载项目空间失败');
+    const channels = Array.isArray(data.channels) ? data.channels : [];
+    await Promise.all(channels.map(async (channel) => {
+      if (!channel || !channel.id) return;
+      const msgRes = await api('/api/projects/' + encodeURIComponent(project.id) +
+        '/channels/' + encodeURIComponent(channel.id) + '/messages?limit=8');
+      const msgData = await msgRes.json().catch(() => ({}));
+      channel.messages = msgRes.ok && Array.isArray(msgData.messages) ? msgData.messages : [];
+    }));
+    renderProjectSpaceFeed({ channels }, false);
+  }
   async function editProjectDescription() {
     if (!currentProject || !canEditProjectDescription(currentProject)) return;
     const current = String(currentProject.description || currentProject.project_description || currentProject.projectDescription || '').trim();
@@ -3165,6 +3403,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     ].filter(Boolean).join('\n');
     projectOverviewText.textContent = overview;
     loadProjectWorkspaceHealth(p);
+    loadProjectSpaceFeed(p).catch((err) => {
+      console.warn('loadProjectSpaceFeed failed:', err);
+      renderProjectSpaceFeed({ channels: [] }, false);
+    });
     projectWorkflowText.textContent = defaultWorkflowText(currentStageText.textContent);
   }
 

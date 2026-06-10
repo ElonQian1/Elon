@@ -7,9 +7,10 @@ internal fun ProjectChannelMessage.toChatMessage(projectRole: String? = null): C
         "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
+    val displayContent = parseProjectSpacePostText(content).detailText
     return ChatMessage(
         role = role,
-        content = content,
+        content = displayContent,
         senderLabel = if (role == "friend") senderName else null,
         id = id,
         suggestionStatus = suggestionStatus,
@@ -57,3 +58,60 @@ internal fun projectChannelHint(channel: ProjectChannel, projectRole: String?): 
         else -> "项目成员共享频道。"
     }
 }
+
+internal data class ProjectSpacePostText(
+    val title: String,
+    val body: String,
+    val structured: Boolean
+) {
+    val detailText: String
+        get() = if (structured) {
+            listOf(title, body).filter { it.isNotBlank() }.joinToString("\n\n")
+        } else {
+            body.ifBlank { title }
+        }
+}
+
+internal fun formatProjectSpacePostContent(title: String, body: String): String {
+    return buildString {
+        append(PROJECT_SPACE_POST_TITLE_PREFIX)
+        append(title.trim())
+        append("\n\n")
+        append(body.trim())
+    }
+}
+
+internal fun parseProjectSpacePostText(content: String): ProjectSpacePostText {
+    val trimmed = content.trim()
+    if (trimmed.isBlank()) {
+        return ProjectSpacePostText(title = "未命名帖子", body = "", structured = false)
+    }
+    if (trimmed.startsWith(PROJECT_SPACE_POST_TITLE_PREFIX)) {
+        val withoutPrefix = trimmed.removePrefix(PROJECT_SPACE_POST_TITLE_PREFIX).trimStart()
+        val parts = withoutPrefix.split(Regex("""\n\s*\n"""), limit = 2)
+        val title = parts.getOrNull(0)?.trim().orEmpty().ifBlank { "未命名帖子" }
+        val body = parts.getOrNull(1)?.trim().orEmpty()
+        return ProjectSpacePostText(title = title, body = body, structured = true)
+    }
+    val lines = trimmed.lines()
+    val first = lines.firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+    val title = first.removePrefix("#").trim().ifBlank { "未命名帖子" }
+    return ProjectSpacePostText(title = title, body = trimmed, structured = false)
+}
+
+internal fun ProjectChannel.isProjectSpaceFeedChannel(): Boolean {
+    return kind in setOf("discussion", "requirements", "suggestions", "issues")
+}
+
+internal fun projectSpaceTopicLabel(channel: ProjectChannel): String {
+    return when (channel.kind) {
+        "discussion" -> "讨论"
+        "requirements" -> "需求"
+        "suggestions" -> "意见"
+        "issues" -> "问题反馈"
+        "announcements" -> "公告"
+        else -> channel.name.ifBlank { "话题" }
+    }
+}
+
+private const val PROJECT_SPACE_POST_TITLE_PREFIX = "标题："

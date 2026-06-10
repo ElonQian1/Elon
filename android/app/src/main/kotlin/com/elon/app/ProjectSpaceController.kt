@@ -34,11 +34,7 @@ internal class ProjectSpaceController(
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val personalConversations: () -> List<AppConversation>,
-    private val activePersonalConversationIndex: () -> Int,
-    private val isPersonalConversationWorking: (Int) -> Boolean,
     private val openPersonalAiChat: (Int) -> Unit,
-    private val showPersonalConversationActions: (Int) -> Unit,
-    private val showCreatePersonalConversation: () -> Unit,
     private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
     private val onProjectDescriptionUpdated: (projectId: String, description: String?) -> Unit,
@@ -60,16 +56,31 @@ internal class ProjectSpaceController(
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
-    private val personalConversationPanel = ProjectSpacePersonalConversationPanel(
+    private val feedData = ProjectSpaceFeedData(
         activity = activity,
-        personalConversations = personalConversations,
-        activePersonalConversationIndex = activePersonalConversationIndex,
-        isPersonalConversationWorking = isPersonalConversationWorking,
-        openPersonalAiChat = openPersonalAiChat,
-        showPersonalConversationActions = showPersonalConversationActions,
-        showCreatePersonalConversation = showCreatePersonalConversation,
+        http = http,
+        serverUrl = serverUrl,
+        route = { activeRoute },
+        activeProjectId = { activeProjectId },
+        isSpaceLandingActive = { activeChannel == null && activeMemberConversation == null },
+        renderLanding = { renderProjectSpaceLanding() }
+    )
+    private val feedView = ProjectSpaceFeedView(
+        activity = activity,
         dp = dp,
-        selectableForeground = selectableForeground
+        selectableForeground = selectableForeground,
+        openChannel = { channel -> openChannel(channel) },
+        openPostComposer = { renderPostComposer() },
+        openProjectDocuments = { showProjectDocumentsDialog() }
+    )
+    private val postComposer = ProjectSpacePostComposer(
+        activity = activity,
+        dp = dp,
+        selectableForeground = selectableForeground,
+        onBack = { renderProjectSpaceLanding() },
+        onSubmit = { channel, title, body, onComplete ->
+            feedData.submit(channel, title, body, onComplete)
+        }
     )
     private val memberConversationViews = ProjectSpaceMemberConversationViews(
         activity = activity,
@@ -90,18 +101,6 @@ internal class ProjectSpaceController(
         showCreateAndOpenPersonalConversation = showCreateAndOpenPersonalConversation,
         openPersonalAiChat = openPersonalAiChat
     )
-    private val memberListView = ProjectSpaceMemberListView(
-        activity = activity,
-        http = http,
-        serverUrl = serverUrl,
-        dp = dp,
-        selectableForeground = selectableForeground,
-        personalConversations = personalConversations,
-        showCreatePersonalConversation = showCreatePersonalConversation,
-        openMemberConversations = { member -> renderMemberConversationList(member) },
-        reloadActiveSpace = { reloadActiveSpace() }
-    )
-
     private data class ActiveMemberConversation(
         val projectId: String,
         val memberUserId: String,
@@ -161,6 +160,7 @@ internal class ProjectSpaceController(
         openSelfMemberList: Boolean = false,
         localIconDataUrl: String? = null
     ) {
+        val switchingProject = activeProjectId != projectId
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
         activeChannel = null
@@ -170,6 +170,9 @@ internal class ProjectSpaceController(
         pendingOpenSelfMemberList = openSelfMemberList
         activeAdapter = null
         stopPolling()
+        if (switchingProject) {
+            feedData.reset()
+        }
         val cached = spaceCache[projectId]?.withProjectIcon(localIconDataUrl)
         if (cached != null) {
             // 命中缓存：立即渲染，同时后台静默刷新
@@ -280,12 +283,13 @@ internal class ProjectSpaceController(
         val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(projectIntroHeader(space))
-        container.addView(sectionTitle("频道"))
-        space.channels.forEach { channel ->
-            container.addView(channelRow(channel))
-        }
-        container.addView(sectionTitle("团队成员"))
-        renderMemberList(container, space.members)
+        feedView.render(
+            container = container,
+            space = space,
+            messagesByChannel = feedData.messagesByChannel,
+            loading = feedData.isLoading(space)
+        )
+        feedData.ensure(space)
     }
 
     fun showMembers() {
@@ -543,6 +547,52 @@ internal class ProjectSpaceController(
                 }
             }
         }
+    }
+
+    private fun renderPostComposer() {
+        val space = activeSpace ?: return
+        activeMemberListUserId = null
+        activeChannel = null
+        activeMemberConversation = null
+        activeAdapter = null
+        stopPolling()
+        postComposer.render(
+            container = prepareProjectContent(),
+            space = space,
+            channels = space.channels
+        )
+    }
+
+    private fun showProjectDocumentsDialog() {
+        val space = activeSpace ?: return
+        val items = arrayOf("项目简介", "成员列表", "话题入口")
+        AlertDialog.Builder(activity)
+            .setTitle("项目文档")
+            .setItems(items) { dialog, which ->
+                dialog.dismiss()
+                when (which) {
+                    0 -> showProjectDescriptionDialog(space)
+                    1 -> showMembers()
+                    2 -> showProjectChannelsDialog(space)
+                }
+            }
+            .show()
+    }
+
+    private fun showProjectChannelsDialog(space: ProjectSpace) {
+        val channels = space.channels.filter { it.kind == "announcements" || it.isProjectSpaceFeedChannel() }
+        if (channels.isEmpty()) {
+            Toast.makeText(activity, "暂无话题入口", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = channels.map { projectSpaceTopicLabel(it) }.toTypedArray()
+        AlertDialog.Builder(activity)
+            .setTitle("话题入口")
+            .setItems(labels) { dialog, which ->
+                dialog.dismiss()
+                openChannel(channels[which])
+            }
+            .show()
     }
 
     private fun loadMemberConversationMessages(
@@ -806,67 +856,6 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun sectionTitle(textValue: String): TextView {
-        return TextView(activity).apply {
-            text = textValue
-            textSize = 13f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#6F7785"))
-            setPadding(dp(20), dp(18), dp(20), dp(8))
-        }
-    }
-
-    private fun channelRow(channel: ProjectChannel): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground("#181B20")
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { openChannel(channel) }
-            addView(TextView(activity).apply {
-                text = buildString {
-                    append("# ")
-                    append(channel.name)
-                    if (channel.unreadCount > 0) append("  ·  ").append(channel.unreadCount).append(" 条未读")
-                }
-                textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
-            })
-            addView(TextView(activity).apply {
-                text = projectChannelHint(channel, activeSpace?.project?.role)
-                textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
-                setPadding(0, dp(5), 0, 0)
-                maxLines = 2
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            })
-        }
-    }
-
-    private fun renderMemberList(container: LinearLayout, members: List<ProjectMember>) {
-        val space = activeSpace ?: return
-        val selfId = AuthManager.userId(activity) ?: AuthManager.effectiveUserId(activity)
-        memberListView.render(container, space, members, selfId, activeRoute.isUserProject)
-    }
-
-    private fun reloadActiveSpace() {
-        val projectId = activeProjectId ?: return
-        val route = activeRoute
-        thread(name = "project-space-reload") {
-            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
-            activity.runOnUiThread {
-                result.onSuccess { space ->
-                    activeSpace = space
-                    activeProjectTitle = space.project.name
-                    renderProjectSpaceLanding()
-                }.onFailure { error ->
-                    Toast.makeText(activity, error.message ?: "刷新项目空间失败", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
     private fun openPersonalConversationById(conversationId: String, fromMember: ProjectMember? = null) {
         val index = personalConversations().indexOfFirst { it.id == conversationId }
         if (index >= 0) {
@@ -926,10 +915,6 @@ internal class ProjectSpaceController(
         startPolling()
     }
 
-    private fun renderPersonalConversations(container: LinearLayout) {
-        personalConversationPanel.render(container)
-    }
-
     private fun markSuggestionUpdated(message: ChatMessage) {
         val channel = activeChannel ?: return
         val messageId = message.id?.takeIf { it.isNotBlank() } ?: run {
@@ -980,7 +965,6 @@ internal class ProjectSpaceController(
         const val POLL_INTERVAL_MS = 3000L
         const val SENDING_STATUS = "发送中..."
         const val AI_CHANNEL_KIND = "ai_development"
-        const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
         const val PROJECT_DESCRIPTION_MAX_CHARS = 240
 
         fun canEditProjectDescription(role: String?): Boolean {
