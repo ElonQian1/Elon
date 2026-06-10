@@ -989,6 +989,7 @@ async fn run_via_pc_agent(
                         state,
                         user_id,
                         agent_id,
+                        pc_cli_feature,
                         model.as_deref().or(Some(display_model.as_str())),
                         &usage,
                         accounting_result.as_ref(),
@@ -1153,6 +1154,7 @@ fn settle_pc_cli_node_usage(
     state: &AppState,
     consumer_user_id: &str,
     node_id: &str,
+    feature: &str,
     model: Option<&str>,
     usage: &crate::cli_usage::CliTokenUsage,
     accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
@@ -1195,9 +1197,21 @@ fn settle_pc_cli_node_usage(
         provider_user_id: &provider_user_id,
         node_id,
         model_id: &model_id,
+        feature,
+        usage_mode: "pc_agent_cli",
+        compute_call_id: accounting_result.and_then(|result| result.idempotency_key.as_deref()),
+        token_usage_event_id: accounting_result.map(|result| result.token_usage_event_id.as_str()),
+        billing_event_id: accounting_result.and_then(|result| result.billing_event_id.as_deref()),
         prompt_tokens,
         completion_tokens,
         price_per_1k_credits: pc_cli_price_per_1k_credits(),
+        billed_cost_rmb_fen: accounting_result
+            .map(|result| result.cost_rmb_fen)
+            .unwrap_or(0),
+        accounting_status: accounting_result.map(|result| result.accounting_status.as_str()),
+        provider_revenue_share_x1000: crate::node_router::provider_revenue_share_x1000(
+            &state.store,
+        ),
         platform_fee_rate: 0.2,
     };
     match state.store.settle_node_inference(params) {
@@ -1206,7 +1220,9 @@ fn settle_pc_cli_node_usage(
             provider_user_id,
             node_id,
             tokens = prompt_tokens + completion_tokens,
-            settled_credits = tx.settled_credits,
+            billed_cost_rmb_fen = tx.billed_cost_rmb_fen,
+            provider_earned_fen = tx.provider_earned_fen,
+            settlement_status = tx.settlement_status,
             "PC CLI 节点收益流水已记录"
         ),
         Err(e) => tracing::error!(

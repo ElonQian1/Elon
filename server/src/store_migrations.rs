@@ -59,6 +59,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (37, "模型与算力计价规则配置表", migration_v37),
     (38, "计费自动对账告警表", migration_v38),
     (39, "扣费计价规则版本与价格快照", migration_v39),
+    (40, "节点收益流水绑定真实扣费事件", migration_v40),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1445,6 +1446,72 @@ fn migration_v39(conn: &Connection) -> Result<()> {
         r#"
         CREATE INDEX IF NOT EXISTS idx_billing_events_price_rule
           ON billing_events(price_rule_id, price_rule_version);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v40(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "node_transactions", "feature", "feature TEXT")?;
+    add_column_if_missing(conn, "node_transactions", "usage_mode", "usage_mode TEXT")?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "compute_call_id",
+        "compute_call_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "token_usage_event_id",
+        "token_usage_event_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "billing_event_id",
+        "billing_event_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "billed_cost_rmb_fen",
+        "billed_cost_rmb_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "provider_earned_fen",
+        "provider_earned_fen INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "provider_revenue_share_x1000",
+        "provider_revenue_share_x1000 INTEGER NOT NULL DEFAULT 800",
+    )?;
+    add_column_if_missing(
+        conn,
+        "node_transactions",
+        "settlement_status",
+        "settlement_status TEXT NOT NULL DEFAULT 'legacy_credit'",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_node_transactions_compute_call
+          ON node_transactions(compute_call_id)
+          WHERE compute_call_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_node_transactions_token_usage_event_unique
+          ON node_transactions(token_usage_event_id)
+          WHERE token_usage_event_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_node_transactions_billing_event
+          ON node_transactions(billing_event_id)
+          WHERE billing_event_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_node_transactions_settlement_status
+          ON node_transactions(settlement_status, created_at DESC);
+
+        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+          VALUES ('node_provider_revenue_share_x1000', '800', datetime('now'));
         "#,
     )?;
     Ok(())

@@ -1098,6 +1098,10 @@ function closeConvModal() {
       <label>冻结预授权告警阈值（条）</label>
       <input type="number" id="cfgReservationAlert" placeholder="100" min="1" step="1" />
     </div>
+    <div class="form-group">
+      <label>节点提供者分账比例（%，如 80）</label>
+      <input type="number" id="cfgNodeProviderShare" placeholder="80" min="0" max="100" step="1" />
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeConfigModal()">取消</button>
       <button class="btn btn-primary" onclick="saveConfig()">保存</button>
@@ -1770,11 +1774,13 @@ function renderBillingConfig(cfg) {
   const markup = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
   const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
   const reservationAlert = cfg.billing_open_reservation_alert_threshold || 100;
+  const nodeShare = ((cfg.node_provider_revenue_share_x1000 || 800) / 10).toFixed(0);
   card.innerHTML = `<div class="card" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;padding:16px 20px">
     <div><span style="font-size:12px;color:var(--text-dim)">汇率 &nbsp;</span><strong>1 USD = ${rate} CNY</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">加价 &nbsp;</span><strong>×${markup}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">低余额预警 &nbsp;</span><strong>¥${threshold}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">冻结告警 &nbsp;</span><strong>${reservationAlert} 条</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">节点分账 &nbsp;</span><strong>${nodeShare}%</strong></div>
     <button class="btn btn-ghost" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="openConfigModal()">修改配置</button>
   </div>`;
 }
@@ -1932,6 +1938,7 @@ function openConfigModal() {
     document.getElementById('cfgMarkup').value = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
     document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
     document.getElementById('cfgReservationAlert').value = String(cfg.billing_open_reservation_alert_threshold || 100);
+    document.getElementById('cfgNodeProviderShare').value = String(Math.round((cfg.node_provider_revenue_share_x1000 || 800) / 10));
     document.getElementById('billingConfigModal').classList.add('open');
   }).catch(() => {
     document.getElementById('billingConfigModal').classList.add('open');
@@ -1947,18 +1954,22 @@ async function saveConfig() {
   const markupStr = document.getElementById('cfgMarkup').value.trim();
   const threshStr = document.getElementById('cfgThreshold').value.trim();
   const reservationAlertStr = document.getElementById('cfgReservationAlert').value.trim();
+  const nodeShareStr = document.getElementById('cfgNodeProviderShare').value.trim();
   if (!rateStr || isNaN(parseFloat(rateStr))) return toast('汇率格式无效', 'err');
   if (!markupStr || isNaN(parseFloat(markupStr))) return toast('加价倍数格式无效', 'err');
+  if (nodeShareStr && (isNaN(parseFloat(nodeShareStr)) || parseFloat(nodeShareStr) < 0 || parseFloat(nodeShareStr) > 100)) return toast('节点分账比例需为 0-100', 'err');
   const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
   const markup_x1000 = String(Math.round(parseFloat(markupStr) * 1000));
   const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
   const reservation_alert = String(Math.max(1, Math.round(parseFloat(reservationAlertStr || '100'))));
+  const node_provider_share = String(Math.round(parseFloat(nodeShareStr || '80') * 10));
   try {
     const r1 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'usd_to_rmb_rate_x10000', value: rate_x10000 });
     const r2 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'markup_x1000', value: markup_x1000 });
     const r3 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'low_balance_threshold_fen', value: threshold_fen });
     const r4 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'billing_open_reservation_alert_threshold', value: reservation_alert });
-    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok) return toast('部分配置保存失败', 'err');
+    const r5 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_provider_revenue_share_x1000', value: node_provider_share });
+    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok) return toast('部分配置保存失败', 'err');
     closeConfigModal();
     toast('配置已保存', 'ok');
     loadBilling();

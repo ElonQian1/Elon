@@ -271,6 +271,10 @@ struct NodeBalanceResp {
     balance: f64,
     /// 累计历史总收益
     lifetime_earned: f64,
+    /// 节点提供者分账比例 × 1000（800 = 80%）
+    provider_revenue_share_x1000: i64,
+    /// 节点提供者分账比例百分比，便于前端展示。
+    provider_revenue_share_percent: f64,
 }
 
 /// GET /api/me/node-balance — 本用户作为节点提供者的积分余额
@@ -300,9 +304,13 @@ pub async fn my_node_balance(
         }
     };
     let lifetime_earned = state.store.get_lifetime_earned(&user.id).unwrap_or(0.0);
+    let provider_revenue_share_x1000 =
+        crate::node_router::provider_revenue_share_x1000(&state.store);
     Json(NodeBalanceResp {
         balance,
         lifetime_earned,
+        provider_revenue_share_x1000,
+        provider_revenue_share_percent: provider_revenue_share_x1000 as f64 / 10.0,
     })
     .into_response()
 }

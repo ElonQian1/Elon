@@ -10,6 +10,21 @@ use tokio::sync::mpsc;
 use crate::types::AppState;
 use std::sync::Arc;
 
+pub(crate) fn provider_revenue_share_x1000(store: &crate::store::Store) -> i64 {
+    std::env::var("ELON_NODE_PROVIDER_REVENUE_SHARE_X1000")
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .or_else(|| {
+            store
+                .billing_get_config("node_provider_revenue_share_x1000")
+                .ok()
+                .flatten()
+                .and_then(|value| value.trim().parse::<i64>().ok())
+        })
+        .unwrap_or(800)
+        .clamp(0, 1000)
+}
+
 pub async fn dispatch_to_node_with_req_id(
     state: &Arc<AppState>,
     req_id: String,
@@ -74,7 +89,7 @@ pub fn settle_after_stream(
             total_tokens: (prompt_tokens + completion_tokens) as i64,
             model: Some(model.clone()),
         };
-        let accounting_result = crate::token_usage_api::record_trusted_usage_with_key(
+        let Some(accounting_result) = crate::token_usage_api::record_trusted_usage_with_key(
             &state.store,
             &consumer,
             "node_llm",
@@ -82,12 +97,16 @@ pub fn settle_after_stream(
             Some(&model),
             &usage,
             accounting_key.as_deref(),
-        );
-        if accounting_result
-            .as_ref()
-            .map(|result| result.deduplicated)
-            .unwrap_or(true)
-        {
+        ) else {
+            tracing::warn!(
+                consumer,
+                node,
+                model,
+                "节点推理用量记账失败，跳过节点积分结算"
+            );
+            return;
+        };
+        if accounting_result.deduplicated {
             tracing::warn!(
                 consumer,
                 node,
@@ -112,19 +131,30 @@ pub fn settle_after_stream(
             provider_user_id: &provider,
             node_id: &node,
             model_id: &model,
+            feature: "node_llm",
+            usage_mode: "server_node_llm",
+            compute_call_id: accounting_result.idempotency_key.as_deref(),
+            token_usage_event_id: Some(&accounting_result.token_usage_event_id),
+            billing_event_id: accounting_result.billing_event_id.as_deref(),
             prompt_tokens,
             completion_tokens,
             price_per_1k_credits: price_per_1k,
-            platform_fee_rate: 0.2, // 平台抽成 20%
+            billed_cost_rmb_fen: accounting_result.cost_rmb_fen,
+            accounting_status: Some(&accounting_result.accounting_status),
+            provider_revenue_share_x1000: provider_revenue_share_x1000(&state.store),
+            platform_fee_rate: 0.2,
         };
         match state.store.settle_node_inference(params) {
             Ok(tx) => tracing::debug!(
-                "💰 节点积分结算: {} → {} | {}+{} tokens | {:.4} credits",
                 consumer,
                 provider,
-                prompt_tokens,
-                completion_tokens,
-                tx.settled_credits
+                node,
+                model,
+                tokens = prompt_tokens + completion_tokens,
+                billed_cost_rmb_fen = tx.billed_cost_rmb_fen,
+                provider_earned_fen = tx.provider_earned_fen,
+                settlement_status = tx.settlement_status,
+                "节点收益流水已记录"
             ),
             Err(e) => tracing::error!("节点积分结算失败: {e}"),
         }

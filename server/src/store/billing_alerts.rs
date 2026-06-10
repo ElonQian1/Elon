@@ -40,6 +40,8 @@ const KNOWN_ALERTS: &[&str] = &[
     "billing:open-reservations-threshold",
     "billing:orphan-compute-token-events",
     "billing:orphan-compute-billing-events",
+    "billing:orphan-node-token-events",
+    "billing:orphan-node-billing-events",
 ];
 
 impl Store {
@@ -49,6 +51,8 @@ impl Store {
             configured_i64(self, "billing_open_reservation_alert_threshold", 100).max(1);
         let orphan_token_events = self.count_orphan_compute_token_events()?;
         let orphan_billing_events = self.count_orphan_compute_billing_events()?;
+        let orphan_node_token_events = self.count_orphan_node_token_events()?;
+        let orphan_node_billing_events = self.count_orphan_node_billing_events()?;
 
         let mut candidates = Vec::new();
         push_if_positive(
@@ -118,6 +122,22 @@ impl Store {
             "算力明细引用了不存在的扣费事件",
             orphan_billing_events,
             "compute_meter_events.billing_event_id 找不到对应 billing_events，说明扣费明细链路需要排查。",
+        );
+        push_if_positive(
+            &mut candidates,
+            "billing:orphan-node-token-events",
+            "critical",
+            "节点收益流水引用了不存在的 token 事件",
+            orphan_node_token_events,
+            "node_transactions.token_usage_event_id 找不到对应 token_usage_events，说明节点分账和用量账本出现断链。",
+        );
+        push_if_positive(
+            &mut candidates,
+            "billing:orphan-node-billing-events",
+            "critical",
+            "节点收益流水引用了不存在的扣费事件",
+            orphan_node_billing_events,
+            "node_transactions.billing_event_id 找不到对应 billing_events，说明节点收益没有可靠扣费来源。",
         );
 
         let ts = now();
@@ -218,6 +238,32 @@ impl Store {
              FROM compute_meter_events c
              LEFT JOIN billing_events b ON b.id = c.billing_event_id
              WHERE c.billing_event_id IS NOT NULL AND b.id IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
+    fn count_orphan_node_token_events(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM node_transactions n
+             LEFT JOIN token_usage_events t ON t.id = n.token_usage_event_id
+             WHERE n.token_usage_event_id IS NOT NULL AND t.id IS NULL",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
+    fn count_orphan_node_billing_events(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM node_transactions n
+             LEFT JOIN billing_events b ON b.id = n.billing_event_id
+             WHERE n.billing_event_id IS NOT NULL AND b.id IS NULL",
             [],
             |row| row.get(0),
         )
