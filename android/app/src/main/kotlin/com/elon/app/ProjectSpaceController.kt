@@ -190,6 +190,10 @@ internal class ProjectSpaceController(
     }
 
     fun renderProjectSpaceLanding() {
+        if (activeSpace == null) {
+            renderLoading()
+            return
+        }
         if (pendingOpenSelfMemberList) {
             pendingOpenSelfMemberList = false
             if (renderSelfMemberConversationList()) return
@@ -231,7 +235,7 @@ internal class ProjectSpaceController(
             return
         }
         val space = activeSpace ?: return
-        val container = binding.projectContentLayout
+        val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(spaceHeader(space))
         container.addView(sectionTitle("频道"))
@@ -549,7 +553,7 @@ internal class ProjectSpaceController(
     }
 
     private fun renderLoading() {
-        val container = binding.projectContentLayout
+        val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
             text = "正在进入项目空间..."
@@ -561,7 +565,7 @@ internal class ProjectSpaceController(
     }
 
     private fun renderError(message: String) {
-        val container = binding.projectContentLayout
+        val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
             text = message
@@ -682,7 +686,14 @@ internal class ProjectSpaceController(
         activeMemberListUserId = member.userId
         activeChannel = null
         activeMemberConversation = null
-        memberConversationViews.renderList(binding.projectContentLayout, space, member, isSelf)
+        memberConversationViews.renderList(prepareProjectContent(), space, member, isSelf)
+    }
+
+    private fun prepareProjectContent(): LinearLayout {
+        binding.projectPage.stopNestedScroll()
+        binding.projectPage.scrollTo(0, 0)
+        binding.projectContentLayout.jumpDrawablesToCurrentState()
+        return binding.projectContentLayout
     }
 
     private fun renderMemberConversationMessages(

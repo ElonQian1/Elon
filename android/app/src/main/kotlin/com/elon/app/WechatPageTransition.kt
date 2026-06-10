@@ -258,7 +258,7 @@ internal object WechatPageTransition {
             overlay.translationX = 0f
 
             parent.addView(overlay)
-            if (incomingFrom == Direction.RIGHT) page.bringToFront() else overlay.bringToFront()
+            orderReplacementLayers(page, overlay, incomingFrom)
             parent.invalidate()
             play(
                 animators = listOf(
@@ -280,6 +280,7 @@ internal object WechatPageTransition {
         val width = page.width
         val height = page.height
         if (width <= 0 || height <= 0) return null
+        settlePressedState(page)
         val bitmap = runCatching {
             Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
                 page.draw(Canvas(bitmap))
@@ -291,8 +292,35 @@ internal object WechatPageTransition {
             layoutParams = ViewGroup.LayoutParams(width, height)
             x = page.x
             y = page.y
-            elevation = page.elevation + 1f
+            elevation = page.elevation
+            translationZ = page.translationZ
             visibility = View.VISIBLE
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            isClickable = false
+            isFocusable = false
+        }
+    }
+
+    private fun orderReplacementLayers(page: View, overlay: View, incomingFrom: Direction) {
+        overlay.elevation = page.elevation
+        if (incomingFrom == Direction.RIGHT) {
+            overlay.translationZ = page.translationZ
+            page.bringToFront()
+        } else {
+            overlay.translationZ = page.translationZ + 1f
+            overlay.bringToFront()
+        }
+        (page.parent as? View)?.invalidate()
+    }
+
+    private fun settlePressedState(view: View) {
+        view.isPressed = false
+        view.jumpDrawablesToCurrentState()
+        view.refreshDrawableState()
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                settlePressedState(view.getChildAt(index))
+            }
         }
     }
 
