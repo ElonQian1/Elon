@@ -1,9 +1,13 @@
-use super::{config::ContextCompilerConfig, relevance::RelevantFile, repo_snapshot::RepoSnapshot};
+use super::{
+    config::ContextCompilerConfig, relevance::RelevantFile, repo_snapshot::RepoSnapshot,
+    rust_project::RustProjectSummary,
+};
 
 pub(crate) fn build_context_pack(
     config: &ContextCompilerConfig,
     user_message: &str,
     snapshot: &RepoSnapshot,
+    rust_project: Option<&RustProjectSummary>,
     relevant_files: &[RelevantFile],
     llm_brief: Option<&str>,
 ) -> String {
@@ -48,6 +52,35 @@ pub(crate) fn build_context_pack(
         out.push('\n');
     }
     out.push_str("</repo_snapshot>\n\n");
+
+    if let Some(rust) = rust_project {
+        out.push_str("<rust_project>\n");
+        out.push_str(&format!(
+            "- workspace: {}\n- root_package: {}\n",
+            rust.workspace,
+            rust.root_package.as_deref().unwrap_or("none")
+        ));
+        if let Some(toolchain) = rust.toolchain.as_deref() {
+            out.push_str(&format!("- toolchain: {toolchain}\n"));
+        }
+        if !rust.workspace_members.is_empty() {
+            out.push_str("- workspace_members: ");
+            out.push_str(&rust.workspace_members.join(", "));
+            out.push('\n');
+        }
+        if !rust.manifests.is_empty() {
+            out.push_str("- manifests:\n");
+            for manifest in &rust.manifests {
+                out.push_str(&format!(
+                    "  - path={} package={} workspace={}\n",
+                    manifest.path,
+                    manifest.package_name.as_deref().unwrap_or("none"),
+                    manifest.workspace
+                ));
+            }
+        }
+        out.push_str("</rust_project>\n\n");
+    }
 
     if !snapshot.large_files.is_empty() {
         out.push_str("<source_size_risks>\n");
@@ -134,6 +167,9 @@ mod tests {
             llm_brief_enabled: false,
             max_relevant_files: 4,
             max_pack_chars: 20_000,
+            save_pack_enabled: true,
+            artifact_max_bytes: 100_000,
+            rust_probe_enabled: true,
         };
         let snapshot = RepoSnapshot {
             git_head: Some("abc123".to_string()),
@@ -154,10 +190,54 @@ mod tests {
             matches: Vec::new(),
         }];
 
-        let pack = build_context_pack(&config, "实现 context compiler", &snapshot, &relevant, None);
+        let pack = build_context_pack(
+            &config,
+            "实现 context compiler",
+            &snapshot,
+            None,
+            &relevant,
+            None,
+        );
 
         assert!(pack.contains("只读预检产物"));
         assert!(pack.contains("server/src/context_compiler/mod.rs"));
         assert!(pack.contains("Cargo.toml"));
+    }
+
+    #[test]
+    fn context_pack_includes_rust_project_summary() {
+        let config = ContextCompilerConfig {
+            enabled: true,
+            mode: ContextCompilerMode::Inject,
+            agent_name: "hunyuan".to_string(),
+            llm_brief_enabled: false,
+            max_relevant_files: 4,
+            max_pack_chars: 20_000,
+            save_pack_enabled: true,
+            artifact_max_bytes: 100_000,
+            rust_probe_enabled: true,
+        };
+        let snapshot = RepoSnapshot {
+            git_head: Some("abc123".to_string()),
+            git_branch: Some("main".to_string()),
+            has_origin: true,
+            top_level_entries: Vec::new(),
+            instruction_docs: Vec::new(),
+            manifests: vec!["Cargo.toml".to_string()],
+            large_files: Vec::new(),
+            source_file_count: 1,
+        };
+        let rust = RustProjectSummary {
+            root_package: Some("elon-server".to_string()),
+            workspace: true,
+            workspace_members: vec!["server".to_string()],
+            manifests: Vec::new(),
+            toolchain: Some("stable".to_string()),
+        };
+
+        let pack = build_context_pack(&config, "任务", &snapshot, Some(&rust), &[], None);
+
+        assert!(pack.contains("<rust_project>"));
+        assert!(pack.contains("root_package: elon-server"));
     }
 }

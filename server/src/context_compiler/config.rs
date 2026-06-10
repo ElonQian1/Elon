@@ -28,6 +28,9 @@ pub(crate) struct ContextCompilerConfig {
     pub(crate) llm_brief_enabled: bool,
     pub(crate) max_relevant_files: usize,
     pub(crate) max_pack_chars: usize,
+    pub(crate) save_pack_enabled: bool,
+    pub(crate) artifact_max_bytes: usize,
+    pub(crate) rust_probe_enabled: bool,
 }
 
 impl ContextCompilerConfig {
@@ -45,6 +48,9 @@ impl ContextCompilerConfig {
             llm_brief_enabled: env_bool("ELON_CONTEXT_COMPILER_LLM_BRIEF", true),
             max_relevant_files: env_usize("ELON_CONTEXT_COMPILER_MAX_FILES", 8),
             max_pack_chars: env_usize("ELON_CONTEXT_COMPILER_MAX_CHARS", 12_000),
+            save_pack_enabled: env_bool("ELON_CONTEXT_COMPILER_SAVE_PACK", true),
+            artifact_max_bytes: env_usize("ELON_CONTEXT_COMPILER_ARTIFACT_MAX_BYTES", 200_000),
+            rust_probe_enabled: env_bool("ELON_CONTEXT_COMPILER_RUST_PROBE", true),
         }
     }
 }
