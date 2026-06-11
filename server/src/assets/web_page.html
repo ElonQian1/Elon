@@ -1354,25 +1354,31 @@
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       padding-bottom: env(safe-area-inset-bottom);
       display: flex;
-      align-items: stretch;
+      align-items: center;
       justify-content: center;
     }
     .project-space-ai-menu.hidden { display: none; }
     .project-space-ai-menu button {
-      flex: 1;
+      width: 108px;
+      height: 48px;
       border: 0;
-      background: transparent;
-      color: var(--ink);
+      border-radius: 16px;
+      background: var(--nav-active-bg);
+      box-shadow: inset 0 0 0 1px var(--line);
+      color: var(--tab-active);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 13px;
-      font-size: 20px;
+      gap: 0;
+      padding: 5px 0;
+      font-size: 12px;
       cursor: pointer;
     }
+    .project-space-ai-menu button:hover { background: var(--secondary-btn); }
     .project-space-ai-menu svg {
-      width: 30px;
-      height: 30px;
+      width: 24px;
+      height: 24px;
       flex: none;
     }
 
@@ -1940,11 +1946,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </nav>
   <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
     <button type="button" id="projectSpaceAiMenuBtn" title="打开项目 AI 会话">
-      <svg viewBox="0 0 30 30" fill="none" aria-hidden="true">
-        <path d="M8.2 7.2h9.4c1.2 0 2.2 1 2.2 2.2v1.7M19.8 17.6v3c0 1.2-1 2.2-2.2 2.2H8.2c-1.2 0-2.2-1-2.2-2.2V9.4c0-1.2 1-2.2 2.2-2.2z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M14.3 18.9l3.2-.8 5.4-5.4c.5-.5.5-1.4 0-1.9l-.6-.6c-.5-.5-1.4-.5-1.9 0L15 15.6zM19.1 11.5l2 2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+        <path d="M7.2 7.1h10.6c2.2 0 3.8 1.5 3.8 3.6v3.5c0 2.1-1.6 3.6-3.8 3.6h-4.3L9.1 21v-3.2H7.2c-2.1 0-3.7-1.5-3.7-3.6v-3.5c0-2.1 1.6-3.6 3.7-3.6z" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9.2 13.1h4.5M9.2 10.7h6.2" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M20.8 4.6v2.1M20.8 9.1v2.1M17.5 7.9h2.1M22 7.9h2.1" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span>Ai 会话</span>
+      <span>AI 会话</span>
     </button>
   </nav>
 </main>

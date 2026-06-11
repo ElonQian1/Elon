@@ -838,24 +838,33 @@
             android:contentDescription="打开项目 AI 会话"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:visibility="gone">
 
-            <ImageView
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_project_ai_conversation"
-                app:tint="@color/elon_text_primary" />
+            <LinearLayout
+                android:layout_width="108dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_project_space_ai_menu_item"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="5dp"
+                android:paddingBottom="5dp">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="13dp"
-                android:includeFontPadding="false"
-                android:text="Ai 会话"
-                android:textColor="@color/elon_text_primary"
-                android:textSize="20sp" />
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_project_ai_conversation"
+                    app:tint="@color/elon_text_primary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:includeFontPadding="false"
+                    android:text="AI 会话"
+                    android:textColor="@color/elon_text_primary"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>
