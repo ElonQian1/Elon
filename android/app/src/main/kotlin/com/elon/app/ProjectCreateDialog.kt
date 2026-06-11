@@ -21,7 +21,7 @@ internal object ProjectCreateDialog {
         http: OkHttpClient,
         serverUrl: String,
         defaultTitle: String,
-        onCreate: (title: String, nodeId: String) -> Unit
+        onCreate: (title: String, nodeId: String?) -> Unit
     ) {
         val nameInput = EditText(activity).apply {
             setText(defaultTitle)
@@ -62,7 +62,8 @@ internal object ProjectCreateDialog {
 
         dialog.setOnShowListener {
             val positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            positive.isEnabled = false
+            // 按钮立即启用，不等节点加载——节点离线时也可先创建项目
+            positive.isEnabled = true
             positive.setOnClickListener {
                 val title = nameInput.text.toString().trim()
                 if (title.isBlank()) {
@@ -70,16 +71,11 @@ internal object ProjectCreateDialog {
                     return@setOnClickListener
                 }
                 val selected = onlineNodes.getOrNull(nodeSpinner.selectedItemPosition)
-                if (selected == null) {
-                    nodeStatus.text = "请先选择一个可创建项目的 PC 节点"
-                    return@setOnClickListener
-                }
                 dialog.dismiss()
-                onCreate(title, selected.nodeId)
+                onCreate(title, selected?.nodeId)
             }
             loadNodes(activity, http, serverUrl, nodeStatus, nodeSpinner) { nodes ->
                 onlineNodes = nodes
-                positive.isEnabled = onlineNodes.isNotEmpty()
             }
             nameInput.post {
                 nameInput.requestFocus()
@@ -114,9 +110,9 @@ internal object ProjectCreateDialog {
                         if (selectableNodes.isEmpty()) {
                             nodeSpinner.visibility = View.GONE
                             nodeStatus.text = if (nodes.isEmpty()) {
-                                "没有在线 PC 节点。请先启动已配置 Codex/Copilot 的 PC 节点。"
+                                "⚠️ 暂无在线 PC 节点，创建后工作区将在节点上线时自动初始化"
                             } else {
-                                "没有可创建项目的 PC 节点：${nodes.first().capacityHint()}"
+                                "⚠️ PC 节点暂不能接受新项目（${nodes.first().capacityHint()}），工作区将在节点就绪后初始化"
                             }
                             return@onSuccess
                         }
@@ -135,7 +131,7 @@ internal object ProjectCreateDialog {
                     .onFailure { error ->
                         onLoaded(emptyList())
                         nodeSpinner.visibility = View.GONE
-                        nodeStatus.text = "加载 PC 节点失败：${error.message ?: "未知错误"}"
+                        nodeStatus.text = "⚠️ 无法获取节点列表（${error.message ?: "网络错误"}），创建后工作区将在节点上线时自动初始化"
                     }
             }
         }

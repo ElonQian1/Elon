@@ -850,10 +850,11 @@ internal class MainProjectActions(
 
     private fun createProject(title: String, nodeId: String? = null) {
         val token = tokenProvider() ?: run {
-            Toast.makeText(activity, "请先登录并启动 PC 节点后新建项目", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, "请先登录后新建项目", Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(activity, "正在通过 PC 节点创建项目...", Toast.LENGTH_SHORT).show()
+        val statusMsg = if (nodeId != null) "正在通过 PC 节点创建项目..." else "正在创建项目..."
+        Toast.makeText(activity, statusMsg, Toast.LENGTH_SHORT).show()
         val ownerAccount = AuthManager.displayName(activity)
         Thread {
             try {
@@ -883,7 +884,12 @@ internal class MainProjectActions(
                     saveProjects()
                     renderProjectList()
                     openProjectSpace(projects[index])
-                    Toast.makeText(activity, "项目已在 PC 节点创建", Toast.LENGTH_SHORT).show()
+                    val doneMsg = if (created.workspacePending) {
+                        "项目已创建，工作区将在 PC 节点上线后自动初始化"
+                    } else {
+                        "项目已在 PC 节点创建"
+                    }
+                    Toast.makeText(activity, doneMsg, Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread {

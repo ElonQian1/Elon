@@ -177,6 +177,24 @@ pub async fn create_project(
     .await
     {
         Ok(node_id) => node_id,
+        // 节点暂时离线 → 保留项目记录，返回 pending 状态。
+        // 用户可以先进入项目，等节点上线后工作区会在首次发起任务时自动初始化。
+        Err((StatusCode::SERVICE_UNAVAILABLE, _)) => {
+            let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
+            return (
+                StatusCode::ACCEPTED,
+                Json(serde_json::json!({
+                    "project": project,
+                    "archive_project": archive_project,
+                    "reused_existing": false,
+                    "workspace_status": "pending",
+                    "node_id": req.node_id,
+                    "message": "项目已创建，PC 节点上线后工作区将自动初始化",
+                })),
+            )
+                .into_response();
+        }
+        // 其他错误（如节点配置错误、不支持 CLI）→ 回滚项目记录，返回错误
         Err((status, message)) => {
             let _ = state.store.purge_project_records(&user.id, &project.id);
             return json_error(status, message);

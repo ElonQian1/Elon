@@ -34,7 +34,8 @@ internal data class StoreProject(
     val archiveEntryKey: String? = null,
     val archiveConversationTitle: String? = null,
     val memoryScopeType: String? = null,
-    val memoryScopeId: String? = null
+    val memoryScopeId: String? = null,
+    val workspacePending: Boolean = false
 )
 
 internal data class ProjectCreateNodeOption(
@@ -166,12 +167,15 @@ internal fun createStoreProject(
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(apiErrorMessage(body, resp.code))
     val root = JSONObject(body)
+    val workspacePending = root.optString("workspace_status") == "pending"
     root.optJSONObject("archive_project")?.let { archive ->
         return parseArchiveProject(archive).toStoreProject(ownerAccount)
+            .copy(workspacePending = workspacePending)
     }
     val project = root.optJSONObject("project")
         ?: error("响应缺少 project")
     return parseCreatedStoreProject(project, ownerAccount)
+        .copy(workspacePending = workspacePending)
 }
 
 internal fun fetchProjectCreateNodes(
