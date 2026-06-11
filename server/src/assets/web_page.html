@@ -475,16 +475,30 @@
     }
     .project-space-feed {
       position: relative;
-      padding: 10px 8px 24px;
+      padding: 22px 0 0;
       background: var(--bg);
     }
-    .project-space-announcement,
+    .project-space-announcement {
+      background: #1B1D21;
+      border-radius: 18px 18px 0 0;
+      margin: 0;
+      padding: 22px;
+      color: var(--ink);
+    }
+    .project-space-post-area {
+      position: relative;
+      min-height: 344px;
+      background: var(--bg);
+      border-radius: 18px 18px 0 0;
+      padding: 0 0 34px;
+    }
     .project-space-post-card {
       background: var(--panel);
-      border-radius: 8px;
-      margin: 8px 2px;
+      border-radius: 10px;
+      margin: 8px 10px;
       padding: 14px;
       color: var(--ink);
+      cursor: pointer;
     }
     .project-space-announcement.editable {
       cursor: pointer;
@@ -495,14 +509,14 @@
     }
     .project-space-announcement-title {
       color: var(--ink);
-      font-size: 15px;
-      font-weight: 700;
-      margin-bottom: 7px;
+      font-size: 20px;
+      font-weight: 400;
+      margin-bottom: 14px;
     }
     .project-space-announcement-body {
-      color: var(--ink-soft);
-      font-size: 14px;
-      line-height: 1.55;
+      color: var(--ink);
+      font-size: 18px;
+      line-height: 1.65;
       white-space: pre-wrap;
     }
     .project-space-post-head {
@@ -563,19 +577,34 @@
       white-space: pre-wrap;
     }
     .project-space-feed-empty {
-      color: var(--ink-faint);
+      color: var(--ink-soft);
       text-align: center;
-      font-size: 14px;
-      padding: 34px 72px 34px 20px;
-    }
-    .project-space-feed-actions {
-      position: sticky;
-      float: right;
-      bottom: 18px;
+      font-size: 15px;
+      padding: 82px 20px 72px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin: -110px 6px 0 0;
+      align-items: center;
+      gap: 28px;
+    }
+    .project-space-empty-post-btn {
+      width: 48px;
+      height: 48px;
+      border: 0;
+      border-radius: 50%;
+      background: #30333A;
+      color: var(--ink);
+      font-size: 34px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .project-space-feed-actions {
+      position: absolute;
+      right: 22px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
       z-index: 2;
     }
     .project-space-fab {
@@ -583,10 +612,13 @@
       height: 48px;
       border: 0;
       border-radius: 50%;
-      background: #7C8EA8;
+      background: #30333A;
       color: var(--ink);
-      font-size: 24px;
+      font-size: 34px;
+      line-height: 1;
       cursor: pointer;
+      display: grid;
+      place-items: center;
     }
     .project-space-fab svg {
       width: 26px;
@@ -1270,6 +1302,33 @@
     .tab .ic { width: 24px; height: 24px; display: block; }
     .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
     .tab .ic svg { width: 100%; height: 100%; }
+    .project-space-ai-menu {
+      grid-area: tabs;
+      background: var(--nav-bg);
+      min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
+      padding-bottom: env(safe-area-inset-bottom);
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+    .project-space-ai-menu.hidden { display: none; }
+    .project-space-ai-menu button {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 13px;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .project-space-ai-menu svg {
+      width: 30px;
+      height: 30px;
+      flex: none;
+    }
 
     /* ===== 模态对话框 ===== */
     .modal-mask {
@@ -1551,16 +1610,18 @@
             <div class="project-space-announcement-title">公告</div>
             <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
           </div>
-          <div id="projectSpacePostList" class="project-space-post-list">
-            <div class="project-space-feed-empty">正在加载帖子...</div>
-          </div>
-          <div class="project-space-feed-actions">
-            <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
-              <svg viewBox="0 0 28 28" aria-hidden="true">
-                <path d="M8 4h8l4 4v16H8zM16 4v5h4M11 13h6M11 17h8M11 21h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
-              </svg>
-            </button>
-            <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button">+</button>
+          <div class="project-space-post-area">
+            <div id="projectSpacePostList" class="project-space-post-list">
+              <div class="project-space-feed-empty">正在加载帖子...</div>
+            </div>
+            <div class="project-space-feed-actions">
+              <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
+                <svg viewBox="0 0 26 26" aria-hidden="true">
+                  <path d="M5.8 8.2h6l1.8 2.2h6.6c1.1 0 2 .9 2 2v6.4c0 1.1-.9 2-2 2H5.8c-1.1 0-2-.9-2-2v-8.6c0-1.1.9-2 2-2zM8.2 14.6h9.6M8.2 17.4h6.4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
+                </svg>
+              </button>
+              <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">+</button>
+            </div>
           </div>
         </div>
         <div class="project-stage" id="currentStageText">待提交需求</div>
@@ -1831,6 +1892,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <span>我的</span>
     </button>
   </nav>
+  <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
+    <button type="button" id="projectSpaceAiMenuBtn" title="打开项目 AI 会话">
+      <svg viewBox="0 0 30 30" fill="none" aria-hidden="true">
+        <path d="M8.2 7.2h9.4c1.2 0 2.2 1 2.2 2.2v1.7M19.8 17.6v3c0 1.2-1 2.2-2.2 2.2H8.2c-1.2 0-2.2-1-2.2-2.2V9.4c0-1.2 1-2.2 2.2-2.2z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14.3 18.9l3.2-.8 5.4-5.4c.5-.5.5-1.4 0-1.9l-.6-.6c-.5-.5-1.4-.5-1.9 0L15 15.6zM19.1 11.5l2 2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Ai 会话</span>
+    </button>
+  </nav>
 </main>
 
 <!-- ============ 新建项目对话框 ============ -->
@@ -2053,6 +2123,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const moreBtn = $('moreBtn');
   const searchBtn = $('searchBtn');
   const tabsBar = document.querySelector('.tabs-bar');
+  const projectSpaceAiMenu = $('projectSpaceAiMenu');
+  const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
 
   const conversationList = $('conversationList');
   const chatView = $('chatView');
@@ -2107,6 +2179,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   if (projectSpacePostBtn) {
     projectSpacePostBtn.addEventListener('click', () => {
       showNativeOnly('发布项目空间帖子和上传本地图片请在 Android APK 中使用，网页版已同步帖子预览。');
+    });
+  }
+  if (projectSpaceAiMenuBtn) {
+    projectSpaceAiMenuBtn.addEventListener('click', () => {
+      if (currentProject) {
+        selectProject(currentProject);
+      } else {
+        showNativeOnly('项目空间底部 Ai 会话请在 Android APK 中打开。');
+      }
     });
   }
 
@@ -2523,6 +2604,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
+    if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     // 返回按钮：聊天详情页显示
     backBtn.style.display = inChat ? '' : 'none';
     voiceCallBtn.style.display = (inFriendChat && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
@@ -2575,6 +2657,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addBtn.style.display = '';
     searchBtn.style.display = '';
     if (tabsBar) tabsBar.classList.remove('hidden');
+    if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     stageHint.classList.add('hidden');
     topTitle.textContent = '好友';
     resetProjectPage();
@@ -2801,6 +2884,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     voiceCallBtn.style.display = 'none';
     moreBtn.style.display = 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
+    if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     stageHint.classList.remove('hidden');
     modelBtn.style.display = '';
     messageInput.placeholder = '描述你想开发的 App 功能';
@@ -2834,6 +2918,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addBtn.style.display = '';
     searchBtn.style.display = '';
     if (tabsBar) tabsBar.classList.remove('hidden');
+    if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     stageHint.classList.add('hidden');
     modelBtn.style.display = '';
     messageInput.placeholder = '描述你想开发的 App 功能';
@@ -2854,6 +2939,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     moreBtn.style.display = '';
     voiceCallBtn.style.display = (currentFriend && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
+    if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     modelBtn.style.display = currentGroup ? 'none' : '';
     messageInput.placeholder = '发消息';
     topTitle.textContent = currentFriend ? friendDisplayName(currentFriend) : groupDisplayName(currentGroup);
@@ -3347,6 +3433,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isProjectSpaceFeedPost(message) {
     return parseProjectSpacePostText(message && message.content).structured;
   }
+  function projectSpaceEmptyHtml(text, showButton) {
+    return '<div class="project-space-feed-empty"><span>' + escapeHtml(text) + '</span>' +
+      (showButton ? '<button class="project-space-empty-post-btn" type="button" aria-label="发布帖子">+</button>' : '') +
+      '</div>';
+  }
+  function wireProjectSpaceEmptyPostButton() {
+    const button = projectSpacePostList && projectSpacePostList.querySelector('.project-space-empty-post-btn');
+    if (!button) return;
+    button.addEventListener('click', () => {
+      if (projectSpacePostBtn) projectSpacePostBtn.click();
+    });
+  }
   function renderProjectSpaceFeed(space, loading) {
     if (!projectSpaceAnnouncement || !projectSpacePostList) return;
     const announcementCard = projectSpaceAnnouncement.closest('.project-space-announcement');
@@ -3361,7 +3459,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!space) {
       projectSpaceAnnouncement.textContent = '不得发布与主题内容不相关的帖子。';
       resetAnnouncementAction();
-      projectSpacePostList.innerHTML = '<div class="project-space-feed-empty">暂无帖子</div>';
+      projectSpacePostList.innerHTML = projectSpaceEmptyHtml('还没有帖子，点击+好发布内容', true);
+      wireProjectSpaceEmptyPostButton();
       return;
     }
     const project = space.project || currentProject;
@@ -3399,9 +3498,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       .sort((a, b) => String(b.message.created_at || '').localeCompare(String(a.message.created_at || '')))
       .slice(0, 40);
     if (!posts.length) {
-      projectSpacePostList.innerHTML = '<div class="project-space-feed-empty">' +
-        (loading ? '正在加载帖子...' : '还没有帖子，请在 Android APK 中发布第一条。') +
-        '</div>';
+      projectSpacePostList.innerHTML = projectSpaceEmptyHtml(
+        loading ? '正在加载帖子...' : '还没有帖子，点击+好发布内容',
+        !loading
+      );
+      wireProjectSpaceEmptyPostButton();
       return;
     }
     projectSpacePostList.innerHTML = posts.map(({ channel, message }) => {

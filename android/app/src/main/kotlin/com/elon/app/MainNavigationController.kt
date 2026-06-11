@@ -47,7 +47,8 @@ internal class MainNavigationController(
     private val onProjectChannelClosed: () -> Unit,
     private val showProjectMembers: () -> Unit,
     private val loadMarketplace: () -> Unit,
-    private val onAgentTabSelected: () -> Unit
+    private val onAgentTabSelected: () -> Unit,
+    private val openProjectSpaceAiConversation: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -72,8 +73,25 @@ internal class MainNavigationController(
         binding.searchButton.setOnClickListener { showFriendLocalSearch() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.voiceCallButton.setOnClickListener { openSocialAiVoiceCall() }
+        binding.projectSpaceAiMenu.setOnClickListener { openProjectSpaceAiConversation() }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         selectBottomTab(binding.tabChat, animate = false)
+    }
+
+    private fun showMainTabs() {
+        binding.pageTabs.visibility = View.VISIBLE
+        binding.projectSpaceAiMenu.visibility = View.GONE
+    }
+
+    private fun hideBottomMenus() {
+        binding.pageTabs.visibility = View.GONE
+        binding.projectSpaceAiMenu.visibility = View.GONE
+    }
+
+    private fun showProjectSpaceBottomMenu() {
+        binding.pageTabs.visibility = View.GONE
+        binding.projectSpaceAiMenu.visibility = View.VISIBLE
+        binding.projectSpaceAiMenu.bringToFront()
     }
 
     private fun selectBottomTab(tab: TextView, animate: Boolean) {
@@ -131,7 +149,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
@@ -168,7 +186,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
     }
 
     private fun pageForBottomTab(tab: TextView): View? {
@@ -232,7 +250,7 @@ internal class MainNavigationController(
                     binding.marketplacePage.visibility = View.VISIBLE
                     binding.agentPage.root.visibility = View.GONE
                     binding.inputLayout.visibility = View.GONE
-                    binding.pageTabs.visibility = View.VISIBLE
+                    showMainTabs()
                     clearPageTranslations()
                     pageTransitionRunning = false
                 }
@@ -255,7 +273,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.VISIBLE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -334,7 +352,7 @@ internal class MainNavigationController(
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
                     binding.conversationPage.visibility = View.VISIBLE
-                    binding.pageTabs.visibility = View.VISIBLE
+                    showMainTabs()
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderConversationList()
@@ -364,7 +382,7 @@ internal class MainNavigationController(
                 outgoing = listOf(binding.conversationPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
+                    hideBottomMenus()
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
@@ -376,7 +394,7 @@ internal class MainNavigationController(
             )
         } else {
             binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
+            hideBottomMenus()
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
             binding.marketplacePage.visibility = View.GONE
@@ -407,7 +425,7 @@ internal class MainNavigationController(
                 outgoingFull = listOf(binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
+                    hideBottomMenus()
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
@@ -419,7 +437,7 @@ internal class MainNavigationController(
             )
         } else {
             binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
+            hideBottomMenus()
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
             binding.marketplacePage.visibility = View.GONE
@@ -448,7 +466,7 @@ internal class MainNavigationController(
                 outgoing = listOf(binding.projectPage, binding.pageTabs),
                 onEnd = {
                     binding.conversationPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
+                    hideBottomMenus()
                     binding.projectPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
@@ -460,7 +478,7 @@ internal class MainNavigationController(
             )
         } else {
             binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
+            hideBottomMenus()
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
             binding.marketplacePage.visibility = View.GONE
@@ -491,7 +509,7 @@ internal class MainNavigationController(
                 outgoingFull = listOf(binding.pageTabs),
                 onEnd = {
                     binding.projectPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
+                    hideBottomMenus()
                     binding.conversationPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
@@ -503,7 +521,7 @@ internal class MainNavigationController(
             )
         } else {
             binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
+            hideBottomMenus()
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
             binding.marketplacePage.visibility = View.GONE
@@ -535,7 +553,7 @@ internal class MainNavigationController(
                 outgoingFull = listOf(binding.pageTabs),
                 onEnd = {
                     binding.projectPage.visibility = View.GONE
-                    binding.pageTabs.visibility = View.GONE
+                    hideBottomMenus()
                     binding.conversationPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
@@ -547,7 +565,7 @@ internal class MainNavigationController(
             )
         } else {
             binding.conversationPage.visibility = View.GONE
-            binding.pageTabs.visibility = View.GONE
+            hideBottomMenus()
             binding.projectPage.visibility = View.GONE
             binding.profilePage.visibility = View.GONE
             binding.marketplacePage.visibility = View.GONE
@@ -647,7 +665,7 @@ internal class MainNavigationController(
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
                     binding.projectPage.visibility = View.VISIBLE
-                    binding.pageTabs.visibility = View.VISIBLE
+                    showMainTabs()
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectList()
@@ -669,7 +687,7 @@ internal class MainNavigationController(
                     binding.conversationPage.visibility = View.GONE
                     binding.profilePage.visibility = View.GONE
                     binding.projectPage.visibility = View.VISIBLE
-                    binding.pageTabs.visibility = View.VISIBLE
+                    showMainTabs()
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectList()
@@ -698,7 +716,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
-        binding.pageTabs.visibility = View.GONE
+        hideBottomMenus()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -723,7 +741,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.VISIBLE
         binding.addButton.visibility = View.VISIBLE
@@ -745,7 +763,7 @@ internal class MainNavigationController(
         binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
-        binding.pageTabs.visibility = View.GONE
+        hideBottomMenus()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -767,7 +785,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
@@ -791,7 +809,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.VISIBLE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.VISIBLE
+        showMainTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -810,7 +828,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        binding.pageTabs.visibility = View.GONE
+        showProjectSpaceBottomMenu()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -830,7 +848,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
-        binding.pageTabs.visibility = View.GONE
+        hideBottomMenus()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -912,5 +930,6 @@ internal class MainNavigationController(
         binding.agentPage.root.translationX = 0f
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
+        binding.projectSpaceAiMenu.translationX = 0f
     }
 }

@@ -549,7 +549,8 @@ class MainActivity : AppCompatActivity() {
             },
             showProjectMembers = { projectSpaceController.showMembers() },
             loadMarketplace = { marketplaceActions.loadProjects() },
-            onAgentTabSelected = { agentPageController.refresh() }
+            onAgentTabSelected = { agentPageController.refresh() },
+            openProjectSpaceAiConversation = ::openCurrentProjectAiConversationFromSpace
         )
     }
 
@@ -944,6 +945,17 @@ class MainActivity : AppCompatActivity() {
                 animate
             )
         }
+    }
+
+    private fun openCurrentProjectAiConversationFromSpace() {
+        if (s.projects.isEmpty()) return
+        val projectIndex = s.activeProjectIndex.coerceIn(0, s.projects.lastIndex)
+        s.activeProjectIndex = projectIndex
+        val project = projectStateActions.activeProject()
+        val conversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
+        project.activeConversationIndex = conversationIndex
+        projectStateActions.saveProjects()
+        conversationOpenActions.openProjectSpaceConversation(projectIndex, conversationIndex)
     }
 
     private fun localProjectIconDataUrl(projectId: String): String? {

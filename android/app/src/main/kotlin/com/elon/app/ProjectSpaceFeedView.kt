@@ -30,10 +30,27 @@ internal class ProjectSpaceFeedView(
         messagesByChannel: Map<String, List<ProjectChannelMessage>>,
         loading: Boolean
     ) {
-        container.addView(announcementBlock(space, messagesByChannel))
+        val feedShell = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(22)
+            }
+        }
+        feedShell.addView(announcementBlock(space, messagesByChannel))
 
         val frame = FrameLayout(activity).apply {
-            setPadding(0, dp(4), 0, dp(28))
+            minimumHeight = dp(344)
+            setPadding(0, 0, 0, dp(34))
+            background = roundedBackground(
+                colorHex = "#101010",
+                topStartDp = 18,
+                topEndDp = 18,
+                bottomEndDp = 0,
+                bottomStartDp = 0
+            )
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -47,8 +64,8 @@ internal class ProjectSpaceFeedView(
         val posts = feedPosts(space, messagesByChannel)
         when {
             posts.isNotEmpty() -> posts.forEach { feedColumn.addView(postCard(it)) }
-            loading -> feedColumn.addView(statusRow("正在加载帖子...", "#A6AFBD"))
-            else -> feedColumn.addView(statusRow("还没有帖子，点击右侧 + 发布第一条。", "#6F7785"))
+            loading -> feedColumn.addView(emptyState("正在加载帖子...", showButton = false))
+            else -> feedColumn.addView(emptyState("还没有帖子，点击+好发布内容", showButton = true))
         }
 
         frame.addView(floatingActions(), FrameLayout.LayoutParams(
@@ -56,9 +73,10 @@ internal class ProjectSpaceFeedView(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.END or Gravity.CENTER_VERTICAL
         ).apply {
-            marginEnd = dp(6)
+            marginEnd = dp(22)
         })
-        container.addView(frame)
+        feedShell.addView(frame)
+        container.addView(feedShell)
     }
 
     private fun announcementBlock(
@@ -80,14 +98,18 @@ internal class ProjectSpaceFeedView(
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(14), dp(20), dp(16))
-            background = roundedBackground("#181B20", 14)
+            setPadding(dp(22), dp(22), dp(22), dp(24))
+            background = roundedBackground(
+                colorHex = "#1B1D21",
+                topStartDp = 18,
+                topEndDp = 18,
+                bottomEndDp = 0,
+                bottomStartDp = 0
+            )
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(dp(10), dp(14), dp(10), dp(8))
-            }
+            )
             if (editable) {
                 isClickable = true
                 foreground = selectableForeground()
@@ -98,16 +120,15 @@ internal class ProjectSpaceFeedView(
             }
             addView(TextView(activity).apply {
                 text = "公告"
-                textSize = 15f
-                setTypeface(typeface, Typeface.BOLD)
+                textSize = 20f
                 setTextColor(Color.parseColor("#F2F5FA"))
             })
             addView(TextView(activity).apply {
                 text = displayText
-                textSize = 14f
-                setTextColor(Color.parseColor("#A6AFBD"))
-                setLineSpacing(dp(3).toFloat(), 1f)
-                setPadding(0, dp(7), 0, 0)
+                textSize = 18f
+                setTextColor(Color.parseColor("#F2F5FA"))
+                setLineSpacing(dp(5).toFloat(), 1f)
+                setPadding(0, dp(14), 0, 0)
             })
         }
     }
@@ -277,16 +298,16 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(floatingButton(
-                iconRes = R.drawable.ic_project_document,
+                iconRes = R.drawable.ic_side_menu_files,
                 contentDescription = "项目文档",
                 onClick = openProjectDocuments
             ))
             addView(floatingButton(
-                iconRes = R.drawable.ic_add_circle_simple,
+                iconRes = R.drawable.ic_project_fab_plus,
                 contentDescription = "发布帖子",
                 onClick = openPostComposer
             ), LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-                topMargin = dp(10)
+                topMargin = dp(20)
             })
         }
     }
@@ -299,9 +320,9 @@ internal class ProjectSpaceFeedView(
         return ImageButton(activity).apply {
             setImageResource(iconRes)
             setColorFilter(Color.parseColor("#F2F5FA"))
-            background = roundedBackground("#7C8EA8", 24)
+            background = roundedBackground("#30333A", 24)
             scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setPadding(dp(10), dp(10), dp(10), dp(10))
             this.contentDescription = contentDescription
             isClickable = true
             foreground = selectableForeground()
@@ -310,13 +331,33 @@ internal class ProjectSpaceFeedView(
         }
     }
 
-    private fun statusRow(textValue: String, colorHex: String): TextView {
-        return TextView(activity).apply {
-            text = textValue
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(colorHex))
-            setPadding(dp(20), dp(44), dp(72), dp(44))
+    private fun emptyState(textValue: String, showButton: Boolean): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(20), dp(82), dp(20), dp(72))
+            addView(TextView(activity).apply {
+                text = textValue
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#A6AFBD"))
+            })
+            if (showButton) {
+                addView(TextView(activity).apply {
+                    text = "+"
+                    textSize = 34f
+                    includeFontPadding = false
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.parseColor("#F2F5FA"))
+                    background = roundedBackground("#30333A", 24)
+                    isClickable = true
+                    foreground = selectableForeground()
+                    setOnClickListener { openPostComposer() }
+                    contentDescription = "发布帖子"
+                }, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                    topMargin = dp(28)
+                })
+            }
         }
     }
 
@@ -324,6 +365,28 @@ internal class ProjectSpaceFeedView(
         return GradientDrawable().apply {
             setColor(Color.parseColor(colorHex))
             cornerRadius = dp(radiusDp).toFloat()
+        }
+    }
+
+    private fun roundedBackground(
+        colorHex: String,
+        topStartDp: Int,
+        topEndDp: Int,
+        bottomEndDp: Int,
+        bottomStartDp: Int
+    ): GradientDrawable {
+        val topStart = dp(topStartDp).toFloat()
+        val topEnd = dp(topEndDp).toFloat()
+        val bottomEnd = dp(bottomEndDp).toFloat()
+        val bottomStart = dp(bottomStartDp).toFloat()
+        return GradientDrawable().apply {
+            setColor(Color.parseColor(colorHex))
+            cornerRadii = floatArrayOf(
+                topStart, topStart,
+                topEnd, topEnd,
+                bottomEnd, bottomEnd,
+                bottomStart, bottomStart
+            )
         }
     }
 
