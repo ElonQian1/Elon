@@ -33,6 +33,12 @@ internal class MainProfileQuickActions(
             openTransactions = { nodeTransactionSheet.show() }
         )
     }
+    private val nodeDirectoryCard by lazy {
+        ProfileNodeDirectoryCard(
+            activity, binding, http, serverUrl,
+            openMarket = { nodeMarketSheet.show() }
+        )
+    }
     private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
     private val userMemoriesCard by lazy { UserMemoriesCard(activity, binding, http, serverUrl) }
 
@@ -63,6 +69,7 @@ internal class MainProfileQuickActions(
             UserProfileViews.renderSummary(activity, binding, openProfileDetails)
             tokenUsageCard.attachAndRefresh()
             nodeBalanceCard.attachAndRefresh()
+            nodeDirectoryCard.attachAndRefresh()
             myNodesCard.attachAndRefresh()
             userMemoriesCard.attachAndRefresh()
         }

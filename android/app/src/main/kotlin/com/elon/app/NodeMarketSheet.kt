@@ -200,7 +200,10 @@ internal class NodeMarketSheet(
                 listContainer.removeView(spinner)
 
                 nodeResult
-                    .onSuccess { nodes -> renderNodes(listContainer, nodes) }
+                    .onSuccess { nodes ->
+                        balanceText.text = buildSummaryLine(nodes, balance)
+                        renderNodes(listContainer, nodes)
+                    }
                     .onFailure { err -> listContainer.addView(buildErrorHint(err.message ?: "加载 PC 节点失败")) }
             }
         }
@@ -592,6 +595,12 @@ internal class NodeMarketSheet(
 
     private fun formatBalance(v: Double): String {
         return if (v == v.toLong().toDouble()) "${v.toLong()}" else String.format("%.2f", v)
+    }
+
+    private fun buildSummaryLine(nodes: List<NodeMarketNode>, balance: NodeBalance?): String {
+        val summary = NodeMarketCatalog.summarize(nodes)
+        val balanceText = balance?.let { "积分 ${formatBalance(it.balance)}" } ?: "积分 --"
+        return "在线 ${summary.onlineNodes} 台 · 可接项目 ${summary.projectReadyNodes} 台 · 模型 ${summary.modelCount} 个  |  $balanceText"
     }
 
     private fun nodeSubtitle(node: NodeMarketNode): String {

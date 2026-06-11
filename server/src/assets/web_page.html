@@ -1077,6 +1077,47 @@
     .node-tx-meta { font-size:11px; color:#6F7785; }
     .node-tx-empty { text-align:center; padding:40px 0; color:#6F7785; font-size:14px; }
     .node-payout-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .node-directory-card {
+      background: #181B20;
+      border-radius: 8px;
+      padding: 18px 22px 16px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .node-directory-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom: 14px;
+    }
+    .node-directory-title { font-size:16px; font-weight:700; color:#F2F5FA; }
+    .node-directory-status {
+      font-size:11px; color:#81B3D9; background:#152C3E;
+      border-radius:8px; padding:4px 10px;
+    }
+    .node-directory-metrics {
+      display:flex; gap:24px; flex-wrap:wrap; margin-bottom:12px;
+    }
+    .node-directory-metric label {
+      display:block; font-size:11px; color:#6F7785; margin-bottom:2px;
+    }
+    .node-directory-metric .val {
+      font-size:24px; font-weight:700; color:#F2F5FA;
+    }
+    .node-directory-preview { margin-top: 2px; }
+    .node-directory-node {
+      background:#0F1217; border-radius:6px; padding:10px 12px; margin-top:6px;
+    }
+    .node-directory-node-title {
+      font-size:13px; color:#F2F5FA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .node-directory-node-detail {
+      font-size:11px; color:#6F7785; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .node-directory-empty {
+      text-align:center; color:#6F7785; font-size:12px; padding:14px 0 8px;
+    }
+    .node-directory-cta {
+      font-size:13px; color:#6091CF; margin-top:10px; display:inline-block;
+    }
     .node-payout-row {
       display:flex; justify-content:space-between; gap:12px;
       padding: 12px 0; border-bottom: 1px solid var(--line);
@@ -1852,6 +1893,32 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
             <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
           </span>
         </div>
+      </div>
+
+      <!-- 全站 PC 节点概览卡片 -->
+      <div class="node-directory-card" id="nodeDirectoryCard" onclick="openNodeMarketDialog()">
+        <div class="node-directory-header">
+          <span class="node-directory-title">全站 PC 节点</span>
+          <span class="node-directory-status" id="nodeDirectoryStatus">加载中…</span>
+        </div>
+        <div class="node-directory-metrics">
+          <div class="node-directory-metric">
+            <label>在线节点</label>
+            <span class="val" id="nodeDirectoryOnlineVal">—</span>
+          </div>
+          <div class="node-directory-metric">
+            <label>可接项目</label>
+            <span class="val" id="nodeDirectoryReadyVal">—</span>
+          </div>
+          <div class="node-directory-metric">
+            <label>可用模型</label>
+            <span class="val" id="nodeDirectoryModelsVal">—</span>
+          </div>
+        </div>
+        <div class="node-directory-preview" id="nodeDirectoryPreview">
+          <div class="node-directory-empty">加载中…</div>
+        </div>
+        <span class="node-directory-cta">进入 PC 节点大厅  →</span>
       </div>
 
       <!-- 积分流水明细弹窗 -->
@@ -2672,6 +2739,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       refreshDownloadPage();
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
       loadNodeBalance().catch((e) => console.warn('loadNodeBalance failed:', e));
+      loadNodeDirectory().catch((e) => console.warn('loadNodeDirectory failed:', e));
       loadMyNodes().catch((e) => console.warn('loadMyNodes failed:', e));
       loadMemories().catch((e) => console.warn('loadMemories failed:', e));
     }
@@ -4666,11 +4734,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
       // 余额
       const balEl = dlg.querySelector('#_nmBalance');
+      let balanceLine = isLoggedIn() ? '积分 --' : '未登录';
       if (balResp.status === 'fulfilled' && balResp.value.ok) {
         const b = await balResp.value.json();
-        balEl.textContent = `积分余额：${fmtBal(b.balance)}  |  累计收益：${fmtBal(b.lifetime_earned || 0)}  |  分账 ${fmtShare(b.provider_revenue_share_x1000)}`;
+        balanceLine = `积分 ${fmtBal(b.balance)} · 累计收益 ${fmtBal(b.lifetime_earned || 0)} · 分账 ${fmtShare(b.provider_revenue_share_x1000)}`;
+        balEl.textContent = balanceLine;
       } else {
-        balEl.textContent = '积分余额：' + (isLoggedIn() ? '加载失败' : '未登录');
+        balanceLine = isLoggedIn() ? '积分加载失败' : '未登录';
+        balEl.textContent = balanceLine;
       }
 
       // 在线节点与模型列表
@@ -4697,6 +4768,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
             cards.push({ node, nodeId, nodeName, hw, capacity, model });
           });
         });
+        balEl.textContent = `${nodeMarketSummaryText(sortedNodes)}  |  ${balanceLine}`;
         if (!sortedNodes.length) {
           modEl.innerHTML = '<div style="color:#6F7785;padding:40px 20px;text-align:center">暂无在线节点</div>';
         } else {
@@ -4731,6 +4803,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function marketNodeName(node) {
     const nodeId = node && (node.node_id || node.agent_id || '');
     return String((node && (node.display_name || node.device_name || node.short_id)) || (nodeId ? nodeId.slice(0, 8) : '在线节点')).trim();
+  }
+
+  function nodeMarketSummary(nodes) {
+    const list = Array.isArray(nodes) ? nodes : [];
+    return {
+      online: list.filter(n => !!n.online).length,
+      ready: list.filter(nodeCanAcceptProject).length,
+      models: list.reduce((sum, n) => sum + (Array.isArray(n.models) ? n.models.length : 0), 0),
+      warnings: list.filter(n => {
+        const tone = nodeCapacityTone(n);
+        const warnings = Array.isArray(n.capacity_warnings || n.capacityWarnings)
+          ? (n.capacity_warnings || n.capacityWarnings).filter(Boolean)
+          : [];
+        return tone === 'warn' || tone === 'bad' || warnings.length > 0;
+      }).length
+    };
+  }
+
+  function nodeMarketSummaryText(nodes) {
+    const s = nodeMarketSummary(nodes);
+    return `在线 ${s.online} 台 · 可接项目 ${s.ready} 台 · 模型 ${s.models} 个`;
   }
 
   function renderMarketNodeCard(node) {
@@ -5035,6 +5128,82 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (pendingEl) pendingEl.textContent = '--';
       if (statusEl) statusEl.textContent = '暂不可用';
     }
+  }
+
+  async function loadNodeDirectory() {
+    const statusEl = document.getElementById('nodeDirectoryStatus');
+    const onlineEl = document.getElementById('nodeDirectoryOnlineVal');
+    const readyEl = document.getElementById('nodeDirectoryReadyVal');
+    const modelsEl = document.getElementById('nodeDirectoryModelsVal');
+    const previewEl = document.getElementById('nodeDirectoryPreview');
+    if (!previewEl) return;
+    if (!isLoggedIn()) {
+      if (statusEl) statusEl.textContent = '未登录';
+      if (onlineEl) onlineEl.textContent = '--';
+      if (readyEl) readyEl.textContent = '--';
+      if (modelsEl) modelsEl.textContent = '--';
+      previewEl.innerHTML = '<div class="node-directory-empty">登录后可浏览全站在线 PC 节点</div>';
+      return;
+    }
+    if (statusEl) statusEl.textContent = '加载中…';
+    if (onlineEl) onlineEl.textContent = '…';
+    if (readyEl) readyEl.textContent = '…';
+    if (modelsEl) modelsEl.textContent = '…';
+    previewEl.innerHTML = '';
+    try {
+      const res = await fetch('/api/nodes', { headers: authHeaders() });
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      const nodes = Array.isArray(data) ? data : (data.nodes || []);
+      const sorted = nodes.slice().sort((a, b) => {
+        const aReady = nodeCanAcceptProject(a) ? 1 : 0;
+        const bReady = nodeCanAcceptProject(b) ? 1 : 0;
+        if (aReady !== bReady) return bReady - aReady;
+        const aModels = Array.isArray(a.models) ? a.models.length : 0;
+        const bModels = Array.isArray(b.models) ? b.models.length : 0;
+        if (aModels !== bModels) return bModels - aModels;
+        return marketNodeName(a).localeCompare(marketNodeName(b), 'zh-CN');
+      });
+      const summary = nodeMarketSummary(sorted);
+      if (onlineEl) onlineEl.textContent = String(summary.online);
+      if (readyEl) readyEl.textContent = String(summary.ready);
+      if (modelsEl) modelsEl.textContent = String(summary.models);
+      if (statusEl) statusEl.textContent = summary.online > 0 ? `在线 ${summary.online}` : '暂无在线';
+      if (!sorted.length) {
+        previewEl.innerHTML = '<div class="node-directory-empty">暂无在线 PC 节点</div>';
+        return;
+      }
+      previewEl.innerHTML = sorted.slice(0, 2).map(renderNodeDirectoryPreview).join('') +
+        (sorted.length > 2 ? `<div class="node-directory-empty" style="color:#6091CF;padding-bottom:0">还有 ${sorted.length - 2} 台节点，点击查看全部</div>` : '');
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '暂不可用';
+      if (onlineEl) onlineEl.textContent = '--';
+      if (readyEl) readyEl.textContent = '--';
+      if (modelsEl) modelsEl.textContent = '--';
+      previewEl.innerHTML = '<div class="node-directory-empty">节点列表加载失败</div>';
+    }
+  }
+
+  function renderNodeDirectoryPreview(node) {
+    const name = marketNodeName(node);
+    const capacity = nodeCapacityLabel(node) || (nodeCanAcceptProject(node) ? '可接项目' : '在线');
+    const modelCount = Array.isArray(node.models) ? node.models.length : 0;
+    const clis = Array.isArray(node.allowed_clis || node.allowedClis)
+      ? (node.allowed_clis || node.allowedClis).filter(Boolean).join('/')
+      : '';
+    const warnings = Array.isArray(node.capacity_warnings || node.capacityWarnings)
+      ? (node.capacity_warnings || node.capacityWarnings).filter(Boolean)
+      : [];
+    const detail = [
+      modelCount ? `模型 ${modelCount}` : '暂无模型',
+      clis ? `CLI ${clis}` : '',
+      nodeHardwareText(node),
+      warnings[0] || ''
+    ].filter(Boolean).map(escapeHtml).join(' · ');
+    return `<div class="node-directory-node">
+      <div class="node-directory-node-title">${escapeHtml(name)} · ${escapeHtml(capacity)}</div>
+      <div class="node-directory-node-detail">${detail || '硬件与容量待上报'}</div>
+    </div>`;
   }
 
   async function loadMyNodes() {

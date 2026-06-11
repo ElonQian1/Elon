@@ -39,12 +39,32 @@ internal data class NodeMarketNode(
     val capacityWarnings: List<String>
 )
 
+internal data class NodeMarketSummary(
+    val onlineNodes: Int,
+    val projectReadyNodes: Int,
+    val modelCount: Int,
+    val warningNodes: Int
+)
+
 internal object NodeMarketCatalog {
     fun parseNodes(body: String): List<NodeMarketNode> {
         val arr = JSONObject(body).optJSONArray("nodes") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             parseNode(arr.getJSONObject(i))
         }
+    }
+
+    fun summarize(nodes: List<NodeMarketNode>): NodeMarketSummary {
+        return NodeMarketSummary(
+            onlineNodes = nodes.count { it.online },
+            projectReadyNodes = nodes.count { it.canAcceptProject },
+            modelCount = nodes.sumOf { it.models.size },
+            warningNodes = nodes.count {
+                it.capacityTone.equals("warn", ignoreCase = true) ||
+                    it.capacityTone.equals("bad", ignoreCase = true) ||
+                    it.capacityWarnings.isNotEmpty()
+            }
+        )
     }
 
     private fun parseNode(o: JSONObject): NodeMarketNode {
