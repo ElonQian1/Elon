@@ -411,6 +411,7 @@
             android:elevation="10dp"
             android:gravity="center"
             android:orientation="vertical"
+            android:translationY="96dp"
             android:visibility="gone">
 
             <ImageButton
