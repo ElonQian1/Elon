@@ -455,6 +455,8 @@ pub struct ProjectAccess {
     pub name: String,
     pub workspace_key: String,
     pub source_type: String,
+    pub repo_url: Option<String>,
+    pub branch: Option<String>,
     pub workspace_path: Option<String>,
     pub node_id: Option<String>,
     pub role: String,

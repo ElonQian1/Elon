@@ -72,6 +72,19 @@ pub async fn recover_project_workspace(
             Ok(node_id) => node_id,
             Err((status, message)) => return json_error(status, message),
         };
+    if requires_git_remote_for_cross_node(action, &project, &target_node)
+        && project
+            .repo_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "该项目没有 Git 远端，不能在其它 PC 节点重建。请先在项目 Git 仓库里配置可访问的 repo_url，并把本地代码 push 到远端。",
+        );
+    }
 
     let provisioned = match project_workspace_provision::provision_project_workspace(
         &state,
@@ -80,6 +93,8 @@ pub async fn recover_project_workspace(
         &project.id,
         &project.name,
         &project.template,
+        project.repo_url.as_deref(),
+        project.branch.as_deref(),
     )
     .await
     {
@@ -98,6 +113,14 @@ pub async fn recover_project_workspace(
         &provisioned.workspace_path,
         &target_node,
         provisioned.git_head.as_deref(),
+        provisioned
+            .git_remote_origin
+            .as_deref()
+            .or(project.repo_url.as_deref()),
+        provisioned
+            .git_branch
+            .as_deref()
+            .or(project.branch.as_deref()),
     ) {
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e),
@@ -173,6 +196,24 @@ fn project_summary_for_user(
         .into_iter()
         .find(|project| project.id == project_id)
         .ok_or_else(|| anyhow::anyhow!("项目不存在，或当前用户无权访问"))
+}
+
+fn requires_git_remote_for_cross_node(
+    action: &str,
+    project: &ProjectSummary,
+    target_node: &str,
+) -> bool {
+    match action {
+        "migrate_workspace" => true,
+        "bind_pc_node" => {
+            project
+                .workspace_path
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+                && project.node_id.as_deref() != Some(target_node)
+        }
+        _ => false,
+    }
 }
 
 fn recovery_message(action: &str, created: bool) -> String {

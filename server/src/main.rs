@@ -55,6 +55,7 @@ mod node_scheduler;
 mod pc_node_capacity;
 mod pc_relay;
 mod pc_relay_client;
+mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod peer_relay;
 mod presence_events;

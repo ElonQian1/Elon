@@ -1032,10 +1032,43 @@ mod tests {
                 "D:/Elon/workspaces/user/project/repo",
                 "node-a",
                 None,
+                None,
+                None,
             )
             .expect_err("system project PC binding should be rejected")
             .to_string();
         assert!(bind_err.contains("系统归档项目不能绑定"));
+    }
+
+    #[test]
+    fn bind_project_to_pc_workspace_persists_git_remote() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-bind-git@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Portable PC Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        let rebound = store
+            .bind_project_to_pc_workspace(
+                &user.id,
+                &project.id,
+                "D:/Elon/workspaces/user/project/repo",
+                "node-a",
+                Some("abc123"),
+                Some("git@github.com:owner/portable.git"),
+                Some("main"),
+            )
+            .expect("project should bind to pc workspace");
+
+        assert_eq!(rebound.source_type, "pc_managed");
+        assert_eq!(
+            rebound.repo_url.as_deref(),
+            Some("git@github.com:owner/portable.git")
+        );
+        assert_eq!(rebound.branch.as_deref(), Some("main"));
     }
 
     #[test]

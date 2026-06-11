@@ -161,6 +161,12 @@ pub enum ServerToAgent {
         user_id: String,
         name: String,
         template: String,
+        /// Optional authoritative Git remote for rebuilding the project on another PC node.
+        #[serde(default)]
+        repo_url: Option<String>,
+        /// Optional branch to check out after clone/fetch. Missing means the remote default branch.
+        #[serde(default)]
+        branch: Option<String>,
     },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {
@@ -311,6 +317,10 @@ pub enum AgentToServer {
         workspace_path: String,
         #[serde(default)]
         git_head: Option<String>,
+        #[serde(default)]
+        git_remote_origin: Option<String>,
+        #[serde(default)]
+        git_branch: Option<String>,
         created: bool,
     },
     /// PC 节点创建项目工作区失败。

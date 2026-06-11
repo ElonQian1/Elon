@@ -40,6 +40,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_hardware_probe;
+mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
@@ -1520,6 +1521,8 @@ async fn run_session(
                             user_id,
                             name,
                             template,
+                            repo_url,
+                            branch,
                         } => {
                             info!(
                                 "📁 ProvisionProjectWorkspace: {} project={}",
@@ -1535,6 +1538,8 @@ async fn run_session(
                                             user_id,
                                             name,
                                             template,
+                                            repo_url,
+                                            branch,
                                         },
                                     ) {
                                         Ok(result) => AgentToServer::ProjectWorkspaceProvisioned {
@@ -1542,6 +1547,8 @@ async fn run_session(
                                             project_id: project_id_for_error,
                                             workspace_path: result.workspace_path,
                                             git_head: result.git_head,
+                                            git_remote_origin: result.git_remote_origin,
+                                            git_branch: result.git_branch,
                                             created: result.created,
                                         },
                                         Err(e) => AgentToServer::ProjectWorkspaceProvisionError {
@@ -2133,6 +2140,8 @@ struct AdminRegisterReq {
     name: String,
     workspace_path: String,
     description: Option<String>,
+    repo_url: Option<String>,
+    branch: Option<String>,
 }
 
 /// 本地管理页 → 注册外部本地项目到云端。
@@ -2173,6 +2182,11 @@ async fn admin_register_project(
             axum::Json(serde_json::json!({ "ok": false, "error": "workspace_path 必须是目录" })),
         );
     }
+    let repo_url = clean_optional_admin_field(req.repo_url.as_deref())
+        .or_else(|| git_value_at(pb, &["remote", "get-url", "origin"]));
+    let branch = clean_optional_admin_field(req.branch.as_deref()).or_else(|| {
+        git_value_at(pb, &["rev-parse", "--abbrev-ref", "HEAD"]).filter(|value| value != "HEAD")
+    });
 
     // 2) 必须已登录（有凭证 + token）才能调用云端
     let creds = match rt.creds().await {
@@ -2211,6 +2225,8 @@ async fn admin_register_project(
         "workspace_path": path,
         "description": req.description,
         "node_id": creds.agent_id,
+        "repo_url": repo_url,
+        "branch": branch,
     });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
@@ -2251,6 +2267,30 @@ async fn admin_register_project(
                 "error": format!("调用云端失败: {}", e),
             })),
         ),
+    }
+}
+
+fn clean_optional_admin_field(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn git_value_at(path: &std::path::Path, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
     }
 }
 

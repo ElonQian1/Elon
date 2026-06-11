@@ -213,6 +213,8 @@ impl Store {
         description: Option<&str>,
         workspace_path: &str,
         node_id: Option<&str>,
+        repo_url: Option<&str>,
+        branch: Option<&str>,
     ) -> Result<CreateProjectResult> {
         let name = name.trim();
         if name.is_empty() {
@@ -228,6 +230,8 @@ impl Store {
         let template = "local";
         let source_type = "local_path";
         let node_id = clean_optional(node_id);
+        let repo_url = clean_optional(repo_url);
+        let branch = clean_optional(branch);
 
         let now = now();
         let conn = self.conn()?;
@@ -261,7 +265,9 @@ impl Store {
                      source_type = 'local_path',
                      workspace_path = ?4,
                      node_id = ?5,
-                     updated_at = ?6
+                     repo_url = COALESCE(?6, repo_url),
+                     branch = COALESCE(?7, branch),
+                     updated_at = ?8
                  WHERE id = ?1 AND status != 'deleted'",
                 params![
                     project_id,
@@ -269,6 +275,8 @@ impl Store {
                     clean_optional(description),
                     workspace_path,
                     node_id,
+                    repo_url,
+                    branch,
                     now
                 ],
             )?;
@@ -282,6 +290,8 @@ impl Store {
                     serde_json::json!({
                         "workspace_path": workspace_path,
                         "node_id": node_id,
+                        "repo_url": repo_url,
+                        "branch": branch,
                     })
                     .to_string(),
                     now
@@ -304,14 +314,22 @@ impl Store {
                      source_type = 'local_path',
                      workspace_path = ?2,
                      node_id = ?3,
-                     updated_at = ?4
+                     repo_url = COALESCE(?4, repo_url),
+                     branch = COALESCE(?5, branch),
+                     updated_at = ?6
                  WHERE id = ?1",
-                params![&project.id, workspace_path, node_id, now],
+                params![&project.id, workspace_path, node_id, repo_url, branch, now],
             )?;
             project.template = "local".into();
             project.source_type = "local_path".into();
             project.workspace_path = Some(workspace_path.to_string());
             project.node_id = node_id.map(ToOwned::to_owned);
+            if repo_url.is_some() {
+                project.repo_url = repo_url.map(ToOwned::to_owned);
+            }
+            if branch.is_some() {
+                project.branch = branch.map(ToOwned::to_owned);
+            }
             project.updated_at = now;
             return Ok(CreateProjectResult {
                 project,
@@ -325,10 +343,11 @@ impl Store {
         let tx = conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO projects (
-                id, name, description, workspace_key, template, source_type, workspace_path, node_id,
+                id, name, description, workspace_key, template, source_type, repo_url, branch,
+                workspace_path, node_id,
                 status, created_by, created_at, updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?10, ?10)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?12, ?12)",
             params![
                 id,
                 name,
@@ -336,6 +355,8 @@ impl Store {
                 workspace_key,
                 template,
                 source_type,
+                repo_url,
+                branch,
                 workspace_path,
                 node_id,
                 user_id,
@@ -358,6 +379,8 @@ impl Store {
                     "name": name,
                     "workspace_path": workspace_path,
                     "node_id": node_id,
+                    "repo_url": repo_url,
+                    "branch": branch,
                 }).to_string(),
                 now
             ],
@@ -372,8 +395,8 @@ impl Store {
                 workspace_key,
                 template: template.to_string(),
                 source_type: source_type.into(),
-                repo_url: None,
-                branch: None,
+                repo_url: repo_url.map(ToOwned::to_owned),
+                branch: branch.map(ToOwned::to_owned),
                 workspace_path: Some(workspace_path.to_string()),
                 node_id: node_id.map(ToOwned::to_owned),
                 status: "active".into(),
@@ -577,7 +600,8 @@ impl Store {
     pub fn get_project_access(&self, user_id: &str, project_id: &str) -> Result<ProjectAccess> {
         self.conn()?
             .query_row(
-                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.workspace_path, p.node_id, pm.role, p.status
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
+                        p.workspace_path, p.node_id, pm.role, p.status
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -588,15 +612,56 @@ impl Store {
                         name: row.get(1)?,
                         workspace_key: row.get(2)?,
                         source_type: row.get(3)?,
-                        workspace_path: row.get(4)?,
-                        node_id: row.get(5)?,
-                        role: row.get(6)?,
-                        status: row.get(7)?,
+                        repo_url: row.get(4)?,
+                        branch: row.get(5)?,
+                        workspace_path: row.get(6)?,
+                        node_id: row.get(7)?,
+                        role: row.get(8)?,
+                        status: row.get(9)?,
                     })
                 },
             )
             .optional()?
             .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))
+    }
+
+    pub fn update_project_git_metadata(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        repo_url: Option<&str>,
+        branch: Option<&str>,
+    ) -> Result<ProjectSummary> {
+        let repo_url = clean_optional(repo_url);
+        let branch = clean_optional(branch);
+        if repo_url.is_none() && branch.is_none() {
+            let conn = self.conn()?;
+            return find_project_by_id_for_user(&conn, user_id, project_id)?
+                .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"));
+        }
+
+        let now = now();
+        let conn = self.conn()?;
+        let changed = conn.execute(
+            "UPDATE projects
+             SET repo_url = COALESCE(?1, repo_url),
+                 branch = COALESCE(?2, branch),
+                 updated_at = ?3
+             WHERE id = ?4
+               AND source_type NOT IN ('agent_balloon', 'chat_memory')
+               AND EXISTS (
+                 SELECT 1 FROM project_members
+                 WHERE project_id = ?4
+                   AND user_id = ?5
+                   AND role IN ('owner', 'editor')
+               )",
+            params![repo_url, branch, now, project_id, user_id],
+        )?;
+        if changed == 0 {
+            return Err(anyhow!("项目不存在，或当前用户无权配置 Git"));
+        }
+        find_project_by_id_for_user(&conn, user_id, project_id)?
+            .ok_or_else(|| anyhow!("Git 配置保存后无法读取项目"))
     }
 
     pub fn update_project_git_config(
@@ -844,6 +909,8 @@ mod tests {
                 Some("from pc"),
                 r"D:\rust\active-projects\one",
                 Some("node-a"),
+                None,
+                None,
             )
             .expect("external project should register");
         assert!(!first.reused_existing);
@@ -858,6 +925,8 @@ mod tests {
                 Some("from pc"),
                 r"D:\rust\active-projects\two",
                 Some("node-b"),
+                Some("git@github.com:owner/pc-project.git"),
+                Some("main"),
             )
             .expect("same external project should update");
         assert!(second.reused_existing);
@@ -866,6 +935,11 @@ mod tests {
             Some(r"D:\rust\active-projects\two")
         );
         assert_eq!(second.project.node_id.as_deref(), Some("node-b"));
+        assert_eq!(
+            second.project.repo_url.as_deref(),
+            Some("git@github.com:owner/pc-project.git")
+        );
+        assert_eq!(second.project.branch.as_deref(), Some("main"));
 
         let access = store
             .get_project_access(&user.id, &second.project.id)
@@ -899,6 +973,8 @@ mod tests {
                 Some("PC local repo"),
                 r"D:\rust\active-projects\elon cli",
                 Some("node-owner"),
+                None,
+                None,
             )
             .expect("existing shared project should bind");
 
@@ -936,6 +1012,8 @@ mod tests {
                 Some("PC local repo"),
                 r"D:\rust\active-projects\elon cli",
                 Some("node-owner"),
+                None,
+                None,
             )
             .expect("existing shared project should bind");
 

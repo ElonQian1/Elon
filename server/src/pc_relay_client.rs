@@ -230,6 +230,8 @@ async fn run_relay_session(
                 user_id,
                 name,
                 template,
+                repo_url,
+                branch,
             } => {
                 let tx = out_tx.clone();
                 tokio::spawn(async move {
@@ -241,6 +243,8 @@ async fn run_relay_session(
                                 user_id,
                                 name,
                                 template,
+                                repo_url,
+                                branch,
                             },
                         ) {
                             Ok(result) => AgentToServer::ProjectWorkspaceProvisioned {
@@ -248,6 +252,8 @@ async fn run_relay_session(
                                 project_id: project_id_for_error,
                                 workspace_path: result.workspace_path,
                                 git_head: result.git_head,
+                                git_remote_origin: result.git_remote_origin,
+                                git_branch: result.git_branch,
                                 created: result.created,
                             },
                             Err(e) => AgentToServer::ProjectWorkspaceProvisionError {

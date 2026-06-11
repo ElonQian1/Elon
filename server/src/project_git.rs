@@ -47,8 +47,12 @@ pub fn project_git_status_json(state: &AppState, project: &ProjectAccess) -> ser
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let has_git = workspace.join(".git").exists();
-    let origin = git_output(&workspace, &["remote", "get-url", "origin"]).ok();
-    let branch = git_output(&workspace, &["rev-parse", "--abbrev-ref", "HEAD"]).ok();
+    let origin = git_output(&workspace, &["remote", "get-url", "origin"])
+        .ok()
+        .or_else(|| project.repo_url.clone());
+    let branch = git_output(&workspace, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .ok()
+        .or_else(|| project.branch.clone());
     let (public_key, has_deploy_key) = read_deploy_public_key(state, &project.id)
         .map(|key| (Some(key), true))
         .unwrap_or((None, false));
@@ -68,9 +72,10 @@ pub fn project_git_status_json(state: &AppState, project: &ProjectAccess) -> ser
     serde_json::json!({
         "project_id": project.id,
         "source_type": project.source_type,
+        "node_id": project.node_id.clone(),
         "workspace": workspace.to_string_lossy(),
         "git": {
-            "has_git": has_git,
+            "has_git": has_git || origin.is_some(),
             "origin": origin,
             "branch": branch,
             "remote_check": remote_check,
@@ -161,6 +166,26 @@ pub async fn user_project_git_config(
     let branch = req.branch.as_deref().unwrap_or("main").trim();
     let branch = if branch.is_empty() { "main" } else { branch };
     let auth_type = req.auth_type.as_deref().unwrap_or("deploy_key");
+
+    if project
+        .node_id
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        let project = match state.store.update_project_git_metadata(
+            &user.id,
+            &project.id,
+            Some(repo_url),
+            Some(branch),
+        ) {
+            Ok(_) => match state.store.get_project_access(&user.id, &project.id) {
+                Ok(project) => project,
+                Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            },
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        };
+        return Json(project_git_status_json(&state, &project)).into_response();
+    }
 
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());

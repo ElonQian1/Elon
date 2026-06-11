@@ -115,6 +115,8 @@ pub fn project_access(
             name: project_id.to_string(),
             workspace_key: project_id.to_string(),
             source_type: "local".to_string(),
+            repo_url: None,
+            branch: None,
             workspace_path: None,
             node_id: None,
             role: "owner".to_string(),

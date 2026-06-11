@@ -11,6 +11,8 @@ use crate::{
 pub struct PcProjectWorkspace {
     pub workspace_path: String,
     pub git_head: Option<String>,
+    pub git_remote_origin: Option<String>,
+    pub git_branch: Option<String>,
     pub created: bool,
 }
 
@@ -86,6 +88,8 @@ pub async fn provision_project_workspace(
     project_id: &str,
     name: &str,
     template: &str,
+    repo_url: Option<&str>,
+    branch: Option<&str>,
 ) -> Result<PcProjectWorkspace> {
     let msg = state
         .agent_manager
@@ -95,6 +99,8 @@ pub async fn provision_project_workspace(
             user_id.to_string(),
             name.to_string(),
             template.to_string(),
+            repo_url.map(ToOwned::to_owned),
+            branch.map(ToOwned::to_owned),
         )
         .await?;
 
@@ -103,11 +109,15 @@ pub async fn provision_project_workspace(
             project_id: returned_project_id,
             workspace_path,
             git_head,
+            git_remote_origin,
+            git_branch,
             created,
             ..
         } if returned_project_id == project_id => Ok(PcProjectWorkspace {
             workspace_path,
             git_head,
+            git_remote_origin,
+            git_branch,
             created,
         }),
         AgentToServer::ProjectWorkspaceProvisioned {

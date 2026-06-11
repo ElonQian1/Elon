@@ -253,6 +253,8 @@ impl AgentManager {
         user_id: String,
         name: String,
         template: String,
+        repo_url: Option<String>,
+        branch: Option<String>,
     ) -> Result<AgentToServer> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
@@ -269,6 +271,8 @@ impl AgentManager {
                 user_id,
                 name,
                 template,
+                repo_url,
+                branch,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);

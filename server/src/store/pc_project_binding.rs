@@ -29,6 +29,8 @@ impl Store {
         workspace_path: &str,
         node_id: &str,
         git_head: Option<&str>,
+        repo_url: Option<&str>,
+        branch: Option<&str>,
     ) -> Result<ProjectSummary> {
         let workspace_path = workspace_path.trim();
         if workspace_path.is_empty() {
@@ -38,6 +40,8 @@ impl Store {
         if node_id.is_empty() {
             return Err(anyhow!("node_id 不能为空"));
         }
+        let repo_url = repo_url.map(str::trim).filter(|value| !value.is_empty());
+        let branch = branch.map(str::trim).filter(|value| !value.is_empty());
 
         let now = now();
         let conn = self.conn()?;
@@ -47,17 +51,27 @@ impl Store {
              SET source_type = 'pc_managed',
                  workspace_path = ?1,
                  node_id = ?2,
+                 repo_url = COALESCE(?3, repo_url),
+                 branch = COALESCE(?4, branch),
                  status = 'active',
-                 updated_at = ?3
-             WHERE id = ?4
+                 updated_at = ?5
+             WHERE id = ?6
                AND source_type NOT IN ('agent_balloon', 'chat_memory')
                AND EXISTS (
                  SELECT 1 FROM project_members pm
                  WHERE pm.project_id = projects.id
-                   AND pm.user_id = ?5
+                   AND pm.user_id = ?7
                    AND pm.role = 'owner'
                )",
-            params![workspace_path, node_id, now, project_id, user_id],
+            params![
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                now,
+                project_id,
+                user_id
+            ],
         )?;
         if updated == 0 {
             return Err(anyhow!(
@@ -75,12 +89,15 @@ impl Store {
                     "workspace_path": workspace_path,
                     "node_id": node_id,
                     "git_head": git_head,
+                    "repo_url": repo_url,
+                    "branch": branch,
                 })
                 .to_string(),
                 now
             ],
         )?;
         tx.commit()?;
+        drop(conn);
 
         let conn = self.conn()?;
         conn.query_row(

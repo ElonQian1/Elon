@@ -165,11 +165,20 @@
       <label>描述（可选）</label>
       <textarea id="regDesc" rows="2" placeholder="一句话介绍这个项目"></textarea>
     </div>
+    <div class="form-row">
+      <label>Git 远端（可选，留空自动读取 origin）</label>
+      <input id="regRepoUrl" placeholder="如：git@github.com:you/project.git" />
+    </div>
+    <div class="form-row">
+      <label>Git 分支（可选，留空自动读取当前分支）</label>
+      <input id="regBranch" placeholder="如：main" />
+    </div>
     <button id="regBtn" onclick="registerProject()">注册到云端</button>
     <div id="regResult"></div>
     <p style="font-size:12px;color:#8b949e;margin-top:12px">
-      流程：本地校验路径存在 → 调用云端 <code>POST /api/projects/external</code>（附 <code>node_id</code>，
-      让服务器跳过本地路径校验）→ 项目自动绑定到本节点，owner = 你。注册成功后在 APK『项目广场 / 我的项目』可见。
+      流程：本地校验路径存在 → 自动读取 Git origin/分支（也可手填）→ 调用云端
+      <code>POST /api/projects/external</code>（附 <code>node_id</code>，让服务器跳过本地路径校验）
+      → 项目自动绑定到本节点，owner = 你。注册成功后在 APK『项目广场 / 我的项目』可见。
     </p>
   </div>
 
@@ -378,6 +387,8 @@ async function registerProject() {
   const name = document.getElementById('regName').value.trim();
   const path = document.getElementById('regPath').value.trim();
   const desc = document.getElementById('regDesc').value.trim();
+  const repoUrl = document.getElementById('regRepoUrl').value.trim();
+  const branch = document.getElementById('regBranch').value.trim();
   const out = document.getElementById('regResult');
   out.innerHTML = '';
   if (!name || !path) { out.innerHTML = '<div class="err-toast">名称和路径必填</div>'; return; }
@@ -388,7 +399,13 @@ async function registerProject() {
     const resp = await fetch('/api/register-project', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, workspace_path: path, description: desc || null }),
+      body: JSON.stringify({
+        name,
+        workspace_path: path,
+        description: desc || null,
+        repo_url: repoUrl || null,
+        branch: branch || null,
+      }),
     });
     const j = await resp.json();
     if (resp.ok && j.ok) {
@@ -398,6 +415,8 @@ async function registerProject() {
       document.getElementById('regName').value = '';
       document.getElementById('regPath').value = '';
       document.getElementById('regDesc').value = '';
+      document.getElementById('regRepoUrl').value = '';
+      document.getElementById('regBranch').value = '';
     } else {
       out.innerHTML = `<div class="err-toast">❌ ${j.error || ('HTTP ' + resp.status)}</div>`;
     }

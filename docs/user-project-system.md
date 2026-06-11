@@ -245,9 +245,9 @@ Authorization: Bearer <token>
 4. 服务端选择当前用户的在线 PC 节点；没有在线节点则拒绝创建，有多个在线节点则要求客户端显式传 `node_id`。
 5. 服务端创建项目数据库记录和 owner 成员记录。
 6. 服务端通过 PC relay 发送 `ProvisionProjectWorkspace`。
-7. PC 节点在自己的受控根目录下创建项目目录、初始化 Git 仓库、写入项目说明文件。
-8. PC 节点回传 `workspace_path` 和 `git_head`。
-9. 服务端把项目标记为 `source_type = pc_managed`，写入 `node_id + workspace_path`。
+7. 如果项目带 `repo_url`，PC 节点在自己的受控根目录下 `git clone/fetch/checkout`；如果没有 `repo_url`，PC 节点创建本地新仓库、初始化 Git 仓库、写入项目说明文件。
+8. PC 节点回传 `workspace_path`、`git_head`、`git_remote_origin` 和 `git_branch`。
+9. 服务端把项目标记为 `source_type = pc_managed`，写入 `node_id + workspace_path`，并保存 `repo_url + branch` 作为后续迁移的重建来源。
 10. 返回项目详情。
 
 PC 节点默认目录结构：
@@ -283,11 +283,30 @@ Authorization: Bearer <token>
   "description": "给自己用的安卓记账 APK",
   "template": "android",
   "execution_target": "pc_node",
-  "node_id": "node-xxx"
+  "node_id": "node-xxx",
+  "repo_url": "git@github.com:friend/accounting-app.git",
+  "branch": "main"
 }
 ```
 
 `node_id` 在用户只有一个在线 PC 节点时可省略。
+
+`repo_url` 和 `branch` 可省略。省略时项目只保证在当前 PC 节点本地可执行；后续如果要在其它 PC 节点重建，必须先配置 Git 远端并把代码 push 到远端。
+
+### 5.1 PC 项目跨节点恢复
+
+PC 工作区的本地路径只代表“当前执行位置”，不能作为长期可信来源。长期可信来源分两层：
+
+1. `node_id + workspace_path`：当前应该在哪台 PC 节点、哪个本地目录执行。
+2. `repo_url + branch`：当当前 PC 离线或需要迁移到其它 PC 节点时，从哪里重建代码。
+
+恢复/迁移规则：
+
+1. `recreate_workspace` 可以在原绑定节点重建或确认目录。
+2. `migrate_workspace` 必须有可访问的 `repo_url`；目标 PC 节点会 clone/fetch 该远端并 checkout 指定分支。
+3. `bind_pc_node` 如果是把已有项目换到另一台 PC 节点，也必须有 `repo_url`。
+4. 没有 Git 远端的项目不能跨节点“空重建”，服务端必须返回明确错误，提示用户先配置远端并 push。
+5. 远端仓库的认证由目标 PC 节点上的 Git/SSH/token 环境负责；服务器只保存项目的远端地址和分支，不持有用户 PC 的本地 Git 凭证。
 
 响应：
 
@@ -850,11 +869,11 @@ PRAGMA busy_timeout = 5000;
 
 推荐策略：
 
-1. 新建项目时执行 `git init` 和初始 commit。
+1. 新建项目时优先使用用户提供的 `repo_url` clone/fetch；没有远端时执行 `git init` 和初始 commit。
 2. 每次 AI 修改后必须 commit。
 3. commit message 包含 task id 和用户 id。
 4. 每天把所有项目仓库打包备份。
-5. 条件允许时，把项目 Git 仓库推送到一个私有 Git 远端。
+5. 条件允许时，把项目 Git 仓库推送到一个私有 Git 远端；只有已 push 的项目才能在其它 PC 节点可靠重建。
 
 commit message 示例：
 

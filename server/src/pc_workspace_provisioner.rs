@@ -2,6 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::pc_workspace_git_remote::{
+    clean_git_branch, clean_git_remote, ensure_git_remote_workspace, ensure_git_repo,
+    git_remote_origin,
+};
 use crate::project_default_docs::ensure_default_docs_in_workspace;
 
 pub struct ProjectWorkspaceRequest {
@@ -9,11 +13,15 @@ pub struct ProjectWorkspaceRequest {
     pub user_id: String,
     pub name: String,
     pub template: String,
+    pub repo_url: Option<String>,
+    pub branch: Option<String>,
 }
 
 pub struct ProjectWorkspaceResult {
     pub workspace_path: String,
     pub git_head: Option<String>,
+    pub git_remote_origin: Option<String>,
+    pub git_branch: Option<String>,
     pub created: bool,
 }
 
@@ -36,15 +44,20 @@ pub fn provision_project_workspace(req: ProjectWorkspaceRequest) -> Result<Proje
     let repo = root.join(user_dir).join(project_dir).join("repo");
     let created = !repo.exists();
 
-    std::fs::create_dir_all(&repo)
-        .with_context(|| format!("failed to create workspace directory {}", repo.display()))?;
-
-    ensure_seed_files(&repo, &req)?;
-    ensure_git_repo(&repo)?;
+    if let Some(remote) = clean_git_remote(req.repo_url.as_deref(), req.branch.as_deref()) {
+        ensure_git_remote_workspace(&repo, &remote, |repo| ensure_seed_files(repo, &req))?;
+    } else {
+        std::fs::create_dir_all(&repo)
+            .with_context(|| format!("failed to create workspace directory {}", repo.display()))?;
+        ensure_seed_files(&repo, &req)?;
+        ensure_git_repo(&repo, clean_git_branch(req.branch.as_deref()).as_deref())?;
+    }
 
     Ok(ProjectWorkspaceResult {
         workspace_path: repo.to_string_lossy().to_string(),
         git_head: git_head(&repo).ok(),
+        git_remote_origin: git_remote_origin(&repo).ok(),
+        git_branch: current_branch(&repo),
         created,
     })
 }
@@ -409,21 +422,6 @@ fn ensure_seed_files(repo: &Path, req: &ProjectWorkspaceRequest) -> Result<()> {
     Ok(())
 }
 
-fn ensure_git_repo(repo: &Path) -> Result<()> {
-    if !repo.join(".git").exists() {
-        run_git(repo, ["init"])?;
-    }
-
-    let _ = run_git(repo, ["config", "user.name", "Elon PC Node"]);
-    let _ = run_git(repo, ["config", "user.email", "node@elon.local"]);
-    run_git(repo, ["add", "."])?;
-    let _ = run_git(
-        repo,
-        ["commit", "-m", "chore: initialize pc managed project"],
-    );
-    Ok(())
-}
-
 fn is_git_work_tree(repo: &Path) -> bool {
     repo.exists()
         && git_output(repo, &["rev-parse", "--is-inside-work-tree"])
@@ -512,10 +510,6 @@ fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn run_git<const N: usize>(repo: &Path, args: [&str; N]) -> Result<()> {
-    run_git_dynamic(repo, &args)
 }
 
 fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {

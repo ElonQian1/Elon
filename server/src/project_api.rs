@@ -22,6 +22,10 @@ pub struct CreateProjectRequest {
     pub name: String,
     pub description: Option<String>,
     pub template: Option<String>,
+    /// Optional Git remote. When present, the selected PC node clones/fetches this repository.
+    pub repo_url: Option<String>,
+    /// Optional branch to check out on the PC node.
+    pub branch: Option<String>,
     /// 新项目可创建到任意在线 PC CLI 节点；多节点在线时必须显式指定。
     pub node_id: Option<String>,
     /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
@@ -41,6 +45,10 @@ pub struct RegisterExternalProjectRequest {
     pub node_id: Option<String>,
     /// true 时注册后立即发布到项目广场。
     pub is_public: Option<bool>,
+    /// 可选 Git 远端；用于之后把该项目迁移到其它 PC 节点时重建工作区。
+    pub repo_url: Option<String>,
+    /// 可选 Git 分支；不传则使用本地/远端默认分支。
+    pub branch: Option<String>,
     /// "open" | "approval" | "invite" | "readonly"；默认 "readonly"。
     pub join_mode: Option<String>,
 }
@@ -129,6 +137,8 @@ pub async fn create_project(
             "服务器磁盘不再承载新代码项目，请选择在线 PC 节点创建项目",
         );
     }
+    let requested_repo_url = clean_optional_string(req.repo_url.as_deref());
+    let requested_branch = clean_optional_string(req.branch.as_deref());
 
     let create_result = match state.store.create_project(
         &user.id,
@@ -141,7 +151,23 @@ pub async fn create_project(
     };
 
     let reused_existing = create_result.reused_existing;
-    let project = create_result.project;
+    let mut project = create_result.project;
+    if requested_repo_url.is_some() || requested_branch.is_some() {
+        project = match state.store.update_project_git_metadata(
+            &user.id,
+            &project.id,
+            requested_repo_url.as_deref(),
+            requested_branch.as_deref(),
+        ) {
+            Ok(project) => project,
+            Err(e) => {
+                if !reused_existing {
+                    let _ = state.store.purge_project_records(&user.id, &project.id);
+                }
+                return json_error(StatusCode::BAD_REQUEST, e.to_string());
+            }
+        };
+    }
     if reused_existing {
         if project
             .node_id
@@ -208,6 +234,8 @@ pub async fn create_project(
         &project.id,
         &project.name,
         &project.template,
+        project.repo_url.as_deref(),
+        project.branch.as_deref(),
     )
     .await
     {
@@ -227,6 +255,14 @@ pub async fn create_project(
         &provisioned.workspace_path,
         &node_id,
         provisioned.git_head.as_deref(),
+        provisioned
+            .git_remote_origin
+            .as_deref()
+            .or(project.repo_url.as_deref()),
+        provisioned
+            .git_branch
+            .as_deref()
+            .or(project.branch.as_deref()),
     ) {
         Ok(project) => project,
         Err(e) => {
@@ -261,6 +297,13 @@ async fn archive_project_payload(
     }
 }
 
+fn clean_optional_string(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
 /// 注册一个指向外部本地路径的项目（如本机 D:\rust\active-projects\bb64a）。
 /// 不会自动创建/初始化目录，仅在 DB 中登记，并验证路径已存在。
 pub async fn register_external_project(
@@ -277,6 +320,8 @@ pub async fn register_external_project(
     if workspace_path.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "workspace_path 不能为空");
     }
+    let repo_url = clean_optional_string(req.repo_url.as_deref());
+    let branch = clean_optional_string(req.branch.as_deref());
 
     let node_id = match resolve_external_project_node(
         &state,
@@ -311,6 +356,8 @@ pub async fn register_external_project(
         req.description.as_deref(),
         workspace_path,
         node_id.as_deref(),
+        repo_url.as_deref(),
+        branch.as_deref(),
     ) {
         Ok(r) => r,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
