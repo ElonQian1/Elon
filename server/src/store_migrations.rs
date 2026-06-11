@@ -66,6 +66,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (44, "节点算力执行证明与质量评分基础表", migration_v44),
     (45, "项目 APK 图标数据", migration_v45),
     (46, "project channel message reply parent", migration_v46),
+    (47, "指定钱一龙为一龙自项目创建者与 owner", migration_v47),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1678,4 +1679,164 @@ fn migration_v46(conn: &Connection) -> Result<()> {
         [],
     )?;
     Ok(())
+}
+
+// ── v47：指定钱一龙为一龙自项目创建者与 owner ────────────────────────────────
+
+fn migration_v47(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        UPDATE users
+           SET nickname = '钱一龙',
+               updated_at = datetime('now')
+         WHERE id = (
+             SELECT id
+               FROM users
+              WHERE status = 'active'
+                AND (phone = '15692409892' OR nickname = '钱一龙')
+              ORDER BY CASE
+                  WHEN phone = '15692409892' THEN 0
+                  WHEN nickname = '钱一龙' THEN 1
+                  ELSE 2
+              END
+              LIMIT 1
+         );
+
+        INSERT INTO project_members (project_id, user_id, role, created_at)
+        SELECT 'elon-self', u.id, 'owner', datetime('now')
+          FROM users u
+          JOIN projects p ON p.id = 'elon-self' AND p.status != 'deleted'
+         WHERE u.id = (
+             SELECT id
+               FROM users
+              WHERE status = 'active'
+                AND (phone = '15692409892' OR nickname = '钱一龙')
+              ORDER BY CASE
+                  WHEN phone = '15692409892' THEN 0
+                  WHEN nickname = '钱一龙' THEN 1
+                  ELSE 2
+              END
+              LIMIT 1
+         )
+        ON CONFLICT(project_id, user_id) DO UPDATE SET role = 'owner';
+
+        UPDATE projects
+           SET created_by = (
+                   SELECT id
+                     FROM users
+                    WHERE status = 'active'
+                      AND (phone = '15692409892' OR nickname = '钱一龙')
+                    ORDER BY CASE
+                        WHEN phone = '15692409892' THEN 0
+                        WHEN nickname = '钱一龙' THEN 1
+                        ELSE 2
+                    END
+                    LIMIT 1
+               ),
+               updated_at = datetime('now')
+         WHERE id = 'elon-self'
+           AND status != 'deleted'
+           AND EXISTS (
+               SELECT 1
+                 FROM users
+                WHERE status = 'active'
+                  AND (phone = '15692409892' OR nickname = '钱一龙')
+           );
+        "#,
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::{params, OptionalExtension};
+
+    #[test]
+    fn migration_v47_promotes_qian_yilong_only_for_elon_self() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_old_owner", "18800000000", "旧 owner"],
+        )
+        .expect("legacy owner should insert");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_qian", "15692409892", "旧昵称"],
+        )
+        .expect("qian user should insert");
+
+        insert_project(&conn, "elon-self", "一龙项目", "usr_old_owner");
+        insert_project(&conn, "prj_joint", "普通联合项目", "usr_old_owner");
+        insert_member(&conn, "elon-self", "usr_old_owner", "owner");
+        insert_member(&conn, "elon-self", "usr_qian", "admin");
+        insert_member(&conn, "prj_joint", "usr_old_owner", "owner");
+
+        migration_v47(&conn).expect("migration should apply");
+
+        let elon_created_by: String = conn
+            .query_row(
+                "SELECT created_by FROM projects WHERE id = 'elon-self'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("elon self project should load");
+        let elon_role: String = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = 'elon-self' AND user_id = 'usr_qian'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("qian membership should load");
+        let nickname: String = conn
+            .query_row(
+                "SELECT nickname FROM users WHERE id = 'usr_qian'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("qian user should load");
+        let joint_created_by: String = conn
+            .query_row(
+                "SELECT created_by FROM projects WHERE id = 'prj_joint'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("joint project should load");
+        let qian_joint_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = 'prj_joint' AND user_id = 'usr_qian'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .expect("joint membership query should run");
+
+        assert_eq!(elon_created_by, "usr_qian");
+        assert_eq!(elon_role, "owner");
+        assert_eq!(nickname, "钱一龙");
+        assert_eq!(joint_created_by, "usr_old_owner");
+        assert!(qian_joint_role.is_none());
+    }
+
+    fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {
+        conn.execute(
+            "INSERT INTO projects (id, name, description, workspace_key, template, source_type, status, created_by, created_at, updated_at)
+             VALUES (?1, ?2, '测试项目', ?1, 'local', 'local_path', 'active', ?3, 'now', 'now')",
+            params![id, name, created_by],
+        )
+        .expect("project should insert");
+    }
+
+    fn insert_member(conn: &Connection, project_id: &str, user_id: &str, role: &str) {
+        conn.execute(
+            "INSERT INTO project_members (project_id, user_id, role, created_at)
+             VALUES (?1, ?2, ?3, 'now')",
+            params![project_id, user_id, role],
+        )
+        .expect("membership should insert");
+    }
 }

@@ -3,6 +3,7 @@ package com.elon.app
 import java.io.File
 
 internal const val SYSTEM_ARCHIVE_OWNER_ACCOUNT = "系统"
+internal const val ELON_SELF_OWNER_ACCOUNT = "钱一龙"
 
 data class AppConversation(
     val id: String,

@@ -112,9 +112,17 @@ private fun ensureElonSelfProject(projects: MutableList<AppProject>) {
     if (existing != null) {
         // 升级旧数据：确保一龙自项目始终是联合开发项目
         if (!existing.isJointProject) existing.isJointProject = true
+        normalizeElonSelfProject(existing)
         return
     }
     projects.add(0, elonSelfProject())
+}
+
+private fun normalizeElonSelfProject(project: AppProject) {
+    project.ownerAccount = ELON_SELF_OWNER_ACCOUNT
+    project.projectOriginType = "platform_self"
+    project.projectOriginLabel = "钱一龙创建"
+    project.memberCount = project.memberCount?.coerceAtLeast(1) ?: 1
 }
 
 private fun elonSelfProject(): AppProject {
@@ -124,9 +132,10 @@ private fun elonSelfProject(): AppProject {
         subtitle = "修改平台自身 · AI 云端迭代",
         updatedAt = 0L,
         isJointProject = true,
-        ownerAccount = SYSTEM_ARCHIVE_OWNER_ACCOUNT,
-        projectOriginType = "system",
-        projectOriginLabel = "系统创建",
+        ownerAccount = ELON_SELF_OWNER_ACCOUNT,
+        projectOriginType = "platform_self",
+        projectOriginLabel = "钱一龙创建",
+        memberCount = 1,
         conversations = mutableListOf(
             AppConversation(
                 id = "elon-self-default",
