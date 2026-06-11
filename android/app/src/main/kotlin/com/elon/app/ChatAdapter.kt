@@ -135,7 +135,7 @@ class ChatAdapter(
             3    -> R.layout.item_message_error
             4    -> R.layout.item_message_friend
             5    -> R.layout.item_message_project_share
-            6    -> R.layout.item_message_project_share
+            6    -> R.layout.item_message_project_post
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)

@@ -24,6 +24,7 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
             "ai_progress",
             "AI 正在总结这些聊天记录...",
             None,
+            None,
         );
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let run_state = task.state.clone();
@@ -84,6 +85,7 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
             None,
             "ai_result",
             &content,
+            None,
             None,
         );
         task.state.server_traces.record(

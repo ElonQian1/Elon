@@ -15,13 +15,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import kotlin.concurrent.thread
 
 internal class ProjectSpaceFeedView(
     private val activity: AppCompatActivity,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
-    private val openChannel: (ProjectChannel) -> Unit,
+    private val openPost: (ProjectChannel, ProjectChannelMessage) -> Unit,
     private val openPostComposer: () -> Unit,
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
 ) {
@@ -161,7 +162,7 @@ internal class ProjectSpaceFeedView(
 
     private fun postCard(post: ProjectSpaceFeedPost): LinearLayout {
         val postText = parseProjectSpacePostText(post.message.content)
-        val sender = post.message.senderName?.takeIf { it.isNotBlank() } ?: "项目成员"
+        val sender = post.message.senderName.cleanProjectSpaceDisplayName() ?: "项目成员"
         val timeText = parseChatMessageCreatedAt(post.message.createdAt)
             ?.let { formatChatTimelineLabel(it) }
             ?: "刚刚"
@@ -171,7 +172,7 @@ internal class ProjectSpaceFeedView(
             background = roundedBackground("#181B20", 10)
             isClickable = true
             foreground = selectableForeground()
-            setOnClickListener { openChannel(post.channel) }
+            setOnClickListener { openPost(post.channel, post.message) }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -179,7 +180,7 @@ internal class ProjectSpaceFeedView(
                 setMargins(dp(10), dp(6), dp(10), dp(8))
             }
 
-            addView(postHeader(sender, timeText, projectSpaceTopicLabel(post.channel)))
+            addView(postHeader(sender, post.message.senderAvatarDataUrl, timeText, projectSpaceTopicLabel(post.channel)))
             addView(TextView(activity).apply {
                 text = postText.title
                 textSize = 16f
@@ -205,11 +206,11 @@ internal class ProjectSpaceFeedView(
         }
     }
 
-    private fun postHeader(sender: String, timeText: String, topic: String): LinearLayout {
+    private fun postHeader(sender: String, avatarDataUrl: String?, timeText: String, topic: String): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(avatar(sender), LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+            addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(40), dp(40)).apply {
                 marginEnd = dp(10)
             })
             addView(LinearLayout(activity).apply {
@@ -240,7 +241,16 @@ internal class ProjectSpaceFeedView(
         }
     }
 
-    private fun avatar(sender: String): TextView {
+    private fun avatar(sender: String, avatarDataUrl: String?): View {
+        val bitmap = UserProfileStore.decodeAvatar(avatarDataUrl.cleanProjectSpaceDisplayName())
+        if (bitmap != null) {
+            return TextView(activity).apply {
+                background = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    cornerRadius = dp(20).toFloat()
+                    setAntiAlias(true)
+                }
+            }
+        }
         return TextView(activity).apply {
             text = sender.firstOrNull()?.toString() ?: "成"
             gravity = Gravity.CENTER
@@ -304,7 +314,7 @@ internal class ProjectSpaceFeedView(
                 iconRes = R.drawable.ic_project_post_chat,
                 value = post.replyCount.coerceAtLeast(0).toString(),
                 description = "查看${post.replyCount.coerceAtLeast(0)}条讨论",
-                onClick = { openChannel(post.channel) }
+                onClick = { openPost(post.channel, post.message) }
             ), metricParams())
             addView(metricButton(
                 iconRes = if (liked) R.drawable.ic_project_post_like_filled else R.drawable.ic_project_post_like,

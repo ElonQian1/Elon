@@ -256,6 +256,8 @@ pub struct ProjectChannelMessage {
     pub channel_id: String,
     pub sender_user_id: Option<String>,
     pub sender_name: Option<String>,
+    pub sender_avatar_data_url: Option<String>,
+    pub reply_to_message_id: Option<String>,
     pub kind: String,
     pub content: String,
     pub task_id: Option<String>,

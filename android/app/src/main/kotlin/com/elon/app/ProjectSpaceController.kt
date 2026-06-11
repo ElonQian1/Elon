@@ -51,6 +51,7 @@ internal class ProjectSpaceController(
     private var activeProjectId: String? = null
     private var activeProjectTitle: String = "项目空间"
     private var activeChannel: ProjectChannel? = null
+    private var activePostMessageId: String? = null
     private var activeMemberConversation: ActiveMemberConversation? = null
     private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
     private var activeMemberListUserId: String? = null
@@ -78,7 +79,7 @@ internal class ProjectSpaceController(
         activity = activity,
         dp = dp,
         selectableForeground = selectableForeground,
-        openChannel = { channel -> openChannel(channel) },
+        openPost = { channel, post -> openChannel(channel, postMessage = post) },
         openPostComposer = { renderPostComposer() },
         openAnnouncementEditor = { channel, currentText ->
             activeSpace?.let { announcementEditor.show(it, channel, currentText) }
@@ -126,6 +127,10 @@ internal class ProjectSpaceController(
         val title: String
     ) {
         val key: String = "$projectId:$memberUserId:$conversationId"
+    }
+
+    private fun activeChannelMessageKey(channel: ProjectChannel, postId: String? = activePostMessageId): String {
+        return postId?.takeIf { it.isNotBlank() }?.let { "${channel.id}:post:$it" } ?: channel.id
     }
 
     private val pollRunnable = object : Runnable {
@@ -181,6 +186,7 @@ internal class ProjectSpaceController(
         activeProjectId = projectId
         activeProjectTitle = title.ifBlank { "项目空间" }
         activeChannel = null
+        activePostMessageId = null
         activeMemberConversation = null
         activeRoute = route
         activeMemberListUserId = null
@@ -291,6 +297,11 @@ internal class ProjectSpaceController(
 
     fun renderActiveSpace() {
         activeMemberListUserId = null
+        activeChannel = null
+        activePostMessageId = null
+        activeMemberConversation = null
+        activeAdapter = null
+        stopPolling()
         // 从个人会话返回时，若来源是成员会话列表，恢复到成员会话列表而不是顶层空间
         val backMember = pendingMemberBack
         if (backMember != null) {
@@ -331,6 +342,7 @@ internal class ProjectSpaceController(
 
     fun closeChannelChat() {
         activeChannel = null
+        activePostMessageId = null
         activeMemberConversation = null
         activeAdapter = null
         stopPolling()
@@ -362,7 +374,9 @@ internal class ProjectSpaceController(
         }
         if (text.isBlank()) return true
 
-        val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val postMessageId = activePostMessageId
+        val messageKey = activeChannelMessageKey(channel, postMessageId)
+        val messages = messagesByChannel.getOrPut(messageKey) { mutableListOf() }
         val route = activeRoute
         val pending = ChatMessage("user", text, sendStatus = SENDING_STATUS)
         messages.add(pending)
@@ -385,11 +399,20 @@ internal class ProjectSpaceController(
                         route = route
                     )
                 } else {
-                    sendProjectChannelMessage(http, serverUrl, activity, channel.projectId, channel.id, text, route)
+                    sendProjectChannelMessage(
+                        http = http,
+                        serverUrl = serverUrl,
+                        context = activity,
+                        projectId = channel.projectId,
+                        channelId = channel.id,
+                        content = text,
+                        route = route,
+                        replyToMessageId = postMessageId
+                    )
                 }
             }
             activity.runOnUiThread {
-                if (activeChannel?.id != channel.id) return@runOnUiThread
+                if (activeChannel?.id != channel.id || activePostMessageId != postMessageId) return@runOnUiThread
                 result.onSuccess { sent ->
                     val index = messages.indexOf(pending)
                     if (index >= 0) {
@@ -466,7 +489,8 @@ internal class ProjectSpaceController(
     fun summarizeSelectedDiscussion(summary: SelectedDiscussionSummary): Boolean {
         val channel = activeChannel ?: return false
         if (channel.kind == DOCS_CHANNEL_KIND) return false
-        val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val messageKey = activeChannelMessageKey(channel)
+        val messages = messagesByChannel.getOrPut(messageKey) { mutableListOf() }
         val route = activeRoute
         val pending = ChatMessage("user", summary.channelPost, sendStatus = SENDING_STATUS)
         messages.add(pending)
@@ -489,7 +513,7 @@ internal class ProjectSpaceController(
                 )
             }
             activity.runOnUiThread {
-                if (activeChannel?.id != channel.id) return@runOnUiThread
+                if (activeChannel?.id != channel.id || activeChannelMessageKey(channel) != messageKey) return@runOnUiThread
                 result.onSuccess { sent ->
                     val index = messages.indexOfFirst { it === pending }
                     if (index >= 0) {
@@ -507,11 +531,17 @@ internal class ProjectSpaceController(
         return true
     }
 
-    private fun openChannel(channel: ProjectChannel, animate: Boolean = true) {
+    private fun openChannel(
+        channel: ProjectChannel,
+        animate: Boolean = true,
+        postMessage: ProjectChannelMessage? = null
+    ) {
         activeChannel = channel
+        activePostMessageId = postMessage?.id
         activeMemberConversation = null
         if (channel.kind == DOCS_CHANNEL_KIND) stopPolling()
-        val messages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val messageKey = activeChannelMessageKey(channel, activePostMessageId)
+        val messages = messagesByChannel.getOrPut(messageKey) { mutableListOf() }
         val adapter = ChatAdapter(
             messages = messages,
             onMessageLongPress = showMessageActions,
@@ -539,7 +569,9 @@ internal class ProjectSpaceController(
         scrollToBottom: Boolean,
         allowPendingRefresh: Boolean = false
     ) {
-        val currentMessages = messagesByChannel.getOrPut(channel.id) { mutableListOf() }
+        val postMessageId = activePostMessageId
+        val messageKey = activeChannelMessageKey(channel, postMessageId)
+        val currentMessages = messagesByChannel.getOrPut(messageKey) { mutableListOf() }
         if (!allowPendingRefresh && currentMessages.any { it.sendStatus == SENDING_STATUS }) return
         val route = activeRoute
         thread {
@@ -553,7 +585,10 @@ internal class ProjectSpaceController(
                     route = route
                 )
                 val replyCounts = projectSpaceReplyCountsByPost(channelMessages)
-                channelMessages.map { message ->
+                val visibleMessages = postMessageId
+                    ?.let { projectSpaceMessagesForPost(channelMessages, it) }
+                    ?: channelMessages
+                visibleMessages.map { message ->
                     message.toChatMessage(
                         projectRole = activeSpace?.project?.role,
                         channel = channel,
@@ -562,13 +597,15 @@ internal class ProjectSpaceController(
                 }
             }
             activity.runOnUiThread {
-                if (activeChannel?.id != channel.id) return@runOnUiThread
+                if (activeChannel?.id != channel.id || activePostMessageId != postMessageId) return@runOnUiThread
                 result.onSuccess { remoteMessages ->
                     val changed = currentMessages.size != remoteMessages.size ||
                         currentMessages.zip(remoteMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
-                                current.senderLabel != incoming.senderLabel
+                                current.senderLabel != incoming.senderLabel ||
+                                current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
+                                current.projectPostCard != incoming.projectPostCard
                         }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)
@@ -594,6 +631,7 @@ internal class ProjectSpaceController(
         val space = activeSpace ?: return
         activeMemberListUserId = null
         activeChannel = null
+        activePostMessageId = null
         activeMemberConversation = null
         activeAdapter = null
         stopPolling()
@@ -900,6 +938,7 @@ internal class ProjectSpaceController(
         val isSelf = member.userId == selfId
         activeMemberListUserId = member.userId
         activeChannel = null
+        activePostMessageId = null
         activeMemberConversation = null
         memberConversationViews.renderList(prepareProjectContent(), space, member, isSelf)
     }
@@ -935,6 +974,7 @@ internal class ProjectSpaceController(
             title = title
         )
         activeChannel = null
+        activePostMessageId = null
         activeMemberConversation = memberConversation
         pendingMemberBack = member
         val messages = messagesByMemberConversation.getOrPut(memberConversation.key) { mutableListOf() }
@@ -962,7 +1002,8 @@ internal class ProjectSpaceController(
             return
         }
         message.canResolveSuggestion = false
-        activeAdapter?.notifyMessageUpdated(messagesByChannel[channel.id]?.indexOf(message) ?: -1)
+        val messageKey = activeChannelMessageKey(channel)
+        activeAdapter?.notifyMessageUpdated(messagesByChannel[messageKey]?.indexOf(message) ?: -1)
         thread {
             val route = activeRoute
             val result = runCatching {
@@ -977,8 +1018,8 @@ internal class ProjectSpaceController(
                 )
             }
             activity.runOnUiThread {
-                if (activeChannel?.id != channel.id) return@runOnUiThread
-                val messages = messagesByChannel[channel.id] ?: return@runOnUiThread
+                if (activeChannel?.id != channel.id || activeChannelMessageKey(channel) != messageKey) return@runOnUiThread
+                val messages = messagesByChannel[messageKey] ?: return@runOnUiThread
                 val index = messages.indexOfFirst { it.id == messageId }
                 result.onSuccess { updated ->
                     if (index >= 0) {

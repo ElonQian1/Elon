@@ -39,6 +39,7 @@ pub struct MemberConversationQuery {
 #[derive(Deserialize)]
 pub struct SendChannelMessageRequest {
     pub content: String,
+    pub reply_to_message_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -437,6 +438,7 @@ fn send_channel_message_response(
         message_kind,
         &req.content,
         None,
+        req.reply_to_message_id.as_deref(),
     ) {
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -611,6 +613,7 @@ fn start_channel_ai_task_response(
         "ai_task",
         &format!("发起 AI 开发任务：{}", content),
         Some(&task_id),
+        None,
     ) {
         Ok(message) => message,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
@@ -708,6 +711,7 @@ fn summarize_channel_selection_response(
         Some(&user_id),
         "text",
         &post_content,
+        None,
         None,
     ) {
         Ok(message) => message,
@@ -827,6 +831,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             "ai_progress",
                             message,
                             Some(&task.task_id),
+                            None,
                         );
                     }
                     "done" => {
@@ -843,6 +848,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             "ai_result",
                             &result,
                             Some(&task.task_id),
+                            None,
                         );
                     }
                     "error" => {
@@ -857,6 +863,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             "ai_result",
                             &result_message(&msg, None, Some("失败")),
                             Some(&task.task_id),
+                            None,
                         );
                     }
                     _ => {}

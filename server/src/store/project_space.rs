@@ -20,6 +20,31 @@ const DEFAULT_CHANNELS: [(&str, &str, i64); 8] = [
     ("构建发布", "builds", 60),
 ];
 
+fn project_channel_message_from_row(
+    row: &rusqlite::Row<'_>,
+    user_id: &str,
+) -> rusqlite::Result<ProjectChannelMessage> {
+    let sender_user_id: Option<String> = row.get(3)?;
+    Ok(ProjectChannelMessage {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        channel_id: row.get(2)?,
+        outgoing: sender_user_id.as_deref() == Some(user_id),
+        sender_user_id,
+        sender_name: row.get(4)?,
+        sender_avatar_data_url: row.get(5)?,
+        reply_to_message_id: row.get(6)?,
+        kind: row.get(7)?,
+        content: row.get(8)?,
+        task_id: row.get(9)?,
+        suggestion_status: row.get(10)?,
+        suggestion_resolved_by: row.get(11)?,
+        suggestion_resolved_by_name: row.get(12)?,
+        suggestion_resolved_at: row.get(13)?,
+        created_at: row.get(14)?,
+    })
+}
+
 impl Store {
     pub fn project_space_summary(
         &self,
@@ -160,6 +185,8 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT m.id, m.project_id, m.channel_id, m.sender_user_id,
                     COALESCE(u.nickname, u.phone, u.email, m.sender_user_id) AS sender_name,
+                    u.avatar_data_url,
+                    m.reply_to_message_id,
                     m.kind, m.content, m.task_id,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
@@ -177,25 +204,7 @@ impl Store {
         let mut rows = stmt
             .query_map(
                 params![project_id, channel_id, limit.clamp(1, 200)],
-                |row| {
-                    let sender_user_id: Option<String> = row.get(3)?;
-                    Ok(ProjectChannelMessage {
-                        id: row.get(0)?,
-                        project_id: row.get(1)?,
-                        channel_id: row.get(2)?,
-                        outgoing: sender_user_id.as_deref() == Some(user_id),
-                        sender_user_id,
-                        sender_name: row.get(4)?,
-                        kind: row.get(5)?,
-                        content: row.get(6)?,
-                        task_id: row.get(7)?,
-                        suggestion_status: row.get(8)?,
-                        suggestion_resolved_by: row.get(9)?,
-                        suggestion_resolved_by_name: row.get(10)?,
-                        suggestion_resolved_at: row.get(11)?,
-                        created_at: row.get(12)?,
-                    })
-                },
+                |row| project_channel_message_from_row(row, user_id),
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         rows.reverse();
@@ -212,6 +221,7 @@ impl Store {
         kind: &str,
         content: &str,
         task_id: Option<&str>,
+        reply_to_message_id: Option<&str>,
     ) -> Result<ProjectChannelMessage> {
         let content = content.trim();
         if content.is_empty() {
@@ -242,9 +252,9 @@ impl Store {
         conn.execute(
             "INSERT INTO project_channel_messages (
                 id, project_id, channel_id, sender_user_id, kind, content, task_id,
-                suggestion_status, created_at
+                suggestion_status, reply_to_message_id, created_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 id,
                 project_id,
@@ -254,6 +264,7 @@ impl Store {
                 content,
                 task_id,
                 suggestion_status,
+                reply_to_message_id,
                 created_at
             ],
         )?;
@@ -261,24 +272,26 @@ impl Store {
             "UPDATE project_channels SET updated_at = ?1 WHERE id = ?2",
             params![created_at, channel_id],
         )?;
-        drop(conn);
-
-        Ok(ProjectChannelMessage {
-            id,
-            project_id: project_id.to_string(),
-            channel_id: channel_id.to_string(),
-            sender_user_id: sender_user_id.map(ToOwned::to_owned),
-            sender_name: None,
-            kind: kind.to_string(),
-            content: content.to_string(),
-            task_id: task_id.map(ToOwned::to_owned),
-            suggestion_status: suggestion_status.map(ToOwned::to_owned),
-            suggestion_resolved_by: None,
-            suggestion_resolved_by_name: None,
-            suggestion_resolved_at: None,
-            created_at,
-            outgoing: sender_user_id.is_some(),
-        })
+        conn.query_row(
+            "SELECT m.id, m.project_id, m.channel_id, m.sender_user_id,
+                    COALESCE(u.nickname, u.phone, u.email, m.sender_user_id) AS sender_name,
+                    u.avatar_data_url,
+                    m.reply_to_message_id,
+                    m.kind, m.content, m.task_id,
+                    m.suggestion_status,
+                    m.suggestion_resolved_by,
+                    COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
+                      AS suggestion_resolved_by_name,
+                    m.suggestion_resolved_at,
+                    m.created_at
+             FROM project_channel_messages m
+             LEFT JOIN users u ON u.id = m.sender_user_id
+             LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
+            params![project_id, channel_id, id],
+            |row| project_channel_message_from_row(row, sender_user_id.unwrap_or_default()),
+        )
+        .map_err(Into::into)
     }
 
     pub fn mark_project_suggestion_updated(
@@ -324,6 +337,8 @@ impl Store {
         conn.query_row(
             "SELECT m.id, m.project_id, m.channel_id, m.sender_user_id,
                     COALESCE(u.nickname, u.phone, u.email, m.sender_user_id) AS sender_name,
+                    u.avatar_data_url,
+                    m.reply_to_message_id,
                     m.kind, m.content, m.task_id,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
@@ -333,28 +348,10 @@ impl Store {
                     m.created_at
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
-             LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
-             WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
+            LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+            WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
             params![project_id, channel_id, message_id],
-            |row| {
-                let sender_user_id: Option<String> = row.get(3)?;
-                Ok(ProjectChannelMessage {
-                    id: row.get(0)?,
-                    project_id: row.get(1)?,
-                    channel_id: row.get(2)?,
-                    outgoing: sender_user_id.as_deref() == Some(user_id),
-                    sender_user_id,
-                    sender_name: row.get(4)?,
-                    kind: row.get(5)?,
-                    content: row.get(6)?,
-                    task_id: row.get(7)?,
-                    suggestion_status: row.get(8)?,
-                    suggestion_resolved_by: row.get(9)?,
-                    suggestion_resolved_by_name: row.get(10)?,
-                    suggestion_resolved_at: row.get(11)?,
-                    created_at: row.get(12)?,
-                })
-            },
+            |row| project_channel_message_from_row(row, user_id),
         )
         .map_err(Into::into)
     }
@@ -460,6 +457,7 @@ mod tests {
                 Some(&owner.id),
                 "suggestion",
                 "希望增加深色模式",
+                None,
                 None,
             )
             .expect("suggestion should insert");

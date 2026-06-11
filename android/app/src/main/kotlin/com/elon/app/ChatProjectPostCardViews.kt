@@ -10,11 +10,13 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 
 data class ChatProjectPostCard(
     val title: String,
     val body: String,
     val authorName: String,
+    val authorAvatarDataUrl: String? = null,
     val timeText: String,
     val topic: String,
     val imageSource: String?,
@@ -61,7 +63,7 @@ private fun postHeader(context: Context, post: ChatProjectPostCard): LinearLayou
     return LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        addView(postAvatar(context, post.authorName), LinearLayout.LayoutParams(
+        addView(postAvatar(context, post.authorName, post.authorAvatarDataUrl), LinearLayout.LayoutParams(
             context.postDp(48),
             context.postDp(48)
         ).apply {
@@ -101,7 +103,16 @@ private fun postHeader(context: Context, post: ChatProjectPostCard): LinearLayou
     }
 }
 
-private fun postAvatar(context: Context, authorName: String): TextView {
+private fun postAvatar(context: Context, authorName: String, avatarDataUrl: String?): View {
+    val bitmap = UserProfileStore.decodeAvatar(avatarDataUrl)
+    if (bitmap != null) {
+        return TextView(context).apply {
+            background = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                cornerRadius = context.postDp(24).toFloat()
+                setAntiAlias(true)
+            }
+        }
+    }
     return TextView(context).apply {
         text = UserProfileStore.avatarInitial(authorName.ifBlank { "成员" })
         gravity = Gravity.CENTER

@@ -13,11 +13,13 @@ internal fun ProjectChannelMessage.toChatMessage(
     }
     val postText = parseProjectSpacePostText(content)
     val displayContent = postText.detailText
+    val cleanSenderName = senderName.cleanProjectSpaceDisplayName()
     val postCard = if (postText.structured && channel?.isProjectSpaceFeedChannel() == true) {
         ChatProjectPostCard(
             title = postText.title,
             body = projectSpacePostBodyWithoutImages(postText.body),
-            authorName = senderName?.trim()?.takeIf { it.isNotBlank() } ?: if (outgoing) "我" else "项目成员",
+            authorName = cleanSenderName ?: if (outgoing) "我" else "项目成员",
+            authorAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
             timeText = parseChatMessageCreatedAt(createdAt)
                 ?.let { "回复于${formatChatTimelineLabel(it)}" }
                 ?: "回复于刚刚",
@@ -34,7 +36,8 @@ internal fun ProjectChannelMessage.toChatMessage(
         role = role,
         content = displayContent,
         projectPostCard = postCard,
-        senderLabel = if (role == "friend") senderName else null,
+        senderLabel = if (role == "friend") cleanSenderName else null,
+        senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
         suggestionStatus = suggestionStatus,
         suggestionResolvedByName = suggestionResolvedByName,
@@ -129,19 +132,51 @@ internal fun ProjectChannelMessage.isProjectSpaceFeedPost(): Boolean {
 
 internal fun projectSpaceReplyCountsByPost(messages: List<ProjectChannelMessage>): Map<String, Int> {
     val counts = linkedMapOf<String, Int>()
+    val postIds = messages
+        .filter { it.isProjectSpaceFeedPost() }
+        .map { it.id }
+        .toSet()
+    messages.forEach { message ->
+        message.replyToMessageId?.takeIf { it in postIds }?.let { postId ->
+            counts[postId] = (counts[postId] ?: 0) + 1
+        }
+    }
     var activePostId: String? = null
     var activeCount = 0
     messages.forEach { message ->
         if (message.isProjectSpaceFeedPost()) {
-            activePostId?.let { counts[it] = activeCount }
+            activePostId?.let { counts[it] = (counts[it] ?: 0) + activeCount }
             activePostId = message.id
             activeCount = 0
-        } else if (activePostId != null) {
+        } else if (activePostId != null && message.replyToMessageId == null) {
             activeCount += 1
         }
     }
-    activePostId?.let { counts[it] = activeCount }
+    activePostId?.let { counts[it] = (counts[it] ?: 0) + activeCount }
     return counts
+}
+
+internal fun projectSpaceMessagesForPost(
+    messages: List<ProjectChannelMessage>,
+    postId: String
+): List<ProjectChannelMessage> {
+    val targetIndex = messages.indexOfFirst { it.id == postId }
+    if (targetIndex < 0) return emptyList()
+    val nextPostIndex = messages.drop(targetIndex + 1)
+        .indexOfFirst { it.isProjectSpaceFeedPost() }
+        .takeIf { it >= 0 }
+        ?.let { targetIndex + 1 + it }
+    return messages.filterIndexed { index, message ->
+        when {
+            message.id == postId -> true
+            message.replyToMessageId == postId -> true
+            message.replyToMessageId == null &&
+                index > targetIndex &&
+                (nextPostIndex == null || index < nextPostIndex) &&
+                !message.isProjectSpaceFeedPost() -> true
+            else -> false
+        }
+    }
 }
 
 internal fun ProjectChannel.isProjectSpaceFeedChannel(): Boolean {
@@ -160,6 +195,10 @@ internal fun projectSpaceTopicLabel(channel: ProjectChannel): String {
 }
 
 private const val PROJECT_SPACE_POST_TITLE_PREFIX = "标题："
+
+internal fun String?.cleanProjectSpaceDisplayName(): String? {
+    return this?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
 
 private fun projectSpacePostBodyWithoutImages(text: String): String {
     return text

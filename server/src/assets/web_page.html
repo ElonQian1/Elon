@@ -499,7 +499,7 @@
     .project-space-post-card {
       background: var(--panel);
       border-radius: 18px;
-      margin: 10px 24px;
+      margin: 10px;
       padding: 18px;
       color: var(--ink);
       cursor: pointer;
@@ -541,6 +541,13 @@
       place-items: center;
       font-weight: 700;
       flex: none;
+      overflow: hidden;
+    }
+    .project-space-post-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
     .project-space-post-user { min-width: 0; flex: 1; }
     .project-space-post-name {
@@ -3469,20 +3476,29 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isProjectSpaceFeedPost(message) {
     return parseProjectSpacePostText(message && message.content).structured;
   }
+  function cleanProjectSpaceField(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
+  }
   function projectSpaceReplyCountsByPost(messages) {
     const counts = new Map();
+    const postIds = new Set((messages || []).filter(isProjectSpaceFeedPost).map((message) => message.id));
+    (messages || []).forEach((message) => {
+      const parentId = cleanProjectSpaceField(message && (message.reply_to_message_id || message.replyToMessageId));
+      if (parentId && postIds.has(parentId)) counts.set(parentId, (counts.get(parentId) || 0) + 1);
+    });
     let activePostId = '';
     let activeCount = 0;
     (messages || []).forEach((message) => {
       if (isProjectSpaceFeedPost(message)) {
-        if (activePostId) counts.set(activePostId, activeCount);
+        if (activePostId) counts.set(activePostId, (counts.get(activePostId) || 0) + activeCount);
         activePostId = message.id || '';
         activeCount = 0;
-      } else if (activePostId) {
+      } else if (activePostId && !cleanProjectSpaceField(message && (message.reply_to_message_id || message.replyToMessageId))) {
         activeCount += 1;
       }
     });
-    if (activePostId) counts.set(activePostId, activeCount);
+    if (activePostId) counts.set(activePostId, (counts.get(activePostId) || 0) + activeCount);
     return counts;
   }
   function extractProjectSpacePostImageSource(text) {
@@ -3566,7 +3582,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function projectSpacePostCardHtml(channel, message, replyCount) {
     const post = parseProjectSpacePostText(message.content);
-    const name = message.sender_name || '项目成员';
+    const name = cleanProjectSpaceField(message.sender_name || message.senderName) || '项目成员';
+    const avatar = cleanProjectSpaceField(message.sender_avatar_data_url || message.senderAvatarDataUrl);
     const initial = Array.from(name)[0] || '成';
     const topic = projectSpaceTopicLabel(channel.kind, channel.name);
     const created = message.created_at ? new Date(message.created_at).toLocaleString('zh-CN', {
@@ -3581,7 +3598,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) +
         '" data-post-key="' + escapeHtml(metricKey) + '">',
       '<div class="project-space-post-head">',
-      '<div class="project-space-post-avatar">' + escapeHtml(initial) + '</div>',
+      '<div class="project-space-post-avatar">' +
+        (avatar ? '<img src="' + escapeHtml(avatar) + '" alt="" />' : escapeHtml(initial)) +
+      '</div>',
       '<div class="project-space-post-user">',
       '<div class="project-space-post-name">' + escapeHtml(name) + '</div>',
       '<div class="project-space-post-time">回复于' + escapeHtml(created) + '</div>',

@@ -267,8 +267,11 @@ internal fun sendProjectChannelMessage(
     projectId: String,
     channelId: String,
     content: String,
-    route: ProjectSpaceRoute = ProjectSpaceRoute()
+    route: ProjectSpaceRoute = ProjectSpaceRoute(),
+    replyToMessageId: String? = null
 ): ProjectChannelMessage {
+    val payload = JSONObject().put("content", content)
+    replyToMessageId.cleanProjectSpaceApiString()?.let { payload.put("reply_to_message_id", it) }
     return postProjectChannelPayload(
         http = http,
         serverUrl = serverUrl,
@@ -276,7 +279,7 @@ internal fun sendProjectChannelMessage(
         projectId = projectId,
         channelId = channelId,
         suffix = "messages",
-        payload = JSONObject().put("content", content),
+        payload = payload,
         route = route
     )
 }
@@ -476,10 +479,10 @@ private fun parseProjectMemberConversation(json: JSONObject) = ProjectMemberConv
 private fun parseProjectMemberConversationMessage(json: JSONObject) = ProjectMemberConversationMessage(
     id = json.optString("id", ""),
     projectId = json.optString("project_id", ""),
-    conversationId = json.optString("conversation_id").takeIf { it.isNotBlank() },
-    taskId = json.optString("task_id").takeIf { it.isNotBlank() },
-    userId = json.optString("user_id").takeIf { it.isNotBlank() },
-    senderName = json.optString("sender_name").takeIf { it.isNotBlank() },
+    conversationId = json.cleanProjectSpaceString("conversation_id"),
+    taskId = json.cleanProjectSpaceString("task_id"),
+    userId = json.cleanProjectSpaceString("user_id"),
+    senderName = json.cleanProjectSpaceString("sender_name"),
     role = json.optString("role", "user"),
     content = json.optString("content", ""),
     createdAt = json.optString("created_at", ""),
@@ -490,18 +493,28 @@ internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessag
     id = json.optString("id", ""),
     projectId = json.optString("project_id", ""),
     channelId = json.optString("channel_id", ""),
-    senderUserId = json.optString("sender_user_id").takeIf { it.isNotBlank() },
-    senderName = json.optString("sender_name").takeIf { it.isNotBlank() },
+    senderUserId = json.cleanProjectSpaceString("sender_user_id"),
+    senderName = json.cleanProjectSpaceString("sender_name"),
+    senderAvatarDataUrl = json.cleanProjectSpaceString("sender_avatar_data_url"),
+    replyToMessageId = json.cleanProjectSpaceString("reply_to_message_id"),
     kind = json.optString("kind", "text"),
     content = json.optString("content", ""),
-    taskId = json.optString("task_id").takeIf { it.isNotBlank() },
-    suggestionStatus = json.optString("suggestion_status").takeIf { it.isNotBlank() },
-    suggestionResolvedBy = json.optString("suggestion_resolved_by").takeIf { it.isNotBlank() },
-    suggestionResolvedByName = json.optString("suggestion_resolved_by_name").takeIf { it.isNotBlank() },
-    suggestionResolvedAt = json.optString("suggestion_resolved_at").takeIf { it.isNotBlank() },
+    taskId = json.cleanProjectSpaceString("task_id"),
+    suggestionStatus = json.cleanProjectSpaceString("suggestion_status"),
+    suggestionResolvedBy = json.cleanProjectSpaceString("suggestion_resolved_by"),
+    suggestionResolvedByName = json.cleanProjectSpaceString("suggestion_resolved_by_name"),
+    suggestionResolvedAt = json.cleanProjectSpaceString("suggestion_resolved_at"),
     createdAt = json.optString("created_at", ""),
     outgoing = json.optBoolean("outgoing", false)
 )
+
+private fun JSONObject.cleanProjectSpaceString(key: String): String? {
+    return optString(key, "").cleanProjectSpaceApiString()
+}
+
+private fun String?.cleanProjectSpaceApiString(): String? {
+    return this?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
 
 private fun readProjectSpaceError(body: String, fallback: String): String {
     if (body.isBlank()) return fallback

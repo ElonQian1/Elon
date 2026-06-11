@@ -65,6 +65,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (43, "节点收益整数资金账本", migration_v43),
     (44, "节点算力执行证明与质量评分基础表", migration_v44),
     (45, "项目 APK 图标数据", migration_v45),
+    (46, "project channel message reply parent", migration_v46),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1661,5 +1662,20 @@ fn migration_v44(conn: &Connection) -> Result<()> {
 
 fn migration_v45(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "projects", "icon_data_url", "icon_data_url TEXT")?;
+    Ok(())
+}
+
+fn migration_v46(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "project_channel_messages",
+        "reply_to_message_id",
+        "reply_to_message_id TEXT",
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_channel_messages_reply_to
+         ON project_channel_messages(project_id, channel_id, reply_to_message_id, created_at)",
+        [],
+    )?;
     Ok(())
 }

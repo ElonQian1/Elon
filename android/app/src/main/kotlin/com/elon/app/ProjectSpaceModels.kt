@@ -73,6 +73,8 @@ internal data class ProjectChannelMessage(
     val channelId: String,
     val senderUserId: String?,
     val senderName: String?,
+    val senderAvatarDataUrl: String?,
+    val replyToMessageId: String?,
     val kind: String,
     val content: String,
     val taskId: String?,

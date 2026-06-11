@@ -112,6 +112,8 @@ fn synthetic_message(
         channel_id: channel_id.to_string(),
         sender_user_id: None,
         sender_name: Some("项目文档".to_string()),
+        sender_avatar_data_url: None,
+        reply_to_message_id: None,
         kind: "system".to_string(),
         content,
         task_id: None,
