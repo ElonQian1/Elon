@@ -640,8 +640,7 @@
     .project-space-feed-actions {
       position: fixed;
       right: max(8px, calc((100vw - 720px) / 2 + 8px));
-      top: calc(50% + 96px);
-      transform: translateY(-50%);
+      bottom: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom) + 36px);
       display: flex;
       flex-direction: column;
       gap: 20px;

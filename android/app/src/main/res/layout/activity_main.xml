@@ -406,12 +406,12 @@
             android:id="@+id/projectSpaceFeedActionsOverlay"
             android:layout_width="48dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="end|center_vertical"
+            android:layout_gravity="end|bottom"
             android:layout_marginEnd="8dp"
+            android:layout_marginBottom="36dp"
             android:elevation="10dp"
             android:gravity="center"
             android:orientation="vertical"
-            android:translationY="96dp"
             android:visibility="gone">
 
             <ImageButton
