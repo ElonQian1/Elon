@@ -9,26 +9,7 @@
 #
 # 用法：双击「启动一龙节点.cmd」即可（不要直接双击本 .ps1）
 
-# ── 单实例保护（命名 Mutex）──────────────────────────────────────────────────
-Add-Type -TypeDefinition @"
-using System.Threading;
-public static class ElonTrayMutex {
-    public static readonly Mutex M = new Mutex(false, "Global\\ElonNodeAgentTray");
-    public static bool TryAcquire() { return M.WaitOne(0, false); }
-}
-"@ -Language CSharp -ErrorAction SilentlyContinue
-
-if (-not [ElonTrayMutex]::TryAcquire()) {
-    Start-Process "http://127.0.0.1:7799/"
-    exit 0
-}
-
-# ── 基础组件 ──────────────────────────────────────────────────────────────────
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$taskName = "ElonNodeAgentTray"
 
 function Load-EnvFile($path) {
     if (-not (Test-Path -LiteralPath $path)) { return }
@@ -48,6 +29,26 @@ function Load-EnvFile($path) {
 Load-EnvFile (Join-Path $here 'node-agent.env')
 $port = if ($env:NODE_ADMIN_PORT) { $env:NODE_ADMIN_PORT } else { "7799" }
 $adminUrl = "http://127.0.0.1:$port/"
+
+# ── 单实例保护（命名 Mutex）──────────────────────────────────────────────────
+Add-Type -TypeDefinition @"
+using System.Threading;
+public static class ElonTrayMutex {
+    public static readonly Mutex M = new Mutex(false, "Global\\ElonNodeAgentTray");
+    public static bool TryAcquire() { return M.WaitOne(0, false); }
+}
+"@ -Language CSharp -ErrorAction SilentlyContinue
+
+if (-not [ElonTrayMutex]::TryAcquire()) {
+    Start-Process $adminUrl
+    exit 0
+}
+
+# ── 基础组件 ──────────────────────────────────────────────────────────────────
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$taskName = "ElonNodeAgentTray"
 
 # ── 图标创建 ──────────────────────────────────────────────────────────────────
 function New-StatusIcon([int]$r, [int]$g, [int]$b) {
@@ -107,7 +108,79 @@ function Invoke-NoProxyDownloadFile($url, $path) {
     $wc.DownloadFile($url, $path)
 }
 
-function Update-AgentIfNeeded {
+function Get-ManagedClientFiles {
+    return @(
+        'elon-node-agent.exe',
+        'node-agent-version.json',
+        'node-agent.env.example',
+        'start-node-agent.ps1',
+        'tray-launcher.ps1',
+        'install-elon-node.ps1',
+        'uninstall-elon-node.ps1',
+        '启动一龙节点.cmd',
+        '安装一龙PC节点.cmd',
+        '卸载一龙PC节点.cmd',
+        'README.txt'
+    )
+}
+
+function Copy-ManagedClientFiles($sourceDir) {
+    foreach ($file in Get-ManagedClientFiles) {
+        $src = Join-Path $sourceDir $file
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        $dest = if ($file -eq 'elon-node-agent.exe') { Get-ExePath } else { Join-Path $here $file }
+        $srcFull = [System.IO.Path]::GetFullPath($src)
+        $destFull = [System.IO.Path]::GetFullPath($dest)
+        if ($srcFull -ieq $destFull) { continue }
+        Copy-Item -LiteralPath $src -Destination $dest -Force
+    }
+}
+
+function Update-AgentExeFromVersion($remote, $remoteText, $baseUrl, $versionFile) {
+    $exe = Get-ExePath
+    $downloadUrl = if ($remote.downloadUrl) { $remote.downloadUrl } else { "$baseUrl/api/node-agent/download/windows" }
+    $tmp = "$exe.new"
+    Invoke-NoProxyDownloadFile $downloadUrl $tmp
+    if (-not (Test-Path -LiteralPath $tmp)) { return $false }
+    $size = (Get-Item -LiteralPath $tmp).Length
+    if ($size -lt 1024 * 1024) {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    Move-Item -LiteralPath $tmp -Destination $exe -Force
+    $remoteText | Set-Content -LiteralPath $versionFile -Encoding UTF8
+    return $true
+}
+
+function Update-ClientPackageFromVersion($remote, $remoteText, $baseUrl, $versionFile) {
+    $downloadUrl = if ($remote.windowsClientDownloadUrl) {
+        $remote.windowsClientDownloadUrl
+    } else {
+        "$baseUrl/api/node-agent/download/windows-client"
+    }
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-client-update-' + [Guid]::NewGuid().ToString('N'))
+    $zipPath = Join-Path $tempRoot 'elon-node-agent-windows.zip'
+    $extractDir = Join-Path $tempRoot 'package'
+    New-Item -ItemType Directory -Force -Path $tempRoot, $extractDir | Out-Null
+    try {
+        Invoke-NoProxyDownloadFile $downloadUrl $zipPath
+        if ((Get-Item -LiteralPath $zipPath).Length -lt 1024 * 1024) { return $false }
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+        $packageDir = Get-ChildItem -LiteralPath $extractDir -Recurse -Filter 'elon-node-agent.exe' |
+            Select-Object -First 1 |
+            ForEach-Object { $_.DirectoryName }
+        if (-not $packageDir) { return $false }
+        $packageExe = Join-Path $packageDir 'elon-node-agent.exe'
+        if ((Get-Item -LiteralPath $packageExe).Length -lt 1024 * 1024) { return $false }
+        Copy-ManagedClientFiles $packageDir
+        $remoteText | Set-Content -LiteralPath $versionFile -Encoding UTF8
+        return $true
+    } finally {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Update-ClientIfNeeded {
     if ($env:NODE_AGENT_AUTO_UPDATE -match '^(0|false|no|off)$') { return }
     $exe = Get-ExePath
     $baseUrl = Get-UpdateBaseUrl
@@ -123,17 +196,10 @@ function Update-AgentIfNeeded {
         $sameGitSha = $local -and $remote.gitSha -and $local.gitSha -eq $remote.gitSha
         if ((Test-Path -LiteralPath $exe) -and $sameGitSha) { return }
 
-        $downloadUrl = if ($remote.downloadUrl) { $remote.downloadUrl } else { "$baseUrl/api/node-agent/download/windows" }
-        $tmp = "$exe.new"
-        Invoke-NoProxyDownloadFile $downloadUrl $tmp
-        if (-not (Test-Path -LiteralPath $tmp)) { return }
-        $size = (Get-Item -LiteralPath $tmp).Length
-        if ($size -lt 1024 * 1024) {
-            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-            return
+        $updated = Update-ClientPackageFromVersion $remote $remoteText $baseUrl $versionFile
+        if (-not $updated) {
+            Update-AgentExeFromVersion $remote $remoteText $baseUrl $versionFile | Out-Null
         }
-        Move-Item -LiteralPath $tmp -Destination $exe -Force
-        $remoteText | Set-Content -LiteralPath $versionFile -Encoding UTF8
     } catch {
         Remove-Item -LiteralPath "$exe.new" -Force -ErrorAction SilentlyContinue
     }
@@ -142,7 +208,7 @@ function Update-AgentIfNeeded {
 function Start-NodeIfNeeded {
     $proc = Get-Process -Name "elon-node-agent" -ErrorAction SilentlyContinue
     if ($proc) { return }
-    Update-AgentIfNeeded
+    Update-ClientIfNeeded
     $exe = Get-ExePath
     if (Test-Path $exe) {
         [Environment]::SetEnvironmentVariable("NODE_AUTO_OPEN_ADMIN", "0", 'Process')

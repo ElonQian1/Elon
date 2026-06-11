@@ -94,7 +94,9 @@ try {
         "start-node-agent.ps1",
         "tray-launcher.ps1",
         "install-elon-node.ps1",
+        "uninstall-elon-node.ps1",
         "node-agent.env.example",
+        "卸载一龙PC节点.cmd",
         "README.txt"
     )
     foreach ($file in $launcherFiles) {

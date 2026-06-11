@@ -85,8 +85,10 @@ function Copy-ClientFiles($sourceDir, $installDir) {
         'start-node-agent.ps1',
         'tray-launcher.ps1',
         'install-elon-node.ps1',
+        'uninstall-elon-node.ps1',
         '启动一龙节点.cmd',
         '安装一龙PC节点.cmd',
+        '卸载一龙PC节点.cmd',
         'README.txt'
     )
     foreach ($file in $files) {
