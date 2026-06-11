@@ -18,7 +18,7 @@ import kotlin.concurrent.thread
 
 /**
  * 我的页内联积分余额卡片。
- * 无需打开算力市场弹窗即可一眼看到余额和累计收益，点击后直接打开算力市场。
+ * 无需打开 PC 节点大厅即可一眼看到余额和累计收益，点击后直接查看在线节点。
  */
 internal class ProfileNodeBalanceCard(
     private val activity: AppCompatActivity,
@@ -185,7 +185,7 @@ internal class ProfileNodeBalanceCard(
                 addView(TextView(activity).apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
-                    text = "进入节点算力市场  →"
+                    text = "查看在线 PC 节点  →"
                     setTextColor(Color.parseColor("#6091CF"))
                     textSize = 13f
                     isClickable = true

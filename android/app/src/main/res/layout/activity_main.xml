@@ -539,7 +539,7 @@
                     android:gravity="center_vertical"
                     android:paddingStart="22dp"
                     android:paddingEnd="22dp"
-                    android:text="节点算力市场"
+                    android:text="PC 节点大厅"
                     android:textColor="@color/elon_text_primary"
                     android:textSize="16sp" />
 

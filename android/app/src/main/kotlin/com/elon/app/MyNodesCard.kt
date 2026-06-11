@@ -336,7 +336,7 @@ internal class MyNodesCard(
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).also { it.topMargin = dp(8); it.bottomMargin = dp(4) }
         includeFontPadding = false
-        text = "暂无注册节点\n运行 elon-node-agent 即可在此显示"
+        text = "暂无你提供的节点\n所有在线节点请看 PC 节点大厅"
         textSize = 12f
         setTextColor(Color.parseColor("#6F7785"))
         gravity = Gravity.CENTER

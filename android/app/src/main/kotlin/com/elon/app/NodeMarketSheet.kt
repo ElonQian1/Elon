@@ -26,30 +26,15 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 import kotlin.concurrent.thread
-
-// ─── 数据模型 ─────────────────────────────────────────────────────────────────
-
-internal data class NodeModel(
-    val modelId: String,
-    val displayName: String,
-    val nodeId: String,
-    val nodeOwner: String,
-    val contextLen: Int,
-    val pricePerK: Double
-)
-
-internal data class NodeBalance(
-    val balance: Double,
-    val lifetime: Double
-)
 
 // ─── 主类 ─────────────────────────────────────────────────────────────────────
 
 /**
- * 节点算力市场：
+ * PC 节点大厅：
  * - 展示积分余额
- * - 展示在线节点提供的模型列表
+ * - 展示全局在线 PC 节点和节点提供的模型列表
  * - 点击模型可向该节点发送一条消息，返回结果显示在对话框
  */
 internal class NodeMarketSheet(
@@ -63,9 +48,12 @@ internal class NodeMarketSheet(
     // ─── 入口 ───────────────────────────────────────────────────────────────
 
     fun show() {
-        val dialog = AlertDialog.Builder(activity)
-            .setView(buildRootView())
+        lateinit var dialog: AlertDialog
+        val root = buildRootView { dialog.dismiss() }
+        dialog = AlertDialog.Builder(activity)
+            .setView(root)
             .create()
+        dialog.show()
         dialog.window?.setLayout(
             ViewGroup.LayoutParams.MATCH_PARENT,
             (activity.resources.displayMetrics.heightPixels * 0.85).toInt()
@@ -76,19 +64,18 @@ internal class NodeMarketSheet(
                 cornerRadius = dp(14).toFloat()
             }
         )
-        dialog.show()
     }
 
     // ─── 根布局 ─────────────────────────────────────────────────────────────
 
-    private fun buildRootView(): View {
+    private fun buildRootView(onClose: () -> Unit): View {
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0F1217"))
         }
 
         // 标题栏
-        root.addView(buildHeader())
+        root.addView(buildHeader(onClose))
 
         // 积分余额条
         val balanceText = buildBalanceBar()
@@ -131,14 +118,14 @@ internal class NodeMarketSheet(
 
     // ─── 头部 ───────────────────────────────────────────────────────────────
 
-    private fun buildHeader(): View {
+    private fun buildHeader(onClose: () -> Unit): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(22), dp(18), dp(16), dp(14))
 
             addView(TextView(activity).apply {
-                text = "节点算力市场"
+                text = "PC 节点大厅"
                 textSize = 18f
                 setTextColor(Color.parseColor("#F2F5FA"))
                 typeface = Typeface.DEFAULT_BOLD
@@ -150,6 +137,9 @@ internal class NodeMarketSheet(
                 textSize = 20f
                 setTextColor(Color.parseColor("#6F7785"))
                 setPadding(dp(10), dp(4), dp(10), dp(4))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onClose() }
             })
         }
     }
@@ -189,8 +179,12 @@ internal class NodeMarketSheet(
         thread(name = "node-market-load") {
             // 1. 余额
             val balance = runCatching { fetchBalance(ctx) }.getOrNull()
-            // 2. 模型列表
-            val models = runCatching { fetchModels() }.getOrElse { emptyList() }
+            // 2. 全局 PC 节点目录
+            val nodeResult = if (AuthManager.isLoggedIn(ctx)) {
+                runCatching { fetchNodes(ctx) }
+            } else {
+                Result.failure(IllegalStateException("请先登录后查看 PC 节点"))
+            }
 
             activity.runOnUiThread {
                 if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
@@ -205,17 +199,9 @@ internal class NodeMarketSheet(
                 // 移除 spinner
                 listContainer.removeView(spinner)
 
-                // 渲染列表
-                if (models.isEmpty()) {
-                    listContainer.addView(buildEmptyHint())
-                } else {
-                    // 标题
-                    listContainer.addView(buildSectionTitle("在线模型  (${models.size})"))
-                    models.forEach { model ->
-                        listContainer.addView(buildModelCard(model))
-                    }
-                    listContainer.addView(buildBottomPad())
-                }
+                nodeResult
+                    .onSuccess { nodes -> renderNodes(listContainer, nodes) }
+                    .onFailure { err -> listContainer.addView(buildErrorHint(err.message ?: "加载 PC 节点失败")) }
             }
         }
     }
@@ -234,27 +220,25 @@ internal class NodeMarketSheet(
         )
     }
 
-    private fun fetchModels(): List<NodeModel> {
-        val req = Request.Builder().url("$serverUrl/api/nodes/models").get().build()
-        val body = http.newCall(req).execute().use { it.body?.string() ?: "[]" }
-        val arr = JSONArray(body)
-        return (0 until arr.length()).map { i ->
-            val o = arr.getJSONObject(i)
-            NodeModel(
-                modelId = o.optString("model_id"),
-                displayName = o.optString("display_name", o.optString("model_id")),
-                nodeId = o.optString("node_id"),
-                nodeOwner = o.optString("owner_user_id", ""),
-                contextLen = o.optInt("context_len", 2048),
-                pricePerK = o.optDouble("price_per_1k_credits", 1.0)
-            )
+    private fun fetchNodes(ctx: Context): List<NodeMarketNode> {
+        val req = AuthManager.applyAuth(
+            ctx,
+            Request.Builder().url("$serverUrl/api/nodes").get()
+        ).build()
+        val resp = http.newCall(req).execute()
+        val body = resp.use { it.body?.string() ?: "{}" }
+        if (!resp.isSuccessful) {
+            val err = runCatching { JSONObject(body).optString("error") }.getOrNull()
+            throw RuntimeException(err?.takeIf { it.isNotBlank() } ?: "HTTP ${resp.code}")
         }
+        return NodeMarketCatalog.parseNodes(body)
     }
 
     private fun sendNodeChat(model: NodeModel, message: String): String {
         val ctx = activity.applicationContext
         val body = JSONObject().apply {
             put("model_id", model.modelId)
+            if (model.nodeId.isNotBlank()) put("node_id", model.nodeId)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "user")
@@ -284,6 +268,30 @@ internal class NodeMarketSheet(
     }
 
     // ─── UI 组件 ─────────────────────────────────────────────────────────────
+
+    private fun renderNodes(listContainer: LinearLayout, nodes: List<NodeMarketNode>) {
+        if (nodes.isEmpty()) {
+            listContainer.addView(buildEmptyHint())
+            return
+        }
+        listContainer.addView(buildSectionTitle("在线 PC 节点  (${nodes.size})"))
+        nodes.sortedWith(
+            compareByDescending<NodeMarketNode> { it.canAcceptProject }
+                .thenByDescending { it.models.isNotEmpty() }
+                .thenBy { it.displayName.lowercase(Locale.US) }
+        ).forEach { node ->
+            listContainer.addView(buildNodeCard(node))
+        }
+
+        val models = nodes.flatMap { it.models }
+        if (models.isNotEmpty()) {
+            listContainer.addView(buildSectionTitle("可调用模型  (${models.size})"))
+            models.forEach { model ->
+                listContainer.addView(buildModelCard(model))
+            }
+        }
+        listContainer.addView(buildBottomPad())
+    }
 
     private fun buildSectionTitle(text: String): View {
         return TextView(activity).apply {
@@ -331,13 +339,106 @@ internal class NodeMarketSheet(
 
         // 节点 & 上下文信息
         card.addView(TextView(activity).apply {
-            text = "节点：${model.nodeId.take(8)}… · 上下文 ${model.contextLen} tokens"
+            text = "${model.nodeDisplayName} · ${model.nodeCapacityLabel} · 上下文 ${model.contextLen} tokens"
             textSize = 12f
             setTextColor(Color.parseColor("#6F7785"))
             setPadding(0, dp(4), 0, 0)
         })
+        if (model.nodeHardwareSummary.isNotBlank() && model.nodeHardwareSummary != "硬件未知") {
+            card.addView(TextView(activity).apply {
+                text = model.nodeHardwareSummary
+                textSize = 12f
+                setTextColor(Color.parseColor("#6F7785"))
+                setPadding(0, dp(3), 0, 0)
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+            })
+        }
 
         card.setOnClickListener { openChatDialog(model) }
+        return card
+    }
+
+    private fun buildNodeCard(node: NodeMarketNode): View {
+        val card = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(13), dp(16), dp(13))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#181B20"))
+                cornerRadius = dp(8).toFloat()
+                when (node.capacityTone.lowercase(Locale.US)) {
+                    "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
+                    "warn" -> setStroke(dp(1), Color.parseColor("#6A5628"))
+                }
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.setMargins(dp(12), dp(4), dp(12), dp(4)) }
+        }
+
+        val titleRow = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(8), dp(8)).also { it.marginEnd = dp(10) }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor(if (node.online) "#58BE6A" else "#6F7785"))
+            }
+        })
+        titleRow.addView(TextView(activity).apply {
+            text = node.displayName
+            textSize = 15f
+            setTextColor(Color.parseColor("#F2F5FA"))
+            typeface = Typeface.DEFAULT_BOLD
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        titleRow.addView(buildPill(nodeStatusLabel(node), nodeStatusBg(node), nodeStatusColor(node)))
+        card.addView(titleRow)
+
+        card.addView(TextView(activity).apply {
+            text = nodeSubtitle(node)
+            textSize = 12f
+            setTextColor(Color.parseColor("#6F7785"))
+            setPadding(0, dp(7), 0, 0)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+
+        val metrics = listOfNotNull(
+            nodeProjectSlotsText(node),
+            formatBytes(node.diskFreeBytes).takeIf { it.isNotBlank() }?.let { "磁盘 $it" },
+            node.hardwareSummary.takeIf { it.isNotBlank() && it != "硬件未知" },
+            node.allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/")?.let { "CLI $it" },
+            node.capacityWarnings.firstOrNull()
+        )
+        card.addView(TextView(activity).apply {
+            text = metrics.joinToString(" · ").ifBlank { "硬件与容量待上报" }
+            textSize = 12f
+            setTextColor(nodeMetricColor(node))
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+
+        val modelText = if (node.models.isNotEmpty()) {
+            node.models.take(4).joinToString("  ·  ") { it.displayName.ifBlank { it.modelId } } +
+                if (node.models.size > 4) "  +${node.models.size - 4}" else ""
+        } else {
+            "暂无在线模型"
+        }
+        card.addView(TextView(activity).apply {
+            text = modelText
+            textSize = 12f
+            setTextColor(Color.parseColor(if (node.models.isNotEmpty()) "#81B3D9" else "#6F7785"))
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
         return card
     }
 
@@ -356,9 +457,23 @@ internal class NodeMarketSheet(
 
     private fun buildEmptyHint(): View {
         return TextView(activity).apply {
-            text = "暂无在线节点\n部署 PC 节点可在此列表中显示"
+            text = "暂无在线 PC 节点\n节点上线后会在这里显示"
             textSize = 14f
             setTextColor(Color.parseColor("#6F7785"))
+            gravity = Gravity.CENTER
+            setPadding(dp(22), dp(40), dp(22), dp(40))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+    }
+
+    private fun buildErrorHint(message: String): View {
+        return TextView(activity).apply {
+            text = message
+            textSize = 14f
+            setTextColor(Color.parseColor("#D97A7A"))
             gravity = Gravity.CENTER
             setPadding(dp(22), dp(40), dp(22), dp(40))
             layoutParams = LinearLayout.LayoutParams(
@@ -477,5 +592,76 @@ internal class NodeMarketSheet(
 
     private fun formatBalance(v: Double): String {
         return if (v == v.toLong().toDouble()) "${v.toLong()}" else String.format("%.2f", v)
+    }
+
+    private fun nodeSubtitle(node: NodeMarketNode): String {
+        return if (node.deviceName.isNotBlank() && !node.deviceName.equals(node.displayName, ignoreCase = true)) {
+            "设备: ${node.deviceName} · ID: ${node.shortId}"
+        } else {
+            "ID: ${node.shortId}"
+        }
+    }
+
+    private fun nodeStatusLabel(node: NodeMarketNode): String {
+        return node.capacityLabel.ifBlank {
+            when {
+                !node.online -> "离线"
+                node.canAcceptProject -> "可接项目"
+                else -> "在线"
+            }
+        }
+    }
+
+    private fun nodeStatusBg(node: NodeMarketNode): String {
+        return when (node.capacityTone.lowercase(Locale.US)) {
+            "ok" -> "#152C3E"
+            "bad" -> "#2A1F1F"
+            "warn" -> "#283140"
+            else -> "#152C3E"
+        }
+    }
+
+    private fun nodeStatusColor(node: NodeMarketNode): String {
+        return when (node.capacityTone.lowercase(Locale.US)) {
+            "ok" -> "#58BE6A"
+            "bad" -> "#E99191"
+            "warn" -> "#F7D28A"
+            else -> "#81B3D9"
+        }
+    }
+
+    private fun nodeMetricColor(node: NodeMarketNode): Int {
+        return Color.parseColor(
+            when (node.capacityTone.lowercase(Locale.US)) {
+                "bad" -> "#E99191"
+                "warn" -> "#F7D28A"
+                else -> "#6F7785"
+            }
+        )
+    }
+
+    private fun nodeProjectSlotsText(node: NodeMarketNode): String {
+        return if (node.projectLimit > 0) {
+            "项目 ${node.projectCount}/${node.projectLimit}，剩余 ${node.projectSlotsRemaining.coerceAtLeast(0)}"
+        } else {
+            "项目 ${node.projectCount}"
+        }
+    }
+
+    private fun formatBytes(value: Long?): String {
+        val bytes = value ?: return ""
+        if (bytes <= 0L) return ""
+        val units = listOf("B", "KB", "MB", "GB", "TB")
+        var amount = bytes.toDouble()
+        var index = 0
+        while (amount >= 1024.0 && index < units.lastIndex) {
+            amount /= 1024.0
+            index += 1
+        }
+        return if (index >= 3) {
+            String.format(Locale.US, "%.1f %s", amount, units[index])
+        } else {
+            "${amount.toInt()} ${units[index]}"
+        }
     }
 }
