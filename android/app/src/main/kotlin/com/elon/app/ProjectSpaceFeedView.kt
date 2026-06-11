@@ -1,5 +1,7 @@
 package com.elon.app
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
@@ -11,6 +13,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlin.concurrent.thread
 
@@ -22,6 +25,8 @@ internal class ProjectSpaceFeedView(
     private val openPostComposer: () -> Unit,
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
 ) {
+    private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
+
     fun render(
         container: LinearLayout,
         space: ProjectSpace,
@@ -145,9 +150,11 @@ internal class ProjectSpaceFeedView(
             .filter { it.isProjectSpaceFeedChannel() }
             .associateBy { it.id }
         return channelsById.values.flatMap { channel ->
-            messagesByChannel[channel.id].orEmpty()
+            val channelMessages = messagesByChannel[channel.id].orEmpty()
+            val replyCounts = projectSpaceReplyCountsByPost(channelMessages)
+            channelMessages
                 .filter { it.isProjectSpaceFeedPost() }
-                .map { ProjectSpaceFeedPost(channel, it) }
+                .map { ProjectSpaceFeedPost(channel, it, replyCounts[it.id] ?: 0) }
         }.sortedByDescending { parseChatMessageCreatedAt(it.message.createdAt) ?: 0L }
             .take(MAX_FEED_POSTS)
     }
@@ -194,7 +201,7 @@ internal class ProjectSpaceFeedView(
             extractProjectPostImageSource(postText.body)?.let { source ->
                 addView(postImagePreview(source))
             }
-            addView(postMetrics(post))
+            addView(postMetrics(post, postText))
         }
     }
 
@@ -272,24 +279,135 @@ internal class ProjectSpaceFeedView(
         return image
     }
 
-    private fun postMetrics(post: ProjectSpaceFeedPost): LinearLayout {
-        val countText = if (post.channel.unreadCount > 0) post.channel.unreadCount.toString() else "1"
+    private fun postMetrics(post: ProjectSpaceFeedPost, postText: ProjectSpacePostText): LinearLayout {
+        val key = post.metricKey()
+        val shareCount = metricPrefs.getInt("$key:shares", 0)
+        val liked = metricPrefs.getBoolean("$key:liked", false)
+        val likeCount = if (liked) 1 else 0
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(20), dp(12), dp(10), 0)
-            addView(metric("♡", "1"), metricParams())
-            addView(metric("◌", countText), metricParams())
-            addView(metric("♧", "16"), metricParams())
+            setPadding(dp(8), dp(10), dp(8), 0)
+            addView(metricButton(
+                iconRes = R.drawable.ic_project_post_share,
+                value = shareCount.toString(),
+                description = "分享帖子",
+                onClick = { views ->
+                    sharePost(post, postText) {
+                        val nextCount = metricPrefs.getInt("$key:shares", 0) + 1
+                        metricPrefs.edit().putInt("$key:shares", nextCount).apply()
+                        views.value.text = nextCount.toString()
+                    }
+                }
+            ), metricParams())
+            addView(metricButton(
+                iconRes = R.drawable.ic_project_post_chat,
+                value = post.replyCount.coerceAtLeast(0).toString(),
+                description = "查看${post.replyCount.coerceAtLeast(0)}条讨论",
+                onClick = { openChannel(post.channel) }
+            ), metricParams())
+            addView(metricButton(
+                iconRes = if (liked) R.drawable.ic_project_post_like_filled else R.drawable.ic_project_post_like,
+                value = likeCount.toString(),
+                description = if (liked) "取消点赞" else "点赞",
+                selected = liked,
+                onClick = { views ->
+                    val nextLiked = !metricPrefs.getBoolean("$key:liked", false)
+                    metricPrefs.edit().putBoolean("$key:liked", nextLiked).apply()
+                    updateMetricButton(
+                        views = views,
+                        iconRes = if (nextLiked) R.drawable.ic_project_post_like_filled else R.drawable.ic_project_post_like,
+                        value = if (nextLiked) "1" else "0",
+                        selected = nextLiked,
+                        description = if (nextLiked) "取消点赞" else "点赞"
+                    )
+                }
+            ), metricParams())
         }
     }
 
-    private fun metric(icon: String, value: String): TextView {
-        return TextView(activity).apply {
-            text = "$icon $value"
-            textSize = 12f
-            setTextColor(Color.parseColor("#A6AFBD"))
+    private fun metricButton(
+        iconRes: Int,
+        value: String,
+        description: String,
+        selected: Boolean = false,
+        onClick: (MetricButtonViews) -> Unit
+    ): LinearLayout {
+        val color = metricColor(selected)
+        val icon = ImageView(activity).apply {
+            setImageResource(iconRes)
+            setColorFilter(color)
+        }
+        val valueText = TextView(activity).apply {
+            text = value
+            textSize = 13f
+            includeFontPadding = false
+            setTextColor(color)
             gravity = Gravity.CENTER
+        }
+        val views = MetricButtonViews(icon, valueText)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = description
+            minimumHeight = dp(32)
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            addView(icon, LinearLayout.LayoutParams(dp(18), dp(18)).apply {
+                marginEnd = dp(5)
+            })
+            addView(valueText, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+            setOnClickListener { onClick(views) }
+        }
+    }
+
+    private fun updateMetricButton(
+        views: MetricButtonViews,
+        iconRes: Int,
+        value: String,
+        selected: Boolean,
+        description: String
+    ) {
+        val color = metricColor(selected)
+        views.icon.setImageResource(iconRes)
+        views.icon.setColorFilter(color)
+        views.value.text = value
+        views.value.setTextColor(color)
+        (views.icon.parent as? View)?.contentDescription = description
+    }
+
+    private fun metricColor(selected: Boolean): Int {
+        return Color.parseColor(if (selected) "#58BE6A" else "#A6AFBD")
+    }
+
+    private fun sharePost(
+        post: ProjectSpaceFeedPost,
+        postText: ProjectSpacePostText,
+        onShared: () -> Unit
+    ) {
+        val topic = projectSpaceTopicLabel(post.channel)
+        val shareText = buildString {
+            append("【").append(postText.title).append("】")
+            postText.body.trim().takeIf { it.isNotBlank() }?.let { body ->
+                append("\n\n").append(body)
+            }
+            append("\n\n来自项目话题：").append(topic)
+        }
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, postText.title)
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        runCatching {
+            activity.startActivity(Intent.createChooser(intent, "分享帖子"))
+        }.onSuccess {
+            onShared()
+        }.onFailure { error ->
+            Toast.makeText(activity, error.message ?: "无法打开系统分享", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -359,13 +477,26 @@ internal class ProjectSpaceFeedView(
     private companion object {
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
+        const val POST_METRIC_PREFS = "project_post_metrics"
     }
+
+    private data class MetricButtonViews(
+        val icon: ImageView,
+        val value: TextView
+    )
 }
 
 internal data class ProjectSpaceFeedPost(
     val channel: ProjectChannel,
-    val message: ProjectChannelMessage
-)
+    val message: ProjectChannelMessage,
+    val replyCount: Int
+) {
+    fun metricKey(): String {
+        val messageId = message.id.trim()
+        if (messageId.isNotBlank()) return "post:$messageId"
+        return "post:${channel.id}:${message.createdAt}:${message.content.hashCode()}"
+    }
+}
 
 private fun extractProjectPostImageSource(text: String): String? {
     val markdown = Regex("""!\[[^]]*]\(([^)]+)\)""").find(text)

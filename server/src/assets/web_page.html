@@ -591,7 +591,30 @@
       font-size: 16px;
       line-height: 1;
       text-align: center;
-      padding: 18px 18px 0;
+      padding: 18px 8px 0;
+    }
+    .project-space-post-metric {
+      min-height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink-soft);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      font: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .project-space-post-metric svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      flex: none;
+    }
+    .project-space-post-metric.liked {
+      color: var(--brand);
     }
     .project-space-feed-empty {
       color: var(--ink-soft);
@@ -3479,6 +3502,69 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       .join('\n')
       .trim();
   }
+  function projectSpacePostMetricKey(channel, message) {
+    const id = message && message.id;
+    if (id) return 'project-post:' + id;
+    return 'project-post:' + [
+      channel && channel.id,
+      message && message.created_at,
+      String(message && message.content || '').slice(0, 48)
+    ].join(':');
+  }
+  function projectSpacePostMetricNumber(key, name) {
+    try {
+      const value = Number(localStorage.getItem(key + ':' + name) || '0');
+      return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    } catch {
+      return 0;
+    }
+  }
+  function projectSpacePostMetricBool(key, name) {
+    try {
+      return localStorage.getItem(key + ':' + name) === '1';
+    } catch {
+      return false;
+    }
+  }
+  function setProjectSpacePostMetric(key, name, value) {
+    try {
+      localStorage.setItem(key + ':' + name, String(value));
+    } catch {}
+  }
+  function projectSpaceMetricIcon(name) {
+    if (name === 'share') {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.22.09-.46.09-.7s-.04-.48-.09-.7l7.05-4.11C16.5 7.69 17.21 8 18 8c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.48.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.18c-.05.2-.08.42-.08.63 0 1.61 1.31 2.92 2.92 2.92S20.92 20.61 20.92 19 19.61 16.08 18 16.08z"/></svg>';
+    }
+    if (name === 'chat') {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM20 16H5.17L4 17.17V4h16v12z"/></svg>';
+    }
+    if (name === 'like-filled') {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5C2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.1 18.55l-.1.1-.11-.1C7.14 14.24 4 11.39 4 8.5C4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5C18.5 5 20 6.5 20 8.5c0 2.89-3.14 5.74-7.9 10.05zM16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3C4.42 3 2 5.42 2 8.5c0 3.76 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.26 22 8.5C22 5.42 19.58 3 16.5 3z"/></svg>';
+  }
+  function projectSpacePostMetricButtonHtml(action, icon, value, label, extraClass) {
+    return '<button class="project-space-post-metric ' + (extraClass || '') + '" type="button" data-post-action="' +
+      escapeHtml(action) + '" aria-label="' + escapeHtml(label) + '">' +
+      projectSpaceMetricIcon(icon) + '<span>' + escapeHtml(String(value)) + '</span></button>';
+  }
+  async function shareProjectSpacePost(channel, message) {
+    const post = parseProjectSpacePostText(message && message.content);
+    const body = projectSpacePostBodyWithoutImages(post.body);
+    const topic = projectSpaceTopicLabel(channel && channel.kind, channel && channel.name);
+    const text = ['【' + post.title + '】', body, '来自项目话题：' + topic]
+      .filter(Boolean)
+      .join('\n\n');
+    if (navigator.share) {
+      await navigator.share({ title: post.title, text });
+      return 'shared';
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return 'copied';
+    }
+    throw new Error('当前浏览器不支持分享或复制');
+  }
   function projectSpacePostCardHtml(channel, message, replyCount) {
     const post = parseProjectSpacePostText(message.content);
     const name = message.sender_name || '项目成员';
@@ -3489,8 +3575,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }) : '刚刚';
     const body = projectSpacePostBodyWithoutImages(post.body) || post.title;
     const imageSource = extractProjectSpacePostImageSource(post.body);
+    const metricKey = projectSpacePostMetricKey(channel, message);
+    const shareCount = projectSpacePostMetricNumber(metricKey, 'shares');
+    const liked = projectSpacePostMetricBool(metricKey, 'liked');
     return [
-      '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) + '">',
+      '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) +
+        '" data-post-key="' + escapeHtml(metricKey) + '">',
       '<div class="project-space-post-head">',
       '<div class="project-space-post-avatar">' + escapeHtml(initial) + '</div>',
       '<div class="project-space-post-user">',
@@ -3502,7 +3592,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '<div class="project-space-post-title">' + escapeHtml(post.title) + '</div>',
       body ? '<div class="project-space-post-body">' + escapeHtml(body) + '</div>' : '',
       imageSource ? '<img class="project-space-post-media" src="' + escapeHtml(imageSource) + '" alt="帖子图片" loading="lazy" />' : '',
-      '<div class="project-space-post-metrics"><span>↗ 1</span><span>◌ ' + escapeHtml(String(replyCount || 0)) + '</span><span>♡ 16</span></div>',
+      '<div class="project-space-post-metrics">',
+      projectSpacePostMetricButtonHtml('share', 'share', shareCount, '分享帖子'),
+      projectSpacePostMetricButtonHtml('chat', 'chat', replyCount || 0, '查看' + (replyCount || 0) + '条讨论'),
+      projectSpacePostMetricButtonHtml('like', liked ? 'like-filled' : 'like', liked ? 1 : 0, liked ? '取消点赞' : '点赞', liked ? 'liked' : ''),
+      '</div>',
       '</article>'
     ].join('');
   }
@@ -3589,7 +3683,49 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectSpacePostList.innerHTML = posts
       .map(({ channel, message, replyCount }) => projectSpacePostCardHtml(channel, message, replyCount))
       .join('');
+    const postByMetricKey = new Map(posts.map((item) => [
+      projectSpacePostMetricKey(item.channel, item.message),
+      item
+    ]));
     projectSpacePostList.querySelectorAll('.project-space-post-card').forEach((card) => {
+      card.querySelectorAll('.project-space-post-metric').forEach((button) => {
+        button.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const item = postByMetricKey.get(card.dataset.postKey || '');
+          if (!item) return;
+          const action = button.dataset.postAction;
+          if (action === 'share') {
+            try {
+              const mode = await shareProjectSpacePost(item.channel, item.message);
+              const nextCount = projectSpacePostMetricNumber(card.dataset.postKey, 'shares') + 1;
+              setProjectSpacePostMetric(card.dataset.postKey, 'shares', nextCount);
+              const value = button.querySelector('span');
+              if (value) value.textContent = String(nextCount);
+              if (mode === 'copied') showNativeOnly('帖子内容已复制，可以发给其他人。');
+            } catch (error) {
+              showNativeOnly((error && error.message) || '分享帖子失败');
+            }
+            return;
+          }
+          if (action === 'chat') {
+            showNativeOnly('进入「' +
+              projectSpaceTopicLabel(item.channel && item.channel.kind, item.channel && item.channel.name) +
+              '」帖内讨论请在 Android APK 中使用。');
+            return;
+          }
+          if (action === 'like') {
+            const nextLiked = !projectSpacePostMetricBool(card.dataset.postKey, 'liked');
+            setProjectSpacePostMetric(card.dataset.postKey, 'liked', nextLiked ? '1' : '0');
+            button.classList.toggle('liked', nextLiked);
+            button.setAttribute('aria-label', nextLiked ? '取消点赞' : '点赞');
+            const value = button.querySelector('span');
+            if (value) value.textContent = nextLiked ? '1' : '0';
+            const iconName = nextLiked ? 'like-filled' : 'like';
+            button.firstElementChild?.remove();
+            button.insertAdjacentHTML('afterbegin', projectSpaceMetricIcon(iconName));
+          }
+        });
+      });
       card.addEventListener('click', () => {
         const channel = channelById.get(card.dataset.channel);
         showNativeOnly('网页版已同步项目空间帖子预览；进入「' +
