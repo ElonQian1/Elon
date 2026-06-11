@@ -20,6 +20,7 @@ $Server = "root@43.139.149.158"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-node-agent"
+$WindowsClientPackageName = "elon-node-agent-windows.zip"
 
 Write-Host "=== elon-node-agent 构建 + 发布 ===" -ForegroundColor Cyan
 
@@ -75,30 +76,74 @@ try {
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 
+# ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
+Write-Host "[2.5/4] 打包 Windows 客户端..." -ForegroundColor Yellow
+$BaseUrl = "http://43.139.149.158:8080"
+$LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
+$WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
+$WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
+$LauncherDir = Join-Path $PSScriptRoot "node-agent-launcher"
+$PackageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-windows-" + [Guid]::NewGuid().ToString("N"))
+$WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
+New-Item -ItemType Directory -Force -Path $PackageRoot | Out-Null
+try {
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "$Bin.exe") -Force
+    $launcherFiles = @(
+        "启动一龙节点.cmd",
+        "安装一龙PC节点.cmd",
+        "start-node-agent.ps1",
+        "tray-launcher.ps1",
+        "install-elon-node.ps1",
+        "node-agent.env.example",
+        "README.txt"
+    )
+    foreach ($file in $launcherFiles) {
+        $src = Join-Path $LauncherDir $file
+        if (-not (Test-Path -LiteralPath $src)) { throw "Windows 客户端打包缺少文件：$src" }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $PackageRoot $file) -Force
+    }
+    $PackageVersionInfo = [ordered]@{
+        version = $PackageVersion
+        gitSha = $GitSha
+        updated_at = (Get-Date).ToString("o")
+        downloadUrl = $WindowsDownloadUrl
+        linuxDownloadUrl = $LinuxDownloadUrl
+        windowsClientDownloadUrl = $WindowsClientDownloadUrl
+    }
+    $PackageVersionInfo | ConvertTo-Json -Depth 4 |
+        Set-Content -LiteralPath (Join-Path $PackageRoot "node-agent-version.json") -Encoding UTF8
+    Remove-Item -LiteralPath $WindowsClientPackage -Force -ErrorAction SilentlyContinue
+    Compress-Archive -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage -Force
+} finally {
+    Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
+
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/4] 上传到服务器..." -ForegroundColor Yellow
 ssh -o ProxyCommand=none $Server "mkdir -p $RemoteDir"
 scp -o ProxyCommand=none $LinuxBin "${Server}:${RemoteDir}/${Bin}"
 ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
 scp -o ProxyCommand=none $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
+scp -o ProxyCommand=none $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/4] 验证下载地址..." -ForegroundColor Yellow
-$BaseUrl = "http://43.139.149.158:8080"
-$LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
-$WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 
 $size    = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}"
 $sizeWin = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
+$sizeWinClient = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
 $VersionInfo = [ordered]@{
     version = $PackageVersion
     gitSha = $GitSha
     updated_at = (Get-Date).ToString("o")
     downloadUrl = $WindowsDownloadUrl
     linuxDownloadUrl = $LinuxDownloadUrl
+    windowsClientDownloadUrl = $WindowsClientDownloadUrl
     fileSize = [int64]$sizeWin
     linuxFileSize = [int64]$size
+    windowsClientFileSize = [int64]$sizeWinClient
 }
 $VersionFile = New-TemporaryFile
 try {
@@ -110,9 +155,11 @@ try {
 }
 Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
+Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "✅ elon-node-agent 发布完成" -ForegroundColor Green
 Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
+Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"

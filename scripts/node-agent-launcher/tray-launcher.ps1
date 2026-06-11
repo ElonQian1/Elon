@@ -31,7 +31,7 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $taskName = "ElonNodeAgentTray"
 
 function Load-EnvFile($path) {
-    if (-not (Test-Path $path)) { return }
+    if (-not (Test-Path -LiteralPath $path)) { return }
     foreach ($raw in Get-Content -LiteralPath $path) {
         $line = $raw.Trim()
         if (-not $line -or $line.StartsWith('#') -or -not $line.Contains('=')) { continue }
@@ -45,7 +45,7 @@ function Load-EnvFile($path) {
     }
 }
 
-Load-EnvFile (Join-Path $here "node-agent.env")
+Load-EnvFile (Join-Path $here 'node-agent.env')
 $port = if ($env:NODE_ADMIN_PORT) { $env:NODE_ADMIN_PORT } else { "7799" }
 $adminUrl = "http://127.0.0.1:$port/"
 
@@ -79,9 +79,70 @@ function Get-ExePath {
     return Join-Path $here "elon-node-agent.exe"
 }
 
+function Get-UpdateBaseUrl {
+    if ($env:NODE_AGENT_UPDATE_BASE_URL) { return $env:NODE_AGENT_UPDATE_BASE_URL.TrimEnd('/') }
+    if ($env:NODE_CLOUD_HTTP_URL) { return $env:NODE_CLOUD_HTTP_URL.TrimEnd('/') }
+    if ($env:NODE_CLOUD_URL) {
+        $cloud = $env:NODE_CLOUD_URL
+        if ($cloud.StartsWith('wss://')) {
+            return ('https://' + $cloud.Substring(6).Split('/')[0]).TrimEnd('/')
+        }
+        if ($cloud.StartsWith('ws://')) {
+            return ('http://' + $cloud.Substring(5).Split('/')[0]).TrimEnd('/')
+        }
+    }
+    return 'http://43.139.149.158:8080'
+}
+
+function Invoke-NoProxyDownloadString($url) {
+    $wc = New-Object System.Net.WebClient
+    $wc.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
+    $wc.Headers.Add('Accept', 'application/json')
+    return $wc.DownloadString($url)
+}
+
+function Invoke-NoProxyDownloadFile($url, $path) {
+    $wc = New-Object System.Net.WebClient
+    $wc.Proxy = [System.Net.GlobalProxySelection]::GetEmptyWebProxy()
+    $wc.DownloadFile($url, $path)
+}
+
+function Update-AgentIfNeeded {
+    if ($env:NODE_AGENT_AUTO_UPDATE -match '^(0|false|no|off)$') { return }
+    $exe = Get-ExePath
+    $baseUrl = Get-UpdateBaseUrl
+    $versionUrl = "$baseUrl/api/node-agent/version"
+    $versionFile = Join-Path $here 'node-agent-version.json'
+    try {
+        $remoteText = Invoke-NoProxyDownloadString $versionUrl
+        $remote = $remoteText | ConvertFrom-Json
+        $local = $null
+        if (Test-Path -LiteralPath $versionFile) {
+            $local = Get-Content -Raw -LiteralPath $versionFile | ConvertFrom-Json
+        }
+        $sameGitSha = $local -and $remote.gitSha -and $local.gitSha -eq $remote.gitSha
+        if ((Test-Path -LiteralPath $exe) -and $sameGitSha) { return }
+
+        $downloadUrl = if ($remote.downloadUrl) { $remote.downloadUrl } else { "$baseUrl/api/node-agent/download/windows" }
+        $tmp = "$exe.new"
+        Invoke-NoProxyDownloadFile $downloadUrl $tmp
+        if (-not (Test-Path -LiteralPath $tmp)) { return }
+        $size = (Get-Item -LiteralPath $tmp).Length
+        if ($size -lt 1024 * 1024) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+            return
+        }
+        Move-Item -LiteralPath $tmp -Destination $exe -Force
+        $remoteText | Set-Content -LiteralPath $versionFile -Encoding UTF8
+    } catch {
+        Remove-Item -LiteralPath "$exe.new" -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Start-NodeIfNeeded {
     $proc = Get-Process -Name "elon-node-agent" -ErrorAction SilentlyContinue
     if ($proc) { return }
+    Update-AgentIfNeeded
     $exe = Get-ExePath
     if (Test-Path $exe) {
         [Environment]::SetEnvironmentVariable("NODE_AUTO_OPEN_ADMIN", "0", 'Process')

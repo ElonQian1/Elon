@@ -188,14 +188,14 @@ class NodeActivity : Activity() {
             ).also { it.topMargin = 12; it.marginStart = 16; it.marginEnd = 16 }
 
             addView(TextView(context).apply {
-                text = "📦 安装 elon-node-agent"
+                text = "📦 安装一龙 PC 节点"
                 textSize = 14f
                 setTypeface(null, Typeface.BOLD)
                 setTextColor(Color.parseColor(TEXT_PRIMARY))
             })
 
             addView(TextView(context).apply {
-                text = "在你的 PC 上运行 node-agent，即可将本地 LLM 算力贡献给平台，赚取积分。"
+                text = "Windows 下载客户端包后双击安装，登录一次即可自动注册为 PC 节点并贡献算力。"
                 textSize = 13f
                 setTextColor(Color.parseColor(TEXT_SECONDARY))
                 layoutParams = LinearLayout.LayoutParams(
@@ -226,15 +226,15 @@ class NodeActivity : Activity() {
                 })
 
                 addView(Button(context).apply {
-                    text = "🪟 Windows 下载"
+                    text = "🪟 Windows 客户端包"
                     textSize = 13f
                     setBackgroundColor(Color.parseColor(SECONDARY_BG))
                     setTextColor(Color.parseColor(SECONDARY_TEXT))
                     layoutParams = LinearLayout.LayoutParams(0, 100, 1f)
                     setOnClickListener {
                         copyToClipboard(
-                            "Windows 下载地址",
-                            "http://$serverUrl/api/node-agent/download/windows"
+                            "Windows 客户端包下载地址",
+                            "http://$serverUrl/api/node-agent/download/windows-client"
                         )
                     }
                 })
@@ -514,22 +514,26 @@ class NodeActivity : Activity() {
         """.trimIndent()
 
         val winCmd = """
-            # PowerShell 启动命令
-            ${'$'}env:NODE_AGENT_ID="${result.agentId}"
-            ${'$'}env:NODE_AGENT_SECRET="${result.agentSecret}"
-            ${'$'}env:NODE_OWNER_USER_ID="${result.ownerUserId}"
-            ${'$'}env:NODE_CLOUD_URL="${result.cloudWsUrl}/agent/ws"
-            .\elon-node-agent.exe
+            # Windows 推荐流程：
+            # 1. 下载客户端包：$serverBase/api/node-agent/download/windows-client
+            # 2. 解压后双击「安装一龙PC节点.cmd」
+            # 3. 本地管理页打开后，用一龙账号登录一次即可自动注册节点
+            #
+            # 如需手动免网页登录，也可以在 node-agent.env 中配置：
+            NODE_AGENT_ID=${result.agentId}
+            NODE_AGENT_SECRET=${result.agentSecret}
+            NODE_OWNER_USER_ID=${result.ownerUserId}
+            NODE_CLOUD_URL=${result.cloudWsUrl}/agent/ws
         """.trimIndent()
 
         AlertDialog.Builder(this)
             .setTitle("✅ 节点已注册！")
-            .setMessage("Agent ID：${result.agentId}\n\n⚠️ Secret 只显示一次，请立即复制保存到 PC：\n\n${result.agentSecret}\n\n点击“复制启动命令”获取完整启动脚本。")
+            .setMessage("Agent ID：${result.agentId}\n\nWindows 用户推荐直接下载客户端包并在本地管理页登录，通常不需要手动保存 Secret。\n\n高级手动配置场景下，Secret 只显示一次：\n\n${result.agentSecret}")
             .setPositiveButton("复制 Linux 命令") { _, _ ->
                 copyToClipboard("Linux 启动命令", linuxCmd)
             }
-            .setNeutralButton("复制 Windows 命令") { _, _ ->
-                copyToClipboard("Windows 启动命令", winCmd)
+            .setNeutralButton("复制 Windows 安装说明") { _, _ ->
+                copyToClipboard("Windows 安装说明", winCmd)
             }
             .setNegativeButton("关闭", null)
             .show()

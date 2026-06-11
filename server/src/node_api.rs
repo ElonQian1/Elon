@@ -998,7 +998,7 @@ pub async fn chat_with_node(
 
 // ── /api/node-agent/version ───────────────────────────────────────────────────
 
-/// GET /api/node-agent/version — 返回最新 node-agent Windows exe 的版本信息
+/// GET /api/node-agent/version — 返回最新 node-agent 发布版本信息
 /// 不需要登录（node-agent 启动时就需要查询）
 pub async fn node_agent_version(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let version_file = state
@@ -1025,6 +1025,19 @@ pub async fn download_node_agent_windows(State(state): State<Arc<AppState>>) -> 
     download_node_agent_binary(state, "elon-node-agent.exe", "elon-node-agent.exe").await
 }
 
+/// GET /api/node-agent/download/windows-client — 下载 Windows 客户端包
+/// 不需要登录（压缩包不含敏感信息，首次登录在本机管理页完成）
+pub async fn download_node_agent_windows_client(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    download_node_agent_binary(
+        state,
+        "elon-node-agent-windows.zip",
+        "elon-node-agent-windows.zip",
+    )
+    .await
+}
+
 /// GET /api/node-agent/download/linux — 下载最新 Linux 可执行文件
 /// 不需要登录（执行文件不含敏感信息）
 pub async fn download_node_agent_linux(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -1040,7 +1053,7 @@ async fn download_node_agent_binary(
     match tokio::fs::read(&exe_path).await {
         Ok(bytes) => axum::response::Response::builder()
             .status(StatusCode::OK)
-            .header("content-type", "application/octet-stream")
+            .header("content-type", download_content_type(download_name))
             .header(
                 "content-disposition",
                 format!("attachment; filename=\"{}\"", download_name),
@@ -1052,5 +1065,13 @@ async fn download_node_agent_binary(
             Json(serde_json::json!({"error": "node-agent binary not available"})),
         )
             .into_response(),
+    }
+}
+
+fn download_content_type(download_name: &str) -> &'static str {
+    if download_name.ends_with(".zip") {
+        "application/zip"
+    } else {
+        "application/octet-stream"
     }
 }
