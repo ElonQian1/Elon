@@ -498,9 +498,9 @@
     }
     .project-space-post-card {
       background: var(--panel);
-      border-radius: 10px;
-      margin: 8px 10px;
-      padding: 14px;
+      border-radius: 18px;
+      margin: 10px 24px;
+      padding: 18px;
       color: var(--ink);
       cursor: pointer;
     }
@@ -529,11 +529,11 @@
     .project-space-post-head {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
     .project-space-post-avatar {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       background: #D8D8D8;
       color: #101010;
@@ -545,43 +545,53 @@
     .project-space-post-user { min-width: 0; flex: 1; }
     .project-space-post-name {
       color: var(--ink);
-      font-size: 14px;
+      font-size: 18px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .project-space-post-time {
-      color: var(--ink-faint);
-      font-size: 11px;
-      margin-top: 3px;
+      color: var(--ink-soft);
+      font-size: 13px;
+      margin-top: 4px;
     }
     .project-space-topic {
       color: var(--ink-soft);
-      background: var(--panel-2);
-      border-radius: 8px;
-      font-size: 13px;
-      padding: 5px 10px;
+      font-size: 17px;
       white-space: nowrap;
     }
     .project-space-post-title {
       color: var(--ink);
-      font-size: 16px;
-      font-weight: 700;
-      margin-top: 10px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-size: 19px;
+      line-height: 1.55;
+      margin-top: 20px;
+      white-space: pre-wrap;
     }
     .project-space-post-body {
       color: var(--ink-soft);
-      font-size: 14px;
+      font-size: 17px;
       line-height: 1.55;
-      margin-top: 8px;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      margin-top: 10px;
       white-space: pre-wrap;
+    }
+    .project-space-post-media {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      display: block;
+      border-radius: 6px;
+      background: #22262C;
+      margin-top: 16px;
+    }
+    .project-space-post-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      color: var(--ink-soft);
+      font-size: 16px;
+      line-height: 1;
+      text-align: center;
+      padding: 18px 18px 0;
     }
     .project-space-feed-empty {
       color: var(--ink-soft);
@@ -3437,6 +3447,65 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isProjectSpaceFeedPost(message) {
     return parseProjectSpacePostText(message && message.content).structured;
   }
+  function projectSpaceReplyCountsByPost(messages) {
+    const counts = new Map();
+    let activePostId = '';
+    let activeCount = 0;
+    (messages || []).forEach((message) => {
+      if (isProjectSpaceFeedPost(message)) {
+        if (activePostId) counts.set(activePostId, activeCount);
+        activePostId = message.id || '';
+        activeCount = 0;
+      } else if (activePostId) {
+        activeCount += 1;
+      }
+    });
+    if (activePostId) counts.set(activePostId, activeCount);
+    return counts;
+  }
+  function extractProjectSpacePostImageSource(text) {
+    const raw = String(text || '');
+    const markdown = raw.match(/!\[[^\]]*\]\(([^)]+)\)/);
+    if (markdown && markdown[1]) return markdown[1].trim();
+    const url = raw.match(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/i);
+    return url ? url[0] : '';
+  }
+  function projectSpacePostBodyWithoutImages(text) {
+    return String(text || '')
+      .replace(/!\[[^\]]*\]\(([^)]+)\)/g, '')
+      .replace(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/ig, '')
+      .split('\n')
+      .map((line) => line.replace(/\s+$/g, ''))
+      .join('\n')
+      .trim();
+  }
+  function projectSpacePostCardHtml(channel, message, replyCount) {
+    const post = parseProjectSpacePostText(message.content);
+    const name = message.sender_name || '项目成员';
+    const initial = Array.from(name)[0] || '成';
+    const topic = projectSpaceTopicLabel(channel.kind, channel.name);
+    const created = message.created_at ? new Date(message.created_at).toLocaleString('zh-CN', {
+      month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) : '刚刚';
+    const body = projectSpacePostBodyWithoutImages(post.body) || post.title;
+    const imageSource = extractProjectSpacePostImageSource(post.body);
+    return [
+      '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) + '">',
+      '<div class="project-space-post-head">',
+      '<div class="project-space-post-avatar">' + escapeHtml(initial) + '</div>',
+      '<div class="project-space-post-user">',
+      '<div class="project-space-post-name">' + escapeHtml(name) + '</div>',
+      '<div class="project-space-post-time">回复于' + escapeHtml(created) + '</div>',
+      '</div>',
+      '<div class="project-space-topic">' + escapeHtml(topic) + '</div>',
+      '</div>',
+      '<div class="project-space-post-title">' + escapeHtml(post.title) + '</div>',
+      body ? '<div class="project-space-post-body">' + escapeHtml(body) + '</div>' : '',
+      imageSource ? '<img class="project-space-post-media" src="' + escapeHtml(imageSource) + '" alt="帖子图片" loading="lazy" />' : '',
+      '<div class="project-space-post-metrics"><span>↗ 1</span><span>◌ ' + escapeHtml(String(replyCount || 0)) + '</span><span>♡ 16</span></div>',
+      '</article>'
+    ].join('');
+  }
   function projectSpaceEmptyHtml(text, showButton) {
     return '<div class="project-space-feed-empty"><span>' + escapeHtml(text) + '</span>' +
       (showButton ? '<button class="project-space-empty-post-btn" type="button" aria-label="发布帖子">+</button>' : '') +
@@ -3501,9 +3570,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
     const posts = channels
       .filter((channel) => ['discussion', 'requirements', 'suggestions', 'issues'].includes(channel.kind))
-      .flatMap((channel) => (channel.messages || [])
-        .filter(isProjectSpaceFeedPost)
-        .map((message) => ({ channel, message })))
+      .flatMap((channel) => {
+        const replyCounts = projectSpaceReplyCountsByPost(channel.messages || []);
+        return (channel.messages || [])
+          .filter(isProjectSpaceFeedPost)
+          .map((message) => ({ channel, message, replyCount: replyCounts.get(message.id) || 0 }));
+      })
       .sort((a, b) => String(b.message.created_at || '').localeCompare(String(a.message.created_at || '')))
       .slice(0, 40);
     if (!posts.length) {
@@ -3514,29 +3586,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       wireProjectSpaceEmptyPostButton();
       return;
     }
-    projectSpacePostList.innerHTML = posts.map(({ channel, message }) => {
-      const post = parseProjectSpacePostText(message.content);
-      const name = message.sender_name || '项目成员';
-      const initial = Array.from(name)[0] || '成';
-      const topic = projectSpaceTopicLabel(channel.kind, channel.name);
-      const created = message.created_at ? new Date(message.created_at).toLocaleString('zh-CN', {
-        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
-      }) : '刚刚';
-      return [
-        '<article class="project-space-post-card" data-channel="' + escapeHtml(channel.id) + '">',
-        '<div class="project-space-post-head">',
-        '<div class="project-space-post-avatar">' + escapeHtml(initial) + '</div>',
-        '<div class="project-space-post-user">',
-        '<div class="project-space-post-name">' + escapeHtml(name) + '</div>',
-        '<div class="project-space-post-time">回复于' + escapeHtml(created) + '</div>',
-        '</div>',
-        '<div class="project-space-topic">' + escapeHtml(topic) + '</div>',
-        '</div>',
-        '<div class="project-space-post-title">' + escapeHtml(post.title) + '</div>',
-        '<div class="project-space-post-body">' + escapeHtml(post.body || post.title) + '</div>',
-        '</article>'
-      ].join('');
-    }).join('');
+    projectSpacePostList.innerHTML = posts
+      .map(({ channel, message, replyCount }) => projectSpacePostCardHtml(channel, message, replyCount))
+      .join('');
     projectSpacePostList.querySelectorAll('.project-space-post-card').forEach((card) => {
       card.addEventListener('click', () => {
         const channel = channelById.get(card.dataset.channel);

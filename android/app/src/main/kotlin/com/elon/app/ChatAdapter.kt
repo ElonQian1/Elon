@@ -45,7 +45,8 @@ data class ChatMessage(
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
     var nodeId: String? = null,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
-    var streamId: String? = null
+    var streamId: String? = null,
+    var projectPostCard: ChatProjectPostCard? = null
 )
 
 class ChatAdapter(
@@ -109,6 +110,7 @@ class ChatAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
+        if (messages[position].projectPostCard != null) return 6
         if (parseChatProjectShareMessage(messages[position].content) != null) return 5
         return when (messages[position].role) {
             "user"        -> 0
@@ -133,6 +135,7 @@ class ChatAdapter(
             3    -> R.layout.item_message_error
             4    -> R.layout.item_message_friend
             5    -> R.layout.item_message_project_share
+            6    -> R.layout.item_message_project_share
             else -> R.layout.item_message_ai
         }
         val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
@@ -152,13 +155,19 @@ class ChatAdapter(
             }
         )
         bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
-        val projectCardBound = bindChatProjectShareView(
-            holder.attachmentList,
-            holder.text,
-            message,
-            onProjectShareAction,
-            onProjectShareLongPress
-        )
+        val postCardBound = bindChatProjectPostCardView(holder.attachmentList, holder.text, message)
+        val projectShareBound = if (postCardBound) {
+            false
+        } else {
+            bindChatProjectShareView(
+                holder.attachmentList,
+                holder.text,
+                message,
+                onProjectShareAction,
+                onProjectShareLongPress
+            )
+        }
+        val projectCardBound = postCardBound || projectShareBound
         applyChatProjectBubbleStyle(holder.bubble, message.role, projectCardBound)
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)

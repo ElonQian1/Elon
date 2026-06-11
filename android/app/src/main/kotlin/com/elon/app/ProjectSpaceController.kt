@@ -393,7 +393,7 @@ internal class ProjectSpaceController(
                 result.onSuccess { sent ->
                     val index = messages.indexOf(pending)
                     if (index >= 0) {
-                        messages[index] = sent.toChatMessage(activeSpace?.project?.role)
+                        messages[index] = sent.toChatMessage(activeSpace?.project?.role, channel)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
@@ -493,7 +493,7 @@ internal class ProjectSpaceController(
                 result.onSuccess { sent ->
                     val index = messages.indexOfFirst { it === pending }
                     if (index >= 0) {
-                        messages[index] = sent.toChatMessage(activeSpace?.project?.role)
+                        messages[index] = sent.toChatMessage(activeSpace?.project?.role, channel)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     loadMessages(channel, silent = true, scrollToBottom = true, allowPendingRefresh = true)
@@ -544,8 +544,22 @@ internal class ProjectSpaceController(
         val route = activeRoute
         thread {
             val result = runCatching {
-                fetchProjectChannelMessages(http, serverUrl, activity, channel.projectId, channel.id, route = route)
-                    .map { it.toChatMessage(activeSpace?.project?.role) }
+                val channelMessages = fetchProjectChannelMessages(
+                    http,
+                    serverUrl,
+                    activity,
+                    channel.projectId,
+                    channel.id,
+                    route = route
+                )
+                val replyCounts = projectSpaceReplyCountsByPost(channelMessages)
+                channelMessages.map { message ->
+                    message.toChatMessage(
+                        projectRole = activeSpace?.project?.role,
+                        channel = channel,
+                        replyCount = replyCounts[message.id]
+                    )
+                }
             }
             activity.runOnUiThread {
                 if (activeChannel?.id != channel.id) return@runOnUiThread
@@ -968,7 +982,7 @@ internal class ProjectSpaceController(
                 val index = messages.indexOfFirst { it.id == messageId }
                 result.onSuccess { updated ->
                     if (index >= 0) {
-                        messages[index] = updated.toChatMessage(activeSpace?.project?.role)
+                        messages[index] = updated.toChatMessage(activeSpace?.project?.role, channel)
                         activeAdapter?.notifyMessageUpdated(index)
                     }
                     Toast.makeText(activity, "已标记为更新完成", Toast.LENGTH_SHORT).show()

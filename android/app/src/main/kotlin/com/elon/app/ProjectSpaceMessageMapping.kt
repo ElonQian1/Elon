@@ -1,16 +1,39 @@
 package com.elon.app
 
-internal fun ProjectChannelMessage.toChatMessage(projectRole: String? = null): ChatMessage {
+internal fun ProjectChannelMessage.toChatMessage(
+    projectRole: String? = null,
+    channel: ProjectChannel? = null,
+    replyCount: Int? = null
+): ChatMessage {
     val role = when (kind) {
         "ai_progress" -> "ai-progress"
         "ai_result" -> "ai-complete"
         "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
-    val displayContent = parseProjectSpacePostText(content).detailText
+    val postText = parseProjectSpacePostText(content)
+    val displayContent = postText.detailText
+    val postCard = if (postText.structured && channel?.isProjectSpaceFeedChannel() == true) {
+        ChatProjectPostCard(
+            title = postText.title,
+            body = projectSpacePostBodyWithoutImages(postText.body),
+            authorName = senderName?.trim()?.takeIf { it.isNotBlank() } ?: if (outgoing) "我" else "项目成员",
+            timeText = parseChatMessageCreatedAt(createdAt)
+                ?.let { "回复于${formatChatTimelineLabel(it)}" }
+                ?: "回复于刚刚",
+            topic = projectSpaceTopicLabel(channel),
+            imageSource = extractProjectSpacePostImageSource(postText.body),
+            commentCount = replyCount?.coerceAtLeast(0)?.toString()
+                ?: channel.unreadCount.takeIf { it > 0 }?.toString()
+                ?: "0"
+        )
+    } else {
+        null
+    }
     return ChatMessage(
         role = role,
         content = displayContent,
+        projectPostCard = postCard,
         senderLabel = if (role == "friend") senderName else null,
         id = id,
         suggestionStatus = suggestionStatus,
@@ -104,6 +127,23 @@ internal fun ProjectChannelMessage.isProjectSpaceFeedPost(): Boolean {
     return parseProjectSpacePostText(content).structured
 }
 
+internal fun projectSpaceReplyCountsByPost(messages: List<ProjectChannelMessage>): Map<String, Int> {
+    val counts = linkedMapOf<String, Int>()
+    var activePostId: String? = null
+    var activeCount = 0
+    messages.forEach { message ->
+        if (message.isProjectSpaceFeedPost()) {
+            activePostId?.let { counts[it] = activeCount }
+            activePostId = message.id
+            activeCount = 0
+        } else if (activePostId != null) {
+            activeCount += 1
+        }
+    }
+    activePostId?.let { counts[it] = activeCount }
+    return counts
+}
+
 internal fun ProjectChannel.isProjectSpaceFeedChannel(): Boolean {
     return kind in setOf("discussion", "requirements", "suggestions", "issues")
 }
@@ -120,3 +160,26 @@ internal fun projectSpaceTopicLabel(channel: ProjectChannel): String {
 }
 
 private const val PROJECT_SPACE_POST_TITLE_PREFIX = "标题："
+
+private fun projectSpacePostBodyWithoutImages(text: String): String {
+    return text
+        .replace(Regex("""!\[[^]]*]\(([^)]+)\)"""), "")
+        .replace(PROJECT_SPACE_POST_IMAGE_URL_REGEX, "")
+        .lines()
+        .joinToString("\n") { it.trimEnd() }
+        .trim()
+}
+
+internal fun extractProjectSpacePostImageSource(text: String): String? {
+    val markdown = Regex("""!\[[^]]*]\(([^)]+)\)""").find(text)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.trim()
+    if (!markdown.isNullOrBlank()) return markdown
+    return PROJECT_SPACE_POST_IMAGE_URL_REGEX.find(text)?.value
+}
+
+private val PROJECT_SPACE_POST_IMAGE_URL_REGEX = Regex(
+    """https?://\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?""",
+    RegexOption.IGNORE_CASE
+)
