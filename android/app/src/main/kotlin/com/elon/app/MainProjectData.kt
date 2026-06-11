@@ -72,7 +72,8 @@ internal fun legacyAppProject(prefs: SharedPreferences, gson: Gson): AppProject 
 internal fun loadStoredProjects(
     prefs: SharedPreferences,
     gson: Gson,
-    normalizeProject: (AppProject) -> Unit
+    normalizeProject: (AppProject) -> Unit,
+    elonSelfIconDataUrl: String? = null
 ): LoadedProjects {
     val savedProjects = prefs.getString(PROJECTS_JSON_KEY, null)
     val projects = runCatching {
@@ -88,7 +89,7 @@ internal fun loadStoredProjects(
         projects.add(legacyAppProject(prefs, gson))
     }
 
-    ensureElonSelfProject(projects)
+    ensureElonSelfProject(projects, elonSelfIconDataUrl)
     val activeIndex = prefs.getInt(ACTIVE_PROJECT_INDEX_KEY, 0).coerceIn(0, projects.lastIndex)
     return LoadedProjects(projects, activeIndex)
 }
@@ -107,31 +108,35 @@ internal fun saveStoredProjects(
         .apply()
 }
 
-private fun ensureElonSelfProject(projects: MutableList<AppProject>) {
+private fun ensureElonSelfProject(projects: MutableList<AppProject>, iconDataUrl: String?) {
     val existing = projects.firstOrNull { it.id == ELON_SELF_PROJECT_ID }
     if (existing != null) {
         // 升级旧数据：确保一龙自项目始终是联合开发项目
         if (!existing.isJointProject) existing.isJointProject = true
-        normalizeElonSelfProject(existing)
+        normalizeElonSelfProject(existing, iconDataUrl)
         return
     }
-    projects.add(0, elonSelfProject())
+    projects.add(0, elonSelfProject(iconDataUrl))
 }
 
-private fun normalizeElonSelfProject(project: AppProject) {
+private fun normalizeElonSelfProject(project: AppProject, iconDataUrl: String?) {
     project.ownerAccount = ELON_SELF_OWNER_ACCOUNT
     project.projectOriginType = "platform_self"
     project.projectOriginLabel = "钱一龙创建"
     project.memberCount = project.memberCount?.coerceAtLeast(1) ?: 1
+    if (project.iconDataUrl.cleanElonSelfIconDataUrl() == null) {
+        iconDataUrl.cleanElonSelfIconDataUrl()?.let { project.iconDataUrl = it }
+    }
 }
 
-private fun elonSelfProject(): AppProject {
+private fun elonSelfProject(iconDataUrl: String?): AppProject {
     return AppProject(
         id = ELON_SELF_PROJECT_ID,
         title = "一龙项目",
         subtitle = "修改平台自身 · AI 云端迭代",
         updatedAt = 0L,
         isJointProject = true,
+        iconDataUrl = iconDataUrl.cleanElonSelfIconDataUrl(),
         ownerAccount = ELON_SELF_OWNER_ACCOUNT,
         projectOriginType = "platform_self",
         projectOriginLabel = "钱一龙创建",
@@ -151,6 +156,11 @@ private fun elonSelfProject(): AppProject {
             )
         )
     )
+}
+
+private fun String?.cleanElonSelfIconDataUrl(): String? {
+    val text = this?.trim().orEmpty()
+    return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
 
 private const val PROJECTS_JSON_KEY = "projects_json"

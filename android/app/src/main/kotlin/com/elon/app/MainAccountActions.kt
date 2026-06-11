@@ -34,12 +34,16 @@ internal class MainAccountActions(
         thread(name = "sync-my-projects") {
             try {
                 val archive = fetchMyProjectArchive(http, serverUrl, activity)
-                val remoteProjects = archive.allProjects
-                    .map { it.toAppProject() }
+                val archiveProjects = archive.allProjects.map { it.toAppProject() }
+                val remoteElonSelfIcon = archiveProjects
+                    .firstOrNull { it.id == ELON_SELF_PROJECT_ID }
+                    ?.iconDataUrl
+                val remoteProjects = archiveProjects
                     .filter { it.id != ELON_SELF_PROJECT_ID }
                 activity.runOnUiThread {
-                    val changed = mergeRemoteProjects(remoteProjects)
-                    if (changed) {
+                    val projectsChanged = mergeRemoteProjects(remoteProjects)
+                    val selfIconChanged = mergeElonSelfProjectIcon(remoteElonSelfIcon)
+                    if (projectsChanged || selfIconChanged) {
                         saveProjects()
                         renderProjectList()
                     }
@@ -75,6 +79,19 @@ internal class MainAccountActions(
             }
         }
         return changed
+    }
+
+    private fun mergeElonSelfProjectIcon(remoteIconDataUrl: String?): Boolean {
+        val icon = cleanProjectIconDataUrl(remoteIconDataUrl) ?: return false
+        val local = projects.firstOrNull { it.id == ELON_SELF_PROJECT_ID } ?: return false
+        if (cleanProjectIconDataUrl(local.iconDataUrl) == icon) return false
+        local.iconDataUrl = icon
+        return true
+    }
+
+    private fun cleanProjectIconDataUrl(value: String?): String? {
+        val text = value?.trim().orEmpty()
+        return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun mergeRemoteProjectIntoLocal(local: AppProject, remote: AppProject): Boolean {

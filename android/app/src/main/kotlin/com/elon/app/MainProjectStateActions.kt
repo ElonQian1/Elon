@@ -9,7 +9,8 @@ internal class MainProjectStateActions(
     private val projects: MutableList<AppProject>,
     private val activeProjectIndex: () -> Int,
     private val setActiveProjectIndex: (Int) -> Unit,
-    private val normalizeProject: (AppProject) -> Unit
+    private val normalizeProject: (AppProject) -> Unit,
+    private val elonSelfIconDataUrl: () -> String? = { null }
 ) {
     val conversations: MutableList<AppConversation>
         get() = activeProject().conversations
@@ -61,7 +62,12 @@ internal class MainProjectStateActions(
     }
 
     fun loadProjects() {
-        val loaded = loadStoredProjects(prefs, gson, normalizeProject)
+        val loaded = loadStoredProjects(
+            prefs = prefs,
+            gson = gson,
+            normalizeProject = normalizeProject,
+            elonSelfIconDataUrl = elonSelfIconDataUrl()
+        )
         projects.clear()
         projects.addAll(loaded.projects)
         setActiveProjectIndex(loaded.activeProjectIndex)

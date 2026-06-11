@@ -759,7 +759,8 @@ class MainActivity : AppCompatActivity() {
             projects = s.projects,
             activeProjectIndex = { s.activeProjectIndex },
             setActiveProjectIndex = { s.activeProjectIndex = it },
-            normalizeProject = { project -> workflowActions.projectHygieneActions.normalizeProject(project) }
+            normalizeProject = { project -> workflowActions.projectHygieneActions.normalizeProject(project) },
+            elonSelfIconDataUrl = { defaultElonSelfProjectIconDataUrl(this) }
         )
     }
 
