@@ -80,7 +80,6 @@ internal class ProjectSpaceController(
         selectableForeground = selectableForeground,
         openChannel = { channel -> openChannel(channel) },
         openPostComposer = { renderPostComposer() },
-        openProjectDocuments = { showProjectDocumentsDialog() },
         openAnnouncementEditor = { channel, currentText ->
             activeSpace?.let { announcementEditor.show(it, channel, currentText) }
         }
@@ -114,6 +113,11 @@ internal class ProjectSpaceController(
         showCreateAndOpenPersonalConversation = showCreateAndOpenPersonalConversation,
         openPersonalAiChat = openPersonalAiChat
     )
+    init {
+        binding.projectSpaceDocsFab.setOnClickListener { showProjectDocumentsDialog() }
+        binding.projectSpacePostFab.setOnClickListener { renderPostComposer() }
+    }
+
     private data class ActiveMemberConversation(
         val projectId: String,
         val memberUserId: String,
@@ -304,6 +308,7 @@ internal class ProjectSpaceController(
             messagesByChannel = feedData.messagesByChannel,
             loading = feedData.isLoading(space)
         )
+        showProjectSpaceFeedActions()
         feedData.ensure(space)
     }
 
@@ -888,8 +893,18 @@ internal class ProjectSpaceController(
     private fun prepareProjectContent(): LinearLayout {
         binding.projectPage.stopNestedScroll()
         binding.projectPage.scrollTo(0, 0)
+        hideProjectSpaceFeedActions()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
         return binding.projectContentLayout
+    }
+
+    private fun showProjectSpaceFeedActions() {
+        binding.projectSpaceFeedActionsOverlay.visibility = View.VISIBLE
+        binding.projectSpaceFeedActionsOverlay.bringToFront()
+    }
+
+    private fun hideProjectSpaceFeedActions() {
+        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun renderMemberConversationMessages(

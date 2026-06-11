@@ -81,11 +81,13 @@ internal class MainNavigationController(
     private fun showMainTabs() {
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
+        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun hideBottomMenus() {
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
+        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun showProjectSpaceBottomMenu() {
@@ -931,5 +933,6 @@ internal class MainNavigationController(
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
         binding.projectSpaceAiMenu.translationX = 0f
+        binding.projectSpaceFeedActionsOverlay.translationX = 0f
     }
 }

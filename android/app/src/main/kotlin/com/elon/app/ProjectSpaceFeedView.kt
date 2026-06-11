@@ -8,7 +8,6 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -21,7 +20,6 @@ internal class ProjectSpaceFeedView(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val openChannel: (ProjectChannel) -> Unit,
     private val openPostComposer: () -> Unit,
-    private val openProjectDocuments: () -> Unit,
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
 ) {
     fun render(
@@ -55,7 +53,7 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = -dp(18)
+                topMargin = -dp(10)
             }
         }
         val feedColumn = LinearLayout(activity).apply {
@@ -74,13 +72,6 @@ internal class ProjectSpaceFeedView(
             else -> feedColumn.addView(emptyState("还没有帖子，点击+好发布内容", showButton = true))
         }
 
-        frame.addView(floatingActions(), FrameLayout.LayoutParams(
-            dp(48),
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.END or Gravity.CENTER_VERTICAL
-        ).apply {
-            marginEnd = dp(22)
-        })
         feedShell.addView(frame)
         container.addView(feedShell)
     }
@@ -106,7 +97,7 @@ internal class ProjectSpaceFeedView(
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(14), dp(20), dp(16))
+            setPadding(dp(20), dp(16), dp(20), dp(34))
             background = roundedBackground(
                 colorHex = "#1B1D21",
                 topStartDp = 18,
@@ -304,44 +295,6 @@ internal class ProjectSpaceFeedView(
 
     private fun metricParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-    }
-
-    private fun floatingActions(): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            addView(floatingButton(
-                iconRes = R.drawable.ic_side_menu_files,
-                contentDescription = "项目文档",
-                onClick = openProjectDocuments
-            ))
-            addView(floatingButton(
-                iconRes = R.drawable.ic_project_fab_plus,
-                contentDescription = "发布帖子",
-                onClick = openPostComposer
-            ), LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-                topMargin = dp(20)
-            })
-        }
-    }
-
-    private fun floatingButton(
-        iconRes: Int,
-        contentDescription: String,
-        onClick: () -> Unit
-    ): ImageButton {
-        return ImageButton(activity).apply {
-            setImageResource(iconRes)
-            setColorFilter(Color.parseColor("#F2F5FA"))
-            background = roundedBackground("#30333A", 24)
-            scaleType = ImageView.ScaleType.CENTER
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            this.contentDescription = contentDescription
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { onClick() }
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
-        }
     }
 
     private fun emptyState(textValue: String, showButton: Boolean): LinearLayout {
