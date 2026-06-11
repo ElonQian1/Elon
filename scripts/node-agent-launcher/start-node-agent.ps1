@@ -74,6 +74,7 @@ if (-not (Test-Path $exe)) {
 }
 
 # 隐藏后台启动节点进程
+[Environment]::SetEnvironmentVariable("NODE_AUTO_OPEN_ADMIN", "0", 'Process')
 Start-Process -FilePath $exe -WindowStyle Hidden -WorkingDirectory $here | Out-Null
 
 # 等端口就绪（最多 ~15 秒）

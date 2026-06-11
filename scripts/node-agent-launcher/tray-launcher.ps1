@@ -28,9 +28,26 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$adminUrl = "http://127.0.0.1:7799/"
 $taskName = "ElonNodeAgentTray"
+
+function Load-EnvFile($path) {
+    if (-not (Test-Path $path)) { return }
+    foreach ($raw in Get-Content -LiteralPath $path) {
+        $line = $raw.Trim()
+        if (-not $line -or $line.StartsWith('#') -or -not $line.Contains('=')) { continue }
+        $idx = $line.IndexOf('=')
+        $key = $line.Substring(0, $idx).Trim()
+        $val = $line.Substring($idx + 1).Trim()
+        if (($val.StartsWith('"') -and $val.EndsWith('"')) -or ($val.StartsWith("'") -and $val.EndsWith("'"))) {
+            if ($val.Length -ge 2) { $val = $val.Substring(1, $val.Length - 2) }
+        }
+        if ($key) { [Environment]::SetEnvironmentVariable($key, $val, 'Process') }
+    }
+}
+
+Load-EnvFile (Join-Path $here "node-agent.env")
 $port = if ($env:NODE_ADMIN_PORT) { $env:NODE_ADMIN_PORT } else { "7799" }
+$adminUrl = "http://127.0.0.1:$port/"
 
 # ── 图标创建 ──────────────────────────────────────────────────────────────────
 function New-StatusIcon([int]$r, [int]$g, [int]$b) {
@@ -67,6 +84,7 @@ function Start-NodeIfNeeded {
     if ($proc) { return }
     $exe = Get-ExePath
     if (Test-Path $exe) {
+        [Environment]::SetEnvironmentVariable("NODE_AUTO_OPEN_ADMIN", "0", 'Process')
         Start-Process $exe -WorkingDirectory $here -WindowStyle Hidden
     }
 }
@@ -247,7 +265,9 @@ $timer.add_Tick({ Update-TrayStatus })
 $timer.Start()
 
 # ── 启动 ──────────────────────────────────────────────────────────────────────
-Start-NodeIfNeededStart-TtsWorkerIfNeededStart-Process $adminUrl          # 首次启动时自动打开管理页
+Start-NodeIfNeeded
+Start-TtsWorkerIfNeeded
+Start-Process $adminUrl          # 首次启动时自动打开管理页
 Start-Sleep -Milliseconds 2500
 Update-TrayStatus
 

@@ -19,12 +19,22 @@
   code { background: #21262d; padding: 1px 6px; border-radius: 3px; }
   button { background: #238636; color: white; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; }
   button:hover { background: #2ea043; }
+  button.secondary, .button-link.secondary { background: #30363d; }
+  button.secondary:hover, .button-link.secondary:hover { background: #3f4954; }
   button:disabled { background: #30363d; cursor: not-allowed; }
+  .button-link { display: inline-flex; align-items: center; justify-content: center; background: #238636; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; text-decoration: none; min-height: 34px; box-sizing: border-box; }
+  .button-link:hover { background: #2ea043; text-decoration: none; }
   input, textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 8px 10px; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
   input:focus, textarea:focus { outline: none; border-color: #58a6ff; }
   .form-row { margin: 10px 0; }
   .form-row label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
   .card { background: #161b22; border-radius: 6px; padding: 16px; }
+  .muted { color: #8b949e; font-size: 13px; line-height: 1.65; }
+  .action-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+  .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mini-panel { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
+  .mini-panel strong { display: block; margin-bottom: 4px; }
+  @media (max-width: 720px) { .split-grid { grid-template-columns: 1fr; } }
   .warn { background: #3a2e1f; border-left: 4px solid #d29922; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
   .ok-toast { background: #1f3a26; border-left: 4px solid #2ea043; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
   .err-toast { background: #3a1f26; border-left: 4px solid #f85149; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
@@ -109,6 +119,32 @@
     </div>
   </div>
 
+  <h3>网页版入口（不提供算力也能使用）</h3>
+  <div class="card">
+    <div class="split-grid">
+      <div class="mini-panel">
+        <strong>使用一龙网页版</strong>
+        <div class="muted">
+          没有配置 Codex CLI / Copilot CLI 的电脑，也可以从这里进入网页版，登录账号后新建项目、聊天和使用其它在线 PC 节点。
+        </div>
+      </div>
+      <div class="mini-panel">
+        <strong>成为本机算力节点</strong>
+        <div class="muted">
+          登录后本机会先注册成你的 PC 节点；安装 AI 编码工具后，才会被项目创建流程选为可承接任务的节点。
+        </div>
+      </div>
+    </div>
+    <div class="action-row">
+      <a id="cloudWebLink" class="button-link" href="#" target="_blank" rel="noopener">打开一龙网页版</a>
+      <button class="secondary" type="button" onclick="copyCloudWebUrl()">复制网页版地址</button>
+    </div>
+    <div id="cloudWebResult"></div>
+    <p class="muted" style="margin:12px 0 0">
+      网页版会在云端页面内完成登录。登录后进入底部「项目」，点击右上角「新建项目」即可选择可用 PC 节点创建项目。
+    </p>
+  </div>
+
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
 
@@ -135,6 +171,25 @@
       流程：本地校验路径存在 → 调用云端 <code>POST /api/projects/external</code>（附 <code>node_id</code>，
       让服务器跳过本地路径校验）→ 项目自动绑定到本节点，owner = 你。注册成功后在 APK『项目广场 / 我的项目』可见。
     </p>
+  </div>
+
+  <h3>AI 编码工具（让本机能承接项目任务）</h3>
+  <div class="card">
+    <p class="muted" style="margin-top:0">
+      这一步只影响“让本机提供项目开发算力”。如果暂时不安装，仍可通过上方网页版入口使用平台和其它在线节点。
+    </p>
+    <div class="grid" id="envCheckGrid"></div>
+    <div class="action-row">
+      <button type="button" onclick="installEnv(this)">一键安装 / 修复 Codex 环境</button>
+      <button class="secondary" type="button" onclick="loadEnvCheck()">重新检查</button>
+    </div>
+    <div id="installResult"></div>
+    <div class="form-row" style="margin-top:14px">
+      <label>OPENAI_API_KEY（Codex CLI 鉴权，可稍后再填）</label>
+      <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
+    </div>
+    <button class="secondary" type="button" onclick="saveApiKey()">保存 API Key</button>
+    <div id="apiKeyResult"></div>
   </div>
 
   <h3>本地模型 <button style="padding:4px 10px;font-size:12px" onclick="load()">刷新</button></h3>
@@ -201,10 +256,39 @@ function hardwareLine(h) {
   if (h.gpu_memory_total_bytes) parts.push('显存 ' + fmtBytes(h.gpu_memory_total_bytes));
   return parts.filter(Boolean).join(' · ') || '未探测';
 }
+function cloudWebUrl(r) {
+  const base = ((r && r.cloud_http_url) || 'http://43.139.149.158:8080').replace(/\/+$/, '');
+  return base + '/web';
+}
+function updateCloudWebLink(url) {
+  const link = document.getElementById('cloudWebLink');
+  if (link) link.href = url;
+  window.__elonCloudWebUrl = url;
+}
+async function copyCloudWebUrl() {
+  const url = window.__elonCloudWebUrl || cloudWebUrl(null);
+  const out = document.getElementById('cloudWebResult');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+    out.innerHTML = `<div class="ok-toast">✅ 已复制：<code>${url}</code></div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 复制失败，请手动复制：<code>${url}</code></div>`;
+  }
+}
 async function load() {
   if (window.__elonDup) return;
   const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
   if (!r) { document.getElementById('connStatus').textContent = '加载失败'; return; }
+  updateCloudWebLink(cloudWebUrl(r));
   const s = document.getElementById('connStatus');
   s.className = 'status ' + (r.connected ? 'on' : 'off');
   s.textContent = (r.connected ? '🟢 已连接到云端' : '🔴 未连接到云端') + ' — ' + (r.last_event || '');
@@ -434,6 +518,7 @@ async function loadTts() {
 async function loadEnvCheck() {
   const r = await fetch('/api/env-check').then(r => r.json()).catch(() => null);
   const grid = document.getElementById('envCheckGrid');
+  if (!grid) return;
   if (!r) {
     grid.innerHTML = '<div class="label" style="color:#f85149">检查失败</div><div></div>';
     return;
@@ -444,6 +529,7 @@ async function loadEnvCheck() {
     { name: 'Node.js',        key: 'node',         note: 'Codex 运行时',        required: true },
     { name: 'npm',            key: 'npm',          note: 'Node 包管理器',       required: true },
     { name: 'Codex CLI',      key: 'codex',        note: 'AI 编码代理',         required: true },
+    { name: 'Copilot CLI',    key: 'copilot',      note: '可选备用代理',         required: false },
     { name: 'Android SDK',    key: 'android_sdk',  note: 'APK 编译必需',        required: true },
     { name: 'Gradle 镜像',    key: 'gradle_mirror',note: '国内加速（阿里云）',   required: false },
     { name: 'Ollama',         key: 'ollama',       note: '本地 LLM（可选）',    required: false },

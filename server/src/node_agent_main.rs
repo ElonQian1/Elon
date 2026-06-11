@@ -38,6 +38,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
 mod cli_usage;
+mod node_agent_admin_open;
 mod node_hardware_probe;
 mod pc_workspace_provisioner;
 mod project_default_docs;
@@ -1823,7 +1824,9 @@ async fn main() -> Result<()> {
     info!("   积分价格: {} credits/1k tokens", cfg.price_per_1k);
 
     let runtime = Arc::new(NodeRuntime::new(cfg, creds));
-    spawn_admin_server(runtime.clone());
+    let admin_port = node_agent_admin_open::admin_port_from_env();
+    spawn_admin_server(runtime.clone(), admin_port);
+    node_agent_admin_open::maybe_open_admin_page(admin_port);
 
     run_loop(runtime).await;
     Ok(())
@@ -1907,11 +1910,7 @@ impl NodeRuntime {
     }
 }
 
-fn spawn_admin_server(runtime: Arc<NodeRuntime>) {
-    let port: u16 = std::env::var("NODE_ADMIN_PORT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(7799);
+fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     tokio::spawn(async move {
         let app = axum::Router::new()
@@ -2373,6 +2372,7 @@ async fn admin_env_check(
             "node":         tool_available("node"),
             "npm":          tool_available("npm"),
             "codex":        tool_available("codex"),
+            "copilot":      tool_available("copilot"),
             "android_sdk":  android_sdk_ready(),
             "gradle_mirror": gradle_mirror_ok(),
             "ollama":       tool_available("ollama"),
