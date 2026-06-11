@@ -518,7 +518,7 @@ internal class ProjectManagementHomeView(
         val kind = project.projectKindLabel()
         val stage = projectStageText(project.stage)
         val workspace = projectWorkspaceText(project, stage)
-        return "$kind · ${project.projectOriginLabel()} · ${project.displayConversationCount()}个会话 · $workspace"
+        return "$kind · ${project.displayConversationCount()}个会话 · $workspace"
     }
 
     private fun projectWorkspaceText(project: AppProject, stage: String): String {

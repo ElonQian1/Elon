@@ -391,7 +391,7 @@
             <span class="project-home-name">${escapeHtml(titleOf(project))}</span>
             <span class="project-home-time">${escapeHtml(projectTime(project))}</span>
           </span>
-          <span class="project-home-meta">${escapeHtml(`${kind} · ${originLabel} · ${conversationCount(project)}个会话 · ${status}`)}</span>
+          <span class="project-home-meta">${escapeHtml(`${kind} · ${conversationCount(project)}个会话 · ${status}`)}</span>
         </span>
       </div>
     `;
