@@ -42,7 +42,7 @@ internal class ProjectSpaceFeedView(
         feedShell.addView(announcementBlock(space, messagesByChannel))
 
         val frame = FrameLayout(activity).apply {
-            minimumHeight = dp(344)
+            minimumHeight = dp(464)
             setPadding(0, 0, 0, dp(34))
             background = roundedBackground(
                 colorHex = "#101010",
@@ -51,6 +51,12 @@ internal class ProjectSpaceFeedView(
                 bottomEndDp = 0,
                 bottomStartDp = 0
             )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = -dp(18)
+            }
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -89,16 +95,18 @@ internal class ProjectSpaceFeedView(
                 .orEmpty()
                 .maxByOrNull { parseChatMessageCreatedAt(it.createdAt) ?: 0L }
         }
-        val textValue = latest?.content?.trim()
-            ?: announcement?.lastMessage?.trim()
+        val textValue = cleanAnnouncementText(latest?.content)
+            ?: cleanAnnouncementText(announcement?.lastMessage)
             ?: "不得发布与主题内容不相关的帖子。"
         val displayText = parseProjectSpacePostText(textValue).detailText
+            .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+            ?: "不得发布与主题内容不相关的帖子。"
         val announcementChannel = announcement
         val editable = announcementChannel != null && canEditProjectAnnouncement(space.project.role)
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(22), dp(22), dp(24))
+            setPadding(dp(20), dp(14), dp(20), dp(16))
             background = roundedBackground(
                 colorHex = "#1B1D21",
                 topStartDp = 18,
@@ -120,17 +128,22 @@ internal class ProjectSpaceFeedView(
             }
             addView(TextView(activity).apply {
                 text = "公告"
-                textSize = 20f
+                textSize = 15f
+                setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor("#F2F5FA"))
             })
             addView(TextView(activity).apply {
                 text = displayText
-                textSize = 18f
-                setTextColor(Color.parseColor("#F2F5FA"))
-                setLineSpacing(dp(5).toFloat(), 1f)
-                setPadding(0, dp(14), 0, 0)
+                textSize = 14f
+                setTextColor(Color.parseColor("#A6AFBD"))
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, dp(7), 0, 0)
             })
         }
+    }
+
+    private fun cleanAnnouncementText(value: String?): String? {
+        return value?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun feedPosts(
@@ -335,7 +348,7 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(20), dp(82), dp(20), dp(72))
+            setPadding(dp(20), dp(72), dp(20), dp(104))
             addView(TextView(activity).apply {
                 text = textValue
                 textSize = 15f

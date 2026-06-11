@@ -31,7 +31,7 @@ internal fun projectSpaceDownloadButton(
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(42)
-        ).apply { topMargin = dp(14) }
+        ).apply { topMargin = dp(10) }
     }
 }
 

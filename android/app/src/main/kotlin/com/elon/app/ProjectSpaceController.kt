@@ -690,14 +690,17 @@ internal class ProjectSpaceController(
     private fun projectIntroHeader(space: ProjectSpace): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(18))
+            setPadding(dp(20), dp(8), dp(20), dp(14))
             background = panelBackground("#181B20")
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                addView(projectSpaceIconView(space.project), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                    marginEnd = dp(12)
-                })
+                val iconBitmap = UserProfileStore.decodeAvatar(space.project.iconDataUrl)
+                if (iconBitmap != null) {
+                    addView(projectSpaceIconView(iconBitmap), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                        marginEnd = dp(12)
+                    })
+                }
                 addView(LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -715,10 +718,10 @@ internal class ProjectSpaceController(
                         setTextColor(Color.parseColor("#A6AFBD"))
                         setPadding(0, dp(8), 0, 0)
                     })
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.78f))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.72f))
                 addView(projectDescriptionCard(space), LinearLayout.LayoutParams(
                     0,
-                    dp(136),
+                    dp(84),
                     1.7f
                 ).apply {
                     marginStart = dp(12)
@@ -733,35 +736,20 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun projectSpaceIconView(project: ProjectSpaceSummary): View {
+    private fun projectSpaceIconView(iconBitmap: android.graphics.Bitmap): View {
         return FrameLayout(activity).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
                 setColor(Color.parseColor("#283140"))
             }
             clipToOutline = true
-            val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
-            if (iconBitmap != null) {
-                addView(ImageView(activity).apply {
-                    setImageBitmap(iconBitmap)
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
-            } else {
-                addView(TextView(activity).apply {
-                    text = project.name.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    setTypeface(typeface, Typeface.BOLD)
-                    setTextColor(Color.parseColor("#DDE8FC"))
-                    textSize = 18f
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
-            }
+            addView(ImageView(activity).apply {
+                setImageBitmap(iconBitmap)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+            }, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
         }
     }
 

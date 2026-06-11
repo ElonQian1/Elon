@@ -790,7 +790,7 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:id="@+id/projectSpaceAiMenu"
             android:layout_width="match_parent"
             android:layout_height="@dimen/main_bottom_menu_height"
@@ -798,14 +798,26 @@
             android:background="@color/elon_nav_bg"
             android:clickable="true"
             android:contentDescription="打开项目 AI 会话"
-            android:drawableStart="@drawable/ic_project_ai_conversation"
-            android:drawablePadding="13dp"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="Ai 会话"
-            android:textColor="@color/elon_text_primary"
-            android:textSize="20sp"
-            android:visibility="gone" />
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_project_ai_conversation"
+                app:tint="@color/elon_text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="13dp"
+                android:includeFontPadding="false"
+                android:text="Ai 会话"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="20sp" />
+        </LinearLayout>
     </FrameLayout>
 </LinearLayout>

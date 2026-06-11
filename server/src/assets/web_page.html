@@ -397,7 +397,7 @@
     }
     .project-space-summary {
       background: var(--panel);
-      padding: 18px 22px;
+      padding: 8px 20px 14px;
       display: grid;
       grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.7fr);
       gap: 12px;
@@ -426,6 +426,9 @@
       font-weight: 700;
       line-height: 1;
     }
+    .project-space-icon.hidden {
+      display: none;
+    }
     .project-space-icon img {
       width: 100%;
       height: 100%;
@@ -448,19 +451,19 @@
       white-space: nowrap;
     }
     .project-space-intro-card {
-      min-height: 136px;
+      min-height: 84px;
       border: 0;
       border-radius: 14px;
       background: #22262C;
       color: var(--ink);
-      padding: 14px 16px;
+      padding: 12px 16px;
       text-align: center;
       font-size: 13px;
       line-height: 1.45;
       white-space: pre-wrap;
       overflow: hidden;
       display: -webkit-box;
-      -webkit-line-clamp: 8;
+      -webkit-line-clamp: 4;
       -webkit-box-orient: vertical;
       -webkit-box-pack: center;
       -webkit-box-align: center;
@@ -482,14 +485,15 @@
       background: #1B1D21;
       border-radius: 18px 18px 0 0;
       margin: 0;
-      padding: 22px;
+      padding: 14px 20px 16px;
       color: var(--ink);
     }
     .project-space-post-area {
       position: relative;
-      min-height: 344px;
+      min-height: 464px;
       background: var(--bg);
       border-radius: 18px 18px 0 0;
+      margin-top: -18px;
       padding: 0 0 34px;
     }
     .project-space-post-card {
@@ -509,14 +513,14 @@
     }
     .project-space-announcement-title {
       color: var(--ink);
-      font-size: 20px;
-      font-weight: 400;
-      margin-bottom: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 7px;
     }
     .project-space-announcement-body {
-      color: var(--ink);
-      font-size: 18px;
-      line-height: 1.65;
+      color: var(--ink-soft);
+      font-size: 14px;
+      line-height: 1.55;
       white-space: pre-wrap;
     }
     .project-space-post-head {
@@ -580,7 +584,7 @@
       color: var(--ink-soft);
       text-align: center;
       font-size: 15px;
-      padding: 82px 20px 72px;
+      padding: 72px 20px 104px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -3354,14 +3358,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function projectTitleOf(project) {
     return String((project && (project.name || project.title)) || '项目').trim() || '项目';
   }
-  function projectInitialOf(project) {
-    const title = projectTitleOf(project);
-    if (title.startsWith('一龙')) return '龙';
-    return Array.from(title)[0] || '项';
-  }
   function projectIconUrlOf(project) {
     if (!project) return '';
-    return [
+    const iconUrl = [
       project.iconDataUrl,
       project.icon_data_url,
       project.iconUrl,
@@ -3370,14 +3369,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       project.avatar,
       project.logo
     ].find((value) => typeof value === 'string' && value.trim()) || '';
+    const text = String(iconUrl).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
   }
   function renderProjectSpaceIcon(project) {
     if (!projectSpaceIcon) return;
     const iconUrl = projectIconUrlOf(project);
-    const label = escapeHtml(projectInitialOf(project));
+    projectSpaceIcon.classList.toggle('hidden', !iconUrl);
     projectSpaceIcon.innerHTML = iconUrl
-      ? '<img src="' + escapeHtml(iconUrl) + '" alt="" loading="lazy" onerror="this.remove()" />'
-      : label;
+      ? '<img src="' + escapeHtml(iconUrl) + '" alt="" loading="lazy" onerror="this.closest(\'.project-space-icon\').classList.add(\'hidden\');this.remove()" />'
+      : '';
   }
   function renderProjectIntroCard(project) {
     if (!projectIntroCard) return;
@@ -3445,6 +3446,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpacePostBtn) projectSpacePostBtn.click();
     });
   }
+  function cleanProjectSpaceAnnouncementText(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
+  }
   function renderProjectSpaceFeed(space, loading) {
     if (!projectSpaceAnnouncement || !projectSpacePostList) return;
     const announcementCard = projectSpaceAnnouncement.closest('.project-space-announcement');
@@ -3470,10 +3475,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const announcementMessages = announcements.flatMap((channel) => channel.messages || []);
     const latestAnnouncement = announcementMessages[announcementMessages.length - 1];
     const announcementText =
-      (latestAnnouncement && latestAnnouncement.content) ||
-      (announcements[0] && announcements[0].last_message) ||
+      cleanProjectSpaceAnnouncementText(latestAnnouncement && latestAnnouncement.content) ||
+      cleanProjectSpaceAnnouncementText(announcements[0] && announcements[0].last_message) ||
       '不得发布与主题内容不相关的帖子。';
-    projectSpaceAnnouncement.textContent = parseProjectSpacePostText(announcementText).body || announcementText;
+    const parsedAnnouncement = cleanProjectSpaceAnnouncementText(parseProjectSpacePostText(announcementText).body);
+    projectSpaceAnnouncement.textContent = parsedAnnouncement || announcementText;
     const editableAnnouncement = announcements[0] && canEditProjectAnnouncement(project);
     if (announcementCard && editableAnnouncement) {
       announcementCard.classList.add('editable');
