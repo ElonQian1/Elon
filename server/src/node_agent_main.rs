@@ -40,6 +40,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_hardware_probe;
 mod pc_workspace_provisioner;
+mod project_default_docs;
 mod project_docs_scan;
 mod project_workspace_inspect;
 

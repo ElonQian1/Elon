@@ -7,6 +7,8 @@ use std::{
     path::{Path as FsPath, PathBuf},
 };
 
+use crate::project_default_docs::default_project_documents;
+
 const MAX_DOCUMENTS: usize = 48;
 const MAX_DOC_CHARS: usize = 24_000;
 const MAX_TOTAL_CHARS: usize = 220_000;
@@ -37,8 +39,11 @@ pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDoc
     if !workspace.is_dir() {
         return Ok(ProjectDocumentsSnapshot {
             workspace_path,
-            documents: Vec::new(),
-            warnings: vec!["项目工作区不存在或服务器当前不可读取。".to_string()],
+            documents: default_project_documents(),
+            warnings: vec![
+                "项目工作区不存在或服务器当前不可读取。".to_string(),
+                "已加载平台默认项目文档，项目工作区可用后会优先显示同名仓库文档。".to_string(),
+            ],
         });
     }
 
@@ -65,10 +70,7 @@ pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDoc
         }
     }
 
-    if documents.is_empty() {
-        warnings
-            .push("没有发现 AGENTS/CODEX/README、GitHub 指令或 docs Markdown 文档。".to_string());
-    }
+    append_default_documents(&mut documents, &mut warnings);
 
     Ok(ProjectDocumentsSnapshot {
         workspace_path,
@@ -114,6 +116,33 @@ fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) 
         ));
     }
     unique
+}
+
+fn append_default_documents(documents: &mut Vec<ProjectDocumentEntry>, warnings: &mut Vec<String>) {
+    let existing = documents
+        .iter()
+        .map(|doc| normalized_doc_path(&doc.path))
+        .collect::<HashSet<_>>();
+    let missing_defaults = default_project_documents()
+        .into_iter()
+        .filter(|doc| !existing.contains(&normalized_doc_path(&doc.path)))
+        .collect::<Vec<_>>();
+
+    if missing_defaults.is_empty() {
+        return;
+    }
+
+    if documents.is_empty() {
+        warnings.push("当前项目尚未创建自定义文档，已加载平台默认项目文档。".to_string());
+    } else {
+        warnings
+            .push("已补充缺失的平台默认 AI 指令文档；项目内同名 Markdown 会优先显示。".to_string());
+    }
+    documents.extend(missing_defaults);
+}
+
+fn normalized_doc_path(path: &str) -> String {
+    path.replace('\\', "/").to_ascii_lowercase()
 }
 
 fn push_if_markdown(workspace: &FsPath, relative: &str, candidates: &mut Vec<(usize, PathBuf)>) {
@@ -282,5 +311,35 @@ mod tests {
         assert_eq!(paths[1], "CODEX.md");
         assert!(paths.contains(&".github/instructions/git.instructions.md"));
         assert!(paths.contains(&"docs/guide.md"));
+        assert!(paths.contains(&".github/copilot-instructions.md"));
+    }
+
+    #[test]
+    fn project_docs_returns_default_docs_for_empty_workspace() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-project-docs-empty-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+
+        let snapshot = collect_project_documents(&root).unwrap();
+        let _ = fs::remove_dir_all(&root);
+
+        let paths = snapshot
+            .documents
+            .iter()
+            .map(|doc| doc.path.as_str())
+            .collect::<Vec<_>>();
+        assert!(paths.contains(&"AGENTS.md"));
+        assert!(paths.contains(&"CODEX.md"));
+        assert!(paths.contains(&".github/copilot-instructions.md"));
+        assert!(paths.contains(&".github/instructions/project-workflow.instructions.md"));
+        assert!(snapshot
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("默认项目文档")));
     }
 }

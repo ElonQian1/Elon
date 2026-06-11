@@ -2,6 +2,8 @@ use anyhow::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::project_default_docs::ensure_default_docs_in_workspace;
+
 pub struct ProjectWorkspaceRequest {
     pub project_id: String,
     pub user_id: String,
@@ -393,6 +395,8 @@ fn ensure_seed_files(repo: &Path, req: &ProjectWorkspaceRequest) -> Result<()> {
             ),
         )?;
     }
+
+    let _ = ensure_default_docs_in_workspace(repo)?;
 
     let gitignore = repo.join(".gitignore");
     if !gitignore.exists() {

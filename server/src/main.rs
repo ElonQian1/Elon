@@ -70,6 +70,7 @@ mod project_chat_reply;
 mod project_completion;
 mod project_conversation_identity;
 mod project_conversation_workspace;
+mod project_default_docs;
 mod project_deletion;
 mod project_docs;
 mod project_docs_channel;

@@ -7,6 +7,8 @@ use std::{
 };
 use tracing::{info, warn};
 
+use crate::project_default_docs::ensure_default_docs_in_workspace;
+
 pub use crate::tools_git::{git_commit, git_fetch_status};
 
 /// 每用户并发构建槽（同一用户同时只允许一个本地构建）
@@ -96,6 +98,7 @@ pub fn create_project_workspace(
         }
     }
 
+    ensure_default_docs_in_workspace(project_root)?;
     ensure_git_repo(project_root, user_id)?;
     let _ = git_commit(project_root, "chore: initialize project")?;
     Ok(format!(
@@ -280,6 +283,7 @@ pub fn init_project(project_root: &Path, project_type: &str) -> Result<String> {
             copy_dir_all(&template_dir, project_root)?;
             let pkg = derive_android_package_id(project_root);
             patch_android_application_id(project_root, &pkg)?;
+            ensure_default_docs_in_workspace(project_root)?;
             Ok("Android 项目模板已初始化。\n\
                  现在请用 write_file 修改以下文件实现具体功能:\n\
                  - app/src/main/kotlin/com/template/app/MainActivity.kt\n\
