@@ -58,7 +58,7 @@ internal class ProjectSpaceFeedView(
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, 0)
+            setPadding(0, dp(10), 0, 0)
         }
         frame.addView(feedColumn, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,

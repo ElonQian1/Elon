@@ -840,6 +840,9 @@ internal class MainNavigationController(
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
+        if (binding.projectSpaceFeedActionsOverlay.visibility == View.VISIBLE) {
+            binding.projectSpaceFeedActionsOverlay.bringToFront()
+        }
     }
 
     private fun applyProjectChannelChrome(title: String) {

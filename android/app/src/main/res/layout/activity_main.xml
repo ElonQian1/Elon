@@ -408,6 +408,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="end|center_vertical"
             android:layout_marginEnd="8dp"
+            android:elevation="10dp"
             android:gravity="center"
             android:orientation="vertical"
             android:visibility="gone">
