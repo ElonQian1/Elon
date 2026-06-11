@@ -145,6 +145,6 @@ internal class ProjectSpaceFeedData(
     }
 
     private companion object {
-        const val FEED_MESSAGE_LIMIT = 24
+        const val FEED_MESSAGE_LIMIT = 120
     }
 }

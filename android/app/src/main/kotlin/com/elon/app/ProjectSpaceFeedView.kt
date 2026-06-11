@@ -120,7 +120,9 @@ internal class ProjectSpaceFeedView(
             .filter { it.isProjectSpaceFeedChannel() }
             .associateBy { it.id }
         return channelsById.values.flatMap { channel ->
-            messagesByChannel[channel.id].orEmpty().map { ProjectSpaceFeedPost(channel, it) }
+            messagesByChannel[channel.id].orEmpty()
+                .filter { it.isProjectSpaceFeedPost() }
+                .map { ProjectSpaceFeedPost(channel, it) }
         }.sortedByDescending { parseChatMessageCreatedAt(it.message.createdAt) ?: 0L }
             .take(MAX_FEED_POSTS)
     }

@@ -3326,18 +3326,26 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function parseProjectSpacePostText(content) {
     const raw = String(content || '').trim();
-    if (!raw) return { title: '未命名帖子', body: '' };
+    if (!raw) return { title: '未命名帖子', body: '', structured: false };
     const prefix = '标题：';
     if (raw.startsWith(prefix)) {
       const rest = raw.slice(prefix.length).trimStart();
       const parts = rest.split(/\n\s*\n/);
       return {
         title: (parts.shift() || '未命名帖子').trim() || '未命名帖子',
-        body: parts.join('\n\n').trim()
+        body: parts.join('\n\n').trim(),
+        structured: true
       };
     }
     const first = raw.split(/\n/).find((line) => line.trim()) || '未命名帖子';
-    return { title: first.replace(/^#\s*/, '').trim() || '未命名帖子', body: raw };
+    return {
+      title: first.replace(/^#\s*/, '').trim() || '未命名帖子',
+      body: raw,
+      structured: false
+    };
+  }
+  function isProjectSpaceFeedPost(message) {
+    return parseProjectSpacePostText(message && message.content).structured;
   }
   function renderProjectSpaceFeed(space, loading) {
     if (!projectSpaceAnnouncement || !projectSpacePostList) return;
@@ -3385,7 +3393,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
     const posts = channels
       .filter((channel) => ['discussion', 'requirements', 'suggestions', 'issues'].includes(channel.kind))
-      .flatMap((channel) => (channel.messages || []).map((message) => ({ channel, message })))
+      .flatMap((channel) => (channel.messages || [])
+        .filter(isProjectSpaceFeedPost)
+        .map((message) => ({ channel, message })))
       .sort((a, b) => String(b.message.created_at || '').localeCompare(String(a.message.created_at || '')))
       .slice(0, 40);
     if (!posts.length) {
@@ -3439,7 +3449,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     await Promise.all(channels.map(async (channel) => {
       if (!channel || !channel.id) return;
       const msgRes = await api('/api/projects/' + encodeURIComponent(project.id) +
-        '/channels/' + encodeURIComponent(channel.id) + '/messages?limit=8');
+        '/channels/' + encodeURIComponent(channel.id) + '/messages?limit=120');
       const msgData = await msgRes.json().catch(() => ({}));
       channel.messages = msgRes.ok && Array.isArray(msgData.messages) ? msgData.messages : [];
     }));

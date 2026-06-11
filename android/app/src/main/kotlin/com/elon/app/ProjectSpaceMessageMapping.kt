@@ -100,6 +100,10 @@ internal fun parseProjectSpacePostText(content: String): ProjectSpacePostText {
     return ProjectSpacePostText(title = title, body = trimmed, structured = false)
 }
 
+internal fun ProjectChannelMessage.isProjectSpaceFeedPost(): Boolean {
+    return parseProjectSpacePostText(content).structured
+}
+
 internal fun ProjectChannel.isProjectSpaceFeedChannel(): Boolean {
     return kind in setOf("discussion", "requirements", "suggestions", "issues")
 }
