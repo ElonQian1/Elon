@@ -860,7 +860,7 @@
                 android:src="@drawable/ic_project_ai_conversation"
                 app:tint="@color/elon_text_primary" />
 
-            <TextView
+            <com.elon.app.ProjectSpaceAiLabelView
                 android:id="@+id/projectSpaceAiLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

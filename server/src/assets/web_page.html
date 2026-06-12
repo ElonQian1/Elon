@@ -1439,6 +1439,11 @@
       max-width: 72px;
       transition: opacity 220ms ease, max-width 220ms ease;
     }
+    .project-space-ai-menu.animating span,
+    .project-space-ai-menu.compact span {
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
+    }
     .project-space-ai-menu.compact button {
       width: 64px;
       gap: 0;
@@ -2340,9 +2345,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       }
     });
   }
+  let projectSpaceAiMenuMotionTimer = 0;
   function syncProjectSpaceAiMenuMotion() {
     if (!projectPage || !projectSpaceAiMenu) return;
-    projectSpaceAiMenu.classList.toggle('compact', projectPage.scrollTop > 4);
+    const shouldCompact = projectPage.scrollTop > 4;
+    if (projectSpaceAiMenu.classList.contains('compact') === shouldCompact) return;
+    projectSpaceAiMenu.classList.add('animating');
+    projectSpaceAiMenu.classList.toggle('compact', shouldCompact);
+    window.clearTimeout(projectSpaceAiMenuMotionTimer);
+    projectSpaceAiMenuMotionTimer = window.setTimeout(() => {
+      projectSpaceAiMenu.classList.remove('animating');
+    }, 240);
   }
   if (projectPage && projectSpaceAiMenu) {
     projectPage.addEventListener('scroll', syncProjectSpaceAiMenuMotion, { passive: true });

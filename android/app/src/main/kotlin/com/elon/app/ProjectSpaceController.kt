@@ -1003,17 +1003,16 @@ internal class ProjectSpaceController(
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
 
-        val targetAlpha = if (expanded) 1f else 0f
         val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
         label.visibility = View.VISIBLE
+        label.alpha = 1f
 
         if (!animate || menu.visibility != View.VISIBLE || menu.width <= 0) {
-            applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin, targetLabelWidth)
+            applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
             return
         }
 
         val startWidth = menu.width.takeIf { it > 0 } ?: currentLayoutWidth
-        val startAlpha = label.alpha
         val startIconMargin = (binding.projectSpaceAiIcon.layoutParams as LinearLayout.LayoutParams).marginEnd
         val startLabelWidth = (label.layoutParams as LinearLayout.LayoutParams)
             .width
@@ -1024,10 +1023,9 @@ internal class ProjectSpaceController(
             addUpdateListener { valueAnimator ->
                 val progress = valueAnimator.animatedValue as Float
                 val width = (startWidth + (targetWidth - startWidth) * progress).toInt()
-                val alpha = startAlpha + (targetAlpha - startAlpha) * progress
                 val iconMargin = (startIconMargin + (targetIconMargin - startIconMargin) * progress).toInt()
                 val labelWidth = (startLabelWidth + (targetLabelWidth - startLabelWidth) * progress).toInt()
-                applyProjectSpaceAiMenuFrame(width, alpha, iconMargin, labelWidth)
+                applyProjectSpaceAiMenuFrame(width, iconMargin, labelWidth)
             }
             addListener(object : AnimatorListenerAdapter() {
                 private var cancelled = false
@@ -1038,7 +1036,7 @@ internal class ProjectSpaceController(
 
                 override fun onAnimationEnd(animation: Animator) {
                     if (cancelled) return
-                    applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin, targetLabelWidth)
+                    applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
                     projectSpaceAiAnimator = null
                 }
             })
@@ -1049,7 +1047,6 @@ internal class ProjectSpaceController(
 
     private fun applyProjectSpaceAiMenuFrame(
         width: Int,
-        labelAlpha: Float,
         iconMarginEnd: Int,
         labelWidth: Int
     ) {
@@ -1074,7 +1071,7 @@ internal class ProjectSpaceController(
             labelParams.width = labelWidth
             label.layoutParams = labelParams
         }
-        label.alpha = labelAlpha
+        label.alpha = 1f
         label.translationX = 0f
     }
 
