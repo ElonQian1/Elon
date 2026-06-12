@@ -318,7 +318,7 @@ internal class ProjectSpaceController(
             return
         }
         val space = activeSpace ?: return
-        val container = prepareProjectContent()
+        val container = prepareProjectContent(showAiMenu = true)
         container.removeAllViews()
         container.addView(projectIntroHeader(space))
         feedView.render(
@@ -1015,13 +1015,25 @@ internal class ProjectSpaceController(
         memberConversationViews.renderList(prepareProjectContent(), space, member, isSelf)
     }
 
-    private fun prepareProjectContent(): LinearLayout {
+    private fun prepareProjectContent(showAiMenu: Boolean = false): LinearLayout {
         binding.projectPage.stopNestedScroll()
         binding.projectPage.scrollTo(0, 0)
-        resetProjectSpaceAiMenu()
+        if (showAiMenu) showProjectSpaceAiMenu() else hideProjectSpaceAiMenu()
         hideProjectSpaceFeedActions()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
         return binding.projectContentLayout
+    }
+
+    private fun showProjectSpaceAiMenu() {
+        binding.projectSpaceAiMenu.visibility = View.VISIBLE
+        resetProjectSpaceAiMenu()
+        binding.projectSpaceAiMenu.bringToFront()
+    }
+
+    private fun hideProjectSpaceAiMenu() {
+        projectSpaceAiAnimator?.cancel()
+        projectSpaceAiAnimator = null
+        binding.projectSpaceAiMenu.visibility = View.GONE
     }
 
     private fun showProjectSpaceFeedActions() {
