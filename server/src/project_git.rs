@@ -73,6 +73,11 @@ pub fn project_git_status_json(state: &AppState, project: &ProjectAccess) -> ser
         "project_id": project.id,
         "source_type": project.source_type,
         "node_id": project.node_id.clone(),
+        "storage_node_id": project.storage_node_id.clone(),
+        "storage_repo_path": project.storage_repo_path.clone(),
+        "storage_repo_url": project.storage_repo_url.clone(),
+        "storage_worktree_path": project.storage_worktree_path.clone(),
+        "storage_status": project.storage_status.clone(),
         "workspace": workspace.to_string_lossy(),
         "git": {
             "has_git": has_git || origin.is_some(),

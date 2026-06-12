@@ -194,6 +194,11 @@ pub enum ServerToAgent {
         branch: Option<String>,
         #[serde(default)]
         access_token: Option<String>,
+        /// Whether the storage PC should also create a normal owner checkout
+        /// next to the bare repo. This keeps the user's Windows PC as a real
+        /// project entry even when another PC provides AI compute.
+        #[serde(default)]
+        prepare_worktree: bool,
     },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {
@@ -369,6 +374,8 @@ pub enum AgentToServer {
         storage_repo_path: String,
         #[serde(default)]
         storage_repo_url: Option<String>,
+        #[serde(default)]
+        storage_worktree_path: Option<String>,
         #[serde(default)]
         branch: Option<String>,
         created: bool,

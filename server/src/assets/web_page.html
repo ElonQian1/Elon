@@ -1498,6 +1498,7 @@
     .modal .btn-confirm { background: var(--brand); color: var(--brand-ink); }
     .modal .btn-confirm:disabled { opacity: 0.55; cursor: not-allowed; }
     .modal .error-text { font-size: 13px; color: var(--bubble-error-ink); min-height: 18px; }
+    .modal .hint-text { font-size: 12px; color: var(--ink-soft); line-height: 1.55; min-height: 18px; }
     .modal-pre {
       background: var(--bg-hint);
       border: 1px solid var(--line);
@@ -2082,6 +2083,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <select id="projectStorageNodeSelect" disabled>
         <option value="">自动选择可用硬盘节点</option>
       </select>
+      <div class="hint-text" id="projectStorageHint"></div>
     </div>
     <div>
       <label for="projectRepoUrlInput">Git 远端（可选）</label>
@@ -2268,6 +2270,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   // ====== DOM 引用 ======
   const $ = (id) => document.getElementById(id);
+  const pageParams = new URLSearchParams(window.location.search || '');
+  const preferredStorageNodeId = String(pageParams.get('preferred_storage_node_id') || '').trim();
   const loginView = $('loginView');
   const appView = $('appView');
   const loginForm = $('loginForm');
@@ -2421,6 +2425,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const templateSelect = $('templateSelect');
   const projectNodeSelect = $('projectNodeSelect');
   const projectStorageNodeSelect = $('projectStorageNodeSelect');
+  const projectStorageHint = $('projectStorageHint');
   const projectRepoUrlInput = $('projectRepoUrlInput');
   const projectBranchInput = $('projectBranchInput');
   const newProjectError = $('newProjectError');
@@ -2561,6 +2566,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '项目 ID：' + (data.project_id || (currentProject && currentProject.id) || ''),
       '来源：' + (data.source_type || ''),
       '工作区：' + (data.workspace || ''),
+      data.storage_node_id ? '硬盘节点：' + data.storage_node_id : '',
+      data.storage_worktree_path ? '本机硬盘目录：' + data.storage_worktree_path : '',
+      data.storage_repo_url ? '硬盘 Git 地址：' + data.storage_repo_url : '',
+      data.storage_repo_path ? '硬盘母仓：' + data.storage_repo_path : '',
       '',
       'Git：' + (git.has_git ? '已初始化' : '未初始化'),
       '远端：' + (git.origin || '未配置'),
@@ -4643,11 +4652,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectDescInput.value = '';
     projectRepoUrlInput.value = '';
     projectBranchInput.value = '';
+    if (projectStorageHint) projectStorageHint.textContent = '';
     loadProjectCreateNodes().catch((err) => {
       projectNodeSelect.innerHTML = '<option value="">加载 PC 节点失败</option>';
       projectNodeSelect.disabled = true;
       projectStorageNodeSelect.innerHTML = '<option value="">加载硬盘节点失败</option>';
       projectStorageNodeSelect.disabled = true;
+      if (projectStorageHint) projectStorageHint.textContent = '';
       newProjectError.textContent = err.message || '加载 PC 节点失败';
     });
     newProjectMask.classList.add('active');
@@ -4684,16 +4695,40 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       ? options
       : '<option value="">暂无可创建项目的 PC 节点</option>' + options;
     projectNodeSelect.disabled = false;
-    const storageNodes = nodes.filter((node) => node.storage_ready || (node.storage && node.storage.enabled));
+    const storageNodes = nodes
+      .filter((node) => (node.storage_ready || (node.storage && node.storage.enabled)) && node.storage_repo_url_configured)
+      .sort((left, right) => {
+        const leftId = left.node_id || left.agent_id || '';
+        const rightId = right.node_id || right.agent_id || '';
+        return Number(rightId === preferredStorageNodeId) - Number(leftId === preferredStorageNodeId);
+      });
+    const preferredStorageNode = preferredStorageNodeId
+      ? nodes.find((node) => (node.node_id || node.agent_id || '') === preferredStorageNodeId)
+      : null;
+    const preferredStorageReady = storageNodes.some((node) => (node.node_id || node.agent_id || '') === preferredStorageNodeId);
     const storageOptions = storageNodes.map((node) => {
       const nodeId = node.node_id || node.agent_id || '';
       const shortId = node.short_id || (nodeId.length > 16 ? '...' + nodeId.slice(-14) : nodeId);
       const label = node.display_name || node.label || node.device_name || shortId;
       const configured = node.storage_repo_url_configured ? '可跨 PC' : '仅同机/需升级节点';
-      return `<option value="${escapeHtml(nodeId)}">${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(configured)}</option>`;
+      const selected = preferredStorageReady && nodeId === preferredStorageNodeId ? ' selected' : '';
+      return `<option value="${escapeHtml(nodeId)}"${selected}>${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(configured)}</option>`;
     }).join('');
     projectStorageNodeSelect.innerHTML = '<option value="">自动选择可用硬盘节点</option>' + storageOptions;
     projectStorageNodeSelect.disabled = false;
+    if (projectStorageHint) {
+      if (preferredStorageReady) {
+        projectStorageHint.textContent = '已自动选择当前 Windows PC 作为代码硬盘节点，项目会在本机硬盘保留可见目录。';
+      } else if (preferredStorageNode) {
+        projectStorageHint.textContent = '当前 Windows PC 尚未启用可跨 PC 的硬盘服务；可在本地管理页启用硬盘服务并确认已安装 Git。';
+      } else if (preferredStorageNodeId) {
+        projectStorageHint.textContent = '当前 Windows PC 暂未连接到账号节点列表，先按在线硬盘节点自动选择。';
+      } else {
+        projectStorageHint.textContent = storageNodes.length
+          ? '可选硬盘节点会保存项目母仓；远程算力节点可从这里重建项目。'
+          : '没有可用硬盘节点时，项目仍会创建在所选 PC 算力节点上。';
+      }
+    }
   }
   function openAddFriendDialog() {
     addFriendResult.textContent = '';

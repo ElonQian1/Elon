@@ -295,6 +295,7 @@ impl AgentManager {
         name: String,
         branch: Option<String>,
         access_token: Option<String>,
+        prepare_worktree: bool,
     ) -> Result<AgentToServer> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
@@ -312,6 +313,7 @@ impl AgentManager {
                 name,
                 branch,
                 access_token,
+                prepare_worktree,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);

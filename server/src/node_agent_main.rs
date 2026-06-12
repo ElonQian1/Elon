@@ -1609,6 +1609,7 @@ async fn run_session(
                             name,
                             branch,
                             access_token,
+                            prepare_worktree,
                         } => {
                             info!(
                                 "🗄️  PrepareProjectStorageRepo: {} project={}",
@@ -1626,6 +1627,7 @@ async fn run_session(
                                         name,
                                         branch,
                                         access_token,
+                                        prepare_worktree,
                                     },
                                 ) {
                                     Ok(result) => AgentToServer::ProjectStorageRepoReady {
@@ -1633,6 +1635,7 @@ async fn run_session(
                                         project_id: project_id_for_error,
                                         storage_repo_path: result.storage_repo_path,
                                         storage_repo_url: result.storage_repo_url,
+                                        storage_worktree_path: result.storage_worktree_path,
                                         branch: result.branch,
                                         created: result.created,
                                     },

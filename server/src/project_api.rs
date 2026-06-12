@@ -291,6 +291,7 @@ pub async fn create_project(
                 &storage.node_id,
                 &storage.storage_repo_path,
                 storage.storage_repo_url.as_deref(),
+                storage.storage_worktree_path.as_deref(),
                 storage.branch.as_deref(),
             ) {
                 Ok(project) => project,
@@ -352,6 +353,7 @@ pub async fn create_project(
     };
 
     let storage_node_id = project.storage_node_id.clone();
+    let storage_worktree_path = project.storage_worktree_path.clone();
     let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
     Json(serde_json::json!({
         "project": project,
@@ -359,6 +361,7 @@ pub async fn create_project(
         "reused_existing": false,
         "node_id": node_id,
         "storage_node_id": storage_node_id,
+        "storage_worktree_path": storage_worktree_path,
         "provisioned": true,
         "workspace_created": provisioned.created,
         "storage_repo_created": storage_repo_created,

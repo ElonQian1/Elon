@@ -122,6 +122,7 @@ pub fn project_access(
             storage_node_id: None,
             storage_repo_path: None,
             storage_repo_url: None,
+            storage_worktree_path: None,
             storage_status: "none".to_string(),
             role: "owner".to_string(),
             status: "active".to_string(),

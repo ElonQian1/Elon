@@ -68,6 +68,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (46, "project channel message reply parent", migration_v46),
     (47, "指定钱一龙为一龙自项目创建者与 owner", migration_v47),
     (48, "PC 硬盘节点项目仓库绑定", migration_v48),
+    (49, "PC 硬盘节点 owner checkout 路径", migration_v49),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1764,6 +1765,16 @@ fn migration_v48(conn: &Connection) -> Result<()> {
           ON projects(storage_node_id)
           WHERE storage_node_id IS NOT NULL;
         "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v49(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "projects",
+        "storage_worktree_path",
+        "storage_worktree_path TEXT",
     )?;
     Ok(())
 }

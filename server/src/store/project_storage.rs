@@ -11,6 +11,7 @@ impl Store {
         storage_node_id: &str,
         storage_repo_path: &str,
         storage_repo_url: Option<&str>,
+        storage_worktree_path: Option<&str>,
         branch: Option<&str>,
     ) -> Result<ProjectSummary> {
         let storage_node_id = storage_node_id.trim();
@@ -22,31 +23,34 @@ impl Store {
             return Err(anyhow!("storage_repo_path 不能为空"));
         }
         let storage_repo_url = clean_optional(storage_repo_url);
+        let storage_worktree_path = clean_optional(storage_worktree_path);
         let branch = clean_optional(branch);
         let now = now();
         let conn = self.conn()?;
         let tx = conn.unchecked_transaction()?;
         let updated = tx.execute(
             "UPDATE projects
-             SET storage_node_id = ?1,
-                 storage_repo_path = ?2,
-                 storage_repo_url = ?3,
-                 storage_status = 'ready',
-                 repo_url = COALESCE(?3, repo_url),
-                 branch = COALESCE(?4, branch),
-                 updated_at = ?5
-             WHERE id = ?6
-               AND source_type NOT IN ('agent_balloon', 'chat_memory')
-               AND EXISTS (
-                 SELECT 1 FROM project_members pm
-                 WHERE pm.project_id = projects.id
-                   AND pm.user_id = ?7
-                   AND pm.role = 'owner'
-               )",
+                 SET storage_node_id = ?1,
+                     storage_repo_path = ?2,
+                     storage_repo_url = ?3,
+                     storage_worktree_path = ?4,
+                     storage_status = 'ready',
+                     repo_url = COALESCE(?3, repo_url),
+                     branch = COALESCE(?5, branch),
+                     updated_at = ?6
+                 WHERE id = ?7
+                   AND source_type NOT IN ('agent_balloon', 'chat_memory')
+                   AND EXISTS (
+                     SELECT 1 FROM project_members pm
+                     WHERE pm.project_id = projects.id
+                       AND pm.user_id = ?8
+                       AND pm.role = 'owner'
+                   )",
             params![
                 storage_node_id,
                 storage_repo_path,
                 storage_repo_url,
+                storage_worktree_path,
                 branch,
                 now,
                 project_id,
@@ -69,6 +73,7 @@ impl Store {
                     "storage_node_id": storage_node_id,
                     "storage_repo_path": storage_repo_path,
                     "storage_repo_url": storage_repo_url,
+                    "storage_worktree_path": storage_worktree_path,
                     "branch": branch,
                 })
                 .to_string(),

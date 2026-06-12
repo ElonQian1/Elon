@@ -142,7 +142,7 @@
     </div>
     <div id="cloudWebResult"></div>
     <p class="muted" style="margin:12px 0 0">
-      网页版会在云端页面内完成登录。登录后进入底部「项目」，点击右上角「新建项目」即可选择可用 PC 节点创建项目。
+      网页版会在云端页面内完成登录。登录后进入底部「项目」，点击右上角「新建项目」即可选择可用 PC 节点创建项目；如果本机已启用硬盘服务，网页版会优先把本机选为代码硬盘节点。
     </p>
   </div>
 
@@ -294,7 +294,9 @@ function hardwareLine(h) {
 }
 function cloudWebUrl(r) {
   const base = ((r && r.cloud_http_url) || 'http://43.139.149.158:8080').replace(/\/+$/, '');
-  return base + '/web';
+  const agentId = r && r.agent_id ? String(r.agent_id).trim() : '';
+  if (!agentId) return base + '/web';
+  return base + '/web?preferred_storage_node_id=' + encodeURIComponent(agentId);
 }
 function updateCloudWebLink(url) {
   const link = document.getElementById('cloudWebLink');

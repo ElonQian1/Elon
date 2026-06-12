@@ -12,6 +12,7 @@ pub struct PreparedStorageRepo {
     pub node_id: String,
     pub storage_repo_path: String,
     pub storage_repo_url: Option<String>,
+    pub storage_worktree_path: Option<String>,
     pub branch: Option<String>,
     pub created: bool,
 }
@@ -53,6 +54,7 @@ pub async fn maybe_prepare_project_storage_repo(
         ));
     }
     let access_token = supports_relay_git_url.then(make_storage_access_token);
+    let prepare_worktree = compute_node_id.is_some_and(|compute| compute != node.node_id);
     let msg = state
         .agent_manager
         .dispatch_project_storage_repo_prepare(
@@ -62,6 +64,7 @@ pub async fn maybe_prepare_project_storage_repo(
             name.to_string(),
             branch.map(ToOwned::to_owned),
             access_token.clone(),
+            prepare_worktree,
         )
         .await
         .map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, e.to_string()))?;
@@ -71,6 +74,7 @@ pub async fn maybe_prepare_project_storage_repo(
             project_id: returned_project_id,
             storage_repo_path,
             storage_repo_url,
+            storage_worktree_path,
             branch,
             created,
             ..
@@ -84,6 +88,7 @@ pub async fn maybe_prepare_project_storage_repo(
                 node_id: node.node_id,
                 storage_repo_path,
                 storage_repo_url,
+                storage_worktree_path,
                 branch,
                 created,
             }))

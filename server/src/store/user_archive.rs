@@ -14,7 +14,7 @@ impl Store {
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
                     p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
-                    COALESCE(p.storage_status, 'none'), p.status,
+                    p.storage_worktree_path, COALESCE(p.storage_status, 'none'), p.status,
                     pm.role,
                     (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
                     p.is_public,
@@ -80,27 +80,28 @@ fn archive_project_from_row(
         storage_node_id: row.get(10)?,
         storage_repo_path: row.get(11)?,
         storage_repo_url: row.get(12)?,
-        storage_status: row.get(13)?,
-        status: row.get(14)?,
-        role: row.get(15)?,
-        member_count: row.get(16)?,
-        is_public: row.get::<_, i64>(17)? != 0,
-        join_mode: row.get(18)?,
-        last_task_status: row.get(19)?,
-        last_apk_url: row.get(20)?,
-        icon_data_url: row.get(21)?,
-        updated_at: row.get(22)?,
+        storage_worktree_path: row.get(13)?,
+        storage_status: row.get(14)?,
+        status: row.get(15)?,
+        role: row.get(16)?,
+        member_count: row.get(17)?,
+        is_public: row.get::<_, i64>(18)? != 0,
+        join_mode: row.get(19)?,
+        last_task_status: row.get(20)?,
+        last_apk_url: row.get(21)?,
+        icon_data_url: row.get(22)?,
+        updated_at: row.get(23)?,
     };
-    let conversation_count = row.get(19)?;
+    let conversation_count = row.get(24)?;
     let system_key = system_project_key_for_source_type(&project.source_type).map(str::to_string);
     let owner_account = if system_key.is_some() {
         "系统".to_string()
     } else {
-        row.get(20)?
+        row.get(25)?
     };
-    let owner_id: String = row.get(21)?;
+    let owner_id: String = row.get(26)?;
     let workspace_kind = workspace_kind_for_project(&project).to_string();
-    let creator_role: String = row.get(22)?;
+    let creator_role: String = row.get(27)?;
     let (project_origin_type, project_origin_label) = project_origin_for(
         system_key.as_deref(),
         &owner_id,
