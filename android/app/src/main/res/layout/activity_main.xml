@@ -643,7 +643,7 @@
         android:id="@+id/bottomBarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/elon_bg_app"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -853,8 +853,8 @@
 
             <ImageView
                 android:id="@+id/projectSpaceAiIcon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:layout_marginEnd="14dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_project_ai_conversation"
@@ -864,7 +864,9 @@
                 android:id="@+id/projectSpaceAiLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:gravity="end|center_vertical"
                 android:includeFontPadding="false"
+                android:maxLines="1"
                 android:text="Ai 会话"
                 android:textColor="@color/elon_text_primary"
                 android:textSize="18sp" />

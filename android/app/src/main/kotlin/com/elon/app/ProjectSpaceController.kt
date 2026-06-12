@@ -986,10 +986,16 @@ internal class ProjectSpaceController(
         val label = binding.projectSpaceAiLabel
         val collapsedWidth = dp(PROJECT_SPACE_AI_COLLAPSED_SIZE_DP)
         val expandedWidth = dp(PROJECT_SPACE_AI_EXPANDED_WIDTH_DP)
+        val expandedLabelWidth = measureProjectSpaceAiLabelWidth()
         val targetWidth = if (expanded) expandedWidth else collapsedWidth
+        val targetLabelWidth = if (expanded) expandedLabelWidth else 0
         val currentLayoutWidth = menu.layoutParams.width.takeIf { it > 0 } ?: targetWidth
+        val currentLabelWidth = (label.layoutParams as LinearLayout.LayoutParams)
+            .width
+            .takeIf { it >= 0 } ?: expandedLabelWidth
         val alreadyAtTarget = projectSpaceAiExpanded == expanded &&
             currentLayoutWidth == targetWidth &&
+            currentLabelWidth == targetLabelWidth &&
             projectSpaceAiAnimator == null
         if (alreadyAtTarget) return
 
@@ -999,17 +1005,19 @@ internal class ProjectSpaceController(
 
         val targetAlpha = if (expanded) 1f else 0f
         val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
-        if (expanded) label.visibility = View.VISIBLE
+        label.visibility = View.VISIBLE
 
         if (!animate || menu.visibility != View.VISIBLE || menu.width <= 0) {
-            applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin)
-            label.visibility = if (expanded) View.VISIBLE else View.GONE
+            applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin, targetLabelWidth)
             return
         }
 
         val startWidth = menu.width.takeIf { it > 0 } ?: currentLayoutWidth
         val startAlpha = label.alpha
         val startIconMargin = (binding.projectSpaceAiIcon.layoutParams as LinearLayout.LayoutParams).marginEnd
+        val startLabelWidth = (label.layoutParams as LinearLayout.LayoutParams)
+            .width
+            .takeIf { it >= 0 } ?: expandedLabelWidth
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = PROJECT_SPACE_AI_ANIMATION_MS
             interpolator = AccelerateDecelerateInterpolator()
@@ -1018,7 +1026,8 @@ internal class ProjectSpaceController(
                 val width = (startWidth + (targetWidth - startWidth) * progress).toInt()
                 val alpha = startAlpha + (targetAlpha - startAlpha) * progress
                 val iconMargin = (startIconMargin + (targetIconMargin - startIconMargin) * progress).toInt()
-                applyProjectSpaceAiMenuFrame(width, alpha, iconMargin)
+                val labelWidth = (startLabelWidth + (targetLabelWidth - startLabelWidth) * progress).toInt()
+                applyProjectSpaceAiMenuFrame(width, alpha, iconMargin, labelWidth)
             }
             addListener(object : AnimatorListenerAdapter() {
                 private var cancelled = false
@@ -1029,8 +1038,7 @@ internal class ProjectSpaceController(
 
                 override fun onAnimationEnd(animation: Animator) {
                     if (cancelled) return
-                    applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin)
-                    label.visibility = if (expanded) View.VISIBLE else View.GONE
+                    applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin, targetLabelWidth)
                     projectSpaceAiAnimator = null
                 }
             })
@@ -1039,7 +1047,12 @@ internal class ProjectSpaceController(
         animator.start()
     }
 
-    private fun applyProjectSpaceAiMenuFrame(width: Int, labelAlpha: Float, iconMarginEnd: Int) {
+    private fun applyProjectSpaceAiMenuFrame(
+        width: Int,
+        labelAlpha: Float,
+        iconMarginEnd: Int,
+        labelWidth: Int
+    ) {
         val menu = binding.projectSpaceAiMenu
         val height = dp(PROJECT_SPACE_AI_COLLAPSED_SIZE_DP)
         val menuParams = menu.layoutParams
@@ -1056,8 +1069,22 @@ internal class ProjectSpaceController(
         }
 
         val label = binding.projectSpaceAiLabel
+        val labelParams = label.layoutParams as LinearLayout.LayoutParams
+        if (labelParams.width != labelWidth) {
+            labelParams.width = labelWidth
+            label.layoutParams = labelParams
+        }
         label.alpha = labelAlpha
-        label.translationX = dp(4) * (1f - labelAlpha)
+        label.translationX = 0f
+    }
+
+    private fun measureProjectSpaceAiLabelWidth(): Int {
+        val label = binding.projectSpaceAiLabel
+        label.measure(
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        return label.measuredWidth.coerceAtLeast(dp(PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP))
     }
 
     private fun renderMemberConversationMessages(
@@ -1150,6 +1177,7 @@ internal class ProjectSpaceController(
         const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 176
         const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
         const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 14
+        const val PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP = 70
 
         fun canEditProjectDescription(role: String?): Boolean {
             return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")

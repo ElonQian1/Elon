@@ -304,7 +304,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun applySystemBarColors() {
         window.statusBarColor = ContextCompat.getColor(this, R.color.elon_bg_app)
-        window.navigationBarColor = ContextCompat.getColor(this, R.color.elon_nav_bg)
+        val navigationColor = if (::binding.isInitialized && binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
+            R.color.elon_bg_app
+        } else {
+            R.color.elon_nav_bg
+        }
+        window.navigationBarColor = ContextCompat.getColor(this, navigationColor)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
         }

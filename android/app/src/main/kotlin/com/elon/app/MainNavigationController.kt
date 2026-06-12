@@ -79,21 +79,28 @@ internal class MainNavigationController(
     }
 
     private fun showMainTabs() {
+        setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun hideBottomMenus() {
+        setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun showProjectSpaceBottomMenu() {
+        setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.bringToFront()
+    }
+
+    private fun setNavigationBarColor(colorRes: Int) {
+        activity.window.navigationBarColor = activity.getColor(colorRes)
     }
 
     private fun selectBottomTab(tab: TextView, animate: Boolean) {
