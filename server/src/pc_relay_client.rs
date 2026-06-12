@@ -13,7 +13,6 @@ use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, CliWorkspaceStatus, ServerToAgent, PROTO_VERSION};
-use std::path::Path;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -591,7 +590,7 @@ fn resolve_cli_program(cli: &str) -> String {
                 candidates.push(format!(r"{}\npm\copilot", appdata));
             }
             for p in candidates {
-                if Path::new(&p).exists() {
+                if std::path::Path::new(&p).exists() {
                     return p;
                 }
             }
