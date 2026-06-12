@@ -609,6 +609,7 @@ internal class MainNavigationController(
                 },
                 onEnd = {
                     clearPageTranslations()
+                    bringProjectSpaceFloatingControlsToFront()
                     pageTransitionRunning = false
                 }
             )
@@ -634,6 +635,7 @@ internal class MainNavigationController(
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectSpace()
+                    bringProjectSpaceFloatingControlsToFront()
                 }
             )
         }
@@ -847,8 +849,15 @@ internal class MainNavigationController(
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
+        bringProjectSpaceFloatingControlsToFront()
+    }
+
+    private fun bringProjectSpaceFloatingControlsToFront() {
         if (binding.projectSpaceFeedActionsOverlay.visibility == View.VISIBLE) {
             binding.projectSpaceFeedActionsOverlay.bringToFront()
+        }
+        if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
+            binding.projectSpaceAiMenu.bringToFront()
         }
     }
 
