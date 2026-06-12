@@ -2471,6 +2471,7 @@ fn git_value_at(path: &std::path::Path, args: &[&str]) -> Option<String> {
 // ── AI 编码工具 & Android 环境检查 / 安装 ────────────────────────────────────
 
 /// 安装向导脚本（嵌入二进制，管理页触发时写到临时目录执行）
+#[cfg(windows)]
 const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
 
 /// 检查单个命令行工具是否可用（PATH + 常见安装目录双路扫描）。
