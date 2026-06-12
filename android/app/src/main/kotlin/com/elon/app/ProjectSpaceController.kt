@@ -963,6 +963,9 @@ internal class ProjectSpaceController(
     private fun showProjectSpaceFeedActions() {
         binding.projectSpaceFeedActionsOverlay.visibility = View.VISIBLE
         binding.projectSpaceFeedActionsOverlay.bringToFront()
+        if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
+            binding.projectSpaceAiMenu.bringToFront()
+        }
     }
 
     private fun hideProjectSpaceFeedActions() {
