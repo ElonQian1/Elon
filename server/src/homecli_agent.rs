@@ -20,7 +20,7 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, NodeHardwareProfile, ServerToAgent};
+use homecli_proto::{AgentToServer, NodeHardwareProfile, NodeStorageProfile, ServerToAgent};
 use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::{
@@ -42,6 +42,7 @@ pub struct AgentEntry {
     pub version: String,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
+    pub storage: Option<NodeStorageProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -132,6 +133,7 @@ impl AgentManager {
                 version: a.version.clone(),
                 device_name: a.device_name.clone(),
                 hardware: a.hardware.clone(),
+                storage: a.storage.clone(),
                 allowed_clis: a.allowed_clis.clone(),
                 allowed_cwds: a.allowed_cwds.clone(),
                 connected_at: a.connected_at,
@@ -281,6 +283,41 @@ impl AgentManager {
             Ok(Some(msg)) => Ok(msg),
             Ok(None) => Err(anyhow!("agent disconnected before provisioning response")),
             Err(_) => Err(anyhow!("project workspace provisioning timeout (120s)")),
+        }
+    }
+
+    /// Ask a storage-capable PC node to create or reuse a bare Git repo for a project.
+    pub async fn dispatch_project_storage_repo_prepare(
+        &self,
+        agent_id: &str,
+        project_id: String,
+        user_id: String,
+        name: String,
+        branch: Option<String>,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        agent.pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(homecli_proto::ServerToAgent::PrepareProjectStorageRepo {
+                req_id: req_id.clone(),
+                project_id,
+                user_id,
+                name,
+                branch,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+
+        match tokio::time::timeout(Duration::from_secs(60), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!("agent disconnected before storage repo response")),
+            Err(_) => Err(anyhow!("project storage repo prepare timeout (60s)")),
         }
     }
 
@@ -436,6 +473,7 @@ pub struct AgentSummary {
     pub version: String,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
+    pub storage: Option<NodeStorageProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -529,6 +567,7 @@ async fn run_agent_session(
         owner_user_id,
         device_name,
         hardware,
+        storage,
     ) = match register {
         AgentToServer::Register {
             agent_id,
@@ -539,6 +578,7 @@ async fn run_agent_session(
             owner_user_id,
             device_name,
             hardware,
+            storage,
         } => (
             agent_id,
             version,
@@ -548,6 +588,7 @@ async fn run_agent_session(
             owner_user_id,
             clean_optional(device_name),
             hardware,
+            storage,
         ),
         _ => return Err(anyhow!("first frame must be register")),
     };
@@ -610,6 +651,7 @@ async fn run_agent_session(
         version,
         device_name: device_name.clone(),
         hardware: hardware.clone(),
+        storage: storage.clone(),
         allowed_clis,
         allowed_cwds,
         connected_at: SystemTime::now()
@@ -665,6 +707,7 @@ async fn run_agent_session(
             session_owner_user_id.clone(),
             device_name,
             hardware,
+            storage,
             vec![],
             connected_at,
         )
@@ -753,6 +796,7 @@ async fn run_agent_session(
                                     models,
                                     tts_worker_url,
                                     hardware,
+                                    storage,
                                 } => {
                                     if let Some(hardware) = hardware.as_ref() {
                                         if !session_owner_user_id.is_empty() {
@@ -779,6 +823,7 @@ async fn run_agent_session(
                                             models.clone(),
                                             tts_worker_url.clone(),
                                             hardware.clone(),
+                                            storage.clone(),
                                         )
                                         .await;
                                 }

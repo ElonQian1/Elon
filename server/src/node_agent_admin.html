@@ -25,6 +25,7 @@
   .button-link { display: inline-flex; align-items: center; justify-content: center; background: #238636; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; text-decoration: none; min-height: 34px; box-sizing: border-box; }
   .button-link:hover { background: #2ea043; text-decoration: none; }
   input, textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 8px 10px; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+  input[type="checkbox"] { width: auto; }
   input:focus, textarea:focus { outline: none; border-color: #58a6ff; }
   .form-row { margin: 10px 0; }
   .form-row label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
@@ -182,6 +183,29 @@
     </p>
   </div>
 
+  <h3>项目硬盘服务（让本机保存项目母仓）</h3>
+  <div class="card">
+    <div class="form-row">
+      <label><input id="storageEnabledInput" type="checkbox" /> 启用本机作为项目硬盘节点</label>
+    </div>
+    <div class="form-row">
+      <label>存储根目录</label>
+      <input id="storageRootInput" placeholder="留空使用默认目录" />
+    </div>
+    <div class="form-row">
+      <label>Git 服务基础地址（可选，跨 PC 重建需要）</label>
+      <input id="storageGitBaseUrlInput" placeholder="如：https://git.example.com/elon-storage" />
+    </div>
+    <div class="action-row">
+      <button id="saveStorageBtn" type="button" onclick="saveStorageConfig()">保存硬盘服务配置</button>
+      <button class="secondary" type="button" onclick="loadStorageConfig()">刷新</button>
+    </div>
+    <div id="storageConfigResult"></div>
+    <p class="muted" style="margin:12px 0 0">
+      不填写 Git 服务基础地址时，本机仍可作为同机项目母仓；如果要让其它 PC 节点从这台硬盘节点重建项目，需要配置一个其它 PC 能访问的 Git 地址。
+    </p>
+  </div>
+
   <h3>AI 编码工具（让本机能承接项目任务）</h3>
   <div class="card">
     <p class="muted" style="margin-top:0">
@@ -243,6 +267,9 @@ NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
 NODE_LM_STUDIO_URL   LM Studio 地址（可选）
 NODE_CUSTOM_LLM_URL  自定义 OpenAI 兼容地址（可选）
 NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
+NODE_STORAGE_ENABLED 启用项目硬盘服务（true/false）
+NODE_STORAGE_ROOT    项目硬盘服务存储根目录
+NODE_STORAGE_GIT_BASE_URL 可被其它 PC 访问的 Git 服务基础地址
 NODE_ADMIN_PORT      本管理页端口（默认 7799）</pre>
 
 <script>
@@ -317,6 +344,7 @@ async function load() {
     ['节点 ID', r.agent_id || '(登录后自动生成)'],
     ['设备名称', r.device_name || '(未知 PC)'],
     ['硬件画像', hardwareLine(r.hardware)],
+    ['硬盘服务', r.storage && r.storage.enabled ? ('✅ 已启用 · ' + (r.storage.root_path || '默认目录')) : '未启用'],
     ['云端', r.cloud_url],
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],
@@ -425,6 +453,60 @@ async function registerProject() {
   } finally {
     btn.disabled = false;
     btn.textContent = '注册到云端';
+  }
+}
+
+// ── 项目硬盘服务配置 ───────────────────────────────────────────────────────
+async function loadStorageConfig() {
+  const r = await fetch('/api/storage-config').then(r => r.json()).catch(() => null);
+  if (!r) return;
+  const enabled = document.getElementById('storageEnabledInput');
+  const root = document.getElementById('storageRootInput');
+  const gitBase = document.getElementById('storageGitBaseUrlInput');
+  const out = document.getElementById('storageConfigResult');
+  if (enabled) enabled.checked = !!r.enabled;
+  if (root) root.value = r.root_path || '';
+  if (gitBase) gitBase.value = r.git_base_url || '';
+  const profile = r.profile || {};
+  if (out) {
+    const free = profile.disk_free_bytes ? '，剩余 ' + fmtBytes(profile.disk_free_bytes) : '';
+    out.innerHTML = profile.enabled
+      ? `<div class="ok-toast" style="margin-top:8px">✅ 硬盘服务已启用：<code>${profile.root_path || r.root_path || '默认目录'}</code>${free}</div>`
+      : '<div class="warn" style="margin-top:8px">硬盘服务未启用。未启用时项目仍可使用外部 Git 或绑定到单台 PC。</div>';
+  }
+}
+
+async function saveStorageConfig() {
+  const enabled = !!document.getElementById('storageEnabledInput')?.checked;
+  const root = (document.getElementById('storageRootInput')?.value || '').trim();
+  const gitBase = (document.getElementById('storageGitBaseUrlInput')?.value || '').trim();
+  const out = document.getElementById('storageConfigResult');
+  const btn = document.getElementById('saveStorageBtn');
+  out.innerHTML = '';
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const resp = await fetch('/api/storage-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled,
+        root_path: root || null,
+        git_base_url: gitBase || null,
+      }),
+    });
+    const j = await resp.json();
+    if (j.ok) {
+      const profile = j.profile || {};
+      const free = profile.disk_free_bytes ? '，剩余 ' + fmtBytes(profile.disk_free_bytes) : '';
+      out.innerHTML = `<div class="ok-toast" style="margin-top:8px">${enabled ? '✅ 硬盘服务已启用' : '✅ 硬盘服务已禁用'}${enabled ? '：<code>' + (j.root_path || profile.root_path || '默认目录') + '</code>' + free : ''}。云端重连后生效。</div>`;
+      setTimeout(load, 800);
+    } else {
+      out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ ${j.error || 'HTTP ' + resp.status}</div>`;
+    }
+  } catch(e) {
+    out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ 请求失败: ${e}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '保存硬盘服务配置';
   }
 }
 
@@ -610,6 +692,7 @@ async function saveApiKey() {
 }
 
 load();
+loadStorageConfig();
 loadEnvCheck();
 loadTts();
 loadTtsRelayConfig();

@@ -128,6 +128,7 @@ mod tests {
                 gpu_memory_total_bytes: Some(bytes),
                 ..Default::default()
             }),
+            storage: None,
             models: vec![model(price)],
             tts_worker_url: None,
             connected_at: 1,

@@ -119,6 +119,10 @@ pub fn project_access(
             branch: None,
             workspace_path: None,
             node_id: None,
+            storage_node_id: None,
+            storage_repo_path: None,
+            storage_repo_url: None,
+            storage_status: "none".to_string(),
             role: "owner".to_string(),
             status: "active".to_string(),
         });

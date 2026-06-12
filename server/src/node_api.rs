@@ -15,7 +15,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use homecli_proto::{ModelCapability, NodeHardwareProfile};
+use homecli_proto::{ModelCapability, NodeHardwareProfile, NodeStorageProfile};
 use sha2::Digest as _;
 use std::{collections::HashMap, sync::Arc};
 
@@ -98,6 +98,17 @@ pub async fn list_nodes(
             device_name,
             hardware,
             hardware_summary,
+            storage: node.storage.clone(),
+            storage_ready: node
+                .storage
+                .as_ref()
+                .map(|storage| storage.enabled)
+                .unwrap_or(false),
+            storage_repo_url_configured: node
+                .storage
+                .as_ref()
+                .and_then(|storage| storage.git_base_url.as_ref())
+                .is_some(),
             display_name,
             short_id,
             models: node.models,
@@ -119,7 +130,7 @@ pub async fn list_nodes(
 
     for agent in cli_by_id.into_values() {
         let node_id = agent.agent_id.clone();
-        let allowed_clis = agent.allowed_clis;
+        let allowed_clis = agent.allowed_clis.clone();
         let short_id = short_node_id(&node_id);
         let device_name = clean_string(agent.device_name.as_deref());
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
@@ -154,6 +165,17 @@ pub async fn list_nodes(
             device_name,
             hardware,
             hardware_summary,
+            storage: agent.storage.clone(),
+            storage_ready: agent
+                .storage
+                .as_ref()
+                .map(|storage| storage.enabled)
+                .unwrap_or(false),
+            storage_repo_url_configured: agent
+                .storage
+                .as_ref()
+                .and_then(|storage| storage.git_base_url.as_ref())
+                .is_some(),
             display_name,
             short_id,
             models: Vec::new(),
@@ -532,6 +554,12 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 .ok()
                 .flatten();
             let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
+            let storage = node.storage.clone();
+            let storage_ready = node.storage_ready();
+            let storage_repo_url_configured = storage
+                .as_ref()
+                .and_then(|storage| storage.git_base_url.as_ref())
+                .is_some();
             let hardware = hardware_for_response(&state, &node.node_id, node.hardware);
             let hardware_summary = hardware_summary(hardware.as_ref());
             MyNodeResponse {
@@ -542,6 +570,9 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 device_name: node.device_name,
                 hardware,
                 hardware_summary,
+                storage,
+                storage_ready,
+                storage_repo_url_configured,
                 display_name: node.display_name,
                 short_id: node.short_id,
                 models: node.models,
@@ -576,6 +607,9 @@ struct PublicNodeResponse {
     device_name: Option<String>,
     hardware: Option<NodeHardwareProfile>,
     hardware_summary: String,
+    storage: Option<NodeStorageProfile>,
+    storage_ready: bool,
+    storage_repo_url_configured: bool,
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
@@ -603,6 +637,9 @@ struct MyNodeResponse {
     device_name: Option<String>,
     hardware: Option<NodeHardwareProfile>,
     hardware_summary: String,
+    storage: Option<NodeStorageProfile>,
+    storage_ready: bool,
+    storage_repo_url_configured: bool,
     display_name: String,
     short_id: String,
     models: Vec<ModelCapability>,
@@ -663,6 +700,7 @@ fn capacity_for_response(
         label: label.to_string(),
         device_name: device_name.map(ToOwned::to_owned),
         hardware: None,
+        storage: None,
         display_name: display_name.to_string(),
         short_id: short_node_id(node_id),
         models: Vec::new(),

@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use homecli_proto::{ModelCapability, NodeHardwareProfile};
+use homecli_proto::{ModelCapability, NodeHardwareProfile, NodeStorageProfile};
 use serde::Serialize;
 use tokio::sync::RwLock;
 
@@ -26,6 +26,8 @@ pub struct NodeEntry {
     pub device_name: Option<String>,
     /// PC 硬件画像，用于算力市场展示。
     pub hardware: Option<NodeHardwareProfile>,
+    /// PC 项目代码硬盘服务能力。
+    pub storage: Option<NodeStorageProfile>,
     /// 该节点支持的 LLM 模型列表
     pub models: Vec<ModelCapability>,
     /// 本机 TTS Worker URL（如 http://127.0.0.1:5011）——空表示无 TTS 能力
@@ -43,6 +45,7 @@ pub struct NodeSummary {
     pub owner_user_id: String,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
+    pub storage: Option<NodeStorageProfile>,
     pub models: Vec<ModelCapability>,
     pub tts_worker_url: Option<String>,
     pub connected_at: u64,
@@ -69,6 +72,7 @@ impl NodeRegistry {
         owner_user_id: String,
         device_name: Option<String>,
         hardware: Option<NodeHardwareProfile>,
+        storage: Option<NodeStorageProfile>,
         models: Vec<ModelCapability>,
         connected_at: u64,
     ) {
@@ -77,6 +81,7 @@ impl NodeRegistry {
             owner_user_id,
             device_name,
             hardware,
+            storage,
             models,
             tts_worker_url: None,
             connected_at,
@@ -97,6 +102,7 @@ impl NodeRegistry {
         models: Vec<ModelCapability>,
         tts_worker_url: Option<String>,
         hardware: Option<NodeHardwareProfile>,
+        storage: Option<NodeStorageProfile>,
     ) {
         if let Some(entry) = self.nodes.write().await.get_mut(node_id) {
             entry.models = models;
@@ -105,6 +111,9 @@ impl NodeRegistry {
             }
             if hardware.is_some() {
                 entry.hardware = hardware;
+            }
+            if storage.is_some() {
+                entry.storage = storage;
             }
             entry.last_seen = Instant::now();
         }
@@ -158,6 +167,7 @@ impl NodeRegistry {
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
                 hardware: e.hardware.clone(),
+                storage: e.storage.clone(),
                 models: e.models.clone(),
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
@@ -178,6 +188,7 @@ impl NodeRegistry {
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
                 hardware: e.hardware.clone(),
+                storage: e.storage.clone(),
                 models: e.models.clone(),
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
@@ -246,6 +257,7 @@ impl NodeRegistry {
                 owner_user_id: e.owner_user_id.clone(),
                 device_name: e.device_name.clone(),
                 hardware: e.hardware.clone(),
+                storage: e.storage.clone(),
                 models: e.models.clone(),
                 tts_worker_url: e.tts_worker_url.clone(),
                 connected_at: e.connected_at,
@@ -281,6 +293,7 @@ mod tests {
                 "user-a".to_string(),
                 Some("PC-A".to_string()),
                 None,
+                None,
                 vec![model("qwen")],
                 1,
             )
@@ -290,6 +303,7 @@ mod tests {
                 "node-b".to_string(),
                 "user-b".to_string(),
                 Some("PC-B".to_string()),
+                None,
                 None,
                 vec![model("llama")],
                 1,

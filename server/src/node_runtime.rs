@@ -1,5 +1,5 @@
 use anyhow::Result;
-use homecli_proto::{ModelCapability, NodeHardwareProfile};
+use homecli_proto::{ModelCapability, NodeHardwareProfile, NodeStorageProfile};
 use std::collections::HashMap;
 
 use crate::{
@@ -13,6 +13,7 @@ pub struct NodeRuntime {
     pub label: String,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
+    pub storage: Option<NodeStorageProfile>,
     pub display_name: String,
     pub short_id: String,
     pub models: Vec<ModelCapability>,
@@ -29,6 +30,14 @@ pub struct NodeRuntime {
 impl NodeRuntime {
     pub fn cli_project_ready(&self) -> bool {
         supports_project_cli(&self.allowed_clis)
+    }
+
+    pub fn storage_ready(&self) -> bool {
+        self.storage
+            .as_ref()
+            .map(|storage| storage.enabled)
+            .unwrap_or(false)
+            && self.cli_connected
     }
 }
 
@@ -212,6 +221,9 @@ fn build_runtime_for_parts(
     let hardware = registry
         .and_then(|node| node.hardware.clone())
         .or_else(|| cli.and_then(|agent| agent.hardware.clone()));
+    let storage = registry
+        .and_then(|node| node.storage.clone())
+        .or_else(|| cli.and_then(|agent| agent.storage.clone()));
     let registry_online = registry.map(|node| node.online).unwrap_or(false);
     let cli_connected = cli.is_some();
     let connected_at = registry
@@ -224,6 +236,7 @@ fn build_runtime_for_parts(
         label,
         device_name,
         hardware,
+        storage,
         display_name,
         short_id,
         models,

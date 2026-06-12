@@ -87,6 +87,7 @@ mod project_mobile;
 mod project_prewarm;
 mod project_space;
 mod project_store;
+mod project_storage;
 mod project_task_scheduler;
 mod project_trace_events;
 mod project_workspace_health;

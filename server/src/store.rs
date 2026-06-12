@@ -33,6 +33,7 @@ mod pc_project_binding;
 mod project_execution_sessions;
 mod project_member_conversations;
 mod project_space;
+mod project_storage;
 mod project_workspace_health_snapshots;
 mod projects;
 mod social_ai_messages;
@@ -188,6 +189,10 @@ impl Store {
                 branch: None,
                 workspace_path: None,
                 node_id: None,
+                storage_node_id: None,
+                storage_repo_path: None,
+                storage_repo_url: None,
+                storage_status: "none".into(),
                 status: "active".into(),
                 role: "owner".into(),
                 member_count: 1,
@@ -399,6 +404,10 @@ impl Store {
                 branch: branch.map(ToOwned::to_owned),
                 workspace_path: Some(workspace_path.to_string()),
                 node_id: node_id.map(ToOwned::to_owned),
+                storage_node_id: None,
+                storage_repo_path: None,
+                storage_repo_url: None,
+                storage_status: "none".into(),
                 status: "active".into(),
                 role: "owner".into(),
                 member_count: 1,
@@ -565,7 +574,9 @@ impl Store {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
-                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
+                    p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                    COALESCE(p.storage_status, 'none'), p.status,
                     pm.role,
                     (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
                     p.is_public,
@@ -601,7 +612,9 @@ impl Store {
         self.conn()?
             .query_row(
                 "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
-                        p.workspace_path, p.node_id, pm.role, p.status
+                        p.workspace_path, p.node_id,
+                        p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                        COALESCE(p.storage_status, 'none'), pm.role, p.status
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -616,8 +629,12 @@ impl Store {
                         branch: row.get(5)?,
                         workspace_path: row.get(6)?,
                         node_id: row.get(7)?,
-                        role: row.get(8)?,
-                        status: row.get(9)?,
+                        storage_node_id: row.get(8)?,
+                        storage_repo_path: row.get(9)?,
+                        storage_repo_url: row.get(10)?,
+                        storage_status: row.get(11)?,
+                        role: row.get(12)?,
+                        status: row.get(13)?,
                     })
                 },
             )
@@ -794,15 +811,19 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         branch: row.get(7)?,
         workspace_path: row.get(8)?,
         node_id: row.get(9)?,
-        status: row.get(10)?,
-        role: row.get(11)?,
-        member_count: row.get(12)?,
-        is_public: row.get::<_, i64>(13)? != 0,
-        join_mode: row.get(14)?,
-        last_task_status: row.get(15)?,
-        last_apk_url: row.get(16)?,
-        icon_data_url: row.get(17)?,
-        updated_at: row.get(18)?,
+        storage_node_id: row.get(10)?,
+        storage_repo_path: row.get(11)?,
+        storage_repo_url: row.get(12)?,
+        storage_status: row.get(13)?,
+        status: row.get(14)?,
+        role: row.get(15)?,
+        member_count: row.get(16)?,
+        is_public: row.get::<_, i64>(17)? != 0,
+        join_mode: row.get(18)?,
+        last_task_status: row.get(19)?,
+        last_apk_url: row.get(20)?,
+        icon_data_url: row.get(21)?,
+        updated_at: row.get(22)?,
     })
 }
 
@@ -814,7 +835,9 @@ fn find_owner_project_by_name(
     Ok(conn
         .query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
-                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
+                    p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                    COALESCE(p.storage_status, 'none'), p.status,
                     COALESCE(pm.role, 'owner') AS role,
                     (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
                     p.is_public,
@@ -852,7 +875,9 @@ fn find_project_by_id_for_user(
     Ok(conn
         .query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
-                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id, p.status,
+                    p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
+                    p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                    COALESCE(p.storage_status, 'none'), p.status,
                     pm.role,
                     (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
                     p.is_public,

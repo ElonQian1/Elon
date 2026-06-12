@@ -10,7 +10,7 @@ use std::{collections::HashMap, sync::Arc};
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_mobile::ensure_mobile_project,
-    project_workspace_provision,
+    project_storage, project_workspace_provision,
     project_ws_session::handle_project_ws,
     store::is_system_project_source_type,
     types::AppState,
@@ -28,6 +28,8 @@ pub struct CreateProjectRequest {
     pub branch: Option<String>,
     /// 新项目可创建到任意在线 PC CLI 节点；多节点在线时必须显式指定。
     pub node_id: Option<String>,
+    /// 可选：项目代码母仓所在的 PC 硬盘节点；不传时优先自动使用当前用户的在线硬盘节点。
+    pub storage_node_id: Option<String>,
     /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
     pub execution_target: Option<String>,
 }
@@ -139,6 +141,18 @@ pub async fn create_project(
     }
     let requested_repo_url = clean_optional_string(req.repo_url.as_deref());
     let requested_branch = clean_optional_string(req.branch.as_deref());
+    if requested_repo_url.is_some()
+        && req
+            .storage_node_id
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty())
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "repo_url 和 storage_node_id 不能同时指定：外部 Git 远端与平台硬盘节点二选一",
+        );
+    }
 
     let create_result = match state.store.create_project(
         &user.id,
@@ -227,6 +241,69 @@ pub async fn create_project(
         }
     };
 
+    let mut provision_repo_url = project.repo_url.clone();
+    let mut provision_branch = project.branch.clone();
+    let mut storage_repo_created = None;
+    let mut local_storage_clone_path = None;
+    if provision_repo_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none()
+    {
+        let prepared_storage = match project_storage::maybe_prepare_project_storage_repo(
+            &state,
+            &user.id,
+            &project.id,
+            &project.name,
+            project.branch.as_deref(),
+            req.storage_node_id.as_deref(),
+            Some(&node_id),
+        )
+        .await
+        {
+            Ok(repo) => repo,
+            Err((status, message)) => {
+                let _ = state.store.purge_project_records(&user.id, &project.id);
+                return json_error(status, message);
+            }
+        };
+        if let Some(storage) = prepared_storage {
+            let clone_url = match project_storage::clone_url_for_prepared_storage(
+                &storage, &node_id,
+            ) {
+                Some(url) => url,
+                None => {
+                    let _ = state.store.purge_project_records(&user.id, &project.id);
+                    return json_error(
+                        StatusCode::BAD_REQUEST,
+                        "硬盘节点已创建项目仓库，但没有可跨 PC clone 的 Git 地址。请在硬盘节点管理页配置 Git 服务基础地址，或选择同一台 PC 同时作为硬盘和计算节点。",
+                    );
+                }
+            };
+            if storage.storage_repo_url.is_none() && clone_url == storage.storage_repo_path {
+                local_storage_clone_path = Some(clone_url.clone());
+            }
+            storage_repo_created = Some(storage.created);
+            project = match state.store.bind_project_storage_repo(
+                &user.id,
+                &project.id,
+                &storage.node_id,
+                &storage.storage_repo_path,
+                storage.storage_repo_url.as_deref(),
+                storage.branch.as_deref(),
+            ) {
+                Ok(project) => project,
+                Err(e) => {
+                    let _ = state.store.purge_project_records(&user.id, &project.id);
+                    return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
+                }
+            };
+            provision_repo_url = Some(clone_url);
+            provision_branch = storage.branch.or(project.branch.clone());
+        }
+    }
+
     let provisioned = match project_workspace_provision::provision_project_workspace(
         &state,
         &node_id,
@@ -234,8 +311,8 @@ pub async fn create_project(
         &project.id,
         &project.name,
         &project.template,
-        project.repo_url.as_deref(),
-        project.branch.as_deref(),
+        provision_repo_url.as_deref(),
+        provision_branch.as_deref(),
     )
     .await
     {
@@ -249,19 +326,22 @@ pub async fn create_project(
         }
     };
 
+    let persisted_remote_origin = provisioned
+        .git_remote_origin
+        .as_deref()
+        .filter(|origin| Some(*origin) != local_storage_clone_path.as_deref())
+        .or(project.repo_url.as_deref());
     let project = match state.store.bind_project_to_pc_workspace(
         &user.id,
         &project.id,
         &provisioned.workspace_path,
         &node_id,
         provisioned.git_head.as_deref(),
-        provisioned
-            .git_remote_origin
-            .as_deref()
-            .or(project.repo_url.as_deref()),
+        persisted_remote_origin,
         provisioned
             .git_branch
             .as_deref()
+            .or(provision_branch.as_deref())
             .or(project.branch.as_deref()),
     ) {
         Ok(project) => project,
@@ -271,14 +351,17 @@ pub async fn create_project(
         }
     };
 
+    let storage_node_id = project.storage_node_id.clone();
     let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
     Json(serde_json::json!({
         "project": project,
         "archive_project": archive_project,
         "reused_existing": false,
         "node_id": node_id,
+        "storage_node_id": storage_node_id,
         "provisioned": true,
         "workspace_created": provisioned.created,
+        "storage_repo_created": storage_repo_created,
     }))
     .into_response()
 }

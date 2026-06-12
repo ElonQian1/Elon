@@ -2074,6 +2074,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       </select>
     </div>
     <div>
+      <label for="projectStorageNodeSelect">代码硬盘节点（可选）</label>
+      <select id="projectStorageNodeSelect" disabled>
+        <option value="">自动选择可用硬盘节点</option>
+      </select>
+    </div>
+    <div>
       <label for="projectRepoUrlInput">Git 远端（可选）</label>
       <input id="projectRepoUrlInput" placeholder="git@github.com:you/project.git" />
     </div>
@@ -2410,6 +2416,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectDescInput = $('projectDescInput');
   const templateSelect = $('templateSelect');
   const projectNodeSelect = $('projectNodeSelect');
+  const projectStorageNodeSelect = $('projectStorageNodeSelect');
   const projectRepoUrlInput = $('projectRepoUrlInput');
   const projectBranchInput = $('projectBranchInput');
   const newProjectError = $('newProjectError');
@@ -4635,6 +4642,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     loadProjectCreateNodes().catch((err) => {
       projectNodeSelect.innerHTML = '<option value="">加载 PC 节点失败</option>';
       projectNodeSelect.disabled = true;
+      projectStorageNodeSelect.innerHTML = '<option value="">加载硬盘节点失败</option>';
+      projectStorageNodeSelect.disabled = true;
       newProjectError.textContent = err.message || '加载 PC 节点失败';
     });
     newProjectMask.classList.add('active');
@@ -4644,12 +4653,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   async function loadProjectCreateNodes() {
     projectNodeSelect.disabled = true;
     projectNodeSelect.innerHTML = '<option value="">正在加载在线 PC 节点...</option>';
+    projectStorageNodeSelect.disabled = true;
+    projectStorageNodeSelect.innerHTML = '<option value="">正在加载硬盘节点...</option>';
     const res = await api('/api/nodes');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载 PC 节点失败');
     const nodes = (data.nodes || []).filter((node) => node.online && (node.node_id || node.agent_id));
     if (!nodes.length) {
       projectNodeSelect.innerHTML = '<option value="">没有在线 PC 节点</option>';
+      projectStorageNodeSelect.innerHTML = '<option value="">没有在线硬盘节点</option>';
       return;
     }
     const orderedNodes = nodes.slice().sort((left, right) => {
@@ -4668,6 +4680,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       ? options
       : '<option value="">暂无可创建项目的 PC 节点</option>' + options;
     projectNodeSelect.disabled = false;
+    const storageNodes = nodes.filter((node) => node.storage_ready || (node.storage && node.storage.enabled));
+    const storageOptions = storageNodes.map((node) => {
+      const nodeId = node.node_id || node.agent_id || '';
+      const shortId = node.short_id || (nodeId.length > 16 ? '...' + nodeId.slice(-14) : nodeId);
+      const label = node.display_name || node.label || node.device_name || shortId;
+      const configured = node.storage_repo_url_configured ? '可跨 PC' : '仅同机/需配置 Git 服务';
+      return `<option value="${escapeHtml(nodeId)}">${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(configured)}</option>`;
+    }).join('');
+    projectStorageNodeSelect.innerHTML = '<option value="">自动选择可用硬盘节点</option>' + storageOptions;
+    projectStorageNodeSelect.disabled = false;
   }
   function openAddFriendDialog() {
     addFriendResult.textContent = '';
@@ -4704,7 +4726,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           repo_url: projectRepoUrlInput.value.trim() || null,
           branch: projectBranchInput.value.trim() || null,
           execution_target: 'pc_node',
-          node_id: projectNodeSelect.value
+          node_id: projectNodeSelect.value,
+          storage_node_id: projectRepoUrlInput.value.trim() ? null : (projectStorageNodeSelect.value || null)
         })
       });
       const data = await res.json().catch(() => ({}));

@@ -40,6 +40,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_hardware_probe;
+mod pc_storage_repo;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
@@ -82,6 +83,9 @@ struct PersistedState {
     agent_secret: Option<String>,
     owner_user_id: Option<String>,
     user_token: Option<String>,
+    storage_enabled: Option<bool>,
+    storage_root: Option<String>,
+    storage_git_base_url: Option<String>,
 }
 
 fn derive_http_url(ws_url: &str) -> String {
@@ -140,12 +144,15 @@ fn save_persisted(s: &PersistedState) {
 }
 
 impl PersistedState {
-    fn from_creds(c: &Credentials) -> Self {
+    fn from_parts(c: Option<&Credentials>, storage: &pc_storage_repo::StorageSettings) -> Self {
         Self {
-            agent_id: Some(c.agent_id.clone()),
-            agent_secret: Some(c.agent_secret.clone()),
-            owner_user_id: Some(c.owner_user_id.clone()),
-            user_token: c.user_token.clone(),
+            agent_id: c.map(|c| c.agent_id.clone()),
+            agent_secret: c.map(|c| c.agent_secret.clone()),
+            owner_user_id: c.map(|c| c.owner_user_id.clone()),
+            user_token: c.and_then(|c| c.user_token.clone()),
+            storage_enabled: Some(storage.enabled),
+            storage_root: storage.root_path.clone(),
+            storage_git_base_url: storage.git_base_url.clone(),
         }
     }
 }
@@ -167,6 +174,36 @@ fn initial_credentials(persisted: &PersistedState) -> Option<Credentials> {
         owner_user_id,
         user_token,
     })
+}
+
+fn initial_storage_settings(persisted: &PersistedState) -> pc_storage_repo::StorageSettings {
+    let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    let root_path = env_nonempty("NODE_STORAGE_ROOT")
+        .or_else(|| env_nonempty("ELON_STORAGE_ROOT"))
+        .or_else(|| persisted.storage_root.clone());
+    let git_base_url = env_nonempty("NODE_STORAGE_GIT_BASE_URL")
+        .or_else(|| env_nonempty("ELON_STORAGE_GIT_BASE_URL"))
+        .or_else(|| persisted.storage_git_base_url.clone());
+    let enabled = env_flag("NODE_STORAGE_ENABLED")
+        .or_else(|| env_flag("ELON_STORAGE_ENABLED"))
+        .or(persisted.storage_enabled)
+        .unwrap_or(false);
+    pc_storage_repo::StorageSettings {
+        enabled,
+        root_path: root_path.or_else(|| {
+            enabled.then(|| {
+                pc_storage_repo::default_storage_root()
+                    .to_string_lossy()
+                    .to_string()
+            })
+        }),
+        git_base_url,
+    }
+}
+
+fn env_flag(name: &str) -> Option<bool> {
+    let value = std::env::var(name).ok()?.trim().to_ascii_lowercase();
+    Some(matches!(value.as_str(), "1" | "true" | "yes" | "on"))
 }
 
 /// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
@@ -1437,6 +1474,8 @@ async fn run_session(
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
     let hardware = crate::node_hardware_probe::collect_hardware_profile();
+    let storage_settings = runtime.storage_settings.read().await.clone();
+    let storage = pc_storage_repo::storage_profile(&storage_settings);
 
     // 发送 Register
     out_tx.send(ws_text(&AgentToServer::Register {
@@ -1448,6 +1487,7 @@ async fn run_session(
         owner_user_id: Some(creds.owner_user_id.clone()),
         device_name: Some(machine_label()),
         hardware: Some(hardware.clone()),
+        storage: Some(storage.clone()),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
@@ -1457,6 +1497,7 @@ async fn run_session(
         models: models.clone(),
         tts_worker_url: tts_url,
         hardware: Some(hardware),
+        storage: Some(storage),
     }))?;
 
     // WS ping 定时器
@@ -1557,6 +1598,47 @@ async fn run_session(
                                             message: e.to_string(),
                                         },
                                     };
+                                let _ = tx_c.send(ws_text(&response));
+                            });
+                        }
+                        ServerToAgent::PrepareProjectStorageRepo {
+                            req_id,
+                            project_id,
+                            user_id,
+                            name,
+                            branch,
+                        } => {
+                            info!(
+                                "🗄️  PrepareProjectStorageRepo: {} project={}",
+                                req_id, project_id
+                            );
+                            let tx_c = out_tx_r.clone();
+                            let storage_settings = runtime.storage_settings.read().await.clone();
+                            tokio::spawn(async move {
+                                let project_id_for_error = project_id.clone();
+                                let response = match pc_storage_repo::prepare_project_storage_repo(
+                                    &storage_settings,
+                                    pc_storage_repo::StorageRepoRequest {
+                                        project_id,
+                                        user_id,
+                                        name,
+                                        branch,
+                                    },
+                                ) {
+                                    Ok(result) => AgentToServer::ProjectStorageRepoReady {
+                                        req_id,
+                                        project_id: project_id_for_error,
+                                        storage_repo_path: result.storage_repo_path,
+                                        storage_repo_url: result.storage_repo_url,
+                                        branch: result.branch,
+                                        created: result.created,
+                                    },
+                                    Err(e) => AgentToServer::ProjectStorageRepoError {
+                                        req_id,
+                                        project_id: project_id_for_error,
+                                        message: e.to_string(),
+                                    },
+                                };
                                 let _ = tx_c.send(ws_text(&response));
                             });
                         }
@@ -1794,6 +1876,7 @@ async fn main() -> Result<()> {
 
     let cfg = NodeConfig::from_env()?;
     let persisted = load_persisted();
+    let storage_settings = initial_storage_settings(&persisted);
     let mut creds = initial_credentials(&persisted);
 
     // 有登录 token 但还没有节点凭证 → 自动注册一次
@@ -1807,7 +1890,7 @@ async fn main() -> Result<()> {
             match provision_node(&cfg, &tok).await {
                 Ok(c) => {
                     info!("✅ 节点已自动注册: {}", c.agent_id);
-                    save_persisted(&PersistedState::from_creds(&c));
+                    save_persisted(&PersistedState::from_parts(Some(&c), &storage_settings));
                     creds = Some(c);
                 }
                 Err(e) => warn!("自动注册失败（可在管理页重新登录）: {e:#}"),
@@ -1829,8 +1912,17 @@ async fn main() -> Result<()> {
     info!("   云端: {}", cfg.cloud_url);
     info!("   Ollama: {}", cfg.ollama_url);
     info!("   积分价格: {} credits/1k tokens", cfg.price_per_1k);
+    if storage_settings.enabled {
+        info!(
+            "   硬盘服务: {}",
+            storage_settings
+                .root_path
+                .as_deref()
+                .unwrap_or("<default storage root>")
+        );
+    }
 
-    let runtime = Arc::new(NodeRuntime::new(cfg, creds));
+    let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings));
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
     node_agent_admin_open::maybe_open_admin_page(admin_port);
@@ -1856,12 +1948,18 @@ struct NodeRuntime {
     cli_paths: RwLock<Vec<(String, String)>>,
     /// 本地 TTS Worker URL（如 http://127.0.0.1:5011）；由管理页或环境变量设置
     tts_worker_url: RwLock<Option<String>>,
+    /// 本机项目代码硬盘服务配置。
+    storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
 }
 
 impl NodeRuntime {
-    fn new(cfg: NodeConfig, creds: Option<Credentials>) -> Self {
+    fn new(
+        cfg: NodeConfig,
+        creds: Option<Credentials>,
+        storage_settings: pc_storage_repo::StorageSettings,
+    ) -> Self {
         // 从环境变量读取 TTS Worker URL 初始值
         let tts_url = std::env::var("NODE_TTS_WORKER_URL")
             .ok()
@@ -1873,6 +1971,7 @@ impl NodeRuntime {
             status: RwLock::new(NodeStatus::default()),
             cli_paths: RwLock::new(Vec::new()),
             tts_worker_url: RwLock::new(tts_url),
+            storage_settings: RwLock::new(storage_settings),
             wake: Notify::new(),
         }
     }
@@ -1898,11 +1997,16 @@ impl NodeRuntime {
 
     /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
     async fn set_creds(&self, c: Option<Credentials>) {
-        match &c {
-            Some(c) => save_persisted(&PersistedState::from_creds(c)),
-            None => save_persisted(&PersistedState::default()),
-        }
+        let storage = self.storage_settings.read().await.clone();
+        save_persisted(&PersistedState::from_parts(c.as_ref(), &storage));
         *self.creds.write().await = c;
+        self.wake.notify_waiters();
+    }
+
+    async fn set_storage_settings(&self, settings: pc_storage_repo::StorageSettings) {
+        let creds = self.creds.read().await.clone();
+        save_persisted(&PersistedState::from_parts(creds.as_ref(), &settings));
+        *self.storage_settings.write().await = settings;
         self.wake.notify_waiters();
     }
 
@@ -1934,6 +2038,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/register-project",
                 axum::routing::post(admin_register_project),
+            )
+            .route(
+                "/api/storage-config",
+                axum::routing::get(admin_storage_config_get).post(admin_storage_config_set),
             )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(
@@ -1979,6 +2087,69 @@ async fn admin_tts_relay_set(
     // 唤醒连接循环重新注册能力（让云端尽快知晓有 TTS 能力）
     rt.wake.notify_one();
     axum::Json(serde_json::json!({ "ok": true, "ttsWorkerUrl": url }))
+}
+
+async fn admin_storage_config_get(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let settings = rt.storage_settings.read().await.clone();
+    let profile = pc_storage_repo::storage_profile(&settings);
+    axum::Json(serde_json::json!({
+        "enabled": settings.enabled,
+        "root_path": settings.root_path,
+        "git_base_url": settings.git_base_url,
+        "profile": profile,
+    }))
+}
+
+#[derive(serde::Deserialize)]
+struct StorageConfigSetReq {
+    enabled: Option<bool>,
+    root_path: Option<String>,
+    git_base_url: Option<String>,
+}
+
+async fn admin_storage_config_set(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<StorageConfigSetReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    let enabled = req.enabled.unwrap_or(false);
+    let root_path = clean_optional_admin_field(req.root_path.as_deref()).or_else(|| {
+        enabled.then(|| {
+            pc_storage_repo::default_storage_root()
+                .to_string_lossy()
+                .to_string()
+        })
+    });
+    if enabled {
+        if let Some(root) = root_path.as_deref() {
+            if let Err(e) = std::fs::create_dir_all(root) {
+                return (
+                    axum::http::StatusCode::BAD_REQUEST,
+                    axum::Json(serde_json::json!({
+                        "ok": false,
+                        "error": format!("创建硬盘服务目录失败: {e}"),
+                    })),
+                );
+            }
+        }
+    }
+    let settings = pc_storage_repo::StorageSettings {
+        enabled,
+        root_path,
+        git_base_url: clean_optional_admin_field(req.git_base_url.as_deref()),
+    };
+    rt.set_storage_settings(settings.clone()).await;
+    (
+        axum::http::StatusCode::OK,
+        axum::Json(serde_json::json!({
+            "ok": true,
+            "enabled": settings.enabled,
+            "root_path": settings.root_path,
+            "git_base_url": settings.git_base_url,
+            "profile": pc_storage_repo::storage_profile(&settings),
+        })),
+    )
 }
 
 async fn admin_index() -> axum::response::Html<&'static str> {
@@ -2036,6 +2207,8 @@ async fn admin_status(
     let creds = rt.creds().await;
     let st = rt.status.read().await;
     let hardware = crate::node_hardware_probe::collect_hardware_profile();
+    let storage_settings = rt.storage_settings.read().await.clone();
+    let storage = pc_storage_repo::storage_profile(&storage_settings);
     axum::Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "logged_in": creds.is_some(),
@@ -2052,6 +2225,7 @@ async fn admin_status(
         "connected": st.connected,
         "last_event": st.last_event,
         "hardware": hardware,
+        "storage": storage,
         "models": live,
     }))
 }

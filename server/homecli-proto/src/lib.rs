@@ -38,6 +38,19 @@ pub struct NodeHardwareProfile {
     pub disk_free_bytes: Option<u64>,
 }
 
+/// PC 节点提供的项目代码硬盘服务能力。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NodeStorageProfile {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub root_path: Option<String>,
+    #[serde(default)]
+    pub git_base_url: Option<String>,
+    #[serde(default)]
+    pub disk_free_bytes: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CliProjectContext {
     pub project_id: String,
@@ -168,6 +181,15 @@ pub enum ServerToAgent {
         #[serde(default)]
         branch: Option<String>,
     },
+    /// 云端要求硬盘节点在本机存储根目录创建或复用一个项目裸 Git 仓库。
+    PrepareProjectStorageRepo {
+        req_id: String,
+        project_id: String,
+        user_id: String,
+        name: String,
+        #[serde(default)]
+        branch: Option<String>,
+    },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {
         req_id: String,
@@ -219,6 +241,9 @@ pub enum AgentToServer {
         /// PC 硬件画像，用于市场展示和算力供给筛选。
         #[serde(default)]
         hardware: Option<NodeHardwareProfile>,
+        /// 项目代码硬盘服务能力；旧节点不发送也兼容。
+        #[serde(default)]
+        storage: Option<NodeStorageProfile>,
     },
     TaskStarted {
         task_id: String,
@@ -292,6 +317,9 @@ pub enum AgentToServer {
         /// 能力刷新时顺带更新硬件画像，旧节点不发送也兼容。
         #[serde(default)]
         hardware: Option<NodeHardwareProfile>,
+        /// 能力刷新时顺带更新硬盘服务状态。
+        #[serde(default)]
+        storage: Option<NodeStorageProfile>,
     },
     /// LLM 推理流式输出片段
     LlmStreamChunk {
@@ -325,6 +353,23 @@ pub enum AgentToServer {
     },
     /// PC 节点创建项目工作区失败。
     ProjectWorkspaceProvisionError {
+        req_id: String,
+        project_id: String,
+        message: String,
+    },
+    /// 硬盘节点已创建或复用项目裸 Git 仓库。
+    ProjectStorageRepoReady {
+        req_id: String,
+        project_id: String,
+        storage_repo_path: String,
+        #[serde(default)]
+        storage_repo_url: Option<String>,
+        #[serde(default)]
+        branch: Option<String>,
+        created: bool,
+    },
+    /// 硬盘节点准备项目裸仓库失败。
+    ProjectStorageRepoError {
         req_id: String,
         project_id: String,
         message: String,
@@ -399,6 +444,8 @@ impl AgentToServer {
             | Self::LlmStreamError { .. }
             | Self::ProjectWorkspaceProvisioned { .. }
             | Self::ProjectWorkspaceProvisionError { .. }
+            | Self::ProjectStorageRepoReady { .. }
+            | Self::ProjectStorageRepoError { .. }
             | Self::ProjectWorkspaceInspected { .. }
             | Self::ProjectWorkspaceInspectError { .. }
             | Self::ProjectDocumentsRead { .. }
@@ -421,6 +468,8 @@ impl AgentToServer {
             | Self::LlmStreamError { req_id, .. }
             | Self::ProjectWorkspaceProvisioned { req_id, .. }
             | Self::ProjectWorkspaceProvisionError { req_id, .. }
+            | Self::ProjectStorageRepoReady { req_id, .. }
+            | Self::ProjectStorageRepoError { req_id, .. }
             | Self::ProjectWorkspaceInspected { req_id, .. }
             | Self::ProjectWorkspaceInspectError { req_id, .. }
             | Self::ProjectDocumentsRead { req_id, .. }

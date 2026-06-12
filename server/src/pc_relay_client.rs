@@ -125,6 +125,7 @@ async fn run_relay_session(
         owner_user_id: None,
         device_name: local_device_name(),
         hardware: Some(crate::node_hardware_probe::collect_hardware_profile()),
+        storage: None,
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");
@@ -264,6 +265,17 @@ async fn run_relay_session(
                         };
                     let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
                 });
+            }
+
+            ServerToAgent::PrepareProjectStorageRepo {
+                req_id, project_id, ..
+            } => {
+                let err = AgentToServer::ProjectStorageRepoError {
+                    req_id,
+                    project_id,
+                    message: "此 relay 客户端未启用项目硬盘服务，请使用 elon-node-agent".into(),
+                };
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
 
             ServerToAgent::InspectProjectWorkspace {

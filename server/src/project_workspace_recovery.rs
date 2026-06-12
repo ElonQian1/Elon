@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
-    project_workspace_provision,
+    project_storage, project_workspace_provision,
     store::{is_system_project_source_type, ProjectSummary, UserArchiveProject},
     types::AppState,
     user_archive_profile::build_user_archive_project_response,
@@ -72,9 +72,9 @@ pub async fn recover_project_workspace(
             Ok(node_id) => node_id,
             Err((status, message)) => return json_error(status, message),
         };
+    let rebuild_repo_url = project_storage::clone_url_for_project_storage(&project, &target_node);
     if requires_git_remote_for_cross_node(action, &project, &target_node)
-        && project
-            .repo_url
+        && rebuild_repo_url
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
@@ -82,7 +82,7 @@ pub async fn recover_project_workspace(
     {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "该项目没有 Git 远端，不能在其它 PC 节点重建。请先在项目 Git 仓库里配置可访问的 repo_url，并把本地代码 push 到远端。",
+            "该项目没有可跨 PC 访问的 Git 仓库，不能在其它 PC 节点重建。请配置外部 repo_url，或在硬盘节点管理页配置 Git 服务基础地址。",
         );
     }
 
@@ -93,7 +93,7 @@ pub async fn recover_project_workspace(
         &project.id,
         &project.name,
         &project.template,
-        project.repo_url.as_deref(),
+        rebuild_repo_url.as_deref(),
         project.branch.as_deref(),
     )
     .await
@@ -107,16 +107,23 @@ pub async fn recover_project_workspace(
         }
     };
 
+    let local_storage_path = project.storage_repo_path.as_deref().filter(|path| {
+        project.storage_repo_url.is_none()
+            && project.storage_node_id.as_deref() == Some(target_node.as_str())
+            && rebuild_repo_url.as_deref() == Some(*path)
+    });
+    let persisted_remote_origin = provisioned
+        .git_remote_origin
+        .as_deref()
+        .filter(|origin| Some(*origin) != local_storage_path)
+        .or(project.repo_url.as_deref());
     let rebound = match state.store.bind_project_to_pc_workspace(
         &user.id,
         &project.id,
         &provisioned.workspace_path,
         &target_node,
         provisioned.git_head.as_deref(),
-        provisioned
-            .git_remote_origin
-            .as_deref()
-            .or(project.repo_url.as_deref()),
+        persisted_remote_origin,
         provisioned
             .git_branch
             .as_deref()
