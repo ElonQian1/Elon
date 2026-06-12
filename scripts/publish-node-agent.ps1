@@ -1,4 +1,6 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
+# NOTE: Keep this file encoded as UTF-8 with BOM. Windows PowerShell 5.1 must
+# read Chinese launcher filenames correctly.
 <#
 .SYNOPSIS
     构建并上传 elon-node-agent 可执行文件到服务器。
