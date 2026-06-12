@@ -17,6 +17,7 @@ use crate::types::AppState;
 const BRAND_PNG_B64: &str = include_str!("assets/ic_app_brand.b64");
 const TAB_CHAT_PNG_B64: &str = include_str!("assets/ic_tab_chat_edit.b64");
 const TAB_PROJECT_PNG_B64: &str = include_str!("assets/ic_tab_project_stack.b64");
+const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
@@ -52,6 +53,7 @@ fn build_html() -> String {
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
         .replace("__TAB_PROJECT_PNG_B64__", TAB_PROJECT_PNG_B64.trim())
+        .replace("__PROJECT_AI_ICON_PNG_B64__", PROJECT_AI_ICON_PNG_B64.trim())
 }
 
 const WEB_HTML_TEMPLATE: &str = include_str!("assets/web_page.html");
