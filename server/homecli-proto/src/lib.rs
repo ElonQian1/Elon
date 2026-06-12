@@ -47,6 +47,9 @@ pub struct NodeStorageProfile {
     pub root_path: Option<String>,
     #[serde(default)]
     pub git_base_url: Option<String>,
+    /// 节点是否支持通过云端 WebSocket relay 暴露 Git HTTP 访问。
+    #[serde(default)]
+    pub relay_git_url_enabled: bool,
     #[serde(default)]
     pub disk_free_bytes: Option<u64>,
 }
@@ -189,6 +192,8 @@ pub enum ServerToAgent {
         name: String,
         #[serde(default)]
         branch: Option<String>,
+        #[serde(default)]
+        access_token: Option<String>,
     },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {

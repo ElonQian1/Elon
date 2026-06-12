@@ -193,7 +193,7 @@
       <input id="storageRootInput" placeholder="留空使用默认目录" />
     </div>
     <div class="form-row">
-      <label>Git 服务基础地址（可选，跨 PC 重建需要）</label>
+      <label>外部 Git 服务基础地址（可选，高级直连）</label>
       <input id="storageGitBaseUrlInput" placeholder="如：https://git.example.com/elon-storage" />
     </div>
     <div class="action-row">
@@ -202,7 +202,7 @@
     </div>
     <div id="storageConfigResult"></div>
     <p class="muted" style="margin:12px 0 0">
-      不填写 Git 服务基础地址时，本机仍可作为同机项目母仓；如果要让其它 PC 节点从这台硬盘节点重建项目，需要配置一个其它 PC 能访问的 Git 地址。
+      新版节点默认通过云端 relay 给其它 PC 提供 Git clone/push，不占用服务器硬盘；外部 Git 地址只用于你已经有独立 Git 服务、希望绕过 relay 直连的场景。
     </p>
   </div>
 
@@ -269,7 +269,7 @@ NODE_CUSTOM_LLM_URL  自定义 OpenAI 兼容地址（可选）
 NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
 NODE_STORAGE_ENABLED 启用项目硬盘服务（true/false）
 NODE_STORAGE_ROOT    项目硬盘服务存储根目录
-NODE_STORAGE_GIT_BASE_URL 可被其它 PC 访问的 Git 服务基础地址
+NODE_STORAGE_GIT_BASE_URL 外部 Git 服务基础地址（可选；默认使用云端 relay）
 NODE_ADMIN_PORT      本管理页端口（默认 7799）</pre>
 
 <script>
@@ -344,7 +344,7 @@ async function load() {
     ['节点 ID', r.agent_id || '(登录后自动生成)'],
     ['设备名称', r.device_name || '(未知 PC)'],
     ['硬件画像', hardwareLine(r.hardware)],
-    ['硬盘服务', r.storage && r.storage.enabled ? ('✅ 已启用 · ' + (r.storage.root_path || '默认目录')) : '未启用'],
+    ['硬盘服务', storageStatusLine(r.storage)],
     ['云端', r.cloud_url],
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],
@@ -366,6 +366,13 @@ async function load() {
       tbody.innerHTML += `<tr><td><code>${m.model_id}</code></td><td>${m.provider}</td><td>${m.price_per_1k_credits}</td></tr>`;
     }
   }
+}
+
+function storageStatusLine(storage) {
+  if (!storage || !storage.enabled) return '未启用';
+  const root = storage.root_path || '默认目录';
+  const cross = storage.relay_git_url_enabled || storage.git_base_url ? '可跨 PC' : '需安装 Git';
+  return `✅ 已启用 · ${root} · ${cross}`;
 }
 
 async function postLogin(payload, btn, out) {

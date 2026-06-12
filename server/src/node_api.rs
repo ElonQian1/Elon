@@ -31,6 +31,15 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+fn storage_can_cross_pc(storage: &NodeStorageProfile) -> bool {
+    storage
+        .git_base_url
+        .as_ref()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+        || storage.relay_git_url_enabled
+}
+
 // ── /api/nodes ────────────────────────────────────────────────────────────────
 
 /// GET /api/nodes — 列出所有用户可发现的在线节点（含在线状态）
@@ -107,8 +116,8 @@ pub async fn list_nodes(
             storage_repo_url_configured: node
                 .storage
                 .as_ref()
-                .and_then(|storage| storage.git_base_url.as_ref())
-                .is_some(),
+                .map(storage_can_cross_pc)
+                .unwrap_or(false),
             display_name,
             short_id,
             models: node.models,
@@ -174,8 +183,8 @@ pub async fn list_nodes(
             storage_repo_url_configured: agent
                 .storage
                 .as_ref()
-                .and_then(|storage| storage.git_base_url.as_ref())
-                .is_some(),
+                .map(storage_can_cross_pc)
+                .unwrap_or(false),
             display_name,
             short_id,
             models: Vec::new(),
@@ -556,10 +565,8 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
             let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
             let storage = node.storage.clone();
             let storage_ready = node.storage_ready();
-            let storage_repo_url_configured = storage
-                .as_ref()
-                .and_then(|storage| storage.git_base_url.as_ref())
-                .is_some();
+            let storage_repo_url_configured =
+                storage.as_ref().map(storage_can_cross_pc).unwrap_or(false);
             let hardware = hardware_for_response(&state, &node.node_id, node.hardware);
             let hardware_summary = hardware_summary(hardware.as_ref());
             MyNodeResponse {

@@ -277,11 +277,11 @@ pub async fn create_project(
                     let _ = state.store.purge_project_records(&user.id, &project.id);
                     return json_error(
                         StatusCode::BAD_REQUEST,
-                        "硬盘节点已创建项目仓库，但没有可跨 PC clone 的 Git 地址。请在硬盘节点管理页配置 Git 服务基础地址，或选择同一台 PC 同时作为硬盘和计算节点。",
+                        "硬盘节点已创建项目仓库，但没有可用的跨 PC Git 地址。请升级硬盘节点 node-agent、配置外部 Git 服务基础地址，或选择同一台 PC 同时作为硬盘和计算节点。",
                     );
                 }
             };
-            if storage.storage_repo_url.is_none() && clone_url == storage.storage_repo_path {
+            if clone_url == storage.storage_repo_path {
                 local_storage_clone_path = Some(clone_url.clone());
             }
             storage_repo_created = Some(storage.created);

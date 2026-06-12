@@ -40,6 +40,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_hardware_probe;
+mod pc_storage_git_http;
 mod pc_storage_repo;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
@@ -1607,6 +1608,7 @@ async fn run_session(
                             user_id,
                             name,
                             branch,
+                            access_token,
                         } => {
                             info!(
                                 "🗄️  PrepareProjectStorageRepo: {} project={}",
@@ -1623,6 +1625,7 @@ async fn run_session(
                                         user_id,
                                         name,
                                         branch,
+                                        access_token,
                                     },
                                 ) {
                                     Ok(result) => AgentToServer::ProjectStorageRepoReady {
@@ -2043,6 +2046,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/storage-config",
                 axum::routing::get(admin_storage_config_get).post(admin_storage_config_set),
             )
+            .route(
+                "/storage/git/:token/*path",
+                axum::routing::any(admin_storage_git_http),
+            )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(
                 "/api/tts-relay-config",
@@ -2442,6 +2449,14 @@ async fn admin_register_project(
             })),
         ),
     }
+}
+
+async fn admin_storage_git_http(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    req: axum::http::Request<axum::body::Body>,
+) -> axum::response::Response {
+    let settings = rt.storage_settings.read().await.clone();
+    pc_storage_git_http::handle_git_http(settings, req).await
 }
 
 fn clean_optional_admin_field(value: Option<&str>) -> Option<String> {

@@ -15,6 +15,7 @@ pub struct StorageRepoRequest {
     pub user_id: String,
     pub name: String,
     pub branch: Option<String>,
+    pub access_token: Option<String>,
 }
 
 pub struct StorageRepoResult {
@@ -51,6 +52,7 @@ pub fn storage_profile(settings: &StorageSettings) -> NodeStorageProfile {
         enabled: true,
         root_path: Some(root.to_string_lossy().to_string()),
         git_base_url: settings.git_base_url.clone(),
+        relay_git_url_enabled: git_available(),
         disk_free_bytes: disk_free_bytes(&root),
     }
 }
@@ -90,17 +92,23 @@ pub fn prepare_project_storage_repo(
     } else if !repo.join("HEAD").exists() {
         anyhow::bail!("存储仓库路径已存在但不是 Git 裸仓库: {}", repo.display());
     }
+    ensure_http_receive_pack(&repo)?;
+    write_access_token(&repo, req.access_token.as_deref())?;
 
     let branch = clean_branch(req.branch.as_deref()).or_else(|| bare_head_branch(&repo));
     Ok(StorageRepoResult {
         storage_repo_path: repo.to_string_lossy().to_string(),
-        storage_repo_url: storage_repo_url(settings.git_base_url.as_deref(), &req.project_id),
+        storage_repo_url: storage_repo_url(
+            settings.git_base_url.as_deref(),
+            &req.user_id,
+            &req.project_id,
+        ),
         branch,
         created,
     })
 }
 
-fn storage_root(settings: &StorageSettings) -> PathBuf {
+pub fn storage_root(settings: &StorageSettings) -> PathBuf {
     settings
         .root_path
         .as_deref()
@@ -108,13 +116,18 @@ fn storage_root(settings: &StorageSettings) -> PathBuf {
         .unwrap_or_else(default_storage_root)
 }
 
-fn storage_repo_url(base_url: Option<&str>, project_id: &str) -> Option<String> {
+pub fn git_project_root(settings: &StorageSettings) -> PathBuf {
+    storage_root(settings).join("git")
+}
+
+fn storage_repo_url(base_url: Option<&str>, user_id: &str, project_id: &str) -> Option<String> {
     let base = base_url
         .map(str::trim)
         .filter(|value| !value.is_empty())?
         .trim_end_matches('/');
+    let user = safe_path_part(user_id, "user", 80);
     let project = safe_path_part(project_id, "project", 96);
-    Some(format!("{base}/projects/{project}.git"))
+    Some(format!("{base}/projects/{user}/{project}.git"))
 }
 
 fn set_bare_head(repo: &Path, branch: &str) -> Result<()> {
@@ -122,6 +135,10 @@ fn set_bare_head(repo: &Path, branch: &str) -> Result<()> {
         repo,
         &["symbolic-ref", "HEAD", &format!("refs/heads/{branch}")],
     )
+}
+
+fn ensure_http_receive_pack(repo: &Path) -> Result<()> {
+    run_git(repo, &["config", "http.receivepack", "true"])
 }
 
 fn bare_head_branch(repo: &Path) -> Option<String> {
@@ -137,6 +154,23 @@ fn write_description(repo: &Path, name: &str) {
         return;
     }
     let _ = std::fs::write(repo.join("description"), description);
+}
+
+fn write_access_token(repo: &Path, token: Option<&str>) -> Result<()> {
+    let Some(token) = clean_access_token(token) else {
+        return Ok(());
+    };
+    run_git(repo, &["config", "elon.storageToken", &token])
+        .with_context(|| format!("failed to write storage access token {}", repo.display()))
+}
+
+pub fn validate_repo_access_token(repo: &Path, token: &str) -> bool {
+    let Some(token) = clean_access_token(Some(token)) else {
+        return false;
+    };
+    git_output(repo, &["config", "--get", "elon.storageToken"])
+        .map(|stored| stored.trim() == token)
+        .unwrap_or(false)
 }
 
 fn git_available() -> bool {
@@ -162,10 +196,37 @@ fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+fn git_output(cwd: &Path, args: &[&str]) -> Result<String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .context("failed to run git")?;
+    if !output.status.success() {
+        return Err(anyhow!(
+            "git command failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 fn clean_branch(value: Option<&str>) -> Option<String> {
     value
         .map(str::trim)
         .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn clean_access_token(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| value.len() >= 32)
+        .filter(|value| {
+            value
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+        })
         .map(ToOwned::to_owned)
 }
 
@@ -234,4 +295,50 @@ fn disk_free_bytes(path: &Path) -> Option<u64> {
     let line = text.lines().nth(1)?;
     let available_kb = line.split_whitespace().nth(3)?.parse::<u64>().ok()?;
     available_kb.checked_mul(1024)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        prepare_project_storage_repo, validate_repo_access_token, StorageRepoRequest,
+        StorageSettings,
+    };
+    use std::{path::PathBuf, process::Command};
+    use uuid::Uuid;
+
+    #[test]
+    fn prepare_repo_uses_user_scoped_url_and_token() {
+        if Command::new("git").arg("--version").output().is_err() {
+            return;
+        }
+        let root =
+            std::env::temp_dir().join(format!("elon_storage_repo_{}", Uuid::new_v4().simple()));
+        let settings = StorageSettings {
+            enabled: true,
+            root_path: Some(root.to_string_lossy().to_string()),
+            git_base_url: Some("https://git.example.test/elon".into()),
+        };
+
+        let result = prepare_project_storage_repo(
+            &settings,
+            StorageRepoRequest {
+                project_id: "project:one".into(),
+                user_id: "user/one".into(),
+                name: "Project One".into(),
+                branch: Some("main".into()),
+                access_token: Some("abcdefghijklmnopqrstuvwxyz0123456789".into()),
+            },
+        )
+        .expect("storage repo should prepare");
+
+        assert_eq!(
+            result.storage_repo_url.as_deref(),
+            Some("https://git.example.test/elon/projects/user-one/project-one.git")
+        );
+        assert!(validate_repo_access_token(
+            &PathBuf::from(&result.storage_repo_path),
+            "abcdefghijklmnopqrstuvwxyz0123456789"
+        ));
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
