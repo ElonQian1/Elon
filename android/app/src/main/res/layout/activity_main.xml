@@ -404,11 +404,11 @@
 
         <LinearLayout
             android:id="@+id/projectSpaceFeedActionsOverlay"
-            android:layout_width="48dp"
+            android:layout_width="64dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|bottom"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="36dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="28dp"
             android:elevation="10dp"
             android:gravity="center"
             android:orientation="vertical"
@@ -416,25 +416,25 @@
 
             <ImageButton
                 android:id="@+id/projectSpaceDocsFab"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:background="@drawable/bg_project_space_fab"
                 android:contentDescription="项目文档"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
-                android:padding="10dp"
+                android:padding="14dp"
                 android:scaleType="center"
                 android:src="@drawable/ic_side_menu_files"
                 app:tint="@color/elon_text_primary" />
 
             <ImageButton
                 android:id="@+id/projectSpacePostFab"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
                 android:layout_marginTop="20dp"
                 android:background="@drawable/bg_project_space_fab"
                 android:contentDescription="发布帖子"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
-                android:padding="10dp"
+                android:padding="14dp"
                 android:scaleType="center"
                 android:src="@drawable/ic_project_fab_plus"
                 app:tint="@color/elon_text_primary" />
@@ -836,41 +836,38 @@
 
         <LinearLayout
             android:id="@+id/projectSpaceAiMenu"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/main_bottom_menu_height"
-            android:layout_gravity="bottom"
-            android:background="@color/elon_nav_bg"
+            android:layout_width="176dp"
+            android:layout_height="64dp"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_project_space_ai_menu_item"
             android:clickable="true"
+            android:clipToOutline="true"
             android:contentDescription="打开项目 AI 会话"
             android:foreground="?attr/selectableItemBackground"
+            android:elevation="10dp"
             android:gravity="center"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:visibility="gone">
 
-            <LinearLayout
-                android:layout_width="108dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_project_space_ai_menu_item"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingTop="5dp"
-                android:paddingBottom="5dp">
+            <ImageView
+                android:id="@+id/projectSpaceAiIcon"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="14dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_project_ai_conversation"
+                app:tint="@color/elon_text_primary" />
 
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_project_ai_conversation"
-                    app:tint="@color/elon_text_primary" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:includeFontPadding="false"
-                    android:text="AI 会话"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="12sp" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/projectSpaceAiLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="Ai 会话"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="18sp" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

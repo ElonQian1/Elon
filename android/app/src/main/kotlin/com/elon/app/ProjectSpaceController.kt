@@ -1,5 +1,8 @@
 package com.elon.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -10,6 +13,7 @@ import android.text.InputType
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -59,6 +63,8 @@ internal class ProjectSpaceController(
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
+    private var projectSpaceAiExpanded = true
+    private var projectSpaceAiAnimator: ValueAnimator? = null
     private val feedData = ProjectSpaceFeedData(
         activity = activity,
         http = http,
@@ -117,6 +123,7 @@ internal class ProjectSpaceController(
     init {
         binding.projectSpaceDocsFab.setOnClickListener { showProjectDocumentsDialog() }
         binding.projectSpacePostFab.setOnClickListener { renderPostComposer() }
+        setupProjectSpaceAiMenuMotion()
     }
 
     private data class ActiveMemberConversation(
@@ -193,6 +200,7 @@ internal class ProjectSpaceController(
         pendingOpenSelfMemberList = openSelfMemberList
         activeAdapter = null
         stopPolling()
+        resetProjectSpaceAiMenu()
         if (switchingProject) {
             feedData.reset()
         }
@@ -946,6 +954,7 @@ internal class ProjectSpaceController(
     private fun prepareProjectContent(): LinearLayout {
         binding.projectPage.stopNestedScroll()
         binding.projectPage.scrollTo(0, 0)
+        resetProjectSpaceAiMenu()
         hideProjectSpaceFeedActions()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
         return binding.projectContentLayout
@@ -958,6 +967,97 @@ internal class ProjectSpaceController(
 
     private fun hideProjectSpaceFeedActions() {
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
+    }
+
+    private fun setupProjectSpaceAiMenuMotion() {
+        binding.projectPage.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            val shouldExpand = scrollY <= dp(PROJECT_SPACE_AI_EXPAND_AT_TOP_DP)
+            updateProjectSpaceAiMenuExpanded(shouldExpand, animate = true)
+        }
+        resetProjectSpaceAiMenu()
+    }
+
+    private fun resetProjectSpaceAiMenu() {
+        updateProjectSpaceAiMenuExpanded(expanded = true, animate = false)
+    }
+
+    private fun updateProjectSpaceAiMenuExpanded(expanded: Boolean, animate: Boolean) {
+        val menu = binding.projectSpaceAiMenu
+        val label = binding.projectSpaceAiLabel
+        val collapsedWidth = dp(PROJECT_SPACE_AI_COLLAPSED_SIZE_DP)
+        val expandedWidth = dp(PROJECT_SPACE_AI_EXPANDED_WIDTH_DP)
+        val targetWidth = if (expanded) expandedWidth else collapsedWidth
+        val currentLayoutWidth = menu.layoutParams.width.takeIf { it > 0 } ?: targetWidth
+        val alreadyAtTarget = projectSpaceAiExpanded == expanded &&
+            currentLayoutWidth == targetWidth &&
+            projectSpaceAiAnimator == null
+        if (alreadyAtTarget) return
+
+        projectSpaceAiExpanded = expanded
+        projectSpaceAiAnimator?.cancel()
+        projectSpaceAiAnimator = null
+
+        val targetAlpha = if (expanded) 1f else 0f
+        val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
+        if (expanded) label.visibility = View.VISIBLE
+
+        if (!animate || menu.visibility != View.VISIBLE || menu.width <= 0) {
+            applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin)
+            label.visibility = if (expanded) View.VISIBLE else View.GONE
+            return
+        }
+
+        val startWidth = menu.width.takeIf { it > 0 } ?: currentLayoutWidth
+        val startAlpha = label.alpha
+        val startIconMargin = (binding.projectSpaceAiIcon.layoutParams as LinearLayout.LayoutParams).marginEnd
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = PROJECT_SPACE_AI_ANIMATION_MS
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { valueAnimator ->
+                val progress = valueAnimator.animatedValue as Float
+                val width = (startWidth + (targetWidth - startWidth) * progress).toInt()
+                val alpha = startAlpha + (targetAlpha - startAlpha) * progress
+                val iconMargin = (startIconMargin + (targetIconMargin - startIconMargin) * progress).toInt()
+                applyProjectSpaceAiMenuFrame(width, alpha, iconMargin)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    if (cancelled) return
+                    applyProjectSpaceAiMenuFrame(targetWidth, targetAlpha, targetIconMargin)
+                    label.visibility = if (expanded) View.VISIBLE else View.GONE
+                    projectSpaceAiAnimator = null
+                }
+            })
+        }
+        projectSpaceAiAnimator = animator
+        animator.start()
+    }
+
+    private fun applyProjectSpaceAiMenuFrame(width: Int, labelAlpha: Float, iconMarginEnd: Int) {
+        val menu = binding.projectSpaceAiMenu
+        val height = dp(PROJECT_SPACE_AI_COLLAPSED_SIZE_DP)
+        val menuParams = menu.layoutParams
+        if (menuParams.width != width || menuParams.height != height) {
+            menuParams.width = width
+            menuParams.height = height
+            menu.layoutParams = menuParams
+        }
+
+        val iconParams = binding.projectSpaceAiIcon.layoutParams as LinearLayout.LayoutParams
+        if (iconParams.marginEnd != iconMarginEnd) {
+            iconParams.marginEnd = iconMarginEnd
+            binding.projectSpaceAiIcon.layoutParams = iconParams
+        }
+
+        val label = binding.projectSpaceAiLabel
+        label.alpha = labelAlpha
+        label.translationX = dp(4) * (1f - labelAlpha)
     }
 
     private fun renderMemberConversationMessages(
@@ -1045,6 +1145,11 @@ internal class ProjectSpaceController(
         const val PROJECT_DESCRIPTION_MAX_CHARS = 240
         const val DOCS_CHANNEL_KIND = "docs"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
+        const val PROJECT_SPACE_AI_ANIMATION_MS = 220L
+        const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 64
+        const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 176
+        const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
+        const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 14
 
         fun canEditProjectDescription(role: String?): Boolean {
             return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")
