@@ -440,6 +440,43 @@
                 app:tint="@color/elon_text_primary" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/projectSpaceAiMenu"
+            android:layout_width="176dp"
+            android:layout_height="64dp"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="18dp"
+            android:background="@drawable/bg_project_space_ai_menu_item"
+            android:clickable="true"
+            android:clipToOutline="true"
+            android:contentDescription="打开项目 AI 会话"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/projectSpaceAiIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="14dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_project_ai_conversation"
+                app:tint="@color/elon_text_primary" />
+
+            <com.elon.app.ProjectSpaceAiLabelView
+                android:id="@+id/projectSpaceAiLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="end|center_vertical"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="Ai 会话"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="18sp" />
+        </LinearLayout>
+
         <ScrollView
             android:id="@+id/profilePage"
             android:layout_width="match_parent"
@@ -643,7 +680,7 @@
         android:id="@+id/bottomBarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/elon_bg_app"
+        android:background="@android:color/transparent"
         android:clipChildren="false"
         android:clipToPadding="false">
 
@@ -834,42 +871,5 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <LinearLayout
-            android:id="@+id/projectSpaceAiMenu"
-            android:layout_width="176dp"
-            android:layout_height="64dp"
-            android:layout_gravity="end|bottom"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="18dp"
-            android:background="@drawable/bg_project_space_ai_menu_item"
-            android:clickable="true"
-            android:clipToOutline="true"
-            android:contentDescription="打开项目 AI 会话"
-            android:foreground="?attr/selectableItemBackground"
-            android:elevation="10dp"
-            android:gravity="center"
-            android:orientation="horizontal"
-            android:visibility="gone">
-
-            <ImageView
-                android:id="@+id/projectSpaceAiIcon"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginEnd="14dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_project_ai_conversation"
-                app:tint="@color/elon_text_primary" />
-
-            <com.elon.app.ProjectSpaceAiLabelView
-                android:id="@+id/projectSpaceAiLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="end|center_vertical"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text="Ai 会话"
-                android:textColor="@color/elon_text_primary"
-                android:textSize="18sp" />
-        </LinearLayout>
     </FrameLayout>
 </LinearLayout>
