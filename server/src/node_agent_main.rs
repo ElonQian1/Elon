@@ -2604,14 +2604,12 @@ async fn admin_env_check(
 async fn admin_install_env(
     axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    use axum::http::StatusCode;
-
     #[cfg(windows)]
     {
         let tmp = std::env::temp_dir().join("elon-setup-node-env.ps1");
         if let Err(e) = std::fs::write(&tmp, SETUP_ENV_SCRIPT) {
             return (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({
                     "ok": false,
                     "error": format!("写入临时脚本失败: {e}")
@@ -2631,14 +2629,14 @@ async fn admin_install_env(
             .spawn()
         {
             Ok(_) => (
-                StatusCode::OK,
+                axum::http::StatusCode::OK,
                 axum::Json(serde_json::json!({
                     "ok": true,
                     "msg": "安装脚本已在新窗口启动，按提示操作完成后刷新本页查看结果"
                 })),
             ),
             Err(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({
                     "ok": false,
                     "error": format!("启动脚本失败: {e}")
