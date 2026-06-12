@@ -667,9 +667,15 @@
       place-items: center;
     }
     .project-space-fab svg {
-      width: 34px;
-      height: 34px;
+      width: 28px;
+      height: 28px;
       vertical-align: middle;
+    }
+    .project-space-doc-icon {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      display: block;
     }
     @media (max-width: 520px) {
       .project-space-summary {
@@ -1738,9 +1744,7 @@
             </div>
             <div class="project-space-feed-actions">
               <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
-                <svg viewBox="0 0 26 26" aria-hidden="true">
-                  <path d="M5.8 8.2h6l1.8 2.2h6.6c1.1 0 2 .9 2 2v6.4c0 1.1-.9 2-2 2H5.8c-1.1 0-2-.9-2-2v-8.6c0-1.1.9-2 2-2zM8.2 14.6h9.6M8.2 17.4h6.4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"/>
-                </svg>
+                <img class="project-space-doc-icon" src="data:image/png;base64,__PROJECT_DOCUMENT_ICON_PNG_B64__" alt="" aria-hidden="true" />
               </button>
               <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">+</button>
             </div>
