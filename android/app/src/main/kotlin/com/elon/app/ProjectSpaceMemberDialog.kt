@@ -20,6 +20,7 @@ internal object ProjectSpaceMemberDialog {
         projectTitle: String,
         members: List<ProjectMember>,
         dp: (Int) -> Int,
+        onMemberLongPress: ((ProjectMember, () -> Unit) -> Boolean)? = null,
         onMemberClick: (ProjectMember) -> Unit
     ) {
         var dialog: AlertDialog? = null
@@ -27,6 +28,7 @@ internal object ProjectSpaceMemberDialog {
             dialog?.dismiss()
             onMemberClick(member)
         }
+        val closeDialog: () -> Unit = { dialog?.dismiss() }
         val content = ScrollView(activity).apply {
             isFillViewport = false
             addView(LinearLayout(activity).apply {
@@ -36,7 +38,7 @@ internal object ProjectSpaceMemberDialog {
                     addView(emptyRow(activity, dp))
                 } else {
                     members.forEach { member ->
-                        addView(memberRow(activity, member, dp, openMember))
+                        addView(memberRow(activity, member, dp, openMember, closeDialog, onMemberLongPress))
                     }
                 }
             })
@@ -53,21 +55,35 @@ internal object ProjectSpaceMemberDialog {
         activity: AppCompatActivity,
         member: ProjectMember,
         dp: (Int) -> Int,
-        onMemberClick: (ProjectMember) -> Unit
+        onMemberClick: (ProjectMember) -> Unit,
+        closeDialog: () -> Unit,
+        onMemberLongPress: ((ProjectMember, () -> Unit) -> Boolean)?
     ): LinearLayout {
+        val longClickListener = onMemberLongPress?.let { handler ->
+            View.OnLongClickListener { handler(member, closeDialog) }
+        }
+        fun View.enableMemberLongPress() {
+            if (longClickListener != null) {
+                isLongClickable = true
+                setOnLongClickListener(longClickListener)
+            }
+        }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(10), 0, dp(10))
             isClickable = true
             setOnClickListener { onMemberClick(member) }
+            enableMemberLongPress()
             addView(avatar(activity, member, dp).apply {
                 contentDescription = "${member.account.ifBlank { "成员" }}的项目 AI 会话"
                 setOnClickListener { onMemberClick(member) }
+                enableMemberLongPress()
             })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), 0, 0, 0)
+                enableMemberLongPress()
                 addView(TextView(activity).apply {
                     text = member.account.ifBlank { "成员" }
                     textSize = 16f

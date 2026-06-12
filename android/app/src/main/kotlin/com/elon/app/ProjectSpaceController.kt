@@ -341,8 +341,72 @@ internal class ProjectSpaceController(
             Toast.makeText(activity, "个人项目成员列表暂不展开", Toast.LENGTH_SHORT).show()
             return
         }
-        ProjectSpaceMemberDialog.show(activity, space.project.name, space.members, dp) { member ->
+        val selfIds = currentProjectSelfIds()
+        val memberLongPress: ((ProjectMember, () -> Unit) -> Boolean)? =
+            if (canManageProjectMembers(space.project.role)) {
+                { member, closeDialog ->
+                    showMemberRoleDialogFromMemberList(space.project.id, member, selfIds, closeDialog)
+                }
+            } else {
+                null
+            }
+        ProjectSpaceMemberDialog.show(
+            activity,
+            space.project.name,
+            space.members,
+            dp,
+            onMemberLongPress = memberLongPress
+        ) { member ->
             renderMemberConversationList(member)
+        }
+    }
+
+    private fun currentProjectSelfIds(): Set<String> {
+        return listOfNotNull(
+            AuthManager.userId(activity),
+            AuthManager.effectiveUserId(activity)
+        ).toSet()
+    }
+
+    private fun showMemberRoleDialogFromMemberList(
+        projectId: String,
+        member: ProjectMember,
+        selfIds: Set<String>,
+        closeMemberDialog: () -> Unit
+    ): Boolean {
+        if (member.userId in selfIds || member.role.equals("owner", ignoreCase = true)) return true
+        closeMemberDialog()
+        ProjectSpaceMemberManagement.showRoleDialog(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            projectId = projectId,
+            member = member,
+            dp = dp,
+            onChanged = { reloadProjectSpaceAfterMemberRoleChange(reopenMembers = true) }
+        )
+        return true
+    }
+
+    private fun reloadProjectSpaceAfterMemberRoleChange(reopenMembers: Boolean) {
+        val projectId = activeProjectId ?: return
+        val route = activeRoute
+        thread(name = "project-reload-after-member-role") {
+            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
+            activity.runOnUiThread {
+                if (activeProjectId != projectId) return@runOnUiThread
+                result.onSuccess { space ->
+                    val icon = localProjectIconDataUrl(projectId).cleanProjectIconDataUrl()
+                    val nextSpace = space.withProjectIcon(icon)
+                    spaceCache[projectId] = nextSpace
+                    activeSpace = nextSpace
+                    activeProjectTitle = nextSpace.project.name
+                    renderProjectSpaceLanding()
+                    if (reopenMembers) showMembers()
+                }.onFailure { error ->
+                    Toast.makeText(activity, error.message ?: "成员列表刷新失败", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
