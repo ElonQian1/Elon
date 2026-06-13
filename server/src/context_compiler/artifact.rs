@@ -8,8 +8,9 @@ use serde::Serialize;
 use serde_json::json;
 
 use super::{
-    config::ContextCompilerConfig, model::RepoContextIndex, relevance::RelevantFile,
-    repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary, validation::ValidationPlan,
+    artifact_exports, config::ContextCompilerConfig, model::RepoContextIndex,
+    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
+    validation::ValidationPlan,
 };
 
 #[derive(Debug, Clone)]
@@ -108,6 +109,7 @@ pub(crate) fn save_context_artifacts(
             &mut files,
         )?;
     }
+    bytes += artifact_exports::write_context_exports(&bundle_dir, input.repo_index, &mut files)?;
     bytes += write_json(
         &bundle_dir.join("manifest.json"),
         &json!({
@@ -189,6 +191,7 @@ Before editing, verify important facts by reading the actual files.
 - context_pack.md
 - repo_snapshot.json
 - repo_context_index.json
+- repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / lsp_locations.jsonl when Rust analysis ran
 - relevant_files.json
 - validation_plan.json
 - validation.md
@@ -260,18 +263,8 @@ mod tests {
     use crate::context_compiler::validation::ValidationPlan;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn saves_pack_and_bundle_under_data_dir() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!(
-            "elon_context_artifact_{}_{}",
-            std::process::id(),
-            nonce
-        ));
-        let config = ContextCompilerConfig {
+    fn test_config() -> ContextCompilerConfig {
+        ContextCompilerConfig {
             enabled: true,
             mode: ContextCompilerMode::Shadow,
             agent_name: "hunyuan".to_string(),
@@ -292,7 +285,21 @@ mod tests {
             save_pack_enabled: true,
             artifact_max_bytes: 100_000,
             rust_probe_enabled: true,
-        };
+        }
+    }
+
+    #[test]
+    fn saves_pack_and_bundle_under_data_dir() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "elon_context_artifact_{}_{}",
+            std::process::id(),
+            nonce
+        ));
+        let config = test_config();
         let snapshot = RepoSnapshot {
             git_head: Some("abc123".to_string()),
             git_branch: Some("main".to_string()),

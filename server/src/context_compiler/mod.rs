@@ -1,4 +1,7 @@
 mod artifact;
+mod artifact_exports;
+#[cfg(test)]
+mod artifact_exports_tests;
 mod cargo_index;
 mod config;
 mod context_evidence;
