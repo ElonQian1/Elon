@@ -23,11 +23,16 @@ pub(crate) fn render_context_quality(out: &mut String, report: Option<&ContextQu
         report.coverage.validation_commands
     ));
     out.push_str(&format!(
-        "- semantic: rust_analyzer_available={} ra_symbols={} ra_files={} lsp_queries={} probe_enabled={} probe_ok={} probe_failed={} probe_timed_out={}\n",
+        "- semantic: rust_analyzer_available={} ra_symbols={} ra_files={} lsp_queries={} lsp_enabled={} lsp_attempted={} lsp_ok={} lsp_failed={} lsp_timed_out={} probe_enabled={} probe_ok={} probe_failed={} probe_timed_out={}\n",
         report.semantic.rust_analyzer_available,
         report.semantic.rust_analyzer_symbols,
         report.semantic.rust_analyzer_files_enhanced,
         report.semantic.lsp_queries_planned,
+        report.semantic.lsp_enabled,
+        report.semantic.lsp_attempted,
+        report.semantic.lsp_succeeded,
+        report.semantic.lsp_failed,
+        report.semantic.lsp_timed_out,
         report.semantic.probe_enabled,
         report.semantic.probe_succeeded,
         report.semantic.probe_failed,

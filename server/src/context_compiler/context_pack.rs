@@ -1,8 +1,8 @@
 use super::{
     config::ContextCompilerConfig, context_pack_render, context_quality_render, impact_render,
     model::RepoContextIndex, relevance::RelevantFile, repo_map_tags_render,
-    repo_snapshot::RepoSnapshot, rust_analyzer_probe_render, rust_project::RustProjectSummary,
-    semantic_query_plan_render, validation::ValidationPlan,
+    repo_snapshot::RepoSnapshot, rust_analyzer_lsp_render, rust_analyzer_probe_render,
+    rust_project::RustProjectSummary, semantic_query_plan_render, validation::ValidationPlan,
 };
 
 pub(crate) fn build_context_pack(
@@ -51,6 +51,10 @@ pub(crate) fn build_context_pack(
         &mut out,
         repo_index.map(|index| &index.semantic_plan),
     );
+    rust_analyzer_lsp_render::render_rust_analyzer_lsp(
+        &mut out,
+        repo_index.map(|index| &index.rust_analyzer.lsp),
+    );
     context_quality_render::render_context_quality(
         &mut out,
         repo_index.map(|index| &index.quality),
@@ -97,6 +101,9 @@ mod tests {
             rust_analyzer_enabled: true,
             rust_analyzer_probe_enabled: false,
             rust_analyzer_probe_timeout_ms: 4_000,
+            rust_analyzer_lsp_enabled: false,
+            rust_analyzer_lsp_timeout_ms: 6_000,
+            rust_analyzer_lsp_max_queries: 16,
             max_relevant_files: 4,
             max_rust_files: 40,
             max_symbols: 20,

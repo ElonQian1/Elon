@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::{
     model::{
         ContextQualityCoverage, ContextQualityGap, ContextQualityReport, ContextQualitySemantic,
-        ContextQualitySeverity, RepoContextIndex, RustAnalyzerProbeStatus,
+        ContextQualitySeverity, RepoContextIndex, RustAnalyzerLspStatus, RustAnalyzerProbeStatus,
     },
     relevance::RelevantFile,
     validation::ValidationPlan,
@@ -92,12 +92,28 @@ fn build_semantic(index: &RepoContextIndex) -> ContextQualitySemantic {
             RustAnalyzerProbeStatus::TimedOut => probe_timed_out += 1,
         }
     }
+    let mut lsp_succeeded = 0usize;
+    let mut lsp_failed = 0usize;
+    let mut lsp_timed_out = 0usize;
+    for result in &index.rust_analyzer.lsp.results {
+        match result.status {
+            RustAnalyzerLspStatus::Succeeded => lsp_succeeded += 1,
+            RustAnalyzerLspStatus::Failed => lsp_failed += 1,
+            RustAnalyzerLspStatus::TimedOut => lsp_timed_out += 1,
+            RustAnalyzerLspStatus::Skipped => {}
+        }
+    }
 
     ContextQualitySemantic {
         rust_analyzer_available: index.rust_analyzer.available,
         rust_analyzer_symbols: index.rust_analyzer.symbols.len(),
         rust_analyzer_files_enhanced: index.rust_analyzer.files_enhanced,
         lsp_queries_planned: index.semantic_plan.queries.len(),
+        lsp_enabled: index.rust_analyzer.lsp.enabled,
+        lsp_attempted: index.rust_analyzer.lsp.attempted,
+        lsp_succeeded,
+        lsp_failed,
+        lsp_timed_out,
         probe_enabled: index.rust_analyzer.probes.enabled,
         probe_succeeded,
         probe_failed,
@@ -179,6 +195,36 @@ fn collect_gaps(
             "inspect semantic plan generation before relying on semantic coverage",
         ));
     }
+    if semantic.lsp_enabled && semantic.lsp_queries_planned > 0 && semantic.lsp_attempted == 0 {
+        gaps.push(gap(
+            ContextQualitySeverity::Warning,
+            "rust_analyzer_lsp",
+            None,
+            None,
+            "semantic query plan existed but no executable rust-analyzer LSP request was attempted",
+            "inspect rust_analyzer_lsp warnings and confirm the Top-K source files are in the Cargo workspace",
+        ));
+    }
+    if semantic.lsp_enabled && (semantic.lsp_failed > 0 || semantic.lsp_timed_out > 0) {
+        gaps.push(gap(
+            ContextQualitySeverity::Warning,
+            "rust_analyzer_lsp",
+            None,
+            None,
+            "one or more Top-K rust-analyzer LSP requests failed or timed out",
+            "use successful LSP results plus repo_map_tags fallback before changing public APIs",
+        ));
+    }
+    if semantic.lsp_enabled && semantic.lsp_attempted > 0 && semantic.lsp_succeeded == 0 {
+        gaps.push(gap(
+            ContextQualitySeverity::Warning,
+            "rust_analyzer_lsp",
+            None,
+            None,
+            "Top-K rust-analyzer LSP execution produced no successful semantic result",
+            "check rust-analyzer availability, workspace root, and source URI conversion",
+        ));
+    }
     if semantic.probe_enabled && (semantic.probe_failed > 0 || semantic.probe_timed_out > 0) {
         gaps.push(gap(
             ContextQualitySeverity::Warning,
@@ -248,6 +294,12 @@ fn score_quality(
     if semantic.lsp_queries_planned == 0 {
         score -= 8;
     }
+    if semantic.lsp_enabled && semantic.lsp_queries_planned > 0 && semantic.lsp_succeeded == 0 {
+        score -= 6;
+    }
+    if semantic.lsp_enabled {
+        score -= ((semantic.lsp_failed + semantic.lsp_timed_out) as i32 * 2).min(8);
+    }
     if coverage.validation_commands == 0 {
         score -= 8;
     }
@@ -283,9 +335,21 @@ fn recommended_actions(
             "read uncovered top ranked symbols from real files before applying edits".to_string(),
         );
     }
-    if semantic.lsp_queries_planned > 0 {
+    if semantic.lsp_queries_planned > 0 && !semantic.lsp_enabled {
         actions.push(
-            "execute the semantic_query_plan Top-K rust-analyzer LSP requests for references and implementations"
+            "enable ELON_CONTEXT_COMPILER_RA_LSP=true to execute the semantic_query_plan Top-K rust-analyzer LSP requests"
+                .to_string(),
+        );
+    }
+    if semantic.lsp_enabled && semantic.lsp_succeeded > 0 {
+        actions.push(
+            "prefer successful rust_analyzer_lsp reference/implementation facts when estimating edit blast radius"
+                .to_string(),
+        );
+    }
+    if semantic.lsp_enabled && (semantic.lsp_failed > 0 || semantic.lsp_timed_out > 0) {
+        actions.push(
+            "inspect rust_analyzer_lsp warnings before trusting missing references or implementations"
                 .to_string(),
         );
     }

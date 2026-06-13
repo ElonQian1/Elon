@@ -30,6 +30,9 @@ pub(crate) struct ContextCompilerConfig {
     pub(crate) rust_analyzer_enabled: bool,
     pub(crate) rust_analyzer_probe_enabled: bool,
     pub(crate) rust_analyzer_probe_timeout_ms: usize,
+    pub(crate) rust_analyzer_lsp_enabled: bool,
+    pub(crate) rust_analyzer_lsp_timeout_ms: usize,
+    pub(crate) rust_analyzer_lsp_max_queries: usize,
     pub(crate) max_relevant_files: usize,
     pub(crate) max_rust_files: usize,
     pub(crate) max_symbols: usize,
@@ -60,6 +63,15 @@ impl ContextCompilerConfig {
             rust_analyzer_probe_timeout_ms: env_usize(
                 "ELON_CONTEXT_COMPILER_RA_PROBE_TIMEOUT_MS",
                 4_000,
+            ),
+            rust_analyzer_lsp_enabled: env_bool("ELON_CONTEXT_COMPILER_RA_LSP", false),
+            rust_analyzer_lsp_timeout_ms: env_usize(
+                "ELON_CONTEXT_COMPILER_RA_LSP_TIMEOUT_MS",
+                6_000,
+            ),
+            rust_analyzer_lsp_max_queries: env_usize(
+                "ELON_CONTEXT_COMPILER_RA_LSP_MAX_QUERIES",
+                16,
             ),
             max_relevant_files: env_usize("ELON_CONTEXT_COMPILER_MAX_FILES", 8),
             max_rust_files: env_usize("ELON_CONTEXT_COMPILER_MAX_RUST_FILES", 400),

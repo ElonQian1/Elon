@@ -23,6 +23,11 @@ mod repo_map_tags_render;
 mod repo_map_tags_tests;
 mod repo_snapshot;
 mod rust_analyzer;
+mod rust_analyzer_lsp;
+mod rust_analyzer_lsp_protocol;
+mod rust_analyzer_lsp_render;
+#[cfg(test)]
+mod rust_analyzer_lsp_tests;
 mod rust_analyzer_probe;
 mod rust_analyzer_probe_render;
 #[cfg(test)]
@@ -98,6 +103,13 @@ pub(crate) async fn compile_preflight_note(
             config.max_rust_analyzer_files,
             config.max_symbols,
         );
+        index.rust_analyzer.lsp = rust_analyzer_lsp::execute_semantic_query_plan(
+            workspace,
+            &index,
+            config.rust_analyzer_lsp_enabled,
+            config.rust_analyzer_lsp_timeout_ms,
+            config.rust_analyzer_lsp_max_queries,
+        );
         index.impact = impact_analysis::build_rust_impact_analysis(workspace, &index);
         index.evidence =
             context_evidence::build_context_evidence(workspace, &index, &relevant_files);
@@ -169,6 +181,9 @@ pub(crate) async fn compile_preflight_note(
                     "ra_files": index.rust_analyzer.files_enhanced,
                     "ra_probe_enabled": index.rust_analyzer.probes.enabled,
                     "ra_probe_findings": count_ra_probe_findings(&index.rust_analyzer.probes),
+                    "ra_lsp_enabled": index.rust_analyzer.lsp.enabled,
+                    "ra_lsp_attempted": index.rust_analyzer.lsp.attempted,
+                    "ra_lsp_succeeded": index.rust_analyzer.lsp.succeeded,
                     "semantic_queries": index.semantic_plan.queries.len(),
                     "context_quality_score": index.quality.score,
                     "context_quality_gaps": index.quality.gaps.len(),
@@ -210,6 +225,14 @@ pub(crate) async fn compile_preflight_note(
         semantic_queries = repo_index
             .as_ref()
             .map(|index| index.semantic_plan.queries.len())
+            .unwrap_or_default(),
+        ra_lsp_enabled = repo_index
+            .as_ref()
+            .map(|index| index.rust_analyzer.lsp.enabled)
+            .unwrap_or_default(),
+        ra_lsp_succeeded = repo_index
+            .as_ref()
+            .map(|index| index.rust_analyzer.lsp.succeeded)
             .unwrap_or_default(),
         context_quality_score = repo_index
             .as_ref()

@@ -204,6 +204,7 @@ pub(crate) struct RustAnalyzerReport {
     pub(crate) symbols: Vec<RustAnalyzerSymbol>,
     pub(crate) enhancement_targets: Vec<String>,
     pub(crate) probes: RustAnalyzerProbeReport,
+    pub(crate) lsp: RustAnalyzerLspReport,
     pub(crate) warnings: Vec<String>,
 }
 
@@ -265,6 +266,51 @@ pub(crate) struct RustAnalyzerFinding {
     pub(crate) severity: Option<String>,
     pub(crate) message: String,
     pub(crate) evidence: String,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct RustAnalyzerLspReport {
+    pub(crate) enabled: bool,
+    pub(crate) workspace_path: Option<String>,
+    pub(crate) attempted: usize,
+    pub(crate) succeeded: usize,
+    pub(crate) failed: usize,
+    pub(crate) skipped: usize,
+    pub(crate) timed_out: usize,
+    pub(crate) results: Vec<RustAnalyzerLspQueryResult>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RustAnalyzerLspQueryResult {
+    pub(crate) method: SemanticQueryMethod,
+    pub(crate) path: String,
+    pub(crate) line: usize,
+    pub(crate) symbol: Option<String>,
+    pub(crate) status: RustAnalyzerLspStatus,
+    pub(crate) duration_ms: u64,
+    pub(crate) summary: Option<String>,
+    pub(crate) warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RustAnalyzerLspStatus {
+    Succeeded,
+    Failed,
+    TimedOut,
+    Skipped,
+}
+
+impl RustAnalyzerLspStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::TimedOut => "timed_out",
+            Self::Skipped => "skipped",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -478,6 +524,11 @@ pub(crate) struct ContextQualitySemantic {
     pub(crate) rust_analyzer_symbols: usize,
     pub(crate) rust_analyzer_files_enhanced: usize,
     pub(crate) lsp_queries_planned: usize,
+    pub(crate) lsp_enabled: bool,
+    pub(crate) lsp_attempted: usize,
+    pub(crate) lsp_succeeded: usize,
+    pub(crate) lsp_failed: usize,
+    pub(crate) lsp_timed_out: usize,
     pub(crate) probe_enabled: bool,
     pub(crate) probe_succeeded: usize,
     pub(crate) probe_failed: usize,
