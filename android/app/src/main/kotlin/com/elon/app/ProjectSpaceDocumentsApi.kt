@@ -143,6 +143,8 @@ internal fun clearCachedProjectSpaceDocuments(
     context.getSharedPreferences(PROJECT_DOCS_CACHE, Context.MODE_PRIVATE)
         .edit()
         .remove(projectDocsCacheKey(serverUrl, projectId, route))
+        .remove(projectDocsLegacyCacheKey(serverUrl, projectId, route))
+        .remove(projectId)
         .apply()
 }
 
@@ -267,6 +269,14 @@ private fun defaultProjectSpaceDocuments(
 }
 
 private fun projectDocsCacheKey(
+    serverUrl: String,
+    projectId: String,
+    route: ProjectSpaceRoute
+): String {
+    return "v$PROJECT_DOCS_CACHE_SCHEMA|" + projectDocsLegacyCacheKey(serverUrl, projectId, route)
+}
+
+private fun projectDocsLegacyCacheKey(
     serverUrl: String,
     projectId: String,
     route: ProjectSpaceRoute

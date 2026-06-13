@@ -148,10 +148,14 @@ internal object ProjectSpaceDocumentDialog {
     ) {
         val parts = mutableListOf<String>()
         parts.add("来源：${sourceLabel(bundle.source.ifBlank { "server" })}")
+        parts.add("文档：${bundle.documents.size}")
         bundle.revision.takeIf { it.isNotBlank() }?.let { parts.add("Revision：${it.take(12)}") }
         bundle.generatedAtMs.takeIf { it > 0L }?.let { parts.add("生成：${formatTime(it)}") }
-        if (bundle.fromCache) parts.add("APK 缓存")
-        bundle.cachedAtMs.takeIf { it > 0L }?.let { parts.add("缓存：${formatTime(it)}") }
+        parts.add(if (bundle.fromCache) "缓存命中" else "在线快照")
+        bundle.cachedAtMs.takeIf { it > 0L }?.let {
+            parts.add("缓存：${formatTime(it)}")
+            parts.add("缓存龄：${formatAge(it)}")
+        }
         val metadata = TextView(activity).apply {
             textSize = 12f
             setTextColor(Color.parseColor("#A6AFBD"))
@@ -307,5 +311,15 @@ internal object ProjectSpaceDocumentDialog {
         return runCatching {
             java.time.Instant.ofEpochMilli(epochMillis).toString()
         }.getOrDefault(epochMillis.toString())
+    }
+
+    private fun formatAge(epochMillis: Long): String {
+        val minutes = ((System.currentTimeMillis() - epochMillis).coerceAtLeast(0L) / 60000L)
+        return when {
+            minutes < 1L -> "刚刚"
+            minutes < 60L -> "${minutes} 分钟"
+            minutes < 24L * 60L -> "${minutes / 60L} 小时"
+            else -> "${minutes / (24L * 60L)} 天"
+        }
     }
 }

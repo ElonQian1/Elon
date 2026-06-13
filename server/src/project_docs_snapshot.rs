@@ -3,6 +3,7 @@ use homecli_proto::{AgentToServer, ProjectDocumentsSnapshot};
 use std::path::Path;
 
 use crate::{
+    project_auth::can_edit,
     project_docs_scan::{
         build_snapshot, collect_project_documents_with_options, ProjectDocumentScanOptions,
     },
@@ -112,7 +113,7 @@ fn fallback_snapshot(
 }
 
 fn should_seed_default_documents(project: &ProjectAccess) -> bool {
-    !project.id.eq_ignore_ascii_case("elon-self")
+    !project.id.eq_ignore_ascii_case("elon-self") && can_edit(&project.role)
 }
 
 fn scan_options(seed_missing_defaults: bool) -> ProjectDocumentScanOptions {
