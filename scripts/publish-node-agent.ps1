@@ -26,6 +26,27 @@ $WindowsClientPackageName = "elon-node-agent-windows.zip"
 
 Write-Host "=== elon-node-agent 构建 + 发布 ===" -ForegroundColor Cyan
 
+function Compress-ArchiveWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [int]$MaxAttempts = 5
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue
+            Compress-Archive -Path $Path -DestinationPath $DestinationPath -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -ge $MaxAttempts) { throw }
+            $delayMs = 500 * $attempt
+            Write-Host "  压缩被文件占用中断，${delayMs}ms 后重试 ($attempt/$MaxAttempts)..." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds $delayMs
+        }
+    }
+}
+
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
 $ServerDir = Join-Path $PSScriptRoot "..\server"
 Push-Location $ServerDir
@@ -116,8 +137,7 @@ try {
     }
     $PackageVersionInfo | ConvertTo-Json -Depth 4 |
         Set-Content -LiteralPath (Join-Path $PackageRoot "node-agent-version.json") -Encoding UTF8
-    Remove-Item -LiteralPath $WindowsClientPackage -Force -ErrorAction SilentlyContinue
-    Compress-Archive -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage -Force
+    Compress-ArchiveWithRetry -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage
 } finally {
     Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
