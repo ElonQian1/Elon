@@ -229,7 +229,7 @@ internal class ProfileTokenUsageCard(
             detailButton = actionButton("查看明细", "#2A2A2A", "#D6D6D6", endMarginDp = 8).apply {
                 setOnClickListener { openUsageDetails() }
             }
-            rechargeButton = actionButton("充值额度", "#C8C8C8", "#101010").apply {
+            rechargeButton = actionButton("充值额度", "#58BE6A", "#101010").apply {
                 setOnClickListener { showRechargeDialog() }
             }
             addView(detailButton)
