@@ -232,6 +232,7 @@ class MainActivity : AppCompatActivity() {
         applySystemBarColors()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.installScrollIndicatorHider()
         createActions.onCreate(intent)
         messageSelectionActions.setup()
         agentPageController = AgentPageController(this, binding)
