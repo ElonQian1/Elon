@@ -1075,7 +1075,10 @@ internal class ProjectSpaceController(
         val currentLabelWidth = (label.layoutParams as LinearLayout.LayoutParams)
             .width
             .takeIf { it >= 0 } ?: expandedLabelWidth
-        val alreadyAtTarget = projectSpaceAiExpanded == expanded &&
+        val sameTarget = projectSpaceAiExpanded == expanded
+        if (sameTarget && projectSpaceAiAnimator?.isRunning == true) return
+
+        val alreadyAtTarget = sameTarget &&
             currentLayoutWidth == targetWidth &&
             currentLabelWidth == targetLabelWidth &&
             projectSpaceAiAnimator == null
