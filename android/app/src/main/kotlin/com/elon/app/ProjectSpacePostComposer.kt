@@ -140,7 +140,7 @@ internal class ProjectSpacePostComposer(
             text = "‹ 项目空间"
             textSize = 15f
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(Color.parseColor("#DDE8FC"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
             isClickable = true
             foreground = selectableForeground()
@@ -160,8 +160,8 @@ internal class ProjectSpacePostComposer(
             maxLines = maxLinesValue
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             filters = arrayOf(InputFilter.LengthFilter(maxLength))
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.TOP or Gravity.START
             setPadding(dp(14), dp(16), dp(14), dp(14))
@@ -193,7 +193,7 @@ internal class ProjectSpacePostComposer(
         } else {
             imageTile.text = "$label\n${cleanUrl.take(42)}"
             imageTile.textSize = 12f
-            imageTile.setTextColor(Color.parseColor("#DDE8FC"))
+            imageTile.setTextColor(Color.parseColor("#D6D6D6"))
         }
     }
 
@@ -215,14 +215,14 @@ internal class ProjectSpacePostComposer(
                 text = iconText
                 textSize = 17f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
             }, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 marginEnd = dp(8)
             })
             addView(TextView(activity).apply {
                 text = titleText
                 textSize = 14f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             valueText?.let {
                 addView(it, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.1f))
@@ -231,7 +231,7 @@ internal class ProjectSpacePostComposer(
                 text = "›"
                 textSize = 20f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
             }, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.WRAP_CONTENT))
         }
     }
@@ -241,7 +241,7 @@ internal class ProjectSpacePostComposer(
             text = textValue
             textSize = 12f
             gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         }
@@ -253,8 +253,8 @@ internal class ProjectSpacePostComposer(
             textSize = 15f
             gravity = Gravity.CENTER
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#07120A"))
-            background = roundedBackground("#58BE6A", 7)
+            setTextColor(Color.parseColor("#101010"))
+            background = roundedBackground("#C8C8C8", 7)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
@@ -325,10 +325,10 @@ internal class ProjectSpacePostComposer(
         val input = EditText(activity).apply {
             hint = "粘贴图片 URL（可选）"
             setText(current.orEmpty())
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = roundedBackground("#181B20", 8)
+            background = roundedBackground("#222222", 8)
             setSelection(text?.length ?: 0)
         }
         AlertDialog.Builder(activity)
@@ -364,7 +364,7 @@ internal class ProjectSpacePostComposer(
 
     private fun divider(): View {
         return View(activity).apply {
-            setBackgroundColor(Color.parseColor("#1E2126"))
+            setBackgroundColor(Color.parseColor("#2E2E2E"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1

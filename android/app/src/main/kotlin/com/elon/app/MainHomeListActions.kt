@@ -206,8 +206,8 @@ internal class MainHomeListActions(
             setSingleLine(true)
             textSize = 15f
             hint = "搜索好友、群聊、最近消息"
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             background = null
             setPadding(dp(12), 0, dp(12), 0)
             addTextChangedListener(object : TextWatcher {
@@ -225,12 +225,12 @@ internal class MainHomeListActions(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             addView(TextView(activity).apply {
                 text = "⌕"
                 textSize = 18f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
             }, LinearLayout.LayoutParams(dp(30), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
@@ -285,7 +285,7 @@ internal class MainHomeListActions(
                 dp(92)
             )
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             textSize = 14f
             text = if (friendSearchQuery.isBlank()) {
                 "输入关键词搜索本地好友内容"

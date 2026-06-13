@@ -17,43 +17,44 @@
     :root {
       color-scheme: dark;
       --bg: #101010;
-      --bg-hint: #0f1217;
-      --panel: #181b20;
-      --panel-2: #181b20;
-      --panel-3: #283140;
-      --line: #24282f;
-      --ink: #f2f5fa;
-      --ink-strong: #f2f5fa;
-      --ink-soft: #a6afbd;
-      --ink-muted: #a6afbd;
-      --ink-faint: #6f7785;
-      --ink-dim: #6f7785;
-      --brand: #58be6a;
-      --brand-hover: #4eab5f;
-      --brand-ink: #07120a;
-      --link: #6091cf;
-      --secondary-btn: #283140;
-      --secondary-btn-ink: #dde8fc;
-      --badge-info-bg: #152c3e;
-      --badge-info-ink: #81b3d9;
-      --badge-neutral-bg: #283345;
-      --badge-neutral-ink: #b8c4d8;
-      --nav-bg: #181b20;
-      --nav-active-bg: #262626;
-      --popup-panel-bg: #262626;
-      --bubble-user: #58be6a;
-      --bubble-user-ink: #07120a;
-      --bubble-ai-bg: #181b20;
-      --bubble-ai-border: #24282f;
-      --bubble-ai-ink: #f2f5fa;
-      --bubble-progress-bg: #0f1217;
-      --bubble-progress-border: #24282f;
-      --bubble-progress-ink: #a6afbd;
+      --bg-hint: #151515;
+      --panel: #222222;
+      --panel-2: #222222;
+      --panel-3: #2A2A2A;
+      --line: #2E2E2E;
+      --ink: #D6D6D6;
+      --ink-strong: #D6D6D6;
+      --ink-soft: #A8A8A8;
+      --ink-muted: #A8A8A8;
+      --ink-faint: #777777;
+      --ink-dim: #777777;
+      --brand: #C8C8C8;
+      --brand-hover: #B8B8B8;
+      --brand-ink: #101010;
+      --accent: #58BE6A;
+      --link: #58BE6A;
+      --secondary-btn: #2A2A2A;
+      --secondary-btn-ink: #D6D6D6;
+      --badge-info-bg: #16251A;
+      --badge-info-ink: #8DDC9B;
+      --badge-neutral-bg: #2A2A2A;
+      --badge-neutral-ink: #D0D0D0;
+      --nav-bg: #222222;
+      --nav-active-bg: #242424;
+      --popup-panel-bg: #242424;
+      --bubble-user: #C8C8C8;
+      --bubble-user-ink: #101010;
+      --bubble-ai-bg: #222222;
+      --bubble-ai-border: #2E2E2E;
+      --bubble-ai-ink: #D6D6D6;
+      --bubble-progress-bg: #151515;
+      --bubble-progress-border: #2E2E2E;
+      --bubble-progress-ink: #A8A8A8;
       --bubble-error-bg: #fff1f0;
       --bubble-error-border: #ffd6d2;
       --bubble-error-ink: #c62828;
-      --tab-icon: #a6afbd;
-      --tab-active: #f2f5fa;
+      --tab-icon: #A8A8A8;
+      --tab-active: #D6D6D6;
       --bottom-menu-height: 56px;
     }
     * { box-sizing: border-box; }
@@ -67,7 +68,7 @@
       -webkit-font-smoothing: antialiased;
     }
     button, input, textarea, select { font: inherit; color: inherit; }
-    a { color: var(--brand); text-decoration: none; }
+    a { color: var(--link); text-decoration: none; }
     a:hover { text-decoration: underline; }
     .hidden { display: none !important; }
 
@@ -156,14 +157,14 @@
       overflow: visible;
       border-bottom: 1px solid var(--line);
     }
-    .conversation-item:hover { background: #283140; }
-    .conversation-item.active { background: #283140; }
+    .conversation-item:hover { background: #2A2A2A; }
+    .conversation-item.active { background: #2A2A2A; }
     .conversation-item.working {
       animation: working-row-pulse 1.35s linear infinite;
     }
     @keyframes working-row-pulse {
-      0%, 100% { background: #181B20; }
-      50% { background: #283140; }
+      0%, 100% { background: #222222; }
+      50% { background: #2A2A2A; }
     }
     .conversation-item .brand {
       width: 44px; height: 44px;
@@ -173,13 +174,13 @@
       background: var(--panel);
       display: flex; align-items: center; justify-content: center;
       position: relative;
-      color: #283140;
+      color: #2A2A2A;
       font-weight: 700;
       font-size: 17px;
       z-index: 1;
     }
     .conversation-item .brand.round { border-radius: 50%; background: #d6d6d6; }
-    .conversation-item .brand.group { background: #f2f5fa; }
+    .conversation-item .brand.group { background: #D6D6D6; }
     .conversation-item .brand img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
     .conversation-item .brand .avatar-badge {
       position: absolute;
@@ -205,14 +206,14 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: var(--brand);
+      background: var(--accent);
       border: 2px solid var(--panel-2);
     }
     .group-avatar-grid {
       width: 44px;
       height: 44px;
       border-radius: 8px;
-      background: #f2f5fa;
+      background: #D6D6D6;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       grid-auto-rows: 1fr;
@@ -228,7 +229,7 @@
       min-width: 0;
       border-radius: 3px;
       background: #efefef;
-      color: #283140;
+      color: #2A2A2A;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -301,7 +302,7 @@
     .chat-message-block { display: flex; flex-direction: column; gap: 5px; }
     .chat-timeline-label {
       align-self: center;
-      color: #6f7785;
+      color: #777777;
       font-size: 13px;
       line-height: 1;
       padding: 8px 0 2px;
@@ -316,7 +317,7 @@
       border-radius: 8px;
       overflow: hidden;
       background: #d6d6d6;
-      color: #283140;
+      color: #2A2A2A;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -370,7 +371,7 @@
     }
     .bubble .meta { display: block; font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
     .bubble .status { display: block; font-size: 12px; color: rgba(7,18,10,0.54); margin-top: 5px; }
-    .bubble .status.read { color: var(--brand); }
+    .bubble .status.read { color: var(--accent); }
     .bubble a { color: inherit; text-decoration: underline; }
 
     @media (min-width: 720px) {
@@ -417,8 +418,8 @@
       width: 42px;
       height: 42px;
       border-radius: 8px;
-      background: #283140;
-      color: #DDE8FC;
+      background: #2A2A2A;
+      color: #D6D6D6;
       display: grid;
       place-items: center;
       overflow: hidden;
@@ -511,7 +512,7 @@
       cursor: pointer;
     }
     .project-space-announcement.editable:focus-visible {
-      outline: 2px solid var(--accent-blue);
+      outline: 2px solid var(--accent);
       outline-offset: 2px;
     }
     .project-space-announcement-title {
@@ -621,7 +622,7 @@
       flex: none;
     }
     .project-space-post-metric.liked {
-      color: var(--brand);
+      color: var(--accent);
     }
     .project-space-feed-empty {
       color: var(--ink-soft);
@@ -708,7 +709,7 @@
       padding: 4px 10px;
       white-space: nowrap;
       color: #d8e2ec;
-      background: #283140;
+      background: #2A2A2A;
       border: 1px solid rgba(216,226,236,0.12);
     }
     .workspace-health-pill.ok {
@@ -782,7 +783,7 @@
     }
     .project-block h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); font-weight: normal; }
     .stage-line { padding: 8px 0; font-size: 14px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
-    .stage-line.active { color: var(--brand); font-weight: 500; }
+    .stage-line.active { color: var(--accent); font-weight: 500; }
     .stage-line.done { color: #58be6a; }
     .stage-line.active::after { content: '⋯'; animation: dots 1.2s infinite; }
     @keyframes dots { 0%,100%{opacity:1} 50%{opacity:.3} }
@@ -811,7 +812,7 @@
       border: 0; border-radius: 6px;
       font-size: 15px; cursor: pointer;
     }
-    .project-grid button:hover { background: #283140; }
+    .project-grid button:hover { background: #2A2A2A; }
     .project-history {
       background: var(--panel);
       padding: 22px;
@@ -835,7 +836,7 @@
     .profile-avatar {
       width: 60px; height: 60px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #152c3e, #58be6a);
+      background: linear-gradient(135deg, #16251A, #58be6a);
       display: flex; align-items: center; justify-content: center;
       font-size: 22px;
       color: var(--brand-ink);
@@ -864,7 +865,7 @@
       width: 34px;
       height: 34px;
       border-radius: 4px;
-      background: #f2f5fa;
+      background: #D6D6D6;
       color: #101010;
       display: flex;
       align-items: center;
@@ -878,7 +879,7 @@
     }
     /* Token 消耗统计 */
     .usage-section {
-      background: #181b20;
+      background: #222222;
       padding: 18px 22px;
       margin-top: 10px !important;
       border-radius: 8px;
@@ -887,7 +888,7 @@
       margin: 0;
       font-size: 16px;
       font-weight: 600;
-      color: #f2f5fa;
+      color: #D6D6D6;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -910,7 +911,7 @@
     }
     .usage-caption {
       margin-top: 8px;
-      color: #a6afbd;
+      color: #A8A8A8;
       font-size: 13px;
     }
     .usage-bar {
@@ -924,12 +925,12 @@
       height: 100%;
       width: 0;
       border-radius: inherit;
-      background: var(--brand);
+      background: var(--accent);
       transition: width 180ms ease, background 180ms ease;
     }
     .usage-progress-label {
       margin-top: 8px;
-      color: #6f7785;
+      color: #777777;
       font-size: 12px;
     }
     .usage-metrics {
@@ -939,11 +940,11 @@
       margin-top: 18px;
     }
     .usage-metric-label {
-      color: #6f7785;
+      color: #777777;
       font-size: 11px;
     }
     .usage-metric-value {
-      color: #f2f5fa;
+      color: #D6D6D6;
       font-size: 15px;
       font-weight: 700;
       margin-top: 7px;
@@ -987,13 +988,13 @@
       white-space: pre-wrap;
     }
     .node-balance-card {
-      background: #181B20;
+      background: #222222;
       border-radius: 8px;
       padding: 18px 22px;
       margin-top: 10px;
       cursor: pointer;
     }
-    .node-balance-card:hover { background: #181b20; }
+    .node-balance-card:hover { background: #222222; }
     .node-balance-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 14px;
@@ -1001,12 +1002,12 @@
     .node-balance-title {
       font-size: 16px;
       font-weight: 600;
-      color: #F2F5FA;
+      color: #D6D6D6;
     }
     .node-balance-status {
       font-size: 11px;
-      color: #81B3D9;
-      background: #152C3E;
+      color: #8DDC9B;
+      background: #16251A;
       padding: 4px 10px;
       border-radius: 8px;
     }
@@ -1019,13 +1020,13 @@
     .node-balance-metric label {
       display: block;
       font-size: 11px;
-      color: #6F7785;
+      color: #777777;
       margin-bottom: 2px;
     }
     .node-balance-metric .val {
       font-size: 26px;
       font-weight: 700;
-      color: #F2F5FA;
+      color: #D6D6D6;
     }
     .node-balance-cta-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -1033,19 +1034,19 @@
     }
     .node-balance-cta {
       font-size: 13px;
-      color: #6091CF;
+      color: #58BE6A;
       cursor: pointer;
     }
     .node-balance-cta:hover { text-decoration: underline; }
     .node-balance-tx-btn {
       font-size: 12px;
-      color: #81B3D9;
-      background: #152C3E;
+      color: #8DDC9B;
+      background: #16251A;
       border-radius: 8px;
       padding: 4px 10px;
       cursor: pointer;
     }
-    .node-balance-tx-btn:hover { background: #152C3E; }
+    .node-balance-tx-btn:hover { background: #16251A; }
     .node-balance-payout-btn {
       font-size: 12px;
       color: #58BE6A;
@@ -1062,13 +1063,13 @@
     }
     .node-tx-mask.active { display:flex; }
     .node-tx-sheet {
-      background:#0f1217; border-radius:14px 14px 0 0;
+      background:#151515; border-radius:14px 14px 0 0;
       width:100%; max-width:640px; max-height:80vh;
       display:flex; flex-direction:column;
       padding: 20px;
       box-sizing: border-box;
     }
-    .node-tx-title { font-size:18px; font-weight:700; color:#F2F5FA; margin-bottom:16px; }
+    .node-tx-title { font-size:18px; font-weight:700; color:#D6D6D6; margin-bottom:16px; }
     .node-tx-list { overflow-y:auto; flex:1; }
     .node-tx-row {
       padding: 12px 0;
@@ -1078,13 +1079,13 @@
     .node-tx-row-top {
       display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;
     }
-    .node-tx-model { font-size:14px; font-weight:700; color:#F2F5FA; }
+    .node-tx-model { font-size:14px; font-weight:700; color:#D6D6D6; }
     .node-tx-earned { font-size:14px; font-weight:700; color:#58BE6A; }
-    .node-tx-meta { font-size:11px; color:#6F7785; }
-    .node-tx-empty { text-align:center; padding:40px 0; color:#6F7785; font-size:14px; }
+    .node-tx-meta { font-size:11px; color:#777777; }
+    .node-tx-empty { text-align:center; padding:40px 0; color:#777777; font-size:14px; }
     .node-payout-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .node-directory-card {
-      background: #181B20;
+      background: #222222;
       border-radius: 8px;
       padding: 18px 22px 16px;
       margin-top: 10px;
@@ -1094,51 +1095,51 @@
       display:flex; align-items:center; justify-content:space-between;
       margin-bottom: 14px;
     }
-    .node-directory-title { font-size:16px; font-weight:700; color:#F2F5FA; }
+    .node-directory-title { font-size:16px; font-weight:700; color:#D6D6D6; }
     .node-directory-status {
-      font-size:11px; color:#81B3D9; background:#152C3E;
+      font-size:11px; color:#8DDC9B; background:#16251A;
       border-radius:8px; padding:4px 10px;
     }
     .node-directory-metrics {
       display:flex; gap:24px; flex-wrap:wrap; margin-bottom:12px;
     }
     .node-directory-metric label {
-      display:block; font-size:11px; color:#6F7785; margin-bottom:2px;
+      display:block; font-size:11px; color:#777777; margin-bottom:2px;
     }
     .node-directory-metric .val {
-      font-size:24px; font-weight:700; color:#F2F5FA;
+      font-size:24px; font-weight:700; color:#D6D6D6;
     }
     .node-directory-preview { margin-top: 2px; }
     .node-directory-node {
-      background:#0F1217; border-radius:6px; padding:10px 12px; margin-top:6px;
+      background:#151515; border-radius:6px; padding:10px 12px; margin-top:6px;
     }
     .node-directory-node-title {
-      font-size:13px; color:#F2F5FA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      font-size:13px; color:#D6D6D6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .node-directory-node-detail {
-      font-size:11px; color:#6F7785; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      font-size:11px; color:#777777; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
     .node-directory-empty {
-      text-align:center; color:#6F7785; font-size:12px; padding:14px 0 8px;
+      text-align:center; color:#777777; font-size:12px; padding:14px 0 8px;
     }
     .node-directory-cta {
-      font-size:13px; color:#6091CF; margin-top:10px; display:inline-block;
+      font-size:13px; color:#58BE6A; margin-top:10px; display:inline-block;
     }
     .node-payout-row {
       display:flex; justify-content:space-between; gap:12px;
       padding: 12px 0; border-bottom: 1px solid var(--line);
     }
     .node-payout-main { min-width:0; }
-    .node-payout-title { font-size:14px; color:#F2F5FA; font-weight:700; }
-    .node-payout-meta { font-size:11px; color:#6F7785; margin-top:4px; word-break:break-word; }
-    .node-payout-status { font-size:12px; color:#81B3D9; white-space:nowrap; }
+    .node-payout-title { font-size:14px; color:#D6D6D6; font-weight:700; }
+    .node-payout-meta { font-size:11px; color:#777777; margin-top:4px; word-break:break-word; }
+    .node-payout-status { font-size:12px; color:#8DDC9B; white-space:nowrap; }
     .node-payout-cancel {
       border:0; border-radius:8px; background:#2A1F1F; color:#E99191;
       padding:4px 9px; cursor:pointer; margin-top:6px; font-size:12px;
     }
     /* 我的节点卡片 */
     .my-nodes-card {
-      background: #0F1217;
+      background: #151515;
       border-radius: 8px;
       padding: 16px 22px;
       margin-top: 10px;
@@ -1147,17 +1148,17 @@
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 10px;
     }
-    .my-nodes-title { font-size: 15px; font-weight: 700; color: #F2F5FA; }
+    .my-nodes-title { font-size: 15px; font-weight: 700; color: #D6D6D6; }
     .my-nodes-status {
-      font-size: 11px; color: #81B3D9;
-      background: #152C3E; border-radius: 8px;
+      font-size: 11px; color: #8DDC9B;
+      background: #16251A; border-radius: 8px;
       padding: 4px 10px;
     }
-    .my-nodes-status.online { color: var(--brand); background: var(--badge-info-bg); }
+    .my-nodes-status.online { color: var(--accent); background: var(--badge-info-bg); }
     .my-nodes-status.offline { color: var(--ink-faint); background: var(--panel); }
     .my-node-row {
       display: flex; align-items: center;
-      background: #181B20; border-radius: 6px;
+      background: #222222; border-radius: 6px;
       padding: 10px 12px; margin-top: 8px;
     }
     .my-node-dot {
@@ -1165,12 +1166,12 @@
       flex-shrink: 0; margin-right: 10px;
     }
     .my-node-dot.online { background: #58BE6A; }
-    .my-node-dot.offline { background: #6F7785; }
+    .my-node-dot.offline { background: #777777; }
     .my-node-info { flex: 1; min-width: 0; }
-    .my-node-id { font-size: 13px; font-weight: 700; color: #F2F5FA; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .my-node-id.offline { color: #6F7785; }
-    .my-node-subtitle { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .my-node-models { font-size: 11px; color: #6F7785; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-id { font-size: 13px; font-weight: 700; color: #D6D6D6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-id.offline { color: #777777; }
+    .my-node-subtitle { font-size: 11px; color: #777777; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .my-node-models { font-size: 11px; color: #777777; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .my-node-metrics {
       display: flex; flex-wrap: wrap; gap: 4px 8px;
       font-size: 11px; color: #8C96A5; margin-top: 4px;
@@ -1178,12 +1179,12 @@
     .my-node-alert { color: #F7D28A; }
     .my-node-row.warning { border: 1px solid rgba(201,150,48,0.28); }
     .my-node-row.bad { border: 1px solid rgba(196,70,70,0.34); }
-    .my-node-badge { font-size: 11px; color: #81B3D9; flex-shrink: 0; margin-left: 8px; }
+    .my-node-badge { font-size: 11px; color: #8DDC9B; flex-shrink: 0; margin-left: 8px; }
     .my-node-badge.ok { color: #58BE6A; }
     .my-node-badge.warn { color: #F7D28A; }
     .my-node-badge.bad { color: #E99191; }
-    .my-node-badge.offline { color: #6F7785; }
-    .my-nodes-empty { text-align: center; color: #6F7785; font-size: 12px; padding: 12px 0 4px; line-height: 1.6; }
+    .my-node-badge.offline { color: #777777; }
+    .my-nodes-empty { text-align: center; color: #777777; font-size: 12px; padding: 12px 0 4px; line-height: 1.6; }
     .profile-row {
       min-height: 64px;
       background: var(--panel);
@@ -1309,8 +1310,8 @@
       cursor: pointer; width: 100%;
       display: flex; align-items: center; justify-content: center;
     }
-    .copy-btn:hover { background: #283140; }
-    .copy-btn.copied { color: var(--brand); border-color: var(--brand); }
+    .copy-btn:hover { background: #2A2A2A; }
+    .copy-btn.copied { color: var(--accent); border-color: var(--accent); }
     .download-link-box {
       background: var(--panel); border: 1px solid var(--line);
       border-radius: 7px; padding: 10px 12px;
@@ -1356,7 +1357,7 @@
       border-radius: 6px;
       cursor: pointer;
     }
-    .input-bar .model-btn:hover { background: #283140; }
+    .input-bar .model-btn:hover { background: #2A2A2A; }
     .input-bar .send-btn {
       flex: 0 0 64px; height: 42px;
       background: var(--brand);
@@ -1520,7 +1521,7 @@
       gap: 12px;
     }
     .project-document-path {
-      color: #81B3D9;
+      color: #8DDC9B;
       font-size: 12px;
       min-height: 18px;
     }
@@ -1575,10 +1576,10 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .agent-option:hover { background: #283140; }
+    .agent-option:hover { background: #2A2A2A; }
     .agent-option.active {
-      border-color: var(--brand);
-      background: rgba(39, 117, 255, 0.16);
+      border-color: var(--accent);
+      background: rgba(88, 190, 106, 0.14);
       color: var(--ink-strong);
     }
     .agent-option:disabled {
@@ -1960,9 +1961,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="node-tx-sheet">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <span class="node-tx-title" style="margin-bottom:0">积分流水明细</span>
-            <button onclick="document.getElementById('nodeTxMask').classList.remove('active')" style="background:none;border:none;color:#6F7785;font-size:22px;cursor:pointer;padding:0">×</button>
+            <button onclick="document.getElementById('nodeTxMask').classList.remove('active')" style="background:none;border:none;color:#777777;font-size:22px;cursor:pointer;padding:0">×</button>
           </div>
-          <div class="node-tx-list" id="nodeTxList"><div style="text-align:center;padding:32px 0;color:#6F7785">加载中…</div></div>
+          <div class="node-tx-list" id="nodeTxList"><div style="text-align:center;padding:32px 0;color:#777777">加载中…</div></div>
         </div>
       </div>
 
@@ -1980,10 +1981,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <span class="my-nodes-title">AI 记住的你</span>
           <span style="display:flex;align-items:center;gap:6px;">
             <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
-            <button id="addMemoryBtn" title="主动告诉 AI" style="background:none;border:none;color:#81B3D9;cursor:pointer;font-size:20px;line-height:1;padding:0 4px;">+</button>
+            <button id="addMemoryBtn" title="主动告诉 AI" style="background:none;border:none;color:#8DDC9B;cursor:pointer;font-size:20px;line-height:1;padding:0 4px;">+</button>
           </span>
         </div>
-        <p style="font-size:11px;color:#6F7785;margin:4px 0 8px">AI 在对话中自动记录，让每次回答更贴合你</p>
+        <p style="font-size:11px;color:#777777;margin:4px 0 8px">AI 在对话中自动记录，让每次回答更贴合你</p>
         <div id="memoriesList"></div>
       </div>
 
@@ -4535,18 +4536,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function usageStatusTextColor(percent) {
     if (percent <= 15) return '#ffc3c3';
     if (percent <= 35) return '#ffd8a8';
-    return '#B8C4D8';
+    return '#D0D0D0';
   }
   function usageStatusBgColor(percent) {
     if (percent <= 15) return '#3a1e1e';
     if (percent <= 35) return '#3a2818';
-    return '#152C3E';
+    return '#16251A';
   }
   function renderUsagePending(label, caption) {
-    setUsageStatus(label, '#B8C4D8', '#283345');
+    setUsageStatus(label, '#D0D0D0', '#2A2A2A');
     usageRemainingText.textContent = '读取中...';
     usageRemainingCaption.textContent = caption;
-    setUsageProgress(0, '#6091cf');
+    setUsageProgress(0, '#58BE6A');
     usageProgressLabel.textContent = '额度读取中';
     usageMonthValue.textContent = '—';
     usageWeekValue.textContent = '—';
@@ -4583,10 +4584,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         data.reset_at || data.resets_at || data.reset_time || '';
 
       if (remaining === null) {
-        setUsageStatus('未配置', '#B8C4D8', '#283345');
+        setUsageStatus('未配置', '#D0D0D0', '#2A2A2A');
         usageRemainingText.textContent = '未配置';
         usageRemainingCaption.textContent = '服务器暂未返回剩余额度';
-        setUsageProgress(0, '#A6AFBD');
+        setUsageProgress(0, '#A8A8A8');
         usageProgressLabel.textContent = '额度上限未配置';
       } else {
         if (limit && limit > 0) {
@@ -4597,7 +4598,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           setUsageProgress(percent, usageProgressColor(percent));
           usageProgressLabel.textContent = '已用 ' + Math.max(0, 100 - percent) + '% · 近30天消耗 ' + formatUsageCount(total) + ' tokens';
         } else {
-          setUsageStatus('已同步', '#B8C4D8', '#152C3E');
+          setUsageStatus('已同步', '#D0D0D0', '#16251A');
           usageRemainingText.textContent = formatUsageCount(remaining);
           usageRemainingCaption.textContent = '剩余 tokens' + (resetText ? ' · ' + resetText : '');
           setUsageProgress(100, '#58be6a');
@@ -4837,17 +4838,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   // ====== 节点市场弹窗 ======
   async function openNodeMarketDialog() {
-    let balanceHtml = '<span style="color:#6F7785">未登录</span>';
-    let modelsHtml = '<div style="color:#6F7785;padding:32px 0;text-align:center">加载中…</div>';
+    let balanceHtml = '<span style="color:#777777">未登录</span>';
+    let modelsHtml = '<div style="color:#777777;padding:32px 0;text-align:center">加载中…</div>';
     const dlg = document.createElement('div');
     dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
-    dlg.innerHTML = `<div style="background:#0f1217;border-radius:14px;width:min(520px,96vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column">
+    dlg.innerHTML = `<div style="background:#151515;border-radius:14px;width:min(520px,96vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column">
       <div style="padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:18px;font-weight:600;color:#F2F5FA">PC 节点大厅</span>
-        <button id="_nmClose" style="background:none;border:none;color:#6F7785;font-size:22px;cursor:pointer">✕</button>
+        <span style="font-size:18px;font-weight:600;color:#D6D6D6">PC 节点大厅</span>
+        <button id="_nmClose" style="background:none;border:none;color:#777777;font-size:22px;cursor:pointer">✕</button>
       </div>
-      <div id="_nmBalance" style="padding:4px 20px 8px;font-size:13px;color:#A6AFBD">积分余额：加载中…</div>
-      <hr style="border:none;border-top:1px solid #24282F;margin:0">
+      <div id="_nmBalance" style="padding:4px 20px 8px;font-size:13px;color:#A8A8A8">积分余额：加载中…</div>
+      <hr style="border:none;border-top:1px solid #2E2E2E;margin:0">
       <div id="_nmModels" style="overflow-y:auto;flex:1;padding:8px 0">加载中…</div>
     </div>`;
     document.body.appendChild(dlg);
@@ -4899,22 +4900,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         });
         balEl.textContent = `${nodeMarketSummaryText(sortedNodes)}  |  ${balanceLine}`;
         if (!sortedNodes.length) {
-          modEl.innerHTML = '<div style="color:#6F7785;padding:40px 20px;text-align:center">暂无在线节点</div>';
+          modEl.innerHTML = '<div style="color:#777777;padding:40px 20px;text-align:center">暂无在线节点</div>';
         } else {
           const nodeCards = sortedNodes.map(renderMarketNodeCard).join('');
           const modelCards = cards.length
-            ? `<div style="color:#6F7785;font-size:12px;padding:16px 20px 4px">可调用模型 (${cards.length})</div>` +
+            ? `<div style="color:#777777;font-size:12px;padding:16px 20px 4px">可调用模型 (${cards.length})</div>` +
               cards.map(({ nodeId, nodeName, hw, capacity, model: m }) => `<div class="_nm-card" data-id="${escapeHtml(m.model_id)}" data-node="${escapeHtml(nodeId)}"
-              style="margin:4px 12px;padding:12px 16px;background:#181B20;border-radius:8px;cursor:pointer">
+              style="margin:4px 12px;padding:12px 16px;background:#222222;border-radius:8px;cursor:pointer">
               <div style="display:flex;align-items:center">
-                <span style="flex:1;font-size:15px;font-weight:600;color:#F2F5FA">${escapeHtml(m.display_name || m.model_id)}</span>
-                <span style="font-size:11px;padding:2px 8px;background:#152C3E;color:#58BE6A;border-radius:10px">${escapeHtml(String(m.price_per_1k_credits ?? 1))} /千词</span>
+                <span style="flex:1;font-size:15px;font-weight:600;color:#D6D6D6">${escapeHtml(m.display_name || m.model_id)}</span>
+                <span style="font-size:11px;padding:2px 8px;background:#16251A;color:#58BE6A;border-radius:10px">${escapeHtml(String(m.price_per_1k_credits ?? 1))} /千词</span>
               </div>
-              <div style="font-size:12px;color:#6F7785;margin-top:4px">${escapeHtml(nodeName)} · ${escapeHtml(capacity)} · 上下文 ${escapeHtml(String(m.context_len || 2048))} tokens</div>
+              <div style="font-size:12px;color:#777777;margin-top:4px">${escapeHtml(nodeName)} · ${escapeHtml(capacity)} · 上下文 ${escapeHtml(String(m.context_len || 2048))} tokens</div>
               <div style="font-size:12px;color:#8B949E;margin-top:3px">${escapeHtml(hw)}</div>
             </div>`).join('')
-            : '<div style="color:#6F7785;padding:12px 20px 22px;text-align:center">当前在线节点暂未上报可调用模型</div>';
-          modEl.innerHTML = `<div style="color:#6F7785;font-size:12px;padding:10px 20px 4px">在线 PC 节点 (${sortedNodes.length})</div>` +
+            : '<div style="color:#777777;padding:12px 20px 22px;text-align:center">当前在线节点暂未上报可调用模型</div>';
+          modEl.innerHTML = `<div style="color:#777777;font-size:12px;padding:10px 20px 4px">在线 PC 节点 (${sortedNodes.length})</div>` +
             nodeCards +
             modelCards;
           modEl.querySelectorAll('._nm-card').forEach(card => {
@@ -4965,9 +4966,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       : `ID: ${shortId}`;
     const tone = nodeCapacityTone(node);
     const capacity = nodeCapacityLabel(node) || (node.online ? (nodeCanAcceptProject(node) ? '可接项目' : '在线') : '离线');
-    const capacityColor = tone === 'bad' ? '#E99191' : tone === 'warn' ? '#F7D28A' : tone === 'ok' ? '#58BE6A' : '#81B3D9';
-    const capacityBg = tone === 'bad' ? '#2A1F1F' : tone === 'warn' ? '#283140' : '#152C3E';
-    const dotColor = node.online ? '#58BE6A' : '#6F7785';
+    const capacityColor = tone === 'bad' ? '#E99191' : tone === 'warn' ? '#F7D28A' : tone === 'ok' ? '#58BE6A' : '#8DDC9B';
+    const capacityBg = tone === 'bad' ? '#2A1F1F' : tone === 'warn' ? '#2A2A2A' : '#16251A';
+    const dotColor = node.online ? '#58BE6A' : '#777777';
     const warnings = Array.isArray(node.capacity_warnings || node.capacityWarnings)
       ? (node.capacity_warnings || node.capacityWarnings).filter(Boolean)
       : [];
@@ -4985,15 +4986,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const models = modelNames.length
       ? modelNames.slice(0, 4).map(escapeHtml).join('  ·  ') + (modelNames.length > 4 ? `  +${modelNames.length - 4}` : '')
       : '暂无在线模型';
-    return `<div style="margin:4px 12px;padding:13px 16px;background:#181B20;border-radius:8px">
+    return `<div style="margin:4px 12px;padding:13px 16px;background:#222222;border-radius:8px">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
-        <span style="flex:1;min-width:0;font-size:15px;font-weight:700;color:#F2F5FA;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(name)}</span>
+        <span style="flex:1;min-width:0;font-size:15px;font-weight:700;color:#D6D6D6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(name)}</span>
         <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${capacityBg};color:${capacityColor};white-space:nowrap">${escapeHtml(capacity)}</span>
       </div>
-      <div style="font-size:12px;color:#6F7785;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(subtitle)}</div>
-      <div style="font-size:12px;color:${tone === 'bad' ? '#E99191' : tone === 'warn' ? '#F7D28A' : '#6F7785'};margin-top:5px;line-height:1.45">${metrics || '硬件与容量待上报'}</div>
-      <div style="font-size:12px;color:${modelNames.length ? '#81B3D9' : '#6F7785'};margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${models}</div>
+      <div style="font-size:12px;color:#777777;margin-top:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(subtitle)}</div>
+      <div style="font-size:12px;color:${tone === 'bad' ? '#E99191' : tone === 'warn' ? '#F7D28A' : '#777777'};margin-top:5px;line-height:1.45">${metrics || '硬件与容量待上报'}</div>
+      <div style="font-size:12px;color:${modelNames.length ? '#8DDC9B' : '#777777'};margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${models}</div>
     </div>`;
   }
 
@@ -5040,7 +5041,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!mask || !list) return;
     mask.classList.add('active');
     mask.addEventListener('click', (e) => { if (e.target === mask) mask.classList.remove('active'); }, { once: true });
-    list.innerHTML = '<div style="text-align:center;padding:32px 0;color:#6F7785">加载中…</div>';
+    list.innerHTML = '<div style="text-align:center;padding:32px 0;color:#777777">加载中…</div>';
     try {
       const res = await fetch('/api/me/node-transactions', { headers: authHeaders() });
       if (!res.ok) throw new Error('http ' + res.status);
@@ -5158,7 +5159,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     dlg.innerHTML = `<div class="node-tx-sheet">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <span class="node-tx-title" style="margin-bottom:0">提现记录</span>
-        <button id="_nodePayoutsClose" style="background:none;border:none;color:#6F7785;font-size:22px;cursor:pointer;padding:0">×</button>
+        <button id="_nodePayoutsClose" style="background:none;border:none;color:#777777;font-size:22px;cursor:pointer;padding:0">×</button>
       </div>
       <div class="node-tx-list" id="_nodePayoutsList"><div class="node-tx-empty">加载中…</div></div>
     </div>`;
@@ -5301,7 +5302,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         return;
       }
       previewEl.innerHTML = sorted.slice(0, 2).map(renderNodeDirectoryPreview).join('') +
-        (sorted.length > 2 ? `<div class="node-directory-empty" style="color:#6091CF;padding-bottom:0">还有 ${sorted.length - 2} 台节点，点击查看全部</div>` : '');
+        (sorted.length > 2 ? `<div class="node-directory-empty" style="color:#58BE6A;padding-bottom:0">还有 ${sorted.length - 2} 台节点，点击查看全部</div>` : '');
     } catch (e) {
       if (statusEl) statusEl.textContent = '暂不可用';
       if (onlineEl) onlineEl.textContent = '--';
@@ -5447,7 +5448,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   };
 
   // ====== AI 记忆列表 ======
-  const CATEGORY_COLORS = { preference: '#81B3D9', profile: '#58BE6A', goal: '#FCD34D', fact: '#6F7785' };
+  const CATEGORY_COLORS = { preference: '#8DDC9B', profile: '#58BE6A', goal: '#FCD34D', fact: '#777777' };
   async function loadMemories() {
     const card = document.getElementById('memoriesCard');
     const statusEl = document.getElementById('memoriesStatus');
@@ -5475,11 +5476,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       memories.forEach((m) => {
         const color = CATEGORY_COLORS[m.category] || CATEGORY_COLORS.fact;
         const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;background:#181B20;border-radius:6px;';
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:6px;background:#222222;border-radius:6px;';
         row.innerHTML = `
           <div style="width:3px;min-height:30px;align-self:stretch;background:${color};border-radius:2px;flex-shrink:0;"></div>
-          <span style="flex:1;font-size:13px;color:#DDE8FC;line-height:1.5;">${escHtml(m.content)}</span>
-          <button data-id="${escHtml(m.id)}" data-content="${escHtml(m.content)}" style="background:none;border:none;color:#6F7785;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" title="删除">✕</button>
+          <span style="flex:1;font-size:13px;color:#D6D6D6;line-height:1.5;">${escHtml(m.content)}</span>
+          <button data-id="${escHtml(m.id)}" data-content="${escHtml(m.content)}" style="background:none;border:none;color:#777777;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;" title="删除">✕</button>
         `;
         row.querySelector('button').addEventListener('click', async (e) => {
           const btn = e.currentTarget;

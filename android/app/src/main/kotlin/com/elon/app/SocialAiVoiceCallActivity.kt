@@ -44,18 +44,18 @@ class SocialAiVoiceCallActivity : AppCompatActivity() {
     }
 
     private val bgColor = Color.parseColor("#101010")
-    private val cardColor = Color.parseColor("#181B20")
-    private val subtleColor = Color.parseColor("#0F1217")
-    private val borderColor = Color.parseColor("#24282F")
-    private val primaryTextColor = Color.parseColor("#F2F5FA")
-    private val secondaryTextColor = Color.parseColor("#A6AFBD")
-    private val tertiaryTextColor = Color.parseColor("#6F7785")
-    private val primaryActionColor = Color.parseColor("#58BE6A")
-    private val primaryActionTextColor = Color.parseColor("#07120A")
-    private val secondaryActionColor = Color.parseColor("#283140")
-    private val secondaryActionTextColor = Color.parseColor("#DDE8FC")
-    private val infoBadgeColor = Color.parseColor("#152C3E")
-    private val infoTextColor = Color.parseColor("#81B3D9")
+    private val cardColor = Color.parseColor("#222222")
+    private val subtleColor = Color.parseColor("#151515")
+    private val borderColor = Color.parseColor("#2E2E2E")
+    private val primaryTextColor = Color.parseColor("#D6D6D6")
+    private val secondaryTextColor = Color.parseColor("#A8A8A8")
+    private val tertiaryTextColor = Color.parseColor("#777777")
+    private val primaryActionColor = Color.parseColor("#C8C8C8")
+    private val primaryActionTextColor = Color.parseColor("#101010")
+    private val secondaryActionColor = Color.parseColor("#2A2A2A")
+    private val secondaryActionTextColor = Color.parseColor("#D6D6D6")
+    private val infoBadgeColor = Color.parseColor("#16251A")
+    private val infoTextColor = Color.parseColor("#8DDC9B")
 
     private lateinit var serverUrl: String
     private lateinit var userId: String

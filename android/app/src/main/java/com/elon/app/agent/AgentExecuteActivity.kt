@@ -1,4 +1,4 @@
-﻿// interface/AgentExecuteActivity.kt
+// interface/AgentExecuteActivity.kt
 package com.elon.app.agent
 
 import android.Manifest
@@ -27,18 +27,18 @@ import com.elon.app.agent.infrastructure.floating.ConversationalVoiceActivity
 import com.elon.app.agent.infrastructure.voice.VoiceRecognitionHelper
 
 private const val APP_BG = "#101010"
-private const val CARD_BG = "#181B20"
-private const val SUBTLE_BG = "#0F1217"
-private const val TEXT_PRIMARY = "#F2F5FA"
-private const val TEXT_SECONDARY = "#A6AFBD"
-private const val TEXT_TERTIARY = "#6F7785"
-private const val BUTTON_SECONDARY_BG = "#283140"
-private const val BUTTON_SECONDARY_TEXT = "#DDE8FC"
-private const val BUTTON_PRIMARY_BG = "#58BE6A"
-private const val BUTTON_PRIMARY_TEXT = "#07120A"
-private const val LINK_PRIMARY = "#6091CF"
-private const val BADGE_INFO_BG = "#152C3E"
-private const val BADGE_INFO_TEXT = "#81B3D9"
+private const val CARD_BG = "#222222"
+private const val SUBTLE_BG = "#151515"
+private const val TEXT_PRIMARY = "#D6D6D6"
+private const val TEXT_SECONDARY = "#A8A8A8"
+private const val TEXT_TERTIARY = "#777777"
+private const val BUTTON_SECONDARY_BG = "#2A2A2A"
+private const val BUTTON_SECONDARY_TEXT = "#D6D6D6"
+private const val BUTTON_PRIMARY_BG = "#C8C8C8"
+private const val BUTTON_PRIMARY_TEXT = "#101010"
+private const val LINK_PRIMARY = "#58BE6A"
+private const val BADGE_INFO_BG = "#16251A"
+private const val BADGE_INFO_TEXT = "#8DDC9B"
 private const val DANGER_TEXT = "#D97A7A"
 
 /**
@@ -578,7 +578,7 @@ class AgentExecuteActivity : Activity() {
             updateUI(executing = false)
             
             if (success) {
-                statusIndicator.setBackgroundColor(Color.parseColor(BUTTON_PRIMARY_BG))
+                statusIndicator.setBackgroundColor(Color.parseColor(LINK_PRIMARY))
                 appendLog("✅ 执行成功!")
                 if (result.isNotEmpty()) {
                     appendLog("📊 结果: $result")
@@ -859,7 +859,7 @@ class AgentExecuteActivity : Activity() {
             viewReportButton.setBackgroundColor(when (performanceScore) {
                 "POOR" -> Color.parseColor(DANGER_TEXT)
                 "FAIR" -> Color.parseColor(LINK_PRIMARY)
-                else -> Color.parseColor(BUTTON_PRIMARY_BG)
+                else -> Color.parseColor(LINK_PRIMARY)
             })
             viewReportButton.setTextColor(Color.parseColor(
                 if (performanceScore == "GOOD") BUTTON_PRIMARY_TEXT else BUTTON_SECONDARY_TEXT

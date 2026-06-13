@@ -127,12 +127,12 @@ internal class ProjectSpaceFeedView(
                 text = "公告"
                 textSize = 15f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             })
             addView(TextView(activity).apply {
                 text = displayText
                 textSize = 14f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setLineSpacing(dp(3).toFloat(), 1f)
                 setPadding(0, dp(7), 0, 0)
             })
@@ -169,7 +169,7 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(12))
-            background = roundedBackground("#181B20", 10)
+            background = roundedBackground("#222222", 10)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openPost(post.channel, post.message) }
@@ -184,7 +184,7 @@ internal class ProjectSpaceFeedView(
             addView(TextView(activity).apply {
                 text = postText.title
                 textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 setTypeface(typeface, Typeface.BOLD)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
@@ -193,7 +193,7 @@ internal class ProjectSpaceFeedView(
             addView(TextView(activity).apply {
                 text = postText.body.ifBlank { postText.title }
                 textSize = 14f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 3
                 ellipsize = TextUtils.TruncateAt.END
@@ -218,24 +218,24 @@ internal class ProjectSpaceFeedView(
                 addView(TextView(activity).apply {
                     text = sender
                     textSize = 14f
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
                 addView(TextView(activity).apply {
                     text = "回复于$timeText"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor("#777777"))
                     setPadding(0, dp(3), 0, 0)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 text = topic
                 textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 gravity = Gravity.CENTER
                 maxLines = 1
-                background = roundedBackground("#0F1217", 8)
+                background = roundedBackground("#151515", 8)
                 setPadding(dp(10), dp(5), dp(10), dp(5))
             })
         }
@@ -391,7 +391,7 @@ internal class ProjectSpaceFeedView(
     }
 
     private fun metricColor(selected: Boolean): Int {
-        return Color.parseColor(if (selected) "#58BE6A" else "#A6AFBD")
+        return Color.parseColor(if (selected) "#58BE6A" else "#A8A8A8")
     }
 
     private fun sharePost(
@@ -434,7 +434,7 @@ internal class ProjectSpaceFeedView(
                 text = textValue
                 textSize = 15f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
             })
             if (showButton) {
                 addView(TextView(activity).apply {
@@ -442,7 +442,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 34f
                     includeFontPadding = false
                     gravity = Gravity.CENTER
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     background = roundedBackground("#30333A", 24)
                     isClickable = true
                     foreground = selectableForeground()

@@ -224,7 +224,7 @@ internal class MainInputComposerSetup(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "按住 说话"
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 15f
             visibility = View.GONE
             setOnTouchListener { _, event ->

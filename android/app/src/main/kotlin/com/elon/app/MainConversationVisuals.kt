@@ -21,7 +21,7 @@ internal fun conversationSubtitleColor(text: String): Int {
         text.startsWith("未连接") -> Color.parseColor("#D93025")
         text.startsWith("工作完成") -> Color.parseColor("#58BE6A")
         text.startsWith("工作停止") -> Color.parseColor("#D93025")
-        text.startsWith("会话已结束") -> Color.parseColor("#6F7785")
-        else -> Color.parseColor("#A6AFBD")
+        text.startsWith("会话已结束") -> Color.parseColor("#777777")
+        else -> Color.parseColor("#A8A8A8")
     }
 }

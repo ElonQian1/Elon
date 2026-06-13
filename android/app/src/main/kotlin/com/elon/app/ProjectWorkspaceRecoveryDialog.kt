@@ -36,7 +36,7 @@ internal object ProjectWorkspaceRecoveryDialog {
             addView(TextView(activity).apply {
                 text = "正在检查 PC 工作区..."
                 textSize = 14f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 gravity = Gravity.CENTER
                 setPadding(0, dp(activity, 12), 0, 0)
             })
@@ -89,7 +89,7 @@ internal object ProjectWorkspaceRecoveryDialog {
         content.removeAllViews()
         content.addView(statusHeader(activity, health))
         if (health.recommendedAction.isNotBlank()) {
-            content.addView(messageView(activity, health.recommendedAction, "#A6AFBD"))
+            content.addView(messageView(activity, health.recommendedAction, "#A8A8A8"))
         }
         listOf(
             "节点" to health.nodeDisplay,
@@ -125,8 +125,8 @@ internal object ProjectWorkspaceRecoveryDialog {
             actions.forEach { action ->
                 addView(Button(activity).apply {
                     text = action.label
-                    setTextColor(Color.parseColor("#07120A"))
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#58BE6A"))
+                    setTextColor(Color.parseColor("#101010"))
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C8C8C8"))
                     setOnClickListener {
                         if (action.key == "migrate_workspace" || action.key == "bind_pc_node") {
                             chooseNodeAndRecover(activity, http, serverUrl, projectId, content, action, onProjectUpdated)
@@ -234,12 +234,12 @@ internal object ProjectWorkspaceRecoveryDialog {
                 text = health.healthLabel
                 textSize = 17f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 text = toneLabel
                 textSize = 12f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(activity, 10).toFloat()
                     setColor(Color.parseColor(color))
@@ -253,7 +253,7 @@ internal object ProjectWorkspaceRecoveryDialog {
         return TextView(activity).apply {
             text = "$label：$value"
             textSize = 13f
-            setTextColor(Color.parseColor("#DDE8FC"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setPadding(0, dp(activity, 8), 0, 0)
         }
     }

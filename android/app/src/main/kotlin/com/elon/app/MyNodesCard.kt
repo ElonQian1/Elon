@@ -74,9 +74,9 @@ internal class MyNodesCard(
                         } else {
                             val online = nodes.count { it.online }
                             statusPill.text = if (online > 0) "在线 $online/${nodes.size}" else "全部离线"
-                            statusPill.setTextColor(Color.parseColor(if (online > 0) "#58BE6A" else "#6F7785"))
+                            statusPill.setTextColor(Color.parseColor(if (online > 0) "#58BE6A" else "#777777"))
                             val pillBg = statusPill.background as? GradientDrawable
-                            pillBg?.setColor(Color.parseColor(if (online > 0) "#152C3E" else "#181B20"))
+                            pillBg?.setColor(Color.parseColor(if (online > 0) "#16251A" else "#222222"))
                             statusPill.visibility = View.VISIBLE
                             nodes.forEach { node ->
                                 nodeListContainer.addView(buildNodeRow(node))
@@ -173,7 +173,7 @@ internal class MyNodesCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(16), dp(22), dp(16))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0F1217"))
+                setColor(Color.parseColor("#151515"))
                 cornerRadius = dp(8).toFloat()
             }
 
@@ -190,7 +190,7 @@ internal class MyNodesCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "我的节点"
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     textSize = 15f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -201,9 +201,9 @@ internal class MyNodesCard(
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     text = "加载中…"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#81B3D9"))
+                    setTextColor(Color.parseColor("#8DDC9B"))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#152C3E"))
+                        setColor(Color.parseColor("#16251A"))
                         cornerRadius = dp(8).toFloat()
                     }
                 }
@@ -231,7 +231,7 @@ internal class MyNodesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#181B20"))
+            setColor(Color.parseColor("#222222"))
             cornerRadius = dp(6).toFloat()
             when (node.capacityTone.lowercase(Locale.US)) {
                 "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
@@ -246,7 +246,7 @@ internal class MyNodesCard(
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(if (node.online) "#58BE6A" else "#6F7785"))
+                setColor(Color.parseColor(if (node.online) "#58BE6A" else "#777777"))
             }
         })
 
@@ -260,7 +260,7 @@ internal class MyNodesCard(
                 text = node.displayName
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(if (node.online) "#F2F5FA" else "#6F7785"))
+                setTextColor(Color.parseColor(if (node.online) "#D6D6D6" else "#777777"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -273,7 +273,7 @@ internal class MyNodesCard(
                 includeFontPadding = false
                 text = nodeSubtitle(node)
                 textSize = 11f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -288,7 +288,7 @@ internal class MyNodesCard(
                     text = node.models.take(3).joinToString("  ·  ") +
                             if (node.models.size > 3) "  +${node.models.size - 3}" else ""
                     textSize = 11f
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor("#777777"))
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 })
@@ -301,7 +301,7 @@ internal class MyNodesCard(
                     includeFontPadding = false
                     text = "暂无可用模型"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor("#777777"))
                     maxLines = 1
                 })
             }
@@ -338,7 +338,7 @@ internal class MyNodesCard(
         includeFontPadding = false
         text = "暂无你提供的节点\n所有在线节点请看 PC 节点大厅"
         textSize = 12f
-        setTextColor(Color.parseColor("#6F7785"))
+        setTextColor(Color.parseColor("#777777"))
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, dp(8))
     }
@@ -377,12 +377,12 @@ internal class MyNodesCard(
     }
 
     private fun nodeCapacityTextColor(node: NodeItem): Int {
-        if (!node.online) return Color.parseColor("#6F7785")
+        if (!node.online) return Color.parseColor("#777777")
         return when (node.capacityTone.lowercase(Locale.US)) {
             "ok" -> Color.parseColor("#58BE6A")
             "bad" -> Color.parseColor("#E99191")
             "warn" -> Color.parseColor("#F7D28A")
-            else -> Color.parseColor("#81B3D9")
+            else -> Color.parseColor("#8DDC9B")
         }
     }
 

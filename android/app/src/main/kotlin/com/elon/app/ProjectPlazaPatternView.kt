@@ -34,10 +34,10 @@ internal class ProjectPlazaPatternView(
         .take(14)
     private val density = resources.displayMetrics.density
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#181B20")
+        color = Color.parseColor("#222222")
     }
     private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#1E2126")
+        color = Color.parseColor("#2E2E2E")
         strokeWidth = dp(1).toFloat()
         alpha = 130
     }

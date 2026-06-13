@@ -153,13 +153,13 @@ internal class ChatAiSideMenuView(
             addView(
                 menuText("当前聊天").apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                 }
             )
             addView(
                 ImageButton(context).apply {
                     setImageResource(R.drawable.ic_add_circle_simple)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#F2F5FA"))
+                    imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
                     background = null
                     scaleType = ImageView.ScaleType.CENTER
                     contentDescription = "新建会话"
@@ -195,13 +195,13 @@ internal class ChatAiSideMenuView(
             setPadding(dp(10), 0, dp(10), 0)
             isClickable = true
             foreground = selectableForeground()
-            setTextColor(Color.parseColor(if (active) "#F2F5FA" else "#A6AFBD"))
+            setTextColor(Color.parseColor(if (active) "#D6D6D6" else "#A8A8A8"))
             if (working) {
                 startDirectoryRowShimmer(this)
             } else if (active) {
                 background = GradientDrawable().apply {
                     cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#181B20"))
+                    setColor(Color.parseColor("#222222"))
                 }
             }
             setOnClickListener { onClick() }
@@ -224,7 +224,7 @@ internal class ChatAiSideMenuView(
             addView(
                 ImageView(context).apply {
                     setImageResource(iconRes)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#A6AFBD"))
+                    imageTintList = ColorStateList.valueOf(Color.parseColor("#A8A8A8"))
                     scaleType = ImageView.ScaleType.CENTER
                 },
                 LinearLayout.LayoutParams(dp(26), dp(26))
@@ -247,14 +247,14 @@ internal class ChatAiSideMenuView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             textSize = 17.5f
         }
     }
 
     private fun startDirectoryRowShimmer(row: View) {
-        val baseColor = Color.parseColor("#181B20")
-        val highlightColor = Color.parseColor("#283140")
+        val baseColor = Color.parseColor("#222222")
+        val highlightColor = Color.parseColor("#2A2A2A")
         val background = GradientDrawable().apply {
             cornerRadius = dp(8).toFloat()
             setColor(baseColor)

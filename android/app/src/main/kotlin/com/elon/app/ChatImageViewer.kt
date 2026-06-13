@@ -76,7 +76,7 @@ internal object ChatImageViewer {
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "×"
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 30f
             setOnClickListener { dialog.dismiss() }
         }

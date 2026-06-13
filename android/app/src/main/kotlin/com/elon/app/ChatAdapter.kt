@@ -518,11 +518,11 @@ class ChatAdapter(
     }
 
     private fun messageTextColor(role: String): Int = when (role) {
-        "ai", "ai-intent", "friend" -> Color.parseColor("#F2F5FA")
+        "ai", "ai-intent", "friend" -> Color.parseColor("#D6D6D6")
         "ai-stopped" -> Color.parseColor("#D9B66B")
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#A6AFBD")
+        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#A8A8A8")
         "error" -> Color.parseColor("#C62828")
-        else -> Color.parseColor("#07120A")
+        else -> Color.parseColor("#101010")
     }
 
     private fun startShimmer(holder: VH, expectedRole: String) {
@@ -539,11 +539,11 @@ class ChatAdapter(
                 width.toFloat(),
                 0f,
                 intArrayOf(
-                    Color.parseColor("#A6AFBD"),
+                    Color.parseColor("#A8A8A8"),
                     Color.parseColor("#CFCFCF"),
                     Color.parseColor("#F6F6F6"),
-                    Color.parseColor("#F2F5FA"),
-                    Color.parseColor("#A6AFBD")
+                    Color.parseColor("#D6D6D6"),
+                    Color.parseColor("#A8A8A8")
                 ),
                 floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
                 Shader.TileMode.CLAMP
@@ -711,11 +711,11 @@ class ChatAdapter(
     private fun buildEvidenceShader(width: Int): LinearGradient = LinearGradient(
         0f, 0f, width.toFloat(), 0f,
         intArrayOf(
-            Color.parseColor("#6F7785"),
+            Color.parseColor("#777777"),
             Color.parseColor("#CFCFCF"),
             Color.parseColor("#F6F6F6"),
-            Color.parseColor("#F2F5FA"),
-            Color.parseColor("#6F7785")
+            Color.parseColor("#D6D6D6"),
+            Color.parseColor("#777777")
         ),
         floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
         Shader.TileMode.CLAMP

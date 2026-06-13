@@ -96,7 +96,7 @@ internal class MainEmojiActions(
                 0
             )
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#181B20"))
+            setBackgroundColor(Color.parseColor("#222222"))
             visibility = View.GONE
             addView(createTabRow())
             contentFrame = FrameLayout(context).apply {
@@ -328,8 +328,8 @@ internal class MainEmojiActions(
     }
 
     private fun TextView.applyTabStyle(selected: Boolean) {
-        background = rounded("#283140", if (selected) "#F2F5FA" else "#24282F")
-        setTextColor(Color.parseColor(if (selected) "#F2F5FA" else "#A6AFBD"))
+        background = rounded("#2A2A2A", if (selected) "#D6D6D6" else "#2E2E2E")
+        setTextColor(Color.parseColor(if (selected) "#D6D6D6" else "#A8A8A8"))
     }
 
     private fun createBuiltInContent(): View {
@@ -389,12 +389,12 @@ internal class MainEmojiActions(
             layoutParams = LinearLayout.LayoutParams(0, dp(38), 1f).apply {
                 marginEnd = dp(8)
             }
-            background = rounded("#283140", "#24282F")
+            background = rounded("#2A2A2A", "#2E2E2E")
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = label
             textSize = 14f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
@@ -428,7 +428,7 @@ internal class MainEmojiActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "添加外部表情包或 GIF 后，会显示在这里"
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 textSize = 13f
             })
         }
@@ -445,7 +445,7 @@ internal class MainEmojiActions(
     private fun createImportTile(label: String, icon: String, onClick: () -> Unit): View {
         return LinearLayout(activity).apply {
             layoutParams = customTileLayoutParams()
-            background = rounded("#181B20", "#24282F")
+            background = rounded("#222222", "#2E2E2E")
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL
             isClickable = true
@@ -456,14 +456,14 @@ internal class MainEmojiActions(
                 includeFontPadding = false
                 text = icon
                 textSize = if (icon == "GIF") 16f else 28f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             })
             addView(TextView(context).apply {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = label
                 textSize = 12f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             })
         }
     }
@@ -471,7 +471,7 @@ internal class MainEmojiActions(
     private fun createCustomEmojiTile(item: CustomEmojiItem): View {
         return FrameLayout(activity).apply {
             layoutParams = customTileLayoutParams()
-            background = rounded("#181B20", "#24282F")
+            background = rounded("#222222", "#2E2E2E")
             isClickable = true
             foreground = selectableForeground()
             contentDescription = "自定义表情 ${item.displayName}，长按删除"
@@ -496,7 +496,7 @@ internal class MainEmojiActions(
                     includeFontPadding = false
                     text = "GIF"
                     textSize = 10f
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                 })
             }
             setOnClickListener {

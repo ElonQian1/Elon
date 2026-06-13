@@ -99,35 +99,35 @@ internal class MainFriendActions(
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(24), dp(24), dp(22))
-            background = roundedRect("#262626", 12)
+            background = roundedRect("#242424", 12)
         }
         val title = TextView(activity).apply {
             text = "添加好友"
             textSize = 24f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
         }
         val hint = TextView(activity).apply {
             text = "选择搜索方式后输入关键词，只能搜索到已注册一龙账号的用户。"
             textSize = 14f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setLineSpacing(0f, 1.08f)
         }
         val searchTypeLabel = TextView(activity).apply {
             text = "搜索类型"
             textSize = 13f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
         }
         val searchTypeValue = TextView(activity).apply {
             text = selectedOption.label
             textSize = 17f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
         }
         val searchTypeHint = TextView(activity).apply {
             text = selectedOption.hint
             textSize = 12f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
         }
         val input = EditText(activity).apply {
             setHint(selectedOption.hint)
@@ -135,10 +135,10 @@ internal class MainFriendActions(
             setSingleLine(true)
             textSize = 17f
             setSelectAllOnFocus(false)
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             minimumHeight = dp(54)
             setPadding(dp(16), 0, dp(16), 0)
         }
@@ -147,7 +147,7 @@ internal class MainFriendActions(
             gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             isFocusable = true
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             minimumHeight = dp(58)
             setPadding(dp(16), dp(9), dp(14), dp(9))
             setOnClickListener {
@@ -180,15 +180,15 @@ internal class MainFriendActions(
             text = "▾"
             textSize = 20f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
         }
         val result = TextView(activity).apply {
             textSize = 14f
             minHeight = dp(24)
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
         }
-        val cancelButton = dialogButton("取消", "#283140", "#DDE8FC")
-        val searchButton = dialogButton("搜索", "#58BE6A", "#07120A")
+        val cancelButton = dialogButton("取消", "#2A2A2A", "#D6D6D6")
+        val searchButton = dialogButton("搜索", "#C8C8C8", "#101010")
         val actions = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -243,7 +243,7 @@ internal class MainFriendActions(
             .setView(container)
             .create()
 
-        fun setResult(text: String, color: String = "#A6AFBD") {
+        fun setResult(text: String, color: String = "#A8A8A8") {
             result.text = text
             result.setTextColor(Color.parseColor(color))
         }
@@ -308,29 +308,29 @@ internal class MainFriendActions(
         val container = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(24), dp(24), dp(24), dp(22))
-            background = roundedRect("#262626", 12)
+            background = roundedRect("#242424", 12)
         }
         val title = TextView(activity).apply {
             text = "确认添加"
             textSize = 22f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
         }
         val summary = TextView(activity).apply {
             text = "将这位用户添加到你的好友列表"
             textSize = 14f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
         }
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             setPadding(dp(16), dp(14), dp(16), dp(14))
         }
         val name = TextView(activity).apply {
             text = candidate.name
             textSize = 18f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
         }
         card.addView(name)
         candidate.account.takeIf { it.isNotBlank() }?.let {
@@ -339,8 +339,8 @@ internal class MainFriendActions(
         candidate.phone?.takeIf { it.isNotBlank() }?.let {
             card.addView(detailText("手机号：$it"))
         }
-        val cancelButton = dialogButton("取消", "#283140", "#DDE8FC")
-        val addButton = dialogButton("添加", "#58BE6A", "#07120A")
+        val cancelButton = dialogButton("取消", "#2A2A2A", "#D6D6D6")
+        val addButton = dialogButton("添加", "#C8C8C8", "#101010")
         val actions = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -421,7 +421,7 @@ internal class MainFriendActions(
         val panel = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(6), dp(6), dp(6), dp(6))
-            background = roundedRect("#262626", 10)
+            background = roundedRect("#242424", 10)
             alpha = 0f
             scaleY = 0.96f
         }
@@ -460,7 +460,7 @@ internal class MainFriendActions(
             isClickable = true
             isFocusable = true
             setPadding(dp(12), 0, dp(10), 0)
-            if (selected) background = roundedRect("#283140", 8)
+            if (selected) background = roundedRect("#2A2A2A", 8)
             setOnClickListener { onClick() }
         }
         val labelBlock = LinearLayout(activity).apply {
@@ -469,12 +469,12 @@ internal class MainFriendActions(
         labelBlock.addView(TextView(activity).apply {
             text = option.label
             textSize = 15f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
         })
         labelBlock.addView(TextView(activity).apply {
             text = option.hint
             textSize = 11.5f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
         })
         row.addView(labelBlock, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row.addView(TextView(activity).apply {
@@ -490,7 +490,7 @@ internal class MainFriendActions(
         TextView(activity).apply {
             text = textValue
             textSize = 14f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(0, dp(6), 0, 0)
         }
 

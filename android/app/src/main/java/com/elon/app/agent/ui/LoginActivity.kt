@@ -1,4 +1,4 @@
-﻿// ui/LoginActivity.kt
+// ui/LoginActivity.kt
 // module: ui | layer: presentation | role: 登录界面
 // summary: 用户登录/注册入口（程序化布局）
 
@@ -23,13 +23,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 private const val LOGIN_BG = "#101010"
-private const val LOGIN_CARD = "#181B20"
-private const val LOGIN_TEXT_PRIMARY = "#F2F5FA"
-private const val LOGIN_TEXT_SECONDARY = "#A6AFBD"
-private const val LOGIN_TEXT_TERTIARY = "#6F7785"
-private const val LOGIN_PRIMARY_BG = "#58BE6A"
-private const val LOGIN_PRIMARY_TEXT = "#07120A"
-private const val LOGIN_LINK = "#6091CF"
+private const val LOGIN_CARD = "#222222"
+private const val LOGIN_TEXT_PRIMARY = "#D6D6D6"
+private const val LOGIN_TEXT_SECONDARY = "#A8A8A8"
+private const val LOGIN_TEXT_TERTIARY = "#777777"
+private const val LOGIN_PRIMARY_BG = "#C8C8C8"
+private const val LOGIN_PRIMARY_TEXT = "#101010"
+private const val LOGIN_LINK = "#58BE6A"
 private const val LOGIN_ERROR = "#D97A7A"
 
 /**

@@ -32,7 +32,7 @@ internal object ProjectSpaceDocumentDialog {
             text = "正在读取仓库文档..."
             textSize = 14f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         }
         val column = LinearLayout(activity).apply {
@@ -111,7 +111,7 @@ internal object ProjectSpaceDocumentDialog {
     ) {
         column.removeAllViews()
         status.text = if (forceRefresh) "正在刷新仓库文档..." else "正在读取仓库文档..."
-        status.setTextColor(Color.parseColor("#A6AFBD"))
+        status.setTextColor(Color.parseColor("#A8A8A8"))
         column.addView(status)
         thread(name = "project-document-load") {
             val result = runCatching {
@@ -158,7 +158,7 @@ internal object ProjectSpaceDocumentDialog {
         }
         val metadata = TextView(activity).apply {
             textSize = 12f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(dp(18), dp(10), dp(18), dp(2))
             text = parts.joinToString(" · ")
         }
@@ -176,12 +176,12 @@ internal object ProjectSpaceDocumentDialog {
             hint = "搜索文档、路径或内容"
             textSize = 14f
             setSingleLine(true)
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             setPadding(dp(14), 0, dp(14), 0)
-            background = panelBackground("#0F1217").apply {
+            background = panelBackground("#151515").apply {
                 cornerRadius = dp(8).toFloat()
-                setStroke(dp(1), Color.parseColor("#1E2126"))
+                setStroke(dp(1), Color.parseColor("#2E2E2E"))
             }
         }
         val docsContainer = LinearLayout(activity).apply {
@@ -211,7 +211,7 @@ internal object ProjectSpaceDocumentDialog {
                 docsContainer.addView(TextView(activity).apply {
                     text = "没有匹配的项目文档"
                     textSize = 13f
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor("#777777"))
                     gravity = Gravity.CENTER
                     setPadding(dp(18), dp(28), dp(18), dp(28))
                 })
@@ -258,7 +258,7 @@ internal object ProjectSpaceDocumentDialog {
     ) {
         val pathText = TextView(activity).apply {
             textSize = 12f
-            setTextColor(Color.parseColor("#81B3D9"))
+            setTextColor(Color.parseColor("#8DDC9B"))
             setPadding(dp(18), dp(14), dp(18), dp(2))
             text = document.relativePath.ifBlank { document.title }
             document.source.takeIf { it.isNotBlank() }?.let {
@@ -268,12 +268,12 @@ internal object ProjectSpaceDocumentDialog {
         }
         val documentText = TextView(activity).apply {
             textSize = 14f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setLineSpacing(dp(4).toFloat(), 1f)
             setTextIsSelectable(true)
             movementMethod = LinkMovementMethod.getInstance()
             setPadding(dp(18), dp(12), dp(18), dp(22))
-            background = panelBackground("#181B20").apply {
+            background = panelBackground("#222222").apply {
                 cornerRadius = dp(8).toFloat()
             }
         }

@@ -28,16 +28,17 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val BG = "#101010"
-private const val CARD = "#181B20"
-private const val TEXT_PRIMARY = "#F2F5FA"
-private const val TEXT_SECONDARY = "#A6AFBD"
-private const val TEXT_TERTIARY = "#6F7785"
+private const val CARD = "#222222"
+private const val TEXT_PRIMARY = "#D6D6D6"
+private const val TEXT_SECONDARY = "#A8A8A8"
+private const val TEXT_TERTIARY = "#777777"
 private const val PRIMARY_BG = "#58BE6A"
-private const val PRIMARY_TEXT = "#07120A"
-private const val ACCENT_BG = "#1A237E"
-private const val SECONDARY_BG = "#283140"
-private const val SECONDARY_TEXT = "#DDE8FC"
-private const val BORDER = "#24282F"
+private const val ACTION_BG = "#C8C8C8"
+private const val PRIMARY_TEXT = "#101010"
+private const val ACCENT_BG = "#2A2A2A"
+private const val SECONDARY_BG = "#2A2A2A"
+private const val SECONDARY_TEXT = "#D6D6D6"
+private const val BORDER = "#2E2E2E"
 
 /**
  * 节点管理界面：
@@ -270,7 +271,7 @@ class NodeActivity : Activity() {
             text = "＋ 注册新节点"
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
-            setBackgroundColor(Color.parseColor(PRIMARY_BG))
+            setBackgroundColor(Color.parseColor(ACTION_BG))
             setTextColor(Color.parseColor(PRIMARY_TEXT))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 130

@@ -192,8 +192,8 @@ internal class MainMarketplaceActions(
             setSingleLine(true)
             textSize = 15f
             hint = "搜索项目、功能或创建者"
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             background = null
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             setPadding(0, 0, dp(8), 0)
@@ -224,7 +224,7 @@ internal class MainMarketplaceActions(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             setPadding(dp(12), 0, dp(8), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -233,14 +233,14 @@ internal class MainMarketplaceActions(
             addView(TextView(activity).apply {
                 text = "搜索"
                 textSize = 13f
-                setTextColor(Color.parseColor("#81B3D9"))
+                setTextColor(Color.parseColor("#8DDC9B"))
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(dp(44), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             addView(TextView(activity).apply {
                 text = "清除"
                 textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 gravity = Gravity.CENTER
                 isClickable = true
                 foreground = selectableForeground()
@@ -292,11 +292,11 @@ internal class MainMarketplaceActions(
     private fun updateFilterChipVisuals() {
         filterChipViews.forEach { (key, chip) ->
             val selected = key == activeFilterKey
-            chip.setTextColor(Color.parseColor(if (selected) "#DDE8FC" else "#A6AFBD"))
+            chip.setTextColor(Color.parseColor(if (selected) "#D6D6D6" else "#A8A8A8"))
             chip.background = roundedRect(
-                if (selected) "#152C3E" else "#181B20",
+                if (selected) "#16251A" else "#222222",
                 999,
-                if (selected) "#6091CF" else "#283140"
+                if (selected) "#58BE6A" else "#2A2A2A"
             )
         }
     }
@@ -456,8 +456,8 @@ internal class MainMarketplaceActions(
     private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
         joinBtn.text = "进入项目"
         joinBtn.isEnabled = true
-        joinBtn.setTextColor(Color.parseColor("#07120A"))
-        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#58BE6A"))
+        joinBtn.setTextColor(Color.parseColor("#101010"))
+        (joinBtn.background as? GradientDrawable)?.setColor(Color.parseColor("#C8C8C8"))
         joinBtn.setOnClickListener { openJoinedProject(project) }
     }
 
@@ -469,7 +469,7 @@ internal class MainMarketplaceActions(
         container.addView(TextView(activity).apply {
             text = "加载中..."
             textSize = 14f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             gravity = Gravity.CENTER
             setPadding(0, dp(60), 0, dp(60))
             layoutParams = LinearLayout.LayoutParams(
@@ -508,7 +508,7 @@ internal class MainMarketplaceActions(
         container.addView(TextView(activity).apply {
             text = resultSummary(projects.size)
             textSize = 12f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             setPadding(dp(16), dp(16), dp(16), dp(8))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -541,16 +541,16 @@ internal class MainMarketplaceActions(
             addView(TextView(activity).apply {
                 text = if (isFilterActive()) "没有找到匹配的项目" else "暂无公开项目"
                 textSize = 15f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 gravity = Gravity.CENTER
             })
             if (isFilterActive()) {
                 addView(TextView(activity).apply {
                     text = "清除筛选"
                     textSize = 14f
-                    setTextColor(Color.parseColor("#DDE8FC"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     gravity = Gravity.CENTER
-                    background = roundedRect("#283140", 8)
+                    background = roundedRect("#2A2A2A", 8)
                     isClickable = true
                     foreground = selectableForeground()
                     setOnClickListener { clearDiscoveryFilters() }
@@ -572,7 +572,7 @@ internal class MainMarketplaceActions(
         // 外层卡片容器（圆角 + 深色背景）
         val card = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#181B20", 8, "#24282F")
+            background = roundedRect("#222222", 8, "#2E2E2E")
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -623,14 +623,14 @@ internal class MainMarketplaceActions(
             text = identity.title.firstOrNull()?.uppercaseChar()?.toString() ?: "P"
             textSize = 21f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             gravity = Gravity.CENTER
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 palette
             ).apply {
                 shape = GradientDrawable.OVAL
-                setStroke(dp(1), Color.parseColor("#283140"))
+                setStroke(dp(1), Color.parseColor("#2A2A2A"))
             }
             layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
         }
@@ -662,7 +662,7 @@ internal class MainMarketplaceActions(
         titleColumn.addView(TextView(activity).apply {
             text = identity.title
             textSize = 21f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             maxLines = 2
             setLineSpacing(dp(1).toFloat(), 1.0f)
@@ -676,7 +676,7 @@ internal class MainMarketplaceActions(
             titleColumn.addView(TextView(activity).apply {
                 text = subtitle
                 textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 maxLines = 2
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 layoutParams = LinearLayout.LayoutParams(
@@ -697,9 +697,9 @@ internal class MainMarketplaceActions(
             ).apply { topMargin = dp(12) }
         }
         pillRow.addView(pill("\u25CF  ${project.memberCount} 位成员", "#58BE6A", "#13251A"))
-        pillRow.addView(pill(projectJoinModeSummary(project.joinMode), "#81B3D9", "#152C3E"))
+        pillRow.addView(pill(projectJoinModeSummary(project.joinMode), "#8DDC9B", "#16251A"))
         if (!project.latestApkUrl.isNullOrBlank()) {
-            pillRow.addView(pill("可安装 APK", "#DDE8FC", "#283140"))
+            pillRow.addView(pill("可安装 APK", "#D6D6D6", "#2A2A2A"))
         }
         body.addView(pillRow)
 
@@ -709,7 +709,7 @@ internal class MainMarketplaceActions(
             body.addView(TextView(activity).apply {
                 text = "创建者：$owner"
                 textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 layoutParams = LinearLayout.LayoutParams(
@@ -719,11 +719,11 @@ internal class MainMarketplaceActions(
             })
         }
 
-        // ── 加入按钮（全宽，Discord 绿色）─────────────────────────────────────
+        // ── 加入按钮（全宽，银灰主操作）─────────────────────────────────────
         val joinBtn = actionButton(
             projectJoinActionLabel(project.joinMode, alreadyJoined),
-            "#58BE6A",
-            "#07120A"
+            "#C8C8C8",
+            "#101010"
         ).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(46)
@@ -749,7 +749,7 @@ internal class MainMarketplaceActions(
                 1f
             ).apply { rightMargin = dp(10) }
 
-            val installBtn = actionButton("直接安装", "#6091CF", "#F2F5FA").apply {
+            val installBtn = actionButton("直接安装", "#C8C8C8", "#101010").apply {
                 setOnClickListener { tryInstallProject(project, this, joinBtn) }
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             }

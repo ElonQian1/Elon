@@ -149,21 +149,21 @@ internal object ProjectMemberConversationDialog {
             ).apply { bottomMargin = dp(8) }
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = panelBackground("#181B20", dp)
+            background = panelBackground("#222222", dp)
             isClickable = true
             setOnClickListener { onClick() }
             addView(TextView(activity).apply {
                 text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
                 text = conversationMeta(conversation)
                 textSize = 12f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setPadding(0, dp(5), 0, 0)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
@@ -172,7 +172,7 @@ internal object ProjectMemberConversationDialog {
                 addView(TextView(activity).apply {
                     text = preview
                     textSize = 13f
-                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextColor(Color.parseColor("#A8A8A8"))
                     setPadding(0, dp(8), 0, 0)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -220,7 +220,7 @@ internal object ProjectMemberConversationDialog {
             ).apply { bottomMargin = dp(8) }
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = panelBackground("#181B20", dp)
+            background = panelBackground("#222222", dp)
             addView(TextView(activity).apply {
                 val label = if (message.role == "discussion") {
                     message.senderName?.takeIf { it.isNotBlank() } ?: "讨论"
@@ -237,7 +237,7 @@ internal object ProjectMemberConversationDialog {
             addView(TextView(activity).apply {
                 text = message.content.ifBlank { "(空消息)" }
                 textSize = 14f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 setPadding(0, dp(6), 0, 0)
             })
         }
@@ -254,7 +254,7 @@ internal object ProjectMemberConversationDialog {
             this.text = text
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         })
     }
@@ -264,7 +264,7 @@ internal object ProjectMemberConversationDialog {
             this.text = text
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         }
     }
@@ -315,7 +315,7 @@ internal object ProjectMemberConversationDialog {
             "assistant" -> "#A7F3D0"
             "system" -> "#FCA5A5"
             "discussion" -> "#C4B5FD"
-            else -> "#A6AFBD"
+            else -> "#A8A8A8"
         }
     )
 
@@ -323,7 +323,7 @@ internal object ProjectMemberConversationDialog {
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setPadding(dp(14), dp(14), dp(14), dp(14))
             isClickable = true
             setOnClickListener { onClick() }

@@ -83,7 +83,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 34f
                 setOnClickListener { finish() }
             })
@@ -92,7 +92,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "我的二维码"
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 20f
             })
             addView(View(this@PersonalQrCodeActivity).apply {
@@ -104,7 +104,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
     private fun qrCard(profile: UserProfile, userId: String, qrSize: Int): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#F2F5FA", 12)
+            background = roundedRect("#D6D6D6", 12)
             setPadding(dp(20), dp(20), dp(20), dp(18))
             addView(identityHeader(profile, userId))
             addView(ImageView(this@PersonalQrCodeActivity).apply {
@@ -126,7 +126,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "扫码识别我的一龙账号"
-                setTextColor(Color.parseColor("#283140"))
+                setTextColor(Color.parseColor("#2A2A2A"))
                 textSize = 14f
             })
         }
@@ -158,7 +158,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                     includeFontPadding = false
                     maxLines = 1
                     text = "账号：${profile.wechatId}"
-                    setTextColor(Color.parseColor("#283140"))
+                    setTextColor(Color.parseColor("#2A2A2A"))
                     textSize = 13f
                     setPadding(0, dp(8), 0, 0)
                 })
@@ -166,7 +166,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                     includeFontPadding = false
                     maxLines = 1
                     text = "ID：$userId"
-                    setTextColor(Color.parseColor("#6F7785"))
+                    setTextColor(Color.parseColor("#777777"))
                     textSize = 12f
                     setPadding(0, dp(6), 0, 0)
                 })
@@ -183,8 +183,8 @@ class PersonalQrCodeActivity : AppCompatActivity() {
             text = "复制账号 ID"
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#DDE8FC"))
-            background = roundedRect("#283140", 8, "#24282F")
+            setTextColor(Color.parseColor("#D6D6D6"))
+            background = roundedRect("#2A2A2A", 8, "#2E2E2E")
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()

@@ -27,14 +27,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val JR_BG = "#101010"
-private const val JR_CARD = "#181B20"
-private const val JR_TEXT_PRIMARY = "#F2F5FA"
-private const val JR_TEXT_SECONDARY = "#A6AFBD"
-private const val JR_TEXT_TERTIARY = "#6F7785"
+private const val JR_CARD = "#222222"
+private const val JR_TEXT_PRIMARY = "#D6D6D6"
+private const val JR_TEXT_SECONDARY = "#A8A8A8"
+private const val JR_TEXT_TERTIARY = "#777777"
 private const val JR_PRIMARY_BG = "#58BE6A"
-private const val JR_PRIMARY_TEXT = "#07120A"
-private const val JR_SECONDARY_BG = "#283140"
-private const val JR_SECONDARY_TEXT = "#DDE8FC"
+private const val JR_ACTION_BG = "#C8C8C8"
+private const val JR_PRIMARY_TEXT = "#101010"
+private const val JR_SECONDARY_BG = "#2A2A2A"
+private const val JR_SECONDARY_TEXT = "#D6D6D6"
 private const val JR_PENDING = "#F0A030"
 private const val JR_DANGER = "#D97A7A"
 
@@ -102,7 +103,7 @@ class JoinRequestsActivity : Activity() {
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor("#6091CF"))
+                setTextColor(Color.parseColor("#58BE6A"))
                 setOnClickListener { finish() }
             })
 
@@ -238,7 +239,7 @@ class JoinRequestsActivity : Activity() {
                     addView(Button(context).apply {
                         text = "✓ 通过"
                         textSize = 14f
-                        setBackgroundColor(Color.parseColor(JR_PRIMARY_BG))
+                        setBackgroundColor(Color.parseColor(JR_ACTION_BG))
                         setTextColor(Color.parseColor(JR_PRIMARY_TEXT))
                         layoutParams = LinearLayout.LayoutParams(0, 110, 1f)
                         setOnClickListener { doReview(reqId, "approve") }

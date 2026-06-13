@@ -42,7 +42,7 @@ internal class NodeTransactionSheet(
         )
         dialog.window?.setBackgroundDrawable(
             GradientDrawable().apply {
-                setColor(Color.parseColor("#0F1217"))
+                setColor(Color.parseColor("#151515"))
                 cornerRadius = dp(14).toFloat()
             }
         )
@@ -71,14 +71,14 @@ internal class NodeTransactionSheet(
                 text = "积分流水明细"
                 textSize = 18f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 includeFontPadding = false
             })
 
             addView(TextView(activity).apply {
                 text = "最近 50 条"
                 textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 includeFontPadding = false
             })
         })
@@ -159,7 +159,7 @@ internal class NodeTransactionSheet(
                 text = tx.modelId
                 textSize = 14f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 includeFontPadding = false
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -183,7 +183,7 @@ internal class NodeTransactionSheet(
             val shortNode = if (tx.nodeId.length > 12) tx.nodeId.takeLast(8) else tx.nodeId
             text = "节点 $shortNode  ·  ${tx.promptTokens + tx.completionTokens} tokens  ·  ${formatTime(tx.createdAt)}"
             textSize = 11f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             includeFontPadding = false
         })
     }
@@ -194,7 +194,7 @@ internal class NodeTransactionSheet(
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
         )
-        setBackgroundColor(Color.parseColor("#24282F"))
+        setBackgroundColor(Color.parseColor("#2E2E2E"))
     }
 
     private fun emptyLabel() = TextView(activity).apply {
@@ -205,7 +205,7 @@ internal class NodeTransactionSheet(
         text = "暂无流水记录"
         textSize = 14f
         gravity = Gravity.CENTER
-        setTextColor(Color.parseColor("#6F7785"))
+        setTextColor(Color.parseColor("#777777"))
     }
 
     private fun errorLabel(msg: String) = TextView(activity).apply {

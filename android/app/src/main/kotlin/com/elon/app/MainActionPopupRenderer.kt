@@ -20,10 +20,10 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
-internal const val WECHAT_POPUP_PANEL_COLOR = "#262626"
-internal const val WECHAT_POPUP_TEXT_COLOR = "#F2F5FA"
-internal const val WECHAT_POPUP_DIVIDER_COLOR = "#24282F"
-internal const val LEGACY_MESSAGE_POPUP_COLOR = "#262626"
+internal const val WECHAT_POPUP_PANEL_COLOR = "#242424"
+internal const val WECHAT_POPUP_TEXT_COLOR = "#D6D6D6"
+internal const val WECHAT_POPUP_DIVIDER_COLOR = "#2E2E2E"
+internal const val LEGACY_MESSAGE_POPUP_COLOR = "#242424"
 
 private const val MESSAGE_POPUP_DEFAULT_COLUMNS = 5
 private const val MESSAGE_POPUP_CELL_WIDTH_DP = 54
@@ -349,7 +349,7 @@ internal class MainActionPopupRenderer(
                 }
                 includeFontPadding = false
                 text = action.title
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 setTextSize(TypedValue.COMPLEX_UNIT_DIP, MESSAGE_POPUP_LABEL_TEXT_SIZE_DP)
                 gravity = Gravity.CENTER
                 maxLines = 1

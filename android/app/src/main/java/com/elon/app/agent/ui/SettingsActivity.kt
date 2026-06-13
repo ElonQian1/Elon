@@ -1,4 +1,4 @@
-﻿// ui/SettingsActivity.kt
+// ui/SettingsActivity.kt
 // module: ui | layer: presentation | role: 设置页面
 // summary: 用户设置、账号管理 - 支持未登录/已登录两种状态
 
@@ -17,16 +17,16 @@ import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.infrastructure.auth.AuthService
 
 private const val SETTINGS_BG = "#101010"
-private const val SETTINGS_CARD = "#181B20"
-private const val SETTINGS_BORDER = "#24282F"
-private const val SETTINGS_TEXT_PRIMARY = "#F2F5FA"
-private const val SETTINGS_TEXT_SECONDARY = "#A6AFBD"
-private const val SETTINGS_TEXT_TERTIARY = "#6F7785"
-private const val SETTINGS_PRIMARY_BG = "#58BE6A"
-private const val SETTINGS_PRIMARY_TEXT = "#07120A"
-private const val SETTINGS_SECONDARY_BG = "#283140"
-private const val SETTINGS_SECONDARY_TEXT = "#DDE8FC"
-private const val SETTINGS_LINK = "#6091CF"
+private const val SETTINGS_CARD = "#222222"
+private const val SETTINGS_BORDER = "#2E2E2E"
+private const val SETTINGS_TEXT_PRIMARY = "#D6D6D6"
+private const val SETTINGS_TEXT_SECONDARY = "#A8A8A8"
+private const val SETTINGS_TEXT_TERTIARY = "#777777"
+private const val SETTINGS_PRIMARY_BG = "#C8C8C8"
+private const val SETTINGS_PRIMARY_TEXT = "#101010"
+private const val SETTINGS_SECONDARY_BG = "#2A2A2A"
+private const val SETTINGS_SECONDARY_TEXT = "#D6D6D6"
+private const val SETTINGS_LINK = "#58BE6A"
 private const val SETTINGS_DANGER = "#D97A7A"
 
 /**
@@ -231,7 +231,7 @@ class SettingsActivity : Activity() {
                 addView(TextView(context).apply {
                     text = "☁️ 已同步"
                     textSize = 12f
-                    setTextColor(Color.parseColor(SETTINGS_PRIMARY_BG))
+                    setTextColor(Color.parseColor(SETTINGS_LINK))
                 })
             })
 
@@ -305,8 +305,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🖥️ 我的节点"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor("#1A237E"))
-                setTextColor(Color.WHITE)
+                setBackgroundColor(Color.parseColor(SETTINGS_SECONDARY_BG))
+                setTextColor(Color.parseColor(SETTINGS_SECONDARY_TEXT))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }
@@ -318,8 +318,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🏪 项目广场"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor("#283140"))
-                setTextColor(Color.parseColor("#DDE8FC"))
+                setBackgroundColor(Color.parseColor("#2A2A2A"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }

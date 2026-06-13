@@ -71,9 +71,9 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         // 颜色
         private val COLOR_BG_DARK = Color.parseColor("#E8181B20")      // 深色背景 (90% 不透明)
         private val COLOR_BG_HEADER = Color.parseColor("#30283140")    // 标题栏背景
-        private val COLOR_TEXT_PRIMARY = Color.parseColor("#F2F5FA")   // 主文字
-        private val COLOR_TEXT_SECONDARY = Color.parseColor("#A6AFBD") // 次要文字
-        private val COLOR_ACCENT = Color.parseColor("#6091CF")         // 强调色
+        private val COLOR_TEXT_PRIMARY = Color.parseColor("#D6D6D6")   // 主文字
+        private val COLOR_TEXT_SECONDARY = Color.parseColor("#A8A8A8") // 次要文字
+        private val COLOR_ACCENT = Color.parseColor("#58BE6A")         // 强调色
         private val COLOR_STOP = Color.parseColor("#D97A7A")           // 停止按钮
         private val COLOR_SUCCESS = Color.parseColor("#58BE6A")        // 成功
         private val COLOR_FAILED = Color.parseColor("#D97A7A")         // 失败
@@ -249,7 +249,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         stopButton = Button(context).apply {
             text = "⏹ 停止执行"
             textSize = 13f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             background = createStopButtonBackground()
             setPadding(dp(16), dp(8), dp(16), dp(8))
             setOnClickListener { onStopClick?.invoke() }
@@ -322,7 +322,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         val progressColor = when (info.state) {
             ExecutionState.SUCCESS -> COLOR_SUCCESS
             ExecutionState.FAILED, ExecutionState.STOPPED -> COLOR_FAILED
-            ExecutionState.STOPPING -> Color.parseColor("#81B3D9")
+            ExecutionState.STOPPING -> Color.parseColor("#8DDC9B")
             else -> COLOR_ACCENT
         }
         progressBar.progressDrawable.setTint(progressColor)
@@ -335,7 +335,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
             textSize = 10f
             setTextColor(when (entry.level) {
                 ExecutionLogEntry.LogLevel.ERROR -> COLOR_FAILED
-                ExecutionLogEntry.LogLevel.WARNING -> Color.parseColor("#81B3D9")
+                ExecutionLogEntry.LogLevel.WARNING -> Color.parseColor("#8DDC9B")
                 else -> COLOR_TEXT_SECONDARY
             })
             maxLines = 1

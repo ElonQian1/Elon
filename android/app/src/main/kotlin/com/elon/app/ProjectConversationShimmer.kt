@@ -10,8 +10,8 @@ import kotlin.math.sin
 internal fun startProjectConversationShimmer(
     row: View,
     background: GradientDrawable,
-    baseColorHex: String = "#181B20",
-    highlightColorHex: String = "#283140"
+    baseColorHex: String = "#222222",
+    highlightColorHex: String = "#2A2A2A"
 ) {
     val baseColor = Color.parseColor(baseColorHex)
     val highlightColor = Color.parseColor(highlightColorHex)

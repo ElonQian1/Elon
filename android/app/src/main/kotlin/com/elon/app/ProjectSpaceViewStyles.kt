@@ -6,7 +6,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.LinearLayout
 
-private const val PROJECT_SPACE_DIVIDER_COLOR = "#24282F"
+private const val PROJECT_SPACE_DIVIDER_COLOR = "#2E2E2E"
 
 internal fun panelBackground(color: String): GradientDrawable {
     return GradientDrawable().apply {

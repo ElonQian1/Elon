@@ -38,7 +38,7 @@ internal class MainShareActions(
             setText(text)
             setTextIsSelectable(true)
             setPadding(dp(22), dp(8), dp(22), dp(2))
-            setTextColor(Color.parseColor("#283140"))
+            setTextColor(Color.parseColor("#2A2A2A"))
             textSize = 14f
             setLineSpacing(dp(3).toFloat(), 1.0f)
         }

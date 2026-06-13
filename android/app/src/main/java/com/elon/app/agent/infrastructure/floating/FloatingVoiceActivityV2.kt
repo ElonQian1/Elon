@@ -425,7 +425,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         statusText = TextView(this).apply {
             text = "正在准备..."
             textSize = 16f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             gravity = Gravity.CENTER
         }
         card.addView(statusText, LinearLayout.LayoutParams(
@@ -440,7 +440,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         resultText = TextView(this).apply {
             text = ""
             textSize = 18f
-            setTextColor(Color.parseColor("#6091CF"))
+            setTextColor(Color.parseColor("#58BE6A"))
             gravity = Gravity.CENTER
             maxLines = 5
             minHeight = (60 * density).toInt()
@@ -474,9 +474,9 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         cancelButton = Button(this).apply {
             text = "❌ 取消"
             textSize = 14f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#283140"))
+                setColor(Color.parseColor("#2A2A2A"))
                 cornerRadius = 20 * density
             }
             background = bg
@@ -495,7 +495,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
         val tipText = TextView(this).apply {
             text = "说完会自动执行，点击空白处取消"
             textSize = 11f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             gravity = Gravity.CENTER
         }
         card.addView(tipText, LinearLayout.LayoutParams(
@@ -529,7 +529,7 @@ class ConversationalVoiceActivity : AppCompatActivity() {
             )
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#181B20"))
+                setColor(Color.parseColor("#222222"))
                 cornerRadius = 24 * density
             }
             background = bg

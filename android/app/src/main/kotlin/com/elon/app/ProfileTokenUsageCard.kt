@@ -81,7 +81,7 @@ internal class ProfileTokenUsageCard(
             )
             orientation = LinearLayout.VERTICAL
             setPadding(activity.dp(22), activity.dp(18), activity.dp(22), activity.dp(18))
-            background = roundedRect(Color.parseColor("#181B20"), activity.dp(8))
+            background = roundedRect(Color.parseColor("#222222"), activity.dp(8))
             isClickable = true
             setOnClickListener { openUsageDetails() }
 
@@ -105,7 +105,7 @@ internal class ProfileTokenUsageCard(
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 includeFontPadding = false
                 text = "Token 额度"
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
             })
@@ -116,8 +116,8 @@ internal class ProfileTokenUsageCard(
                 setPadding(activity.dp(10), activity.dp(5), activity.dp(10), activity.dp(5))
                 text = "近30天"
                 textSize = 12f
-                setTextColor(Color.parseColor("#B8C4D8"))
-                background = roundedRect(Color.parseColor("#152C3E"), activity.dp(8))
+                setTextColor(Color.parseColor("#D0D0D0"))
+                background = roundedRect(Color.parseColor("#16251A"), activity.dp(8))
             }
             addView(statusPill)
         }
@@ -136,7 +136,7 @@ internal class ProfileTokenUsageCard(
             remainingText = TextView(activity).apply {
                 includeFontPadding = false
                 text = "读取中..."
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 32f
                 setTypeface(typeface, Typeface.BOLD)
             }
@@ -145,7 +145,7 @@ internal class ProfileTokenUsageCard(
             remainingCaption = TextView(activity).apply {
                 includeFontPadding = false
                 text = "正在同步服务器用量"
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 textSize = 13f
                 setPadding(0, activity.dp(8), 0, 0)
             }
@@ -161,14 +161,14 @@ internal class ProfileTokenUsageCard(
                 max = 1000
                 progress = 0
                 progressTintList = ColorStateList.valueOf(Color.parseColor("#58BE6A"))
-                progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#1E2126"))
+                progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2E2E2E"))
             }
             addView(progressBar)
 
             progressLabel = TextView(activity).apply {
                 includeFontPadding = false
                 text = "额度读取中"
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 textSize = 12f
                 setPadding(0, activity.dp(8), 0, 0)
             }
@@ -200,13 +200,13 @@ internal class ProfileTokenUsageCard(
         box.addView(TextView(activity).apply {
             includeFontPadding = false
             text = label
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             textSize = 11f
         })
         val value = TextView(activity).apply {
             includeFontPadding = false
             text = "—"
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
             setPadding(0, activity.dp(7), 0, 0)
@@ -226,10 +226,10 @@ internal class ProfileTokenUsageCard(
             }
             orientation = LinearLayout.HORIZONTAL
 
-            detailButton = actionButton("查看明细", "#283140", "#DDE8FC", endMarginDp = 8).apply {
+            detailButton = actionButton("查看明细", "#2A2A2A", "#D6D6D6", endMarginDp = 8).apply {
                 setOnClickListener { openUsageDetails() }
             }
-            rechargeButton = actionButton("充值额度", "#58BE6A", "#07120A").apply {
+            rechargeButton = actionButton("充值额度", "#C8C8C8", "#101010").apply {
                 setOnClickListener { showRechargeDialog() }
             }
             addView(detailButton)
@@ -259,10 +259,10 @@ internal class ProfileTokenUsageCard(
     }
 
     private fun renderLoading() {
-        applyStatus("同步中", "#B8C4D8", "#283345")
+        applyStatus("同步中", "#D0D0D0", "#2A2A2A")
         remainingText.text = "读取中..."
         remainingCaption.text = "正在同步服务器用量"
-        updateProgress(0, Color.parseColor("#6091CF"))
+        updateProgress(0, Color.parseColor("#58BE6A"))
         progressLabel.text = "额度读取中"
         monthValue.text = "—"
         weekValue.text = "—"
@@ -289,10 +289,10 @@ internal class ProfileTokenUsageCard(
     private fun renderSummary(summary: TokenUsageSummary) {
         val remaining = summary.remainingTokens
         if (remaining == null) {
-            applyStatus("未配置", "#B8C4D8", "#283345")
+            applyStatus("未配置", "#D0D0D0", "#2A2A2A")
             remainingText.text = "未配置"
             remainingCaption.text = "服务器暂未返回剩余额度"
-            updateProgress(0, Color.parseColor("#A6AFBD"))
+            updateProgress(0, Color.parseColor("#A8A8A8"))
             progressLabel.text = "额度上限未配置"
         } else {
             val percent = remainingPercent(summary)
@@ -344,7 +344,7 @@ internal class ProfileTokenUsageCard(
     private fun updateProgress(progress: Int, color: Int) {
         progressBar.progress = progress.coerceIn(0, 1000)
         progressBar.progressTintList = ColorStateList.valueOf(color)
-        progressBar.progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#1E2126"))
+        progressBar.progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2E2E2E"))
     }
 
     private fun applyStatus(text: String, textColor: String, bgColor: String) {
@@ -365,13 +365,13 @@ internal class ProfileTokenUsageCard(
     private fun statusTextColor(percent: Int): String = when {
         percent <= 15 -> "#FFC3C3"
         percent <= 35 -> "#FFD8A8"
-        else -> "#B8C4D8"
+        else -> "#D0D0D0"
     }
 
     private fun statusBgColor(percent: Int): String = when {
         percent <= 15 -> "#3A1E1E"
         percent <= 35 -> "#3A2818"
-        else -> "#152C3E"
+        else -> "#16251A"
     }
 
     private fun openUsageDetails() {

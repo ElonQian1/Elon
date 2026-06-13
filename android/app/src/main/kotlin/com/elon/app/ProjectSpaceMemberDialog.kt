@@ -95,7 +95,7 @@ internal object ProjectSpaceMemberDialog {
                 addView(TextView(activity).apply {
                     text = memberSubtitle(member)
                     textSize = 12f
-                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextColor(Color.parseColor("#A8A8A8"))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
@@ -121,10 +121,10 @@ internal object ProjectSpaceMemberDialog {
             text = UserProfileStore.avatarInitial(member.account.ifBlank { "成员" }).uppercase()
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#1E2126"))
+                setColor(Color.parseColor("#2E2E2E"))
             }
         }
     }
@@ -134,7 +134,7 @@ internal object ProjectSpaceMemberDialog {
             text = "暂无成员"
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         }
     }

@@ -100,7 +100,7 @@ internal object ProjectSpaceMemberManagement {
         val friendStatus = TextView(activity).apply {
             text = "正在加载好友..."
             textSize = 13f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             setPadding(0, dp(4), 0, dp(6))
         }
         val friendScroll = ScrollView(activity).apply {
@@ -113,7 +113,7 @@ internal object ProjectSpaceMemberManagement {
             addView(TextView(activity).apply {
                 text = "从好友列表勾选成员，也可以手动输入账号。"
                 textSize = 13f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 setPadding(0, 0, 0, dp(6))
             })
             addView(friendStatus)
@@ -203,11 +203,11 @@ internal object ProjectSpaceMemberManagement {
         selectedFriends.clear()
         if (friends.isEmpty()) {
             friendStatus.text = "暂无好友，可手动输入账号邀请"
-            friendStatus.setTextColor(Color.parseColor("#6F7785"))
+            friendStatus.setTextColor(Color.parseColor("#777777"))
             return
         }
         friendStatus.text = "好友列表"
-        friendStatus.setTextColor(Color.parseColor("#6F7785"))
+        friendStatus.setTextColor(Color.parseColor("#777777"))
         friends.forEach { friend ->
             val alreadyMember = existingMemberIds.contains(friend.id)
             friendList.addView(CheckBox(activity).apply {
@@ -217,7 +217,7 @@ internal object ProjectSpaceMemberManagement {
                     if (alreadyMember) append(" · 已在项目中")
                 }
                 textSize = 14f
-                setTextColor(Color.parseColor(if (alreadyMember) "#9AA1AD" else "#1E2126"))
+                setTextColor(Color.parseColor(if (alreadyMember) "#9AA1AD" else "#2E2E2E"))
                 setPadding(0, dp(5), 0, dp(5))
                 isEnabled = !alreadyMember
                 setOnCheckedChangeListener { _, checked ->
@@ -340,8 +340,8 @@ internal object ProjectSpaceMemberManagement {
             hint = "手机号 / 昵称 / 邮箱 / 用户 ID"
             inputType = InputType.TYPE_CLASS_TEXT
             setSingleLine(true)
-            setTextColor(Color.parseColor("#1E2126"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#2E2E2E"))
+            setHintTextColor(Color.parseColor("#777777"))
             setPadding(dp(10), dp(8), dp(10), dp(8))
         }
     }
@@ -360,7 +360,7 @@ internal object ProjectSpaceMemberManagement {
                     tag = option.role
                     text = option.label
                     textSize = 15f
-                    setTextColor(Color.parseColor("#1E2126"))
+                    setTextColor(Color.parseColor("#2E2E2E"))
                     isChecked = option.role == selectedRole
                 })
             }
@@ -375,7 +375,7 @@ internal object ProjectSpaceMemberManagement {
                 text = "权限"
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 setPadding(0, 0, 0, dp(4))
             })
             addView(group)

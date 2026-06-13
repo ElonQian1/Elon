@@ -29,15 +29,16 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val BG = "#101010"
-private const val CARD = "#181B20"
-private const val TEXT_PRIMARY = "#F2F5FA"
-private const val TEXT_SECONDARY = "#A6AFBD"
-private const val TEXT_TERTIARY = "#6F7785"
+private const val CARD = "#222222"
+private const val TEXT_PRIMARY = "#D6D6D6"
+private const val TEXT_SECONDARY = "#A8A8A8"
+private const val TEXT_TERTIARY = "#777777"
 private const val PRIMARY_BG = "#58BE6A"
-private const val PRIMARY_TEXT = "#07120A"
-private const val SECONDARY_BG = "#283140"
-private const val SECONDARY_TEXT = "#DDE8FC"
-private const val BORDER = "#24282F"
+private const val ACTION_BG = "#C8C8C8"
+private const val PRIMARY_TEXT = "#101010"
+private const val SECONDARY_BG = "#2A2A2A"
+private const val SECONDARY_TEXT = "#D6D6D6"
+private const val BORDER = "#2E2E2E"
 private const val PENDING_COLOR = "#F0A030"
 private const val DANGER = "#D97A7A"
 
@@ -112,7 +113,7 @@ class ProjectPlazaActivity : Activity() {
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor("#6091CF"))
+                setTextColor(Color.parseColor("#58BE6A"))
                 setOnClickListener { finish() }
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -216,7 +217,7 @@ class ProjectPlazaActivity : Activity() {
             addView(searchInput)
             addView(Button(context).apply {
                 text = "搜索"
-                setBackgroundColor(Color.parseColor(PRIMARY_BG))
+                setBackgroundColor(Color.parseColor(ACTION_BG))
                 setTextColor(Color.parseColor(PRIMARY_TEXT))
                 setPadding(24, 0, 24, 0)
                 layoutParams = LinearLayout.LayoutParams(
@@ -362,10 +363,10 @@ class ProjectPlazaActivity : Activity() {
 
     private fun buildJoinButton(projectId: String, projectName: String, joinMode: String): View {
         val (btnText, btnColor) = when (joinMode) {
-            "open" -> Pair("直接加入", PRIMARY_BG)
-            "approval" -> Pair("申请加入", "#5B7FBA")
+            "open" -> Pair("直接加入", ACTION_BG)
+            "approval" -> Pair("申请加入", ACTION_BG)
             "readonly" -> Pair("只读访问", SECONDARY_BG)
-            else -> Pair("加入", PRIMARY_BG)
+            else -> Pair("加入", ACTION_BG)
         }
 
         return Button(this).apply {
@@ -527,7 +528,7 @@ class ProjectPlazaActivity : Activity() {
                 text = "+ 注册本地项目（外部路径）"
                 textSize = 13f
                 setTextColor(Color.WHITE)
-                setBackgroundColor(Color.parseColor(PRIMARY_BG))
+                setBackgroundColor(Color.parseColor(ACTION_BG))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT,

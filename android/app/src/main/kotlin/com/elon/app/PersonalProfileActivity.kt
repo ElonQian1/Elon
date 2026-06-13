@@ -88,7 +88,7 @@ class PersonalProfileActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(android.graphics.Color.parseColor("#F2F5FA"))
+                setTextColor(android.graphics.Color.parseColor("#D6D6D6"))
                 textSize = 34f
                 setOnClickListener { finish() }
             })
@@ -97,7 +97,7 @@ class PersonalProfileActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "个人资料"
-                setTextColor(android.graphics.Color.parseColor("#F2F5FA"))
+                setTextColor(android.graphics.Color.parseColor("#D6D6D6"))
                 textSize = 20f
             })
             addView(View(this@PersonalProfileActivity).apply {

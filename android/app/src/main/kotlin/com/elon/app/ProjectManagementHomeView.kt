@@ -104,7 +104,7 @@ internal class ProjectManagementHomeView(
                 text = "项目广场"
                 setPadding(dp(14), dp(9), dp(14), dp(9))
                 background = rect("#990F1217", 6)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 alpha = 0.92f
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, SECTION_TITLE_TEXT_SP)
                 setShadowLayer(dp(2).toFloat(), 0f, dp(1).toFloat(), Color.parseColor("#AA000000"))
@@ -175,7 +175,7 @@ internal class ProjectManagementHomeView(
             includeFontPadding = false
             text = "›"
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
             isSelected = expanded
             rotation = if (expanded) 90f else 0f
@@ -194,7 +194,7 @@ internal class ProjectManagementHomeView(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, SECTION_TITLE_TEXT_SP)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(arrow, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.MATCH_PARENT))
@@ -316,7 +316,7 @@ internal class ProjectManagementHomeView(
     private fun createProjectCard(item: IndexedProject): View {
         val project = item.project
         return AdaptiveProjectCardFrame(activity, dp(CARD_INFO_BAR_HEIGHT_DP)).apply {
-            background = rect("#181B20", PROJECT_CARD_RADIUS_DP)
+            background = rect("#222222", PROJECT_CARD_RADIUS_DP)
             clipToOutline = true
             isClickable = true
             foreground = selectableForeground()
@@ -366,7 +366,7 @@ internal class ProjectManagementHomeView(
 
             project.projectCardCode()?.let { code ->
                 addView(View(activity).apply {
-                    setBackgroundColor(Color.parseColor("#A6AFBD"))
+                    setBackgroundColor(Color.parseColor("#A8A8A8"))
                     alpha = 0.72f
                 }, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -380,7 +380,7 @@ internal class ProjectManagementHomeView(
                     text = "项目代号：$code"
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextColor(Color.parseColor("#A8A8A8"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
                     setLineSpacing(dp(2).toFloat(), 1.0f)
                 }, LinearLayout.LayoutParams(
@@ -413,7 +413,7 @@ internal class ProjectManagementHomeView(
             text = value
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -477,7 +477,7 @@ internal class ProjectManagementHomeView(
                     text = project.title.ifBlank { "未命名项目" }
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TITLE_TEXT_SP)
                     setTypeface(typeface, Typeface.BOLD)
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -485,7 +485,7 @@ internal class ProjectManagementHomeView(
                     includeFontPadding = false
                     text = projectTime(project)
                     maxLines = 1
-                    setTextColor(Color.parseColor("#DDE8FC"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TIME_TEXT_SP)
                 }, LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -503,7 +503,7 @@ internal class ProjectManagementHomeView(
                 text = projectMeta(project)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor("#DDE8FC"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_META_TEXT_SP)
                 setAutoSizeTextTypeUniformWithConfiguration(9, 11, 1, TypedValue.COMPLEX_UNIT_SP)
             }, LinearLayout.LayoutParams(
@@ -563,7 +563,7 @@ internal class ProjectManagementHomeView(
 
     private fun createEmptyProjectSlot(emptyAction: (() -> Unit)?): View {
         return AdaptiveProjectCardFrame(activity).apply {
-            background = rect("#181B20", PROJECT_CARD_RADIUS_DP)
+            background = rect("#222222", PROJECT_CARD_RADIUS_DP)
             clipToOutline = true
             emptyAction?.let { action ->
                 contentDescription = "新建项目"
@@ -574,7 +574,7 @@ internal class ProjectManagementHomeView(
                     gravity = Gravity.CENTER
                     includeFontPadding = false
                     text = "+"
-                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextColor(Color.parseColor("#A8A8A8"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -607,7 +607,7 @@ internal class ProjectManagementHomeView(
         const val CARD_INFO_BAR_HEIGHT_DP = 47
         const val PROJECT_CARD_RADIUS_DP = 8
         const val CARD_INFO_BAR_BG = "#303338"
-        const val CARD_INFO_BAR_SHIMMER_BG = "#283140"
+        const val CARD_INFO_BAR_SHIMMER_BG = "#2A2A2A"
         const val SECTION_TITLE_TEXT_SP = 16f
         const val CARD_TITLE_TEXT_SP = 14.2f
         const val CARD_TIME_TEXT_SP = 12.2f

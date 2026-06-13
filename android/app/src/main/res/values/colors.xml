@@ -1,25 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="elon_bg_app">#101010</color>
-    <color name="elon_surface_card">#181B20</color>
-    <color name="elon_surface_subtle">#0F1217</color>
-    <color name="elon_border_subtle">#24282F</color>
+    <color name="elon_surface_card">#222222</color>
+    <color name="elon_surface_subtle">#151515</color>
+    <color name="elon_border_subtle">#2E2E2E</color>
 
-    <color name="elon_text_primary">#F2F5FA</color>
-    <color name="elon_text_secondary">#A6AFBD</color>
-    <color name="elon_text_tertiary">#6F7785</color>
+    <color name="elon_text_primary">#D6D6D6</color>
+    <color name="elon_text_secondary">#A8A8A8</color>
+    <color name="elon_text_tertiary">#777777</color>
 
-    <color name="elon_button_secondary_bg">#283140</color>
-    <color name="elon_button_secondary_text">#DDE8FC</color>
-    <color name="elon_button_primary_bg">#58BE6A</color>
-    <color name="elon_button_primary_text">#07120A</color>
+    <color name="elon_button_secondary_bg">#2A2A2A</color>
+    <color name="elon_button_secondary_text">#D6D6D6</color>
+    <color name="elon_button_primary_bg">#C8C8C8</color>
+    <color name="elon_button_primary_text">#101010</color>
 
-    <color name="elon_link_primary">#6091CF</color>
-    <color name="elon_badge_info_bg">#152C3E</color>
-    <color name="elon_badge_info_text">#81B3D9</color>
-    <color name="elon_badge_neutral_bg">#283345</color>
-    <color name="elon_badge_neutral_text">#B8C4D8</color>
+    <color name="elon_accent_primary">#58BE6A</color>
+    <color name="elon_link_primary">#58BE6A</color>
+    <color name="elon_badge_info_bg">#16251A</color>
+    <color name="elon_badge_info_text">#8DDC9B</color>
+    <color name="elon_badge_neutral_bg">#2A2A2A</color>
+    <color name="elon_badge_neutral_text">#D0D0D0</color>
 
-    <color name="elon_nav_bg">#181B20</color>
-    <color name="elon_nav_active_bg">#262626</color>
+    <color name="elon_nav_bg">#222222</color>
+    <color name="elon_nav_active_bg">#242424</color>
 </resources>

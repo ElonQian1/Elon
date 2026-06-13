@@ -47,11 +47,11 @@ internal class MainStoreController(
         // ── 搜索栏 ──────────────────────────────────────────────────────────
         val searchField = EditText(activity).apply {
             hint = "搜索项目名称..."
-            setHintTextColor(Color.parseColor("#6F7785"))
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setHintTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 14f
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = createRoundedBg(8, "#283140")
+            background = createRoundedBg(8, "#2A2A2A")
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -64,7 +64,7 @@ internal class MainStoreController(
         // ── 状态提示 / 列表容器 ──────────────────────────────────────────────
         val statusText = TextView(activity).apply {
             text = "加载中..."
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(dp(16), dp(24), dp(16), dp(24))
@@ -165,7 +165,7 @@ internal class MainStoreController(
         val row = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(12), dp(12), dp(12))
-            setBackgroundColor(if (index % 2 == 0) Color.parseColor("#181B20") else Color.parseColor("#181B20"))
+            setBackgroundColor(if (index % 2 == 0) Color.parseColor("#222222") else Color.parseColor("#222222"))
             isClickable = true
             setOnClickListener { showProjectDetail(project, dialog) }
         }
@@ -176,7 +176,7 @@ internal class MainStoreController(
 
             addView(TextView(activity).apply {
                 text = project.name
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 15f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -184,9 +184,9 @@ internal class MainStoreController(
 
             val statusColor = when (project.lastTaskStatus) {
                 "done" -> "#58BE6A"
-                "running" -> "#6091CF"
+                "running" -> "#58BE6A"
                 "error" -> "#D97A7A"
-                else -> "#6F7785"
+                else -> "#777777"
             }
             addView(TextView(activity).apply {
                 text = "${project.memberCount} 人"
@@ -199,7 +199,7 @@ internal class MainStoreController(
         if (!project.description.isNullOrBlank()) {
             row.addView(TextView(activity).apply {
                 text = project.description
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 textSize = 12f
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -209,7 +209,7 @@ internal class MainStoreController(
 
         row.addView(TextView(activity).apply {
             text = "模板：${project.template}  ·  ${projectJoinModeSummary(project.joinMode)}"
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             textSize = 11f
             setPadding(0, dp(2), 0, 0)
         })

@@ -494,7 +494,7 @@ internal class ChatSideMenuController(
                 includeFontPadding = false
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 textSize = 12.5f
                 setPadding(0, dp(6), 0, 0)
             }
@@ -539,7 +539,7 @@ internal class ChatSideMenuController(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             textSize = 17.5f
         }
     }

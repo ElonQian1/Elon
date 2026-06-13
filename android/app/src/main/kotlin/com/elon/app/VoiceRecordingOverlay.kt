@@ -465,7 +465,7 @@ private class VoiceActionTrayView(
         style = Paint.Style.FILL
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#F2F5FA")
+        color = Color.parseColor("#D6D6D6")
         textAlign = Paint.Align.CENTER
         textSize = sp(15f)
     }
@@ -569,7 +569,7 @@ private class VoiceActionTrayView(
     }
 
     private fun drawOption(canvas: Canvas, label: String, x: Float, centerY: Float, selected: Boolean) {
-        textPaint.color = Color.parseColor(if (selected) "#F2F5FA" else "#F2F5FA")
+        textPaint.color = Color.parseColor(if (selected) "#D6D6D6" else "#D6D6D6")
         textPaint.isFakeBoldText = selected
         val fontMetrics = textPaint.fontMetrics
         val baseline = centerY - (fontMetrics.ascent + fontMetrics.descent) / 2f

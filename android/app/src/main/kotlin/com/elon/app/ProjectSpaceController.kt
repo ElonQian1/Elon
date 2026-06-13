@@ -801,7 +801,7 @@ internal class ProjectSpaceController(
         container.addView(TextView(activity).apply {
             text = "正在进入项目空间..."
             textSize = 15f
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             gravity = Gravity.CENTER
             setPadding(dp(24), dp(80), dp(24), dp(80))
         })
@@ -823,7 +823,7 @@ internal class ProjectSpaceController(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(8), dp(20), dp(14))
-            background = panelBackground("#181B20")
+            background = panelBackground("#222222")
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -840,14 +840,14 @@ internal class ProjectSpaceController(
                         text = space.project.name
                         textSize = 20f
                         setTypeface(typeface, Typeface.BOLD)
-                        setTextColor(Color.parseColor("#F2F5FA"))
+                        setTextColor(Color.parseColor("#D6D6D6"))
                         maxLines = 2
                         ellipsize = TextUtils.TruncateAt.END
                     })
                     addView(TextView(activity).apply {
                         text = "${space.project.memberCount} 位成员 · ${projectRoleLabel(space.project.role)}"
                         textSize = 13f
-                        setTextColor(Color.parseColor("#A6AFBD"))
+                        setTextColor(Color.parseColor("#A8A8A8"))
                         setPadding(0, dp(8), 0, 0)
                     })
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.72f))
@@ -872,7 +872,7 @@ internal class ProjectSpaceController(
         return FrameLayout(activity).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#283140"))
+                setColor(Color.parseColor("#2A2A2A"))
             }
             clipToOutline = true
             addView(ImageView(activity).apply {
@@ -905,7 +905,7 @@ internal class ProjectSpaceController(
             textSize = 13f
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(Color.parseColor(if (description.isBlank()) "#6F7785" else "#F2F5FA"))
+            setTextColor(Color.parseColor(if (description.isBlank()) "#777777" else "#D6D6D6"))
             setLineSpacing(dp(3).toFloat(), 1.0f)
             maxLines = 8
             ellipsize = TextUtils.TruncateAt.END
@@ -934,10 +934,10 @@ internal class ProjectSpaceController(
             maxLines = 6
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             filters = arrayOf(InputFilter.LengthFilter(PROJECT_DESCRIPTION_MAX_CHARS))
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = panelBackground("#181B20").apply {
+            background = panelBackground("#222222").apply {
                 cornerRadius = dp(8).toFloat()
             }
             setSelection(text?.length ?: 0)

@@ -26,8 +26,8 @@ internal class ProjectSpaceAnnouncementEditor(
             maxLines = 8
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             filters = arrayOf(InputFilter.LengthFilter(PROJECT_ANNOUNCEMENT_MAX_CHARS))
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = roundedInputBackground()
             setSelection(text?.length ?: 0)
@@ -74,7 +74,7 @@ internal class ProjectSpaceAnnouncementEditor(
 
     private fun roundedInputBackground(): android.graphics.drawable.GradientDrawable {
         return android.graphics.drawable.GradientDrawable().apply {
-            setColor(Color.parseColor("#181B20"))
+            setColor(Color.parseColor("#222222"))
             cornerRadius = dp(8).toFloat()
         }
     }

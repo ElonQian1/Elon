@@ -54,7 +54,7 @@ internal class FullScreenEditorOverlay(
             )
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#181B20"))
+            setBackgroundColor(Color.parseColor("#222222"))
             setPadding(dp(4), 0, dp(12), 0)
         }
 
@@ -65,7 +65,7 @@ internal class FullScreenEditorOverlay(
             text = "‹"
             textSize = 26f
             includeFontPadding = false
-            setTextColor(Color.parseColor("#A6AFBD"))
+            setTextColor(Color.parseColor("#A8A8A8"))
             setOnClickListener { hide() }
         }
 
@@ -75,7 +75,7 @@ internal class FullScreenEditorOverlay(
             gravity = Gravity.CENTER_VERTICAL
             text = "长文本编辑"
             textSize = 15f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             setPadding(dp(2), 0, 0, 0)
         }
 
@@ -86,7 +86,7 @@ internal class FullScreenEditorOverlay(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { marginEnd = dp(12) }
             textSize = 12f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
         }
 
         // 发送按钮
@@ -95,7 +95,7 @@ internal class FullScreenEditorOverlay(
             gravity = Gravity.CENTER
             text = "发送"
             textSize = 14f
-            setTextColor(Color.parseColor("#07120A"))
+            setTextColor(Color.parseColor("#101010"))
             background = activity.getDrawable(R.drawable.bg_send_button)
             setOnClickListener {
                 val text = editor.text.toString()
@@ -115,7 +115,7 @@ internal class FullScreenEditorOverlay(
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, 1
             ).apply { topMargin = topBarHeight }
-            setBackgroundColor(Color.parseColor("#283140"))
+            setBackgroundColor(Color.parseColor("#2A2A2A"))
         }
 
         // 编辑区域
@@ -126,8 +126,8 @@ internal class FullScreenEditorOverlay(
             ).apply { topMargin = topBarHeight + 1 }
             background = ColorDrawable(Color.TRANSPARENT)
             setPadding(dp(20), dp(16), dp(20), dp(120))
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             hint = "描述你想要的功能，越详细越好…"
             textSize = 16f
             setLineSpacing(0f, 1.5f)

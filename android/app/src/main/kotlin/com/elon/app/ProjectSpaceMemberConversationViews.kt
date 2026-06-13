@@ -38,7 +38,7 @@ internal class ProjectSpaceMemberConversationViews(
         container.addView(header(member, isSelf))
         container.addView(sectionTitle("项目 AI 会话"))
 
-        val loadingView = inlineStatusRow("正在加载会话...", "#A6AFBD")
+        val loadingView = inlineStatusRow("正在加载会话...", "#A8A8A8")
         container.addView(loadingView)
 
         thread {
@@ -50,7 +50,7 @@ internal class ProjectSpaceMemberConversationViews(
                 container.removeView(loadingView)
                 result.onSuccess { conversations ->
                     if (conversations.isEmpty()) {
-                        container.addView(inlineStatusRow("还没有项目 AI 会话", "#6F7785"))
+                        container.addView(inlineStatusRow("还没有项目 AI 会话", "#777777"))
                     } else {
                         conversations.forEach { conversation ->
                             container.addView(card(conversation, member, isSelf, space))
@@ -74,7 +74,7 @@ internal class ProjectSpaceMemberConversationViews(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
+            background = panelBackground("#222222")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
@@ -97,12 +97,12 @@ internal class ProjectSpaceMemberConversationViews(
                 }
                 textSize = 20f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             })
             addView(TextView(activity).apply {
                 text = projectRoleLabel(member.role)
                 textSize = 13f
-                setTextColor(Color.parseColor("#A6AFBD"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setPadding(0, dp(6), 0, 0)
             })
         }
@@ -117,7 +117,7 @@ internal class ProjectSpaceMemberConversationViews(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
+            background = panelBackground("#222222")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
@@ -132,21 +132,21 @@ internal class ProjectSpaceMemberConversationViews(
             addView(TextView(activity).apply {
                 text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
                 textSize = 16f
-                setTextColor(Color.parseColor("#F2F5FA"))
+                setTextColor(Color.parseColor("#D6D6D6"))
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
                 text = conversationSummary(conversation)
                 textSize = 12f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
                 setPadding(0, dp(5), 0, 0)
             })
             conversation.lastMessage?.takeIf { it.isNotBlank() }?.let { preview ->
                 addView(TextView(activity).apply {
                     text = preview
                     textSize = 13f
-                    setTextColor(Color.parseColor("#A6AFBD"))
+                    setTextColor(Color.parseColor("#A8A8A8"))
                     setPadding(0, dp(8), 0, 0)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -179,9 +179,9 @@ internal class ProjectSpaceMemberConversationViews(
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#F2F5FA"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#181B20")
+            background = panelBackground("#222222")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
@@ -241,7 +241,7 @@ internal class ProjectSpaceMemberConversationViews(
         return TextView(activity).apply {
             text = textValue
             textSize = 13f
-            setTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#777777"))
             setPadding(dp(20), dp(18), dp(20), dp(6))
         }
     }

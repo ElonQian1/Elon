@@ -20,10 +20,10 @@ internal fun projectSpaceDownloadButton(
         textSize = 15f
         gravity = Gravity.CENTER
         setTypeface(typeface, Typeface.BOLD)
-        setTextColor(Color.parseColor("#07120A"))
+        setTextColor(Color.parseColor("#101010"))
         background = GradientDrawable().apply {
             cornerRadius = dp(6).toFloat()
-            setColor(Color.parseColor("#58BE6A"))
+            setColor(Color.parseColor("#C8C8C8"))
         }
         isClickable = true
         foreground = selectableForeground()

@@ -147,7 +147,7 @@ internal class UserMemoriesCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(16), dp(22), dp(16))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0F1217"))
+                setColor(Color.parseColor("#151515"))
                 cornerRadius = dp(8).toFloat()
             }
 
@@ -164,7 +164,7 @@ internal class UserMemoriesCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "AI 记住的你"
-                    setTextColor(Color.parseColor("#F2F5FA"))
+                    setTextColor(Color.parseColor("#D6D6D6"))
                     textSize = 15f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -175,9 +175,9 @@ internal class UserMemoriesCard(
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     text = "加载中…"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#81B3D9"))
+                    setTextColor(Color.parseColor("#8DDC9B"))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#152C3E"))
+                        setColor(Color.parseColor("#16251A"))
                         cornerRadius = dp(8).toFloat()
                     }
                 }
@@ -192,7 +192,7 @@ internal class UserMemoriesCard(
                     includeFontPadding = false
                     text = "+"
                     textSize = 20f
-                    setTextColor(Color.parseColor("#81B3D9"))
+                    setTextColor(Color.parseColor("#8DDC9B"))
                     setPadding(dp(6), 0, dp(2), 0)
                     setOnClickListener { showAddDialog() }
                 })
@@ -207,7 +207,7 @@ internal class UserMemoriesCard(
                 includeFontPadding = false
                 text = "AI 在对话中自动记录，让每次回答更贴合你"
                 textSize = 11f
-                setTextColor(Color.parseColor("#6F7785"))
+                setTextColor(Color.parseColor("#777777"))
             })
 
             // 记忆列表
@@ -231,7 +231,7 @@ internal class UserMemoriesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(9), dp(8), dp(9))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#181B20"))
+            setColor(Color.parseColor("#222222"))
             cornerRadius = dp(6).toFloat()
         }
 
@@ -252,7 +252,7 @@ internal class UserMemoriesCard(
             includeFontPadding = false
             text = item.content
             textSize = 13f
-            setTextColor(Color.parseColor("#DDE8FC"))
+            setTextColor(Color.parseColor("#D6D6D6"))
             maxLines = 3
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
@@ -263,7 +263,7 @@ internal class UserMemoriesCard(
                 it.marginStart = dp(6)
             }
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setColorFilter(Color.parseColor("#6F7785"))
+            setColorFilter(Color.parseColor("#777777"))
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(6), dp(6), dp(6), dp(6))
             background = null
@@ -281,7 +281,7 @@ internal class UserMemoriesCard(
         includeFontPadding = false
         text = "还没有记忆\n多和 AI 对话，它会逐渐记住你的偏好"
         textSize = 12f
-        setTextColor(Color.parseColor("#6F7785"))
+        setTextColor(Color.parseColor("#777777"))
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, dp(8))
     }
@@ -319,10 +319,10 @@ internal class UserMemoriesCard(
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                     android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setPadding(dp(16), dp(12), dp(16), dp(12))
-            setTextColor(Color.parseColor("#F2F5FA"))
-            setHintTextColor(Color.parseColor("#6F7785"))
+            setTextColor(Color.parseColor("#D6D6D6"))
+            setHintTextColor(Color.parseColor("#777777"))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#181B20"))
+                setColor(Color.parseColor("#222222"))
                 cornerRadius = dp(6).toFloat()
             }
         }
@@ -371,10 +371,10 @@ internal class UserMemoriesCard(
     // ─── 工具 ────────────────────────────────────────────────────────────────
 
     private fun categoryColor(category: String): String = when (category) {
-        "preference" -> "#81B3D9"
+        "preference" -> "#8DDC9B"
         "profile"    -> "#58BE6A"
         "goal"       -> "#FCD34D"
-        else         -> "#6F7785"  // fact
+        else         -> "#777777"  // fact
     }
 
     private fun dp(n: Int): Int =
