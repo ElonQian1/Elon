@@ -93,9 +93,11 @@ fn build_semantic(index: &RepoContextIndex) -> ContextQualitySemantic {
         }
     }
     let mut lsp_succeeded = 0usize;
+    let mut lsp_locations = 0usize;
     let mut lsp_failed = 0usize;
     let mut lsp_timed_out = 0usize;
     for result in &index.rust_analyzer.lsp.results {
+        lsp_locations += result.locations.len();
         match result.status {
             RustAnalyzerLspStatus::Succeeded => lsp_succeeded += 1,
             RustAnalyzerLspStatus::Failed => lsp_failed += 1,
@@ -112,6 +114,7 @@ fn build_semantic(index: &RepoContextIndex) -> ContextQualitySemantic {
         lsp_enabled: index.rust_analyzer.lsp.enabled,
         lsp_attempted: index.rust_analyzer.lsp.attempted,
         lsp_succeeded,
+        lsp_locations,
         lsp_failed,
         lsp_timed_out,
         probe_enabled: index.rust_analyzer.probes.enabled,
@@ -344,6 +347,12 @@ fn recommended_actions(
     if semantic.lsp_enabled && semantic.lsp_succeeded > 0 {
         actions.push(
             "prefer successful rust_analyzer_lsp reference/implementation facts when estimating edit blast radius"
+                .to_string(),
+        );
+    }
+    if semantic.lsp_locations > 0 {
+        actions.push(
+            "use rust_analyzer_lsp locations as exact path:line evidence before widening edits"
                 .to_string(),
         );
     }

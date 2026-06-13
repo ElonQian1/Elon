@@ -42,6 +42,22 @@ pub(crate) fn render_rust_analyzer_lsp(out: &mut String, report: Option<&RustAna
             if let Some(summary) = result.summary.as_deref() {
                 out.push_str(&format!("    summary: {}\n", markdown_escape(summary)));
             }
+            if !result.locations.is_empty() {
+                out.push_str("    locations:\n");
+                for location in result.locations.iter().take(8) {
+                    let line = location
+                        .end_line
+                        .map(|end| format!("{}-{}", location.line, end))
+                        .unwrap_or_else(|| location.line.to_string());
+                    out.push_str(&format!(
+                        "      - role={} path={} line={} symbol={}\n",
+                        location.role.as_str(),
+                        markdown_escape(&location.path),
+                        line,
+                        markdown_escape(location.symbol.as_deref().unwrap_or("-"))
+                    ));
+                }
+            }
             if let Some(warning) = result.warning.as_deref() {
                 out.push_str(&format!("    warning: {}\n", markdown_escape(warning)));
             }

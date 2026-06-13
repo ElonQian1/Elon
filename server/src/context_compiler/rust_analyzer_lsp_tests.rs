@@ -6,8 +6,11 @@ use std::{
 use serde_json::json;
 
 use super::{
-    model::SemanticQueryMethod,
+    model::{
+        RustAnalyzerLspLocationRole, SemanticQuery, SemanticQueryMethod, SemanticQueryProvider,
+    },
     rust_analyzer_lsp::{file_uri, find_symbol_character, summarize_lsp_result},
+    rust_analyzer_lsp_locations::{parse_lsp_locations, uri_to_workspace_path},
 };
 
 #[test]
@@ -75,4 +78,121 @@ fn summarize_lsp_result_extracts_hover_contents() {
     );
 
     assert!(summary.contains("target_name"));
+}
+
+#[test]
+fn uri_to_workspace_path_decodes_relative_path() {
+    let workspace = std::path::Path::new("C:/repo/with space");
+    let uri = "file:///C:/repo/with%20space/src/lib.rs";
+
+    let path = uri_to_workspace_path(workspace, uri).unwrap();
+
+    assert_eq!(path, "src/lib.rs");
+}
+
+#[test]
+fn parse_lsp_locations_extracts_reference_lines() {
+    let workspace = std::path::Path::new("C:/repo");
+    let query = query(SemanticQueryMethod::References, "src/lib.rs");
+    let value = json!([
+        {
+            "uri": "file:///C:/repo/src/lib.rs",
+            "range": { "start": { "line": 9, "character": 4 }, "end": { "line": 9, "character": 12 } }
+        },
+        {
+            "uri": "file:///C:/repo/src/main.rs",
+            "range": { "start": { "line": 20, "character": 0 }, "end": { "line": 21, "character": 1 } }
+        }
+    ]);
+
+    let locations = parse_lsp_locations(workspace, &query, &value);
+
+    assert_eq!(locations.len(), 2);
+    assert_eq!(locations[0].role, RustAnalyzerLspLocationRole::Reference);
+    assert_eq!(locations[0].path, "src/lib.rs");
+    assert_eq!(locations[0].line, 10);
+    assert_eq!(locations[1].end_line, Some(22));
+}
+
+#[test]
+fn parse_lsp_locations_extracts_location_links() {
+    let workspace = std::path::Path::new("C:/repo");
+    let query = query(SemanticQueryMethod::Implementation, "src/lib.rs");
+    let value = json!([
+        {
+            "targetUri": "file:///C:/repo/src/impls.rs",
+            "targetSelectionRange": { "start": { "line": 14, "character": 8 }, "end": { "line": 14, "character": 18 } }
+        }
+    ]);
+
+    let locations = parse_lsp_locations(workspace, &query, &value);
+
+    assert_eq!(locations.len(), 1);
+    assert_eq!(
+        locations[0].role,
+        RustAnalyzerLspLocationRole::Implementation
+    );
+    assert_eq!(locations[0].path, "src/impls.rs");
+    assert_eq!(locations[0].line, 15);
+}
+
+#[test]
+fn parse_lsp_locations_extracts_nested_document_symbols() {
+    let workspace = std::path::Path::new("C:/repo");
+    let query = query(SemanticQueryMethod::DocumentSymbol, "src/lib.rs");
+    let value = json!([
+        {
+            "name": "Outer",
+            "selectionRange": { "start": { "line": 2, "character": 0 }, "end": { "line": 2, "character": 5 } },
+            "children": [{
+                "name": "inner",
+                "selectionRange": { "start": { "line": 8, "character": 4 }, "end": { "line": 8, "character": 9 } }
+            }]
+        }
+    ]);
+
+    let locations = parse_lsp_locations(workspace, &query, &value);
+
+    assert_eq!(locations.len(), 2);
+    assert_eq!(locations[0].symbol.as_deref(), Some("Outer"));
+    assert_eq!(locations[1].symbol.as_deref(), Some("inner"));
+    assert_eq!(locations[1].line, 9);
+}
+
+#[test]
+fn parse_lsp_locations_extracts_call_hierarchy_items() {
+    let workspace = std::path::Path::new("C:/repo");
+    let query = query(SemanticQueryMethod::IncomingCalls, "src/lib.rs");
+    let value = json!([
+        {
+            "from": {
+                "name": "caller",
+                "uri": "file:///C:/repo/src/caller.rs",
+                "selectionRange": { "start": { "line": 30, "character": 4 }, "end": { "line": 30, "character": 10 } }
+            },
+            "fromRanges": []
+        }
+    ]);
+
+    let locations = parse_lsp_locations(workspace, &query, &value);
+
+    assert_eq!(locations.len(), 1);
+    assert_eq!(
+        locations[0].role,
+        RustAnalyzerLspLocationRole::IncomingCaller
+    );
+    assert_eq!(locations[0].path, "src/caller.rs");
+    assert_eq!(locations[0].symbol.as_deref(), Some("caller"));
+}
+
+fn query(method: SemanticQueryMethod, path: &str) -> SemanticQuery {
+    SemanticQuery {
+        provider: SemanticQueryProvider::RustAnalyzerLsp,
+        method,
+        path: path.to_string(),
+        line: 1,
+        symbol: Some("target".to_string()),
+        priority: 1,
+        reason: "test".to_string(),
+    }
 }

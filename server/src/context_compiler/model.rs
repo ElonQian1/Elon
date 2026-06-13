@@ -290,7 +290,41 @@ pub(crate) struct RustAnalyzerLspQueryResult {
     pub(crate) status: RustAnalyzerLspStatus,
     pub(crate) duration_ms: u64,
     pub(crate) summary: Option<String>,
+    pub(crate) locations: Vec<RustAnalyzerLspLocation>,
     pub(crate) warning: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RustAnalyzerLspLocation {
+    pub(crate) role: RustAnalyzerLspLocationRole,
+    pub(crate) path: String,
+    pub(crate) line: usize,
+    pub(crate) end_line: Option<usize>,
+    pub(crate) symbol: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RustAnalyzerLspLocationRole {
+    DocumentSymbol,
+    Reference,
+    Implementation,
+    IncomingCaller,
+    OutgoingCallee,
+    CallHierarchyItem,
+}
+
+impl RustAnalyzerLspLocationRole {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::DocumentSymbol => "document_symbol",
+            Self::Reference => "reference",
+            Self::Implementation => "implementation",
+            Self::IncomingCaller => "incoming_caller",
+            Self::OutgoingCallee => "outgoing_callee",
+            Self::CallHierarchyItem => "call_hierarchy_item",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -527,6 +561,7 @@ pub(crate) struct ContextQualitySemantic {
     pub(crate) lsp_enabled: bool,
     pub(crate) lsp_attempted: usize,
     pub(crate) lsp_succeeded: usize,
+    pub(crate) lsp_locations: usize,
     pub(crate) lsp_failed: usize,
     pub(crate) lsp_timed_out: usize,
     pub(crate) probe_enabled: bool,

@@ -24,6 +24,7 @@ mod repo_map_tags_tests;
 mod repo_snapshot;
 mod rust_analyzer;
 mod rust_analyzer_lsp;
+mod rust_analyzer_lsp_locations;
 mod rust_analyzer_lsp_protocol;
 mod rust_analyzer_lsp_render;
 #[cfg(test)]

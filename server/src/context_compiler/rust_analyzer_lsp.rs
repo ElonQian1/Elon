@@ -11,6 +11,7 @@ use super::{
         RepoContextIndex, RustAnalyzerLspQueryResult, RustAnalyzerLspReport, RustAnalyzerLspStatus,
         SemanticQuery, SemanticQueryMethod, SemanticQueryProvider,
     },
+    rust_analyzer_lsp_locations::parse_lsp_locations,
     rust_analyzer_lsp_protocol::{LspRequestStatus, RustAnalyzerLspClient},
 };
 
@@ -127,16 +128,17 @@ fn execute_query(
 
     match query.method {
         SemanticQueryMethod::IncomingCalls | SemanticQueryMethod::OutgoingCalls => {
-            execute_call_hierarchy_query(client, query, params, timeout, started)
+            execute_call_hierarchy_query(workspace, client, query, params, timeout, started)
         }
         method => {
             let status = client.request(method.as_lsp_method(), params, timeout);
-            query_result_from_status(query, started.elapsed(), status)
+            query_result_from_status(workspace, query, started.elapsed(), status)
         }
     }
 }
 
 fn execute_call_hierarchy_query(
+    workspace: &Path,
     client: &mut RustAnalyzerLspClient,
     query: &SemanticQuery,
     prepare_params: Value,
@@ -149,7 +151,7 @@ fn execute_call_hierarchy_query(
         timeout,
     );
     let LspRequestStatus::Succeeded(result) = prepare else {
-        return query_result_from_status(query, started.elapsed(), prepare);
+        return query_result_from_status(workspace, query, started.elapsed(), prepare);
     };
     let Some(item) = first_call_hierarchy_item(&result) else {
         return RustAnalyzerLspQueryResult {
@@ -160,6 +162,7 @@ fn execute_call_hierarchy_query(
             status: RustAnalyzerLspStatus::Skipped,
             duration_ms: elapsed_ms(started.elapsed()),
             summary: Some("prepareCallHierarchy returned no item".to_string()),
+            locations: Vec::new(),
             warning: None,
         };
     };
@@ -169,7 +172,7 @@ fn execute_call_hierarchy_query(
         json!({ "item": item }),
         timeout,
     );
-    query_result_from_status(query, started.elapsed(), status)
+    query_result_from_status(workspace, query, started.elapsed(), status)
 }
 
 fn query_position_params(workspace: &Path, query: &SemanticQuery) -> Result<Value, String> {
@@ -209,6 +212,7 @@ fn query_position_params(workspace: &Path, query: &SemanticQuery) -> Result<Valu
 }
 
 fn query_result_from_status(
+    workspace: &Path,
     query: &SemanticQuery,
     elapsed: Duration,
     status: LspRequestStatus,
@@ -222,6 +226,7 @@ fn query_result_from_status(
             status: RustAnalyzerLspStatus::Succeeded,
             duration_ms: elapsed_ms(elapsed),
             summary: Some(summarize_lsp_result(query.method, &result)),
+            locations: parse_lsp_locations(workspace, query, &result),
             warning: None,
         },
         LspRequestStatus::Failed(error) => RustAnalyzerLspQueryResult {
@@ -232,6 +237,7 @@ fn query_result_from_status(
             status: RustAnalyzerLspStatus::Failed,
             duration_ms: elapsed_ms(elapsed),
             summary: None,
+            locations: Vec::new(),
             warning: Some(error),
         },
         LspRequestStatus::TimedOut => RustAnalyzerLspQueryResult {
@@ -242,6 +248,7 @@ fn query_result_from_status(
             status: RustAnalyzerLspStatus::TimedOut,
             duration_ms: elapsed_ms(elapsed),
             summary: None,
+            locations: Vec::new(),
             warning: Some("rust-analyzer LSP request timed out".to_string()),
         },
     }
@@ -264,6 +271,7 @@ fn skipped_result_with_duration(
         status: RustAnalyzerLspStatus::Skipped,
         duration_ms: elapsed_ms(elapsed),
         summary: None,
+        locations: Vec::new(),
         warning: Some(warning.to_string()),
     }
 }
