@@ -40,7 +40,7 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(22)
+                topMargin = dp(28)
             }
         }
         feedShell.addView(announcementBlock(space, messagesByChannel))
@@ -59,12 +59,12 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = -dp(10)
+                topMargin = -dp(8)
             }
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(10), 0, 0)
+            setPadding(0, dp(6), 0, 0)
         }
         frame.addView(feedColumn, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -103,7 +103,7 @@ internal class ProjectSpaceFeedView(
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(16), dp(20), dp(34))
+            setPadding(dp(20), dp(12), dp(20), dp(24))
             background = roundedBackground(
                 colorHex = "#30333A",
                 topStartDp = 18,
@@ -177,7 +177,7 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(dp(10), dp(6), dp(10), dp(8))
+                setMargins(dp(10), dp(4), dp(10), dp(4))
             }
 
             addView(postHeader(sender, post.message.senderAvatarDataUrl, timeText, projectSpaceTopicLabel(post.channel)))
