@@ -59,7 +59,7 @@ impl ContextCompilerConfig {
             max_symbols: env_usize("ELON_CONTEXT_COMPILER_MAX_SYMBOLS", 80),
             max_relationships: env_usize("ELON_CONTEXT_COMPILER_MAX_RELATIONSHIPS", 120),
             max_rust_analyzer_files: env_usize("ELON_CONTEXT_COMPILER_RA_FILES", 6),
-            max_pack_chars: env_usize("ELON_CONTEXT_COMPILER_MAX_CHARS", 12_000),
+            max_pack_chars: env_usize("ELON_CONTEXT_COMPILER_MAX_CHARS", 24_000),
             save_pack_enabled: env_bool("ELON_CONTEXT_COMPILER_SAVE_PACK", true),
             artifact_max_bytes: env_usize("ELON_CONTEXT_COMPILER_ARTIFACT_MAX_BYTES", 200_000),
             rust_probe_enabled: env_bool("ELON_CONTEXT_COMPILER_RUST_PROBE", true),

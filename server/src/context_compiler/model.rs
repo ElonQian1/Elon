@@ -1,9 +1,20 @@
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub(crate) struct RepoContextIndex {
+    pub(crate) task: TaskProfile,
     pub(crate) cargo: CargoIndex,
     pub(crate) rust: RustIndex,
     pub(crate) graph: SymbolGraphSummary,
     pub(crate) rust_analyzer: RustAnalyzerReport,
+    pub(crate) evidence: ContextEvidence,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct TaskProfile {
+    pub(crate) keywords: Vec<String>,
+    pub(crate) likely_domains: Vec<String>,
+    pub(crate) suspected_symbols: Vec<String>,
+    pub(crate) suspected_files: Vec<String>,
+    pub(crate) action_hints: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -20,6 +31,7 @@ pub(crate) struct CargoPackageSummary {
     pub(crate) version: String,
     pub(crate) manifest_path: String,
     pub(crate) targets: Vec<String>,
+    pub(crate) target_paths: Vec<String>,
     pub(crate) features: Vec<String>,
 }
 
@@ -177,4 +189,68 @@ pub(crate) struct RustAnalyzerSymbol {
     pub(crate) detail: Option<String>,
     pub(crate) line: usize,
     pub(crate) parent: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct ContextEvidence {
+    pub(crate) snippets: Vec<EvidenceSnippet>,
+    pub(crate) neighbor_summaries: Vec<NeighborSummary>,
+    pub(crate) test_targets: Vec<TestTarget>,
+    pub(crate) build_commands: Vec<BuildCommand>,
+    pub(crate) invariants: Vec<ContextFact>,
+    pub(crate) public_api_contracts: Vec<ContextFact>,
+    pub(crate) unsafe_boundaries: Vec<ContextFact>,
+    pub(crate) feature_flags: Vec<FeatureFlagFact>,
+    pub(crate) missing_context: Vec<String>,
+    pub(crate) recommended_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct EvidenceSnippet {
+    pub(crate) id: String,
+    pub(crate) path: String,
+    pub(crate) role: &'static str,
+    pub(crate) symbols: Vec<String>,
+    pub(crate) line_start: usize,
+    pub(crate) line_end: usize,
+    pub(crate) sha256: String,
+    pub(crate) reason: String,
+    pub(crate) content: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct NeighborSummary {
+    pub(crate) path: String,
+    pub(crate) relationship: RelationshipKind,
+    pub(crate) symbols: Vec<String>,
+    pub(crate) reason: String,
+    pub(crate) needed_if: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct TestTarget {
+    pub(crate) path: String,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct BuildCommand {
+    pub(crate) command: String,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct ContextFact {
+    pub(crate) subject: String,
+    pub(crate) path: String,
+    pub(crate) line_start: usize,
+    pub(crate) line_end: usize,
+    pub(crate) detail: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct FeatureFlagFact {
+    pub(crate) package: String,
+    pub(crate) feature: String,
+    pub(crate) manifest_path: String,
 }

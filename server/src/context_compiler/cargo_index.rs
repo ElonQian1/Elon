@@ -94,6 +94,7 @@ fn parse_metadata(workspace: &Path, manifest: &Path, text: &str) -> CargoIndex {
                 .map(PathBuf::from)
                 .map(|path| relative_path(workspace, &path))
                 .unwrap_or_else(|| relative_path(workspace, manifest));
+            let mut target_paths = Vec::new();
             let targets = package
                 .get("targets")
                 .and_then(Value::as_array)
@@ -102,6 +103,14 @@ fn parse_metadata(workspace: &Path, manifest: &Path, text: &str) -> CargoIndex {
                         .iter()
                         .filter_map(|target| {
                             let name = target.get("name").and_then(Value::as_str)?;
+                            if let Some(src_path) = target
+                                .get("src_path")
+                                .and_then(Value::as_str)
+                                .map(PathBuf::from)
+                                .map(|path| relative_path(workspace, &path))
+                            {
+                                target_paths.push(src_path);
+                            }
                             let kinds = target
                                 .get("kind")
                                 .and_then(Value::as_array)
@@ -134,6 +143,7 @@ fn parse_metadata(workspace: &Path, manifest: &Path, text: &str) -> CargoIndex {
                 version,
                 manifest_path,
                 targets,
+                target_paths,
                 features,
             });
         }

@@ -1,9 +1,6 @@
 use super::{
-    config::ContextCompilerConfig,
-    model::{RepoContextIndex, RustAnalyzerReport, RustSymbol, SymbolGraphSummary},
-    relevance::RelevantFile,
-    repo_snapshot::RepoSnapshot,
-    rust_project::RustProjectSummary,
+    config::ContextCompilerConfig, context_pack_render, model::RepoContextIndex,
+    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
     validation::ValidationPlan,
 };
 
@@ -18,7 +15,7 @@ pub(crate) fn build_context_pack(
     llm_brief: Option<&str>,
 ) -> String {
     let mut out = String::new();
-    out.push_str("<task_context_pack version=\"0.1\" source=\"elon-context-compiler\">\n\n");
+    out.push_str("<task_context_pack version=\"0.2\" source=\"elon-context-compiler\">\n\n");
     out.push_str("<instructions>\n");
     out.push_str("这份上下文包是只读预检产物，只能作为导航证据，不是真实代码的替代品。\n");
     out.push_str("执行修改前必须读取真实文件确认；如果上下文不足，请继续用当前 CLI 工具查询。\n");
@@ -28,311 +25,27 @@ pub(crate) fn build_context_pack(
     out.push_str(user_message.trim());
     out.push_str("\n</task>\n\n");
 
+    if let Some(index) = repo_index {
+        context_pack_render::render_task_profile(&mut out, &index.task);
+    }
+
     if let Some(brief) = llm_brief.filter(|value| !value.trim().is_empty()) {
         out.push_str("<llm_brief model_role=\"context-compressor\">\n");
         out.push_str(brief.trim());
         out.push_str("\n</llm_brief>\n\n");
     }
 
-    out.push_str("<repo_snapshot>\n");
-    out.push_str(&format!(
-        "- git_head: {}\n- git_branch: {}\n- has_origin: {}\n- source_file_count: {}\n",
-        snapshot.git_head.as_deref().unwrap_or("unknown"),
-        snapshot.git_branch.as_deref().unwrap_or("unknown"),
-        snapshot.has_origin,
-        snapshot.source_file_count
-    ));
-    out.push_str(&format!("- git_dirty: {}\n", snapshot.git_dirty));
-    if !snapshot.git_status_short.is_empty() {
-        out.push_str("- git_status_short:\n");
-        for line in &snapshot.git_status_short {
-            out.push_str(&format!("  - {}\n", markdown_escape(line)));
-        }
-    }
-    if !snapshot.top_level_entries.is_empty() {
-        out.push_str("- top_level_entries: ");
-        out.push_str(&snapshot.top_level_entries.join(", "));
-        out.push('\n');
-    }
-    if !snapshot.manifests.is_empty() {
-        out.push_str("- manifests: ");
-        out.push_str(&snapshot.manifests.join(", "));
-        out.push('\n');
-    }
-    if !snapshot.instruction_docs.is_empty() {
-        out.push_str("- instruction_docs: ");
-        out.push_str(&snapshot.instruction_docs.join(", "));
-        out.push('\n');
-    }
-    out.push_str("</repo_snapshot>\n\n");
-
-    if let Some(rust) = rust_project {
-        out.push_str("<rust_project>\n");
-        out.push_str(&format!(
-            "- workspace: {}\n- root_package: {}\n",
-            rust.workspace,
-            rust.root_package.as_deref().unwrap_or("none")
-        ));
-        if let Some(toolchain) = rust.toolchain.as_deref() {
-            out.push_str(&format!("- toolchain: {toolchain}\n"));
-        }
-        if !rust.workspace_members.is_empty() {
-            out.push_str("- workspace_members: ");
-            out.push_str(&rust.workspace_members.join(", "));
-            out.push('\n');
-        }
-        if !rust.manifests.is_empty() {
-            out.push_str("- manifests:\n");
-            for manifest in &rust.manifests {
-                out.push_str(&format!(
-                    "  - path={} package={} workspace={}\n",
-                    manifest.path,
-                    manifest.package_name.as_deref().unwrap_or("none"),
-                    manifest.workspace
-                ));
-            }
-        }
-        out.push_str("</rust_project>\n\n");
-    }
-
-    if let Some(index) = repo_index {
-        render_cargo_workspace(&mut out, index);
-        render_repo_map(&mut out, &index.graph);
-        render_symbol_graph(&mut out, &index.graph);
-        render_rust_safety_context(&mut out, &index.rust.symbols);
-        render_rust_analyzer(&mut out, &index.rust_analyzer);
-    } else {
-        out.push_str("<repo_map status=\"disabled\">\n");
-        out.push_str("Rust repo map++ disabled by ELON_CONTEXT_COMPILER_RUST_ANALYSIS=false.\n");
-        out.push_str("</repo_map>\n\n");
-    }
-
-    if !snapshot.large_files.is_empty() {
-        out.push_str("<source_size_risks>\n");
-        out.push_str("新增逻辑优先放入独立 focused module，避免扩大红区文件。\n");
-        for file in &snapshot.large_files {
-            out.push_str(&format!(
-                "- {}: {} lines, role={}\n",
-                file.path, file.lines, file.role
-            ));
-        }
-        out.push_str("</source_size_risks>\n\n");
-    }
-
-    if !relevant_files.is_empty() {
-        out.push_str("<retrieval_evidence>\n");
-        for file in relevant_files {
-            out.push_str(&format!(
-                "<file path=\"{}\" score=\"{}\" lines=\"{}\" role=\"{}\">\n",
-                xml_escape(&file.path),
-                file.score,
-                file.lines,
-                file.role
-            ));
-            if !file.reasons.is_empty() {
-                out.push_str("reason: ");
-                out.push_str(&file.reasons.join("; "));
-                out.push('\n');
-            }
-            for line_match in &file.matches {
-                out.push_str(&format!(
-                    "- L{}: {}\n",
-                    line_match.line,
-                    markdown_escape(&line_match.text)
-                ));
-            }
-            out.push_str("</file>\n");
-        }
-        out.push_str("</retrieval_evidence>\n\n");
-    }
-
-    out.push_str("<output_contract>\n");
-    out.push_str("- 先用真实文件确认上下文包给出的 path/line/symbol，再修改。\n");
-    out.push_str("- 优先编辑 ranked_files 与 retrieval_evidence 同时命中的模块。\n");
-    out.push_str("- 涉及 Rust public API、trait impl、enum match、unsafe/await/Send/Sync/Drop 时同步检查调用方和测试。\n");
-    out.push_str("- 修改 Rust 代码后优先对本次改动的 .rs 文件运行 rustfmt。\n");
-    out.push_str("- 后端行为变化至少运行相关 cargo test 或 cargo check。\n");
-    out.push_str("- Android/APK 变化先完成代码同步；只有用户明确要求发布时才运行发布脚本。\n");
-    out.push_str("</output_contract>\n\n");
-
-    out.push_str("<validation_guidance>\n");
-    for command in &validation_plan.commands {
-        let required = if command.required {
-            "required"
-        } else {
-            "recommended"
-        };
-        out.push_str(&format!(
-            "- `{}` ({}) - {}\n",
-            command.command, required, command.reason
-        ));
-    }
-    for note in &validation_plan.notes {
-        out.push_str(&format!("- note: {note}\n"));
-    }
-    out.push_str("</validation_guidance>\n\n");
+    context_pack_render::render_repo_snapshot(&mut out, snapshot);
+    context_pack_render::render_rust_project(&mut out, rust_project);
+    context_pack_render::render_repo_index(&mut out, repo_index);
+    context_pack_render::render_source_size_risks(&mut out, snapshot);
+    context_pack_render::render_context_evidence(&mut out, repo_index.map(|index| &index.evidence));
+    context_pack_render::render_retrieval_evidence(&mut out, relevant_files);
+    context_pack_render::render_validation_guidance(&mut out, validation_plan);
+    context_pack_render::render_output_contract(&mut out);
     out.push_str("</task_context_pack>");
 
     truncate_pack(out, config.max_pack_chars)
-}
-
-fn render_cargo_workspace(out: &mut String, index: &RepoContextIndex) {
-    out.push_str("<cargo_workspace>\n");
-    if let Some(manifest) = &index.cargo.manifest_path {
-        out.push_str(&format!("- manifest: {}\n", markdown_escape(manifest)));
-    }
-    if let Some(root) = &index.cargo.workspace_root {
-        out.push_str(&format!("- workspace_root: {}\n", markdown_escape(root)));
-    }
-    for package in index.cargo.packages.iter().take(12) {
-        out.push_str(&format!(
-            "- package {} v{} manifest={}\n",
-            markdown_escape(&package.name),
-            markdown_escape(&package.version),
-            markdown_escape(&package.manifest_path)
-        ));
-        if !package.targets.is_empty() {
-            out.push_str(&format!(
-                "  targets: {}\n",
-                markdown_escape(&package.targets.join(", "))
-            ));
-        }
-        if !package.features.is_empty() {
-            out.push_str(&format!(
-                "  features: {}\n",
-                markdown_escape(&package.features.join(", "))
-            ));
-        }
-    }
-    for warning in &index.cargo.warnings {
-        out.push_str(&format!("- warning: {}\n", markdown_escape(warning)));
-    }
-    out.push_str("</cargo_workspace>\n\n");
-}
-
-fn render_repo_map(out: &mut String, graph: &SymbolGraphSummary) {
-    out.push_str("<repo_map strategy=\"rust-native-aider-plus\">\n");
-    for file in &graph.ranked_files {
-        out.push_str(&format!(
-            "<file path=\"{}\" score=\"{:.2}\" role=\"{}\" symbols=\"{}\">\n",
-            xml_escape(&file.path),
-            file.score,
-            file.role,
-            file.symbol_count
-        ));
-        if !file.top_symbols.is_empty() {
-            out.push_str("top_symbols: ");
-            out.push_str(&markdown_escape(&file.top_symbols.join(", ")));
-            out.push('\n');
-        }
-        if !file.reasons.is_empty() {
-            out.push_str("reason: ");
-            out.push_str(&markdown_escape(&file.reasons.join("; ")));
-            out.push('\n');
-        }
-        out.push_str("</file>\n");
-    }
-    for warning in &graph.warnings {
-        out.push_str(&format!("- warning: {}\n", markdown_escape(warning)));
-    }
-    out.push_str("</repo_map>\n\n");
-}
-
-fn render_symbol_graph(out: &mut String, graph: &SymbolGraphSummary) {
-    out.push_str("<symbol_graph>\n");
-    out.push_str("<ranked_symbols>\n");
-    for symbol in graph.ranked_symbols.iter().take(40) {
-        out.push_str(&format!(
-            "- {} {} {}:{}-{} score={:.2} id={}",
-            symbol.kind.as_str(),
-            markdown_escape(&symbol.name),
-            markdown_escape(&symbol.path),
-            symbol.line_start,
-            symbol.line_end,
-            symbol.score,
-            markdown_escape(&symbol.id)
-        ));
-        if !symbol.reasons.is_empty() {
-            out.push_str(" reason=");
-            out.push_str(&markdown_escape(&symbol.reasons.join("; ")));
-        }
-        out.push('\n');
-    }
-    out.push_str("</ranked_symbols>\n");
-    out.push_str("<relationships>\n");
-    for relationship in graph.relationships.iter().take(50) {
-        out.push_str(&format!(
-            "- {} L{} -> {} [{}] at {} reason={}\n",
-            markdown_escape(&relationship.from_path),
-            relationship.line,
-            markdown_escape(&relationship.to_symbol_name),
-            relationship.kind.as_str(),
-            markdown_escape(&relationship.to_path),
-            markdown_escape(&relationship.reason)
-        ));
-    }
-    out.push_str("</relationships>\n");
-    out.push_str("</symbol_graph>\n\n");
-}
-
-fn render_rust_safety_context(out: &mut String, symbols: &[RustSymbol]) {
-    let risky = symbols
-        .iter()
-        .filter(|symbol| !symbol.safety_notes.is_empty())
-        .take(30)
-        .collect::<Vec<_>>();
-    if risky.is_empty() {
-        return;
-    }
-    out.push_str("<rust_safety_context>\n");
-    for symbol in risky {
-        out.push_str(&format!(
-            "- {} {} {}:{}-{} visibility={} notes={}\n",
-            symbol.kind.as_str(),
-            markdown_escape(&symbol.name),
-            markdown_escape(&symbol.path),
-            symbol.line_start,
-            symbol.line_end,
-            symbol.visibility.as_str(),
-            markdown_escape(&symbol.safety_notes.join(", "))
-        ));
-    }
-    out.push_str("</rust_safety_context>\n\n");
-}
-
-fn render_rust_analyzer(out: &mut String, report: &RustAnalyzerReport) {
-    out.push_str("<rust_analyzer>\n");
-    out.push_str(&format!("- available: {}\n", report.available));
-    if let Some(version) = &report.version {
-        out.push_str(&format!("- version: {}\n", markdown_escape(version)));
-    }
-    if !report.enhancement_targets.is_empty() {
-        out.push_str(&format!(
-            "- enhanced_files: {} / targets={}\n",
-            report.files_enhanced,
-            markdown_escape(&report.enhancement_targets.join(", "))
-        ));
-    }
-    for symbol in report.symbols.iter().take(40) {
-        out.push_str(&format!(
-            "- {} {} {}:{}",
-            markdown_escape(&symbol.kind),
-            markdown_escape(&symbol.label),
-            markdown_escape(&symbol.path),
-            symbol.line
-        ));
-        if let Some(detail) = &symbol.detail {
-            out.push_str(&format!(" detail={}", markdown_escape(detail)));
-        }
-        if let Some(parent) = &symbol.parent {
-            out.push_str(&format!(" parent={}", markdown_escape(parent)));
-        }
-        out.push('\n');
-    }
-    for warning in &report.warnings {
-        out.push_str(&format!("- warning: {}\n", markdown_escape(warning)));
-    }
-    out.push_str("</rust_analyzer>\n\n");
 }
 
 fn truncate_pack(mut pack: String, max_chars: usize) -> String {
@@ -345,26 +58,16 @@ fn truncate_pack(mut pack: String, max_chars: usize) -> String {
     truncated
 }
 
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-fn markdown_escape(value: &str) -> String {
-    value.replace('<', "&lt;").replace('>', "&gt;")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context_compiler::config::ContextCompilerMode;
+    use crate::context_compiler::{
+        config::ContextCompilerMode,
+        model::{ContextEvidence, RepoContextIndex, TaskProfile},
+    };
 
-    #[test]
-    fn context_pack_contains_navigation_warning_and_relevant_file() {
-        let config = ContextCompilerConfig {
+    fn test_config() -> ContextCompilerConfig {
+        ContextCompilerConfig {
             enabled: true,
             mode: ContextCompilerMode::Inject,
             agent_name: "hunyuan".to_string(),
@@ -380,8 +83,11 @@ mod tests {
             save_pack_enabled: true,
             artifact_max_bytes: 100_000,
             rust_probe_enabled: true,
-        };
-        let snapshot = RepoSnapshot {
+        }
+    }
+
+    fn test_snapshot() -> RepoSnapshot {
+        RepoSnapshot {
             git_head: Some("abc123".to_string()),
             git_branch: Some("main".to_string()),
             git_dirty: false,
@@ -392,7 +98,13 @@ mod tests {
             manifests: vec!["Cargo.toml".to_string()],
             large_files: Vec::new(),
             source_file_count: 1,
-        };
+        }
+    }
+
+    #[test]
+    fn context_pack_contains_navigation_warning_and_relevant_file() {
+        let config = test_config();
+        let snapshot = test_snapshot();
         let relevant = vec![RelevantFile {
             path: "server/src/context_compiler/mod.rs".to_string(),
             score: 9,
@@ -421,38 +133,16 @@ mod tests {
         assert!(pack.contains("server/src/context_compiler/mod.rs"));
         assert!(pack.contains("Cargo.toml"));
         assert!(pack.contains("<retrieval_evidence>"));
+        assert!(pack.contains("<final_instructions>"));
     }
 
     #[test]
     fn context_pack_includes_rust_project_summary() {
-        let config = ContextCompilerConfig {
-            enabled: true,
-            mode: ContextCompilerMode::Inject,
-            agent_name: "hunyuan".to_string(),
-            llm_brief_enabled: false,
-            rust_analysis_enabled: true,
-            rust_analyzer_enabled: true,
-            max_relevant_files: 4,
-            max_rust_files: 40,
-            max_symbols: 20,
-            max_relationships: 20,
-            max_rust_analyzer_files: 2,
-            max_pack_chars: 20_000,
-            save_pack_enabled: true,
-            artifact_max_bytes: 100_000,
-            rust_probe_enabled: true,
-        };
+        let config = test_config();
         let snapshot = RepoSnapshot {
-            git_head: Some("abc123".to_string()),
-            git_branch: Some("main".to_string()),
             git_dirty: true,
             git_status_short: vec![" M src/lib.rs".to_string()],
-            has_origin: true,
-            top_level_entries: Vec::new(),
-            instruction_docs: Vec::new(),
-            manifests: vec!["Cargo.toml".to_string()],
-            large_files: Vec::new(),
-            source_file_count: 1,
+            ..test_snapshot()
         };
         let rust = RustProjectSummary {
             root_package: Some("elon-server".to_string()),
@@ -480,5 +170,43 @@ mod tests {
         assert!(pack.contains("<rust_project>"));
         assert!(pack.contains("root_package: elon-server"));
         assert!(pack.contains("git_dirty: true"));
+    }
+
+    #[test]
+    fn context_pack_includes_task_and_evidence_sections() {
+        let config = test_config();
+        let snapshot = test_snapshot();
+        let index = RepoContextIndex {
+            task: TaskProfile {
+                keywords: vec!["repo".to_string(), "map".to_string()],
+                likely_domains: vec!["rust_context_compiler".to_string()],
+                ..TaskProfile::default()
+            },
+            evidence: ContextEvidence {
+                missing_context: vec!["no direct test file identified".to_string()],
+                recommended_actions: vec!["Open edit targets first".to_string()],
+                ..ContextEvidence::default()
+            },
+            ..RepoContextIndex::default()
+        };
+        let validation = ValidationPlan {
+            commands: Vec::new(),
+            notes: Vec::new(),
+        };
+
+        let pack = build_context_pack(
+            &config,
+            "继续完善 repo map",
+            &snapshot,
+            None,
+            Some(&index),
+            &[],
+            &validation,
+            None,
+        );
+
+        assert!(pack.contains("<task_understanding>"));
+        assert!(pack.contains("<missing_context_policy>"));
+        assert!(pack.contains("<recommended_agent_actions>"));
     }
 }

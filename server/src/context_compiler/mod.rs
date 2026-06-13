@@ -1,7 +1,11 @@
 mod artifact;
 mod cargo_index;
 mod config;
+mod context_evidence;
+#[cfg(test)]
+mod context_evidence_tests;
 mod context_pack;
+mod context_pack_render;
 mod hunyuan_brief;
 mod model;
 mod relevance;
@@ -10,6 +14,7 @@ mod rust_analyzer;
 mod rust_project;
 mod rust_symbols;
 mod symbol_graph;
+mod task_profile;
 mod validation;
 
 use std::{path::Path, sync::Arc};
@@ -31,10 +36,13 @@ pub(crate) async fn compile_preflight_note(
     }
 
     let snapshot = repo_snapshot::collect_repo_snapshot(workspace);
+    let task = task_profile::analyze_task(user_message);
     let rust_project = config
         .rust_probe_enabled
         .then(|| rust_project::collect_rust_project_summary(workspace))
         .flatten();
+    let relevant_files =
+        relevance::find_relevant_files(workspace, user_message, config.max_relevant_files);
     let repo_index = if config.rust_analysis_enabled {
         let cargo = cargo_index::collect_cargo_index(workspace);
         let rust = rust_symbols::collect_rust_index(workspace, config.max_rust_files);
@@ -52,17 +60,20 @@ pub(crate) async fn compile_preflight_note(
             config.rust_analyzer_enabled,
             config.max_rust_analyzer_files,
         );
-        Some(model::RepoContextIndex {
+        let mut index = model::RepoContextIndex {
+            task,
             cargo,
             rust,
             graph,
             rust_analyzer,
-        })
+            evidence: model::ContextEvidence::default(),
+        };
+        index.evidence =
+            context_evidence::build_context_evidence(workspace, &index, &relevant_files);
+        Some(index)
     } else {
         None
     };
-    let relevant_files =
-        relevance::find_relevant_files(workspace, user_message, config.max_relevant_files);
     let validation_plan =
         validation::build_validation_plan(&snapshot, rust_project.as_ref(), &relevant_files);
     let deterministic_pack = context_pack::build_context_pack(
@@ -121,6 +132,9 @@ pub(crate) async fn compile_preflight_note(
                     "relationships": index.graph.relationships.len(),
                     "ra_available": index.rust_analyzer.available,
                     "ra_files": index.rust_analyzer.files_enhanced,
+                    "snippets": index.evidence.snippets.len(),
+                    "test_targets": index.evidence.test_targets.len(),
+                    "build_commands": index.evidence.build_commands.len(),
                 })),
                 "pack_chars": final_pack.chars().count(),
                 "artifact_path": artifact.as_ref().map(|item| item.path.display().to_string()),
@@ -143,6 +157,10 @@ pub(crate) async fn compile_preflight_note(
         rust_analyzer = repo_index
             .as_ref()
             .map(|index| index.rust_analyzer.available)
+            .unwrap_or_default(),
+        snippets = repo_index
+            .as_ref()
+            .map(|index| index.evidence.snippets.len())
             .unwrap_or_default(),
         artifact_path = artifact
             .as_ref()
