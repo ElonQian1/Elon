@@ -13,6 +13,10 @@ mod impact_analysis_tests;
 mod impact_render;
 mod model;
 mod relevance;
+mod repo_map_tags;
+mod repo_map_tags_render;
+#[cfg(test)]
+mod repo_map_tags_tests;
 mod repo_snapshot;
 mod rust_analyzer;
 mod rust_analyzer_probe;

@@ -114,7 +114,29 @@ pub(crate) struct SymbolGraphSummary {
     pub(crate) ranked_files: Vec<RankedFile>,
     pub(crate) ranked_symbols: Vec<RankedSymbol>,
     pub(crate) relationships: Vec<CodeRelationship>,
+    pub(crate) repo_map_tags: RepoMapTagSummary,
     pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct RepoMapTagSummary {
+    pub(crate) definitions: usize,
+    pub(crate) references: usize,
+    pub(crate) edges: Vec<RepoMapTagEdge>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RepoMapTagEdge {
+    pub(crate) symbol: String,
+    pub(crate) target_symbol_id: String,
+    pub(crate) from_path: String,
+    pub(crate) to_path: String,
+    pub(crate) definition_line: usize,
+    pub(crate) reference_lines: Vec<usize>,
+    pub(crate) references: usize,
+    pub(crate) score: f64,
+    pub(crate) reason: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

@@ -9,6 +9,7 @@ use super::{
         CodeRelationship, RankedFile, RankedSymbol, RelationshipKind, RustIndex, RustSymbol,
         SymbolGraphSummary, SymbolKind, SymbolVisibility,
     },
+    repo_map_tags,
     repo_snapshot::{relative_path, source_role},
 };
 
@@ -29,7 +30,13 @@ pub(crate) fn build_symbol_graph(
     }
 
     let task_terms = extract_task_terms(user_message);
-    let relationships = collect_relationships(workspace, &rust.symbols, max_relationships);
+    let tag_index =
+        repo_map_tags::build_repo_map_tag_index(workspace, &rust.symbols, max_relationships);
+    let relationships = repo_map_tags::merge_relationships(
+        tag_index.relationships.clone(),
+        collect_relationships(workspace, &rust.symbols, max_relationships),
+        max_relationships,
+    );
     let file_rank = page_rank(&rust.symbols, &relationships);
     let ranked_symbols = rank_symbols(
         &rust.symbols,
@@ -44,7 +51,8 @@ pub(crate) fn build_symbol_graph(
         ranked_files,
         ranked_symbols,
         relationships,
-        warnings: Vec::new(),
+        repo_map_tags: tag_index.summary,
+        warnings: tag_index.warnings,
     }
 }
 

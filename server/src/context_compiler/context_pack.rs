@@ -1,7 +1,7 @@
 use super::{
     config::ContextCompilerConfig, context_pack_render, impact_render, model::RepoContextIndex,
-    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_analyzer_probe_render,
-    rust_project::RustProjectSummary, validation::ValidationPlan,
+    relevance::RelevantFile, repo_map_tags_render, repo_snapshot::RepoSnapshot,
+    rust_analyzer_probe_render, rust_project::RustProjectSummary, validation::ValidationPlan,
 };
 
 pub(crate) fn build_context_pack(
@@ -38,6 +38,10 @@ pub(crate) fn build_context_pack(
     context_pack_render::render_repo_snapshot(&mut out, snapshot);
     context_pack_render::render_rust_project(&mut out, rust_project);
     context_pack_render::render_repo_index(&mut out, repo_index);
+    repo_map_tags_render::render_repo_map_tags(
+        &mut out,
+        repo_index.map(|index| &index.graph.repo_map_tags),
+    );
     rust_analyzer_probe_render::render_rust_analyzer_probes(
         &mut out,
         repo_index.map(|index| &index.rust_analyzer.probes),
