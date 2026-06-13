@@ -1,10 +1,12 @@
 //! Shared Markdown discovery for project documentation surfaces.
 use anyhow::{anyhow, Result};
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentsSnapshot};
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
     fs,
     path::{Path as FsPath, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::project_default_docs::default_project_documents;
@@ -37,14 +39,15 @@ const DOC_DIRS: &[(&str, usize, usize)] = &[
 pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDocumentsSnapshot> {
     let workspace_path = workspace.to_string_lossy().to_string();
     if !workspace.is_dir() {
-        return Ok(ProjectDocumentsSnapshot {
+        return Ok(build_snapshot(
             workspace_path,
-            documents: default_project_documents(),
-            warnings: vec![
+            "platform_default",
+            default_project_documents(),
+            vec![
                 "项目工作区不存在或服务器当前不可读取。".to_string(),
                 "已加载平台默认项目文档，项目工作区可用后会优先显示同名仓库文档。".to_string(),
             ],
-        });
+        ));
     }
 
     let mut warnings = Vec::new();
@@ -71,12 +74,9 @@ pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDoc
     }
 
     append_default_documents(&mut documents, &mut warnings);
+    let source = snapshot_source(&documents);
 
-    Ok(ProjectDocumentsSnapshot {
-        workspace_path,
-        documents,
-        warnings,
-    })
+    Ok(build_snapshot(workspace_path, source, documents, warnings))
 }
 
 fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) -> Vec<PathBuf> {
@@ -212,9 +212,75 @@ fn read_document_snapshot(
             content,
             truncated,
             byte_len: raw.len() as u64,
+            source: "workspace".to_string(),
         },
         used_chars,
     ))
+}
+
+pub(crate) fn build_snapshot(
+    workspace_path: String,
+    source: &str,
+    documents: Vec<ProjectDocumentEntry>,
+    warnings: Vec<String>,
+) -> ProjectDocumentsSnapshot {
+    let revision = compute_revision(source, &workspace_path, &documents, &warnings);
+    ProjectDocumentsSnapshot {
+        workspace_path,
+        revision,
+        source: source.to_string(),
+        generated_at_ms: now_millis(),
+        documents,
+        warnings,
+    }
+}
+
+fn snapshot_source(documents: &[ProjectDocumentEntry]) -> &'static str {
+    let has_workspace = documents.iter().any(|doc| doc.source == "workspace");
+    let has_default = documents.iter().any(|doc| doc.source == "platform_default");
+    match (has_workspace, has_default) {
+        (true, true) => "workspace_with_defaults",
+        (true, false) => "workspace",
+        (false, true) => "platform_default",
+        (false, false) => "empty",
+    }
+}
+
+fn compute_revision(
+    source: &str,
+    workspace_path: &str,
+    documents: &[ProjectDocumentEntry],
+    warnings: &[String],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(source.as_bytes());
+    hasher.update([0]);
+    hasher.update(workspace_path.as_bytes());
+    hasher.update([0]);
+    for doc in documents {
+        hasher.update(doc.path.as_bytes());
+        hasher.update([0]);
+        hasher.update(doc.title.as_bytes());
+        hasher.update([0]);
+        hasher.update(doc.source.as_bytes());
+        hasher.update([0]);
+        hasher.update(doc.byte_len.to_le_bytes());
+        hasher.update([doc.truncated as u8]);
+        hasher.update(doc.content.as_bytes());
+        hasher.update([0]);
+    }
+    for warning in warnings {
+        hasher.update(warning.as_bytes());
+        hasher.update([0]);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or_default()
 }
 
 fn markdown_title(content: &str) -> Option<String> {
@@ -315,6 +381,8 @@ mod tests {
         assert!(paths.contains(&".github/instructions/git.instructions.md"));
         assert!(paths.contains(&"docs/guide.md"));
         assert!(paths.contains(&".github/copilot-instructions.md"));
+        assert!(!snapshot.revision.is_empty());
+        assert_eq!(snapshot.source, "workspace_with_defaults");
     }
 
     #[test]
@@ -350,5 +418,26 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("默认项目文档")));
+        assert!(!snapshot.revision.is_empty());
+        assert_eq!(snapshot.source, "platform_default");
+    }
+
+    #[test]
+    fn project_docs_revision_changes_when_content_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-project-docs-revision-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("AGENTS.md"), "# Agent Rules\none").unwrap();
+        let first = collect_project_documents(&root).unwrap();
+        fs::write(root.join("AGENTS.md"), "# Agent Rules\ntwo").unwrap();
+        let second = collect_project_documents(&root).unwrap();
+        let _ = fs::remove_dir_all(&root);
+
+        assert_ne!(first.revision, second.revision);
     }
 }

@@ -1,8 +1,14 @@
 {
   "schema_version": 1,
-  "template_version": "2026-06-13.1",
+  "template_version": "2026-06-13.2",
   "authority": ".github/copilot-instructions.md",
   "strategy": "copilot-primary-bridged-agents",
+  "update_policy": {
+    "seed_missing_files": true,
+    "overwrite_existing_files": false,
+    "user_edits_win": true,
+    "manual_upgrade_recommended": true
+  },
   "documents": [
     {
       "path": "AGENTS.md",
@@ -11,6 +17,10 @@
     {
       "path": ".github/copilot-instructions.md",
       "role": "authority"
+    },
+    {
+      "path": ".elon/default-docs.json",
+      "role": "manifest"
     },
     {
       "path": "CODEX.md",

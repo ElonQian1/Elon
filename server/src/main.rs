@@ -76,6 +76,7 @@ mod project_deletion;
 mod project_docs;
 mod project_docs_channel;
 mod project_docs_scan;
+mod project_docs_snapshot;
 mod project_downloads;
 mod project_events;
 mod project_execution_mode;

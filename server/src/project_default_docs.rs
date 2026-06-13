@@ -118,6 +118,7 @@ pub(crate) fn default_project_documents() -> Vec<ProjectDocumentEntry> {
             content: doc.content.trim().to_string(),
             truncated: false,
             byte_len: doc.content.trim().len() as u64,
+            source: "platform_default".to_string(),
         })
         .collect()
 }
@@ -142,7 +143,19 @@ pub(crate) fn ensure_default_docs_in_workspace(workspace: &Path) -> Result<usize
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+    use std::collections::HashSet;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[derive(Deserialize)]
+    struct DefaultDocsManifest {
+        documents: Vec<DefaultDocsManifestDocument>,
+    }
+
+    #[derive(Deserialize)]
+    struct DefaultDocsManifestDocument {
+        path: String,
+    }
 
     #[test]
     fn default_docs_seed_missing_files_without_overwriting_user_docs() {
@@ -169,5 +182,25 @@ mod tests {
         assert!(codex.contains(".github/copilot-instructions.md"));
         assert!(copilot.contains("共享规则权威来源"));
         assert!(metadata.contains("copilot-primary-bridged-agents"));
+    }
+
+    #[test]
+    fn default_docs_manifest_matches_seeded_files() {
+        let manifest: DefaultDocsManifest = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/elon/default-docs.json"
+        )))
+        .unwrap();
+        let manifest_paths = manifest
+            .documents
+            .into_iter()
+            .map(|doc| doc.path)
+            .collect::<HashSet<_>>();
+        let seeded_paths = DEFAULT_PROJECT_FILES
+            .iter()
+            .map(|doc| doc.path.to_string())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(manifest_paths, seeded_paths);
     }
 }

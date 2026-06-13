@@ -11,18 +11,17 @@ internal data class ProjectSpaceDocument(
     val relativePath: String,
     val content: String,
     val sizeBytes: Long,
-    val truncated: Boolean
+    val truncated: Boolean,
+    val source: String
 )
 
 internal data class ProjectSpaceDocumentBundle(
     val documents: List<ProjectSpaceDocument>,
-    val warnings: List<String>
-)
-
-private data class DefaultProjectDocumentAsset(
-    val title: String,
-    val relativePath: String,
-    val assetPath: String
+    val warnings: List<String>,
+    val revision: String,
+    val source: String,
+    val generatedAtMs: Long,
+    val fromCache: Boolean
 )
 
 internal fun fetchProjectSpaceDocuments(
@@ -30,17 +29,31 @@ internal fun fetchProjectSpaceDocuments(
     serverUrl: String,
     context: Context,
     projectId: String,
-    route: ProjectSpaceRoute = ProjectSpaceRoute()
+    route: ProjectSpaceRoute = ProjectSpaceRoute(),
+    forceRefresh: Boolean = false
 ): ProjectSpaceDocumentBundle {
+    val cached = cachedProjectSpaceDocuments(context, projectId)
     val result = runCatching {
+        val builder = Request.Builder()
+            .url(projectSpaceUrl(serverUrl, projectId, route, "docs"))
+            .get()
+        if (!forceRefresh) {
+            cached?.revision
+                ?.takeIf { it.isNotBlank() }
+                ?.let { builder.header("If-None-Match", "\"$it\"") }
+        }
         val request = AuthManager.applyAuth(
             context,
-            Request.Builder()
-                .url(projectSpaceUrl(serverUrl, projectId, route, "docs"))
-                .get()
+            builder
         ).build()
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
+            if (response.code == 304 && cached != null) {
+                return@use cached.copy(
+                    warnings = listOf("服务器文档 revision 未变化，显示 APK 缓存。") + cached.warnings,
+                    fromCache = true
+                )
+            }
             if (!response.isSuccessful) error(readProjectDocumentError(body, "读取项目文档失败"))
             val bundle = parseProjectSpaceDocuments(context, body)
             cacheProjectSpaceDocuments(context, projectId, body)
@@ -48,8 +61,11 @@ internal fun fetchProjectSpaceDocuments(
         }
     }
     return result.getOrElse { error ->
-        cachedProjectSpaceDocuments(context, projectId)?.let { cached ->
-            cached.copy(warnings = listOf("服务器暂不可用，显示 APK 缓存的项目文档。") + cached.warnings)
+        cached?.let { cachedBundle ->
+            cachedBundle.copy(
+                warnings = listOf("服务器暂不可用，显示 APK 缓存的项目文档。") + cachedBundle.warnings,
+                fromCache = true
+            )
         } ?: defaultProjectSpaceDocuments(
             context,
             listOf(error.message ?: "服务器暂不可用，显示 APK 内置默认项目文档。")
@@ -82,7 +98,14 @@ private fun parseProjectSpaceDocuments(context: Context, body: String): ProjectS
     }
     val warnings = root.optJSONArray("warnings").toStringList()
     return if (documents.isNotEmpty()) {
-        ProjectSpaceDocumentBundle(documents, warnings)
+        ProjectSpaceDocumentBundle(
+            documents = documents,
+            warnings = warnings,
+            revision = root.optString("revision", ""),
+            source = root.optString("source", ""),
+            generatedAtMs = root.optLong("generated_at_ms", 0L),
+            fromCache = false
+        )
     } else {
         defaultProjectSpaceDocuments(
             context,
@@ -97,7 +120,8 @@ private fun parseProjectSpaceDocument(doc: JSONObject): ProjectSpaceDocument {
         relativePath = doc.optString("path", doc.optString("title", "项目文档")),
         content = doc.optString("content", ""),
         sizeBytes = doc.optLong("size_bytes", doc.optLong("byte_len", 0L)),
-        truncated = doc.optBoolean("truncated", false)
+        truncated = doc.optBoolean("truncated", false),
+        source = doc.optString("source", "")
     )
 }
 
@@ -115,7 +139,7 @@ private fun cachedProjectSpaceDocuments(
     val body = context.getSharedPreferences(PROJECT_DOCS_CACHE, Context.MODE_PRIVATE)
         .getString(projectId, null)
         ?: return null
-    return runCatching { parseProjectSpaceDocuments(context, body) }.getOrNull()
+    return runCatching { parseProjectSpaceDocuments(context, body).copy(fromCache = true) }.getOrNull()
 }
 
 private fun JSONArray?.toStringList(): List<String> {
@@ -139,31 +163,42 @@ private fun defaultProjectSpaceDocuments(
     warnings: List<String> = emptyList()
 ): ProjectSpaceDocumentBundle {
     val fallbackWarnings = warnings.toMutableList()
-    val documents = DEFAULT_PROJECT_DOCUMENT_ASSETS.mapNotNull { asset ->
+    val manifest = readDefaultDocsManifest(context, fallbackWarnings)
+    val documents = manifest.documentPaths.mapNotNull { relativePath ->
+        if (!relativePath.endsWith(".md", ignoreCase = true)) return@mapNotNull null
+        val assetPath = defaultDocAssetPath(relativePath)
         runCatching {
-            context.assets.open(asset.assetPath).bufferedReader(Charsets.UTF_8).use { reader ->
+            context.assets.open(assetPath).bufferedReader(Charsets.UTF_8).use { reader ->
                 reader.readText().trim()
             }
         }.fold(
             onSuccess = { content ->
                 ProjectSpaceDocument(
-                    title = asset.title,
-                    relativePath = asset.relativePath,
+                    title = markdownTitle(content) ?: relativePath.substringAfterLast('/'),
+                    relativePath = relativePath,
                     content = content,
                     sizeBytes = content.toByteArray(Charsets.UTF_8).size.toLong(),
-                    truncated = false
+                    truncated = false,
+                    source = "apk_default"
                 )
             },
             onFailure = { error ->
                 fallbackWarnings.add(
-                    "APK 内置文档资源 ${asset.assetPath} 不可读取：${error.message ?: "未知错误"}"
+                    "APK 内置文档资源 $assetPath 不可读取：${error.message ?: "未知错误"}"
                 )
                 null
             }
         )
     }
     if (documents.isNotEmpty()) {
-        return ProjectSpaceDocumentBundle(documents = documents, warnings = fallbackWarnings)
+        return ProjectSpaceDocumentBundle(
+            documents = documents,
+            warnings = fallbackWarnings,
+            revision = "apk-default-${manifest.templateVersion}",
+            source = "apk_default",
+            generatedAtMs = System.currentTimeMillis(),
+            fromCache = false
+        )
     }
 
     fallbackWarnings.add("APK 内置文档资源缺失，显示最小项目文档。")
@@ -178,69 +213,73 @@ private fun defaultProjectSpaceDocuments(
                     请读取 `.github/copilot-instructions.md` 作为共享规则权威来源。
                 """.trimIndent(),
                 sizeBytes = 0L,
-                truncated = false
+                truncated = false,
+                source = "apk_default"
             )
         ),
-        warnings = fallbackWarnings
+        warnings = fallbackWarnings,
+        revision = "apk-default-minimal",
+        source = "apk_default",
+        generatedAtMs = System.currentTimeMillis(),
+        fromCache = false
     )
 }
 
-private val DEFAULT_PROJECT_DOCUMENT_ASSETS = listOf(
-    DefaultProjectDocumentAsset(
-        title = "项目 AI 工作入口",
-        relativePath = "AGENTS.md",
-        assetPath = "files/AGENTS.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Copilot 共享项目指令",
-        relativePath = ".github/copilot-instructions.md",
-        assetPath = "files/github/copilot-instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Codex 桥接说明",
-        relativePath = "CODEX.md",
-        assetPath = "files/CODEX.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Claude 桥接说明",
-        relativePath = "CLAUDE.md",
-        assetPath = "files/CLAUDE.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Gemini 桥接说明",
-        relativePath = "GEMINI.md",
-        assetPath = "files/GEMINI.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "项目开发流程",
-        relativePath = ".github/instructions/project-workflow.instructions.md",
-        assetPath = "files/github/instructions/project-workflow.instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Git 与发布流程",
-        relativePath = ".github/instructions/git-workflow.instructions.md",
-        assetPath = "files/github/instructions/git-workflow.instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "Android 与 APK 任务",
-        relativePath = ".github/instructions/android.instructions.md",
-        assetPath = "files/github/instructions/android.instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "UI 与交互任务",
-        relativePath = ".github/instructions/ui.instructions.md",
-        assetPath = "files/github/instructions/ui.instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "后端与 API 任务",
-        relativePath = ".github/instructions/backend.instructions.md",
-        assetPath = "files/github/instructions/backend.instructions.md"
-    ),
-    DefaultProjectDocumentAsset(
-        title = "项目说明",
-        relativePath = "docs/project-readme.md",
-        assetPath = "files/docs/project-readme.md"
-    )
+private data class DefaultDocsManifest(
+    val templateVersion: String,
+    val documentPaths: List<String>
 )
 
+private fun readDefaultDocsManifest(
+    context: Context,
+    warnings: MutableList<String>
+): DefaultDocsManifest {
+    val fallback = DefaultDocsManifest(
+        templateVersion = "bundled",
+        documentPaths = listOf("AGENTS.md")
+    )
+    return runCatching {
+        val raw = context.assets.open(DEFAULT_DOCS_MANIFEST_ASSET)
+            .bufferedReader(Charsets.UTF_8)
+            .use { it.readText() }
+        val root = JSONObject(raw)
+        val paths = mutableListOf<String>()
+        root.optJSONArray("documents")?.let { array ->
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)
+                    ?.optString("path")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(paths::add)
+            }
+        }
+        DefaultDocsManifest(
+            templateVersion = root.optString("template_version", "bundled"),
+            documentPaths = paths.ifEmpty { fallback.documentPaths }
+        )
+    }.getOrElse { error ->
+        warnings.add("APK 内置默认文档 manifest 不可读取：${error.message ?: "未知错误"}")
+        fallback
+    }
+}
+
+private fun defaultDocAssetPath(relativePath: String): String {
+    val normalized = relativePath.replace('\\', '/').trimStart('/')
+    val assetRelative = when {
+        normalized.startsWith(".github/") -> "github/" + normalized.removePrefix(".github/")
+        normalized.startsWith(".elon/") -> "elon/" + normalized.removePrefix(".elon/")
+        else -> normalized
+    }
+    return "files/$assetRelative"
+}
+
+private fun markdownTitle(content: String): String? {
+    return content.lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("# ") && it.length > 2 }
+        ?.removePrefix("# ")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+}
+
+private const val DEFAULT_DOCS_MANIFEST_ASSET = "files/elon/default-docs.json"
 private const val PROJECT_DOCS_CACHE = "project_space_docs_cache"

@@ -135,11 +135,19 @@ pub struct ProjectDocumentEntry {
     pub content: String,
     pub truncated: bool,
     pub byte_len: u64,
+    #[serde(default)]
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDocumentsSnapshot {
     pub workspace_path: String,
+    #[serde(default)]
+    pub revision: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub generated_at_ms: u64,
     #[serde(default)]
     pub documents: Vec<ProjectDocumentEntry>,
     #[serde(default)]

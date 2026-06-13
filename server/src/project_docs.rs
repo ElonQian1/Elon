@@ -2,17 +2,20 @@
 use anyhow::anyhow;
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{
+        header::{ETAG, IF_NONE_MATCH},
+        HeaderMap, HeaderValue, StatusCode,
+    },
     response::{IntoResponse, Response},
     Json,
 };
 use homecli_proto::ProjectDocumentEntry;
 use serde::Serialize;
-use std::{collections::HashMap, path::Path as FsPath, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
-    project_docs_scan::collect_project_documents,
+    project_docs_snapshot::load_project_documents_snapshot,
     project_mobile::ensure_mobile_project,
     store::ProjectAccess,
     types::AppState,
@@ -25,6 +28,7 @@ struct ProjectDocument {
     content: String,
     size_bytes: u64,
     truncated: bool,
+    source: String,
 }
 
 impl From<ProjectDocumentEntry> for ProjectDocument {
@@ -35,6 +39,7 @@ impl From<ProjectDocumentEntry> for ProjectDocument {
             content: entry.content,
             size_bytes: entry.byte_len,
             truncated: entry.truncated,
+            source: entry.source,
         }
     }
 }
@@ -52,7 +57,7 @@ pub async fn get_project_document(
         Ok(access) => access,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
-    project_document_response(state, access)
+    project_document_response(state, headers, access).await
 }
 
 pub async fn get_user_project_document(
@@ -71,21 +76,39 @@ pub async fn get_user_project_document(
         Ok(access) => access,
         Err(response) => return response,
     };
-    project_document_response(state, access)
+    project_document_response(state, headers, access).await
 }
 
-fn project_document_response(state: Arc<AppState>, access: ProjectAccess) -> Response {
-    let workspace =
-        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
-    match load_project_documents(&workspace) {
-        Ok((workspace_path, document, documents, warnings)) => Json(serde_json::json!({
+async fn project_document_response(
+    state: Arc<AppState>,
+    headers: HeaderMap,
+    access: ProjectAccess,
+) -> Response {
+    match load_project_documents(&state, &access).await {
+        Ok((workspace_path, revision, source, generated_at_ms, document, documents, warnings)) => {
+            if etag_matches(&headers, &revision) {
+                let mut response = StatusCode::NOT_MODIFIED.into_response();
+                if let Ok(value) = HeaderValue::from_str(&format!("\"{revision}\"")) {
+                    response.headers_mut().insert(ETAG, value);
+                }
+                return response;
+            }
+            let mut response = Json(serde_json::json!({
             "project_id": access.id,
             "workspace": workspace_path,
+            "revision": revision.clone(),
+            "source": source,
+            "generated_at_ms": generated_at_ms,
             "document": document,
             "documents": documents,
             "warnings": warnings,
-        }))
-        .into_response(),
+            }))
+            .into_response();
+            if let Ok(value) = HeaderValue::from_str(&format!("\"{revision}\"")) {
+                response.headers_mut().insert(ETAG, value);
+            }
+            response
+        }
         Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
     }
 }
@@ -115,10 +138,19 @@ fn ensure_user_project_for_document(
         .map_err(|e| json_error(StatusCode::BAD_REQUEST, e.to_string()))
 }
 
-fn load_project_documents(
-    workspace: &FsPath,
-) -> anyhow::Result<(String, ProjectDocument, Vec<ProjectDocument>, Vec<String>)> {
-    let snapshot = collect_project_documents(workspace)?;
+async fn load_project_documents(
+    state: &AppState,
+    access: &ProjectAccess,
+) -> anyhow::Result<(
+    String,
+    String,
+    String,
+    u64,
+    ProjectDocument,
+    Vec<ProjectDocument>,
+    Vec<String>,
+)> {
+    let snapshot = load_project_documents_snapshot(state, access).await;
     let documents = snapshot
         .documents
         .into_iter()
@@ -130,8 +162,27 @@ fn load_project_documents(
         .ok_or_else(|| anyhow!("未找到可展示的项目文档"))?;
     Ok((
         snapshot.workspace_path,
+        snapshot.revision,
+        snapshot.source,
+        snapshot.generated_at_ms,
         document,
         documents,
         snapshot.warnings,
     ))
+}
+
+fn etag_matches(headers: &HeaderMap, revision: &str) -> bool {
+    if revision.is_empty() {
+        return false;
+    }
+    headers
+        .get(IF_NONE_MATCH)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| {
+            value
+                .split(',')
+                .map(|part| part.trim().trim_matches('"'))
+                .any(|etag| etag == revision || etag == "*")
+        })
+        .unwrap_or(false)
 }

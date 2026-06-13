@@ -1,10 +1,10 @@
 //! Server-side adapter for the fixed project documentation channel.
 use chrono::Utc;
-use homecli_proto::{AgentToServer, ProjectDocumentEntry, ProjectDocumentsSnapshot};
-use std::{path::Path, sync::Arc};
+use homecli_proto::{ProjectDocumentEntry, ProjectDocumentsSnapshot};
+use std::sync::Arc;
 
 use crate::{
-    project_docs_scan::collect_project_documents,
+    project_docs_snapshot::load_project_documents_snapshot,
     store::{ProjectAccess, ProjectChannelMessage},
     types::AppState,
 };
@@ -15,61 +15,8 @@ pub(crate) async fn load_project_doc_messages(
     project: &ProjectAccess,
     channel_id: &str,
 ) -> Vec<ProjectChannelMessage> {
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    let snapshot = read_project_documents(&state, project, &workspace).await;
+    let snapshot = load_project_documents_snapshot(&state, project).await;
     snapshot_to_messages(&project.id, channel_id, user_id, snapshot)
-}
-
-async fn read_project_documents(
-    state: &AppState,
-    project: &ProjectAccess,
-    workspace: &Path,
-) -> ProjectDocumentsSnapshot {
-    if let (Some(node_id), Some(workspace_path)) = (
-        project
-            .node_id
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-        project
-            .workspace_path
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-    ) {
-        match state
-            .agent_manager
-            .dispatch_project_documents_read(node_id, workspace_path.to_string())
-            .await
-        {
-            Ok(AgentToServer::ProjectDocumentsRead { snapshot, .. }) => return snapshot,
-            Ok(AgentToServer::ProjectDocumentsReadError { message, .. }) => {
-                return fallback_snapshot(workspace, format!("PC 节点读取文档失败：{message}"));
-            }
-            Ok(other) => {
-                return fallback_snapshot(workspace, format!("PC 节点返回了非文档响应：{other:?}"));
-            }
-            Err(error) => {
-                return fallback_snapshot(workspace, format!("PC 节点暂不可读取文档：{error}"));
-            }
-        }
-    }
-
-    collect_project_documents(workspace).unwrap_or_else(|error| ProjectDocumentsSnapshot {
-        workspace_path: workspace.to_string_lossy().to_string(),
-        documents: Vec::new(),
-        warnings: vec![format!("读取项目文档失败：{error}")],
-    })
-}
-
-fn fallback_snapshot(workspace: &Path, warning: String) -> ProjectDocumentsSnapshot {
-    let mut snapshot =
-        collect_project_documents(workspace).unwrap_or_else(|error| ProjectDocumentsSnapshot {
-            workspace_path: workspace.to_string_lossy().to_string(),
-            documents: Vec::new(),
-            warnings: vec![format!("服务器本地读取也失败：{error}")],
-        });
-    snapshot.warnings.insert(0, warning);
-    snapshot
 }
 
 fn snapshot_to_messages(
@@ -128,8 +75,8 @@ fn synthetic_message(
 
 fn format_summary(snapshot: &ProjectDocumentsSnapshot) -> String {
     let mut text = format!(
-        "# 项目文档频道\n\n工作区：`{}`\n\n这里固定汇总当前项目内的 AI 代理入口、说明文档、GitHub Copilot 指令、按需加载指令和 docs Markdown。AI 开发前也会优先读取这些项目文档。",
-        snapshot.workspace_path
+        "# 项目文档频道\n\n工作区：`{}`\n\n来源：`{}`\n\nRevision：`{}`\n\n这里固定汇总当前项目内的 AI 代理入口、说明文档、GitHub Copilot 指令、按需加载指令和 docs Markdown。AI 开发前也会优先读取这些项目文档。",
+        snapshot.workspace_path, snapshot.source, snapshot.revision
     );
     if !snapshot.warnings.is_empty() {
         text.push_str("\n\n## 注意\n");
