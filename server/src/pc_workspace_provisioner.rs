@@ -1,15 +1,15 @@
 use anyhow::{anyhow, Context, Result};
+use elon_pc_dev_runtime::{
+    ensure_project_git_baseline, ensure_project_scaffold, safe_path_part, workspace_root,
+    ProjectGitBaselineRequest, ProjectScaffoldRequest,
+};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::pc_workspace_git_remote::{
-    clean_git_branch, clean_git_remote, ensure_git_remote_workspace, ensure_git_repo,
-    git_remote_origin,
+    clean_git_branch, clean_git_remote, ensure_git_remote_workspace, git_remote_origin,
 };
 use crate::project_default_docs::ensure_default_docs_in_workspace;
-use elon_pc_dev_runtime::{
-    ensure_project_scaffold, safe_path_part, workspace_root, ProjectScaffoldRequest,
-};
 
 pub struct ProjectWorkspaceRequest {
     pub project_id: String,
@@ -53,7 +53,13 @@ pub fn provision_project_workspace(req: ProjectWorkspaceRequest) -> Result<Proje
         std::fs::create_dir_all(&repo)
             .with_context(|| format!("failed to create workspace directory {}", repo.display()))?;
         ensure_seed_files(&repo, &req)?;
-        ensure_git_repo(&repo, clean_git_branch(req.branch.as_deref()).as_deref())?;
+        let branch = clean_git_branch(req.branch.as_deref());
+        ensure_project_git_baseline(
+            &repo,
+            &ProjectGitBaselineRequest {
+                branch: branch.as_deref(),
+            },
+        )?;
     }
 
     Ok(ProjectWorkspaceResult {

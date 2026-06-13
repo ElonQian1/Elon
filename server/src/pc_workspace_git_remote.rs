@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use elon_pc_dev_runtime::{ensure_project_git_baseline, ProjectGitBaselineRequest};
 use std::path::Path;
 use std::process::Command;
 
@@ -59,7 +60,12 @@ where
     let needs_seed_commit = !git_has_head(repo);
     if needs_seed_commit {
         seed_files(repo)?;
-        ensure_git_repo(repo, remote.branch.as_deref())?;
+        ensure_project_git_baseline(
+            repo,
+            &ProjectGitBaselineRequest {
+                branch: remote.branch.as_deref(),
+            },
+        )?;
         if let Some(branch) = current_branch(repo).or_else(|| remote.branch.clone()) {
             run_git_dynamic(repo, &["push", "-u", "origin", &branch]).with_context(|| {
                 format!(
@@ -70,35 +76,6 @@ where
         }
     }
 
-    Ok(())
-}
-
-pub(crate) fn ensure_git_repo(repo: &Path, branch: Option<&str>) -> Result<()> {
-    if !repo.join(".git").exists() {
-        run_git(repo, ["init"])?;
-    }
-
-    if let Some(branch) = branch {
-        if git_has_head(repo) {
-            if current_branch(repo).as_deref() != Some(branch) {
-                if local_branch_exists(repo, branch) {
-                    run_git_dynamic(repo, &["checkout", branch])?;
-                } else {
-                    run_git_dynamic(repo, &["checkout", "-b", branch])?;
-                }
-            }
-        } else {
-            run_git_dynamic(repo, &["checkout", "-B", branch])?;
-        }
-    }
-
-    let _ = run_git(repo, ["config", "user.name", "Elon PC Node"]);
-    let _ = run_git(repo, ["config", "user.email", "node@elon.local"]);
-    run_git(repo, ["add", "."])?;
-    let _ = run_git(
-        repo,
-        ["commit", "-m", "chore: initialize pc managed project"],
-    );
     Ok(())
 }
 
@@ -243,10 +220,6 @@ fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn run_git<const N: usize>(repo: &Path, args: [&str; N]) -> Result<()> {
-    run_git_dynamic(repo, &args)
 }
 
 fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
