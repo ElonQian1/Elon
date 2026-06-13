@@ -1,3 +1,4 @@
+use crate::project_commands::ensure_project_command_files;
 use crate::project_environment::ensure_project_environment_files;
 use crate::project_workflow::ensure_project_workflow_files;
 use serde_json::json;
@@ -26,6 +27,7 @@ pub fn ensure_project_scaffold(repo: &Path, req: &ProjectScaffoldRequest<'_>) ->
     ensure_file(repo.join(".elon").join("project.json"), || {
         project_json(req)
     })?;
+    ensure_project_command_files(repo, req)?;
     ensure_project_environment_files(repo, req)?;
     ensure_project_workflow_files(repo, req)?;
     if req.template.eq_ignore_ascii_case("android") {
@@ -151,6 +153,7 @@ mod tests {
         assert!(root.join(".gitattributes").exists());
         assert!(root.join(".env.example").exists());
         assert!(root.join("docs").join("dev-environment.md").exists());
+        assert!(root.join("scripts").join("elon.ps1").exists());
         assert!(root.join("scripts").join("elon-dev-check.ps1").exists());
         assert!(root.join("scripts").join("elon-new-task.ps1").exists());
         assert!(root.join(".elon").join("project.json").exists());

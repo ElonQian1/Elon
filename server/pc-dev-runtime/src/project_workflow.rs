@@ -26,14 +26,14 @@ fn ensure_file(path: PathBuf, content: impl FnOnce() -> io::Result<String>) -> i
 }
 
 fn new_task_script() -> io::Result<String> {
-    Ok(r#"$ErrorActionPreference = 'Stop'
-
-param(
+    Ok(r#"param(
     [Parameter(Mandatory = $true)]
     [string]$Name,
 
     [string]$Base = ''
 )
+
+$ErrorActionPreference = 'Stop'
 
 function Invoke-Git {
     param(

@@ -1,5 +1,6 @@
 mod paths;
 mod profile;
+mod project_commands;
 mod project_environment;
 mod project_git;
 mod project_scaffold;
