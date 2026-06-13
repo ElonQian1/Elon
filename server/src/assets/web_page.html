@@ -418,6 +418,54 @@
       gap: 12px;
       align-items: center;
     }
+    #projectProgressPanel .project-space-summary {
+      display: none;
+    }
+    .project-space-quick-actions {
+      display: flex;
+      justify-content: center;
+      padding: 70px 0 48px;
+      background: var(--bg);
+    }
+    .project-space-action-pill {
+      height: 56px;
+      border: 1px solid var(--ink-soft);
+      border-radius: 28px;
+      background: transparent;
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      overflow: hidden;
+    }
+    .project-space-download-segment,
+    .project-space-docs-segment {
+      height: 100%;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .project-space-download-segment {
+      width: 122px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .project-space-docs-segment {
+      width: 56px;
+      border-left: 1px solid var(--ink-soft);
+    }
+    .project-space-docs-segment svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      fill: none;
+    }
     .project-space-title {
       min-width: 0;
     }
@@ -493,23 +541,29 @@
     }
     .project-space-feed {
       position: relative;
-      padding: 28px 0 0;
+      padding: 6px 0 0;
       background: var(--bg);
     }
     .project-space-announcement {
       background: var(--project-space-info-bg);
       border-radius: 18px 18px 0 0;
       margin: 0;
-      padding: 12px 20px 24px;
+      padding: 20px 20px 42px;
       color: var(--project-space-info-ink);
+      cursor: pointer;
     }
     .project-space-post-area {
       position: relative;
       min-height: 464px;
       background: var(--bg);
       border-radius: 18px 18px 0 0;
-      margin-top: -8px;
+      margin-top: -70px;
       padding: 0 0 34px;
+      transition: margin-top 220ms ease;
+      will-change: margin-top;
+    }
+    .project-space-feed.announcement-expanded .project-space-post-area {
+      margin-top: 0;
     }
     .project-space-post-card {
       background: var(--panel);
@@ -667,6 +721,10 @@
       flex-direction: column;
       gap: 14px;
       z-index: 20;
+    }
+    .project-space-feed-actions.hidden,
+    .project-space-feed-actions .project-space-fab:first-child {
+      display: none;
     }
     .project-space-fab {
       width: 64px;
@@ -1739,6 +1797,16 @@
     <div id="projectPage" class="page project-page">
       <div id="projectHomeRoot" class="project-home-root" aria-live="polite"></div>
       <div id="projectProgressPanel" class="project-progress-panel hidden" aria-hidden="true">
+        <div class="project-space-quick-actions" id="projectSpaceQuickActions">
+          <div class="project-space-action-pill" aria-label="项目快捷入口">
+            <button class="project-space-download-segment" id="projectSpaceDownloadBtn" type="button">下载APK</button>
+            <button class="project-space-docs-segment" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
+              <svg viewBox="0 0 28 28" aria-hidden="true">
+                <path d="M8 9H20M8 14H20M8 19H20"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
         <div class="project-space-summary" id="projectSpaceSummary">
           <div class="project-space-heading">
             <div class="project-space-icon" id="projectSpaceIcon" aria-hidden="true">项</div>
@@ -1759,7 +1827,7 @@
               <div class="project-space-feed-empty">正在加载帖子...</div>
             </div>
             <div class="project-space-feed-actions">
-              <button class="project-space-fab" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
+              <button class="project-space-fab" id="projectSpaceDocsLegacyBtn" title="项目文档" type="button" aria-label="项目文档">
                 <img class="project-space-doc-icon" src="data:image/png;base64,__PROJECT_DOCUMENT_ICON_PNG_B64__" alt="" aria-hidden="true" />
               </button>
               <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">+</button>
@@ -2321,8 +2389,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectSpaceName = $('projectSpaceName');
   const projectSpaceMeta = $('projectSpaceMeta');
   const projectIntroCard = $('projectIntroCard');
+  const projectSpaceFeed = $('projectSpaceFeed');
   const projectSpaceAnnouncement = $('projectSpaceAnnouncement');
   const projectSpacePostList = $('projectSpacePostList');
+  const projectSpaceDownloadBtn = $('projectSpaceDownloadBtn');
   const projectSpaceDocsBtn = $('projectSpaceDocsBtn');
   const projectSpacePostBtn = $('projectSpacePostBtn');
   const projectWorkspaceHealth = $('projectWorkspaceHealth');
@@ -2354,6 +2424,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   if (projectIntroCard) {
     projectIntroCard.addEventListener('click', editProjectDescription);
   }
+  if (projectSpaceDownloadBtn) {
+    projectSpaceDownloadBtn.addEventListener('click', () => {
+      const url = String(
+        currentProjectSpaceLatestApkUrl ||
+        (currentProject && (currentProject.latest_apk_url || currentProject.latestApkUrl)) ||
+        ''
+      ).trim();
+      if (url) {
+        window.open(url, '_blank', 'noopener');
+      } else {
+        showNativeOnly('暂无可下载 APK');
+      }
+    });
+  }
   if (projectSpaceDocsBtn) {
     projectSpaceDocsBtn.addEventListener('click', () => {
       openProjectDocumentDialog(currentProject);
@@ -2374,15 +2458,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     });
   }
   let projectSpaceAiMenuMotionTimer = 0;
+  function syncProjectSpacePostEntry() {
+    const actions = document.querySelector('.project-space-feed-actions');
+    if (!actions || !projectSpaceAiMenu) return;
+    const shouldShow = !projectSpaceAiMenu.classList.contains('hidden') &&
+      projectSpaceAiMenu.classList.contains('compact');
+    actions.classList.toggle('hidden', !shouldShow);
+  }
   function syncProjectSpaceAiMenuMotion() {
     if (!projectPage || !projectSpaceAiMenu) return;
     const shouldCompact = projectPage.scrollTop > 4;
-    if (projectSpaceAiMenu.classList.contains('compact') === shouldCompact) return;
+    if (projectSpaceAiMenu.classList.contains('compact') === shouldCompact) {
+      syncProjectSpacePostEntry();
+      return;
+    }
     projectSpaceAiMenu.classList.add('animating');
     projectSpaceAiMenu.classList.toggle('compact', shouldCompact);
+    syncProjectSpacePostEntry();
     window.clearTimeout(projectSpaceAiMenuMotionTimer);
     projectSpaceAiMenuMotionTimer = window.setTimeout(() => {
       projectSpaceAiMenu.classList.remove('animating');
+      syncProjectSpacePostEntry();
     }, 240);
   }
   if (projectPage && projectSpaceAiMenu) {
@@ -2496,6 +2592,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let friends = [];
   let groups = [];
   let currentProject = null;
+  let currentProjectSpaceLatestApkUrl = '';
+  let projectSpaceAnnouncementExpanded = false;
   let currentFriend = null;
   let currentGroup = null;
   let currentTab = 'chatPage';
@@ -3550,6 +3648,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function resetProjectPage() {
     projectHealthRequestSeq += 1;
+    currentProjectSpaceLatestApkUrl = '';
+    projectSpaceAnnouncementExpanded = false;
+    if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
     renderProjectIntroCard(null);
@@ -3816,13 +3917,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       announcementCard.removeAttribute('role');
       announcementCard.removeAttribute('tabindex');
       announcementCard.onclick = null;
+      announcementCard.ondblclick = null;
       announcementCard.onkeydown = null;
     };
     if (!space) {
+      projectSpaceAnnouncementExpanded = false;
+      if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
       projectSpaceAnnouncement.textContent = '不得发布与主题内容不相关的帖子。';
       resetAnnouncementAction();
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml('还没有帖子，点击+好发布内容', true);
       wireProjectSpaceEmptyPostButton();
+      syncProjectSpacePostEntry();
       return;
     }
     const project = space.project || currentProject;
@@ -3837,20 +3942,48 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '不得发布与主题内容不相关的帖子。';
     const parsedAnnouncement = cleanProjectSpaceAnnouncementText(parseProjectSpacePostText(announcementText).body);
     projectSpaceAnnouncement.textContent = parsedAnnouncement || announcementText;
+    if (projectSpaceFeed) {
+      projectSpaceFeed.classList.toggle('announcement-expanded', projectSpaceAnnouncementExpanded);
+    }
     const editableAnnouncement = announcements[0] && canEditProjectAnnouncement(project);
     if (announcementCard && editableAnnouncement) {
       announcementCard.classList.add('editable');
       announcementCard.setAttribute('role', 'button');
       announcementCard.setAttribute('tabindex', '0');
-      announcementCard.onclick = () => editProjectAnnouncement(announcements[0], projectSpaceAnnouncement.textContent);
+      announcementCard.onclick = () => {
+        projectSpaceAnnouncementExpanded = !projectSpaceAnnouncementExpanded;
+        if (projectSpaceFeed) {
+          projectSpaceFeed.classList.toggle('announcement-expanded', projectSpaceAnnouncementExpanded);
+        }
+      };
+      announcementCard.ondblclick = () => editProjectAnnouncement(announcements[0], projectSpaceAnnouncement.textContent);
       announcementCard.onkeydown = (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          editProjectAnnouncement(announcements[0], projectSpaceAnnouncement.textContent);
+          announcementCard.click();
         }
       };
     } else {
+      projectSpaceAnnouncementExpanded = false;
+      if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
       resetAnnouncementAction();
+    }
+    if (announcementCard && !editableAnnouncement) {
+      announcementCard.classList.add('editable');
+      announcementCard.setAttribute('role', 'button');
+      announcementCard.setAttribute('tabindex', '0');
+      announcementCard.onclick = () => {
+        projectSpaceAnnouncementExpanded = !projectSpaceAnnouncementExpanded;
+        if (projectSpaceFeed) {
+          projectSpaceFeed.classList.toggle('announcement-expanded', projectSpaceAnnouncementExpanded);
+        }
+      };
+      announcementCard.onkeydown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          announcementCard.click();
+        }
+      };
     }
 
     const posts = channels
@@ -3869,6 +4002,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         !loading
       );
       wireProjectSpaceEmptyPostButton();
+      syncProjectSpacePostEntry();
       return;
     }
     projectSpacePostList.innerHTML = posts
@@ -3924,6 +4058,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           '」帖内讨论请在 Android APK 中使用。');
       });
     });
+    syncProjectSpacePostEntry();
   }
   async function loadProjectSpaceFeed(project) {
     if (!project || !project.id || !token) {
@@ -3934,6 +4069,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const res = await api('/api/projects/' + encodeURIComponent(project.id) + '/space');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载项目空间失败');
+    currentProjectSpaceLatestApkUrl = String(data.latest_apk_url || data.latestApkUrl || '').trim();
     const channels = Array.isArray(data.channels) ? data.channels : [];
     await Promise.all(channels.map(async (channel) => {
       if (!channel || !channel.id) return;
@@ -4003,6 +4139,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function renderProjectPage(p) {
     if (!p) { resetProjectPage(); return; }
+    currentProjectSpaceLatestApkUrl = String(p.latest_apk_url || p.latestApkUrl || '').trim();
+    projectSpaceAnnouncementExpanded = false;
     renderProjectIntroCard(p);
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';

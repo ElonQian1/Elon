@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -9,6 +10,7 @@ import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -27,6 +29,8 @@ internal class ProjectSpaceFeedView(
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
+    private val announcementExpandedByProject = mutableMapOf<String, Boolean>()
+    private var announcementAnimator: ValueAnimator? = null
 
     fun render(
         container: LinearLayout,
@@ -40,10 +44,20 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(28)
+                topMargin = dp(6)
             }
         }
-        feedShell.addView(announcementBlock(space, messagesByChannel))
+        val announcementExpanded = announcementExpandedByProject[space.project.id] == true
+        val stack = FrameLayout(activity).apply {
+            clipChildren = false
+            clipToPadding = false
+        }
+        val announcement = announcementBlock(space, messagesByChannel, announcementExpanded)
+        announcement.contentDescription = if (announcementExpanded) "收起项目公告" else "展开项目公告"
+        stack.addView(announcement, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ))
 
         val frame = FrameLayout(activity).apply {
             minimumHeight = dp(464)
@@ -58,9 +72,13 @@ internal class ProjectSpaceFeedView(
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = -dp(8)
-            }
+            )
+        }
+        val frameParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = announcementPostOffset(announcementExpanded)
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -78,13 +96,21 @@ internal class ProjectSpaceFeedView(
             else -> feedColumn.addView(emptyState("还没有帖子，点击+好发布内容", showButton = true))
         }
 
-        feedShell.addView(frame)
+        announcement.setOnClickListener {
+            val nextExpanded = !(announcementExpandedByProject[space.project.id] == true)
+            announcementExpandedByProject[space.project.id] = nextExpanded
+            animateAnnouncementFrame(frame, nextExpanded)
+            announcement.contentDescription = if (nextExpanded) "收起项目公告" else "展开项目公告"
+        }
+        stack.addView(frame, frameParams)
+        feedShell.addView(stack)
         container.addView(feedShell)
     }
 
     private fun announcementBlock(
         space: ProjectSpace,
-        messagesByChannel: Map<String, List<ProjectChannelMessage>>
+        messagesByChannel: Map<String, List<ProjectChannelMessage>>,
+        expanded: Boolean
     ): LinearLayout {
         val announcement = space.channels.firstOrNull { it.kind == "announcements" }
         val latest = announcement?.let { channel ->
@@ -103,7 +129,7 @@ internal class ProjectSpaceFeedView(
 
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(24))
+            setPadding(dp(20), dp(20), dp(20), dp(42))
             background = roundedBackground(
                 colorHex = "#30333A",
                 topStartDp = 18,
@@ -115,12 +141,19 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            contentDescription = if (expanded) "收起项目公告" else "展开项目公告"
             if (editable) {
                 isClickable = true
                 foreground = selectableForeground()
                 contentDescription = "编辑项目公告"
                 setOnClickListener {
                     announcementChannel?.let { openAnnouncementEditor(it, displayText) }
+                }
+            }
+            if (editable) {
+                setOnLongClickListener {
+                    announcementChannel?.let { openAnnouncementEditor(it, displayText) }
+                    true
                 }
             }
             addView(TextView(activity).apply {
@@ -141,6 +174,27 @@ internal class ProjectSpaceFeedView(
 
     private fun cleanAnnouncementText(value: String?): String? {
         return value?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    }
+
+    private fun announcementPostOffset(expanded: Boolean): Int {
+        return dp(if (expanded) ANNOUNCEMENT_EXPANDED_POST_OFFSET_DP else ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
+    }
+
+    private fun animateAnnouncementFrame(frame: View, expanded: Boolean) {
+        val params = frame.layoutParams as? FrameLayout.LayoutParams ?: return
+        val target = announcementPostOffset(expanded)
+        val start = params.topMargin
+        announcementAnimator?.cancel()
+        if (start == target) return
+        announcementAnimator = ValueAnimator.ofInt(start, target).apply {
+            duration = ANNOUNCEMENT_ANIMATION_MS
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { animator ->
+                params.topMargin = animator.animatedValue as Int
+                frame.layoutParams = params
+            }
+            start()
+        }
     }
 
     private fun feedPosts(
@@ -488,6 +542,9 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
+        const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 78
+        const val ANNOUNCEMENT_EXPANDED_POST_OFFSET_DP = 148
+        const val ANNOUNCEMENT_ANIMATION_MS = 220L
     }
 
     private data class MetricButtonViews(

@@ -65,6 +65,7 @@ internal class ProjectSpaceController(
     private var pendingMemberBack: ProjectMember? = null
     private var projectSpaceAiExpanded = true
     private var projectSpaceAiAnimator: ValueAnimator? = null
+    private var projectSpaceFeedActionsEnabled = false
     private val feedData = ProjectSpaceFeedData(
         activity = activity,
         http = http,
@@ -121,7 +122,6 @@ internal class ProjectSpaceController(
         openPersonalAiChat = openPersonalAiChat
     )
     init {
-        binding.projectSpaceDocsFab.setOnClickListener { showProjectDocumentsDialog() }
         binding.projectSpacePostFab.setOnClickListener { renderPostComposer() }
         setupProjectSpaceAiMenuMotion()
     }
@@ -320,7 +320,13 @@ internal class ProjectSpaceController(
         val space = activeSpace ?: return
         val container = prepareProjectContent(showAiMenu = true)
         container.removeAllViews()
-        container.addView(projectIntroHeader(space))
+        container.addView(projectSpaceQuickActions(
+            activity = activity,
+            apkUrl = space.latestApkUrl,
+            dp = dp,
+            selectableForeground = selectableForeground,
+            onOpenDocuments = { showProjectDocumentsDialog() }
+        ))
         feedView.render(
             container = container,
             space = space,
@@ -863,7 +869,13 @@ internal class ProjectSpaceController(
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
             space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
-                addView(projectSpaceDownloadButton(activity, apkUrl, dp, selectableForeground))
+                addView(projectSpaceQuickActions(
+                    activity = activity,
+                    apkUrl = apkUrl,
+                    dp = dp,
+                    selectableForeground = selectableForeground,
+                    onOpenDocuments = { showProjectDocumentsDialog() }
+                ))
             }
         }
     }
@@ -1037,18 +1049,28 @@ internal class ProjectSpaceController(
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
         binding.projectSpaceAiMenu.visibility = View.GONE
+        syncProjectSpacePostEntry()
     }
 
     private fun showProjectSpaceFeedActions() {
-        binding.projectSpaceFeedActionsOverlay.visibility = View.VISIBLE
-        binding.projectSpaceFeedActionsOverlay.bringToFront()
-        if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
-            binding.projectSpaceAiMenu.bringToFront()
-        }
+        projectSpaceFeedActionsEnabled = true
+        syncProjectSpacePostEntry()
     }
 
     private fun hideProjectSpaceFeedActions() {
+        projectSpaceFeedActionsEnabled = false
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
+    }
+
+    private fun syncProjectSpacePostEntry() {
+        val shouldShowPostEntry = projectSpaceFeedActionsEnabled &&
+            binding.projectSpaceAiMenu.visibility == View.VISIBLE &&
+            !projectSpaceAiExpanded
+        binding.projectSpaceFeedActionsOverlay.visibility = if (shouldShowPostEntry) View.VISIBLE else View.GONE
+        if (shouldShowPostEntry) binding.projectSpaceFeedActionsOverlay.bringToFront()
+        if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
+            binding.projectSpaceAiMenu.bringToFront()
+        }
     }
 
     private fun setupProjectSpaceAiMenuMotion() {
@@ -1082,11 +1104,15 @@ internal class ProjectSpaceController(
             currentLayoutWidth == targetWidth &&
             currentLabelWidth == targetLabelWidth &&
             projectSpaceAiAnimator == null
-        if (alreadyAtTarget) return
+        if (alreadyAtTarget) {
+            syncProjectSpacePostEntry()
+            return
+        }
 
         projectSpaceAiExpanded = expanded
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
+        if (expanded) syncProjectSpacePostEntry()
 
         val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
         label.visibility = View.VISIBLE
@@ -1094,6 +1120,7 @@ internal class ProjectSpaceController(
 
         if (!animate || menu.visibility != View.VISIBLE || menu.width <= 0) {
             applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
+            syncProjectSpacePostEntry()
             return
         }
 
@@ -1123,6 +1150,7 @@ internal class ProjectSpaceController(
                     if (cancelled) return
                     applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
                     projectSpaceAiAnimator = null
+                    syncProjectSpacePostEntry()
                 }
             })
         }

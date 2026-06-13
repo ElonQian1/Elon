@@ -415,7 +415,7 @@
             android:visibility="gone">
 
             <ImageButton
-                android:id="@+id/projectSpaceDocsFab"
+                android:visibility="gone"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
                 android:background="@drawable/bg_project_space_fab"
@@ -423,14 +423,12 @@
                 android:foreground="?attr/selectableItemBackgroundBorderless"
                 android:padding="18dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_project_document"
                 app:tint="@color/elon_text_primary" />
 
             <ImageButton
                 android:id="@+id/projectSpacePostFab"
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_project_space_fab"
                 android:contentDescription="发布帖子"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
