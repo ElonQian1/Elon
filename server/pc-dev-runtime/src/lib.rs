@@ -171,7 +171,7 @@ fn android_sdk_candidates() -> Vec<PathBuf> {
     #[cfg(not(windows))]
     {
         if let Ok(home) = std::env::var("HOME") {
-            values.push(PathBuf::from(home).join("Android").join("Sdk"));
+            values.push(PathBuf::from(&home).join("Android").join("Sdk"));
             values.push(PathBuf::from(home).join("android-sdk"));
         }
     }
