@@ -1,3 +1,4 @@
+use crate::project_environment::ensure_project_environment_files;
 use serde_json::json;
 use std::{
     fs,
@@ -24,6 +25,7 @@ pub fn ensure_project_scaffold(repo: &Path, req: &ProjectScaffoldRequest<'_>) ->
     ensure_file(repo.join(".elon").join("project.json"), || {
         project_json(req)
     })?;
+    ensure_project_environment_files(repo, req)?;
     if req.template.eq_ignore_ascii_case("android") {
         ensure_file(
             repo.join("local.properties.example"),
@@ -146,6 +148,8 @@ mod tests {
         assert!(root.join(".gitignore").exists());
         assert!(root.join(".gitattributes").exists());
         assert!(root.join(".env.example").exists());
+        assert!(root.join("docs").join("dev-environment.md").exists());
+        assert!(root.join("scripts").join("elon-dev-check.ps1").exists());
         assert!(root.join(".elon").join("project.json").exists());
         assert!(root.join("local.properties.example").exists());
         assert!(fs::read_to_string(root.join(".elon").join("project.json"))

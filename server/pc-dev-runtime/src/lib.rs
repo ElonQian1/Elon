@@ -1,5 +1,6 @@
 mod paths;
 mod profile;
+mod project_environment;
 mod project_scaffold;
 
 pub use paths::{safe_path_part, workspace_root};
