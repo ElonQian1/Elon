@@ -316,7 +316,8 @@ internal class ProjectManagementHomeView(
     private fun createProjectCard(item: IndexedProject): View {
         val project = item.project
         return AdaptiveProjectCardFrame(activity, dp(CARD_INFO_BAR_HEIGHT_DP)).apply {
-            background = rect("#181B20")
+            background = rect("#181B20", PROJECT_CARD_RADIUS_DP)
+            clipToOutline = true
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
@@ -562,7 +563,8 @@ internal class ProjectManagementHomeView(
 
     private fun createEmptyProjectSlot(emptyAction: (() -> Unit)?): View {
         return AdaptiveProjectCardFrame(activity).apply {
-            background = rect("#181B20")
+            background = rect("#181B20", PROJECT_CARD_RADIUS_DP)
+            clipToOutline = true
             emptyAction?.let { action ->
                 contentDescription = "新建项目"
                 isClickable = true
@@ -603,6 +605,7 @@ internal class ProjectManagementHomeView(
         const val COLLAPSED_PROJECT_LIMIT = 4
         const val SECTION_ANIMATION_MS = 260L
         const val CARD_INFO_BAR_HEIGHT_DP = 47
+        const val PROJECT_CARD_RADIUS_DP = 8
         const val CARD_INFO_BAR_BG = "#303338"
         const val CARD_INFO_BAR_SHIMMER_BG = "#283140"
         const val SECTION_TITLE_TEXT_SP = 16f

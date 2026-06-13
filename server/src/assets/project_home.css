@@ -181,6 +181,7 @@
   color: inherit;
   text-align: left;
   padding: 0;
+  border-radius: 8px;
   overflow: hidden;
 }
 
