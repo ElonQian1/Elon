@@ -163,8 +163,10 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
 === 项目说明读取顺序 ===
 进入任何项目后，优先 list_dir(".") 观察结构；如果存在以下文件，先读取再行动：
 - AGENTS.md
-- CODEX.md
 - .github/copilot-instructions.md
+- CODEX.md
+- CLAUDE.md
+- GEMINI.md
 - .github/instructions/*.md
 - README.md
 - docs/ 中与任务相关的文档
@@ -174,7 +176,7 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
 2. 新项目或未知项目必须先读取项目自己的说明文档；如果项目没有说明文档，使用平台默认流程，但不要假装已经拥有项目记忆。
 3. 一龙自项目只是普通项目；不要把它当特殊路径，也不要把它的发布规则套到无关项目，除非该项目文档明确要求。
 4. 服务器会为每个 APK 会话准备独立 Git worktree/分支；当前目录就是本会话工作区。编码阶段可按会话并行，最终 merge、版本号递增、APK 发布、服务器部署仍由服务器串行保护。
-5. 如果本次发现项目缺少必要流程说明，应建议用户补充 AGENTS.md/CODEX.md/README，而不是靠 CLI 记忆。
+5. 如果本次发现项目缺少必要流程说明，应建议用户补充 AGENTS.md、.github/copilot-instructions.md 或 README，而不是靠 CLI 记忆。
 6. 以后即使服务端接入其他 AI 模型，它们也只是旁路分析工具；最终用户意图、旁路结论和代码协作都要回到当前 APK 会话绑定的 Codex CLI 原生 session，保持主上下文不断。
 7. 低算力模块化流程：写代码前先做短文件计划；新建源文件默认目标 <=500 行，501-800 行可容忍但必须单一职责，>800 行必须拆分；已有 >1500 行文件除小修外不得追加新功能，先抽模块。
 

@@ -16,11 +16,11 @@ const MAX_TOTAL_CHARS: usize = 220_000;
 const ROOT_DOCS: &[&str] = &[
     "AGENTS.md",
     "CODEX.md",
+    "CLAUDE.md",
+    "GEMINI.md",
     "README.md",
     "README.zh-CN.md",
     "README_CN.md",
-    "CLAUDE.md",
-    "GEMINI.md",
     "AI.md",
     "AI_AGENT.md",
     "AI_AGENTS.md",
@@ -231,9 +231,12 @@ fn markdown_title(content: &str) -> Option<String> {
 fn root_priority(relative: &str) -> usize {
     match relative.replace('\\', "/").as_str() {
         "AGENTS.md" => 0,
+        ".github/copilot-instructions.md" => 1,
         "CODEX.md" => 5,
+        "CLAUDE.md" => 6,
+        "GEMINI.md" => 7,
         "README.md" => 10,
-        ".github/copilot-instructions.md" => 20,
+        "README.zh-CN.md" | "README_CN.md" => 11,
         path if path.starts_with(".github/instructions/") => 100,
         path if path.starts_with(".github/prompts/") => 120,
         path if path.starts_with(".github/agents/") => 130,
@@ -337,6 +340,12 @@ mod tests {
         assert!(paths.contains(&"CODEX.md"));
         assert!(paths.contains(&".github/copilot-instructions.md"));
         assert!(paths.contains(&".github/instructions/project-workflow.instructions.md"));
+        assert!(paths.contains(&".github/instructions/git-workflow.instructions.md"));
+        assert!(paths.contains(&".github/instructions/android.instructions.md"));
+        assert!(paths.contains(&".github/instructions/ui.instructions.md"));
+        assert!(paths.contains(&".github/instructions/backend.instructions.md"));
+        assert!(paths.contains(&"CLAUDE.md"));
+        assert!(paths.contains(&"GEMINI.md"));
         assert!(snapshot
             .warnings
             .iter()

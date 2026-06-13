@@ -26,7 +26,7 @@ internal fun defaultWorkflowSummary(): String {
 internal fun defaultWorkflowSteps(): List<String> {
     return listOf(
         "项目准备：确认项目路径、Git 仓库、远端和写权限。",
-        "读取文档：优先读取 AGENTS.md、CODEX.md、README.md、.github/instructions 和任务相关 docs。",
+        "读取文档：先读 AGENTS.md；按入口跳转到 .github/copilot-instructions.md，再读取任务相关 .github/instructions 和 docs。",
         "执行任务：按项目自己的技术栈修改代码，不把一龙自项目规则套到普通项目。",
         "验证保存：运行必要检查，commit；有可用远端时 push。",
         "共享动作：合并 main、版本号递增、APK 发布、服务器部署必须串行。"

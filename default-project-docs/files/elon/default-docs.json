@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "template_version": "2026-06-13.1",
+  "authority": ".github/copilot-instructions.md",
+  "strategy": "copilot-primary-bridged-agents",
+  "documents": [
+    {
+      "path": "AGENTS.md",
+      "role": "shared-entry"
+    },
+    {
+      "path": ".github/copilot-instructions.md",
+      "role": "authority"
+    },
+    {
+      "path": "CODEX.md",
+      "role": "codex-bridge"
+    },
+    {
+      "path": "CLAUDE.md",
+      "role": "claude-bridge"
+    },
+    {
+      "path": "GEMINI.md",
+      "role": "gemini-bridge"
+    },
+    {
+      "path": ".github/instructions/project-workflow.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": ".github/instructions/git-workflow.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": ".github/instructions/android.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": ".github/instructions/ui.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": ".github/instructions/backend.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": "docs/project-readme.md",
+      "role": "project-notes"
+    }
+  ]
+}
