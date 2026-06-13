@@ -7,7 +7,9 @@ use crate::pc_workspace_git_remote::{
     git_remote_origin,
 };
 use crate::project_default_docs::ensure_default_docs_in_workspace;
-use elon_pc_dev_runtime::workspace_root;
+use elon_pc_dev_runtime::{
+    ensure_project_scaffold, safe_path_part, workspace_root, ProjectScaffoldRequest,
+};
 
 pub struct ProjectWorkspaceRequest {
     pub project_id: String,
@@ -340,55 +342,19 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     }
 }
 
-fn safe_path_part(value: &str, fallback: &str, max_len: usize) -> String {
-    let cleaned: String = value
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
-        .take(max_len)
-        .collect();
-    if cleaned.is_empty() {
-        fallback.to_string()
-    } else {
-        cleaned
-    }
-}
-
 fn ensure_seed_files(repo: &Path, req: &ProjectWorkspaceRequest) -> Result<()> {
-    let readme = repo.join("README.md");
-    if !readme.exists() {
-        std::fs::write(
-            &readme,
-            format!(
-                "# {}\n\nThis is an Elon PC-managed project workspace.\n\n- project_id: {}\n- template: {}\n- owner_user_id: {}\n\nThe cloud server stores project metadata and chat history. Source code, build caches, and task worktrees live on this PC node.\n",
-                req.name.trim(),
-                req.project_id,
-                req.template,
-                req.user_id
-            ),
-        )?;
-    }
-
-    let agents = repo.join("AGENTS.md");
-    if !agents.exists() {
-        std::fs::write(
-            &agents,
-            format!(
-                "# Project Workspace\n\nThis project is managed by an Elon PC node.\n\nRules:\n- Keep source code and build outputs inside this repository.\n- Use git for every meaningful code change.\n- Prefer task-specific worktrees for parallel conversations.\n- Do not write build artifacts to the cloud server workspace.\n\nProject metadata:\n- project_id: {}\n- template: {}\n",
-                req.project_id, req.template
-            ),
-        )?;
-    }
-
+    ensure_project_scaffold(
+        repo,
+        &ProjectScaffoldRequest {
+            project_id: &req.project_id,
+            user_id: &req.user_id,
+            name: &req.name,
+            template: &req.template,
+            repo_url: req.repo_url.as_deref(),
+            branch: req.branch.as_deref(),
+        },
+    )?;
     let _ = ensure_default_docs_in_workspace(repo)?;
-
-    let gitignore = repo.join(".gitignore");
-    if !gitignore.exists() {
-        std::fs::write(
-            &gitignore,
-            ".gradle/\nbuild/\napp/build/\n*.apk\n*.aab\nlocal.properties\n.env\n.env.local\n",
-        )?;
-    }
-
     Ok(())
 }
 
@@ -499,7 +465,8 @@ fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{prepare_conversation_workspace, safe_path_part};
+    use super::prepare_conversation_workspace;
+    use elon_pc_dev_runtime::safe_path_part;
     use std::fs;
     use uuid::Uuid;
 
