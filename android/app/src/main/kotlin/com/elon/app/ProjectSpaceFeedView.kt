@@ -177,7 +177,7 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(dp(10), dp(4), dp(10), dp(4))
+                setMargins(dp(8), dp(4), dp(8), dp(4))
             }
 
             addView(postHeader(sender, post.message.senderAvatarDataUrl, timeText, projectSpaceTopicLabel(post.channel)))
