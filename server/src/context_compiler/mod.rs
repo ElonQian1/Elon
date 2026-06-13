@@ -43,6 +43,9 @@ mod semantic_query_plan_render;
 #[cfg(test)]
 mod semantic_query_plan_tests;
 mod symbol_graph;
+mod task_context_exports;
+#[cfg(test)]
+mod task_context_exports_tests;
 mod task_profile;
 mod validation;
 

@@ -10,7 +10,7 @@ use serde_json::json;
 use super::{
     artifact_exports, config::ContextCompilerConfig, model::RepoContextIndex,
     relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
-    validation::ValidationPlan,
+    task_context_exports, validation::ValidationPlan,
 };
 
 #[derive(Debug, Clone)]
@@ -65,6 +65,21 @@ pub(crate) fn save_context_artifacts(
     let mut bytes = 0usize;
     bytes += write_text(&path, &content, &mut files)?;
     bytes += write_text(&bundle_dir.join("context_pack.md"), &content, &mut files)?;
+    bytes += task_context_exports::write_task_context_exports(
+        task_context_exports::TaskContextExportsInput {
+            bundle_dir: &bundle_dir,
+            created_at: &now,
+            trace_id: input.trace_id,
+            user_id: input.user_id,
+            user_message: input.user_message,
+            pack: &content,
+            snapshot: input.snapshot,
+            repo_index: input.repo_index,
+            relevant_files: input.relevant_files,
+            validation_plan: input.validation_plan,
+        },
+        &mut files,
+    )?;
     bytes += write_text(
         &bundle_dir.join("brief.md"),
         &build_brief_markdown(input.user_message, input.llm_brief, input.relevant_files),
@@ -123,6 +138,7 @@ pub(crate) fn save_context_artifacts(
                 .iter()
                 .filter_map(|file| file.file_name().and_then(|name| name.to_str()))
                 .collect::<Vec<_>>(),
+            "bundle_file_paths": bundle_file_paths(&bundle_dir, &files),
         }),
         &mut files,
     )?;
@@ -132,6 +148,18 @@ pub(crate) fn save_context_artifacts(
         files,
         bytes,
     })
+}
+
+fn bundle_file_paths(bundle_dir: &Path, files: &[PathBuf]) -> Vec<String> {
+    files
+        .iter()
+        .filter_map(|file| {
+            file.strip_prefix(bundle_dir)
+                .ok()
+                .and_then(|path| path.to_str())
+                .map(|path| path.replace('\\', "/"))
+        })
+        .collect()
 }
 
 fn write_text(path: &Path, content: &str, files: &mut Vec<PathBuf>) -> Option<usize> {
@@ -188,7 +216,9 @@ Before editing, verify important facts by reading the actual files.
 
 <context_files>
 - brief.md
+- task_context_pack.md
 - context_pack.md
+- .ai/context/current-task.md and .ai/context/current-task.json
 - repo_snapshot.json
 - repo_context_index.json
 - repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / lsp_locations.jsonl when Rust analysis ran
