@@ -20,6 +20,7 @@
 | 次按钮背景，比如“查看明细” | `color.button.secondary.bg` | `#2A2A2A` |
 | 次按钮文字 | `color.button.secondary.text` | `#D6D6D6` |
 | 聊天输入胶囊背景 | `color.input.pill.bg` | `#262626` |
+| 项目空间公告 / 项目介绍半透明白底 | `color.project_space.translucent_white` | `#80FFFFFF` |
 | 主按钮背景，比如“发送” | `color.button.primary.bg` | `#C8C8C8` |
 | 主按钮文字 | `color.button.primary.text` | `#101010` |
 | APP 点缀色 / 成功、在线、完成状态 | `color.accent.primary` | `#58BE6A` |
@@ -38,5 +39,6 @@
 - 主操作、发送按钮、用户气泡优先使用银灰 `#C8C8C8`，保持克制的 ChatGPT 风格。
 - 绿色 `#58BE6A` 只作为点缀色，用于在线、完成、成功、进度、链接，以及“充值额度”这类需要强行动召唤的商业入口。
 - 聊天底部输入胶囊固定使用 `#262626`，保持图形上比底栏稍亮、比按钮更克制。
+- 项目空间的“公告”和“项目介绍”使用 `#80FFFFFF` 半透明白底，承载社区信息块时需配深色文字；Web 侧用 `rgba(255, 255, 255, 0.5)` 表达同一颜色。
 - 不再使用蓝色作为主要辅助色；历史蓝色入口统一收敛为绿色点缀或中性灰。
 - 新增 APP UI 配色时，优先映射到现有 token；确实需要新增颜色时，应先更新本规范。

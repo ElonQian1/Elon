@@ -96,6 +96,7 @@ internal class MainInputComposerSetup(
                 marginStart = dp(24)
                 marginEnd = dp(24)
             }
+            setBackgroundResource(R.drawable.bg_input_pill)
         }
 
         val inputBarContainer = LinearLayout(activity).apply {
@@ -196,7 +197,7 @@ internal class MainInputComposerSetup(
             isVerticalScrollBarEnabled = false
             includeFontPadding = true
             setHorizontallyScrolling(false)
-            setPadding(0, dp(8), dp(36), dp(6))
+            setPadding(dp(18), dp(8), dp(36), dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#A8D0D0D0"))
             textSize = 15f

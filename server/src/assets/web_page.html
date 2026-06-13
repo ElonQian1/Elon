@@ -35,6 +35,11 @@
       --link: #58BE6A;
       --secondary-btn: #2A2A2A;
       --secondary-btn-ink: #D6D6D6;
+      --input-pill-bg: #262626;
+      --project-space-translucent-white: rgba(255, 255, 255, 0.5);
+      --project-space-on-translucent: #101010;
+      --project-space-on-translucent-soft: #333333;
+      --project-space-on-translucent-faint: #454545;
       --badge-info-bg: #16251A;
       --badge-info-ink: #8DDC9B;
       --badge-neutral-bg: #2A2A2A;
@@ -455,8 +460,8 @@
       min-height: 84px;
       border: 0;
       border-radius: 14px;
-      background: #22262C;
-      color: var(--ink);
+      background: var(--project-space-translucent-white);
+      color: var(--project-space-on-translucent);
       padding: 12px 16px;
       text-align: center;
       font-size: 13px;
@@ -471,11 +476,11 @@
       cursor: pointer;
     }
     .project-space-intro-card.empty {
-      color: var(--ink-faint);
+      color: var(--project-space-on-translucent-faint);
     }
     .project-space-intro-card:disabled {
       cursor: default;
-      opacity: 0.86;
+      opacity: 1;
     }
     .project-space-feed {
       position: relative;
@@ -483,11 +488,11 @@
       background: var(--bg);
     }
     .project-space-announcement {
-      background: #1B1D21;
+      background: var(--project-space-translucent-white);
       border-radius: 18px 18px 0 0;
       margin: 0;
       padding: 16px 20px 34px;
-      color: var(--ink);
+      color: var(--project-space-on-translucent);
     }
     .project-space-post-area {
       position: relative;
@@ -522,7 +527,7 @@
       margin-bottom: 7px;
     }
     .project-space-announcement-body {
-      color: var(--ink-soft);
+      color: var(--project-space-on-translucent-soft);
       font-size: 14px;
       line-height: 1.55;
       white-space: pre-wrap;
@@ -1335,8 +1340,8 @@
     .input-bar textarea {
       flex: 1;
       min-width: 0;
-      background: #262626;
-      border: 1px solid #262626;
+      background: var(--input-pill-bg);
+      border: 1px solid var(--input-pill-bg);
       border-radius: 6px;
       color: var(--ink-strong);
       padding: 8px 14px;

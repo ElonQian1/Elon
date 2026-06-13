@@ -9,6 +9,8 @@
     <color name="elon_text_secondary">#A8A8A8</color>
     <color name="elon_text_tertiary">#777777</color>
 
+    <color name="elon_input_pill_bg">#262626</color>
+
     <color name="elon_button_secondary_bg">#2A2A2A</color>
     <color name="elon_button_secondary_text">#D6D6D6</color>
     <color name="elon_button_primary_bg">#C8C8C8</color>
