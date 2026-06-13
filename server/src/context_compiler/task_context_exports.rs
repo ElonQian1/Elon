@@ -59,6 +59,8 @@ fn build_current_task_json(input: &TaskContextExportsInput<'_>) -> Option<String
             "model_input": "task_context_pack.md",
             "harness_markdown": ".ai/context/current-task.md",
             "harness_json": ".ai/context/current-task.json",
+            "context_budget": "context_budget.json",
+            "context_budget_markdown": "context_budget.md",
             "repo_index": "repo_context_index.json",
             "repo_map": "repo_map.md",
             "symbols": "symbols.jsonl",

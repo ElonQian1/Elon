@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::json;
 
 use super::{
-    artifact_exports, config::ContextCompilerConfig, model::RepoContextIndex,
+    artifact_exports, config::ContextCompilerConfig, context_budget, model::RepoContextIndex,
     relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
     task_context_exports, validation::ValidationPlan,
 };
@@ -80,6 +80,7 @@ pub(crate) fn save_context_artifacts(
         },
         &mut files,
     )?;
+    bytes += context_budget::write_context_budget_exports(&bundle_dir, &content, &mut files)?;
     bytes += write_text(
         &bundle_dir.join("brief.md"),
         &build_brief_markdown(input.user_message, input.llm_brief, input.relevant_files),
@@ -219,6 +220,7 @@ Before editing, verify important facts by reading the actual files.
 - task_context_pack.md
 - context_pack.md
 - .ai/context/current-task.md and .ai/context/current-task.json
+- context_budget.md / context_budget.json
 - repo_snapshot.json
 - repo_context_index.json
 - repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / lsp_locations.jsonl when Rust analysis ran

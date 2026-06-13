@@ -4,6 +4,9 @@ mod artifact_exports;
 mod artifact_exports_tests;
 mod cargo_index;
 mod config;
+mod context_budget;
+#[cfg(test)]
+mod context_budget_tests;
 mod context_evidence;
 #[cfg(test)]
 mod context_evidence_tests;
