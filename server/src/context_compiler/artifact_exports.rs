@@ -6,12 +6,13 @@ use std::{
 
 use serde_json::json;
 
-use super::model::{RepoContextIndex, RustAnalyzerLspStatus};
+use super::model::{RepoContextIndex, RustAnalyzerLspStatus, SemanticQueryMethod};
 
 const MAX_SYMBOLS_JSONL: usize = 2_000;
 const MAX_EDGES_TSV: usize = 2_000;
 const MAX_CHUNKS_JSONL: usize = 120;
 const MAX_LSP_LOCATIONS_JSONL: usize = 500;
+const MAX_SEMANTIC_FACTS_JSONL: usize = 500;
 
 pub(crate) fn write_context_exports(
     bundle_dir: &Path,
@@ -50,6 +51,11 @@ pub(crate) fn write_context_exports(
     bytes += write_export_text(
         &bundle_dir.join("lsp_locations.jsonl"),
         &build_lsp_locations_jsonl(repo_index),
+        files,
+    )?;
+    bytes += write_export_text(
+        &bundle_dir.join("semantic_facts.jsonl"),
+        &build_semantic_facts_jsonl(repo_index),
         files,
     )?;
     Some(bytes)
@@ -325,6 +331,46 @@ fn build_lsp_locations_jsonl(index: &RepoContextIndex) -> String {
         }
     }
     lines.join("\n") + "\n"
+}
+
+fn build_semantic_facts_jsonl(index: &RepoContextIndex) -> String {
+    index
+        .rust_analyzer
+        .lsp
+        .results
+        .iter()
+        .take(MAX_SEMANTIC_FACTS_JSONL)
+        .filter_map(|result| {
+            serde_json::to_string(&json!({
+                "source": "rust_analyzer_lsp",
+                "fact_kind": semantic_fact_kind(result.method),
+                "method": result.method.as_lsp_method(),
+                "status": result.status.as_str(),
+                "query_path": result.path,
+                "query_line": result.line,
+                "query_symbol": result.symbol.as_deref(),
+                "summary": result.summary.as_deref(),
+                "location_count": result.locations.len(),
+                "warning": result.warning.as_deref(),
+            }))
+            .ok()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+
+fn semantic_fact_kind(method: SemanticQueryMethod) -> &'static str {
+    match method {
+        SemanticQueryMethod::DocumentSymbol => "document_symbols",
+        SemanticQueryMethod::Diagnostic => "diagnostic",
+        SemanticQueryMethod::References => "references",
+        SemanticQueryMethod::Implementation => "implementations",
+        SemanticQueryMethod::Hover => "hover_type",
+        SemanticQueryMethod::PrepareCallHierarchy
+        | SemanticQueryMethod::IncomingCalls
+        | SemanticQueryMethod::OutgoingCalls => "call_hierarchy",
+    }
 }
 
 fn write_export_text(path: &Path, content: &str, files: &mut Vec<PathBuf>) -> Option<usize> {

@@ -223,7 +223,7 @@ Before editing, verify important facts by reading the actual files.
 - context_budget.md / context_budget.json
 - repo_snapshot.json
 - repo_context_index.json
-- repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / lsp_locations.jsonl when Rust analysis ran
+- repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / lsp_locations.jsonl / semantic_facts.jsonl when Rust analysis ran
 - relevant_files.json
 - validation_plan.json
 - validation.md

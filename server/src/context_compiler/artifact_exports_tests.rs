@@ -69,6 +69,7 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(artifact.bundle_dir.join("edges.tsv").is_file());
     assert!(artifact.bundle_dir.join("chunks.jsonl").is_file());
     assert!(artifact.bundle_dir.join("lsp_locations.jsonl").is_file());
+    assert!(artifact.bundle_dir.join("semantic_facts.jsonl").is_file());
 
     assert!(fs::read_to_string(artifact.bundle_dir.join("repo_map.md"))
         .unwrap()
@@ -89,10 +90,15 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
             .unwrap()
             .contains("\"role\":\"reference\"")
     );
+    let semantic_facts =
+        fs::read_to_string(artifact.bundle_dir.join("semantic_facts.jsonl")).unwrap();
+    assert!(semantic_facts.contains("\"fact_kind\":\"references\""));
+    assert!(semantic_facts.contains("\"fact_kind\":\"hover_type\""));
+    assert!(semantic_facts.contains("pub(crate) fn build_context_pack"));
     assert!(
         fs::read_to_string(artifact.bundle_dir.join("manifest.json"))
             .unwrap()
-            .contains("symbols.jsonl")
+            .contains("semantic_facts.jsonl")
     );
 
     fs::remove_dir_all(dir).unwrap();
@@ -183,23 +189,38 @@ fn test_repo_index() -> RepoContextIndex {
                 enabled: true,
                 attempted: 1,
                 succeeded: 1,
-                results: vec![RustAnalyzerLspQueryResult {
-                    method: SemanticQueryMethod::References,
-                    path: "server/src/context_compiler/context_pack.rs".to_string(),
-                    line: 10,
-                    symbol: Some("build_context_pack".to_string()),
-                    status: RustAnalyzerLspStatus::Succeeded,
-                    duration_ms: 1,
-                    summary: Some("1 item(s)".to_string()),
-                    locations: vec![RustAnalyzerLspLocation {
-                        role: RustAnalyzerLspLocationRole::Reference,
-                        path: "server/src/context_compiler/mod.rs".to_string(),
-                        line: 42,
-                        end_line: None,
+                results: vec![
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::References,
+                        path: "server/src/context_compiler/context_pack.rs".to_string(),
+                        line: 10,
                         symbol: Some("build_context_pack".to_string()),
-                    }],
-                    warning: None,
-                }],
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 1,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::Reference,
+                            path: "server/src/context_compiler/mod.rs".to_string(),
+                            line: 42,
+                            end_line: None,
+                            symbol: Some("build_context_pack".to_string()),
+                        }],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::Hover,
+                        path: "server/src/context_compiler/context_pack.rs".to_string(),
+                        line: 10,
+                        symbol: Some("build_context_pack".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 1,
+                        summary: Some(
+                            "pub(crate) fn build_context_pack(...) -> String".to_string(),
+                        ),
+                        locations: Vec::new(),
+                        warning: None,
+                    },
+                ],
                 ..RustAnalyzerLspReport::default()
             },
             ..RustAnalyzerReport::default()

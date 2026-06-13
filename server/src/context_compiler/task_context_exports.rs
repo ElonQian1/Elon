@@ -66,7 +66,8 @@ fn build_current_task_json(input: &TaskContextExportsInput<'_>) -> Option<String
             "symbols": "symbols.jsonl",
             "edges": "edges.tsv",
             "chunks": "chunks.jsonl",
-            "lsp_locations": "lsp_locations.jsonl"
+            "lsp_locations": "lsp_locations.jsonl",
+            "semantic_facts": "semantic_facts.jsonl"
         },
         "contract": {
             "model_input": "XML-wrapped Markdown with fenced source snippets",
