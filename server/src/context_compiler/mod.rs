@@ -6,6 +6,10 @@ mod context_evidence;
 mod context_evidence_tests;
 mod context_pack;
 mod context_pack_render;
+mod context_quality;
+mod context_quality_render;
+#[cfg(test)]
+mod context_quality_tests;
 mod hunyuan_brief;
 mod impact_analysis;
 #[cfg(test)]
@@ -59,7 +63,7 @@ pub(crate) async fn compile_preflight_note(
         .flatten();
     let relevant_files =
         relevance::find_relevant_files(workspace, user_message, config.max_relevant_files);
-    let repo_index = if config.rust_analysis_enabled {
+    let mut repo_index = if config.rust_analysis_enabled {
         let cargo = cargo_index::collect_cargo_index(workspace);
         let rust = rust_symbols::collect_rust_index(workspace, config.max_rust_files);
         let graph = symbol_graph::build_symbol_graph(
@@ -87,6 +91,7 @@ pub(crate) async fn compile_preflight_note(
             semantic_plan: model::SemanticQueryPlan::default(),
             impact: model::RustImpactAnalysis::default(),
             evidence: model::ContextEvidence::default(),
+            quality: model::ContextQualityReport::default(),
         };
         index.semantic_plan = semantic_query_plan::build_semantic_query_plan(
             &index,
@@ -102,6 +107,10 @@ pub(crate) async fn compile_preflight_note(
     };
     let validation_plan =
         validation::build_validation_plan(&snapshot, rust_project.as_ref(), &relevant_files);
+    if let Some(index) = repo_index.as_mut() {
+        index.quality =
+            context_quality::build_context_quality_report(index, &relevant_files, &validation_plan);
+    }
     let deterministic_pack = context_pack::build_context_pack(
         &config,
         user_message,
@@ -161,6 +170,8 @@ pub(crate) async fn compile_preflight_note(
                     "ra_probe_enabled": index.rust_analyzer.probes.enabled,
                     "ra_probe_findings": count_ra_probe_findings(&index.rust_analyzer.probes),
                     "semantic_queries": index.semantic_plan.queries.len(),
+                    "context_quality_score": index.quality.score,
+                    "context_quality_gaps": index.quality.gaps.len(),
                     "snippets": index.evidence.snippets.len(),
                     "test_targets": index.evidence.test_targets.len(),
                     "build_commands": index.evidence.build_commands.len(),
@@ -199,6 +210,10 @@ pub(crate) async fn compile_preflight_note(
         semantic_queries = repo_index
             .as_ref()
             .map(|index| index.semantic_plan.queries.len())
+            .unwrap_or_default(),
+        context_quality_score = repo_index
+            .as_ref()
+            .map(|index| index.quality.score)
             .unwrap_or_default(),
         artifact_path = artifact
             .as_ref()

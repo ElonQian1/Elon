@@ -8,6 +8,7 @@ pub(crate) struct RepoContextIndex {
     pub(crate) semantic_plan: SemanticQueryPlan,
     pub(crate) impact: RustImpactAnalysis,
     pub(crate) evidence: ContextEvidence,
+    pub(crate) quality: ContextQualityReport,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -447,4 +448,66 @@ pub(crate) struct FeatureFlagFact {
     pub(crate) package: String,
     pub(crate) feature: String,
     pub(crate) manifest_path: String,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct ContextQualityReport {
+    pub(crate) score: u8,
+    pub(crate) coverage: ContextQualityCoverage,
+    pub(crate) semantic: ContextQualitySemantic,
+    pub(crate) gaps: Vec<ContextQualityGap>,
+    pub(crate) recommended_actions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct ContextQualityCoverage {
+    pub(crate) top_files_considered: usize,
+    pub(crate) top_files_with_snippets: usize,
+    pub(crate) top_symbols_considered: usize,
+    pub(crate) top_symbols_with_snippets: usize,
+    pub(crate) snippet_count: usize,
+    pub(crate) relationship_count: usize,
+    pub(crate) repo_map_tag_edges: usize,
+    pub(crate) impact_fact_count: usize,
+    pub(crate) validation_commands: usize,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct ContextQualitySemantic {
+    pub(crate) rust_analyzer_available: bool,
+    pub(crate) rust_analyzer_symbols: usize,
+    pub(crate) rust_analyzer_files_enhanced: usize,
+    pub(crate) lsp_queries_planned: usize,
+    pub(crate) probe_enabled: bool,
+    pub(crate) probe_succeeded: usize,
+    pub(crate) probe_failed: usize,
+    pub(crate) probe_timed_out: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct ContextQualityGap {
+    pub(crate) severity: ContextQualitySeverity,
+    pub(crate) subject: String,
+    pub(crate) path: Option<String>,
+    pub(crate) line: Option<usize>,
+    pub(crate) detail: String,
+    pub(crate) action: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ContextQualitySeverity {
+    Info,
+    Warning,
+    Critical,
+}
+
+impl ContextQualitySeverity {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Critical => "critical",
+        }
+    }
 }

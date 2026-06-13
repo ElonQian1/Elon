@@ -74,6 +74,7 @@ fn builds_snippet_with_hash_and_build_command() {
         semantic_plan: Default::default(),
         impact: Default::default(),
         evidence: Default::default(),
+        quality: Default::default(),
     };
 
     let evidence = build_context_evidence(&dir, &index, &[]);
