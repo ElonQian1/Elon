@@ -3,6 +3,7 @@ mod profile;
 mod project_environment;
 mod project_git;
 mod project_scaffold;
+mod project_workflow;
 
 pub use paths::{safe_path_part, workspace_root};
 pub use profile::collect_dev_runtime_profile;
