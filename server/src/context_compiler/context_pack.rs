@@ -1,5 +1,5 @@
 use super::{
-    config::ContextCompilerConfig, context_pack_render, model::RepoContextIndex,
+    config::ContextCompilerConfig, context_pack_render, impact_render, model::RepoContextIndex,
     relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
     validation::ValidationPlan,
 };
@@ -39,6 +39,7 @@ pub(crate) fn build_context_pack(
     context_pack_render::render_rust_project(&mut out, rust_project);
     context_pack_render::render_repo_index(&mut out, repo_index);
     context_pack_render::render_source_size_risks(&mut out, snapshot);
+    impact_render::render_impact_analysis(&mut out, repo_index.map(|index| &index.impact));
     context_pack_render::render_context_evidence(&mut out, repo_index.map(|index| &index.evidence));
     context_pack_render::render_retrieval_evidence(&mut out, relevant_files);
     context_pack_render::render_validation_guidance(&mut out, validation_plan);
@@ -63,7 +64,10 @@ mod tests {
     use super::*;
     use crate::context_compiler::{
         config::ContextCompilerMode,
-        model::{ContextEvidence, RepoContextIndex, TaskProfile},
+        model::{
+            ContextEvidence, ImpactFact, ImpactKind, RepoContextIndex, RustImpactAnalysis,
+            TaskProfile,
+        },
     };
 
     fn test_config() -> ContextCompilerConfig {
@@ -187,6 +191,17 @@ mod tests {
                 recommended_actions: vec!["Open edit targets first".to_string()],
                 ..ContextEvidence::default()
             },
+            impact: RustImpactAnalysis {
+                function_call_sites: vec![ImpactFact {
+                    subject: "build_context_pack".to_string(),
+                    path: "server/src/context_compiler/context_pack.rs".to_string(),
+                    line: 12,
+                    kind: ImpactKind::FunctionCallSite,
+                    evidence: "build_context_pack(...)".to_string(),
+                    reason: "call-like token hit".to_string(),
+                }],
+                ..RustImpactAnalysis::default()
+            },
             ..RepoContextIndex::default()
         };
         let validation = ValidationPlan {
@@ -206,6 +221,7 @@ mod tests {
         );
 
         assert!(pack.contains("<task_understanding>"));
+        assert!(pack.contains("<impact_analysis>"));
         assert!(pack.contains("<missing_context_policy>"));
         assert!(pack.contains("<recommended_agent_actions>"));
     }

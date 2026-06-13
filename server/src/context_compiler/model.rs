@@ -5,6 +5,7 @@ pub(crate) struct RepoContextIndex {
     pub(crate) rust: RustIndex,
     pub(crate) graph: SymbolGraphSummary,
     pub(crate) rust_analyzer: RustAnalyzerReport,
+    pub(crate) impact: RustImpactAnalysis,
     pub(crate) evidence: ContextEvidence,
 }
 
@@ -189,6 +190,56 @@ pub(crate) struct RustAnalyzerSymbol {
     pub(crate) detail: Option<String>,
     pub(crate) line: usize,
     pub(crate) parent: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct RustImpactAnalysis {
+    pub(crate) trait_implementations: Vec<ImpactFact>,
+    pub(crate) function_call_sites: Vec<ImpactFact>,
+    pub(crate) enum_match_sites: Vec<ImpactFact>,
+    pub(crate) field_accesses: Vec<ImpactFact>,
+    pub(crate) public_api_references: Vec<ImpactFact>,
+    pub(crate) test_links: Vec<ImpactFact>,
+    pub(crate) async_boundaries: Vec<ImpactFact>,
+    pub(crate) limitations: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct ImpactFact {
+    pub(crate) subject: String,
+    pub(crate) path: String,
+    pub(crate) line: usize,
+    pub(crate) kind: ImpactKind,
+    pub(crate) evidence: String,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ImpactKind {
+    TraitImplementation,
+    FunctionCallSite,
+    EnumMatchSite,
+    FieldRead,
+    FieldWrite,
+    PublicApiReference,
+    TestLink,
+    AsyncBoundary,
+}
+
+impl ImpactKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::TraitImplementation => "trait_implementation",
+            Self::FunctionCallSite => "function_call_site",
+            Self::EnumMatchSite => "enum_match_site",
+            Self::FieldRead => "field_read",
+            Self::FieldWrite => "field_write",
+            Self::PublicApiReference => "public_api_reference",
+            Self::TestLink => "test_link",
+            Self::AsyncBoundary => "async_boundary",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]

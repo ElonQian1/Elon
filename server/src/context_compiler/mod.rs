@@ -7,6 +7,10 @@ mod context_evidence_tests;
 mod context_pack;
 mod context_pack_render;
 mod hunyuan_brief;
+mod impact_analysis;
+#[cfg(test)]
+mod impact_analysis_tests;
+mod impact_render;
 mod model;
 mod relevance;
 mod repo_snapshot;
@@ -66,8 +70,10 @@ pub(crate) async fn compile_preflight_note(
             rust,
             graph,
             rust_analyzer,
+            impact: model::RustImpactAnalysis::default(),
             evidence: model::ContextEvidence::default(),
         };
+        index.impact = impact_analysis::build_rust_impact_analysis(workspace, &index);
         index.evidence =
             context_evidence::build_context_evidence(workspace, &index, &relevant_files);
         Some(index)
@@ -135,6 +141,7 @@ pub(crate) async fn compile_preflight_note(
                     "snippets": index.evidence.snippets.len(),
                     "test_targets": index.evidence.test_targets.len(),
                     "build_commands": index.evidence.build_commands.len(),
+                    "impact_facts": count_impact_facts(&index.impact),
                 })),
                 "pack_chars": final_pack.chars().count(),
                 "artifact_path": artifact.as_ref().map(|item| item.path.display().to_string()),
@@ -162,6 +169,10 @@ pub(crate) async fn compile_preflight_note(
             .as_ref()
             .map(|index| index.evidence.snippets.len())
             .unwrap_or_default(),
+        impact_facts = repo_index
+            .as_ref()
+            .map(|index| count_impact_facts(&index.impact))
+            .unwrap_or_default(),
         artifact_path = artifact
             .as_ref()
             .map(|item| item.path.display().to_string())
@@ -179,4 +190,14 @@ pub(crate) async fn compile_preflight_note(
     } else {
         None
     }
+}
+
+fn count_impact_facts(impact: &model::RustImpactAnalysis) -> usize {
+    impact.trait_implementations.len()
+        + impact.function_call_sites.len()
+        + impact.enum_match_sites.len()
+        + impact.field_accesses.len()
+        + impact.public_api_references.len()
+        + impact.test_links.len()
+        + impact.async_boundaries.len()
 }

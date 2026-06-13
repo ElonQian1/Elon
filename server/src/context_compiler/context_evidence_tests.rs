@@ -71,6 +71,7 @@ fn builds_snippet_with_hash_and_build_command() {
             ..SymbolGraphSummary::default()
         },
         rust_analyzer: Default::default(),
+        impact: Default::default(),
         evidence: Default::default(),
     };
 
