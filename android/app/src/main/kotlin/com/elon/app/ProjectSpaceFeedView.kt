@@ -105,7 +105,7 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(34))
             background = roundedBackground(
-                colorHex = "#40FFFFFF",
+                colorHex = "#30333A",
                 topStartDp = 18,
                 topEndDp = 18,
                 bottomEndDp = 0,
@@ -127,12 +127,12 @@ internal class ProjectSpaceFeedView(
                 text = "公告"
                 textSize = 15f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#101010"))
+                setTextColor(Color.parseColor("#D6D6D6"))
             })
             addView(TextView(activity).apply {
                 text = displayText
                 textSize = 14f
-                setTextColor(Color.parseColor("#333333"))
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setLineSpacing(dp(3).toFloat(), 1f)
                 setPadding(0, dp(7), 0, 0)
             })

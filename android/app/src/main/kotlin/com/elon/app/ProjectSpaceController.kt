@@ -905,12 +905,12 @@ internal class ProjectSpaceController(
             textSize = 13f
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(Color.parseColor(if (description.isBlank()) "#454545" else "#101010"))
+            setTextColor(Color.parseColor(if (description.isBlank()) "#777777" else "#D6D6D6"))
             setLineSpacing(dp(3).toFloat(), 1.0f)
             maxLines = 8
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = panelBackground("#40FFFFFF").apply {
+            background = panelBackground("#30333A").apply {
                 cornerRadius = dp(14).toFloat()
             }
             if (editable) {
