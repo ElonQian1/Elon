@@ -129,6 +129,7 @@ mod tests {
                 ..Default::default()
             }),
             storage: None,
+            dev_runtime: None,
             models: vec![model(price)],
             tts_worker_url: None,
             connected_at: 1,

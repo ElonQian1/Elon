@@ -250,6 +250,8 @@ Authorization: Bearer <token>
 9. 服务端把项目标记为 `source_type = pc_managed`，写入 `node_id + workspace_path`，并保存 `repo_url + branch` 作为后续迁移的重建来源。
 10. 返回项目详情。
 
+PC 节点创建项目的门槛是 `workspace_provision_ready`（一龙 PC 开发运行时可用），不是 `cli_project_ready`。`cli_project_ready` 只表示 Codex/Copilot 等 AI CLI 可用，影响后续 AI 开发任务，不应阻止“创建目录 + 初始化 Git”的基础项目创建。
+
 PC 节点默认目录结构：
 
 ```text

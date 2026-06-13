@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const PROTO_VERSION: u32 = 1;
+pub const PROTO_VERSION: u32 = 2;
 
 /// PC 节点上报的单个模型能力描述
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +52,38 @@ pub struct NodeStorageProfile {
     pub relay_git_url_enabled: bool,
     #[serde(default)]
     pub disk_free_bytes: Option<u64>,
+}
+
+/// PC 节点内置开发运行时能力。它描述“能否创建项目工作区”，不等同于 Codex/Copilot 等 AI CLI。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NodeDevRuntimeProfile {
+    #[serde(default)]
+    pub workspace_root_path: Option<String>,
+    #[serde(default)]
+    pub workspace_root_writable: bool,
+    #[serde(default)]
+    pub git_ready: bool,
+    #[serde(default)]
+    pub workspace_provision_ready: bool,
+    #[serde(default)]
+    pub dev_env_ready: bool,
+    #[serde(default)]
+    pub ai_cli_ready: bool,
+    #[serde(default)]
+    pub toolchains: Vec<DevToolchainStatus>,
+    #[serde(default)]
+    pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DevToolchainStatus {
+    pub name: String,
+    #[serde(default)]
+    pub available: bool,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -254,6 +286,9 @@ pub enum AgentToServer {
         /// 项目代码硬盘服务能力；旧节点不发送也兼容。
         #[serde(default)]
         storage: Option<NodeStorageProfile>,
+        /// PC 开发运行时能力；旧节点不发送时服务端会按 allowed_clis 做兼容推断。
+        #[serde(default)]
+        dev_runtime: Option<NodeDevRuntimeProfile>,
     },
     TaskStarted {
         task_id: String,
@@ -330,6 +365,9 @@ pub enum AgentToServer {
         /// 能力刷新时顺带更新硬盘服务状态。
         #[serde(default)]
         storage: Option<NodeStorageProfile>,
+        /// 能力刷新时顺带更新 PC 开发运行时状态。
+        #[serde(default)]
+        dev_runtime: Option<NodeDevRuntimeProfile>,
     },
     /// LLM 推理流式输出片段
     LlmStreamChunk {

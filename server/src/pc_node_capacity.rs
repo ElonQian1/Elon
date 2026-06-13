@@ -36,9 +36,9 @@ pub fn assess_pc_node_capacity(
     if !node.online {
         warnings.push("PC 节点离线，不能创建新项目目录".to_string());
     } else if !node.cli_connected {
-        warnings.push("PC CLI 通道未连接，不能创建新项目目录".to_string());
-    } else if !node.cli_project_ready() {
-        warnings.push("PC 节点未上报 Codex/Copilot CLI 能力".to_string());
+        warnings.push("PC 开发运行时通道未连接，不能创建新项目目录".to_string());
+    } else if !node.workspace_provision_ready() {
+        warnings.push("PC 节点未上报可创建项目工作区的开发运行时能力".to_string());
     }
     if node.project_count >= project_limit {
         warnings.push(format!("PC 节点项目数已达上限 {project_limit} 个"));
@@ -54,13 +54,13 @@ pub fn assess_pc_node_capacity(
 
     let hard_blocked = !node.online
         || !node.cli_connected
-        || !node.cli_project_ready()
+        || !node.workspace_provision_ready()
         || node.project_count >= project_limit
         || disk_free_bytes.is_some_and(|bytes| bytes < min_free_bytes);
     let (label, tone) = if !node.online {
         ("离线", "bad")
-    } else if !node.cli_connected || !node.cli_project_ready() {
-        ("CLI 不可用", "bad")
+    } else if !node.cli_connected || !node.workspace_provision_ready() {
+        ("开发运行时不可用", "bad")
     } else if node.project_count >= project_limit {
         ("项目数已满", "bad")
     } else if disk_free_bytes.is_some_and(|bytes| bytes < min_free_bytes) {
@@ -154,6 +154,7 @@ mod tests {
             device_name: Some("PC-A".to_string()),
             hardware: None,
             storage: None,
+            dev_runtime: None,
             display_name: "PC-A".to_string(),
             short_id: "node-a".to_string(),
             models: Vec::new(),

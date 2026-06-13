@@ -7,6 +7,7 @@ use crate::pc_workspace_git_remote::{
     git_remote_origin,
 };
 use crate::project_default_docs::ensure_default_docs_in_workspace;
+use elon_pc_dev_runtime::workspace_root;
 
 pub struct ProjectWorkspaceRequest {
     pub project_id: String,
@@ -337,37 +338,6 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     } else {
         Ok(format!("conversation branch merged: {}", short_sha(&after)))
     }
-}
-
-fn workspace_root() -> PathBuf {
-    for key in [
-        "ELON_NODE_WORKSPACE_ROOT",
-        "ELON_PC_WORKSPACE_ROOT",
-        "NODE_WORKSPACE_ROOT",
-    ] {
-        if let Ok(value) = std::env::var(key) {
-            let value = value.trim();
-            if !value.is_empty() {
-                return PathBuf::from(value);
-            }
-        }
-    }
-
-    #[cfg(windows)]
-    {
-        if let Ok(profile) = std::env::var("USERPROFILE") {
-            return PathBuf::from(profile).join("Elon").join("workspaces");
-        }
-    }
-
-    #[cfg(not(windows))]
-    {
-        if let Ok(home) = std::env::var("HOME") {
-            return PathBuf::from(home).join(".elon").join("workspaces");
-        }
-    }
-
-    std::env::temp_dir().join("elon").join("workspaces")
 }
 
 fn safe_path_part(value: &str, fallback: &str, max_len: usize) -> String {

@@ -47,6 +47,8 @@ internal data class ProjectCreateNodeOption(
     val projectLimit: Int = 0,
     val projectSlotsRemaining: Int = 0,
     val cliProjectReady: Boolean = false,
+    val workspaceProvisionReady: Boolean = false,
+    val aiCliReady: Boolean = false,
     val allowedClis: List<String> = emptyList(),
     val canAcceptProject: Boolean = false,
     val capacityLabel: String = "",
@@ -210,6 +212,16 @@ internal fun fetchProjectCreateNodes(
         }.orEmpty()
         val cliReady = obj.optBoolean("cli_project_ready", false) ||
             allowedClis.any { it.equals("codex", ignoreCase = true) || it.equals("copilot", ignoreCase = true) }
+        val workspaceReady = when {
+            obj.has("workspace_provision_ready") -> obj.optBoolean("workspace_provision_ready", false)
+            obj.has("workspaceProvisionReady") -> obj.optBoolean("workspaceProvisionReady", false)
+            else -> cliReady
+        }
+        val aiCliReady = when {
+            obj.has("ai_cli_ready") -> obj.optBoolean("ai_cli_ready", false)
+            obj.has("aiCliReady") -> obj.optBoolean("aiCliReady", false)
+            else -> cliReady
+        }
         val projectCount = obj.optInt("project_count", 0).coerceAtLeast(0)
         val projectLimit = obj.optInt("project_limit", 0).coerceAtLeast(0)
         val projectSlotsRemaining = obj.optInt(
@@ -226,7 +238,7 @@ internal fun fetchProjectCreateNodes(
             obj.has("can_accept_project") -> obj.optBoolean("can_accept_project", false)
             obj.has("canAcceptProject") -> obj.optBoolean("canAcceptProject", false)
             else -> obj.optBoolean("online", false) &&
-                cliReady &&
+                workspaceReady &&
                 projectSlotsRemaining > 0 &&
                 !capacityTone.equals("bad", ignoreCase = true)
         }
@@ -244,6 +256,8 @@ internal fun fetchProjectCreateNodes(
             projectLimit = projectLimit,
             projectSlotsRemaining = projectSlotsRemaining,
             cliProjectReady = cliReady,
+            workspaceProvisionReady = workspaceReady,
+            aiCliReady = aiCliReady,
             allowedClis = allowedClis,
             canAcceptProject = canAcceptProject,
             capacityLabel = obj.optString("capacity_label").trim(),

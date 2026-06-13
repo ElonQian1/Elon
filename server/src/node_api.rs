@@ -15,7 +15,9 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use homecli_proto::{ModelCapability, NodeHardwareProfile, NodeStorageProfile};
+use homecli_proto::{
+    ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
+};
 use sha2::Digest as _;
 use std::{collections::HashMap, sync::Arc};
 
@@ -75,6 +77,20 @@ pub async fn list_nodes(
             .as_ref()
             .map(|agent| agent.allowed_clis.clone())
             .unwrap_or_default();
+        let dev_runtime = node.dev_runtime.clone().or_else(|| {
+            cli_agent
+                .as_ref()
+                .and_then(|agent| agent.dev_runtime.clone())
+        });
+        let cli_project_ready = supports_project_cli(&allowed_clis);
+        let workspace_provision_ready = dev_runtime
+            .as_ref()
+            .map(|runtime| runtime.workspace_provision_ready)
+            .unwrap_or(cli_project_ready);
+        let ai_cli_ready = dev_runtime
+            .as_ref()
+            .map(|runtime| runtime.ai_cli_ready)
+            .unwrap_or(cli_project_ready);
         let short_id = short_node_id(&node_id);
         let device_name = clean_string(node.device_name.as_deref()).or_else(|| {
             cli_agent
@@ -96,6 +112,7 @@ pub async fn list_nodes(
             node.online || cli_agent.is_some(),
             cli_agent.is_some(),
             &allowed_clis,
+            dev_runtime.clone(),
             project_count,
         );
         let hardware = hardware_for_response(&state, &node_id, node.hardware);
@@ -108,6 +125,7 @@ pub async fn list_nodes(
             hardware,
             hardware_summary,
             storage: node.storage.clone(),
+            dev_runtime,
             storage_ready: node
                 .storage
                 .as_ref()
@@ -122,7 +140,9 @@ pub async fn list_nodes(
             short_id,
             models: node.models,
             allowed_clis: allowed_clis.clone(),
-            cli_project_ready: supports_project_cli(&allowed_clis),
+            cli_project_ready,
+            workspace_provision_ready,
+            ai_cli_ready,
             project_count,
             project_limit: capacity.project_limit,
             project_slots_remaining: capacity.project_slots_remaining,
@@ -140,6 +160,16 @@ pub async fn list_nodes(
     for agent in cli_by_id.into_values() {
         let node_id = agent.agent_id.clone();
         let allowed_clis = agent.allowed_clis.clone();
+        let dev_runtime = agent.dev_runtime.clone();
+        let cli_project_ready = supports_project_cli(&allowed_clis);
+        let workspace_provision_ready = dev_runtime
+            .as_ref()
+            .map(|runtime| runtime.workspace_provision_ready)
+            .unwrap_or(cli_project_ready);
+        let ai_cli_ready = dev_runtime
+            .as_ref()
+            .map(|runtime| runtime.ai_cli_ready)
+            .unwrap_or(cli_project_ready);
         let short_id = short_node_id(&node_id);
         let device_name = clean_string(agent.device_name.as_deref());
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
@@ -163,6 +193,7 @@ pub async fn list_nodes(
             true,
             true,
             &allowed_clis,
+            dev_runtime.clone(),
             project_count,
         );
         let hardware = hardware_for_response(&state, &node_id, agent.hardware);
@@ -175,6 +206,7 @@ pub async fn list_nodes(
             hardware,
             hardware_summary,
             storage: agent.storage.clone(),
+            dev_runtime,
             storage_ready: agent
                 .storage
                 .as_ref()
@@ -189,7 +221,9 @@ pub async fn list_nodes(
             short_id,
             models: Vec::new(),
             allowed_clis: allowed_clis.clone(),
-            cli_project_ready: supports_project_cli(&allowed_clis),
+            cli_project_ready,
+            workspace_provision_ready,
+            ai_cli_ready,
             project_count,
             project_limit: capacity.project_limit,
             project_slots_remaining: capacity.project_slots_remaining,
@@ -551,6 +585,12 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         .into_iter()
         .map(|node| {
             let cli_project_ready = node.cli_project_ready();
+            let workspace_provision_ready = node.workspace_provision_ready();
+            let ai_cli_ready = node
+                .dev_runtime
+                .as_ref()
+                .map(|runtime| runtime.ai_cli_ready)
+                .unwrap_or(cli_project_ready);
             let global_project_count = state
                 .store
                 .count_active_pc_projects_for_node(&node.node_id)
@@ -578,6 +618,7 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 hardware,
                 hardware_summary,
                 storage,
+                dev_runtime: node.dev_runtime,
                 storage_ready,
                 storage_repo_url_configured,
                 display_name: node.display_name,
@@ -586,6 +627,8 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 allowed_clis: node.allowed_clis,
                 allowed_cwds: node.allowed_cwds,
                 cli_project_ready,
+                workspace_provision_ready,
+                ai_cli_ready,
                 project_count: capacity.project_count,
                 project_limit: capacity.project_limit,
                 project_slots_remaining: capacity.project_slots_remaining,
@@ -615,6 +658,7 @@ struct PublicNodeResponse {
     hardware: Option<NodeHardwareProfile>,
     hardware_summary: String,
     storage: Option<NodeStorageProfile>,
+    dev_runtime: Option<NodeDevRuntimeProfile>,
     storage_ready: bool,
     storage_repo_url_configured: bool,
     display_name: String,
@@ -622,6 +666,8 @@ struct PublicNodeResponse {
     models: Vec<ModelCapability>,
     allowed_clis: Vec<String>,
     cli_project_ready: bool,
+    workspace_provision_ready: bool,
+    ai_cli_ready: bool,
     project_count: i64,
     project_limit: i64,
     project_slots_remaining: i64,
@@ -645,6 +691,7 @@ struct MyNodeResponse {
     hardware: Option<NodeHardwareProfile>,
     hardware_summary: String,
     storage: Option<NodeStorageProfile>,
+    dev_runtime: Option<NodeDevRuntimeProfile>,
     storage_ready: bool,
     storage_repo_url_configured: bool,
     display_name: String,
@@ -653,6 +700,8 @@ struct MyNodeResponse {
     allowed_clis: Vec<String>,
     allowed_cwds: Vec<String>,
     cli_project_ready: bool,
+    workspace_provision_ready: bool,
+    ai_cli_ready: bool,
     project_count: i64,
     project_limit: i64,
     project_slots_remaining: i64,
@@ -694,6 +743,7 @@ fn capacity_for_response(
     online: bool,
     cli_connected: bool,
     allowed_clis: &[String],
+    dev_runtime: Option<NodeDevRuntimeProfile>,
     project_count: i64,
 ) -> PcNodeCapacity {
     let latest_snapshot = state
@@ -708,6 +758,7 @@ fn capacity_for_response(
         device_name: device_name.map(ToOwned::to_owned),
         hardware: None,
         storage: None,
+        dev_runtime,
         display_name: display_name.to_string(),
         short_id: short_node_id(node_id),
         models: Vec::new(),

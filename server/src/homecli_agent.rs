@@ -20,7 +20,9 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, NodeHardwareProfile, NodeStorageProfile, ServerToAgent};
+use homecli_proto::{
+    AgentToServer, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile, ServerToAgent,
+};
 use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::{
@@ -43,6 +45,7 @@ pub struct AgentEntry {
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
+    pub dev_runtime: Option<NodeDevRuntimeProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -134,6 +137,7 @@ impl AgentManager {
                 device_name: a.device_name.clone(),
                 hardware: a.hardware.clone(),
                 storage: a.storage.clone(),
+                dev_runtime: a.dev_runtime.clone(),
                 allowed_clis: a.allowed_clis.clone(),
                 allowed_cwds: a.allowed_cwds.clone(),
                 connected_at: a.connected_at,
@@ -478,6 +482,7 @@ pub struct AgentSummary {
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
+    pub dev_runtime: Option<NodeDevRuntimeProfile>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -572,6 +577,7 @@ async fn run_agent_session(
         device_name,
         hardware,
         storage,
+        dev_runtime,
     ) = match register {
         AgentToServer::Register {
             agent_id,
@@ -583,6 +589,7 @@ async fn run_agent_session(
             device_name,
             hardware,
             storage,
+            dev_runtime,
         } => (
             agent_id,
             version,
@@ -593,6 +600,7 @@ async fn run_agent_session(
             clean_optional(device_name),
             hardware,
             storage,
+            dev_runtime,
         ),
         _ => return Err(anyhow!("first frame must be register")),
     };
@@ -656,6 +664,7 @@ async fn run_agent_session(
         device_name: device_name.clone(),
         hardware: hardware.clone(),
         storage: storage.clone(),
+        dev_runtime: dev_runtime.clone(),
         allowed_clis,
         allowed_cwds,
         connected_at: SystemTime::now()
@@ -712,6 +721,7 @@ async fn run_agent_session(
             device_name,
             hardware,
             storage,
+            dev_runtime,
             vec![],
             connected_at,
         )
@@ -801,6 +811,7 @@ async fn run_agent_session(
                                     tts_worker_url,
                                     hardware,
                                     storage,
+                                    dev_runtime,
                                 } => {
                                     if let Some(hardware) = hardware.as_ref() {
                                         if !session_owner_user_id.is_empty() {
@@ -828,6 +839,7 @@ async fn run_agent_session(
                                             tts_worker_url.clone(),
                                             hardware.clone(),
                                             storage.clone(),
+                                            dev_runtime.clone(),
                                         )
                                         .await;
                                 }

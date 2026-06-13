@@ -17,6 +17,7 @@ tokio = { version = "1", features = ["full"] }
 
 # 共享协议（homecli PC agent ↔ 本服务的反向 WSS 长连接）
 homecli-proto = { path = "homecli-proto" }
+elon-pc-dev-runtime = { path = "pc-dev-runtime" }
 
 # Web 框架
 axum = { version = "0.7", features = ["ws", "macros", "multipart"] }

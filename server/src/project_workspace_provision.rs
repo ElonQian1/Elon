@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 use homecli_proto::AgentToServer;
 
 use crate::{
-    node_runtime::{node_runtime_by_id, supports_project_cli, NodeRuntime},
+    node_runtime::{node_runtime_by_id, NodeRuntime},
     pc_node_capacity::{assess_pc_node_capacity, capacity_block_message},
     types::AppState,
 };
@@ -42,17 +42,17 @@ pub async fn resolve_pc_project_node(
                 format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
             ));
         }
-        if !runtime.cli_project_ready() {
+        if !runtime.workspace_provision_ready() {
             return Err((
                 StatusCode::BAD_REQUEST,
-                format!("PC 节点不支持 Codex/Copilot CLI: {node_id}"),
+                format!("PC 节点未启用可创建项目工作区的开发运行时能力: {node_id}"),
             ));
         }
         enforce_capacity(state, &runtime)?;
         return Ok(node_id.to_string());
     }
 
-    let cli_nodes = connected_project_cli_nodes(state).await;
+    let cli_nodes = connected_project_workspace_nodes(state).await;
     let mut candidates = Vec::new();
     let mut blocked_messages = Vec::new();
     for node in cli_nodes {
@@ -76,7 +76,7 @@ pub async fn resolve_pc_project_node(
         )),
         _ => Err((
             StatusCode::CONFLICT,
-            "检测到多个在线 PC CLI 节点，请在请求中指定 node_id".into(),
+            "检测到多个在线 PC 开发运行时节点，请在请求中指定 node_id".into(),
         )),
     }
 }
@@ -151,18 +151,13 @@ fn enforce_capacity(
     }
 }
 
-async fn connected_project_cli_nodes(state: &AppState) -> Vec<NodeRuntime> {
+async fn connected_project_workspace_nodes(state: &AppState) -> Vec<NodeRuntime> {
     let mut nodes = Vec::new();
-    for agent in state
-        .agent_manager
-        .list()
-        .await
-        .into_iter()
-        .filter(|agent| supports_project_cli(&agent.allowed_clis))
-    {
+    for agent in state.agent_manager.list().await {
         match node_runtime_by_id(state, &agent.agent_id).await {
-            Ok(Some(runtime)) => nodes.push(runtime),
+            Ok(Some(runtime)) if runtime.workspace_provision_ready() => nodes.push(runtime),
             Ok(None) => {}
+            Ok(Some(_)) => {}
             Err(e) => tracing::warn!(
                 node_id = %agent.agent_id,
                 error = %e,

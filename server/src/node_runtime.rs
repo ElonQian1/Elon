@@ -1,5 +1,7 @@
 use anyhow::Result;
-use homecli_proto::{ModelCapability, NodeHardwareProfile, NodeStorageProfile};
+use homecli_proto::{
+    ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
+};
 use std::collections::HashMap;
 
 use crate::{
@@ -14,6 +16,7 @@ pub struct NodeRuntime {
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
+    pub dev_runtime: Option<NodeDevRuntimeProfile>,
     pub display_name: String,
     pub short_id: String,
     pub models: Vec<ModelCapability>,
@@ -30,6 +33,13 @@ pub struct NodeRuntime {
 impl NodeRuntime {
     pub fn cli_project_ready(&self) -> bool {
         supports_project_cli(&self.allowed_clis)
+    }
+
+    pub fn workspace_provision_ready(&self) -> bool {
+        self.dev_runtime
+            .as_ref()
+            .map(|runtime| runtime.workspace_provision_ready)
+            .unwrap_or_else(|| self.cli_project_ready())
     }
 
     pub fn storage_ready(&self) -> bool {
@@ -224,6 +234,9 @@ fn build_runtime_for_parts(
     let storage = registry
         .and_then(|node| node.storage.clone())
         .or_else(|| cli.and_then(|agent| agent.storage.clone()));
+    let dev_runtime = registry
+        .and_then(|node| node.dev_runtime.clone())
+        .or_else(|| cli.and_then(|agent| agent.dev_runtime.clone()));
     let registry_online = registry.map(|node| node.online).unwrap_or(false);
     let cli_connected = cli.is_some();
     let connected_at = registry
@@ -237,6 +250,7 @@ fn build_runtime_for_parts(
         device_name,
         hardware,
         storage,
+        dev_runtime,
         display_name,
         short_id,
         models,
@@ -283,11 +297,52 @@ mod tests {
     }
 
     #[test]
+    fn workspace_provision_ready_prefers_dev_runtime_profile() {
+        let mut runtime = test_runtime(vec!["codex".to_string()]);
+        runtime.dev_runtime = Some(NodeDevRuntimeProfile {
+            workspace_provision_ready: false,
+            ..Default::default()
+        });
+
+        assert!(!runtime.workspace_provision_ready());
+    }
+
+    #[test]
+    fn workspace_provision_ready_falls_back_for_legacy_ai_cli_nodes() {
+        let runtime = test_runtime(vec!["codex".to_string()]);
+
+        assert!(runtime.workspace_provision_ready());
+    }
+
+    #[test]
     fn short_node_id_keeps_tail_for_long_ids() {
         assert_eq!(short_node_id("node-short"), "node-short");
         assert_eq!(
             short_node_id("node-user-1234567890abcdef"),
             "...34567890abcdef"
         );
+    }
+
+    fn test_runtime(allowed_clis: Vec<String>) -> NodeRuntime {
+        NodeRuntime {
+            node_id: "node-a".to_string(),
+            owner_user_id: "user-a".to_string(),
+            label: "PC-A".to_string(),
+            device_name: Some("PC-A".to_string()),
+            hardware: None,
+            storage: None,
+            dev_runtime: None,
+            display_name: "PC-A".to_string(),
+            short_id: "node-a".to_string(),
+            models: Vec::new(),
+            allowed_clis,
+            allowed_cwds: Vec::new(),
+            connected_at: 1,
+            created_at: String::new(),
+            online: true,
+            registry_online: true,
+            cli_connected: true,
+            project_count: 0,
+        }
     }
 }

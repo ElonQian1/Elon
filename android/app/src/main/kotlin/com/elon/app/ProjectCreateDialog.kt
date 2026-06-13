@@ -142,14 +142,16 @@ internal object ProjectCreateDialog {
     }
 
     private fun ProjectCreateNodeOption.spinnerLabel(): String {
-        val cli = allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/") ?: "CLI"
+        val runtime = if (workspaceProvisionReady) "开发运行时" else "运行时未就绪"
+        val aiCli = allowedClis.takeIf { it.isNotEmpty() }?.joinToString("/")?.let { "AI $it" }.orEmpty()
         return listOf(
             displayName,
             shortId,
             capacityLabel.ifBlank { "可创建项目" },
             projectSlotText(),
             diskText(),
-            cli
+            runtime,
+            aiCli
         ).filter { it.isNotBlank() }.joinToString(" · ")
     }
 
@@ -158,7 +160,7 @@ internal object ProjectCreateDialog {
             ?: capacityLabel.takeIf { it.isNotBlank() }
             ?: when {
                 !online -> "PC 节点离线"
-                !cliProjectReady -> "PC CLI 通道不可用"
+                !workspaceProvisionReady -> "PC 开发运行时不可用"
                 projectLimit > 0 && projectSlotsRemaining <= 0 -> "项目数已满"
                 else -> "容量暂不可用"
             }

@@ -1474,6 +1474,18 @@ async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
+    let dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile(&available_clis);
+    if dev_runtime.workspace_provision_ready {
+        info!(
+            "📁 PC 开发运行时已就绪: {}",
+            dev_runtime
+                .workspace_root_path
+                .as_deref()
+                .unwrap_or("workspace root unknown")
+        );
+    } else {
+        warn!("⚠️  PC 开发运行时未就绪: {}", dev_runtime.issues.join("；"));
+    }
     let hardware = crate::node_hardware_probe::collect_hardware_profile();
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
@@ -1489,6 +1501,7 @@ async fn run_session(
         device_name: Some(machine_label()),
         hardware: Some(hardware.clone()),
         storage: Some(storage.clone()),
+        dev_runtime: Some(dev_runtime.clone()),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
@@ -1499,6 +1512,7 @@ async fn run_session(
         tts_worker_url: tts_url,
         hardware: Some(hardware),
         storage: Some(storage),
+        dev_runtime: Some(dev_runtime),
     }))?;
 
     // WS ping 定时器
