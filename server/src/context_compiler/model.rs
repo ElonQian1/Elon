@@ -5,6 +5,7 @@ pub(crate) struct RepoContextIndex {
     pub(crate) rust: RustIndex,
     pub(crate) graph: SymbolGraphSummary,
     pub(crate) rust_analyzer: RustAnalyzerReport,
+    pub(crate) semantic_plan: SemanticQueryPlan,
     pub(crate) impact: RustImpactAnalysis,
     pub(crate) evidence: ContextEvidence,
 }
@@ -263,6 +264,75 @@ pub(crate) struct RustAnalyzerFinding {
     pub(crate) severity: Option<String>,
     pub(crate) message: String,
     pub(crate) evidence: String,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct SemanticQueryPlan {
+    pub(crate) coverage: SemanticQueryCoverage,
+    pub(crate) queries: Vec<SemanticQuery>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct SemanticQueryCoverage {
+    pub(crate) top_files_considered: usize,
+    pub(crate) top_symbols_considered: usize,
+    pub(crate) planned_files: usize,
+    pub(crate) planned_symbols: usize,
+    pub(crate) query_count: usize,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct SemanticQuery {
+    pub(crate) provider: SemanticQueryProvider,
+    pub(crate) method: SemanticQueryMethod,
+    pub(crate) path: String,
+    pub(crate) line: usize,
+    pub(crate) symbol: Option<String>,
+    pub(crate) priority: u8,
+    pub(crate) reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SemanticQueryProvider {
+    RustAnalyzerLsp,
+}
+
+impl SemanticQueryProvider {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::RustAnalyzerLsp => "rust_analyzer_lsp",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SemanticQueryMethod {
+    DocumentSymbol,
+    Diagnostic,
+    References,
+    Implementation,
+    Hover,
+    PrepareCallHierarchy,
+    IncomingCalls,
+    OutgoingCalls,
+}
+
+impl SemanticQueryMethod {
+    pub(crate) fn as_lsp_method(self) -> &'static str {
+        match self {
+            Self::DocumentSymbol => "textDocument/documentSymbol",
+            Self::Diagnostic => "textDocument/diagnostic",
+            Self::References => "textDocument/references",
+            Self::Implementation => "textDocument/implementation",
+            Self::Hover => "textDocument/hover",
+            Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+            Self::IncomingCalls => "callHierarchy/incomingCalls",
+            Self::OutgoingCalls => "callHierarchy/outgoingCalls",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]

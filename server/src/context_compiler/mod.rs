@@ -25,6 +25,10 @@ mod rust_analyzer_probe_render;
 mod rust_analyzer_probe_tests;
 mod rust_project;
 mod rust_symbols;
+mod semantic_query_plan;
+mod semantic_query_plan_render;
+#[cfg(test)]
+mod semantic_query_plan_tests;
 mod symbol_graph;
 mod task_profile;
 mod validation;
@@ -80,9 +84,15 @@ pub(crate) async fn compile_preflight_note(
             rust,
             graph,
             rust_analyzer,
+            semantic_plan: model::SemanticQueryPlan::default(),
             impact: model::RustImpactAnalysis::default(),
             evidence: model::ContextEvidence::default(),
         };
+        index.semantic_plan = semantic_query_plan::build_semantic_query_plan(
+            &index,
+            config.max_rust_analyzer_files,
+            config.max_symbols,
+        );
         index.impact = impact_analysis::build_rust_impact_analysis(workspace, &index);
         index.evidence =
             context_evidence::build_context_evidence(workspace, &index, &relevant_files);
@@ -150,6 +160,7 @@ pub(crate) async fn compile_preflight_note(
                     "ra_files": index.rust_analyzer.files_enhanced,
                     "ra_probe_enabled": index.rust_analyzer.probes.enabled,
                     "ra_probe_findings": count_ra_probe_findings(&index.rust_analyzer.probes),
+                    "semantic_queries": index.semantic_plan.queries.len(),
                     "snippets": index.evidence.snippets.len(),
                     "test_targets": index.evidence.test_targets.len(),
                     "build_commands": index.evidence.build_commands.len(),
@@ -184,6 +195,10 @@ pub(crate) async fn compile_preflight_note(
         impact_facts = repo_index
             .as_ref()
             .map(|index| count_impact_facts(&index.impact))
+            .unwrap_or_default(),
+        semantic_queries = repo_index
+            .as_ref()
+            .map(|index| index.semantic_plan.queries.len())
             .unwrap_or_default(),
         artifact_path = artifact
             .as_ref()
