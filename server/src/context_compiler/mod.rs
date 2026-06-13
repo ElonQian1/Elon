@@ -15,6 +15,10 @@ mod model;
 mod relevance;
 mod repo_snapshot;
 mod rust_analyzer;
+mod rust_analyzer_probe;
+mod rust_analyzer_probe_render;
+#[cfg(test)]
+mod rust_analyzer_probe_tests;
 mod rust_project;
 mod rust_symbols;
 mod symbol_graph;
@@ -63,6 +67,8 @@ pub(crate) async fn compile_preflight_note(
             &graph,
             config.rust_analyzer_enabled,
             config.max_rust_analyzer_files,
+            config.rust_analyzer_probe_enabled,
+            config.rust_analyzer_probe_timeout_ms,
         );
         let mut index = model::RepoContextIndex {
             task,
@@ -138,6 +144,8 @@ pub(crate) async fn compile_preflight_note(
                     "relationships": index.graph.relationships.len(),
                     "ra_available": index.rust_analyzer.available,
                     "ra_files": index.rust_analyzer.files_enhanced,
+                    "ra_probe_enabled": index.rust_analyzer.probes.enabled,
+                    "ra_probe_findings": count_ra_probe_findings(&index.rust_analyzer.probes),
                     "snippets": index.evidence.snippets.len(),
                     "test_targets": index.evidence.test_targets.len(),
                     "build_commands": index.evidence.build_commands.len(),
@@ -200,4 +208,12 @@ fn count_impact_facts(impact: &model::RustImpactAnalysis) -> usize {
         + impact.public_api_references.len()
         + impact.test_links.len()
         + impact.async_boundaries.len()
+}
+
+fn count_ra_probe_findings(probes: &model::RustAnalyzerProbeReport) -> usize {
+    probes
+        .commands
+        .iter()
+        .map(|command| command.findings.len())
+        .sum()
 }

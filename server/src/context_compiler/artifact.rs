@@ -278,6 +278,8 @@ mod tests {
             llm_brief_enabled: false,
             rust_analysis_enabled: true,
             rust_analyzer_enabled: true,
+            rust_analyzer_probe_enabled: false,
+            rust_analyzer_probe_timeout_ms: 4_000,
             max_relevant_files: 4,
             max_rust_files: 40,
             max_symbols: 20,

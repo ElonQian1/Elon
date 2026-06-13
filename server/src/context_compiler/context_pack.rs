@@ -1,7 +1,7 @@
 use super::{
     config::ContextCompilerConfig, context_pack_render, impact_render, model::RepoContextIndex,
-    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
-    validation::ValidationPlan,
+    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_analyzer_probe_render,
+    rust_project::RustProjectSummary, validation::ValidationPlan,
 };
 
 pub(crate) fn build_context_pack(
@@ -38,6 +38,10 @@ pub(crate) fn build_context_pack(
     context_pack_render::render_repo_snapshot(&mut out, snapshot);
     context_pack_render::render_rust_project(&mut out, rust_project);
     context_pack_render::render_repo_index(&mut out, repo_index);
+    rust_analyzer_probe_render::render_rust_analyzer_probes(
+        &mut out,
+        repo_index.map(|index| &index.rust_analyzer.probes),
+    );
     context_pack_render::render_source_size_risks(&mut out, snapshot);
     impact_render::render_impact_analysis(&mut out, repo_index.map(|index| &index.impact));
     context_pack_render::render_context_evidence(&mut out, repo_index.map(|index| &index.evidence));
@@ -78,6 +82,8 @@ mod tests {
             llm_brief_enabled: false,
             rust_analysis_enabled: true,
             rust_analyzer_enabled: true,
+            rust_analyzer_probe_enabled: false,
+            rust_analyzer_probe_timeout_ms: 4_000,
             max_relevant_files: 4,
             max_rust_files: 40,
             max_symbols: 20,

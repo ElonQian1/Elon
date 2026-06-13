@@ -179,6 +179,7 @@ pub(crate) struct RustAnalyzerReport {
     pub(crate) files_enhanced: usize,
     pub(crate) symbols: Vec<RustAnalyzerSymbol>,
     pub(crate) enhancement_targets: Vec<String>,
+    pub(crate) probes: RustAnalyzerProbeReport,
     pub(crate) warnings: Vec<String>,
 }
 
@@ -190,6 +191,56 @@ pub(crate) struct RustAnalyzerSymbol {
     pub(crate) detail: Option<String>,
     pub(crate) line: usize,
     pub(crate) parent: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct RustAnalyzerProbeReport {
+    pub(crate) enabled: bool,
+    pub(crate) workspace_path: Option<String>,
+    pub(crate) commands: Vec<RustAnalyzerCommandProbe>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RustAnalyzerCommandProbe {
+    pub(crate) name: String,
+    pub(crate) command: String,
+    pub(crate) status: RustAnalyzerProbeStatus,
+    pub(crate) duration_ms: u64,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) findings: Vec<RustAnalyzerFinding>,
+    pub(crate) stdout_excerpt: Vec<String>,
+    pub(crate) stderr_excerpt: Vec<String>,
+    pub(crate) warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RustAnalyzerProbeStatus {
+    Succeeded,
+    Failed,
+    TimedOut,
+    Skipped,
+}
+
+impl RustAnalyzerProbeStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::TimedOut => "timed_out",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RustAnalyzerFinding {
+    pub(crate) path: Option<String>,
+    pub(crate) line: Option<usize>,
+    pub(crate) severity: Option<String>,
+    pub(crate) message: String,
+    pub(crate) evidence: String,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]

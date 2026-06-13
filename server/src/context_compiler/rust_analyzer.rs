@@ -7,7 +7,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use super::model::{RustAnalyzerReport, RustAnalyzerSymbol, RustIndex, SymbolGraphSummary};
+use super::{
+    model::{RustAnalyzerReport, RustAnalyzerSymbol, RustIndex, SymbolGraphSummary},
+    rust_analyzer_probe,
+};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(4);
 const MAX_RA_SYMBOLS: usize = 160;
@@ -18,6 +21,8 @@ pub(crate) fn collect_rust_analyzer_report(
     graph: &SymbolGraphSummary,
     enabled: bool,
     max_files: usize,
+    probe_enabled: bool,
+    probe_timeout_ms: usize,
 ) -> RustAnalyzerReport {
     if !enabled {
         return RustAnalyzerReport {
@@ -45,6 +50,13 @@ pub(crate) fn collect_rust_analyzer_report(
             return report;
         }
     }
+
+    report.probes = rust_analyzer_probe::collect_rust_analyzer_probes(
+        workspace,
+        rust,
+        probe_enabled,
+        probe_timeout_ms,
+    );
 
     let targets = enhancement_targets(rust, graph, max_files);
     report.enhancement_targets = targets.clone();
