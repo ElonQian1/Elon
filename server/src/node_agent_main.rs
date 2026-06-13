@@ -1688,13 +1688,19 @@ async fn run_session(
                         ServerToAgent::ReadProjectDocuments {
                             req_id,
                             workspace_path,
+                            seed_defaults,
                         } => {
                             info!("📚 ReadProjectDocuments: {}", req_id);
                             let tx_c = out_tx_r.clone();
                             tokio::spawn(async move {
                                 let path = std::path::PathBuf::from(workspace_path);
                                 let response =
-                                    match project_docs_scan::collect_project_documents(&path) {
+                                    match project_docs_scan::collect_project_documents_with_options(
+                                        &path,
+                                        project_docs_scan::ProjectDocumentScanOptions {
+                                            seed_missing_defaults: seed_defaults,
+                                        },
+                                    ) {
                                         Ok(snapshot) => {
                                             AgentToServer::ProjectDocumentsRead { req_id, snapshot }
                                         }

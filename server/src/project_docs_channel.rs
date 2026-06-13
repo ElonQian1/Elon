@@ -93,9 +93,14 @@ fn format_summary(snapshot: &ProjectDocumentsSnapshot) -> String {
 }
 
 fn format_document(doc: &ProjectDocumentEntry) -> String {
+    let source = if doc.source.is_empty() {
+        String::new()
+    } else {
+        format!("\n\n来源：`{}`", doc.source)
+    };
     let mut text = format!(
-        "## {}\n\n路径：`{}`\n\n{}",
-        doc.title, doc.path, doc.content
+        "## {}\n\n路径：`{}`{}\n\n{}",
+        doc.title, doc.path, source, doc.content
     );
     if doc.truncated {
         text.push_str("\n\n[文档较长，频道中已显示前半部分；AI 执行任务时仍可按需读取完整文件。]");

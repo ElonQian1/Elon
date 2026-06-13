@@ -9,7 +9,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::project_default_docs::default_project_documents;
+use crate::project_default_docs::{default_project_documents, ensure_default_docs_in_workspace};
 
 const MAX_DOCUMENTS: usize = 48;
 const MAX_DOC_CHARS: usize = 24_000;
@@ -36,7 +36,20 @@ const DOC_DIRS: &[(&str, usize, usize)] = &[
     ("docs", 300, 3),
 ];
 
-pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDocumentsSnapshot> {
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct ProjectDocumentScanOptions {
+    pub seed_missing_defaults: bool,
+}
+
+#[cfg(test)]
+fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDocumentsSnapshot> {
+    collect_project_documents_with_options(workspace, ProjectDocumentScanOptions::default())
+}
+
+pub(crate) fn collect_project_documents_with_options(
+    workspace: &FsPath,
+    options: ProjectDocumentScanOptions,
+) -> Result<ProjectDocumentsSnapshot> {
     let workspace_path = workspace.to_string_lossy().to_string();
     if !workspace.is_dir() {
         return Ok(build_snapshot(
@@ -51,6 +64,7 @@ pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDoc
     }
 
     let mut warnings = Vec::new();
+    seed_default_documents_if_requested(workspace, options, &mut warnings);
     let candidates = discover_document_candidates(workspace, &mut warnings);
     let mut documents = Vec::new();
     let mut total_chars = 0usize;
@@ -77,6 +91,25 @@ pub(crate) fn collect_project_documents(workspace: &FsPath) -> Result<ProjectDoc
     let source = snapshot_source(&documents);
 
     Ok(build_snapshot(workspace_path, source, documents, warnings))
+}
+
+fn seed_default_documents_if_requested(
+    workspace: &FsPath,
+    options: ProjectDocumentScanOptions,
+    warnings: &mut Vec<String>,
+) {
+    if !options.seed_missing_defaults {
+        return;
+    }
+    match ensure_default_docs_in_workspace(workspace) {
+        Ok(0) => {}
+        Ok(created) => warnings.push(format!(
+            "已为项目补齐 {created} 份缺失的默认 AI 指令文档；已有同名文件未被覆盖。"
+        )),
+        Err(error) => warnings.push(format!(
+            "无法自动补齐默认 AI 指令文档，已改为仅展示可读取文档：{error}"
+        )),
+    }
 }
 
 fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) -> Vec<PathBuf> {
@@ -420,6 +453,37 @@ mod tests {
             .any(|warning| warning.contains("默认项目文档")));
         assert!(!snapshot.revision.is_empty());
         assert_eq!(snapshot.source, "platform_default");
+    }
+
+    #[test]
+    fn project_docs_can_seed_missing_default_docs() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-project-docs-seed-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+
+        let snapshot = collect_project_documents_with_options(
+            &root,
+            ProjectDocumentScanOptions {
+                seed_missing_defaults: true,
+            },
+        )
+        .unwrap();
+        let agents = fs::read_to_string(root.join("AGENTS.md")).unwrap();
+        let manifest = fs::read_to_string(root.join(".elon/default-docs.json")).unwrap();
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(agents.contains(".github/copilot-instructions.md"));
+        assert!(manifest.contains("copilot-primary-bridged-agents"));
+        assert!(snapshot
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("补齐")));
+        assert_eq!(snapshot.source, "workspace");
     }
 
     #[test]

@@ -21,6 +21,7 @@ internal data class ProjectSpaceDocumentBundle(
     val revision: String,
     val source: String,
     val generatedAtMs: Long,
+    val cachedAtMs: Long,
     val fromCache: Boolean
 )
 
@@ -32,7 +33,8 @@ internal fun fetchProjectSpaceDocuments(
     route: ProjectSpaceRoute = ProjectSpaceRoute(),
     forceRefresh: Boolean = false
 ): ProjectSpaceDocumentBundle {
-    val cached = cachedProjectSpaceDocuments(context, projectId)
+    val cacheKey = projectDocsCacheKey(serverUrl, projectId, route)
+    val cached = cachedProjectSpaceDocuments(context, cacheKey)
     val result = runCatching {
         val builder = Request.Builder()
             .url(projectSpaceUrl(serverUrl, projectId, route, "docs"))
@@ -50,20 +52,26 @@ internal fun fetchProjectSpaceDocuments(
             val body = response.body?.string().orEmpty()
             if (response.code == 304 && cached != null) {
                 return@use cached.copy(
-                    warnings = listOf("服务器文档 revision 未变化，显示 APK 缓存。") + cached.warnings,
+                    warnings = cacheFallbackWarnings(
+                        "服务器文档 revision 未变化，显示 APK 缓存。",
+                        cached
+                    ) + cached.warnings,
                     fromCache = true
                 )
             }
             if (!response.isSuccessful) error(readProjectDocumentError(body, "读取项目文档失败"))
             val bundle = parseProjectSpaceDocuments(context, body)
-            cacheProjectSpaceDocuments(context, projectId, body)
+            cacheProjectSpaceDocuments(context, cacheKey, body)
             bundle
         }
     }
     return result.getOrElse { error ->
         cached?.let { cachedBundle ->
             cachedBundle.copy(
-                warnings = listOf("服务器暂不可用，显示 APK 缓存的项目文档。") + cachedBundle.warnings,
+                warnings = cacheFallbackWarnings(
+                    "服务器暂不可用，显示 APK 缓存的项目文档。",
+                    cachedBundle
+                ) + cachedBundle.warnings,
                 fromCache = true
             )
         } ?: defaultProjectSpaceDocuments(
@@ -104,6 +112,7 @@ private fun parseProjectSpaceDocuments(context: Context, body: String): ProjectS
             revision = root.optString("revision", ""),
             source = root.optString("source", ""),
             generatedAtMs = root.optLong("generated_at_ms", 0L),
+            cachedAtMs = 0L,
             fromCache = false
         )
     } else {
@@ -125,21 +134,51 @@ private fun parseProjectSpaceDocument(doc: JSONObject): ProjectSpaceDocument {
     )
 }
 
-private fun cacheProjectSpaceDocuments(context: Context, projectId: String, body: String) {
+internal fun clearCachedProjectSpaceDocuments(
+    context: Context,
+    serverUrl: String,
+    projectId: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
+) {
     context.getSharedPreferences(PROJECT_DOCS_CACHE, Context.MODE_PRIVATE)
         .edit()
-        .putString(projectId, body)
+        .remove(projectDocsCacheKey(serverUrl, projectId, route))
+        .apply()
+}
+
+private fun cacheProjectSpaceDocuments(context: Context, cacheKey: String, body: String) {
+    val wrapped = JSONObject()
+        .put("schema", PROJECT_DOCS_CACHE_SCHEMA)
+        .put("cached_at_ms", System.currentTimeMillis())
+        .put("body", JSONObject(body))
+        .toString()
+    context.getSharedPreferences(PROJECT_DOCS_CACHE, Context.MODE_PRIVATE)
+        .edit()
+        .putString(cacheKey, wrapped)
         .apply()
 }
 
 private fun cachedProjectSpaceDocuments(
     context: Context,
-    projectId: String
+    cacheKey: String
 ): ProjectSpaceDocumentBundle? {
     val body = context.getSharedPreferences(PROJECT_DOCS_CACHE, Context.MODE_PRIVATE)
-        .getString(projectId, null)
+        .getString(cacheKey, null)
         ?: return null
-    return runCatching { parseProjectSpaceDocuments(context, body).copy(fromCache = true) }.getOrNull()
+    return runCatching { parseCachedProjectSpaceDocuments(context, body) }.getOrNull()
+}
+
+private fun parseCachedProjectSpaceDocuments(
+    context: Context,
+    cachedBody: String
+): ProjectSpaceDocumentBundle {
+    val root = JSONObject(cachedBody)
+    val cachedAtMs = root.optLong("cached_at_ms", 0L)
+    val body = root.optJSONObject("body")?.toString() ?: cachedBody
+    return parseProjectSpaceDocuments(context, body).copy(
+        cachedAtMs = cachedAtMs,
+        fromCache = true
+    )
 }
 
 private fun JSONArray?.toStringList(): List<String> {
@@ -197,6 +236,7 @@ private fun defaultProjectSpaceDocuments(
             revision = "apk-default-${manifest.templateVersion}",
             source = "apk_default",
             generatedAtMs = System.currentTimeMillis(),
+            cachedAtMs = 0L,
             fromCache = false
         )
     }
@@ -221,8 +261,34 @@ private fun defaultProjectSpaceDocuments(
         revision = "apk-default-minimal",
         source = "apk_default",
         generatedAtMs = System.currentTimeMillis(),
+        cachedAtMs = 0L,
         fromCache = false
     )
+}
+
+private fun projectDocsCacheKey(
+    serverUrl: String,
+    projectId: String,
+    route: ProjectSpaceRoute
+): String {
+    val server = serverUrl.trim().trimEnd('/').ifBlank { "server" }
+    val scope = route.userId?.trim()?.takeIf { it.isNotBlank() } ?: "self"
+    return "$server|$scope|$projectId"
+}
+
+private fun cacheFallbackWarnings(
+    message: String,
+    cachedBundle: ProjectSpaceDocumentBundle
+): List<String> {
+    val warnings = mutableListOf(message)
+    if (cachedBundle.cachedAtMs > 0L) {
+        val ageHours = ((System.currentTimeMillis() - cachedBundle.cachedAtMs)
+            .coerceAtLeast(0L) / (60L * 60L * 1000L))
+        if (ageHours >= 24L) {
+            warnings.add("APK 文档缓存已超过 ${ageHours} 小时，联网后建议点刷新。")
+        }
+    }
+    return warnings
 }
 
 private data class DefaultDocsManifest(
@@ -283,3 +349,4 @@ private fun markdownTitle(content: String): String? {
 
 private const val DEFAULT_DOCS_MANIFEST_ASSET = "files/elon/default-docs.json"
 private const val PROJECT_DOCS_CACHE = "project_space_docs_cache"
+private const val PROJECT_DOCS_CACHE_SCHEMA = 2

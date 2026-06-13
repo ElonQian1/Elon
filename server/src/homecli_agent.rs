@@ -370,6 +370,7 @@ impl AgentManager {
         &self,
         agent_id: &str,
         workspace_path: String,
+        seed_defaults: bool,
     ) -> Result<AgentToServer> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
@@ -384,6 +385,7 @@ impl AgentManager {
             .send(homecli_proto::ServerToAgent::ReadProjectDocuments {
                 req_id: req_id.clone(),
                 workspace_path,
+                seed_defaults,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);

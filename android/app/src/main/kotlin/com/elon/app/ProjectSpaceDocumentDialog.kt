@@ -47,6 +47,7 @@ internal object ProjectSpaceDocumentDialog {
         val dialog = AlertDialog.Builder(activity)
             .setTitle("$title · 项目文档")
             .setView(scroll)
+            .setNeutralButton("清缓存", null)
             .setNegativeButton("刷新", null)
             .setPositiveButton("关闭", null)
             .create()
@@ -64,6 +65,21 @@ internal object ProjectSpaceDocumentDialog {
                 dp = dp
             )
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                loadDocument(
+                    activity = activity,
+                    http = http,
+                    serverUrl = serverUrl,
+                    projectId = projectId,
+                    route = route,
+                    dialog = dialog,
+                    column = column,
+                    status = status,
+                    dp = dp,
+                    forceRefresh = true
+                )
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                clearCachedProjectSpaceDocuments(activity, serverUrl, projectId, route)
                 loadDocument(
                     activity = activity,
                     http = http,
@@ -133,7 +149,9 @@ internal object ProjectSpaceDocumentDialog {
         val parts = mutableListOf<String>()
         parts.add("来源：${sourceLabel(bundle.source.ifBlank { "server" })}")
         bundle.revision.takeIf { it.isNotBlank() }?.let { parts.add("Revision：${it.take(12)}") }
+        bundle.generatedAtMs.takeIf { it > 0L }?.let { parts.add("生成：${formatTime(it)}") }
         if (bundle.fromCache) parts.add("APK 缓存")
+        bundle.cachedAtMs.takeIf { it > 0L }?.let { parts.add("缓存：${formatTime(it)}") }
         val metadata = TextView(activity).apply {
             textSize = 12f
             setTextColor(Color.parseColor("#A6AFBD"))
@@ -283,5 +301,11 @@ internal object ProjectSpaceDocumentDialog {
             source == "read_error" -> "读取异常"
             else -> source
         }
+    }
+
+    private fun formatTime(epochMillis: Long): String {
+        return runCatching {
+            java.time.Instant.ofEpochMilli(epochMillis).toString()
+        }.getOrDefault(epochMillis.toString())
     }
 }

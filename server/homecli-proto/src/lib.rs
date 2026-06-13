@@ -249,6 +249,8 @@ pub enum ServerToAgent {
     ReadProjectDocuments {
         req_id: String,
         workspace_path: String,
+        #[serde(default)]
+        seed_defaults: bool,
     },
     /// 云端要求 PC 节点清理一个由平台创建的项目工作区。
     CleanupProjectWorkspace {

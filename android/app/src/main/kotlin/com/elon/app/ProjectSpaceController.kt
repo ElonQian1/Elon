@@ -486,6 +486,9 @@ internal class ProjectSpaceController(
             activity.runOnUiThread {
                 if (activeChannel?.id != channel.id || activePostMessageId != postMessageId) return@runOnUiThread
                 result.onSuccess { sent ->
+                    if (channel.kind == AI_CHANNEL_KIND) {
+                        clearCachedProjectSpaceDocuments(activity, serverUrl, channel.projectId, route)
+                    }
                     val index = messages.indexOf(pending)
                     if (index >= 0) {
                         messages[index] = sent.toChatMessage(activeSpace?.project?.role, channel)
