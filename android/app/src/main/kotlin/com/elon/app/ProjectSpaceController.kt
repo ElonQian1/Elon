@@ -910,7 +910,7 @@ internal class ProjectSpaceController(
             maxLines = 8
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = panelBackground("#80FFFFFF").apply {
+            background = panelBackground("#D9FFFFFF").apply {
                 cornerRadius = dp(14).toFloat()
             }
             if (editable) {

@@ -105,7 +105,7 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(34))
             background = roundedBackground(
-                colorHex = "#80FFFFFF",
+                colorHex = "#D9FFFFFF",
                 topStartDp = 18,
                 topEndDp = 18,
                 bottomEndDp = 0,
