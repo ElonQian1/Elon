@@ -2,7 +2,8 @@ use std::{fs, path::Path};
 
 use super::{
     model::{RustIndex, RustSymbol, SymbolKind, SymbolVisibility},
-    repo_snapshot::{relative_path, should_skip_dir, source_role},
+    repo_snapshot::{relative_path, source_role},
+    repo_walk,
 };
 
 const MAX_RUST_FILE_BYTES: u64 = 512 * 1024;
@@ -14,30 +15,10 @@ pub(crate) fn collect_rust_index(workspace: &Path, max_files: usize) -> RustInde
     index
 }
 
-fn scan_dir(base: &Path, dir: &Path, max_files: usize, index: &mut RustIndex) {
-    if index.files_scanned >= max_files {
-        return;
-    }
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
+fn scan_dir(base: &Path, _dir: &Path, max_files: usize, index: &mut RustIndex) {
+    for path in repo_walk::collect_matching_files(base, max_files, is_rust_file) {
         if index.files_scanned >= max_files {
             return;
-        }
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if file_type.is_dir() {
-            if should_skip_dir(&path) {
-                continue;
-            }
-            scan_dir(base, &path, max_files, index);
-            continue;
-        }
-        if !file_type.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
-            continue;
         }
         if fs::metadata(&path)
             .map(|metadata| metadata.len() > MAX_RUST_FILE_BYTES)
@@ -60,6 +41,10 @@ fn scan_dir(base: &Path, dir: &Path, max_files: usize, index: &mut RustIndex) {
             )),
         }
     }
+}
+
+fn is_rust_file(path: &Path) -> bool {
+    path.extension().and_then(|ext| ext.to_str()) == Some("rs")
 }
 
 fn extract_file_symbols(base: &Path, path: &Path, content: &str) -> Vec<RustSymbol> {

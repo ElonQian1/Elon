@@ -7,7 +7,9 @@ use std::{
 use serde_json::json;
 
 use super::{
+    directory_summary::DirectorySummary,
     model::{RepoContextIndex, RustAnalyzerLspStatus, SemanticQueryMethod},
+    project_manifests::ProjectManifestReport,
     validation::ValidationPlan,
 };
 
@@ -17,17 +19,39 @@ const MAX_CHUNKS_JSONL: usize = 120;
 const MAX_LSP_LOCATIONS_JSONL: usize = 500;
 const MAX_SEMANTIC_FACTS_JSONL: usize = 500;
 const MAX_TESTS_JSONL: usize = 200;
+const MAX_DIRECTORIES_JSONL: usize = 200;
 
 pub(crate) fn write_context_exports(
     bundle_dir: &Path,
     repo_index: Option<&RepoContextIndex>,
+    project_manifests: Option<&ProjectManifestReport>,
+    directory_summaries: &[DirectorySummary],
     validation_plan: &ValidationPlan,
     files: &mut Vec<PathBuf>,
 ) -> Option<usize> {
-    let Some(repo_index) = repo_index else {
-        return Some(0);
-    };
     let mut bytes = 0usize;
+    if let Some(project_manifests) = project_manifests {
+        bytes += write_export_text(
+            &bundle_dir.join("project_manifests.md"),
+            &build_project_manifests_markdown(project_manifests),
+            files,
+        )?;
+    }
+    if !directory_summaries.is_empty() {
+        bytes += write_export_text(
+            &bundle_dir.join("directory_summaries.md"),
+            &build_directory_summaries_markdown(directory_summaries),
+            files,
+        )?;
+        bytes += write_export_text(
+            &bundle_dir.join("directories.jsonl"),
+            &build_directories_jsonl(directory_summaries),
+            files,
+        )?;
+    }
+    let Some(repo_index) = repo_index else {
+        return Some(bytes);
+    };
     bytes += write_export_text(
         &bundle_dir.join("repo_map.md"),
         &build_repo_map_markdown(repo_index),
@@ -222,6 +246,92 @@ fn build_summaries_markdown(index: &RepoContextIndex) -> String {
         out.push_str(&format!("- {}\n", action));
     }
     out
+}
+
+fn build_project_manifests_markdown(report: &ProjectManifestReport) -> String {
+    let mut out = String::new();
+    out.push_str("# Project Manifests\n\n");
+    if !report.readmes.is_empty() {
+        out.push_str("## README Files\n\n");
+        for readme in &report.readmes {
+            out.push_str(&format!(
+                "- `{}` title={}\n",
+                markdown_table_escape(&readme.path),
+                markdown_table_escape(readme.title.as_deref().unwrap_or("none"))
+            ));
+            if !readme.headings.is_empty() {
+                out.push_str(&format!(
+                    "  - headings: {}\n",
+                    markdown_table_escape(&readme.headings.join(", "))
+                ));
+            }
+            if let Some(preview) = readme.preview.as_deref() {
+                out.push_str(&format!("  - preview: {}\n", compact(preview, 260)));
+            }
+        }
+        out.push('\n');
+    }
+    if !report.manifests.is_empty() {
+        out.push_str("## Manifests\n\n");
+        out.push_str(
+            "| path | kind | name | version | description | scripts | dependencies | features |\n",
+        );
+        out.push_str("|---|---|---|---|---|---|---|---|\n");
+        for manifest in &report.manifests {
+            out.push_str(&format!(
+                "| `{}` | {} | {} | {} | {} | {} | {} | {} |\n",
+                markdown_table_escape(&manifest.path),
+                manifest.kind,
+                markdown_table_escape(manifest.name.as_deref().unwrap_or("")),
+                markdown_table_escape(manifest.version.as_deref().unwrap_or("")),
+                markdown_table_escape(manifest.description.as_deref().unwrap_or("")),
+                markdown_table_escape(&manifest.scripts.join(", ")),
+                markdown_table_escape(&manifest.dependencies.join(", ")),
+                markdown_table_escape(&manifest.features.join(", "))
+            ));
+        }
+    }
+    for warning in &report.warnings {
+        out.push_str(&format!("- warning: {}\n", markdown_table_escape(warning)));
+    }
+    out
+}
+
+fn build_directory_summaries_markdown(summaries: &[DirectorySummary]) -> String {
+    let mut out = String::new();
+    out.push_str("# Directory Summaries\n\n");
+    out.push_str("| directory | direct files | subtree source files | subtree lines | roles | key files | children |\n");
+    out.push_str("|---|---:|---:|---:|---|---|---|\n");
+    for summary in summaries.iter().take(80) {
+        let roles = summary
+            .role_counts
+            .iter()
+            .take(8)
+            .map(|item| format!("{}:{}", item.role, item.files))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "| `{}` | {} | {} | {} | {} | {} | {} |\n",
+            markdown_table_escape(&summary.path),
+            summary.direct_files,
+            summary.subtree_source_files,
+            summary.subtree_lines,
+            markdown_table_escape(&roles),
+            markdown_table_escape(&summary.key_files.join(", ")),
+            markdown_table_escape(&summary.child_directories.join(", "))
+        ));
+    }
+    out
+}
+
+fn build_directories_jsonl(summaries: &[DirectorySummary]) -> String {
+    summaries
+        .iter()
+        .take(MAX_DIRECTORIES_JSONL)
+        .filter_map(|summary| serde_json::to_string(summary).ok())
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
 }
 
 fn build_symbols_jsonl(index: &RepoContextIndex) -> String {

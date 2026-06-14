@@ -8,9 +8,10 @@ use serde::Serialize;
 use serde_json::json;
 
 use super::{
-    artifact_exports, config::ContextCompilerConfig, context_budget, model::RepoContextIndex,
-    relevance::RelevantFile, repo_snapshot::RepoSnapshot, rust_project::RustProjectSummary,
-    task_context_exports, validation::ValidationPlan,
+    artifact_exports, config::ContextCompilerConfig, context_budget,
+    directory_summary::DirectorySummary, model::RepoContextIndex,
+    project_manifests::ProjectManifestReport, relevance::RelevantFile, repo_snapshot::RepoSnapshot,
+    rust_project::RustProjectSummary, task_context_exports, validation::ValidationPlan,
 };
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,8 @@ pub(crate) struct ContextArtifactsInput<'a> {
     pub(crate) llm_brief: Option<&'a str>,
     pub(crate) snapshot: &'a RepoSnapshot,
     pub(crate) rust_project: Option<&'a RustProjectSummary>,
+    pub(crate) project_manifests: Option<&'a ProjectManifestReport>,
+    pub(crate) directory_summaries: &'a [DirectorySummary],
     pub(crate) repo_index: Option<&'a RepoContextIndex>,
     pub(crate) relevant_files: &'a [RelevantFile],
     pub(crate) validation_plan: &'a ValidationPlan,
@@ -118,6 +121,20 @@ pub(crate) fn save_context_artifacts(
             &mut files,
         )?;
     }
+    if let Some(project_manifests) = input.project_manifests {
+        bytes += write_json(
+            &bundle_dir.join("project_manifests.json"),
+            project_manifests,
+            &mut files,
+        )?;
+    }
+    if !input.directory_summaries.is_empty() {
+        bytes += write_json(
+            &bundle_dir.join("directory_summaries.json"),
+            input.directory_summaries,
+            &mut files,
+        )?;
+    }
     if let Some(repo_index) = input.repo_index {
         bytes += write_json(
             &bundle_dir.join("repo_context_index.json"),
@@ -128,6 +145,8 @@ pub(crate) fn save_context_artifacts(
     bytes += artifact_exports::write_context_exports(
         &bundle_dir,
         input.repo_index,
+        input.project_manifests,
+        input.directory_summaries,
         input.validation_plan,
         &mut files,
     )?;
@@ -174,7 +193,11 @@ fn write_text(path: &Path, content: &str, files: &mut Vec<PathBuf>) -> Option<us
     Some(content.len())
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T, files: &mut Vec<PathBuf>) -> Option<usize> {
+fn write_json<T: Serialize + ?Sized>(
+    path: &Path,
+    value: &T,
+    files: &mut Vec<PathBuf>,
+) -> Option<usize> {
     let content = serde_json::to_string_pretty(value).ok()?;
     write_text(path, &content, files)
 }
@@ -226,6 +249,8 @@ Before editing, verify important facts by reading the actual files.
 - context_pack.md
 - .ai/context/current-task.md and .ai/context/current-task.json
 - context_budget.md / context_budget.json
+- project_manifests.md / project_manifests.json
+- directory_summaries.md / directory_summaries.json / directories.jsonl
 - repo_snapshot.json
 - repo_context_index.json
 - repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / tests.jsonl / lsp_locations.jsonl / semantic_facts.jsonl when Rust analysis ran
@@ -364,6 +389,8 @@ mod tests {
             llm_brief: None,
             snapshot: &snapshot,
             rust_project: None,
+            project_manifests: None,
+            directory_summaries: &[],
             repo_index: None,
             relevant_files: &[],
             validation_plan: &validation,

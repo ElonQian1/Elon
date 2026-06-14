@@ -5,6 +5,8 @@ use std::{
     process::Command,
 };
 
+use super::repo_walk;
+
 const TOP_LEVEL_LIMIT: usize = 40;
 const DOC_LIMIT: usize = 8;
 const LARGE_FILE_LIMIT: usize = 8;
@@ -175,30 +177,10 @@ fn manifests(workspace: &Path) -> Vec<String> {
         .collect()
 }
 
-fn collect_source_stats(base: &Path, dir: &Path, stats: &mut Vec<SourceFileStat>) {
-    if stats.len() >= MAX_SOURCE_FILES {
-        return;
-    }
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
+fn collect_source_stats(base: &Path, _dir: &Path, stats: &mut Vec<SourceFileStat>) {
+    for path in repo_walk::collect_matching_files(base, MAX_SOURCE_FILES, is_source_file) {
         if stats.len() >= MAX_SOURCE_FILES {
             return;
-        }
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if file_type.is_dir() {
-            if should_skip_dir(&path) {
-                continue;
-            }
-            collect_source_stats(base, &path, stats);
-            continue;
-        }
-        if !file_type.is_file() || !is_source_file(&path) {
-            continue;
         }
         let Some(lines) = count_lines(&path) else {
             continue;
@@ -318,6 +300,35 @@ mod tests {
         assert!(snapshot.manifests.contains(&"Cargo.toml".to_string()));
         assert_eq!(snapshot.large_files[0].path, "src/main.rs");
         assert_eq!(snapshot.large_files[0].lines, 802);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn snapshot_respects_gitignore_when_scanning_sources() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "elon_context_snapshot_ignore_{}_{}",
+            std::process::id(),
+            nonce
+        ));
+        fs::create_dir_all(dir.join("src")).unwrap();
+        fs::create_dir_all(dir.join("ignored")).unwrap();
+        fs::write(dir.join(".gitignore"), "ignored/\n").unwrap();
+        fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+        fs::write(
+            dir.join("ignored/lib.rs"),
+            "pub fn ignored() {}\n".repeat(900),
+        )
+        .unwrap();
+
+        let snapshot = collect_repo_snapshot(&dir);
+
+        assert_eq!(snapshot.source_file_count, 1);
+        assert!(snapshot.large_files.is_empty());
 
         fs::remove_dir_all(dir).unwrap();
     }

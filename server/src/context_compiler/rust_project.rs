@@ -3,11 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::repo_snapshot::should_skip_dir;
+use super::repo_walk;
 
 const MAX_MANIFESTS: usize = 16;
 const MAX_MANIFEST_BYTES: u64 = 128 * 1024;
-const MAX_SCAN_DEPTH: usize = 4;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub(crate) struct RustProjectSummary {
@@ -60,31 +59,12 @@ pub(crate) fn collect_rust_project_summary(workspace: &Path) -> Option<RustProje
 }
 
 fn collect_manifest_paths(base: &Path, dir: &Path, depth: usize, out: &mut Vec<PathBuf>) {
-    if out.len() >= MAX_MANIFESTS || depth > MAX_SCAN_DEPTH {
-        return;
-    }
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        if out.len() >= MAX_MANIFESTS {
-            return;
-        }
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if file_type.is_dir() {
-            if should_skip_dir(&path) {
-                continue;
-            }
-            collect_manifest_paths(base, &path, depth + 1, out);
-            continue;
-        }
-        if path.file_name().and_then(|name| name.to_str()) == Some("Cargo.toml") {
-            out.push(path);
-        }
-    }
+    let _ = (dir, depth);
+    out.extend(repo_walk::collect_matching_files(
+        base,
+        MAX_MANIFESTS,
+        |path| path.file_name().and_then(|name| name.to_str()) == Some("Cargo.toml"),
+    ));
     out.sort_by(|left, right| {
         relative_path(base, left)
             .len()

@@ -16,18 +16,21 @@ mod context_quality;
 mod context_quality_render;
 #[cfg(test)]
 mod context_quality_tests;
+mod directory_summary;
 mod hunyuan_brief;
 mod impact_analysis;
 #[cfg(test)]
 mod impact_analysis_tests;
 mod impact_render;
 mod model;
+mod project_manifests;
 mod relevance;
 mod repo_map_tags;
 mod repo_map_tags_render;
 #[cfg(test)]
 mod repo_map_tags_tests;
 mod repo_snapshot;
+mod repo_walk;
 mod rust_analyzer;
 mod rust_analyzer_lsp;
 mod rust_analyzer_lsp_locations;
@@ -72,6 +75,8 @@ pub(crate) async fn compile_preflight_note(
 
     let snapshot = repo_snapshot::collect_repo_snapshot(workspace);
     let task = task_profile::analyze_task(user_message);
+    let project_manifests = project_manifests::collect_project_manifest_report(workspace);
+    let directory_summaries = directory_summary::collect_directory_summaries(workspace);
     let rust_project = config
         .rust_probe_enabled
         .then(|| rust_project::collect_rust_project_summary(workspace))
@@ -138,6 +143,8 @@ pub(crate) async fn compile_preflight_note(
         user_message,
         &snapshot,
         rust_project.as_ref(),
+        Some(&project_manifests),
+        &directory_summaries,
         repo_index.as_ref(),
         &relevant_files,
         &validation_plan,
@@ -151,6 +158,8 @@ pub(crate) async fn compile_preflight_note(
         user_message,
         &snapshot,
         rust_project.as_ref(),
+        Some(&project_manifests),
+        &directory_summaries,
         repo_index.as_ref(),
         &relevant_files,
         &validation_plan,
@@ -166,6 +175,8 @@ pub(crate) async fn compile_preflight_note(
         llm_brief: llm_brief.as_deref(),
         snapshot: &snapshot,
         rust_project: rust_project.as_ref(),
+        project_manifests: Some(&project_manifests),
+        directory_summaries: &directory_summaries,
         repo_index: repo_index.as_ref(),
         relevant_files: &relevant_files,
         validation_plan: &validation_plan,
@@ -181,6 +192,9 @@ pub(crate) async fn compile_preflight_note(
                 "agent": config.agent_name,
                 "llm_brief": llm_brief.is_some(),
                 "relevant_files": relevant_files.len(),
+                "project_manifests": project_manifests.manifests.len(),
+                "readmes": project_manifests.readmes.len(),
+                "directory_summaries": directory_summaries.len(),
                 "rust_project": rust_project.is_some(),
                 "rust_analysis": repo_index.as_ref().map(|index| serde_json::json!({
                     "cargo_packages": index.cargo.packages.len(),
@@ -215,6 +229,9 @@ pub(crate) async fn compile_preflight_note(
         mode = config.mode.as_str(),
         llm_brief = llm_brief.is_some(),
         relevant_files = relevant_files.len(),
+        project_manifests = project_manifests.manifests.len(),
+        readmes = project_manifests.readmes.len(),
+        directory_summaries = directory_summaries.len(),
         rust_project = rust_project.is_some(),
         rust_symbols = repo_index
             .as_ref()

@@ -6,6 +6,7 @@ use std::{
 use super::{
     artifact::{save_context_artifacts, ContextArtifactsInput},
     config::{ContextCompilerConfig, ContextCompilerMode},
+    directory_summary::{DirectoryRoleCount, DirectorySummary},
     model::{
         BuildCommand, CodeRelationship, ContextEvidence, EvidenceSnippet, RankedFile, RankedSymbol,
         RelationshipKind, RepoContextIndex, RustAnalyzerLspLocation, RustAnalyzerLspLocationRole,
@@ -13,6 +14,7 @@ use super::{
         RustAnalyzerReport, RustIndex, RustSymbol, SemanticQueryMethod, SymbolGraphSummary,
         SymbolKind, SymbolVisibility, TaskProfile, TestTarget,
     },
+    project_manifests::{ProjectManifestReport, ProjectManifestSummary, ReadmeSummary},
     repo_snapshot::RepoSnapshot,
     validation::{ValidationCommand, ValidationPlan},
 };
@@ -50,6 +52,37 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
         notes: Vec::new(),
     };
     let repo_index = test_repo_index();
+    let project_manifests = ProjectManifestReport {
+        readmes: vec![ReadmeSummary {
+            path: "README.md".to_string(),
+            title: Some("Demo".to_string()),
+            headings: vec!["Demo".to_string()],
+            preview: Some("A demo project.".to_string()),
+        }],
+        manifests: vec![ProjectManifestSummary {
+            path: "package.json".to_string(),
+            kind: "package_json",
+            name: Some("web".to_string()),
+            version: Some("1.0.0".to_string()),
+            description: None,
+            scripts: vec!["test".to_string()],
+            dependencies: vec!["react".to_string()],
+            features: Vec::new(),
+        }],
+        warnings: Vec::new(),
+    };
+    let directory_summaries = vec![DirectorySummary {
+        path: ".".to_string(),
+        direct_files: 2,
+        subtree_source_files: 1,
+        subtree_lines: 42,
+        role_counts: vec![DirectoryRoleCount {
+            role: "entrypoint".to_string(),
+            files: 1,
+        }],
+        key_files: vec!["README.md".to_string()],
+        child_directories: vec!["server".to_string()],
+    }];
 
     let artifact = save_context_artifacts(ContextArtifactsInput {
         data_dir: &dir,
@@ -61,6 +94,8 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
         llm_brief: None,
         snapshot: &snapshot,
         rust_project: None,
+        project_manifests: Some(&project_manifests),
+        directory_summaries: &directory_summaries,
         repo_index: Some(&repo_index),
         relevant_files: &[],
         validation_plan: &validation,
@@ -69,6 +104,14 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
 
     assert!(artifact.bundle_dir.join("repo_map.md").is_file());
     assert!(artifact.bundle_dir.join("summaries.md").is_file());
+    assert!(artifact.bundle_dir.join("project_manifests.md").is_file());
+    assert!(artifact.bundle_dir.join("project_manifests.json").is_file());
+    assert!(artifact.bundle_dir.join("directory_summaries.md").is_file());
+    assert!(artifact
+        .bundle_dir
+        .join("directory_summaries.json")
+        .is_file());
+    assert!(artifact.bundle_dir.join("directories.jsonl").is_file());
     assert!(artifact.bundle_dir.join("symbols.jsonl").is_file());
     assert!(artifact.bundle_dir.join("edges.tsv").is_file());
     assert!(artifact.bundle_dir.join("chunks.jsonl").is_file());
@@ -79,6 +122,21 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(fs::read_to_string(artifact.bundle_dir.join("repo_map.md"))
         .unwrap()
         .contains("Ranked Files"));
+    assert!(
+        fs::read_to_string(artifact.bundle_dir.join("project_manifests.md"))
+            .unwrap()
+            .contains("package.json")
+    );
+    assert!(
+        fs::read_to_string(artifact.bundle_dir.join("directory_summaries.md"))
+            .unwrap()
+            .contains("subtree source files")
+    );
+    assert!(
+        fs::read_to_string(artifact.bundle_dir.join("directories.jsonl"))
+            .unwrap()
+            .contains("\"path\":\".\"")
+    );
     assert!(
         fs::read_to_string(artifact.bundle_dir.join("symbols.jsonl"))
             .unwrap()
@@ -118,6 +176,9 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(semantic_facts.contains("pub(crate) fn build_context_pack"));
     let manifest = fs::read_to_string(artifact.bundle_dir.join("manifest.json")).unwrap();
     assert!(manifest.contains("tests.jsonl"));
+    assert!(manifest.contains("project_manifests.md"));
+    assert!(manifest.contains("directory_summaries.md"));
+    assert!(manifest.contains("directories.jsonl"));
     assert!(manifest.contains("semantic_facts.jsonl"));
 
     fs::remove_dir_all(dir).unwrap();

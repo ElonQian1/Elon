@@ -1,8 +1,10 @@
 use super::{
+    directory_summary::DirectorySummary,
     model::{
         ContextEvidence, RepoContextIndex, RustAnalyzerReport, RustSymbol, SymbolGraphSummary,
         TaskProfile,
     },
+    project_manifests::ProjectManifestReport,
     relevance::RelevantFile,
     repo_snapshot::RepoSnapshot,
     rust_project::RustProjectSummary,
@@ -73,6 +75,85 @@ pub(crate) fn render_repo_snapshot(out: &mut String, snapshot: &RepoSnapshot) {
         out.push('\n');
     }
     out.push_str("</repo_snapshot>\n\n");
+}
+
+pub(crate) fn render_project_manifests(out: &mut String, report: Option<&ProjectManifestReport>) {
+    let Some(report) = report else {
+        return;
+    };
+    if report.readmes.is_empty() && report.manifests.is_empty() {
+        return;
+    }
+    out.push_str("<project_manifests>\n");
+    for readme in report.readmes.iter().take(8) {
+        out.push_str(&format!(
+            "- readme {} title={}\n",
+            markdown_escape(&readme.path),
+            markdown_escape(readme.title.as_deref().unwrap_or("none"))
+        ));
+        if !readme.headings.is_empty() {
+            out.push_str(&format!(
+                "  headings: {}\n",
+                markdown_escape(&readme.headings.join(", "))
+            ));
+        }
+        if let Some(preview) = readme.preview.as_deref() {
+            out.push_str(&format!("  preview: {}\n", markdown_escape(preview)));
+        }
+    }
+    for manifest in report.manifests.iter().take(16) {
+        out.push_str(&format!(
+            "- manifest {} kind={} name={} version={}\n",
+            markdown_escape(&manifest.path),
+            manifest.kind,
+            markdown_escape(manifest.name.as_deref().unwrap_or("unknown")),
+            markdown_escape(manifest.version.as_deref().unwrap_or("unknown"))
+        ));
+        if let Some(description) = manifest.description.as_deref() {
+            out.push_str(&format!(
+                "  description: {}\n",
+                markdown_escape(description)
+            ));
+        }
+        push_compact_list(out, "scripts", &manifest.scripts);
+        push_compact_list(out, "dependencies", &manifest.dependencies);
+        push_compact_list(out, "features", &manifest.features);
+    }
+    for warning in &report.warnings {
+        out.push_str(&format!("- warning: {}\n", markdown_escape(warning)));
+    }
+    out.push_str("</project_manifests>\n\n");
+}
+
+pub(crate) fn render_directory_summaries(out: &mut String, summaries: &[DirectorySummary]) {
+    if summaries.is_empty() {
+        return;
+    }
+    out.push_str("<directory_summaries>\n");
+    for summary in summaries.iter().take(30) {
+        out.push_str(&format!(
+            "- {} direct_files={} subtree_source_files={} subtree_lines={}\n",
+            markdown_escape(&summary.path),
+            summary.direct_files,
+            summary.subtree_source_files,
+            summary.subtree_lines
+        ));
+        if !summary.role_counts.is_empty() {
+            let roles = summary
+                .role_counts
+                .iter()
+                .take(6)
+                .map(|item| format!("{}:{}", item.role, item.files))
+                .collect::<Vec<_>>();
+            out.push_str(&format!(
+                "  roles: {}\n",
+                markdown_escape(&roles.join(", "))
+            ));
+        }
+        push_compact_list(out, "key_files", &summary.key_files);
+        push_compact_list(out, "child_directories", &summary.child_directories);
+    }
+    out.push_str("</directory_summaries>\n\n");
 }
 
 pub(crate) fn render_rust_project(out: &mut String, rust_project: Option<&RustProjectSummary>) {
@@ -508,6 +589,24 @@ fn render_facts(out: &mut String, tag: &str, facts: &[super::model::ContextFact]
         ));
     }
     out.push_str(&format!("</{tag}>\n\n"));
+}
+
+fn push_compact_list(out: &mut String, label: &str, values: &[String]) {
+    if values.is_empty() {
+        return;
+    }
+    out.push_str(&format!(
+        "  {}: {}\n",
+        label,
+        markdown_escape(
+            &values
+                .iter()
+                .take(12)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    ));
 }
 
 fn xml_escape(value: &str) -> String {

@@ -70,6 +70,8 @@ fn save_context_artifacts() {}
         llm_brief: None,
         snapshot: &snapshot,
         rust_project: None,
+        project_manifests: None,
+        directory_summaries: &[],
         repo_index: None,
         relevant_files: &[],
         validation_plan: &validation,

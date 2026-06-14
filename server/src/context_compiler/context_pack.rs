@@ -1,6 +1,7 @@
 use super::{
-    config::ContextCompilerConfig, context_pack_render, context_quality_render, impact_render,
-    model::RepoContextIndex, relevance::RelevantFile, repo_map_tags_render,
+    config::ContextCompilerConfig, context_pack_render, context_quality_render,
+    directory_summary::DirectorySummary, impact_render, model::RepoContextIndex,
+    project_manifests::ProjectManifestReport, relevance::RelevantFile, repo_map_tags_render,
     repo_snapshot::RepoSnapshot, rust_analyzer_lsp_render, rust_analyzer_probe_render,
     rust_project::RustProjectSummary, semantic_query_plan_render, validation::ValidationPlan,
 };
@@ -10,6 +11,8 @@ pub(crate) fn build_context_pack(
     user_message: &str,
     snapshot: &RepoSnapshot,
     rust_project: Option<&RustProjectSummary>,
+    project_manifests: Option<&ProjectManifestReport>,
+    directory_summaries: &[DirectorySummary],
     repo_index: Option<&RepoContextIndex>,
     relevant_files: &[RelevantFile],
     validation_plan: &ValidationPlan,
@@ -37,6 +40,8 @@ pub(crate) fn build_context_pack(
     }
 
     context_pack_render::render_repo_snapshot(&mut out, snapshot);
+    context_pack_render::render_project_manifests(&mut out, project_manifests);
+    context_pack_render::render_directory_summaries(&mut out, directory_summaries);
     context_pack_render::render_rust_project(&mut out, rust_project);
     context_pack_render::render_repo_index(&mut out, repo_index);
     repo_map_tags_render::render_repo_map_tags(
@@ -154,6 +159,8 @@ mod tests {
             &snapshot,
             None,
             None,
+            &[],
+            None,
             &relevant,
             &validation,
             None,
@@ -191,6 +198,8 @@ mod tests {
             "任务",
             &snapshot,
             Some(&rust),
+            None,
+            &[],
             None,
             &[],
             &validation,
@@ -240,6 +249,8 @@ mod tests {
             "继续完善 repo map",
             &snapshot,
             None,
+            None,
+            &[],
             Some(&index),
             &[],
             &validation,

@@ -1,7 +1,8 @@
 use std::{fs, io::Read, path::Path};
 
-use super::repo_snapshot::{
-    count_lines, is_source_file, relative_path, should_skip_dir, source_role,
+use super::{
+    repo_snapshot::{count_lines, is_source_file, relative_path, source_role},
+    repo_walk,
 };
 
 const MAX_SCAN_FILES: usize = 1200;
@@ -38,14 +39,14 @@ pub(crate) fn find_relevant_files(
         return Vec::new();
     }
     let mut results = Vec::new();
-    let mut scanned_files = 0usize;
-    scan_dir(
-        workspace,
-        workspace,
-        &terms,
-        &mut results,
-        &mut scanned_files,
-    );
+    for path in repo_walk::collect_matching_files(workspace, MAX_SCAN_FILES, is_searchable_file) {
+        let Some(result) = score_file(workspace, &path, &terms) else {
+            continue;
+        };
+        if result.score > 0 {
+            results.push(result);
+        }
+    }
     results.sort_by(|left, right| {
         right
             .score
@@ -54,47 +55,6 @@ pub(crate) fn find_relevant_files(
     });
     results.truncate(limit);
     results
-}
-
-fn scan_dir(
-    base: &Path,
-    dir: &Path,
-    terms: &[String],
-    results: &mut Vec<RelevantFile>,
-    scanned_files: &mut usize,
-) {
-    if *scanned_files >= MAX_SCAN_FILES {
-        return;
-    }
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        if *scanned_files >= MAX_SCAN_FILES {
-            return;
-        }
-        let path = entry.path();
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if file_type.is_dir() {
-            if should_skip_dir(&path) {
-                continue;
-            }
-            scan_dir(base, &path, terms, results, scanned_files);
-            continue;
-        }
-        if !file_type.is_file() || !is_searchable_file(&path) {
-            continue;
-        }
-        *scanned_files += 1;
-        let Some(result) = score_file(base, &path, terms) else {
-            continue;
-        };
-        if result.score > 0 {
-            results.push(result);
-        }
-    }
 }
 
 fn score_file(base: &Path, path: &Path, terms: &[String]) -> Option<RelevantFile> {
@@ -246,6 +206,35 @@ mod tests {
 
         assert_eq!(files[0].path, "src/context/compiler.rs");
         assert!(files[0].score > 0);
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn ignores_gitignored_relevant_files() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "elon_context_relevance_ignore_{}_{}",
+            std::process::id(),
+            nonce
+        ));
+        fs::create_dir_all(dir.join("src")).unwrap();
+        fs::create_dir_all(dir.join("ignored")).unwrap();
+        fs::write(dir.join(".gitignore"), "ignored/\n").unwrap();
+        fs::write(dir.join("src/compiler.rs"), "pub fn build_repo_map() {}\n").unwrap();
+        fs::write(
+            dir.join("ignored/compiler.rs"),
+            "pub fn build_repo_map_ignored() {}\n",
+        )
+        .unwrap();
+
+        let files = find_relevant_files(&dir, "repo map compiler", 10);
+
+        assert!(files.iter().any(|file| file.path == "src/compiler.rs"));
+        assert!(!files.iter().any(|file| file.path == "ignored/compiler.rs"));
 
         fs::remove_dir_all(dir).unwrap();
     }
