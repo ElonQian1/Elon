@@ -57,6 +57,7 @@ mod symbol_index_impact_edges;
 mod symbol_index_query;
 #[cfg(test)]
 mod symbol_index_query_tests;
+mod symbol_index_query_types;
 mod symbol_index_semantic;
 mod symbol_index_store;
 #[cfg(test)]
