@@ -6,17 +6,22 @@ use std::{
 
 use serde_json::json;
 
-use super::model::{RepoContextIndex, RustAnalyzerLspStatus, SemanticQueryMethod};
+use super::{
+    model::{RepoContextIndex, RustAnalyzerLspStatus, SemanticQueryMethod},
+    validation::ValidationPlan,
+};
 
 const MAX_SYMBOLS_JSONL: usize = 2_000;
 const MAX_EDGES_TSV: usize = 2_000;
 const MAX_CHUNKS_JSONL: usize = 120;
 const MAX_LSP_LOCATIONS_JSONL: usize = 500;
 const MAX_SEMANTIC_FACTS_JSONL: usize = 500;
+const MAX_TESTS_JSONL: usize = 200;
 
 pub(crate) fn write_context_exports(
     bundle_dir: &Path,
     repo_index: Option<&RepoContextIndex>,
+    validation_plan: &ValidationPlan,
     files: &mut Vec<PathBuf>,
 ) -> Option<usize> {
     let Some(repo_index) = repo_index else {
@@ -46,6 +51,11 @@ pub(crate) fn write_context_exports(
     bytes += write_export_text(
         &bundle_dir.join("chunks.jsonl"),
         &build_chunks_jsonl(repo_index),
+        files,
+    )?;
+    bytes += write_export_text(
+        &bundle_dir.join("tests.jsonl"),
+        &build_tests_jsonl(repo_index, validation_plan),
         files,
     )?;
     bytes += write_export_text(
@@ -293,6 +303,57 @@ fn build_chunks_jsonl(index: &RepoContextIndex) -> String {
         + "\n"
 }
 
+fn build_tests_jsonl(index: &RepoContextIndex, validation_plan: &ValidationPlan) -> String {
+    let mut lines = Vec::new();
+
+    for target in &index.evidence.test_targets {
+        if lines.len() >= MAX_TESTS_JSONL {
+            break;
+        }
+        if let Ok(line) = serde_json::to_string(&json!({
+            "source": "context_evidence",
+            "test_kind": "test_target",
+            "path": &target.path,
+            "reason": &target.reason,
+            "confidence": "candidate"
+        })) {
+            lines.push(line);
+        }
+    }
+
+    for command in &index.evidence.build_commands {
+        if lines.len() >= MAX_TESTS_JSONL {
+            break;
+        }
+        if let Ok(line) = serde_json::to_string(&json!({
+            "source": "context_evidence",
+            "test_kind": "build_command",
+            "command": &command.command,
+            "reason": &command.reason,
+            "required": false
+        })) {
+            lines.push(line);
+        }
+    }
+
+    for command in &validation_plan.commands {
+        if lines.len() >= MAX_TESTS_JSONL {
+            break;
+        }
+        if let Ok(line) = serde_json::to_string(&json!({
+            "source": "validation_plan",
+            "test_kind": "validation_command",
+            "command": &command.command,
+            "reason": &command.reason,
+            "required": command.required
+        })) {
+            lines.push(line);
+        }
+    }
+
+    lines.join("\n") + "\n"
+}
+
 fn build_lsp_locations_jsonl(index: &RepoContextIndex) -> String {
     let mut lines = Vec::new();
     let mut seen = HashSet::new();
@@ -364,6 +425,7 @@ fn semantic_fact_kind(method: SemanticQueryMethod) -> &'static str {
     match method {
         SemanticQueryMethod::DocumentSymbol => "document_symbols",
         SemanticQueryMethod::Diagnostic => "diagnostic",
+        SemanticQueryMethod::Definition => "definitions",
         SemanticQueryMethod::References => "references",
         SemanticQueryMethod::Implementation => "implementations",
         SemanticQueryMethod::Hover => "hover_type",

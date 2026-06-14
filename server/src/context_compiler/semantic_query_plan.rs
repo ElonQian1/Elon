@@ -130,6 +130,14 @@ fn push_symbol_queries(
         plan,
         seen,
         symbol,
+        SemanticQueryMethod::Definition,
+        priority,
+        format!("resolve canonical definition for {}", reason),
+    );
+    push_symbol_query(
+        plan,
+        seen,
+        symbol,
         SemanticQueryMethod::Hover,
         priority,
         format!("confirm signature and type details for {}", reason),

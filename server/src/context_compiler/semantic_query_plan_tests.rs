@@ -48,6 +48,11 @@ fn builds_top_k_lsp_queries_for_ranked_files_and_symbols() {
     assert!(has_method(
         &plan,
         Some("Runner"),
+        SemanticQueryMethod::Definition
+    ));
+    assert!(has_method(
+        &plan,
+        Some("Runner"),
         SemanticQueryMethod::Implementation
     ));
     assert!(has_method(
@@ -90,6 +95,11 @@ fn records_fallback_warning_when_rust_analyzer_is_unavailable() {
         .iter()
         .any(|warning| warning.contains("rust-analyzer is not available")));
     assert!(has_method(&plan, Some("build"), SemanticQueryMethod::Hover));
+    assert!(has_method(
+        &plan,
+        Some("build"),
+        SemanticQueryMethod::Definition
+    ));
 }
 
 fn ranked(id: &str, name: &str, kind: SymbolKind, line_start: usize) -> RankedSymbol {

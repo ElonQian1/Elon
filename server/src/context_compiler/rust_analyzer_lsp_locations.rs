@@ -26,6 +26,14 @@ pub(super) fn parse_lsp_locations(
                 RustAnalyzerLspLocationRole::Reference,
             );
         }
+        SemanticQueryMethod::Definition => {
+            parse_location_array(
+                &mut locations,
+                workspace,
+                value,
+                RustAnalyzerLspLocationRole::Definition,
+            );
+        }
         SemanticQueryMethod::Implementation => {
             parse_location_array(
                 &mut locations,
