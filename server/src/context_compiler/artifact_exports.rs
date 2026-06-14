@@ -10,6 +10,8 @@ use super::{
     directory_summary::DirectorySummary,
     model::{RepoContextIndex, RustAnalyzerLspStatus, SemanticQueryMethod},
     project_manifests::ProjectManifestReport,
+    symbol_index::SymbolIndex,
+    symbol_index_build::build_symbol_index,
     validation::ValidationPlan,
 };
 
@@ -20,6 +22,8 @@ const MAX_LSP_LOCATIONS_JSONL: usize = 500;
 const MAX_SEMANTIC_FACTS_JSONL: usize = 500;
 const MAX_TESTS_JSONL: usize = 200;
 const MAX_DIRECTORIES_JSONL: usize = 200;
+const MAX_SYMBOL_INDEX_JSONL: usize = 2_000;
+const MAX_SYMBOL_EDGES_JSONL: usize = 2_000;
 
 pub(crate) fn write_context_exports(
     bundle_dir: &Path,
@@ -65,6 +69,22 @@ pub(crate) fn write_context_exports(
     bytes += write_export_text(
         &bundle_dir.join("symbols.jsonl"),
         &build_symbols_jsonl(repo_index),
+        files,
+    )?;
+    let symbol_index = build_symbol_index(repo_index);
+    bytes += write_export_text(
+        &bundle_dir.join("symbol_index.jsonl"),
+        &build_symbol_index_jsonl(&symbol_index),
+        files,
+    )?;
+    bytes += write_export_text(
+        &bundle_dir.join("symbol_edges.jsonl"),
+        &build_symbol_edges_jsonl(&symbol_index),
+        files,
+    )?;
+    bytes += write_export_text(
+        &bundle_dir.join("symbol_lookup.json"),
+        &build_symbol_lookup_json(&symbol_index),
         files,
     )?;
     bytes += write_export_text(
@@ -343,6 +363,33 @@ fn build_symbols_jsonl(index: &RepoContextIndex) -> String {
         .filter_map(|symbol| serde_json::to_string(symbol).ok())
         .collect::<Vec<_>>()
         .join("\n")
+        + "\n"
+}
+
+fn build_symbol_index_jsonl(index: &SymbolIndex) -> String {
+    index
+        .records
+        .iter()
+        .take(MAX_SYMBOL_INDEX_JSONL)
+        .filter_map(|symbol| serde_json::to_string(symbol).ok())
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+
+fn build_symbol_edges_jsonl(index: &SymbolIndex) -> String {
+    index
+        .edges
+        .iter()
+        .take(MAX_SYMBOL_EDGES_JSONL)
+        .filter_map(|edge| serde_json::to_string(edge).ok())
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+
+fn build_symbol_lookup_json(index: &SymbolIndex) -> String {
+    serde_json::to_string_pretty(&index.lookup_summary()).unwrap_or_else(|_| "{}".to_string())
         + "\n"
 }
 

@@ -113,6 +113,9 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
         .is_file());
     assert!(artifact.bundle_dir.join("directories.jsonl").is_file());
     assert!(artifact.bundle_dir.join("symbols.jsonl").is_file());
+    assert!(artifact.bundle_dir.join("symbol_index.jsonl").is_file());
+    assert!(artifact.bundle_dir.join("symbol_edges.jsonl").is_file());
+    assert!(artifact.bundle_dir.join("symbol_lookup.json").is_file());
     assert!(artifact.bundle_dir.join("edges.tsv").is_file());
     assert!(artifact.bundle_dir.join("chunks.jsonl").is_file());
     assert!(artifact.bundle_dir.join("tests.jsonl").is_file());
@@ -142,6 +145,17 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
             .unwrap()
             .contains("build_context_pack")
     );
+    let symbol_index = fs::read_to_string(artifact.bundle_dir.join("symbol_index.jsonl")).unwrap();
+    assert!(symbol_index.contains("\"qualified_name\""));
+    assert!(symbol_index.contains("build_context_pack"));
+    assert!(
+        fs::read_to_string(artifact.bundle_dir.join("symbol_edges.jsonl"))
+            .unwrap()
+            .contains("\"source\":\"rust_analyzer_lsp\"")
+    );
+    let symbol_lookup = fs::read_to_string(artifact.bundle_dir.join("symbol_lookup.json")).unwrap();
+    assert!(symbol_lookup.contains("search_symbols"));
+    assert!(symbol_lookup.contains("symbol_count"));
     assert!(fs::read_to_string(artifact.bundle_dir.join("edges.tsv"))
         .unwrap()
         .contains("symbol_graph"));
@@ -179,6 +193,9 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(manifest.contains("project_manifests.md"));
     assert!(manifest.contains("directory_summaries.md"));
     assert!(manifest.contains("directories.jsonl"));
+    assert!(manifest.contains("symbol_index.jsonl"));
+    assert!(manifest.contains("symbol_edges.jsonl"));
+    assert!(manifest.contains("symbol_lookup.json"));
     assert!(manifest.contains("semantic_facts.jsonl"));
 
     fs::remove_dir_all(dir).unwrap();
