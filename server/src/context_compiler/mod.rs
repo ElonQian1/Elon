@@ -53,6 +53,7 @@ mod symbol_graph;
 mod symbol_index;
 mod symbol_index_build;
 mod symbol_index_impact_edges;
+mod symbol_index_semantic;
 #[cfg(test)]
 mod symbol_index_tests;
 mod task_context_exports;

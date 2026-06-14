@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+use super::symbol_index_semantic::is_reference_edge;
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SymbolIndex {
     pub(crate) records: Vec<SymbolRecord>,
@@ -62,7 +64,10 @@ pub(crate) struct SymbolLookupSummary {
     pub(crate) file_count: usize,
     pub(crate) kind_counts: BTreeMap<String, usize>,
     pub(crate) source_counts: BTreeMap<String, usize>,
+    pub(crate) edge_kind_counts: BTreeMap<String, usize>,
+    pub(crate) edge_source_counts: BTreeMap<String, usize>,
     pub(crate) lsp_edge_count: usize,
+    pub(crate) precise_semantic_edge_count: usize,
     pub(crate) query_api: Vec<&'static str>,
 }
 
@@ -133,7 +138,7 @@ impl SymbolIndex {
             .into_iter()
             .flatten()
             .filter_map(|index| self.edges.get(*index))
-            .filter(|edge| edge.kind == "reference" || edge.kind == "def_ref")
+            .filter(|edge| is_reference_edge(edge))
             .collect()
     }
 
@@ -178,17 +183,25 @@ impl SymbolIndex {
             file_count: files.len(),
             kind_counts,
             source_counts,
+            edge_kind_counts: self.edge_kind_counts(),
+            edge_source_counts: self.edge_source_counts(),
             lsp_edge_count: self
                 .edges
                 .iter()
                 .filter(|edge| edge.source == "rust_analyzer_lsp")
                 .count(),
+            precise_semantic_edge_count: self.precise_semantic_edge_count(),
             query_api: vec![
                 "search_symbols",
                 "get_symbol",
                 "symbols_in_file",
+                "definitions_for",
                 "references_to",
+                "implementations_for",
+                "callers_of",
+                "callees_of",
                 "neighbors",
+                "semantic_edges_for",
                 "tests_for_symbol",
             ],
         }

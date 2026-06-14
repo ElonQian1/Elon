@@ -15,12 +15,32 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     let service_id = "src/service.rs:1:struct:AuthService";
     let login_id = "src/service.rs:10:function:login";
     let user_id = "src/domain.rs:1:struct:User";
+    let repo_trait_id = "src/repo.rs:1:trait:UserRepository";
+    let repo_impl_id = "src/repo_pg.rs:4:impl:impl UserRepository for PgRepo";
+    let handler_id = "src/api.rs:25:function:login_handler";
+    let issue_id = "src/token.rs:12:function:issue_token";
     let test_id = "tests/auth_test.rs:5:function:login_works";
     let index = RepoContextIndex {
         rust: RustIndex {
-            files_scanned: 2,
+            files_scanned: 6,
             symbols: vec![
                 symbol(user_id, "User", SymbolKind::Struct, "src/domain.rs", 1, 4),
+                symbol(
+                    repo_trait_id,
+                    "UserRepository",
+                    SymbolKind::Trait,
+                    "src/repo.rs",
+                    1,
+                    8,
+                ),
+                symbol(
+                    repo_impl_id,
+                    "impl UserRepository for PgRepo",
+                    SymbolKind::Impl,
+                    "src/repo_pg.rs",
+                    4,
+                    20,
+                ),
                 symbol(
                     service_id,
                     "AuthService",
@@ -40,6 +60,22 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
                         20,
                     )
                 },
+                symbol(
+                    handler_id,
+                    "login_handler",
+                    SymbolKind::Function,
+                    "src/api.rs",
+                    25,
+                    35,
+                ),
+                symbol(
+                    issue_id,
+                    "issue_token",
+                    SymbolKind::Function,
+                    "src/token.rs",
+                    12,
+                    18,
+                ),
                 symbol(
                     test_id,
                     "login_works",
@@ -96,25 +132,95 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
         rust_analyzer: RustAnalyzerReport {
             lsp: RustAnalyzerLspReport {
                 enabled: true,
-                attempted: 1,
-                succeeded: 1,
-                results: vec![RustAnalyzerLspQueryResult {
-                    method: SemanticQueryMethod::References,
-                    path: "src/service.rs".to_string(),
-                    line: 10,
-                    symbol: Some("login".to_string()),
-                    status: RustAnalyzerLspStatus::Succeeded,
-                    duration_ms: 3,
-                    summary: Some("1 item(s)".to_string()),
-                    locations: vec![RustAnalyzerLspLocation {
-                        role: RustAnalyzerLspLocationRole::Reference,
-                        path: "tests/auth_test.rs".to_string(),
-                        line: 8,
-                        end_line: None,
+                attempted: 5,
+                succeeded: 5,
+                results: vec![
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::Definition,
+                        path: "src/api.rs".to_string(),
+                        line: 30,
                         symbol: Some("login".to_string()),
-                    }],
-                    warning: None,
-                }],
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 2,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::Definition,
+                            path: "src/service.rs".to_string(),
+                            line: 10,
+                            end_line: None,
+                            symbol: Some("login".to_string()),
+                        }],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::References,
+                        path: "src/service.rs".to_string(),
+                        line: 10,
+                        symbol: Some("login".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 3,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::Reference,
+                            path: "tests/auth_test.rs".to_string(),
+                            line: 8,
+                            end_line: None,
+                            symbol: Some("login".to_string()),
+                        }],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::Implementation,
+                        path: "src/repo.rs".to_string(),
+                        line: 1,
+                        symbol: Some("UserRepository".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 4,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::Implementation,
+                            path: "src/repo_pg.rs".to_string(),
+                            line: 4,
+                            end_line: None,
+                            symbol: Some("PgRepo".to_string()),
+                        }],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::IncomingCalls,
+                        path: "src/service.rs".to_string(),
+                        line: 10,
+                        symbol: Some("login".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 5,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::IncomingCaller,
+                            path: "src/api.rs".to_string(),
+                            line: 30,
+                            end_line: None,
+                            symbol: Some("login_handler".to_string()),
+                        }],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::OutgoingCalls,
+                        path: "src/service.rs".to_string(),
+                        line: 10,
+                        symbol: Some("login".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 6,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::OutgoingCallee,
+                            path: "src/token.rs".to_string(),
+                            line: 12,
+                            end_line: None,
+                            symbol: Some("issue_token".to_string()),
+                        }],
+                        warning: None,
+                    },
+                ],
                 ..RustAnalyzerLspReport::default()
             },
             ..RustAnalyzerReport::default()
@@ -154,6 +260,26 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     assert!(references
         .iter()
         .any(|edge| edge.source == "rust_analyzer_lsp" && edge.kind == "reference"));
+    assert!(symbol_index
+        .definitions_for(handler_id)
+        .iter()
+        .any(|edge| edge.to_symbol_id.as_deref() == Some(login_id)));
+    assert!(symbol_index
+        .implementations_for(repo_trait_id)
+        .iter()
+        .any(|edge| edge.to_symbol_id.as_deref() == Some(repo_impl_id)));
+    assert!(symbol_index
+        .callers_of(login_id)
+        .iter()
+        .any(|edge| edge.from_symbol_id.as_deref() == Some(handler_id)));
+    assert!(symbol_index
+        .callees_of(login_id)
+        .iter()
+        .any(|edge| edge.to_symbol_id.as_deref() == Some(issue_id)));
+    assert!(symbol_index
+        .semantic_edges_for(login_id)
+        .iter()
+        .any(|edge| edge.source == "rust_analyzer_lsp"));
     let login_neighbors = symbol_index.neighbors(login_id);
     assert!(login_neighbors
         .iter()
@@ -173,10 +299,15 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     assert_eq!(symbol_index.tests_for_symbol(login_id).len(), 1);
 
     let summary = symbol_index.lookup_summary();
-    assert_eq!(summary.symbol_count, 4);
-    assert_eq!(summary.file_count, 3);
-    assert!(summary.lsp_edge_count >= 1);
+    assert_eq!(summary.symbol_count, 8);
+    assert_eq!(summary.file_count, 7);
+    assert!(summary.lsp_edge_count >= 5);
+    assert!(summary.precise_semantic_edge_count >= 5);
+    assert!(summary.edge_kind_counts.contains_key("outgoing_call"));
+    assert!(summary.edge_source_counts.contains_key("rust_analyzer_lsp"));
     assert!(summary.query_api.contains(&"search_symbols"));
+    assert!(summary.query_api.contains(&"callers_of"));
+    assert!(summary.query_api.contains(&"implementations_for"));
 }
 
 fn symbol(
