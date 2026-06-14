@@ -12,6 +12,7 @@ use super::{
     project_manifests::ProjectManifestReport,
     symbol_index::SymbolIndex,
     symbol_index_build::build_symbol_index,
+    symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
     validation::ValidationPlan,
 };
 
@@ -87,6 +88,8 @@ pub(crate) fn write_context_exports(
         &build_symbol_lookup_json(&symbol_index),
         files,
     )?;
+    bytes +=
+        write_symbol_index_sqlite(&bundle_dir.join(SYMBOL_INDEX_DB_FILE), &symbol_index, files)?;
     bytes += write_export_text(
         &bundle_dir.join("edges.tsv"),
         &build_edges_tsv(repo_index),

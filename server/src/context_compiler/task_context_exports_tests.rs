@@ -80,6 +80,7 @@ fn saves_task_context_pack_and_harness_current_task_exports() {
     let json = fs::read_to_string(current_json).unwrap();
     assert!(json.contains("\"user_request\": \"完善 repo map\""));
     assert!(json.contains("\"harness_markdown\": \".ai/context/current-task.md\""));
+    assert!(json.contains("\"symbol_index_db\": \"symbol_index.sqlite\""));
     assert!(json.contains("\"dirty\": true"));
 
     let manifest = fs::read_to_string(artifact.bundle_dir.join("manifest.json")).unwrap();

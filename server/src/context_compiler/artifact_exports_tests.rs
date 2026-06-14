@@ -116,6 +116,7 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(artifact.bundle_dir.join("symbol_index.jsonl").is_file());
     assert!(artifact.bundle_dir.join("symbol_edges.jsonl").is_file());
     assert!(artifact.bundle_dir.join("symbol_lookup.json").is_file());
+    assert!(artifact.bundle_dir.join("symbol_index.sqlite").is_file());
     assert!(artifact.bundle_dir.join("edges.tsv").is_file());
     assert!(artifact.bundle_dir.join("chunks.jsonl").is_file());
     assert!(artifact.bundle_dir.join("tests.jsonl").is_file());
@@ -156,6 +157,48 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     let symbol_lookup = fs::read_to_string(artifact.bundle_dir.join("symbol_lookup.json")).unwrap();
     assert!(symbol_lookup.contains("search_symbols"));
     assert!(symbol_lookup.contains("symbol_count"));
+    let symbol_db = artifact.bundle_dir.join("symbol_index.sqlite");
+    let conn = rusqlite::Connection::open(&symbol_db).unwrap();
+    let symbol_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM symbols", [], |row| row.get(0))
+        .unwrap();
+    assert!(symbol_count >= 1);
+    let stored_symbol_name: String = conn
+        .query_row(
+            "SELECT name FROM symbols WHERE id = ?1",
+            ["server/src/context_compiler/context_pack.rs::build_context_pack"],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(stored_symbol_name, "build_context_pack");
+    let edge_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM edges", [], |row| row.get(0))
+        .unwrap();
+    assert!(edge_count >= 3);
+    let lookup_summary: String = conn
+        .query_row(
+            "SELECT value FROM metadata WHERE key = 'lookup_summary_json'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(lookup_summary.contains("workspace_symbols_named"));
+    let term_hits: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM symbol_terms WHERE term = 'build_context_pack'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(term_hits > 0);
+    let lsp_edges: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM edges WHERE source = 'rust_analyzer_lsp'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(lsp_edges > 0);
     assert!(fs::read_to_string(artifact.bundle_dir.join("edges.tsv"))
         .unwrap()
         .contains("symbol_graph"));
@@ -196,8 +239,10 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
     assert!(manifest.contains("symbol_index.jsonl"));
     assert!(manifest.contains("symbol_edges.jsonl"));
     assert!(manifest.contains("symbol_lookup.json"));
+    assert!(manifest.contains("symbol_index.sqlite"));
     assert!(manifest.contains("semantic_facts.jsonl"));
 
+    drop(conn);
     fs::remove_dir_all(dir).unwrap();
 }
 

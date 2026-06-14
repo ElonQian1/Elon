@@ -253,7 +253,7 @@ Before editing, verify important facts by reading the actual files.
 - directory_summaries.md / directory_summaries.json / directories.jsonl
 - repo_snapshot.json
 - repo_context_index.json
-- repo_map.md / summaries.md / symbols.jsonl / edges.tsv / chunks.jsonl / tests.jsonl / lsp_locations.jsonl / semantic_facts.jsonl when Rust analysis ran
+- repo_map.md / summaries.md / symbols.jsonl / symbol_index.jsonl / symbol_edges.jsonl / symbol_lookup.json / symbol_index.sqlite / edges.tsv / chunks.jsonl / tests.jsonl / lsp_locations.jsonl / semantic_facts.jsonl when Rust analysis ran
 - relevant_files.json
 - validation_plan.json
 - validation.md
