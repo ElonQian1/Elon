@@ -528,6 +528,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(context_compiler::symbol_index_api::get_symbol_impact),
         )
         .route(
+            "/api/admin/context/symbol-index/impact-pack",
+            get(context_compiler::symbol_index_api::get_symbol_impact_pack),
+        )
+        .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )

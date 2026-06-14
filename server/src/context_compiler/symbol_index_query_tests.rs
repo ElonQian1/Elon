@@ -7,6 +7,7 @@ use std::{
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
+    symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
@@ -278,6 +279,42 @@ fn impact_query_reports_missing_seed() {
     .to_string();
 
     assert!(error.contains("没有找到影响面查询种子"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn impact_pack_renders_model_friendly_context_and_truncates() {
+    let dir = temp_dir("elon_symbol_impact_pack");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213011-trace-impact-pack-user",
+        sample_index(),
+    );
+    let impact = load_symbol_impact_db(
+        &db,
+        &SymbolImpactQuery {
+            symbol_id: Some(
+                "server/src/context_compiler/context_pack.rs::build_context_pack".to_string(),
+            ),
+            depth: 1,
+            limit: 20,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let full = build_symbol_impact_pack(impact.clone(), 12_000);
+    assert!(!full.truncated);
+    assert!(full.pack.contains("<symbol_impact_context"));
+    assert!(full.pack.contains("<seed_symbols count=\"1\">"));
+    assert!(full.pack.contains("build_context_pack_test"));
+    assert!(full.pack.contains("<usage_guidance>"));
+
+    let short = build_symbol_impact_pack(impact, normalize_pack_max_chars(1));
+    assert!(short.truncated);
+    assert!(short.pack.contains("symbol impact context truncated"));
 
     fs::remove_dir_all(dir).unwrap();
 }

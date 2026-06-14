@@ -14,6 +14,7 @@ use super::{
     symbol_index_graph_query::{
         load_latest_symbol_graph, SymbolGraphQuery, SymbolRelationDirection,
     },
+    symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
@@ -61,6 +62,22 @@ pub(crate) struct SymbolImpactParams {
     pub(crate) limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolImpactPackParams {
+    pub(crate) id: Option<String>,
+    #[serde(alias = "symbolId")]
+    pub(crate) symbol_id: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "edgeKind")]
+    pub(crate) edge_kind: Option<String>,
+    pub(crate) depth: Option<usize>,
+    pub(crate) limit: Option<usize>,
+    #[serde(alias = "maxChars")]
+    pub(crate) max_chars: Option<usize>,
+}
+
 impl SymbolIndexSearchParams {
     fn into_search(self) -> SymbolIndexSearch {
         SymbolIndexSearch {
@@ -92,20 +109,60 @@ impl SymbolGraphParams {
 
 impl SymbolImpactParams {
     fn into_query(self) -> Result<SymbolImpactQuery, String> {
-        let symbol_id = clean(self.id).or_else(|| clean(self.symbol_id));
-        let path = clean(self.path);
-        if symbol_id.is_none() && path.is_none() {
-            return Err("id 和 path 至少提供一个".to_string());
-        }
-        Ok(SymbolImpactQuery {
-            trace_id: clean(self.trace_id),
-            symbol_id,
-            path,
-            edge_kind: clean(self.edge_kind),
-            depth: self.depth.unwrap_or_default(),
-            limit: self.limit.unwrap_or_default(),
+        build_impact_query(ImpactQueryParts {
+            id: self.id,
+            symbol_id: self.symbol_id,
+            trace_id: self.trace_id,
+            path: self.path,
+            edge_kind: self.edge_kind,
+            depth: self.depth,
+            limit: self.limit,
         })
     }
+}
+
+impl SymbolImpactPackParams {
+    fn into_query(self) -> Result<(SymbolImpactQuery, usize), String> {
+        let query = build_impact_query(ImpactQueryParts {
+            id: self.id,
+            symbol_id: self.symbol_id,
+            trace_id: self.trace_id,
+            path: self.path,
+            edge_kind: self.edge_kind,
+            depth: self.depth,
+            limit: self.limit,
+        })?;
+        Ok((
+            query,
+            normalize_pack_max_chars(self.max_chars.unwrap_or_default()),
+        ))
+    }
+}
+
+struct ImpactQueryParts {
+    id: Option<String>,
+    symbol_id: Option<String>,
+    trace_id: Option<String>,
+    path: Option<String>,
+    edge_kind: Option<String>,
+    depth: Option<usize>,
+    limit: Option<usize>,
+}
+
+fn build_impact_query(parts: ImpactQueryParts) -> Result<SymbolImpactQuery, String> {
+    let symbol_id = clean(parts.id).or_else(|| clean(parts.symbol_id));
+    let path = clean(parts.path);
+    if symbol_id.is_none() && path.is_none() {
+        return Err("id 和 path 至少提供一个".to_string());
+    }
+    Ok(SymbolImpactQuery {
+        trace_id: clean(parts.trace_id),
+        symbol_id,
+        path,
+        edge_kind: clean(parts.edge_kind),
+        depth: parts.depth.unwrap_or_default(),
+        limit: parts.limit.unwrap_or_default(),
+    })
 }
 
 pub(crate) async fn search_symbol_index(
@@ -159,6 +216,26 @@ pub(crate) async fn get_symbol_impact(
 
     match load_latest_symbol_impact(&state.data_dir, &query) {
         Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn get_symbol_impact_pack(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolImpactPackParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let (query, max_chars) = match params.into_query() {
+        Ok(value) => value,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match load_latest_symbol_impact(&state.data_dir, &query) {
+        Ok(response) => Json(build_symbol_impact_pack(response, max_chars)).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }
 }
