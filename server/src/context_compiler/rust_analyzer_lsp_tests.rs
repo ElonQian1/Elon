@@ -7,9 +7,12 @@ use serde_json::json;
 
 use super::{
     model::{
-        RustAnalyzerLspLocationRole, SemanticQuery, SemanticQueryMethod, SemanticQueryProvider,
+        RepoContextIndex, RustAnalyzerLspLocationRole, SemanticQuery, SemanticQueryMethod,
+        SemanticQueryPlan, SemanticQueryProvider,
     },
-    rust_analyzer_lsp::{file_uri, find_symbol_character, summarize_lsp_result},
+    rust_analyzer_lsp::{
+        file_uri, find_symbol_character, ordered_executable_queries, summarize_lsp_result,
+    },
     rust_analyzer_lsp_locations::{parse_lsp_locations, uri_to_workspace_path},
 };
 
@@ -78,6 +81,29 @@ fn summarize_lsp_result_extracts_hover_contents() {
     );
 
     assert!(summary.contains("target_name"));
+}
+
+#[test]
+fn ordered_executable_queries_prioritize_core_semantics_over_sampling() {
+    let mut workspace_symbol = query(SemanticQueryMethod::WorkspaceSymbol, ".");
+    workspace_symbol.priority = 2;
+    let mut definition = query(SemanticQueryMethod::Definition, "src/lib.rs");
+    definition.priority = 1;
+    let mut references = query(SemanticQueryMethod::References, "src/lib.rs");
+    references.priority = 1;
+    let index = RepoContextIndex {
+        semantic_plan: SemanticQueryPlan {
+            queries: vec![workspace_symbol, definition, references],
+            ..SemanticQueryPlan::default()
+        },
+        ..RepoContextIndex::default()
+    };
+
+    let ordered = ordered_executable_queries(&index, 2);
+
+    assert_eq!(ordered.len(), 2);
+    assert_eq!(ordered[0].method, SemanticQueryMethod::Definition);
+    assert_eq!(ordered[1].method, SemanticQueryMethod::References);
 }
 
 #[test]

@@ -79,15 +79,7 @@ pub(crate) fn execute_semantic_query_plan(
         }
     }
 
-    let query_limit = max_queries.max(1).min(64);
-    for query in index
-        .semantic_plan
-        .queries
-        .iter()
-        .filter(|query| query.provider == SemanticQueryProvider::RustAnalyzerLsp)
-        .filter(|query| is_executable_method(query.method))
-        .take(query_limit)
-    {
+    for query in ordered_executable_queries(index, max_queries) {
         push_result(
             &mut report,
             execute_query(workspace, &mut client, query, timeout),
@@ -112,6 +104,27 @@ pub(crate) fn execute_semantic_query_plan(
             .push(format!("rust-analyzer stderr: {line}"));
     }
     report
+}
+
+pub(super) fn ordered_executable_queries(
+    index: &RepoContextIndex,
+    max_queries: usize,
+) -> Vec<&SemanticQuery> {
+    let query_limit = max_queries.max(1).min(64);
+    let mut queries = index
+        .semantic_plan
+        .queries
+        .iter()
+        .enumerate()
+        .filter(|(_, query)| query.provider == SemanticQueryProvider::RustAnalyzerLsp)
+        .filter(|(_, query)| is_executable_method(query.method))
+        .collect::<Vec<_>>();
+    queries.sort_by_key(|(index, query)| (query.priority, *index));
+    queries
+        .into_iter()
+        .take(query_limit)
+        .map(|(_, query)| query)
+        .collect()
 }
 
 fn execute_query(
