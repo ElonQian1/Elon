@@ -51,8 +51,12 @@ mod semantic_query_plan_render;
 mod semantic_query_plan_tests;
 mod symbol_graph;
 mod symbol_index;
+pub(crate) mod symbol_index_api;
 mod symbol_index_build;
 mod symbol_index_impact_edges;
+mod symbol_index_query;
+#[cfg(test)]
+mod symbol_index_query_tests;
 mod symbol_index_semantic;
 mod symbol_index_store;
 #[cfg(test)]
