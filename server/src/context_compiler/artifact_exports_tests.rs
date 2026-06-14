@@ -248,7 +248,7 @@ fn test_repo_index() -> RepoContextIndex {
                 role: "caller",
                 safety_notes: Vec::new(),
             }],
-            warnings: Vec::new(),
+            ..RustIndex::default()
         },
         graph: SymbolGraphSummary {
             ranked_files: vec![RankedFile {

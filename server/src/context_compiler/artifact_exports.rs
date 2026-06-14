@@ -233,6 +233,7 @@ fn build_summaries_markdown(index: &RepoContextIndex) -> String {
         index.rust.symbols.len(),
         index.rust.files_scanned
     ));
+    out.push_str(&format!("- rust_imports: {}\n", index.rust.imports.len()));
     out.push_str(&format!(
         "- relationships: {} repo_map_tag_edges={}\n",
         index.graph.relationships.len(),

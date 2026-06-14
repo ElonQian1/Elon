@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use super::{
     model::{RustIndex, RustSymbol, SymbolKind, SymbolVisibility},
     repo_snapshot::{relative_path, source_role},
-    repo_walk,
+    repo_walk, rust_imports,
 };
 
 const MAX_RUST_FILE_BYTES: u64 = 512 * 1024;
@@ -32,9 +32,15 @@ fn scan_dir(base: &Path, _dir: &Path, max_files: usize, index: &mut RustIndex) {
         }
         index.files_scanned += 1;
         match fs::read_to_string(&path) {
-            Ok(content) => index
-                .symbols
-                .extend(extract_file_symbols(base, &path, &content)),
+            Ok(content) => {
+                let relative = relative_path(base, &path);
+                index
+                    .imports
+                    .extend(rust_imports::collect_file_imports(&relative, &content));
+                index
+                    .symbols
+                    .extend(extract_file_symbols(base, &path, &content));
+            }
             Err(_) => index.warnings.push(format!(
                 "读取 Rust 文件失败：{}",
                 relative_path(base, &path)
@@ -386,5 +392,23 @@ impl ContextBundle {
             .any(|symbol| symbol.name == "ContextBundle" && symbol.kind == SymbolKind::Struct));
         assert!(symbols.iter().any(|symbol| symbol.name == "build"
             && symbol.safety_notes.contains(&"await boundary".to_string())));
+    }
+
+    #[test]
+    fn collects_imports_with_symbols() {
+        let content = "pub use crate::domain::User;\npub struct Service;\n";
+        let mut index = RustIndex::default();
+        index
+            .imports
+            .extend(rust_imports::collect_file_imports("src/lib.rs", content));
+        index.symbols.extend(extract_file_symbols(
+            Path::new("."),
+            Path::new("src/lib.rs"),
+            content,
+        ));
+
+        assert_eq!(index.imports.len(), 1);
+        assert_eq!(index.imports[0].imported_path, "crate::domain::User");
+        assert!(index.symbols.iter().any(|symbol| symbol.name == "Service"));
     }
 }

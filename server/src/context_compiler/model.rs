@@ -42,7 +42,19 @@ pub(crate) struct CargoPackageSummary {
 pub(crate) struct RustIndex {
     pub(crate) files_scanned: usize,
     pub(crate) symbols: Vec<RustSymbol>,
+    pub(crate) imports: Vec<RustImport>,
     pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct RustImport {
+    pub(crate) path: String,
+    pub(crate) line: usize,
+    pub(crate) imported_path: String,
+    pub(crate) alias: Option<String>,
+    pub(crate) public: bool,
+    pub(crate) glob: bool,
+    pub(crate) raw: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

@@ -55,7 +55,7 @@ fn builds_snippet_with_hash_and_build_command() {
         rust: RustIndex {
             files_scanned: 1,
             symbols: vec![symbol.clone()],
-            warnings: Vec::new(),
+            ..RustIndex::default()
         },
         graph: SymbolGraphSummary {
             ranked_symbols: vec![RankedSymbol {

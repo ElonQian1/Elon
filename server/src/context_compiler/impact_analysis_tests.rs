@@ -140,7 +140,7 @@ fn process_test() {
         rust: RustIndex {
             files_scanned: 1,
             symbols,
-            warnings: Vec::new(),
+            ..RustIndex::default()
         },
         graph: SymbolGraphSummary {
             ranked_symbols: vec![

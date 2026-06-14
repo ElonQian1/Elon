@@ -3,8 +3,10 @@ use std::collections::{BTreeMap, HashSet};
 use super::{
     model::{
         CodeRelationship, RelationshipKind, RepoContextIndex, RepoMapTagEdge,
-        RustAnalyzerLspLocationRole, RustAnalyzerLspStatus, RustSymbol, SemanticQueryMethod,
+        RustAnalyzerLspLocationRole, RustAnalyzerLspStatus, RustImport, RustSymbol,
+        SemanticQueryMethod,
     },
+    rust_imports::import_leaf,
     symbol_index::{
         normalize_path, push_source, stable_hash, SymbolEdge, SymbolIndex, SymbolRecord,
     },
@@ -26,6 +28,10 @@ pub(crate) fn build_symbol_index(index: &RepoContextIndex) -> SymbolIndex {
     }
     symbol_index.rebuild_lookups();
     symbol_index.apply_ranked_symbols(index);
+    symbol_index.add_definition_edges();
+    symbol_index.add_contains_edges();
+    symbol_index.add_import_edges(&index.rust.imports);
+    symbol_index.add_impact_edges(&index.impact);
     symbol_index.add_symbol_graph_edges(&index.graph.relationships);
     symbol_index.add_repo_map_tag_edges(&index.graph.repo_map_tags.edges);
     symbol_index.add_lsp_facts(index);
@@ -42,6 +48,98 @@ impl SymbolIndex {
                 push_source(record, "symbol_graph_rank");
             }
         }
+    }
+
+    fn add_definition_edges(&mut self) {
+        let mut seen = HashSet::new();
+        for record in self.records.clone() {
+            self.push_edge(
+                &mut seen,
+                SymbolEdge {
+                    id: String::new(),
+                    source: "rust_symbols",
+                    kind: "defines".to_string(),
+                    from_symbol_id: None,
+                    from_path: record.file_path.clone(),
+                    line: record.start_line,
+                    to_symbol_id: Some(record.id.clone()),
+                    to_symbol_name: Some(record.name.clone()),
+                    to_path: Some(record.file_path),
+                    confidence: 1.0,
+                    reason: "Rust symbol definition".to_string(),
+                },
+            );
+        }
+    }
+
+    fn add_contains_edges(&mut self) {
+        let mut seen = HashSet::new();
+        for child in self.records.clone() {
+            let Some(parent_id) = child.parent_symbol_id.clone() else {
+                continue;
+            };
+            let Some(parent_index) = self.by_id.get(&parent_id).copied() else {
+                continue;
+            };
+            let parent = &self.records[parent_index];
+            self.push_edge(
+                &mut seen,
+                SymbolEdge {
+                    id: String::new(),
+                    source: "rust_symbols",
+                    kind: "contains".to_string(),
+                    from_symbol_id: Some(parent.id.clone()),
+                    from_path: parent.file_path.clone(),
+                    line: child.start_line,
+                    to_symbol_id: Some(child.id.clone()),
+                    to_symbol_name: Some(child.name.clone()),
+                    to_path: Some(child.file_path),
+                    confidence: 1.0,
+                    reason: "parent symbol contains child symbol".to_string(),
+                },
+            );
+        }
+    }
+
+    fn add_import_edges(&mut self, imports: &[RustImport]) {
+        let mut seen = HashSet::new();
+        for import in imports {
+            let leaf = import_leaf(&import.imported_path, import.alias.as_deref());
+            let target_index = self.find_import_target(import, leaf.as_deref());
+            self.push_edge(
+                &mut seen,
+                SymbolEdge {
+                    id: String::new(),
+                    source: "rust_imports",
+                    kind: if import.public { "exports" } else { "imports" }.to_string(),
+                    from_symbol_id: self
+                        .find_symbol_index_at(&import.path, import.line, None)
+                        .map(|index| self.records[index].id.clone()),
+                    from_path: normalize_path(&import.path),
+                    line: import.line,
+                    to_symbol_id: target_index.map(|index| self.records[index].id.clone()),
+                    to_symbol_name: target_index
+                        .map(|index| self.records[index].name.clone())
+                        .or(leaf),
+                    to_path: target_index.map(|index| self.records[index].file_path.clone()),
+                    confidence: if target_index.is_some() { 0.8 } else { 0.45 },
+                    reason: import.raw.clone(),
+                },
+            );
+        }
+    }
+
+    fn find_import_target(&self, import: &RustImport, leaf: Option<&str>) -> Option<usize> {
+        self.records
+            .iter()
+            .position(|record| record.qualified_name == import.imported_path)
+            .or_else(|| {
+                leaf.and_then(|leaf| {
+                    self.by_name
+                        .get(&leaf.to_ascii_lowercase())
+                        .and_then(|matches| matches.first().copied())
+                })
+            })
     }
 
     fn add_symbol_graph_edges(&mut self, relationships: &[CodeRelationship]) {

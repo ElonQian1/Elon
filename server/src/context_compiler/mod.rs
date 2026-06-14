@@ -42,6 +42,7 @@ mod rust_analyzer_probe;
 mod rust_analyzer_probe_render;
 #[cfg(test)]
 mod rust_analyzer_probe_tests;
+mod rust_imports;
 mod rust_project;
 mod rust_symbols;
 mod semantic_query_plan;
@@ -51,6 +52,7 @@ mod semantic_query_plan_tests;
 mod symbol_graph;
 mod symbol_index;
 mod symbol_index_build;
+mod symbol_index_impact_edges;
 #[cfg(test)]
 mod symbol_index_tests;
 mod task_context_exports;

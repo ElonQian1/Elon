@@ -1,9 +1,10 @@
 use super::{
     model::{
-        CodeRelationship, RankedSymbol, RelationshipKind, RepoContextIndex,
+        CodeRelationship, ImpactFact, ImpactKind, RankedSymbol, RelationshipKind, RepoContextIndex,
         RustAnalyzerLspLocation, RustAnalyzerLspLocationRole, RustAnalyzerLspQueryResult,
-        RustAnalyzerLspReport, RustAnalyzerLspStatus, RustAnalyzerReport, RustIndex, RustSymbol,
-        SemanticQueryMethod, SymbolGraphSummary, SymbolKind, SymbolVisibility,
+        RustAnalyzerLspReport, RustAnalyzerLspStatus, RustAnalyzerReport, RustImpactAnalysis,
+        RustImport, RustIndex, RustSymbol, SemanticQueryMethod, SymbolGraphSummary, SymbolKind,
+        SymbolVisibility,
     },
     symbol_index::SymbolQuery,
     symbol_index_build::build_symbol_index,
@@ -13,11 +14,13 @@ use super::{
 fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     let service_id = "src/service.rs:1:struct:AuthService";
     let login_id = "src/service.rs:10:function:login";
+    let user_id = "src/domain.rs:1:struct:User";
     let test_id = "tests/auth_test.rs:5:function:login_works";
     let index = RepoContextIndex {
         rust: RustIndex {
             files_scanned: 2,
             symbols: vec![
+                symbol(user_id, "User", SymbolKind::Struct, "src/domain.rs", 1, 4),
                 symbol(
                     service_id,
                     "AuthService",
@@ -46,7 +49,16 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
                     12,
                 ),
             ],
-            warnings: Vec::new(),
+            imports: vec![RustImport {
+                path: "src/service.rs".to_string(),
+                line: 2,
+                imported_path: "crate::domain::User".to_string(),
+                alias: None,
+                public: true,
+                glob: false,
+                raw: "pub use crate::domain::User;".to_string(),
+            }],
+            ..RustIndex::default()
         },
         graph: SymbolGraphSummary {
             ranked_symbols: vec![RankedSymbol {
@@ -107,6 +119,17 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
             },
             ..RustAnalyzerReport::default()
         },
+        impact: RustImpactAnalysis {
+            function_call_sites: vec![ImpactFact {
+                subject: "login".to_string(),
+                path: "src/api.rs".to_string(),
+                line: 30,
+                kind: ImpactKind::FunctionCallSite,
+                evidence: "service.login().await".to_string(),
+                reason: "call-like token hit".to_string(),
+            }],
+            ..RustImpactAnalysis::default()
+        },
         ..RepoContextIndex::default()
     };
 
@@ -131,12 +154,27 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     assert!(references
         .iter()
         .any(|edge| edge.source == "rust_analyzer_lsp" && edge.kind == "reference"));
-    assert!(!symbol_index.neighbors(login_id).is_empty());
+    let login_neighbors = symbol_index.neighbors(login_id);
+    assert!(login_neighbors
+        .iter()
+        .any(|edge| edge.source == "rust_symbols" && edge.kind == "contains"));
+    assert!(symbol_index
+        .edges
+        .iter()
+        .any(|edge| edge.source == "rust_imports"
+            && edge.kind == "exports"
+            && edge.to_symbol_id.as_deref() == Some(user_id)));
+    assert!(symbol_index
+        .edges
+        .iter()
+        .any(|edge| edge.source == "impact_analysis"
+            && edge.kind == "calls"
+            && edge.to_symbol_id.as_deref() == Some(login_id)));
     assert_eq!(symbol_index.tests_for_symbol(login_id).len(), 1);
 
     let summary = symbol_index.lookup_summary();
-    assert_eq!(summary.symbol_count, 3);
-    assert_eq!(summary.file_count, 2);
+    assert_eq!(summary.symbol_count, 4);
+    assert_eq!(summary.file_count, 3);
     assert!(summary.lsp_edge_count >= 1);
     assert!(summary.query_api.contains(&"search_symbols"));
 }
