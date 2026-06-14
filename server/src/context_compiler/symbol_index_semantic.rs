@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::symbol_index::{SymbolEdge, SymbolIndex};
+use super::symbol_index::{normalize_path, SymbolEdge, SymbolIndex};
 
 #[allow(dead_code)]
 impl SymbolIndex {
@@ -44,7 +44,42 @@ impl SymbolIndex {
         indexes
             .into_iter()
             .filter_map(|index| self.edges.get(index))
-            .filter(|edge| is_precise_semantic_edge(edge) || is_normalized_semantic_edge(edge))
+            .filter(|edge| {
+                is_precise_semantic_edge(edge)
+                    || is_lsp_navigation_edge(edge)
+                    || is_normalized_semantic_edge(edge)
+            })
+            .collect()
+    }
+
+    pub(crate) fn document_symbols_in_file(&self, path: &str) -> Vec<&SymbolEdge> {
+        let path = normalize_path(path);
+        self.edges
+            .iter()
+            .filter(|edge| {
+                edge.source == "rust_analyzer_lsp"
+                    && edge.kind == "document_symbol"
+                    && (edge.from_path == path || edge.to_path.as_deref() == Some(path.as_str()))
+            })
+            .collect()
+    }
+
+    pub(crate) fn workspace_symbols_named(&self, name: &str) -> Vec<&SymbolEdge> {
+        let name = name.trim().to_ascii_lowercase();
+        if name.is_empty() {
+            return Vec::new();
+        }
+        self.edges
+            .iter()
+            .filter(|edge| {
+                edge.source == "rust_analyzer_lsp"
+                    && edge.kind == "workspace_symbol"
+                    && edge
+                        .to_symbol_name
+                        .as_deref()
+                        .map(|symbol| symbol.to_ascii_lowercase().contains(&name))
+                        .unwrap_or(false)
+            })
             .collect()
     }
 
@@ -68,6 +103,13 @@ impl SymbolIndex {
         self.edges
             .iter()
             .filter(|edge| is_precise_semantic_edge(edge))
+            .count()
+    }
+
+    pub(crate) fn lsp_navigation_edge_count(&self) -> usize {
+        self.edges
+            .iter()
+            .filter(|edge| is_lsp_navigation_edge(edge))
             .count()
     }
 
@@ -112,6 +154,14 @@ fn is_precise_semantic_edge(edge: &SymbolEdge) -> bool {
         && matches!(
             edge.kind.as_str(),
             "definition" | "reference" | "implementation" | "incoming_call" | "outgoing_call"
+        )
+}
+
+fn is_lsp_navigation_edge(edge: &SymbolEdge) -> bool {
+    edge.source == "rust_analyzer_lsp"
+        && matches!(
+            edge.kind.as_str(),
+            "document_symbol" | "workspace_symbol" | "call_hierarchy_item"
         )
 }
 

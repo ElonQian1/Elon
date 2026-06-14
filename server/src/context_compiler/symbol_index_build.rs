@@ -281,9 +281,42 @@ impl SymbolIndex {
                             location.symbol.as_deref().or(result.symbol.as_deref()),
                         );
                     }
-                    RustAnalyzerLspLocationRole::DocumentSymbol
-                    | RustAnalyzerLspLocationRole::WorkspaceSymbol
-                    | RustAnalyzerLspLocationRole::CallHierarchyItem => {}
+                    RustAnalyzerLspLocationRole::DocumentSymbol => {
+                        self.push_lsp_edge(
+                            &mut seen,
+                            "document_symbol",
+                            None,
+                            location_symbol_index,
+                            &result.path,
+                            location.line,
+                            &location.path,
+                            location.symbol.as_deref().or(result.symbol.as_deref()),
+                        );
+                    }
+                    RustAnalyzerLspLocationRole::WorkspaceSymbol => {
+                        self.push_lsp_edge(
+                            &mut seen,
+                            "workspace_symbol",
+                            None,
+                            location_symbol_index,
+                            &result.path,
+                            location.line,
+                            &location.path,
+                            location.symbol.as_deref().or(result.symbol.as_deref()),
+                        );
+                    }
+                    RustAnalyzerLspLocationRole::CallHierarchyItem => {
+                        self.push_lsp_edge(
+                            &mut seen,
+                            "call_hierarchy_item",
+                            query_symbol_index,
+                            location_symbol_index,
+                            &result.path,
+                            result.line,
+                            &location.path,
+                            location.symbol.as_deref().or(result.symbol.as_deref()),
+                        );
+                    }
                 }
             }
         }

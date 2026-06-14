@@ -67,6 +67,7 @@ pub(crate) struct SymbolLookupSummary {
     pub(crate) edge_kind_counts: BTreeMap<String, usize>,
     pub(crate) edge_source_counts: BTreeMap<String, usize>,
     pub(crate) lsp_edge_count: usize,
+    pub(crate) lsp_navigation_edge_count: usize,
     pub(crate) precise_semantic_edge_count: usize,
     pub(crate) query_api: Vec<&'static str>,
 }
@@ -190,11 +191,14 @@ impl SymbolIndex {
                 .iter()
                 .filter(|edge| edge.source == "rust_analyzer_lsp")
                 .count(),
+            lsp_navigation_edge_count: self.lsp_navigation_edge_count(),
             precise_semantic_edge_count: self.precise_semantic_edge_count(),
             query_api: vec![
                 "search_symbols",
                 "get_symbol",
                 "symbols_in_file",
+                "document_symbols_in_file",
+                "workspace_symbols_named",
                 "definitions_for",
                 "references_to",
                 "implementations_for",

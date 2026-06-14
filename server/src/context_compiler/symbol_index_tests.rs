@@ -132,9 +132,52 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
         rust_analyzer: RustAnalyzerReport {
             lsp: RustAnalyzerLspReport {
                 enabled: true,
-                attempted: 5,
-                succeeded: 5,
+                attempted: 7,
+                succeeded: 7,
                 results: vec![
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::DocumentSymbol,
+                        path: "src/service.rs".to_string(),
+                        line: 1,
+                        symbol: None,
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 1,
+                        summary: Some("2 item(s)".to_string()),
+                        locations: vec![
+                            RustAnalyzerLspLocation {
+                                role: RustAnalyzerLspLocationRole::DocumentSymbol,
+                                path: "src/service.rs".to_string(),
+                                line: 1,
+                                end_line: Some(4),
+                                symbol: Some("AuthService".to_string()),
+                            },
+                            RustAnalyzerLspLocation {
+                                role: RustAnalyzerLspLocationRole::DocumentSymbol,
+                                path: "src/service.rs".to_string(),
+                                line: 10,
+                                end_line: Some(20),
+                                symbol: Some("login".to_string()),
+                            },
+                        ],
+                        warning: None,
+                    },
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::WorkspaceSymbol,
+                        path: ".".to_string(),
+                        line: 1,
+                        symbol: Some("login".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 2,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::WorkspaceSymbol,
+                            path: "src/service.rs".to_string(),
+                            line: 10,
+                            end_line: None,
+                            symbol: Some("login".to_string()),
+                        }],
+                        warning: None,
+                    },
                     RustAnalyzerLspQueryResult {
                         method: SemanticQueryMethod::Definition,
                         path: "src/api.rs".to_string(),
@@ -255,6 +298,14 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     });
     assert_eq!(matches.first().unwrap().id, login_id);
     assert_eq!(symbol_index.symbols_in_file("src\\service.rs").len(), 2);
+    assert!(symbol_index
+        .document_symbols_in_file("src\\service.rs")
+        .iter()
+        .any(|edge| edge.to_symbol_id.as_deref() == Some(login_id)));
+    assert!(symbol_index
+        .workspace_symbols_named("login")
+        .iter()
+        .any(|edge| edge.to_symbol_id.as_deref() == Some(login_id)));
 
     let references = symbol_index.references_to(login_id);
     assert!(references
@@ -301,11 +352,16 @@ fn builds_queryable_symbol_index_from_repo_map_and_lsp_facts() {
     let summary = symbol_index.lookup_summary();
     assert_eq!(summary.symbol_count, 8);
     assert_eq!(summary.file_count, 7);
-    assert!(summary.lsp_edge_count >= 5);
+    assert!(summary.lsp_edge_count >= 8);
+    assert!(summary.lsp_navigation_edge_count >= 3);
     assert!(summary.precise_semantic_edge_count >= 5);
+    assert!(summary.edge_kind_counts.contains_key("document_symbol"));
+    assert!(summary.edge_kind_counts.contains_key("workspace_symbol"));
     assert!(summary.edge_kind_counts.contains_key("outgoing_call"));
     assert!(summary.edge_source_counts.contains_key("rust_analyzer_lsp"));
     assert!(summary.query_api.contains(&"search_symbols"));
+    assert!(summary.query_api.contains(&"document_symbols_in_file"));
+    assert!(summary.query_api.contains(&"workspace_symbols_named"));
     assert!(summary.query_api.contains(&"callers_of"));
     assert!(summary.query_api.contains(&"implementations_for"));
 }
