@@ -73,7 +73,10 @@ impl RustAnalyzerLspClient {
                     "callHierarchy": { "dynamicRegistration": false },
                     "hover": { "contentFormat": ["markdown", "plaintext"] }
                 },
-                "workspace": { "workspaceFolders": true }
+                "workspace": {
+                    "workspaceFolders": true,
+                    "symbol": { "dynamicRegistration": false }
+                }
             },
             "initializationOptions": {
                 "cargo": {

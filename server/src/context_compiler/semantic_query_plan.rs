@@ -23,6 +23,8 @@ pub(crate) fn build_semantic_query_plan(
         .map(|symbol| (symbol.id.as_str(), symbol))
         .collect::<HashMap<_, _>>();
 
+    push_workspace_symbol_queries(&mut plan, &mut seen, &index.graph.ranked_symbols);
+
     for (rank, file) in index.graph.ranked_files.iter().take(file_limit).enumerate() {
         planned_files.insert(file.path.clone());
         push_file_queries(&mut plan, &mut seen, file, rank);
@@ -70,6 +72,40 @@ pub(crate) fn build_semantic_query_plan(
     }
 
     plan
+}
+
+fn push_workspace_symbol_queries(
+    plan: &mut SemanticQueryPlan,
+    seen: &mut HashSet<String>,
+    ranked_symbols: &[RankedSymbol],
+) {
+    let mut names = HashSet::new();
+    for symbol in ranked_symbols.iter().take(12) {
+        if names.len() >= 4 {
+            break;
+        }
+        if !names.insert(symbol.name.clone()) {
+            continue;
+        }
+        push_query(
+            plan,
+            seen,
+            SemanticQuery {
+                provider: SemanticQueryProvider::RustAnalyzerLsp,
+                method: SemanticQueryMethod::WorkspaceSymbol,
+                path: ".".to_string(),
+                line: 1,
+                symbol: Some(symbol.name.clone()),
+                priority: 2,
+                reason: format!(
+                    "sample rust-analyzer workspace/symbol for top ranked {} `{}` score={:.2}",
+                    symbol.kind.as_str(),
+                    symbol.name,
+                    symbol.score
+                ),
+            },
+        );
+    }
 }
 
 fn push_file_queries(

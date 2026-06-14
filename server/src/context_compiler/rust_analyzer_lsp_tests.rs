@@ -115,6 +115,33 @@ fn parse_lsp_locations_extracts_reference_lines() {
 }
 
 #[test]
+fn parse_lsp_locations_extracts_workspace_symbols() {
+    let workspace = std::path::Path::new("C:/repo");
+    let query = query(SemanticQueryMethod::WorkspaceSymbol, ".");
+    let value = json!([
+        {
+            "name": "Runner",
+            "kind": 23,
+            "location": {
+                "uri": "file:///C:/repo/src/lib.rs",
+                "range": { "start": { "line": 3, "character": 10 }, "end": { "line": 3, "character": 16 } }
+            }
+        }
+    ]);
+
+    let locations = parse_lsp_locations(workspace, &query, &value);
+
+    assert_eq!(locations.len(), 1);
+    assert_eq!(
+        locations[0].role,
+        RustAnalyzerLspLocationRole::WorkspaceSymbol
+    );
+    assert_eq!(locations[0].path, "src/lib.rs");
+    assert_eq!(locations[0].line, 4);
+    assert_eq!(locations[0].symbol.as_deref(), Some("Runner"));
+}
+
+#[test]
 fn parse_lsp_locations_extracts_location_links() {
     let workspace = std::path::Path::new("C:/repo");
     let query = query(SemanticQueryMethod::Implementation, "src/lib.rs");

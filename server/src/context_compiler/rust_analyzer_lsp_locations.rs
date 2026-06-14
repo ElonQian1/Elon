@@ -18,6 +18,9 @@ pub(super) fn parse_lsp_locations(
         SemanticQueryMethod::DocumentSymbol => {
             parse_document_symbols(&mut locations, &query.path, value);
         }
+        SemanticQueryMethod::WorkspaceSymbol => {
+            parse_workspace_symbols(&mut locations, workspace, value);
+        }
         SemanticQueryMethod::References => {
             parse_location_array(
                 &mut locations,
@@ -72,6 +75,41 @@ pub(super) fn parse_lsp_locations(
         _ => {}
     }
     dedupe_locations(locations)
+}
+
+fn parse_workspace_symbols(
+    out: &mut Vec<RustAnalyzerLspLocation>,
+    workspace: &Path,
+    value: &Value,
+) {
+    let Some(items) = value.as_array() else {
+        return;
+    };
+    for item in items {
+        let name = item.get("name").and_then(Value::as_str);
+        let before = out.len();
+        if let Some(location) = item.get("location") {
+            parse_location_like(
+                out,
+                workspace,
+                location,
+                RustAnalyzerLspLocationRole::WorkspaceSymbol,
+            );
+        } else {
+            parse_location_like(
+                out,
+                workspace,
+                item,
+                RustAnalyzerLspLocationRole::WorkspaceSymbol,
+            );
+        }
+        if let Some(location) = out.get_mut(before) {
+            location.symbol = name.map(ToString::to_string);
+        }
+        if out.len() >= MAX_LOCATIONS {
+            break;
+        }
+    }
 }
 
 fn parse_location_array(

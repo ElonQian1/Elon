@@ -121,6 +121,20 @@ fn execute_query(
     timeout: Duration,
 ) -> RustAnalyzerLspQueryResult {
     let started = Instant::now();
+    if query.method == SemanticQueryMethod::WorkspaceSymbol {
+        let query_text = query
+            .symbol
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_default();
+        let status = client.request(
+            query.method.as_lsp_method(),
+            json!({ "query": query_text }),
+            timeout,
+        );
+        return query_result_from_status(workspace, query, started.elapsed(), status);
+    }
+
     let params = match query_position_params(workspace, query) {
         Ok(params) => params,
         Err(warning) => return skipped_result_with_duration(query, started.elapsed(), &warning),

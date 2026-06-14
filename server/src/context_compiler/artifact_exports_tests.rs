@@ -104,9 +104,15 @@ fn saves_repo_map_projection_exports_when_repo_index_exists() {
             .unwrap()
             .contains("\"role\":\"definition\"")
     );
+    assert!(
+        fs::read_to_string(artifact.bundle_dir.join("lsp_locations.jsonl"))
+            .unwrap()
+            .contains("\"role\":\"workspace_symbol\"")
+    );
     let semantic_facts =
         fs::read_to_string(artifact.bundle_dir.join("semantic_facts.jsonl")).unwrap();
     assert!(semantic_facts.contains("\"fact_kind\":\"references\""));
+    assert!(semantic_facts.contains("\"fact_kind\":\"workspace_symbols\""));
     assert!(semantic_facts.contains("\"fact_kind\":\"definitions\""));
     assert!(semantic_facts.contains("\"fact_kind\":\"hover_type\""));
     assert!(semantic_facts.contains("pub(crate) fn build_context_pack"));
@@ -200,9 +206,26 @@ fn test_repo_index() -> RepoContextIndex {
         rust_analyzer: RustAnalyzerReport {
             lsp: RustAnalyzerLspReport {
                 enabled: true,
-                attempted: 3,
-                succeeded: 3,
+                attempted: 4,
+                succeeded: 4,
                 results: vec![
+                    RustAnalyzerLspQueryResult {
+                        method: SemanticQueryMethod::WorkspaceSymbol,
+                        path: ".".to_string(),
+                        line: 1,
+                        symbol: Some("build_context_pack".to_string()),
+                        status: RustAnalyzerLspStatus::Succeeded,
+                        duration_ms: 1,
+                        summary: Some("1 item(s)".to_string()),
+                        locations: vec![RustAnalyzerLspLocation {
+                            role: RustAnalyzerLspLocationRole::WorkspaceSymbol,
+                            path: "server/src/context_compiler/context_pack.rs".to_string(),
+                            line: 10,
+                            end_line: None,
+                            symbol: Some("build_context_pack".to_string()),
+                        }],
+                        warning: None,
+                    },
                     RustAnalyzerLspQueryResult {
                         method: SemanticQueryMethod::Definition,
                         path: "server/src/context_compiler/context_pack.rs".to_string(),

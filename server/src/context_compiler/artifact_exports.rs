@@ -424,6 +424,7 @@ fn build_semantic_facts_jsonl(index: &RepoContextIndex) -> String {
 fn semantic_fact_kind(method: SemanticQueryMethod) -> &'static str {
     match method {
         SemanticQueryMethod::DocumentSymbol => "document_symbols",
+        SemanticQueryMethod::WorkspaceSymbol => "workspace_symbols",
         SemanticQueryMethod::Diagnostic => "diagnostic",
         SemanticQueryMethod::Definition => "definitions",
         SemanticQueryMethod::References => "references",

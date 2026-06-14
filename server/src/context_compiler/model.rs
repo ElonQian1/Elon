@@ -307,6 +307,7 @@ pub(crate) struct RustAnalyzerLspLocation {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum RustAnalyzerLspLocationRole {
     DocumentSymbol,
+    WorkspaceSymbol,
     Definition,
     Reference,
     Implementation,
@@ -319,6 +320,7 @@ impl RustAnalyzerLspLocationRole {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::DocumentSymbol => "document_symbol",
+            Self::WorkspaceSymbol => "workspace_symbol",
             Self::Definition => "definition",
             Self::Reference => "reference",
             Self::Implementation => "implementation",
@@ -394,6 +396,7 @@ impl SemanticQueryProvider {
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SemanticQueryMethod {
     DocumentSymbol,
+    WorkspaceSymbol,
     Diagnostic,
     Definition,
     References,
@@ -408,6 +411,7 @@ impl SemanticQueryMethod {
     pub(crate) fn as_lsp_method(self) -> &'static str {
         match self {
             Self::DocumentSymbol => "textDocument/documentSymbol",
+            Self::WorkspaceSymbol => "workspace/symbol",
             Self::Diagnostic => "textDocument/diagnostic",
             Self::Definition => "textDocument/definition",
             Self::References => "textDocument/references",
