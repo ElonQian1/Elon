@@ -55,6 +55,8 @@ pub(crate) mod symbol_index_api;
 mod symbol_index_build;
 mod symbol_index_graph_query;
 mod symbol_index_impact_edges;
+mod symbol_index_impact_query;
+mod symbol_index_impact_types;
 mod symbol_index_query;
 #[cfg(test)]
 mod symbol_index_query_tests;
