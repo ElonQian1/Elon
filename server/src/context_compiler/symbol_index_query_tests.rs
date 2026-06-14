@@ -6,6 +6,7 @@ use std::{
 
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
+    symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
 };
@@ -103,6 +104,83 @@ fn edge_kind_limits_returned_relations() {
 
     assert!(response.edges.iter().all(|edge| edge.kind == "references"));
     assert_eq!(response.edges.len(), 1);
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn loads_symbol_graph_with_related_symbols() {
+    let dir = temp_dir("elon_symbol_graph");
+    let db = write_bundle(&dir, "20260614", "213005-trace-graph-user", sample_index());
+
+    let response = load_symbol_graph_db(
+        &db,
+        &SymbolGraphQuery {
+            trace_id: None,
+            symbol_id: "server/src/context_compiler/mod.rs::compile_preflight_note".to_string(),
+            edge_kind: None,
+            direction: SymbolRelationDirection::Both,
+            limit: 20,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.symbol.name, "compile_preflight_note");
+    assert_eq!(response.edges.len(), 2);
+    assert!(response
+        .related_symbols
+        .iter()
+        .any(|symbol| symbol.name == "build_context_pack"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn graph_query_filters_direction_and_edge_kind() {
+    let dir = temp_dir("elon_symbol_graph_direction");
+    let db = write_bundle(&dir, "20260614", "213006-trace-graph-user", sample_index());
+
+    let response = load_symbol_graph_db(
+        &db,
+        &SymbolGraphQuery {
+            trace_id: None,
+            symbol_id: "server/src/context_compiler/mod.rs::compile_preflight_note".to_string(),
+            edge_kind: Some("references".to_string()),
+            direction: SymbolRelationDirection::Incoming,
+            limit: 20,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.edges.len(), 1);
+    assert_eq!(response.edges[0].kind, "references");
+    assert_eq!(
+        response.edges[0].to_symbol_id.as_deref(),
+        Some("server/src/context_compiler/mod.rs::compile_preflight_note")
+    );
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn graph_query_reports_missing_symbol_id() {
+    let dir = temp_dir("elon_symbol_graph_missing");
+    let db = write_bundle(&dir, "20260614", "213007-trace-graph-user", sample_index());
+
+    let error = load_symbol_graph_db(
+        &db,
+        &SymbolGraphQuery {
+            trace_id: None,
+            symbol_id: "missing".to_string(),
+            edge_kind: None,
+            direction: SymbolRelationDirection::Both,
+            limit: 20,
+        },
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("symbol_id 不存在"));
 
     fs::remove_dir_all(dir).unwrap();
 }
