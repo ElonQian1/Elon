@@ -12,6 +12,7 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
+    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
 };
 
 #[test]
@@ -315,6 +316,44 @@ fn impact_pack_renders_model_friendly_context_and_truncates() {
     let short = build_symbol_impact_pack(impact, normalize_pack_max_chars(1));
     assert!(short.truncated);
     assert!(short.pack.contains("symbol impact context truncated"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn task_pack_searches_task_and_expands_top_symbol_impact() {
+    let dir = temp_dir("elon_symbol_task_pack");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-task-pack-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("build context pack".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            search_limit: 5,
+            impact_limit: 20,
+            max_chars: 12_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.chosen_seed.name, "build_context_pack");
+    assert!(response
+        .candidate_symbols
+        .iter()
+        .any(|symbol| symbol.name == "build_context_pack"));
+    assert!(response.pack.contains("<symbol_task_context"));
+    assert!(response.pack.contains("<candidate_symbols"));
+    assert!(response.pack.contains("<symbol_impact_context"));
+    assert!(response.pack.contains("build_context_pack_test"));
+    assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
 }

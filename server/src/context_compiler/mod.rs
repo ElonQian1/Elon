@@ -64,6 +64,7 @@ mod symbol_index_query_tests;
 mod symbol_index_query_types;
 mod symbol_index_semantic;
 mod symbol_index_store;
+mod symbol_index_task_pack;
 #[cfg(test)]
 mod symbol_index_tests;
 mod task_context_exports;

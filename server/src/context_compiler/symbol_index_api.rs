@@ -18,6 +18,7 @@ use super::{
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
+    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
 };
 
 #[derive(Debug, Deserialize)]
@@ -74,6 +75,25 @@ pub(crate) struct SymbolImpactPackParams {
     pub(crate) edge_kind: Option<String>,
     pub(crate) depth: Option<usize>,
     pub(crate) limit: Option<usize>,
+    #[serde(alias = "maxChars")]
+    pub(crate) max_chars: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolTaskPackParams {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "edgeKind")]
+    pub(crate) edge_kind: Option<String>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "searchLimit")]
+    pub(crate) search_limit: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
     #[serde(alias = "maxChars")]
     pub(crate) max_chars: Option<usize>,
 }
@@ -136,6 +156,26 @@ impl SymbolImpactPackParams {
             query,
             normalize_pack_max_chars(self.max_chars.unwrap_or_default()),
         ))
+    }
+}
+
+impl SymbolTaskPackParams {
+    fn into_query(self) -> Result<SymbolTaskPackQuery, String> {
+        let text = clean(self.q).or_else(|| clean(self.query));
+        if text.is_none() {
+            return Err("q 不能为空".to_string());
+        }
+        Ok(SymbolTaskPackQuery {
+            trace_id: clean(self.trace_id),
+            text,
+            kind: clean(self.kind),
+            path: clean(self.path),
+            edge_kind: clean(self.edge_kind),
+            depth: self.depth.unwrap_or_default(),
+            search_limit: self.search_limit.unwrap_or_default(),
+            impact_limit: self.impact_limit.unwrap_or_default(),
+            max_chars: self.max_chars.unwrap_or_default(),
+        })
     }
 }
 
@@ -236,6 +276,26 @@ pub(crate) async fn get_symbol_impact_pack(
 
     match load_latest_symbol_impact(&state.data_dir, &query) {
         Ok(response) => Json(build_symbol_impact_pack(response, max_chars)).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn get_symbol_task_pack(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolTaskPackParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let query = match params.into_query() {
+        Ok(query) => query,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match build_latest_symbol_task_pack(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }
 }
