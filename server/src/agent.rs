@@ -399,6 +399,12 @@ async fn run_dispatch_with_workspace(
     info!("intent routing decision: {:?}", decision);
 
     let codex_cli_only = state.ai_cli.codex_cli_only;
+    let user_byok_api_override = codex_cli_only
+        && crate::user_agent_secrets::user_byok_api_enabled()
+        && UserAgentConfig::load(user_config_workspace)
+            .as_ref()
+            .map(|cfg| cfg.has_direct_custom_api())
+            .unwrap_or(false);
     // ImageThenCode: 有文生图模型时走两步管道（先生图，再集成到代码）；否则降级为 CodeAgent
     let is_image_then_code =
         matches!(decision.route, CapabilityRoute::ImageThenCode) && state.image_model.is_some();
@@ -410,7 +416,7 @@ async fn run_dispatch_with_workspace(
             decision.route,
             CapabilityRoute::TextToImage | CapabilityRoute::ImageThenCode
         ));
-    let backend_route = if codex_cli_only {
+    let backend_route = if codex_cli_only && !user_byok_api_override {
         if !state.ai_cli.enabled {
             return Err(anyhow::anyhow!(
                 "当前已锁定只使用 Codex CLI，但服务端没有可用的 Codex CLI 选项"
@@ -438,7 +444,7 @@ async fn run_dispatch_with_workspace(
     } else {
         decision.route
     };
-    let backend_agent_name = if codex_cli_only {
+    let backend_agent_name = if codex_cli_only && !user_byok_api_override {
         agent_name.filter(|name| is_local_cli_option(state, name))
     } else if state.ai_cli.enabled {
         agent_name.filter(|name| is_local_cli_option(state, name))

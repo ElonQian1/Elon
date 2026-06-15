@@ -9,6 +9,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::user_agent_secrets::{decrypt_api_key, encrypt_api_key};
+
 // ── AI 代理配置 ───────────────────────────────────────────────────────────────
 
 /// 单个 AI 代理的配置
@@ -18,6 +20,8 @@ pub struct AgentConfig {
     pub api_base: String,
     pub api_key: String,
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_mode: Option<String>,
 }
 
 impl AgentConfig {
@@ -30,7 +34,12 @@ impl AgentConfig {
             api_key: key,
             model: std::env::var(format!("AGENT_{}_MODEL", prefix))
                 .unwrap_or_else(|_| default_model.into()),
+            usage_mode: None,
         })
+    }
+
+    pub fn usage_mode(&self) -> &str {
+        self.usage_mode.as_deref().unwrap_or("server_api_key")
     }
 }
 
@@ -136,7 +145,11 @@ pub struct UserAgentConfig {
     /// 自定义 API 地址（None = 使用所选全局代理的地址）
     pub api_base: Option<String>,
     /// 自定义 API 密钥（None = 使用所选全局代理的密钥）
+    #[serde(default, skip_serializing)]
     pub api_key: Option<String>,
+    /// 加密后的用户 API Key。明文只在运行时内存中使用，不再写入配置文件。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key_encrypted: Option<String>,
     /// 自定义模型名（None = 使用所选全局代理的模型）
     pub model: Option<String>,
     /// 用户昵称（可选，仅用于管理后台展示）
@@ -149,15 +162,36 @@ impl UserAgentConfig {
     /// 从用户工作区加载配置
     pub fn load(workspace: &std::path::Path) -> Option<Self> {
         let content = std::fs::read_to_string(workspace.join("agent_config.json")).ok()?;
-        serde_json::from_str(&content).ok()
+        let mut config: Self = serde_json::from_str(&content).ok()?;
+        if config.api_key.is_none() {
+            if let Some(encrypted) = config.api_key_encrypted.as_deref() {
+                match decrypt_api_key(encrypted) {
+                    Ok(key) => config.api_key = Some(key),
+                    Err(error) => {
+                        tracing::warn!("用户 API Key 解密失败，将保留密文引用: {}", error);
+                    }
+                }
+            }
+        }
+        Some(config)
     }
 
     /// 持久化到用户工作区
     pub fn save(&self, workspace: &std::path::Path) -> Result<()> {
         std::fs::create_dir_all(workspace)?;
+        let mut persisted = self.clone();
+        if let Some(api_key) = self
+            .api_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            persisted.api_key_encrypted = Some(encrypt_api_key(api_key)?);
+        }
+        persisted.api_key = None;
         std::fs::write(
             workspace.join("agent_config.json"),
-            serde_json::to_string_pretty(self)?,
+            serde_json::to_string_pretty(&persisted)?,
         )?;
         Ok(())
     }
@@ -166,18 +200,145 @@ impl UserAgentConfig {
     pub fn has_config(&self) -> bool {
         self.use_agent.is_some()
             || self.api_base.is_some()
-            || self.api_key.is_some()
+            || self.has_api_key_reference()
             || self.model.is_some()
+    }
+
+    pub fn has_api_key_reference(&self) -> bool {
+        self.api_key
+            .as_deref()
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty())
+            || self
+                .api_key_encrypted
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| !value.is_empty())
+    }
+
+    pub fn has_direct_custom_api(&self) -> bool {
+        self.use_agent.is_none()
+            && self
+                .api_base
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| !value.is_empty())
+            && self
+                .model
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| !value.is_empty())
+            && self
+                .api_key
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|value| !value.is_empty())
     }
 
     /// 解析为实际可使用的 AgentConfig（以全局代理为基础，用自定义值覆盖）
     pub fn resolve(&self, global: &AgentsConfig) -> Option<AgentConfig> {
+        if self.has_direct_custom_api() {
+            return Some(AgentConfig {
+                name: "user-custom-api".to_string(),
+                api_base: self.api_base.clone()?,
+                api_key: self.api_key.clone()?,
+                model: self.model.clone()?,
+                usage_mode: Some("user_api_key_proxy".to_string()),
+            });
+        }
+
         let base = global.get_agent(self.use_agent.as_deref())?.clone();
+        let user_key_override = self.api_key.is_some();
         Some(AgentConfig {
             name: format!("{}(用户自定义)", base.name),
             api_base: self.api_base.clone().unwrap_or(base.api_base),
             api_key: self.api_key.clone().unwrap_or(base.api_key),
             model: self.model.clone().unwrap_or(base.model),
+            usage_mode: if user_key_override {
+                Some("user_api_key_proxy".to_string())
+            } else {
+                base.usage_mode
+            },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn direct_custom_api_resolves_without_global_agent() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-user".into()),
+            model: Some("example-model".into()),
+            ..Default::default()
+        };
+        let global = AgentsConfig {
+            agents: HashMap::new(),
+            default_agent: String::new(),
+        };
+
+        let resolved = cfg.resolve(&global).expect("custom API should resolve");
+
+        assert_eq!(resolved.name, "user-custom-api");
+        assert_eq!(resolved.api_key, "sk-user");
+        assert_eq!(resolved.usage_mode(), "user_api_key_proxy");
+    }
+
+    #[test]
+    fn partial_custom_config_still_overrides_default_agent() {
+        let cfg = UserAgentConfig {
+            model: Some("user-model".into()),
+            ..Default::default()
+        };
+        let global = AgentsConfig {
+            agents: HashMap::from([(
+                "default".into(),
+                AgentConfig {
+                    name: "default".into(),
+                    api_base: "https://api.example.com/v1".into(),
+                    api_key: "server-key".into(),
+                    model: "server-model".into(),
+                    usage_mode: None,
+                },
+            )]),
+            default_agent: "default".into(),
+        };
+
+        let resolved = cfg.resolve(&global).expect("default agent should resolve");
+
+        assert_eq!(resolved.api_base, "https://api.example.com/v1");
+        assert_eq!(resolved.api_key, "server-key");
+        assert_eq!(resolved.model, "user-model");
+        assert_eq!(resolved.usage_mode(), "server_api_key");
+    }
+
+    #[test]
+    fn saving_user_api_key_writes_encrypted_reference_only() {
+        std::env::set_var("USER_API_KEY_SECRET", "test-secret-for-user-api-key");
+        let workspace = std::env::temp_dir().join(format!(
+            "elon-user-agent-config-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-sensitive".into()),
+            model: Some("example-model".into()),
+            ..Default::default()
+        };
+
+        cfg.save(&workspace).expect("save config");
+        let raw =
+            std::fs::read_to_string(workspace.join("agent_config.json")).expect("read config");
+        assert!(!raw.contains("sk-sensitive"));
+        assert!(raw.contains("api_key_encrypted"));
+
+        let loaded = UserAgentConfig::load(&workspace).expect("load config");
+        assert_eq!(loaded.api_key.as_deref(), Some("sk-sensitive"));
+
+        let _ = std::fs::remove_dir_all(workspace);
+        std::env::remove_var("USER_API_KEY_SECRET");
     }
 }

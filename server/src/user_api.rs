@@ -2,7 +2,8 @@
 ///
 /// 每个用户可以通过 APK 的「设置」页面配置自己专属的 AI 代理。
 /// 当前默认 `AI_CODEX_CLI_ONLY=true`，用户侧会被锁定到 Codex CLI；
-/// 显式关闭该模式后，才恢复预设 API 代理或自定义 API 模型选择。
+/// 预设 API 代理仍需显式关闭该模式后才可选择；用户自带 API Key
+/// 可通过 `AI_USER_BYOK_API_ENABLED=true` 作为显式例外。
 ///
 /// 路由（无需管理员权限，user_id 即身份标识）：
 ///   GET /api/user/:user_id/agent   → 获取当前配置 + 可用全局代理列表
@@ -18,6 +19,7 @@ use std::sync::Arc;
 
 use crate::project_auth::{auth_from_headers, json_error};
 use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
+use crate::user_agent_secrets::user_byok_api_enabled;
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
 pub async fn get_user_agent(
@@ -26,16 +28,20 @@ pub async fn get_user_agent(
 ) -> Response {
     let workspace = state.get_user_workspace(&user_id);
     let config = UserAgentConfig::load(&workspace).unwrap_or_default();
+    let byok_api_enabled = user_byok_api_enabled();
     let mut response_config = config.clone();
+    response_config.api_key = None;
+    response_config.api_key_encrypted = None;
     if state.ai_cli.codex_cli_only {
         response_config.use_agent = response_config
             .use_agent
             .as_deref()
             .filter(|name| is_cli_selection(&state, name))
             .map(ToOwned::to_owned);
-        response_config.api_base = None;
-        response_config.api_key = None;
-        response_config.model = None;
+        if !byok_api_enabled {
+            response_config.api_base = None;
+            response_config.model = None;
+        }
     }
 
     // 列出管理员配置的全局代理名称（供 APK 下拉选择）
@@ -98,6 +104,8 @@ pub async fn get_user_agent(
         "available_agents": available_agents,
         "default_agent": default_agent,
         "codex_cli_only": state.ai_cli.codex_cli_only,
+        "user_byok_api_enabled": byok_api_enabled,
+        "api_key_set": config.has_api_key_reference(),
     }))
     .into_response()
 }
@@ -124,6 +132,8 @@ pub async fn set_user_agent(
     Json(req): Json<SetUserAgentReq>,
 ) -> Response {
     let workspace = state.get_user_workspace(&user_id);
+    let existing_config = UserAgentConfig::load(&workspace).unwrap_or_default();
+    let byok_api_enabled = user_byok_api_enabled();
 
     // 校验：如果指定了全局代理名，必须存在
     let use_agent = req.use_agent.and_then(|s| {
@@ -142,7 +152,7 @@ pub async fn set_user_agent(
             Some(s)
         }
     });
-    let api_key = req.api_key.and_then(|s| {
+    let mut api_key = req.api_key.and_then(|s| {
         let s = s.trim().to_string();
         if s.is_empty() {
             None
@@ -158,6 +168,36 @@ pub async fn set_user_agent(
             Some(s)
         }
     });
+    let custom_api_requested = api_base.is_some() || api_key.is_some() || model.is_some();
+    let mut api_key_encrypted = None;
+    if api_key.is_none() && (api_base.is_some() || model.is_some()) {
+        api_key = existing_config.api_key.clone();
+        api_key_encrypted = existing_config.api_key_encrypted.clone();
+    }
+    if (api_base.is_some() || model.is_some())
+        && api_key.is_none()
+        && api_key_encrypted.is_some()
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "已保存的 API 密钥当前无法解密，请重新填写 API Key 或检查服务器密钥配置" })),
+        )
+            .into_response();
+    }
+    if custom_api_requested && (api_base.is_none() || model.is_none()) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "自定义 API 模型需要同时填写 API 地址和模型名称" })),
+        )
+            .into_response();
+    }
+    if (api_base.is_some() || model.is_some()) && api_key.is_none() && api_key_encrypted.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "自定义 API 模型需要填写 API 密钥；留空仅用于保留已保存的密钥" })),
+        )
+            .into_response();
+    }
 
     if let Some(ref name) = use_agent {
         let global = state.agents_config.read().await;
@@ -186,14 +226,12 @@ pub async fn set_user_agent(
             .as_deref()
             .map(|name| !is_cli_selection(&state, name))
             .unwrap_or(false)
-            || api_base.is_some()
-            || api_key.is_some()
-            || model.is_some())
+            || (custom_api_requested && !byok_api_enabled))
     {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
-                "error": "当前已锁定使用 Codex CLI，暂不允许切换到其他 AI 代理或自定义 API 模型"
+                "error": "当前已锁定使用 Codex CLI，暂不允许切换到其他 AI 代理；如需用户自带 API Key，请开启 AI_USER_BYOK_API_ENABLED"
             })),
         )
             .into_response();
@@ -207,6 +245,7 @@ pub async fn set_user_agent(
         use_agent,
         api_base,
         api_key,
+        api_key_encrypted,
         model,
         nickname: req.nickname.and_then(|s| {
             let s = s.trim().to_string();

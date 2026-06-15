@@ -21,6 +21,7 @@ pub struct TokenUsageRecord<'a> {
     pub feature: &'a str,
     /// 来源模式：
     /// - `server_api_key`   服务器 API Key（强可信）
+    /// - `user_api_key_proxy` 用户托管 API Key 由服务器代理调用（审计，不扣平台余额/额度）
     /// - `server_codex_cli` 服务器 Codex CLI（强可信）
     /// - `pc_agent_cli`     PC 节点 CLI 回传（强可信）
     /// - `server_node_llm`  分布式节点 LLM 结算（强可信）
@@ -408,7 +409,7 @@ impl Store {
                     COALESCE(SUM(output_tokens),0),
                     COALESCE(SUM(reasoning_tokens),0),
                     COALESCE(SUM(total_tokens),0),
-                    COALESCE(SUM(CASE WHEN usage_mode != 'client_reported' THEN total_tokens ELSE 0 END),0),
+                    COALESCE(SUM(CASE WHEN usage_mode NOT IN ('client_reported','user_api_key_proxy') THEN total_tokens ELSE 0 END),0),
                     COALESCE(SUM(cost_rmb_fen),0)
              FROM token_usage_events
              WHERE user_id=?1 AND created_at >= datetime('now', ?2)",
@@ -525,7 +526,7 @@ impl Store {
                 "SELECT COALESCE(SUM(total_tokens),0)
                  FROM token_usage_events
                  WHERE user_id=?1
-                   AND usage_mode != 'client_reported'
+                   AND usage_mode NOT IN ('client_reported','user_api_key_proxy')
                    AND created_at >= ?2",
                 params![user_id, month_start],
                 |row| row.get(0),

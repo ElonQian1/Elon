@@ -157,6 +157,7 @@ pub async fn upsert_agent(
             api_base: req.api_base.trim().to_string(),
             api_key,
             model: req.model.trim().to_string(),
+            usage_mode: None,
         },
     );
 

@@ -328,7 +328,9 @@ impl Store {
             let cost = self.admin_user_cost_in_period(&conn, &uid, &since)?;
             let month_tokens: i64 = conn.query_row(
                 "SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events
-                 WHERE user_id=?1 AND usage_mode != 'client_reported' AND created_at >= ?2",
+                 WHERE user_id=?1
+                   AND usage_mode NOT IN ('client_reported','user_api_key_proxy')
+                   AND created_at >= ?2",
                 params![uid, month_start],
                 |r| r.get(0),
             )?;
@@ -606,7 +608,9 @@ impl Store {
             let account = phone.or(email);
             let month_tokens: i64 = conn.query_row(
                 "SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events
-                 WHERE user_id=?1 AND usage_mode != 'client_reported' AND created_at >= ?2",
+                 WHERE user_id=?1
+                   AND usage_mode NOT IN ('client_reported','user_api_key_proxy')
+                   AND created_at >= ?2",
                 params![uid, month_start],
                 |r| r.get(0),
             )?;
@@ -676,7 +680,9 @@ impl Store {
                 let month_start = chrono::Utc::now().format("%Y-%m-01T00:00:00Z").to_string();
                 let used: i64 = conn.query_row(
                     "SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events
-                     WHERE user_id=?1 AND usage_mode != 'client_reported' AND created_at >= ?2",
+                     WHERE user_id=?1
+                       AND usage_mode NOT IN ('client_reported','user_api_key_proxy')
+                       AND created_at >= ?2",
                     params![user_id, month_start],
                     |r| r.get(0),
                 )?;

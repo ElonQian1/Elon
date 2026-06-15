@@ -30,13 +30,13 @@
 ## 运行顺序
 
 1. `agent::run_dispatch_with_workspace` 先调用 `intent_router::classify(user_message)`。
-2. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路由结果是普通聊天、模型配置、图片处理还是项目开发，最终执行后端都会被锁定为 Codex CLI。
+2. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路由结果是普通聊天、模型配置、图片处理还是项目开发，默认执行后端都会被锁定为 Codex CLI；用户显式保存自带 API Key 的 BYOK 配置时，可作为例外走 API Agent。
 3. Codex CLI only 只表示“主执行者是 Codex CLI”，不表示每句话都走重型开发流程。`ChatAgent` 普通聊天继续绑定同一个 Codex CLI 原生 session，但使用轻量聊天 prompt，不做 Git 检查、不读项目文档、不修改文件、不注入发布规则。
 4. 只有 `CodeAgent`、图片转项目资产、编译、部署、发布、代码修改等开发路线，才进入项目队列并注入通用项目工作流和强制 Git/文档/验证规则。普通聊天不能抢项目锁，也不能在进入 agent 前触发 `git pull`。
-5. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型。
+5. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex 预设 `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型；唯一例外是 `AI_USER_BYOK_API_ENABLED=true` 时用户自己保存的自定义 API base/key/model。
 6. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
 
-注意：当前的 `intent_router` 是服务端本地确定性规则，不是另一个 AI 模型。它只做安全分流，防止一句普通聊天误触发 `git pull`、构建或发布。所有真正需要模型理解、回复、澄清和代码协作的环节都必须走 Codex CLI。API fallback 默认关闭；未来恢复 API 旁路必须显式设置 `AI_ALLOW_API_FALLBACK=true`。
+注意：当前的 `intent_router` 是服务端本地确定性规则，不是另一个 AI 模型。它只做安全分流，防止一句普通聊天误触发 `git pull`、构建或发布。默认情况下真正需要模型理解、回复、澄清和代码协作的环节都走 Codex CLI。用户 BYOK API Agent 是显式选择的例外；API fallback 默认关闭，未来恢复通用 API 旁路必须显式设置 `AI_ALLOW_API_FALLBACK=true`。
 
 当本地规则怀疑消息需要进入开发流程时，不能立刻抢项目锁或执行 Git 操作。服务端必须先调用同一个 Codex CLI 原生 session 做一次轻量意图确认：Codex 高置信返回 `development` 才进入强流程；返回 `chat` 或置信度不足时，直接使用本次 Codex 轻量确认给出的 `chat_reply` 回复，避免普通聊天被误判后等待很久。这个轻量确认器在返回 `chat` 时也要尽量正常回答用户的问题，只有确实看不懂时才追问，不应因为消息里出现 APK、项目、服务器或 Git 就要求用户重说。若 Codex 已判定为 `chat`，但 `chat_reply` 仍是低价值澄清句，服务端可以用固定护栏回复兜底，确保用户得到“这不会进入开发流程”的及时反馈。例如“APK 是否支持多个手机登录/并行修改/会不会冲突”属于能力和流程讨论，应该按 chat 回答；只有“现在帮我改代码、打包、发布、提交、推送”才进入 development。
 

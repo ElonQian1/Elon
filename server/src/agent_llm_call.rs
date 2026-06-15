@@ -8,7 +8,7 @@
 //! 让 agent.rs 只保留路由、Agent 选择和高层编排。
 
 use anyhow::Result;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
@@ -27,10 +27,7 @@ pub(crate) async fn call_llm(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
-    // 计费前置检查：若用户已开通预存计费且余额为 0，则拒绝调用
-    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow::anyhow!("{}", msg));
-    }
+    ensure_api_call_allowed(state, agent, user_id)?;
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -77,6 +74,7 @@ pub(crate) async fn call_llm(
         user_id,
         feature,
         &agent.model,
+        agent.usage_mode(),
     );
     Ok(response)
 }
@@ -105,10 +103,7 @@ pub(crate) async fn call_chat_llm_with_options(
     temperature: f64,
     max_tokens: usize,
 ) -> Result<Value> {
-    // 计费前置检查
-    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow::anyhow!("{}", msg));
-    }
+    ensure_api_call_allowed(state, agent, user_id)?;
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
@@ -155,8 +150,19 @@ pub(crate) async fn call_chat_llm_with_options(
         user_id,
         feature,
         &agent.model,
+        agent.usage_mode(),
     );
     Ok(response)
+}
+
+fn ensure_api_call_allowed(state: &Arc<AppState>, agent: &AgentConfig, user_id: &str) -> Result<()> {
+    if agent.usage_mode() == "user_api_key_proxy" {
+        return Ok(());
+    }
+    if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow::anyhow!("{}", msg));
+    }
+    Ok(())
 }
 
 pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {

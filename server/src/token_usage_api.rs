@@ -127,24 +127,39 @@ pub(crate) fn record_api_usage(
     user_id: &str,
     feature: &str,
     model: &str,
+    usage_mode: &str,
 ) {
     let Some(usage) = usage_from_value(response) else {
         return;
     };
-    let _ = record_trusted_usage(
-        store,
-        user_id,
-        feature,
-        "server_api_key",
-        Some(model),
-        &usage,
-    );
+    if usage_mode == "user_api_key_proxy" {
+        let Some(usage) = usage.normalized() else {
+            return;
+        };
+        let record = TokenUsageRecord {
+            user_id,
+            feature,
+            usage_mode,
+            model: Some(model),
+            input_tokens: usage.input_tokens,
+            cached_input_tokens: usage.cached_input_tokens,
+            output_tokens: usage.output_tokens,
+            reasoning_tokens: usage.reasoning_tokens,
+            total_tokens: usage.total_tokens,
+            idempotency_key: None,
+        };
+        if let Err(e) = store.record_token_usage(&record) {
+            tracing::warn!(user_id, feature, usage_mode, "BYOK token 用量记录失败: {}", e);
+        }
+        return;
+    }
+    let _ = record_trusted_usage(store, user_id, feature, usage_mode, Some(model), &usage);
 }
 
 /// 记录服务器可信 token 用量，并同步执行预存余额扣费。
 ///
-/// `client_reported` 不走这里；只有服务器 API key、服务器/PC CLI、节点 LLM 等
-/// 服务端可验证来源才允许扣余额。
+/// `client_reported` 和用户自带 Key 不走这里；只有服务器 API key、
+/// 服务器/PC CLI、节点 LLM 等服务端可验证且应由平台余额承载的来源才扣余额。
 pub(crate) fn record_trusted_usage(
     store: &Store,
     user_id: &str,

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::{
     intent_router::CapabilityRoute,
     types::{AiBackend, AppState, UserAgentConfig},
+    user_agent_secrets::user_byok_api_enabled,
 };
 
 pub(crate) async fn has_api_agents(state: &Arc<AppState>) -> bool {
@@ -21,8 +22,15 @@ pub(crate) fn choose_backend(
     agent_name: Option<&str>,
     _route: CapabilityRoute,
 ) -> AiBackend {
-    // 锁定 Codex CLI → 所有请求全走 CLI
+    // 锁定 Codex CLI 时，只有用户显式保存的 BYOK API 配置可以作为例外。
     if state.ai_cli.codex_cli_only {
+        if user_byok_api_enabled()
+            && user_config
+                .map(|cfg| cfg.has_direct_custom_api())
+                .unwrap_or(false)
+        {
+            return AiBackend::Api;
+        }
         return AiBackend::LocalCli;
     }
 

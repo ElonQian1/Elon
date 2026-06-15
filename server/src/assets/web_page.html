@@ -2416,6 +2416,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <label for="agentList">模型</label>
       <div class="agent-list" id="agentList" role="listbox" aria-label="模型"></div>
     </div>
+    <div id="agentCustomPanel" style="display:none;margin-top:14px">
+      <label for="agentCustomBase">自定义 API 地址</label>
+      <input id="agentCustomBase" type="url" placeholder="https://api.deepseek.com/v1" autocomplete="off" />
+      <label for="agentCustomKey" style="margin-top:10px">API Key</label>
+      <input id="agentCustomKey" type="password" placeholder="sk-...（留空保留已保存密钥）" autocomplete="off" />
+      <label for="agentCustomModel" style="margin-top:10px">模型名称</label>
+      <input id="agentCustomModel" type="text" placeholder="deepseek-chat" autocomplete="off" />
+      <button type="button" class="btn-confirm" id="saveAgentCustomBtn" style="width:100%;margin-top:12px">保存自定义模型</button>
+    </div>
     <div class="error-text" id="agentError"></div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="cancelAgentBtn">关闭</button>
@@ -2676,8 +2685,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const confirmAddFriendBtn = $('confirmAddFriendBtn');
 
   const agentMask = $('agentMask');
+  const agentForm = $('agentForm');
   const agentList = $('agentList');
   const agentError = $('agentError');
+  const agentCustomPanel = $('agentCustomPanel');
+  const agentCustomBase = $('agentCustomBase');
+  const agentCustomKey = $('agentCustomKey');
+  const agentCustomModel = $('agentCustomModel');
+  const saveAgentCustomBtn = $('saveAgentCustomBtn');
   const cancelAgentBtn = $('cancelAgentBtn');
   const rechargeMask = $('rechargeMask');
   const rechargeText = $('rechargeText');
@@ -2733,6 +2748,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let agentSelectionInitialized = false;
   let agentLoading = false;
   let codexCliOnly = false;
+  let userByokApiEnabled = false;
   let lastChatTimelineMs = 0;
   let friendPollTimer = null;
   let typingResetTimer = null;
@@ -4734,6 +4750,19 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       button.addEventListener('click', () => selectAgentOption(item));
       agentList.appendChild(button);
     });
+    if (agentCustomPanel) {
+      agentCustomPanel.style.display = (codexCliOnly && !userByokApiEnabled) ? 'none' : '';
+    }
+  }
+  function syncAgentCustomFields(config, apiKeySet) {
+    const cfg = config || {};
+    if (agentCustomBase) agentCustomBase.value = cfg.api_base || '';
+    if (agentCustomModel) agentCustomModel.value = cfg.model || '';
+    if (agentCustomKey) {
+      agentCustomKey.value = '';
+      agentCustomKey.placeholder = apiKeySet ? '已保存密钥，留空不修改' : 'sk-...';
+      agentCustomKey.dataset.hasSavedKey = apiKeySet ? 'true' : 'false';
+    }
   }
   async function persistAgentSelection(option) {
     const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent', {
@@ -4744,6 +4773,26 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         api_key: null,
         model: null
       })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  }
+  async function persistCustomAgent() {
+    const base = (agentCustomBase && agentCustomBase.value || '').trim();
+    const key = (agentCustomKey && agentCustomKey.value || '').trim();
+    const model = (agentCustomModel && agentCustomModel.value || '').trim();
+    const hasSavedKey = agentCustomKey && agentCustomKey.dataset.hasSavedKey === 'true';
+    if (!base || !model) throw new Error('请填写 API 地址和模型名称');
+    if (!key && !hasSavedKey) throw new Error('请填写 API Key；留空只用于保留已保存的密钥');
+    const payload = {
+      use_agent: null,
+      api_base: base,
+      model,
+    };
+    if (key) payload.api_key = key;
+    const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent', {
+      method: 'PUT',
+      body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
@@ -4780,6 +4829,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       codexCliOnly = !!data.codex_cli_only;
+      userByokApiEnabled = !!data.user_byok_api_enabled;
+      const config = data.config || {};
+      syncAgentCustomFields(config, !!data.api_key_set);
       const serverOptions = (data.available_agents || []).map((it) => ({
         name: it.name || '',
         label: modelOptionLabel(it),
@@ -4790,7 +4842,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         reasoningSummary: it.reasoning_summary || '',
         verbosity: it.verbosity || ''
       })).filter((it) => it.name);
-      if (codexCliOnly) {
+      if (codexCliOnly && !userByokApiEnabled) {
         agentOptions = serverOptions.length ? serverOptions : [{ name: 'codex_cli', label: 'Codex' }];
         const configured = data.config && data.config.use_agent;
         if (agentOptions.some((it) => it.name === configured)) selectedAgent = configured;
@@ -4800,14 +4852,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       }
       const options = [{ name: '', label: '默认模型' }].concat(serverOptions);
       agentOptions = options;
+      const hasCustomConfig = !!((config.api_base || '').trim() || (config.model || '').trim());
       if (!agentSelectionInitialized) {
-        const configured = data.config && data.config.use_agent;
-        selectedAgent = options.some((it) => it.name === configured) ? configured : '';
+        const configured = config && config.use_agent;
+        selectedAgent = hasCustomConfig ? '' : (options.some((it) => it.name === configured) ? configured : '');
         agentSelectionInitialized = true;
       }
-      updateModelButton(selectedAgentOption().label);
+      updateModelButton(hasCustomConfig ? '自定义模型' : selectedAgentOption().label);
     } catch (err) {
       codexCliOnly = false;
+      userByokApiEnabled = false;
       agentOptions = [{ name: '', label: '默认模型' }];
       agentError.textContent = '模型列表加载失败：' + ((err && err.message) ? err.message : '请稍后重试');
     } finally {
@@ -5872,7 +5926,23 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
 
   cancelAgentBtn.addEventListener('click', () => agentMask.classList.remove('active'));
+  agentForm.addEventListener('submit', (e) => e.preventDefault());
   agentMask.addEventListener('click', (e) => { if (e.target === agentMask) agentMask.classList.remove('active'); });
+  saveAgentCustomBtn.addEventListener('click', async () => {
+    agentError.textContent = '';
+    saveAgentCustomBtn.disabled = true;
+    try {
+      await persistCustomAgent();
+      selectedAgent = '';
+      updateModelButton('自定义模型');
+      agentMask.classList.remove('active');
+      await loadAgents();
+    } catch (err) {
+      agentError.textContent = '自定义模型保存失败：' + ((err && err.message) ? err.message : '请稍后重试');
+    } finally {
+      saveAgentCustomBtn.disabled = false;
+    }
+  });
 
   // ====== 推广下载页 ======
   function apkUrl() {

@@ -84,9 +84,10 @@ internal class MainModelActions(
 
                 val json = JSONObject(body)
                 val serverCodexCliOnly = json.optBoolean("codex_cli_only", false)
+                val userByokApiEnabled = json.optBoolean("user_byok_api_enabled", false)
                 val config = json.optJSONObject("config") ?: JSONObject()
                 val agents = json.optJSONArray("available_agents") ?: JSONArray()
-                if (serverCodexCliOnly) {
+                if (serverCodexCliOnly && !userByokApiEnabled) {
                     val options = parseModelOptions(agents, includeDefault = false)
                         .ifEmpty { listOf(ModelOption("Codex", "codex_cli", "codex")) }
                     val serverUseAgent = jsonStringOrNull(config, "use_agent")

@@ -35,6 +35,7 @@ class SettingsActivity : AppCompatActivity() {
     private data class AgentOption(val name: String, val label: String)
     private var availableAgents: List<AgentOption> = emptyList()
     private var codexCliOnly = true
+    private var userByokApiEnabled = true
     private var voicePreviewSpeaker: VoiceSpeaker? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -182,9 +183,11 @@ class SettingsActivity : AppCompatActivity() {
                 val body = resp.body?.string() ?: return@launch
                 val json = JSONObject(body)
                 codexCliOnly = json.optBoolean("codex_cli_only", false)
+                userByokApiEnabled = json.optBoolean("user_byok_api_enabled", false)
 
-                if (codexCliOnly) {
-                    availableAgents = listOf(AgentOption("codex_cli", "Codex CLI"))
+                if (codexCliOnly && !userByokApiEnabled) {
+                    availableAgents = parseAgentOptions(json)
+                        .ifEmpty { listOf(AgentOption("codex_cli", "Codex CLI")) }
                     setupSpinner()
                     applyCodexOnlyUi()
                     cacheModelSelection(null, "Codex CLI")
@@ -192,14 +195,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
 
                 // 解析可用代理列表
-                val agentsArr: JSONArray = json.optJSONArray("available_agents") ?: JSONArray()
-                availableAgents = (0 until agentsArr.length()).map { i ->
-                    val a = agentsArr.getJSONObject(i)
-                    val name = a.getString("name")
-                    val provider = a.optString("provider", name)
-                    val model = a.optString("model", "")
-                    AgentOption(name, displayModelLabel(provider, model, a.optString("label", "")))
-                }
+                availableAgents = parseAgentOptions(json)
                 setupSpinner()
 
                 // 填充当前配置
@@ -209,6 +205,17 @@ class SettingsActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(this@SettingsActivity, "加载配置失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    private fun parseAgentOptions(json: JSONObject): List<AgentOption> {
+        val agentsArr: JSONArray = json.optJSONArray("available_agents") ?: JSONArray()
+        return (0 until agentsArr.length()).map { i ->
+            val a = agentsArr.getJSONObject(i)
+            val name = a.getString("name")
+            val provider = a.optString("provider", name)
+            val model = a.optString("model", "")
+            AgentOption(name, displayModelLabel(provider, model, a.optString("label", "")))
         }
     }
 
@@ -268,7 +275,7 @@ class SettingsActivity : AppCompatActivity() {
 
     // ── 保存配置 ──────────────────────────────
     private fun saveConfig() {
-        if (codexCliOnly) {
+        if (codexCliOnly && !userByokApiEnabled) {
             Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
             return
         }
