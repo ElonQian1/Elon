@@ -572,6 +572,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(context_compiler::symbol_index_api::get_symbol_task_pack),
         )
         .route(
+            "/api/admin/context/symbol-index/patch-check",
+            post(context_compiler::symbol_index_api::check_symbol_patch),
+        )
+        .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )

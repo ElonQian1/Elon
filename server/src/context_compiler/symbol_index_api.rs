@@ -29,6 +29,7 @@ use super::{
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
+    symbol_index_patch_check::check_symbol_patch_diff,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
     symbol_index_vector::{
@@ -118,6 +119,35 @@ pub(crate) struct SymbolTaskPackParams {
     pub(crate) impact_limit: Option<usize>,
     #[serde(alias = "maxChars")]
     pub(crate) max_chars: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolPatchCheckBody {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "edgeKind")]
+    pub(crate) edge_kind: Option<String>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "searchLimit")]
+    pub(crate) search_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
+    #[serde(alias = "maxChars")]
+    pub(crate) max_chars: Option<usize>,
+    pub(crate) diff: Option<String>,
+    #[serde(alias = "generatedDiff")]
+    pub(crate) generated_diff: Option<String>,
+    pub(crate) patch: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -326,6 +356,32 @@ impl SymbolTaskPackParams {
             impact_limit: self.impact_limit.unwrap_or_default(),
             max_chars: self.max_chars.unwrap_or_default(),
         })
+    }
+}
+
+impl SymbolPatchCheckBody {
+    fn into_parts(self) -> Result<(SymbolTaskPackQuery, String), String> {
+        let diff = self
+            .diff
+            .or(self.generated_diff)
+            .or(self.patch)
+            .ok_or_else(|| "diff 不能为空".to_string())?;
+        let task_pack = SymbolTaskPackParams {
+            q: self.q,
+            query: self.query,
+            trace_id: self.trace_id,
+            kind: self.kind,
+            path: self.path,
+            edge_kind: self.edge_kind,
+            depth: self.depth,
+            search_limit: self.search_limit,
+            chunk_limit: self.chunk_limit,
+            vector_model: self.vector_model,
+            vector_limit: self.vector_limit,
+            impact_limit: self.impact_limit,
+            max_chars: self.max_chars,
+        };
+        Ok((task_pack.into_query()?, diff))
     }
 }
 
@@ -591,6 +647,28 @@ pub(crate) async fn get_symbol_task_pack(
 
     match build_latest_symbol_task_pack(&state.data_dir, &query) {
         Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn check_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchCheckBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let (query, diff) = match body.into_parts() {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match build_latest_symbol_task_pack(&state.data_dir, &query) {
+        Ok(response) => {
+            Json(check_symbol_patch_diff(&response.patch_generation, &diff)).into_response()
+        }
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }
 }

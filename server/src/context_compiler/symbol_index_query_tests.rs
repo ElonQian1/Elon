@@ -23,6 +23,7 @@ use super::{
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
     symbol_index_impact_types::SymbolImpactQuery,
+    symbol_index_patch_check::{check_symbol_patch_diff, PatchDiffCheckStatus},
     symbol_index_patch_generation_types::{PatchApplyReadinessLevel, PatchGenerationMode},
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_retrieval_plan::QueryIntent,
@@ -561,6 +562,102 @@ fn task_pack_generates_patch_plan_for_status_change_tasks() {
     assert!(response.pack.contains("## Apply Readiness"));
     assert!(response.pack.contains("## Test Plan"));
     assert!(response.pack.contains("Planning Trace"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn patch_check_accepts_diff_that_matches_generation_contract() {
+    let dir = temp_dir("elon_symbol_patch_check_accepts");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-patch-check-accepts-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("把 build_context_pack 报错 500 改成 401".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            search_limit: 5,
+            chunk_limit: 10,
+            impact_limit: 20,
+            max_chars: 24_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let diff = r#"diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs
+--- a/server/src/context_compiler/context_pack.rs
++++ b/server/src/context_compiler/context_pack.rs
+@@ -10,7 +10,7 @@
+-old status mapping
++new status mapping
+diff --git a/server/src/context_compiler/context_pack_tests.rs b/server/src/context_compiler/context_pack_tests.rs
+--- a/server/src/context_compiler/context_pack_tests.rs
++++ b/server/src/context_compiler/context_pack_tests.rs
+@@ -3,7 +3,7 @@
+-assert old
++assert new
+"#;
+
+    let check = check_symbol_patch_diff(&response.patch_generation, diff);
+
+    assert_eq!(check.status, PatchDiffCheckStatus::AcceptedForApplyCheck);
+    assert!(check.accepted_for_apply_check);
+    assert!(check.violations.is_empty());
+    assert_eq!(check.touched_files.len(), 2);
+    assert_eq!(
+        check.apply_check_command.as_deref(),
+        Some("git apply --check <generated.patch>")
+    );
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn patch_check_rejects_diff_outside_allowed_files() {
+    let dir = temp_dir("elon_symbol_patch_check_rejects");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-patch-check-rejects-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("把 build_context_pack 报错 500 改成 401".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            search_limit: 5,
+            chunk_limit: 10,
+            impact_limit: 20,
+            max_chars: 24_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let diff = r#"diff --git a/server/src/context_compiler/unrelated.rs b/server/src/context_compiler/unrelated.rs
+--- a/server/src/context_compiler/unrelated.rs
++++ b/server/src/context_compiler/unrelated.rs
+@@ -1,3 +1,3 @@
+-old
++new
+"#;
+
+    let check = check_symbol_patch_diff(&response.patch_generation, diff);
+
+    assert_eq!(check.status, PatchDiffCheckStatus::Rejected);
+    assert!(!check.accepted_for_apply_check);
+    assert!(check
+        .violations
+        .iter()
+        .any(|violation| violation.code == "file_not_allowed"));
 
     fs::remove_dir_all(dir).unwrap();
 }
