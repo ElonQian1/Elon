@@ -9,6 +9,7 @@ use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_patch_check::PatchDiffCheckStatus,
     symbol_index_patch_dry_run::{PatchApplyGateStatus, dry_run_symbol_patch},
+    symbol_index_patch_verification::PatchVerificationStatus,
     symbol_index_store::{SYMBOL_INDEX_DB_FILE, write_symbol_index_sqlite},
     symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
 };
@@ -67,6 +68,25 @@ fn patch_dry_run_accepts_diff_that_git_can_apply() {
     assert_eq!(dry_run.repair_context.failure_kind, "workspace_not_clean");
     assert!(!dry_run.repair_context.model_repair_required);
     assert!(dry_run.repair_context.retry_prompt.is_none());
+    assert_eq!(
+        dry_run.verification_plan.status,
+        PatchVerificationStatus::Blocked
+    );
+    assert!(!dry_run.verification_plan.ready_to_verify_after_apply);
+    assert!(
+        dry_run
+            .verification_plan
+            .blocked_reasons
+            .iter()
+            .any(|reason| reason == "workspace_not_clean")
+    );
+    assert!(
+        dry_run
+            .verification_plan
+            .commands
+            .iter()
+            .all(|command| !command.auto_runnable_after_apply)
+    );
     assert_eq!(dry_run.apply_gate.patch_sha256.len(), 64);
     assert!(
         dry_run
@@ -284,6 +304,39 @@ fn patch_dry_run_marks_clean_workspace_ready_for_apply() {
     assert_eq!(dry_run.repair_context.failure_kind, "none");
     assert!(!dry_run.repair_context.model_repair_required);
     assert!(dry_run.repair_context.retry_prompt.is_none());
+    assert_eq!(
+        dry_run.verification_plan.status,
+        PatchVerificationStatus::ReadyAfterApply
+    );
+    assert!(dry_run.verification_plan.ready_to_verify_after_apply);
+    assert_eq!(
+        dry_run.verification_plan.repair_policy.max_repair_attempts,
+        2
+    );
+    assert!(
+        dry_run
+            .verification_plan
+            .repair_policy
+            .model_repair_on_failure
+    );
+    assert!(dry_run.verification_plan.commands.iter().any(
+        |command| command.category == "test" && command.failure_kind == "targeted_tests_failed"
+    ));
+    assert!(
+        dry_run
+            .verification_plan
+            .commands
+            .iter()
+            .any(|command| command.category == "diff_hygiene" && command.auto_runnable_after_apply)
+    );
+    assert!(
+        dry_run
+            .verification_plan
+            .commands
+            .iter()
+            .any(|command| command.category == "workspace_status"
+                && command.auto_runnable_after_apply)
+    );
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();

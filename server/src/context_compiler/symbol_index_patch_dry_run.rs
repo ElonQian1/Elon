@@ -12,6 +12,7 @@ use super::{
     symbol_index_patch_check::{SymbolPatchDiffCheck, check_symbol_patch_diff},
     symbol_index_patch_generation_types::SymbolPatchGeneration,
     symbol_index_patch_repair::{PatchRepairContext, build_patch_repair_context},
+    symbol_index_patch_verification::{PatchVerificationPlan, build_patch_verification_plan},
 };
 
 const COMMAND_OUTPUT_LIMIT: usize = 4_000;
@@ -26,6 +27,7 @@ pub(crate) struct SymbolPatchDryRunResponse {
     pub(crate) apply_check: PatchApplyCheckResult,
     pub(crate) apply_gate: PatchApplyGate,
     pub(crate) repair_context: PatchRepairContext,
+    pub(crate) verification_plan: PatchVerificationPlan,
     pub(crate) next_steps: Vec<String>,
 }
 
@@ -111,6 +113,12 @@ pub(crate) fn dry_run_symbol_patch(
         &apply_check,
         &apply_gate,
     );
+    let verification_plan = build_patch_verification_plan(
+        generation,
+        apply_gate.ready_to_apply,
+        &apply_gate.blockers,
+        workspace.git_root.as_deref(),
+    );
     let next_steps = dry_run_next_steps(&contract_check, &apply_check, &apply_gate);
 
     SymbolPatchDryRunResponse {
@@ -121,6 +129,7 @@ pub(crate) fn dry_run_symbol_patch(
         apply_check,
         apply_gate,
         repair_context,
+        verification_plan,
         next_steps,
     }
 }
