@@ -28,6 +28,7 @@ pub(crate) struct SymbolPatchGeneration {
     pub(crate) ready_to_generate: bool,
     pub(crate) edit_sequence: Vec<PatchGenerationStep>,
     pub(crate) diff_contract: PatchDiffContract,
+    pub(crate) apply_readiness: PatchApplyReadiness,
     pub(crate) prompt: String,
     pub(crate) blocked_reasons: Vec<String>,
     pub(crate) trace: Vec<PatchGenerationTrace>,
@@ -59,6 +60,39 @@ pub(crate) struct PatchDiffContract {
     pub(crate) required_tests: Vec<String>,
     pub(crate) verification_commands: Vec<String>,
     pub(crate) safety_checks: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PatchApplyReadinessLevel {
+    ReadyAfterDiff,
+    NeedsInspection,
+    NotApplicable,
+}
+
+impl PatchApplyReadinessLevel {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            PatchApplyReadinessLevel::ReadyAfterDiff => "ready_after_diff",
+            PatchApplyReadinessLevel::NeedsInspection => "needs_inspection",
+            PatchApplyReadinessLevel::NotApplicable => "not_applicable",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PatchApplyReadiness {
+    pub(crate) level: PatchApplyReadinessLevel,
+    pub(crate) apply_check_status: String,
+    pub(crate) can_run_apply_check: bool,
+    pub(crate) requires_generated_diff: bool,
+    pub(crate) source_requirements: Vec<String>,
+    pub(crate) pre_apply_checks: Vec<String>,
+    pub(crate) post_apply_checks: Vec<String>,
+    pub(crate) rollback_strategy: String,
+    pub(crate) risk_level: String,
+    pub(crate) notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

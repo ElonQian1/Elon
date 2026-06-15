@@ -23,7 +23,7 @@ use super::{
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
     symbol_index_impact_types::SymbolImpactQuery,
-    symbol_index_patch_generation_types::PatchGenerationMode,
+    symbol_index_patch_generation_types::{PatchApplyReadinessLevel, PatchGenerationMode},
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_retrieval_plan::QueryIntent,
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
@@ -444,6 +444,16 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     assert!(!response.patch_plan.should_inspect.is_empty());
     assert_eq!(response.patch_generation.mode, PatchGenerationMode::NoPatch);
     assert!(!response.patch_generation.ready_to_generate);
+    assert_eq!(
+        response.patch_generation.apply_readiness.level,
+        PatchApplyReadinessLevel::NotApplicable
+    );
+    assert!(
+        !response
+            .patch_generation
+            .apply_readiness
+            .can_run_apply_check
+    );
     assert!(response
         .patch_generation
         .blocked_reasons
@@ -451,6 +461,7 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     assert!(response
         .pack
         .contains("<patch_generation mode=\"no_patch\""));
+    assert!(response.pack.contains("## Apply Readiness"));
     assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
@@ -520,11 +531,34 @@ fn task_pack_generates_patch_plan_for_status_change_tasks() {
         .patch_generation
         .prompt
         .contains("Generate a unified diff only"));
+    assert_eq!(
+        response.patch_generation.apply_readiness.level,
+        PatchApplyReadinessLevel::ReadyAfterDiff
+    );
+    assert!(
+        response
+            .patch_generation
+            .apply_readiness
+            .can_run_apply_check
+    );
+    assert!(response
+        .patch_generation
+        .apply_readiness
+        .source_requirements
+        .iter()
+        .any(|requirement| requirement.contains("context_pack.rs")));
+    assert!(response
+        .patch_generation
+        .apply_readiness
+        .pre_apply_checks
+        .iter()
+        .any(|check| check.contains("git apply --check")));
     assert!(response.pack.contains("<patch_plan intent=\"debug_error\""));
     assert!(response
         .pack
         .contains("<patch_generation mode=\"generate_diff\" ready=\"true\""));
     assert!(response.pack.contains("# Patch Generation Contract"));
+    assert!(response.pack.contains("## Apply Readiness"));
     assert!(response.pack.contains("## Test Plan"));
     assert!(response.pack.contains("Planning Trace"));
 

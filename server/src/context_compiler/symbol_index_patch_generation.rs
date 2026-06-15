@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use super::{
     symbol_index_compression_types::SymbolCompressedContext,
     symbol_index_patch_generation_types::{
-        PatchDiffContract, PatchGenerationMode, PatchGenerationStep, PatchGenerationTrace,
-        SymbolPatchGeneration,
+        PatchApplyReadiness, PatchApplyReadinessLevel, PatchDiffContract, PatchGenerationMode,
+        PatchGenerationStep, PatchGenerationTrace, SymbolPatchGeneration,
     },
     symbol_index_patch_plan_types::{
         PatchEditTarget, PatchEditType, ProposedPatchChange, SymbolPatchPlan,
@@ -29,6 +29,7 @@ pub(crate) fn build_symbol_patch_generation(
         .map(|(index, target)| generation_step(index + 1, target, patch_plan, compressed))
         .collect::<Vec<_>>();
     let diff_contract = diff_contract(patch_plan, ready_to_generate);
+    let apply_readiness = apply_readiness(patch_plan, &diff_contract, mode, ready_to_generate);
     let prompt = generation_prompt(task, patch_plan, &diff_contract, mode, ready_to_generate);
     let trace = generation_trace(patch_plan, mode);
 
@@ -38,6 +39,7 @@ pub(crate) fn build_symbol_patch_generation(
         ready_to_generate,
         edit_sequence,
         diff_contract,
+        apply_readiness,
         prompt,
         blocked_reasons,
         trace,
@@ -264,6 +266,127 @@ fn diff_contract(plan: &SymbolPatchPlan, ready_to_generate: bool) -> PatchDiffCo
     }
 }
 
+fn apply_readiness(
+    plan: &SymbolPatchPlan,
+    contract: &PatchDiffContract,
+    mode: PatchGenerationMode,
+    ready_to_generate: bool,
+) -> PatchApplyReadiness {
+    let level = if ready_to_generate {
+        PatchApplyReadinessLevel::ReadyAfterDiff
+    } else if mode == PatchGenerationMode::InspectOnly {
+        PatchApplyReadinessLevel::NeedsInspection
+    } else {
+        PatchApplyReadinessLevel::NotApplicable
+    };
+    let can_run_apply_check = ready_to_generate && !contract.allowed_files.is_empty();
+    let mut source_requirements = plan
+        .must_edit
+        .iter()
+        .take(MAX_GENERATION_STEPS)
+        .map(source_requirement)
+        .collect::<Vec<_>>();
+    source_requirements.extend(plan.should_inspect.iter().take(4).map(|target| {
+        format!(
+            "Inspect before broadening patch: {}",
+            source_requirement(target)
+        )
+    }));
+    let pre_apply_checks = if can_run_apply_check {
+        vec![
+            "git status --short".to_string(),
+            "git apply --check <generated.patch>".to_string(),
+            "confirm generated diff touches only allowed_files".to_string(),
+        ]
+    } else {
+        vec!["do not run git apply until a unified diff exists".to_string()]
+    };
+    let mut post_apply_checks = contract.verification_commands.clone();
+    if can_run_apply_check
+        && !post_apply_checks
+            .iter()
+            .any(|command| command == "git status --short")
+    {
+        post_apply_checks.push("git status --short".to_string());
+    }
+    PatchApplyReadiness {
+        level,
+        apply_check_status: apply_check_status(level).to_string(),
+        can_run_apply_check,
+        requires_generated_diff: can_run_apply_check,
+        source_requirements: dedupe(source_requirements),
+        pre_apply_checks,
+        post_apply_checks: dedupe(post_apply_checks),
+        rollback_strategy: rollback_strategy(level).to_string(),
+        risk_level: risk_level(plan, contract).to_string(),
+        notes: apply_notes(plan, level),
+    }
+}
+
+fn source_requirement(target: &PatchEditTarget) -> String {
+    let symbol = target
+        .qualified_name
+        .as_deref()
+        .unwrap_or("selected target");
+    let line = target
+        .start_line
+        .map(|line| format!(":{line}"))
+        .unwrap_or_default();
+    format!("Read {}{} `{}`", target.file_path, line, symbol)
+}
+
+fn apply_check_status(level: PatchApplyReadinessLevel) -> &'static str {
+    match level {
+        PatchApplyReadinessLevel::ReadyAfterDiff => "ready_to_check_after_diff_generation",
+        PatchApplyReadinessLevel::NeedsInspection => "inspect_sources_before_generating_diff",
+        PatchApplyReadinessLevel::NotApplicable => "no_patch_apply_check_required",
+    }
+}
+
+fn rollback_strategy(level: PatchApplyReadinessLevel) -> &'static str {
+    match level {
+        PatchApplyReadinessLevel::ReadyAfterDiff => {
+            "If apply or validation fails, reverse the generated patch with git apply -R or discard only the allowed files."
+        }
+        PatchApplyReadinessLevel::NeedsInspection => {
+            "No patch should be applied; rerun retrieval after inspection identifies an edit owner."
+        }
+        PatchApplyReadinessLevel::NotApplicable => {
+            "No rollback needed because no code patch should be generated."
+        }
+    }
+}
+
+fn risk_level(plan: &SymbolPatchPlan, contract: &PatchDiffContract) -> &'static str {
+    if contract.allowed_files.len() > 4 || !plan.risk_notes.is_empty() {
+        "high"
+    } else if !contract.inspect_only_files.is_empty() || contract.required_tests.is_empty() {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn apply_notes(plan: &SymbolPatchPlan, level: PatchApplyReadinessLevel) -> Vec<String> {
+    let mut notes = Vec::new();
+    match level {
+        PatchApplyReadinessLevel::ReadyAfterDiff => {
+            notes.push("Patch applicability is unknown until the concrete unified diff exists; run git apply --check before applying.".to_string());
+        }
+        PatchApplyReadinessLevel::NeedsInspection => {
+            notes.push("The patch plan has no editable must_edit target yet; inspect selected files first.".to_string());
+        }
+        PatchApplyReadinessLevel::NotApplicable => {
+            notes.push(
+                "The task is context-only, so patch application is intentionally disabled."
+                    .to_string(),
+            );
+        }
+    }
+    notes.extend(plan.risk_notes.iter().take(3).cloned());
+    dedupe(notes)
+}
+
 fn file_set<'a>(targets: impl Iterator<Item = &'a PatchEditTarget>) -> Vec<String> {
     targets
         .map(|target| target.file_path.clone())
@@ -298,7 +421,7 @@ fn generation_prompt(
         contract.required_tests.join("\n- ")
     };
     format!(
-        "Generate a unified diff only. Task: {task}\nAllowed files:\n- {allowed}\nRequired tests:\n- {tests}\nPatch kind: {}\nRules:\n- Read each allowed file before editing.\n- Modify only allowed files.\n- Preserve unrelated behavior.\n- Include or update regression tests for observable behavior changes.\n- Return blocked instead of guessing if exact source context is missing.",
+        "Generate a unified diff only. Task: {task}\nAllowed files:\n- {allowed}\nRequired tests:\n- {tests}\nPatch kind: {}\nRules:\n- Read each allowed file before editing.\n- Modify only allowed files.\n- Preserve unrelated behavior.\n- Include or update regression tests for observable behavior changes.\n- Before applying, verify the generated patch with git apply --check <generated.patch>.\n- Return blocked instead of guessing if exact source context is missing.",
         plan.plan_kind
     )
 }

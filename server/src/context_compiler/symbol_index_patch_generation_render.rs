@@ -1,5 +1,5 @@
 use super::symbol_index_patch_generation_types::{
-    PatchDiffContract, PatchGenerationStep, SymbolPatchGeneration,
+    PatchApplyReadiness, PatchDiffContract, PatchGenerationStep, SymbolPatchGeneration,
 };
 
 pub(crate) fn render_patch_generation(generation: &SymbolPatchGeneration) -> String {
@@ -14,6 +14,7 @@ pub(crate) fn render_patch_generation(generation: &SymbolPatchGeneration) -> Str
     ));
     out.push_str("# Patch Generation Contract\n\n");
     render_contract(&mut out, &generation.diff_contract);
+    render_apply_readiness(&mut out, &generation.apply_readiness);
     render_steps(&mut out, &generation.edit_sequence);
     render_blocked_reasons(&mut out, &generation.blocked_reasons);
     render_prompt(&mut out, &generation.prompt);
@@ -41,6 +42,36 @@ fn render_contract(out: &mut String, contract: &PatchDiffContract) {
         &contract.verification_commands,
     );
     render_list(out, "safety_checks", &contract.safety_checks);
+    out.push('\n');
+}
+
+fn render_apply_readiness(out: &mut String, readiness: &PatchApplyReadiness) {
+    out.push_str("## Apply Readiness\n");
+    out.push_str(&format!("- level: `{}`\n", readiness.level.as_str()));
+    out.push_str(&format!(
+        "- apply_check_status: `{}`\n",
+        xml_escape(&readiness.apply_check_status)
+    ));
+    out.push_str(&format!(
+        "- can_run_apply_check: {}\n",
+        readiness.can_run_apply_check
+    ));
+    out.push_str(&format!(
+        "- requires_generated_diff: {}\n",
+        readiness.requires_generated_diff
+    ));
+    out.push_str(&format!(
+        "- risk_level: `{}`\n",
+        xml_escape(&readiness.risk_level)
+    ));
+    out.push_str(&format!(
+        "- rollback_strategy: {}\n",
+        xml_escape(&readiness.rollback_strategy)
+    ));
+    render_list(out, "source_requirements", &readiness.source_requirements);
+    render_list(out, "pre_apply_checks", &readiness.pre_apply_checks);
+    render_list(out, "post_apply_checks", &readiness.post_apply_checks);
+    render_list(out, "notes", &readiness.notes);
     out.push('\n');
 }
 
