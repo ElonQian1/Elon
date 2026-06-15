@@ -399,7 +399,7 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
 
 private fun parseProjectSpaceSummary(project: JSONObject) = ProjectSpaceSummary(
     id = project.optString("id", ""),
-    name = project.optString("name", "项目空间"),
+    name = project.optProjectSpaceDisplayName() ?: project.optString("name", "项目空间"),
     description = project.optString("description").takeIf { it.isNotBlank() },
     role = project.optString("role", "member"),
     memberCount = project.optInt("member_count", 0),
@@ -412,6 +412,14 @@ private fun JSONObject.optProjectSpaceIconDataUrl(): String? {
     for (key in keys) {
         val value = optString(key, "").trim()
         if (value.isNotBlank()) return value
+    }
+    return null
+}
+
+private fun JSONObject.optProjectSpaceDisplayName(): String? {
+    val keys = arrayOf("displayName", "display_name", "alias", "project_alias")
+    for (key in keys) {
+        optString(key, "").cleanProjectSpaceApiString()?.let { return it }
     }
     return null
 }

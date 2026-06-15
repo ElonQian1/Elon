@@ -172,7 +172,9 @@ internal fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
     val project = obj.optJSONObject("project") ?: obj
     return ArchiveProjectRecord(
         id = project.getString("id"),
-        name = project.optCleanString("name") ?: "未命名项目",
+        name = project.optArchiveProjectDisplayName()
+            ?: project.optCleanString("name")
+            ?: "未命名项目",
         description = project.optCleanString("description"),
         role = project.optCleanString("role") ?: "member",
         isPublic = project.optBoolean("is_public", false),
@@ -247,6 +249,14 @@ private fun JSONObject.optCleanString(key: String): String? {
 
 private fun JSONObject.optArchiveProjectIconDataUrl(): String? {
     val keys = arrayOf("iconDataUrl", "icon_data_url", "iconUrl", "icon_url", "icon", "avatar", "logo")
+    for (key in keys) {
+        optCleanString(key)?.let { return it }
+    }
+    return null
+}
+
+private fun JSONObject.optArchiveProjectDisplayName(): String? {
+    val keys = arrayOf("displayName", "display_name", "alias", "project_alias")
     for (key in keys) {
         optCleanString(key)?.let { return it }
     }

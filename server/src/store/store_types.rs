@@ -200,6 +200,8 @@ pub struct JoinRequestRecord {
 pub struct PublicProjectItem {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub description: Option<String>,
     pub template: String,
     pub owner_account: String,
@@ -230,6 +232,8 @@ pub struct ProjectMemberEntry {
 pub struct ProjectSpaceSummary {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub description: Option<String>,
     pub role: String,
     pub member_count: i64,
@@ -314,6 +318,8 @@ pub struct CreateProjectResult {
 pub struct ProjectSummary {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub description: Option<String>,
     pub workspace_key: String,
     pub template: String,

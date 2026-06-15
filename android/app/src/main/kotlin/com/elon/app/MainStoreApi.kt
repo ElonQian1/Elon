@@ -438,7 +438,7 @@ private fun storeUrlPart(value: String): String =
 
 internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     id = obj.getString("id"),
-    name = obj.getString("name"),
+    name = obj.optStoreProjectDisplayName() ?: obj.getString("name"),
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "custom"),
     ownerAccount = obj.optString("owner_account", "?"),
@@ -467,7 +467,7 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
 
 private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
     id = obj.getString("id"),
-    name = obj.optString("name", "联合项目"),
+    name = obj.optStoreProjectDisplayName() ?: obj.optString("name", "联合项目"),
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "android"),
     ownerAccount = obj.optString("owner_account").takeIf { it.isNotBlank() }
@@ -500,6 +500,14 @@ private fun JSONObject.optProjectIconDataUrl(): String? {
     for (key in keys) {
         val value = optString(key, "").trim()
         if (value.isNotBlank()) return value
+    }
+    return null
+}
+
+private fun JSONObject.optStoreProjectDisplayName(): String? {
+    val keys = arrayOf("displayName", "display_name", "alias", "project_alias")
+    for (key in keys) {
+        optCleanStoreString(key)?.let { return it }
     }
     return null
 }

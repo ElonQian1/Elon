@@ -30,6 +30,7 @@ mod node_ledger;
 mod node_payout_tests;
 mod node_payouts;
 mod pc_project_binding;
+mod project_branding;
 mod project_execution_sessions;
 mod project_member_conversations;
 mod project_space;
@@ -177,33 +178,37 @@ impl Store {
         )?;
         tx.commit()?;
 
+        let mut project = ProjectSummary {
+            id,
+            name: name.to_string(),
+            display_name: None,
+            description: description.map(ToOwned::to_owned),
+            workspace_key,
+            template: template.to_string(),
+            source_type: "template".into(),
+            repo_url: None,
+            branch: None,
+            workspace_path: None,
+            node_id: None,
+            storage_node_id: None,
+            storage_repo_path: None,
+            storage_repo_url: None,
+            storage_worktree_path: None,
+            storage_status: "none".into(),
+            status: "active".into(),
+            role: "owner".into(),
+            member_count: 1,
+            is_public: false,
+            join_mode: "open".into(),
+            last_task_status: None,
+            last_apk_url: None,
+            icon_data_url: None,
+            updated_at: now,
+        };
+        project_branding::apply_project_summary_branding(&mut project);
+
         Ok(CreateProjectResult {
-            project: ProjectSummary {
-                id,
-                name: name.to_string(),
-                description: description.map(ToOwned::to_owned),
-                workspace_key,
-                template: template.to_string(),
-                source_type: "template".into(),
-                repo_url: None,
-                branch: None,
-                workspace_path: None,
-                node_id: None,
-                storage_node_id: None,
-                storage_repo_path: None,
-                storage_repo_url: None,
-                storage_worktree_path: None,
-                storage_status: "none".into(),
-                status: "active".into(),
-                role: "owner".into(),
-                member_count: 1,
-                is_public: false,
-                join_mode: "open".into(),
-                last_task_status: None,
-                last_apk_url: None,
-                icon_data_url: None,
-                updated_at: now,
-            },
+            project,
             reused_existing: false,
         })
     }
@@ -393,33 +398,37 @@ impl Store {
         )?;
         tx.commit()?;
 
+        let mut project = ProjectSummary {
+            id,
+            name: name.to_string(),
+            display_name: None,
+            description: description.map(ToOwned::to_owned),
+            workspace_key,
+            template: template.to_string(),
+            source_type: source_type.into(),
+            repo_url: repo_url.map(ToOwned::to_owned),
+            branch: branch.map(ToOwned::to_owned),
+            workspace_path: Some(workspace_path.to_string()),
+            node_id: node_id.map(ToOwned::to_owned),
+            storage_node_id: None,
+            storage_repo_path: None,
+            storage_repo_url: None,
+            storage_worktree_path: None,
+            storage_status: "none".into(),
+            status: "active".into(),
+            role: "owner".into(),
+            member_count: 1,
+            is_public: false,
+            join_mode: "open".into(),
+            last_task_status: None,
+            last_apk_url: None,
+            icon_data_url: None,
+            updated_at: now,
+        };
+        project_branding::apply_project_summary_branding(&mut project);
+
         Ok(CreateProjectResult {
-            project: ProjectSummary {
-                id,
-                name: name.to_string(),
-                description: description.map(ToOwned::to_owned),
-                workspace_key,
-                template: template.to_string(),
-                source_type: source_type.into(),
-                repo_url: repo_url.map(ToOwned::to_owned),
-                branch: branch.map(ToOwned::to_owned),
-                workspace_path: Some(workspace_path.to_string()),
-                node_id: node_id.map(ToOwned::to_owned),
-                storage_node_id: None,
-                storage_repo_path: None,
-                storage_repo_url: None,
-                storage_worktree_path: None,
-                storage_status: "none".into(),
-                status: "active".into(),
-                role: "owner".into(),
-                member_count: 1,
-                is_public: false,
-                join_mode: "open".into(),
-                last_task_status: None,
-                last_apk_url: None,
-                icon_data_url: None,
-                updated_at: now,
-            },
+            project,
             reused_existing: false,
         })
     }
@@ -803,9 +812,10 @@ impl Store {
 // ── 私有帮助函数 ──────────────────────────────────────────────────────────────
 
 fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectSummary> {
-    Ok(ProjectSummary {
+    let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
+        display_name: None,
         description: row.get(2)?,
         workspace_key: row.get(3)?,
         template: row.get(4)?,
@@ -828,7 +838,9 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         last_apk_url: row.get(21)?,
         icon_data_url: row.get(22)?,
         updated_at: row.get(23)?,
-    })
+    };
+    project_branding::apply_project_summary_branding(&mut project);
+    Ok(project)
 }
 
 fn find_owner_project_by_name(

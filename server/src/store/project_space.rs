@@ -7,7 +7,10 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{new_id, now, ProjectChannel, ProjectChannelMessage, ProjectSpaceSummary, Store};
+use super::{
+    new_id, now, project_branding, ProjectChannel, ProjectChannelMessage, ProjectSpaceSummary,
+    Store,
+};
 
 const DEFAULT_CHANNELS: [(&str, &str, i64); 8] = [
     ("公告", "announcements", 10),
@@ -56,21 +59,30 @@ impl Store {
         conn.query_row(
             "SELECT p.id, p.name, p.description, pm.role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
-                    p.icon_data_url, p.updated_at
+                    p.icon_data_url, p.updated_at, p.source_type, p.workspace_path
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
             params![project_id, user_id],
             |row| {
-                Ok(ProjectSpaceSummary {
+                let mut project = ProjectSpaceSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    display_name: None,
                     description: row.get(2)?,
                     role: row.get(3)?,
                     member_count: row.get(4)?,
                     icon_data_url: row.get(5)?,
                     updated_at: row.get(6)?,
-                })
+                };
+                let source_type: String = row.get(7)?;
+                let workspace_path: Option<String> = row.get(8)?;
+                project_branding::apply_project_space_branding(
+                    &mut project,
+                    &source_type,
+                    workspace_path.as_deref(),
+                );
+                Ok(project)
             },
         )
         .optional()?

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{new_id, now, ProjectSummary, Store};
+use super::{new_id, now, project_branding, ProjectSummary, Store};
 
 impl Store {
     pub fn count_active_pc_projects_for_node(&self, node_id: &str) -> Result<i64> {
@@ -121,9 +121,10 @@ impl Store {
              WHERE p.id = ?1 AND pm.user_id = ?2",
             params![project_id, user_id],
             |row| {
-                Ok(ProjectSummary {
+                let mut project = ProjectSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    display_name: None,
                     description: row.get(2)?,
                     workspace_key: row.get(3)?,
                     template: row.get(4)?,
@@ -146,7 +147,9 @@ impl Store {
                     last_apk_url: row.get(21)?,
                     icon_data_url: row.get(22)?,
                     updated_at: row.get(23)?,
-                })
+                };
+                project_branding::apply_project_summary_branding(&mut project);
+                Ok(project)
             },
         )
         .optional()?

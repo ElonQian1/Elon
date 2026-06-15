@@ -2,7 +2,7 @@ use anyhow::Result;
 use rusqlite::params;
 
 use super::{
-    is_system_project_source_type,
+    is_system_project_source_type, project_branding,
     store_types::{ProjectSummary, UserArchiveProject},
     system_project_key_for_source_type, Store,
 };
@@ -66,9 +66,10 @@ fn archive_project_from_row(
     row: &rusqlite::Row<'_>,
     current_user_id: &str,
 ) -> rusqlite::Result<UserArchiveProject> {
-    let project = ProjectSummary {
+    let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
+        display_name: None,
         description: row.get(2)?,
         workspace_key: row.get(3)?,
         template: row.get(4)?,
@@ -92,6 +93,7 @@ fn archive_project_from_row(
         icon_data_url: row.get(22)?,
         updated_at: row.get(23)?,
     };
+    project_branding::apply_project_summary_branding(&mut project);
     let conversation_count = row.get(24)?;
     let system_key = system_project_key_for_source_type(&project.source_type).map(str::to_string);
     let owner_account = if system_key.is_some() {

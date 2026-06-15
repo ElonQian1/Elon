@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    is_system_project_source_type, normalize_account, now, ProjectDeletionTarget,
+    is_system_project_source_type, normalize_account, now, project_branding, ProjectDeletionTarget,
     ProjectMemberEntry, PublicProjectItem, Store,
 };
 
@@ -64,7 +64,9 @@ impl Store {
               p.icon_data_url,
               p.created_at,
               p.updated_at,
-              p.created_by AS owner_id
+              p.created_by AS owner_id,
+              p.source_type,
+              p.workspace_path
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
              WHERE p.is_public = 1
@@ -103,9 +105,10 @@ impl Store {
             .query_map(
                 params![pattern, join_mode_filter, has_apk_filter, limit, offset],
                 |row| {
-                    Ok(PublicProjectItem {
+                    let mut project = PublicProjectItem {
                         id: row.get(0)?,
                         name: row.get(1)?,
+                        display_name: None,
                         description: row.get(2)?,
                         template: row.get(3)?,
                         owner_account: row.get(4)?,
@@ -118,7 +121,15 @@ impl Store {
                         created_at: row.get(11)?,
                         updated_at: row.get(12)?,
                         owner_id: row.get(13).unwrap_or_default(),
-                    })
+                    };
+                    let source_type: String = row.get(14)?;
+                    let workspace_path: Option<String> = row.get(15)?;
+                    project_branding::apply_public_project_branding(
+                        &mut project,
+                        &source_type,
+                        workspace_path.as_deref(),
+                    );
+                    Ok(project)
                 },
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -143,7 +154,9 @@ impl Store {
                p.icon_data_url,
                p.created_at,
                p.updated_at,
-               p.created_by AS owner_id
+               p.created_by AS owner_id,
+               p.source_type,
+               p.workspace_path
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
              WHERE p.id = ?1
@@ -153,9 +166,10 @@ impl Store {
                AND p.source_type NOT IN ('agent_balloon', 'chat_memory')",
             params![project_id],
             |row| {
-                Ok(PublicProjectItem {
+                let mut project = PublicProjectItem {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    display_name: None,
                     description: row.get(2)?,
                     template: row.get(3)?,
                     owner_account: row.get(4)?,
@@ -168,7 +182,15 @@ impl Store {
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     owner_id: row.get(13).unwrap_or_default(),
-                })
+                };
+                let source_type: String = row.get(14)?;
+                let workspace_path: Option<String> = row.get(15)?;
+                project_branding::apply_public_project_branding(
+                    &mut project,
+                    &source_type,
+                    workspace_path.as_deref(),
+                );
+                Ok(project)
             },
         )
         .map_err(|_| anyhow!("项目不存在或未公开"))
@@ -430,7 +452,9 @@ impl Store {
                 ORDER BY t.created_at DESC LIMIT 1),
                p.icon_data_url,
                p.created_at, p.updated_at,
-               p.created_by AS owner_id
+               p.created_by AS owner_id,
+               p.source_type,
+               p.workspace_path
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -441,9 +465,10 @@ impl Store {
         )?;
         let rows = stmt
             .query_map(params![user_id], |row| {
-                Ok(PublicProjectItem {
+                let mut project = PublicProjectItem {
                     id: row.get(0)?,
                     name: row.get(1)?,
+                    display_name: None,
                     description: row.get(2)?,
                     template: row.get(3)?,
                     owner_account: row.get(4)?,
@@ -456,7 +481,15 @@ impl Store {
                     created_at: row.get(11)?,
                     updated_at: row.get(12)?,
                     owner_id: row.get(13).unwrap_or_default(),
-                })
+                };
+                let source_type: String = row.get(14)?;
+                let workspace_path: Option<String> = row.get(15)?;
+                project_branding::apply_public_project_branding(
+                    &mut project,
+                    &source_type,
+                    workspace_path.as_deref(),
+                );
+                Ok(project)
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
