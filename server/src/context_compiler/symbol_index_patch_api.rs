@@ -11,6 +11,8 @@ use serde::Deserialize;
 use crate::{admin, types::AppState};
 
 use super::{
+    symbol_index_patch_apply::{apply_reviewed_symbol_patch, rollback_symbol_patch},
+    symbol_index_patch_apply_types::{PatchApplyMode, PatchApplyOptions},
     symbol_index_patch_check::check_symbol_patch_diff,
     symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
     symbol_index_patch_repair_attempt::build_symbol_patch_repair_attempt_response,
@@ -70,6 +72,20 @@ pub(crate) struct SymbolPatchBody {
     pub(crate) max_attempts: Option<usize>,
     #[serde(default, alias = "verificationResults")]
     pub(crate) verification_results: Vec<PatchVerificationCommandResultInput>,
+    #[serde(alias = "applyMode", alias = "mode")]
+    pub(crate) apply_mode: Option<String>,
+    pub(crate) confirm: Option<bool>,
+    pub(crate) commit: Option<bool>,
+    #[serde(alias = "keepWorktree")]
+    pub(crate) keep_worktree: Option<bool>,
+    #[serde(alias = "branchName", alias = "branch")]
+    pub(crate) branch_name: Option<String>,
+    #[serde(alias = "commitMessage")]
+    pub(crate) commit_message: Option<String>,
+    #[serde(alias = "commitSha")]
+    pub(crate) commit_sha: Option<String>,
+    #[serde(alias = "requireReviewApproval")]
+    pub(crate) require_review_approval: Option<bool>,
 }
 
 pub(crate) async fn check_symbol_patch(
@@ -326,6 +342,82 @@ pub(crate) async fn review_symbol_patch(
     }
 }
 
+pub(crate) async fn apply_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    let options = match PatchApplyMode::parse(parts.apply_mode.as_deref()) {
+        Ok(mode) => PatchApplyOptions {
+            mode,
+            confirm: parts.confirm,
+            commit: parts.commit,
+            keep_worktree: parts.keep_worktree,
+            branch_name: parts.branch_name,
+            commit_message: parts.commit_message,
+            require_review_approval: parts.require_review_approval,
+        },
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let plan = response.patch_plan.clone();
+            let generation = response.patch_generation.clone();
+            let diff = parts.diff;
+            match tokio::task::spawn_blocking(move || {
+                apply_reviewed_symbol_patch(&plan, &generation, &diff, &workspace, options)
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn rollback_symbol_patch_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_rollback_parts() {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+    match tokio::task::spawn_blocking(move || {
+        rollback_symbol_patch(
+            &parts.workspace,
+            parts.diff.as_deref(),
+            parts.commit_sha.as_deref(),
+            parts.confirm,
+        )
+    })
+    .await
+    {
+        Ok(result) => Json(result).into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
 impl SymbolPatchBody {
     fn into_parts(self, require_workspace: bool) -> Result<PatchBodyParts, String> {
         let text = clean(self.q).or_else(|| clean(self.query));
@@ -365,6 +457,33 @@ impl SymbolPatchBody {
             attempt: self.attempt,
             max_attempts: self.max_attempts,
             verification_results: self.verification_results,
+            apply_mode: clean(self.apply_mode),
+            confirm: self.confirm.unwrap_or(false),
+            commit: self.commit.unwrap_or(false),
+            keep_worktree: self.keep_worktree.unwrap_or(true),
+            branch_name: clean(self.branch_name),
+            commit_message: clean(self.commit_message),
+            require_review_approval: self.require_review_approval.unwrap_or(true),
+        })
+    }
+
+    fn into_rollback_parts(self) -> Result<PatchRollbackParts, String> {
+        let workspace = clean(self.workspace)
+            .or_else(|| clean(self.workspace_path))
+            .map(PathBuf::from)
+            .ok_or_else(|| "workspace 不能为空".to_string())?;
+        let diff = non_empty_patch(self.diff)
+            .or_else(|| non_empty_patch(self.generated_diff))
+            .or_else(|| non_empty_patch(self.patch));
+        let commit_sha = clean(self.commit_sha);
+        if diff.is_none() && commit_sha.is_none() {
+            return Err("rollback 需要 diff 或 commitSha".to_string());
+        }
+        Ok(PatchRollbackParts {
+            workspace,
+            diff,
+            commit_sha,
+            confirm: self.confirm.unwrap_or(false),
         })
     }
 }
@@ -398,4 +517,18 @@ struct PatchBodyParts {
     attempt: Option<usize>,
     max_attempts: Option<usize>,
     verification_results: Vec<PatchVerificationCommandResultInput>,
+    apply_mode: Option<String>,
+    confirm: bool,
+    commit: bool,
+    keep_worktree: bool,
+    branch_name: Option<String>,
+    commit_message: Option<String>,
+    require_review_approval: bool,
+}
+
+struct PatchRollbackParts {
+    workspace: PathBuf,
+    diff: Option<String>,
+    commit_sha: Option<String>,
+    confirm: bool,
 }

@@ -73,6 +73,13 @@ mod symbol_index_impact_pack;
 mod symbol_index_impact_query;
 mod symbol_index_impact_types;
 pub(crate) mod symbol_index_patch_api;
+mod symbol_index_patch_apply;
+mod symbol_index_patch_apply_git;
+mod symbol_index_patch_apply_policy;
+mod symbol_index_patch_apply_rollback;
+#[cfg(test)]
+mod symbol_index_patch_apply_tests;
+mod symbol_index_patch_apply_types;
 mod symbol_index_patch_check;
 mod symbol_index_patch_dry_run;
 #[cfg(test)]
