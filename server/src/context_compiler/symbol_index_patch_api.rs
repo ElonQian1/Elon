@@ -1,0 +1,175 @@
+use std::{path::PathBuf, sync::Arc};
+
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::Deserialize;
+
+use crate::{admin, types::AppState};
+
+use super::{
+    symbol_index_patch_check::check_symbol_patch_diff,
+    symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
+    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
+};
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolPatchBody {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "edgeKind")]
+    pub(crate) edge_kind: Option<String>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "searchLimit")]
+    pub(crate) search_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
+    #[serde(alias = "maxChars")]
+    pub(crate) max_chars: Option<usize>,
+    pub(crate) workspace: Option<String>,
+    #[serde(
+        alias = "workspacePath",
+        alias = "workspaceRoot",
+        alias = "workspace_root"
+    )]
+    pub(crate) workspace_path: Option<String>,
+    pub(crate) diff: Option<String>,
+    #[serde(alias = "generatedDiff")]
+    pub(crate) generated_diff: Option<String>,
+    pub(crate) patch: Option<String>,
+}
+
+pub(crate) async fn check_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(false) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => Json(check_symbol_patch_diff(
+            &response.patch_generation,
+            &parts.diff,
+        ))
+        .into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn dry_run_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let generation = response.patch_generation.clone();
+            let diff = parts.diff;
+            match tokio::task::spawn_blocking(move || {
+                run_symbol_patch_dry_run(&generation, &diff, &workspace)
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+impl SymbolPatchBody {
+    fn into_parts(self, require_workspace: bool) -> Result<PatchBodyParts, String> {
+        let text = clean(self.q).or_else(|| clean(self.query));
+        if text.is_none() {
+            return Err("q 不能为空".to_string());
+        }
+        let workspace = clean(self.workspace)
+            .or_else(|| clean(self.workspace_path))
+            .map(PathBuf::from);
+        if require_workspace && workspace.is_none() {
+            return Err("workspace 不能为空".to_string());
+        }
+        let diff = non_empty_patch(self.diff)
+            .or_else(|| non_empty_patch(self.generated_diff))
+            .or_else(|| non_empty_patch(self.patch))
+            .ok_or_else(|| "diff 不能为空".to_string())?;
+
+        Ok(PatchBodyParts {
+            query: SymbolTaskPackQuery {
+                trace_id: clean(self.trace_id),
+                text,
+                kind: clean(self.kind),
+                path: clean(self.path),
+                edge_kind: clean(self.edge_kind),
+                depth: self.depth.unwrap_or_default(),
+                search_limit: self.search_limit.unwrap_or_default(),
+                chunk_limit: self.chunk_limit.unwrap_or_default(),
+                vector_model: clean(self.vector_model),
+                vector_limit: self.vector_limit.unwrap_or_default(),
+                impact_limit: self.impact_limit.unwrap_or_default(),
+                max_chars: self.max_chars.unwrap_or_default(),
+            },
+            workspace,
+            diff,
+        })
+    }
+}
+
+fn clean(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn non_empty_patch(value: Option<String>) -> Option<String> {
+    value.filter(|text| !text.trim().is_empty())
+}
+
+fn json_error(status: StatusCode, message: &str) -> Response {
+    (
+        status,
+        Json(serde_json::json!({
+            "error": message,
+        })),
+    )
+        .into_response()
+}
+
+struct PatchBodyParts {
+    query: SymbolTaskPackQuery,
+    workspace: Option<PathBuf>,
+    diff: String,
+}

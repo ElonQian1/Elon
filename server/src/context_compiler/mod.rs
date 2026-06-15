@@ -68,7 +68,11 @@ mod symbol_index_impact_edges;
 mod symbol_index_impact_pack;
 mod symbol_index_impact_query;
 mod symbol_index_impact_types;
+pub(crate) mod symbol_index_patch_api;
 mod symbol_index_patch_check;
+mod symbol_index_patch_dry_run;
+#[cfg(test)]
+mod symbol_index_patch_dry_run_tests;
 mod symbol_index_patch_generation;
 mod symbol_index_patch_generation_render;
 mod symbol_index_patch_generation_types;

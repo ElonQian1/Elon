@@ -1,0 +1,322 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use serde::Serialize;
+
+use super::{
+    symbol_index_patch_check::{check_symbol_patch_diff, SymbolPatchDiffCheck},
+    symbol_index_patch_generation_types::SymbolPatchGeneration,
+};
+
+const COMMAND_OUTPUT_LIMIT: usize = 4_000;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolPatchDryRunResponse {
+    pub(crate) task: String,
+    pub(crate) accepted_for_apply_check: bool,
+    pub(crate) contract_check: SymbolPatchDiffCheck,
+    pub(crate) workspace: PatchDryRunWorkspace,
+    pub(crate) apply_check: PatchApplyCheckResult,
+    pub(crate) next_steps: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PatchDryRunWorkspace {
+    pub(crate) requested_path: String,
+    pub(crate) resolved_path: Option<String>,
+    pub(crate) git_root: Option<String>,
+    pub(crate) head: Option<String>,
+    pub(crate) clean: bool,
+    pub(crate) status_lines: Vec<String>,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PatchApplyCheckResult {
+    pub(crate) attempted: bool,
+    pub(crate) success: bool,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) stdout: String,
+    pub(crate) stderr: String,
+    pub(crate) command: Option<String>,
+    pub(crate) patch_file: Option<String>,
+    pub(crate) error: Option<String>,
+}
+
+pub(crate) fn dry_run_symbol_patch(
+    generation: &SymbolPatchGeneration,
+    generated_diff: &str,
+    workspace: &Path,
+) -> SymbolPatchDryRunResponse {
+    let contract_check = check_symbol_patch_diff(generation, generated_diff);
+    let mut workspace = inspect_workspace(workspace);
+    let apply_check = if contract_check.accepted_for_apply_check {
+        if let Some(git_root) = workspace.git_root.as_ref().map(PathBuf::from) {
+            run_git_apply_check(&git_root, generated_diff)
+        } else {
+            workspace
+                .warnings
+                .push("workspace_not_ready_for_apply_check".to_string());
+            PatchApplyCheckResult::not_attempted("workspace is not a usable git repository")
+        }
+    } else {
+        PatchApplyCheckResult::not_attempted("diff contract was not accepted")
+    };
+    let next_steps = dry_run_next_steps(&contract_check, &apply_check);
+
+    SymbolPatchDryRunResponse {
+        task: generation.task.clone(),
+        accepted_for_apply_check: contract_check.accepted_for_apply_check,
+        contract_check,
+        workspace,
+        apply_check,
+        next_steps,
+    }
+}
+
+fn inspect_workspace(workspace: &Path) -> PatchDryRunWorkspace {
+    let requested_path = workspace.display().to_string();
+    let mut report = PatchDryRunWorkspace {
+        requested_path,
+        resolved_path: None,
+        git_root: None,
+        head: None,
+        clean: false,
+        status_lines: Vec::new(),
+        warnings: Vec::new(),
+    };
+
+    if !workspace.exists() {
+        report.warnings.push("workspace_not_found".to_string());
+        return report;
+    }
+    if !workspace.is_dir() {
+        report.warnings.push("workspace_not_directory".to_string());
+        return report;
+    }
+
+    let resolved = match workspace.canonicalize() {
+        Ok(path) => path,
+        Err(error) => {
+            report
+                .warnings
+                .push(format!("workspace_canonicalize_failed: {error}"));
+            workspace.to_path_buf()
+        }
+    };
+    report.resolved_path = Some(resolved.display().to_string());
+
+    let root_output = run_git(&resolved, &["rev-parse", "--show-toplevel"]);
+    if !root_output.success {
+        report.warnings.push(format!(
+            "git_root_unavailable: {}",
+            first_non_empty(Some(root_output.stderr.as_str()))
+                .or_else(|| first_non_empty(Some(root_output.stdout.as_str())))
+                .unwrap_or("not a git repository")
+        ));
+        return report;
+    }
+
+    let Some(git_root_text) = first_non_empty(Some(root_output.stdout.as_str())) else {
+        report.warnings.push("git_root_empty".to_string());
+        return report;
+    };
+    let git_root = PathBuf::from(git_root_text);
+    report.git_root = Some(git_root.display().to_string());
+
+    let head_output = run_git(&git_root, &["rev-parse", "--short", "HEAD"]);
+    if head_output.success {
+        report.head = first_non_empty(Some(head_output.stdout.as_str())).map(ToOwned::to_owned);
+    } else {
+        report.warnings.push(format!(
+            "git_head_unavailable: {}",
+            first_non_empty(Some(head_output.stderr.as_str()))
+                .or_else(|| first_non_empty(Some(head_output.stdout.as_str())))
+                .unwrap_or("HEAD is unavailable")
+        ));
+    }
+
+    let status_output = run_git(&git_root, &["status", "--short"]);
+    if status_output.success {
+        report.status_lines = status_output
+            .stdout
+            .lines()
+            .map(str::trim_end)
+            .filter(|line| !line.is_empty())
+            .map(ToOwned::to_owned)
+            .collect();
+        report.clean = report.status_lines.is_empty();
+        if !report.clean {
+            report.warnings.push(format!(
+                "dirty_worktree: {} status lines",
+                report.status_lines.len()
+            ));
+        }
+    } else {
+        report.warnings.push(format!(
+            "git_status_unavailable: {}",
+            first_non_empty(Some(status_output.stderr.as_str()))
+                .or_else(|| first_non_empty(Some(status_output.stdout.as_str())))
+                .unwrap_or("status failed")
+        ));
+    }
+
+    report
+}
+
+fn run_git_apply_check(git_root: &Path, generated_diff: &str) -> PatchApplyCheckResult {
+    let patch_file = temp_patch_file();
+    if let Err(error) = fs::write(&patch_file, generated_diff) {
+        return PatchApplyCheckResult {
+            attempted: false,
+            success: false,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            command: None,
+            patch_file: Some(patch_file.display().to_string()),
+            error: Some(format!("write_patch_failed: {error}")),
+        };
+    }
+
+    let command = format!(
+        "git -C {} apply --check --whitespace=nowarn {}",
+        quote_path(git_root),
+        quote_path(&patch_file)
+    );
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(git_root)
+        .args(["apply", "--check", "--whitespace=nowarn"])
+        .arg(&patch_file)
+        .output();
+    let _ = fs::remove_file(&patch_file);
+
+    match output {
+        Ok(output) => PatchApplyCheckResult {
+            attempted: true,
+            success: output.status.success(),
+            exit_code: output.status.code(),
+            stdout: output_text(&output.stdout),
+            stderr: output_text(&output.stderr),
+            command: Some(command),
+            patch_file: Some(patch_file.display().to_string()),
+            error: None,
+        },
+        Err(error) => PatchApplyCheckResult {
+            attempted: true,
+            success: false,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            command: Some(command),
+            patch_file: Some(patch_file.display().to_string()),
+            error: Some(format!("git_apply_check_failed: {error}")),
+        },
+    }
+}
+
+fn run_git(workdir: &Path, args: &[&str]) -> GitRunOutput {
+    match Command::new("git")
+        .arg("-C")
+        .arg(workdir)
+        .args(args)
+        .output()
+    {
+        Ok(output) => GitRunOutput {
+            success: output.status.success(),
+            stdout: output_text(&output.stdout),
+            stderr: output_text(&output.stderr),
+        },
+        Err(error) => GitRunOutput {
+            success: false,
+            stdout: String::new(),
+            stderr: error.to_string(),
+        },
+    }
+}
+
+fn dry_run_next_steps(
+    contract_check: &SymbolPatchDiffCheck,
+    apply_check: &PatchApplyCheckResult,
+) -> Vec<String> {
+    if !contract_check.accepted_for_apply_check {
+        return contract_check.next_steps.clone();
+    }
+    if !apply_check.attempted {
+        return vec!["Fix the workspace or git environment, then rerun patch dry-run.".to_string()];
+    }
+    if apply_check.success {
+        return vec![
+            "Patch dry-run passed against the current git worktree.".to_string(),
+            "Apply the same diff only in a clean worktree, then run required tests.".to_string(),
+        ];
+    }
+    vec![
+        "Regenerate the diff against the current file contents.".to_string(),
+        "Inspect git apply --check stderr before attempting any apply step.".to_string(),
+    ]
+}
+
+fn temp_patch_file() -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "elon-symbol-patch-dry-run-{}-{nanos}.patch",
+        std::process::id()
+    ))
+}
+
+fn output_text(bytes: &[u8]) -> String {
+    truncate_text(String::from_utf8_lossy(bytes).to_string())
+}
+
+fn truncate_text(text: String) -> String {
+    let mut out = String::new();
+    for (index, ch) in text.chars().enumerate() {
+        if index >= COMMAND_OUTPUT_LIMIT {
+            out.push_str("...<truncated>");
+            return out;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+fn first_non_empty(text: Option<&str>) -> Option<&str> {
+    text?.lines().map(str::trim).find(|line| !line.is_empty())
+}
+
+fn quote_path(path: &Path) -> String {
+    format!("\"{}\"", path.display())
+}
+
+impl PatchApplyCheckResult {
+    fn not_attempted(message: &str) -> Self {
+        Self {
+            attempted: false,
+            success: false,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            command: None,
+            patch_file: None,
+            error: Some(message.to_string()),
+        }
+    }
+}
+
+struct GitRunOutput {
+    success: bool,
+    stdout: String,
+    stderr: String,
+}

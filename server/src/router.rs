@@ -573,7 +573,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/api/admin/context/symbol-index/patch-check",
-            post(context_compiler::symbol_index_api::check_symbol_patch),
+            post(context_compiler::symbol_index_patch_api::check_symbol_patch),
+        )
+        .route(
+            "/api/admin/context/symbol-index/patch-dry-run",
+            post(context_compiler::symbol_index_patch_api::dry_run_symbol_patch),
         )
         .route(
             "/api/user/:user_id/agent",
