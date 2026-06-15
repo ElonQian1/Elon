@@ -72,7 +72,7 @@
                         android:singleLine="true"
                         android:text="我的项目"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="19sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <View
@@ -101,7 +101,7 @@
                         android:singleLine="true"
                         android:text="项目广场"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="19sp"
+                        android:textSize="17sp"
                         android:textStyle="bold" />
 
                     <View

@@ -244,7 +244,7 @@ internal class ProjectManagementHomeView(
                     includeFontPadding = false
                     text = avatarText(project.title.ifBlank { "项目" })
                     setTextColor(Color.parseColor("#253140"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     setTypeface(typeface, Typeface.BOLD)
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -381,8 +381,8 @@ internal class ProjectManagementHomeView(
         const val INTRO_WIDTH_DP = 206
         const val EMPTY_CARD_HEIGHT_DP = 238
 
-        const val CARD_TITLE_TEXT_SP = 19.5f
-        const val CARD_META_TEXT_SP = 15f
-        const val CARD_DETAIL_TEXT_SP = 13.2f
+        const val CARD_TITLE_TEXT_SP = 16f
+        const val CARD_META_TEXT_SP = 14f
+        const val CARD_DETAIL_TEXT_SP = 13f
     }
 }

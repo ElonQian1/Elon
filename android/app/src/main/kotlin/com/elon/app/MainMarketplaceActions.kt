@@ -138,7 +138,7 @@ internal class MainMarketplaceActions(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             background = rect(COLOR_CARD_HEADER, 14)
-            setPadding(dp(22), dp(24), dp(22), dp(16))
+            setPadding(dp(22), dp(20), dp(22), dp(16))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -149,13 +149,13 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 text = "搜索"
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             })
             addView(buildFilterScroller(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(24)
+                topMargin = dp(16)
             })
             addView(buildSearchField(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -206,7 +206,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setPadding(0, dp(2), 0, dp(5))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
@@ -301,7 +301,7 @@ internal class MainMarketplaceActions(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 19.5f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(statusLabel(joinApprovalLabel(project.joinMode), approvalDotColor(project.joinMode)))
@@ -339,7 +339,7 @@ internal class MainMarketplaceActions(
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                     setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.2f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     setLineSpacing(dp(2).toFloat(), 1.0f)
                 }, LinearLayout.LayoutParams(dp(206), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = dp(11)
@@ -357,7 +357,7 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 text = "时间"
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -397,7 +397,7 @@ internal class MainMarketplaceActions(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.2f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -425,7 +425,7 @@ internal class MainMarketplaceActions(
                     gravity = Gravity.CENTER
                     text = avatarText(project.name.ifBlank { "项目" })
                     setTextColor(Color.parseColor("#253140"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     setTypeface(typeface, Typeface.BOLD)
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -449,7 +449,7 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 this.text = text
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             })
             addView(View(activity).apply {
                 background = rect(dotColor, 999)

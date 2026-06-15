@@ -52,7 +52,7 @@
 .project-home-name {
   min-width: 0;
   color: #d6d6d6;
-  font-size: 19.5px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
   overflow: hidden;
@@ -63,7 +63,7 @@
 .project-home-meta {
   min-width: 0;
   color: #d6d6d6;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -102,7 +102,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1;
 }
@@ -119,7 +119,7 @@
   min-width: 0;
   padding-left: 14px;
   color: #a8a8a8;
-  font-size: 13.2px;
+  font-size: 13px;
   line-height: 1.12;
 }
 
@@ -149,7 +149,7 @@
   max-width: 100%;
   margin-top: 11px;
   color: #a8a8a8;
-  font-size: 13.2px;
+  font-size: 13px;
   line-height: 1.28;
   overflow: hidden;
   -webkit-line-clamp: 2;
@@ -161,7 +161,7 @@
   right: 24px;
   top: 42px;
   color: #d6d6d6;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -175,7 +175,7 @@
 
 .project-home-empty-plus {
   color: #a8a8a8;
-  font-size: 38px;
+  font-size: 32px;
   line-height: 1;
 }
 
@@ -222,7 +222,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1;
 }
@@ -243,7 +243,7 @@
 
 .project-home-action-title {
   color: #d6d6d6;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
   overflow: hidden;
