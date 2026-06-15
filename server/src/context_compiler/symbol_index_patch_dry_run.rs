@@ -9,8 +9,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::{
-    symbol_index_patch_check::{check_symbol_patch_diff, SymbolPatchDiffCheck},
+    symbol_index_patch_check::{SymbolPatchDiffCheck, check_symbol_patch_diff},
     symbol_index_patch_generation_types::SymbolPatchGeneration,
+    symbol_index_patch_repair::{PatchRepairContext, build_patch_repair_context},
 };
 
 const COMMAND_OUTPUT_LIMIT: usize = 4_000;
@@ -24,6 +25,7 @@ pub(crate) struct SymbolPatchDryRunResponse {
     pub(crate) workspace: PatchDryRunWorkspace,
     pub(crate) apply_check: PatchApplyCheckResult,
     pub(crate) apply_gate: PatchApplyGate,
+    pub(crate) repair_context: PatchRepairContext,
     pub(crate) next_steps: Vec<String>,
 }
 
@@ -101,6 +103,14 @@ pub(crate) fn dry_run_symbol_patch(
         &workspace,
         &apply_check,
     );
+    let repair_context = build_patch_repair_context(
+        generation,
+        generated_diff,
+        &contract_check,
+        &workspace,
+        &apply_check,
+        &apply_gate,
+    );
     let next_steps = dry_run_next_steps(&contract_check, &apply_check, &apply_gate);
 
     SymbolPatchDryRunResponse {
@@ -110,6 +120,7 @@ pub(crate) fn dry_run_symbol_patch(
         workspace,
         apply_check,
         apply_gate,
+        repair_context,
         next_steps,
     }
 }

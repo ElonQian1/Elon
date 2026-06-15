@@ -85,6 +85,7 @@ mod symbol_index_patch_plan_guidance;
 mod symbol_index_patch_plan_render;
 mod symbol_index_patch_plan_rules;
 mod symbol_index_patch_plan_types;
+mod symbol_index_patch_repair;
 mod symbol_index_query;
 mod symbol_index_query_features;
 #[cfg(test)]
