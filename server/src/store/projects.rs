@@ -66,7 +66,8 @@ impl Store {
               p.updated_at,
               p.created_by AS owner_id,
               p.source_type,
-              p.workspace_path
+              p.workspace_path,
+              p.display_name
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
              WHERE p.is_public = 1
@@ -76,6 +77,7 @@ impl Store {
               AND (
                 ?1 IS NULL
                 OR LOWER(p.name) LIKE ?1
+                OR LOWER(COALESCE(p.display_name,'')) LIKE ?1
                 OR LOWER(COALESCE(p.description,'')) LIKE ?1
                 OR LOWER(COALESCE(u.nickname, '')) LIKE ?1
                 OR LOWER(COALESCE(u.phone, u.email, p.created_by)) LIKE ?1
@@ -108,7 +110,7 @@ impl Store {
                     let mut project = PublicProjectItem {
                         id: row.get(0)?,
                         name: row.get(1)?,
-                        display_name: None,
+                        display_name: row.get(16)?,
                         description: row.get(2)?,
                         template: row.get(3)?,
                         owner_account: row.get(4)?,
@@ -156,7 +158,8 @@ impl Store {
                p.updated_at,
                p.created_by AS owner_id,
                p.source_type,
-               p.workspace_path
+               p.workspace_path,
+               p.display_name
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
              WHERE p.id = ?1
@@ -169,7 +172,7 @@ impl Store {
                 let mut project = PublicProjectItem {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    display_name: None,
+                    display_name: row.get(16)?,
                     description: row.get(2)?,
                     template: row.get(3)?,
                     owner_account: row.get(4)?,
@@ -454,7 +457,8 @@ impl Store {
                p.created_at, p.updated_at,
                p.created_by AS owner_id,
                p.source_type,
-               p.workspace_path
+               p.workspace_path,
+               p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -468,7 +472,7 @@ impl Store {
                 let mut project = PublicProjectItem {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    display_name: None,
+                    display_name: row.get(16)?,
                     description: row.get(2)?,
                     template: row.get(3)?,
                     owner_account: row.get(4)?,

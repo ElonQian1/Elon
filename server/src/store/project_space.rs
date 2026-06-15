@@ -59,7 +59,8 @@ impl Store {
         conn.query_row(
             "SELECT p.id, p.name, p.description, pm.role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
-                    p.icon_data_url, p.updated_at, p.source_type, p.workspace_path
+                    p.icon_data_url, p.updated_at, p.source_type, p.workspace_path,
+                    p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -68,7 +69,7 @@ impl Store {
                 let mut project = ProjectSpaceSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    display_name: None,
+                    display_name: row.get(9)?,
                     description: row.get(2)?,
                     role: row.get(3)?,
                     member_count: row.get(4)?,

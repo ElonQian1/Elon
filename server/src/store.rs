@@ -605,7 +605,8 @@ impl Store {
                         LIMIT 1
                     ) AS last_apk_url,
                     p.icon_data_url,
-                    p.updated_at
+                    p.updated_at,
+                    p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE pm.user_id = ?1 AND p.status != 'deleted'
@@ -815,7 +816,7 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
     let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
-        display_name: None,
+        display_name: row.get(24)?,
         description: row.get(2)?,
         workspace_key: row.get(3)?,
         template: row.get(4)?,
@@ -871,7 +872,8 @@ fn find_owner_project_by_name(
                         LIMIT 1
                     ) AS last_apk_url,
                     p.icon_data_url,
-                    p.updated_at
+                    p.updated_at,
+                    p.display_name
              FROM projects p
              LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
              WHERE p.created_by = ?1 AND p.name = ?2 AND p.status != 'deleted'
@@ -911,7 +913,8 @@ fn find_project_by_id_for_user(
                         LIMIT 1
                     ) AS last_apk_url,
                     p.icon_data_url,
-                    p.updated_at
+                    p.updated_at,
+                    p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
              WHERE p.id = ?1 AND p.status != 'deleted'

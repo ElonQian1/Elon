@@ -115,7 +115,8 @@ impl Store {
                      WHERE t.project_id = p.id AND t.apk_url IS NOT NULL AND t.apk_url != ''
                      ORDER BY t.created_at DESC LIMIT 1) AS last_apk_url,
                     p.icon_data_url,
-                    p.updated_at
+                    p.updated_at,
+                    p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              WHERE p.id = ?1 AND pm.user_id = ?2",
@@ -124,7 +125,7 @@ impl Store {
                 let mut project = ProjectSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    display_name: None,
+                    display_name: row.get(24)?,
                     description: row.get(2)?,
                     workspace_key: row.get(3)?,
                     template: row.get(4)?,

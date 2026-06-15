@@ -7,6 +7,7 @@
 ///   POST   /api/projects/:id/members                       管理员邀请/添加成员
 ///   PATCH  /api/projects/:id/visibility                    设置公开/私有（仅 owner/admin）
 ///   PATCH  /api/projects/:id/icon                          修改项目 APK 图标（仅 owner）
+///   PATCH  /api/projects/:id/brand                         修改项目展示别名与 logo（仅 owner）
 ///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
 ///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
 use axum::{
@@ -16,6 +17,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
+use serde_json::{Map, Value};
 use std::sync::Arc;
 
 use crate::{
@@ -57,6 +59,7 @@ pub struct AddMemberRequest {
 
 /// POST /api/projects/:id/join — 加入公开项目
 const MAX_PROJECT_ICON_DATA_URL_BYTES: usize = 512 * 1024;
+const MAX_PROJECT_DISPLAY_NAME_CHARS: usize = 80;
 
 pub async fn join_project(
     State(state): State<Arc<AppState>>,
@@ -314,8 +317,129 @@ pub async fn update_project_icon(
     }
 }
 
+/// PATCH /api/projects/:id/brand — 修改项目展示别名与 logo（仅 owner）
+pub async fn update_project_brand(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(req): Json<Value>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !can_update_project_brand(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目创建者才能修改项目展示资料");
+    }
+
+    let Some(obj) = req.as_object() else {
+        return json_error(StatusCode::BAD_REQUEST, "请求体必须是 JSON 对象");
+    };
+    let display_name_update = match clean_project_display_name_update(project_brand_field(
+        obj,
+        "display_name",
+        "displayName",
+    )) {
+        Ok(value) => value,
+        Err((status, message)) => return json_error(status, message),
+    };
+    let icon_data_url_update = match clean_project_icon_data_url_update(project_brand_field(
+        obj,
+        "icon_data_url",
+        "iconDataUrl",
+    )) {
+        Ok(value) => value,
+        Err((status, message)) => return json_error(status, message),
+    };
+    if display_name_update.is_none() && icon_data_url_update.is_none() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "至少需要提供 display_name/displayName 或 icon_data_url/iconDataUrl",
+        );
+    }
+
+    let display_name_arg = display_name_update.as_ref().map(|value| value.as_deref());
+    let icon_data_url_arg = icon_data_url_update.as_ref().map(|value| value.as_deref());
+    match state
+        .store
+        .update_project_branding(&project_id, display_name_arg, icon_data_url_arg)
+    {
+        Ok(()) => Json(serde_json::json!({
+            "ok": true,
+            "project_id": project_id,
+            "display_name": display_name_update.flatten(),
+            "icon_data_url": icon_data_url_update.flatten(),
+        }))
+        .into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不存在") {
+                StatusCode::NOT_FOUND
+            } else if msg.contains("系统归档项目") {
+                StatusCode::FORBIDDEN
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            json_error(status, msg)
+        }
+    }
+}
+
 fn can_update_project_icon(role: &str) -> bool {
     role.trim().eq_ignore_ascii_case("owner")
+}
+
+fn can_update_project_brand(role: &str) -> bool {
+    can_update_project_icon(role)
+}
+
+fn project_brand_field<'a>(
+    obj: &'a Map<String, Value>,
+    snake_case: &str,
+    camel_case: &str,
+) -> Option<&'a Value> {
+    obj.get(snake_case).or_else(|| obj.get(camel_case))
+}
+
+fn clean_project_display_name_update(
+    value: Option<&Value>,
+) -> Result<Option<Option<String>>, (StatusCode, String)> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(Some(None));
+    }
+    let Some(value) = value.as_str() else {
+        return Err((StatusCode::BAD_REQUEST, "项目别名必须是字符串".into()));
+    };
+    let value = value.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("null") {
+        return Ok(Some(None));
+    }
+    if value.chars().count() > MAX_PROJECT_DISPLAY_NAME_CHARS {
+        return Err((StatusCode::BAD_REQUEST, "项目别名不能超过 80 个字".into()));
+    }
+    Ok(Some(Some(value.to_string())))
+}
+
+fn clean_project_icon_data_url_update(
+    value: Option<&Value>,
+) -> Result<Option<Option<String>>, (StatusCode, String)> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(Some(None));
+    }
+    let Some(value) = value.as_str() else {
+        return Err((StatusCode::BAD_REQUEST, "项目 logo 必须是字符串".into()));
+    };
+    clean_project_icon_data_url(Some(value.to_string())).map(Some)
 }
 
 fn clean_project_icon_data_url(
@@ -324,7 +448,7 @@ fn clean_project_icon_data_url(
     let Some(value) = icon_data_url.map(|value| value.trim().to_string()) else {
         return Ok(None);
     };
-    if value.is_empty() {
+    if value.is_empty() || value.eq_ignore_ascii_case("null") {
         return Ok(None);
     }
     if value.len() > MAX_PROJECT_ICON_DATA_URL_BYTES {
@@ -344,7 +468,11 @@ fn clean_project_icon_data_url(
 
 #[cfg(test)]
 mod tests {
-    use super::can_update_project_icon;
+    use super::{
+        can_update_project_brand, can_update_project_icon, clean_project_display_name_update,
+        clean_project_icon_data_url_update,
+    };
+    use serde_json::{json, Value};
 
     #[test]
     fn project_icon_update_is_owner_only() {
@@ -353,6 +481,38 @@ mod tests {
         assert!(!can_update_project_icon("editor"));
         assert!(!can_update_project_icon("member"));
         assert!(!can_update_project_icon("observer"));
+    }
+
+    #[test]
+    fn project_brand_update_is_owner_only() {
+        assert!(can_update_project_brand("owner"));
+        assert!(!can_update_project_brand("admin"));
+        assert!(!can_update_project_brand("editor"));
+    }
+
+    #[test]
+    fn project_display_name_update_distinguishes_missing_clear_and_set() {
+        assert_eq!(clean_project_display_name_update(None).unwrap(), None);
+        assert_eq!(
+            clean_project_display_name_update(Some(&Value::Null)).unwrap(),
+            Some(None)
+        );
+        assert_eq!(
+            clean_project_display_name_update(Some(&json!(" 一龙网游加速器 "))).unwrap(),
+            Some(Some("一龙网游加速器".to_string()))
+        );
+    }
+
+    #[test]
+    fn project_icon_update_accepts_null_as_clear() {
+        assert_eq!(
+            clean_project_icon_data_url_update(Some(&Value::Null)).unwrap(),
+            Some(None)
+        );
+        assert_eq!(
+            clean_project_icon_data_url_update(Some(&json!("null"))).unwrap(),
+            Some(None)
+        );
     }
 }
 

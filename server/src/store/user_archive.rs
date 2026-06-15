@@ -39,7 +39,8 @@ impl Store {
                     ) AS conversation_count,
                     COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                     p.created_by AS owner_id,
-                    COALESCE(u.role, 'user') AS creator_role
+                    COALESCE(u.role, 'user') AS creator_role,
+                    p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
@@ -69,7 +70,7 @@ fn archive_project_from_row(
     let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
-        display_name: None,
+        display_name: row.get(28)?,
         description: row.get(2)?,
         workspace_key: row.get(3)?,
         template: row.get(4)?,
