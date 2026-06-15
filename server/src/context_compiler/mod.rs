@@ -1,3 +1,4 @@
+pub(crate) mod agent_rag_context;
 mod artifact;
 mod artifact_exports;
 #[cfg(test)]

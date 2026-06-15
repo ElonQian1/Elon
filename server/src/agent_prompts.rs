@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 
 /// AI 代理工具定义列表（告诉 LLM 它可以用哪些工具）
 pub(crate) fn tool_definitions() -> Value {
-    json!([
+    let mut tools = json!([
         {
             "type": "function",
             "function": {
@@ -133,7 +133,11 @@ pub(crate) fn tool_definitions() -> Value {
                 }
             }
         }
-    ])
+    ]);
+    if let Some(array) = tools.as_array_mut() {
+        array.extend(crate::context_compiler::agent_rag_context::tool_definitions());
+    }
+    tools
 }
 
 /// 系统提示词（告诉 LLM 它的角色和规则）
@@ -190,6 +194,7 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
 
 2. **已有 Git 项目**（继续迭代）:
    - list_dir(".") 查看当前结构
+   - 对已有项目、跨文件改动、理解陌生代码、定位定义/引用/调用链时，优先调用 repo_context_status，再用 repo_context_task_pack(q=用户任务) 获取 RAG 上下文；需要精确定位符号或引用时调用 repo_symbol_search
    - 读取项目说明文档和目标文件
    - read_file 读取要修改的文件
    - write_file 写入修改

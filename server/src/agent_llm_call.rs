@@ -155,7 +155,11 @@ pub(crate) async fn call_chat_llm_with_options(
     Ok(response)
 }
 
-fn ensure_api_call_allowed(state: &Arc<AppState>, agent: &AgentConfig, user_id: &str) -> Result<()> {
+fn ensure_api_call_allowed(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    user_id: &str,
+) -> Result<()> {
     if agent.usage_mode() == "user_api_key_proxy" {
         return Ok(());
     }
@@ -203,7 +207,18 @@ pub(crate) fn execute_tool(
     tool_name: &str,
     args: &Value,
     user_id: &str,
+    trace_id: Option<&str>,
 ) -> Result<String> {
+    if crate::context_compiler::agent_rag_context::is_rag_tool(tool_name) {
+        return crate::context_compiler::agent_rag_context::execute_rag_tool(
+            &state.data_dir,
+            workspace,
+            tool_name,
+            args,
+            trace_id,
+        );
+    }
+
     match tool_name {
         "init_project" => {
             let project_type = args["project_type"]

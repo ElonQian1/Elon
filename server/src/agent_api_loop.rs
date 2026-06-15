@@ -123,6 +123,7 @@ pub(crate) async fn run_api_inner_with_workspace(
     download_base: &str,
     user_message: &str,
     preflight_note: Option<&str>,
+    trace_id: Option<&str>,
     agent_name: Option<&str>,
     planning_mode: bool,
     memory_scope_type: Option<&str>,
@@ -234,10 +235,18 @@ pub(crate) async fn run_api_inner_with_workspace(
 
     let effective_user_message = match preflight_note {
         Some(note) => format!(
-            "项目预检结果：\n{}\n\n这不是最终失败，请先把它当作当前任务的一部分处理：查看 git status/diff，保护已有改动，能安全提交、stash、worktree 或 rebase 时自行处理，再继续用户原始请求；无法判断时向用户说明并暂停。\n\n用户原始请求：\n{}",
-            note, user_message
+            "当前任务 trace_id：{}\nRAG 工具会自动绑定这个 trace_id，不要尝试查询其他 trace。\n\n项目预检结果：\n{}\n\n这不是最终失败，请先把它当作当前任务的一部分处理：查看 git status/diff，保护已有改动，能安全提交、stash、worktree 或 rebase 时自行处理，再继续用户原始请求；无法判断时向用户说明并暂停。\n\n用户原始请求：\n{}",
+            trace_id.unwrap_or("无"),
+            note,
+            user_message
         ),
-        None => user_message.to_string(),
+        None => match trace_id {
+            Some(trace_id) => format!(
+                "当前任务 trace_id：{}\nRAG 工具会自动绑定这个 trace_id，不要尝试查询其他 trace。\n\n用户原始请求：\n{}",
+                trace_id, user_message
+            ),
+            None => user_message.to_string(),
+        },
     };
 
     // 初始化对话历史
@@ -339,12 +348,12 @@ pub(crate) async fn run_api_inner_with_workspace(
                             ))
                             .to_json(),
                         );
-                        execute_tool(state, &workspace, &tool_name, &args, user_id)
+                        execute_tool(state, &workspace, &tool_name, &args, user_id, trace_id)
                     } else {
                         r
                     }
                 } else {
-                    execute_tool(state, &workspace, &tool_name, &args, user_id)
+                    execute_tool(state, &workspace, &tool_name, &args, user_id, trace_id)
                 };
 
                 let result_str = match result {
