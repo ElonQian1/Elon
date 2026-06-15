@@ -4,7 +4,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use super::{
-    symbol_index_rank_profile::HybridRankProfile, symbol_index_retrieval_plan::RetrievalPlan,
+    symbol_index_rank_profile::HybridRankProfile, symbol_index_ranker::RerankDecision,
+    symbol_index_retrieval_plan::RetrievalPlan,
 };
 
 const DEFAULT_EVAL_K: usize = 10;
@@ -167,6 +168,7 @@ pub(crate) struct SymbolRetrievalEvalBatchResponse {
     pub(crate) evaluated_count: usize,
     pub(crate) failed_count: usize,
     pub(crate) aggregate: SymbolRetrievalEvalBatchMetrics,
+    pub(crate) intent_groups: Vec<SymbolRetrievalEvalIntentGroupMetrics>,
     pub(crate) cases: Vec<SymbolRetrievalEvalBatchCaseResponse>,
 }
 
@@ -179,6 +181,26 @@ pub(crate) struct SymbolRetrievalEvalBatchMetrics {
     pub(crate) mean_recall_at_k: f64,
     pub(crate) mean_reciprocal_rank: f64,
     pub(crate) has_test_context_rate: f64,
+    pub(crate) noise_count_at_k: usize,
+    pub(crate) mean_noise_rate_at_k: f64,
+    pub(crate) total_token_count_at_k: usize,
+    pub(crate) average_token_count_at_k: f64,
+    pub(crate) candidate_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalIntentGroupMetrics {
+    pub(crate) intent: String,
+    pub(crate) evaluated_count: usize,
+    pub(crate) requirement_count: usize,
+    pub(crate) hit_count_at_k: usize,
+    pub(crate) missing_requirement_count: usize,
+    pub(crate) mean_recall_at_k: f64,
+    pub(crate) mean_reciprocal_rank: f64,
+    pub(crate) has_test_context_rate: f64,
+    pub(crate) noise_count_at_k: usize,
+    pub(crate) mean_noise_rate_at_k: f64,
     pub(crate) total_token_count_at_k: usize,
     pub(crate) average_token_count_at_k: f64,
     pub(crate) candidate_count: usize,
@@ -235,9 +257,12 @@ pub(crate) struct SymbolRetrievalEvalMetrics {
     pub(crate) vector_candidate_count: usize,
     pub(crate) graph_candidate_count: usize,
     pub(crate) test_candidate_count_at_k: usize,
+    pub(crate) noise_count_at_k: usize,
+    pub(crate) noise_rate_at_k: f64,
     pub(crate) total_token_count_at_k: usize,
     pub(crate) average_token_count_at_k: f64,
     pub(crate) has_test_context_at_k: bool,
+    pub(crate) decision_counts: BTreeMap<String, usize>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -245,6 +270,7 @@ pub(crate) struct SymbolRetrievalEvalMetrics {
 pub(crate) struct SymbolRetrievalEvalCandidate {
     pub(crate) rank: usize,
     pub(crate) source: String,
+    pub(crate) sources: Vec<String>,
     pub(crate) id: String,
     pub(crate) label: String,
     pub(crate) file_path: String,
@@ -257,4 +283,5 @@ pub(crate) struct SymbolRetrievalEvalCandidate {
     pub(crate) reasons: Vec<String>,
     pub(crate) matched_requirements: Vec<String>,
     pub(crate) is_test_context: bool,
+    pub(crate) decision: RerankDecision,
 }

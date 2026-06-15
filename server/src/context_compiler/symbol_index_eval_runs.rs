@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     path::Path,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -14,9 +15,10 @@ use super::{
     symbol_index_eval_types::{
         SymbolRetrievalEvalBatchCaseResponse, SymbolRetrievalEvalBatchMetrics,
         SymbolRetrievalEvalBatchQuery, SymbolRetrievalEvalBatchResponse,
-        SymbolRetrievalEvalResponse, SymbolRetrievalRunDetail, SymbolRetrievalRunDetailResponse,
-        SymbolRetrievalRunHistoryQuery, SymbolRetrievalRunHistoryQueryEcho,
-        SymbolRetrievalRunLookupQuery, SymbolRetrievalRunSummary, SymbolRetrievalRunsResponse,
+        SymbolRetrievalEvalIntentGroupMetrics, SymbolRetrievalEvalResponse,
+        SymbolRetrievalRunDetail, SymbolRetrievalRunDetailResponse, SymbolRetrievalRunHistoryQuery,
+        SymbolRetrievalRunHistoryQueryEcho, SymbolRetrievalRunLookupQuery,
+        SymbolRetrievalRunSummary, SymbolRetrievalRunsResponse,
     },
     symbol_index_query::find_symbol_index_db,
     symbol_index_store::create_retrieval_runs_schema,
@@ -31,6 +33,7 @@ struct RetrievalRunScores<'a> {
     evaluated_count: usize,
     failed_count: usize,
     aggregate: &'a SymbolRetrievalEvalBatchMetrics,
+    intent_groups: &'a [SymbolRetrievalEvalIntentGroupMetrics],
 }
 
 pub(crate) fn evaluate_latest_symbol_retrieval_batch(
@@ -57,6 +60,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval_batch(
     }
 
     let aggregate = aggregate_metrics(&cases);
+    let intent_groups = intent_group_metrics(&cases);
     let evaluated_count = cases.iter().filter(|case| case.ok).count();
     let failed_count = cases.len().saturating_sub(evaluated_count);
     let mut response = SymbolRetrievalEvalBatchResponse {
@@ -70,6 +74,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval_batch(
         evaluated_count,
         failed_count,
         aggregate,
+        intent_groups,
         cases,
     };
 
@@ -222,60 +227,103 @@ fn parse_json(value: &str) -> Value {
 fn aggregate_metrics(
     cases: &[SymbolRetrievalEvalBatchCaseResponse],
 ) -> SymbolRetrievalEvalBatchMetrics {
-    let successful = cases
-        .iter()
-        .filter_map(|case| case.result.as_ref())
-        .collect::<Vec<_>>();
-    let evaluated_count = successful.len();
-    let requirement_count = successful
-        .iter()
-        .map(|result| result.metrics.requirement_count)
-        .sum::<usize>();
-    let hit_count_at_k = successful
-        .iter()
-        .map(|result| result.metrics.hit_count_at_k)
-        .sum::<usize>();
-    let missing_requirement_count = successful
-        .iter()
-        .map(|result| result.missing_requirements.len())
-        .sum::<usize>();
-    let total_token_count_at_k = successful
-        .iter()
-        .map(|result| result.metrics.total_token_count_at_k)
-        .sum::<usize>();
-    let candidate_count = successful
-        .iter()
-        .map(|result| result.candidates.len())
-        .sum::<usize>();
+    let mut accumulator = EvalMetricsAccumulator::default();
+    for result in cases.iter().filter_map(|case| case.result.as_ref()) {
+        accumulator.add(result);
+    }
+    accumulator.finish_batch()
+}
 
-    SymbolRetrievalEvalBatchMetrics {
-        requirement_count,
-        hit_count_at_k,
-        missing_requirement_count,
-        mean_recall_at_k: average(
-            successful
-                .iter()
-                .map(|result| result.metrics.recall_at_k)
-                .sum::<f64>(),
-            evaluated_count,
-        ),
-        mean_reciprocal_rank: average(
-            successful
-                .iter()
-                .map(|result| result.metrics.mean_reciprocal_rank)
-                .sum::<f64>(),
-            evaluated_count,
-        ),
-        has_test_context_rate: average(
-            successful
-                .iter()
-                .filter(|result| result.metrics.has_test_context_at_k)
-                .count() as f64,
-            evaluated_count,
-        ),
-        total_token_count_at_k,
-        average_token_count_at_k: average(total_token_count_at_k as f64, evaluated_count),
-        candidate_count,
+fn intent_group_metrics(
+    cases: &[SymbolRetrievalEvalBatchCaseResponse],
+) -> Vec<SymbolRetrievalEvalIntentGroupMetrics> {
+    let mut groups = BTreeMap::<String, EvalMetricsAccumulator>::new();
+    for result in cases.iter().filter_map(|case| case.result.as_ref()) {
+        groups
+            .entry(result.retrieval_plan.intent.as_str().to_string())
+            .or_default()
+            .add(result);
+    }
+    groups
+        .into_iter()
+        .map(|(intent, accumulator)| accumulator.finish_intent(intent))
+        .collect()
+}
+
+#[derive(Debug, Default)]
+struct EvalMetricsAccumulator {
+    evaluated_count: usize,
+    requirement_count: usize,
+    hit_count_at_k: usize,
+    missing_requirement_count: usize,
+    recall_at_k_total: f64,
+    mean_reciprocal_rank_total: f64,
+    has_test_context_count: usize,
+    noise_count_at_k: usize,
+    noise_rate_at_k_total: f64,
+    total_token_count_at_k: usize,
+    candidate_count: usize,
+}
+
+impl EvalMetricsAccumulator {
+    fn add(&mut self, result: &SymbolRetrievalEvalResponse) {
+        self.evaluated_count += 1;
+        self.requirement_count += result.metrics.requirement_count;
+        self.hit_count_at_k += result.metrics.hit_count_at_k;
+        self.missing_requirement_count += result.missing_requirements.len();
+        self.recall_at_k_total += result.metrics.recall_at_k;
+        self.mean_reciprocal_rank_total += result.metrics.mean_reciprocal_rank;
+        self.has_test_context_count += usize::from(result.metrics.has_test_context_at_k);
+        self.noise_count_at_k += result.metrics.noise_count_at_k;
+        self.noise_rate_at_k_total += result.metrics.noise_rate_at_k;
+        self.total_token_count_at_k += result.metrics.total_token_count_at_k;
+        self.candidate_count += result.candidates.len();
+    }
+
+    fn finish_batch(self) -> SymbolRetrievalEvalBatchMetrics {
+        SymbolRetrievalEvalBatchMetrics {
+            requirement_count: self.requirement_count,
+            hit_count_at_k: self.hit_count_at_k,
+            missing_requirement_count: self.missing_requirement_count,
+            mean_recall_at_k: average(self.recall_at_k_total, self.evaluated_count),
+            mean_reciprocal_rank: average(self.mean_reciprocal_rank_total, self.evaluated_count),
+            has_test_context_rate: average(
+                self.has_test_context_count as f64,
+                self.evaluated_count,
+            ),
+            noise_count_at_k: self.noise_count_at_k,
+            mean_noise_rate_at_k: average(self.noise_rate_at_k_total, self.evaluated_count),
+            total_token_count_at_k: self.total_token_count_at_k,
+            average_token_count_at_k: average(
+                self.total_token_count_at_k as f64,
+                self.evaluated_count,
+            ),
+            candidate_count: self.candidate_count,
+        }
+    }
+
+    fn finish_intent(self, intent: String) -> SymbolRetrievalEvalIntentGroupMetrics {
+        SymbolRetrievalEvalIntentGroupMetrics {
+            intent,
+            evaluated_count: self.evaluated_count,
+            requirement_count: self.requirement_count,
+            hit_count_at_k: self.hit_count_at_k,
+            missing_requirement_count: self.missing_requirement_count,
+            mean_recall_at_k: average(self.recall_at_k_total, self.evaluated_count),
+            mean_reciprocal_rank: average(self.mean_reciprocal_rank_total, self.evaluated_count),
+            has_test_context_rate: average(
+                self.has_test_context_count as f64,
+                self.evaluated_count,
+            ),
+            noise_count_at_k: self.noise_count_at_k,
+            mean_noise_rate_at_k: average(self.noise_rate_at_k_total, self.evaluated_count),
+            total_token_count_at_k: self.total_token_count_at_k,
+            average_token_count_at_k: average(
+                self.total_token_count_at_k as f64,
+                self.evaluated_count,
+            ),
+            candidate_count: self.candidate_count,
+        }
     }
 }
 
@@ -298,6 +346,7 @@ fn record_retrieval_run(
         evaluated_count: response.evaluated_count,
         failed_count: response.failed_count,
         aggregate: &response.aggregate,
+        intent_groups: &response.intent_groups,
     })?;
     conn.execute(
         r#"

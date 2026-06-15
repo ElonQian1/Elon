@@ -406,6 +406,8 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .any(|symbol| symbol.name == "build_context_pack"));
     assert!(response.pack.contains("<symbol_task_context"));
     assert!(response.pack.contains("<ranked_context"));
+    assert!(response.pack.contains("decision="));
+    assert!(response.pack.contains("sources="));
     assert!(response.pack.contains("<candidate_symbols"));
     assert!(response.pack.contains("<full_text_chunks"));
     assert!(response.pack.contains("<vector_chunks"));
@@ -779,6 +781,11 @@ fn eval_reports_recall_mrr_and_missing_context_requirements() {
     assert_eq!(response.metrics.recall_at_k, 1.0);
     assert!(response.metrics.mean_reciprocal_rank > 0.0);
     assert!(response.metrics.has_test_context_at_k);
+    assert!(response.metrics.noise_rate_at_k >= 0.0);
+    assert!(response
+        .metrics
+        .decision_counts
+        .contains_key("must_include"));
     assert!(response.missing_requirements.is_empty());
     assert!(response
         .candidates
@@ -884,7 +891,11 @@ fn eval_merges_vector_candidates_when_model_is_requested() {
     assert!(response
         .candidates
         .iter()
-        .any(|candidate| candidate.source == "vector"));
+        .any(|candidate| candidate.sources.iter().any(|source| source == "vector")));
+    assert!(response.candidates.iter().any(|candidate| candidate
+        .reasons
+        .iter()
+        .any(|reason| reason.starts_with("merged_sources="))));
 
     fs::remove_dir_all(dir).unwrap();
 }
@@ -908,7 +919,7 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
                 SymbolRetrievalEvalBatchCaseQuery {
                     id: "context-pack".to_string(),
                     query: RetrievalEvalQuery {
-                        text: Some("build context pack".to_string()),
+                        text: Some("解释 build context pack 流程".to_string()),
                         must_include: vec![
                             "context_pack.rs".to_string(),
                             "context_pack_tests.rs".to_string(),
@@ -925,7 +936,7 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
                 SymbolRetrievalEvalBatchCaseQuery {
                     id: "compile-preflight".to_string(),
                     query: RetrievalEvalQuery {
-                        text: Some("compile preflight".to_string()),
+                        text: Some("重构 compile_preflight_note callers".to_string()),
                         must_include: vec![
                             "mod.rs".to_string(),
                             "compile_preflight_note".to_string(),
@@ -952,6 +963,14 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
     assert_eq!(response.aggregate.mean_recall_at_k, 1.0);
     assert!(response.aggregate.mean_reciprocal_rank > 0.0);
     assert!(response.aggregate.has_test_context_rate > 0.0);
+    assert!(response.aggregate.mean_noise_rate_at_k >= 0.0);
+    assert_eq!(response.intent_groups.len(), 2);
+    assert!(response.intent_groups.iter().any(|group| {
+        group.intent == QueryIntent::Explain.as_str() && group.evaluated_count == 1
+    }));
+    assert!(response.intent_groups.iter().any(|group| {
+        group.intent == QueryIntent::Refactor.as_str() && group.evaluated_count == 1
+    }));
     assert!(response
         .cases
         .iter()
@@ -979,6 +998,7 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
     assert_eq!(history.runs.len(), 1);
     assert_eq!(history.runs[0].id.as_str(), response.run_id.as_str());
     assert_eq!(history.runs[0].scores["caseCount"].as_u64(), Some(2));
+    assert!(history.runs[0].scores["intentGroups"].is_array());
 
     let detail = load_latest_retrieval_run(
         &dir,
@@ -990,6 +1010,7 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
     .unwrap();
     assert_eq!(detail.run.id.as_str(), response.run_id.as_str());
     assert_eq!(detail.run.scores["evaluatedCount"].as_u64(), Some(2));
+    assert!(detail.run.scores["intentGroups"].is_array());
     assert!(detail
         .run
         .selected_chunks

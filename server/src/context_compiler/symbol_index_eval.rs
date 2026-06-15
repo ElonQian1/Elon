@@ -155,6 +155,7 @@ fn candidate_from_ranked(
     SymbolRetrievalEvalCandidate {
         rank: item.rank,
         source: item.source,
+        sources: item.sources,
         id: item.id,
         label: item.label,
         file_path: item.file_path,
@@ -167,6 +168,7 @@ fn candidate_from_ranked(
         reasons: item.reasons,
         matched_requirements,
         is_test_context: item.is_test_context,
+        decision: item.decision,
     }
 }
 
@@ -182,6 +184,14 @@ fn build_metrics(
         .map(|candidate| candidate.token_count)
         .sum::<usize>();
     let top_k_len = top_k.len();
+    let noise_count_at_k = if requirements.is_empty() {
+        0
+    } else {
+        top_k
+            .iter()
+            .filter(|candidate| candidate.matched_requirements.is_empty())
+            .count()
+    };
     SymbolRetrievalEvalMetrics {
         requirement_count: requirements.len(),
         hit_count_at_k: hit_ranks.len(),
@@ -194,28 +204,53 @@ fn build_metrics(
         top_k_candidate_count: top_k_len,
         symbol_candidate_count: candidates
             .iter()
-            .filter(|candidate| candidate.source == "symbol")
+            .filter(|candidate| candidate_has_source(candidate, "symbol"))
             .count(),
         chunk_candidate_count: candidates
             .iter()
-            .filter(|candidate| candidate.source == "full_text")
+            .filter(|candidate| candidate_has_source(candidate, "full_text"))
             .count(),
         vector_candidate_count: candidates
             .iter()
-            .filter(|candidate| candidate.source == "vector")
+            .filter(|candidate| candidate_has_source(candidate, "vector"))
             .count(),
         graph_candidate_count: candidates
             .iter()
-            .filter(|candidate| candidate.source.starts_with("graph_"))
+            .filter(|candidate| candidate_has_graph_source(candidate))
             .count(),
         test_candidate_count_at_k: top_k
             .iter()
             .filter(|candidate| candidate.is_test_context)
             .count(),
+        noise_count_at_k,
+        noise_rate_at_k: ratio(noise_count_at_k, top_k_len),
         total_token_count_at_k: top_k_token_count,
         average_token_count_at_k: ratio(top_k_token_count, top_k_len),
         has_test_context_at_k: top_k.iter().any(|candidate| candidate.is_test_context),
+        decision_counts: decision_counts(candidates),
     }
+}
+
+fn candidate_has_source(candidate: &SymbolRetrievalEvalCandidate, expected: &str) -> bool {
+    candidate.source == expected || candidate.sources.iter().any(|source| source == expected)
+}
+
+fn candidate_has_graph_source(candidate: &SymbolRetrievalEvalCandidate) -> bool {
+    candidate.source.starts_with("graph_")
+        || candidate
+            .sources
+            .iter()
+            .any(|source| source.starts_with("graph_"))
+}
+
+fn decision_counts(candidates: &[SymbolRetrievalEvalCandidate]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        *counts
+            .entry(candidate.decision.as_str().to_string())
+            .or_default() += 1;
+    }
+    counts
 }
 
 fn requirement_hit_ranks(

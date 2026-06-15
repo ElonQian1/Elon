@@ -16,6 +16,7 @@ use super::{
 pub(crate) struct RankedContextItem {
     pub(crate) rank: usize,
     pub(crate) source: String,
+    pub(crate) sources: Vec<String>,
     pub(crate) id: String,
     pub(crate) label: String,
     pub(crate) file_path: String,
@@ -27,11 +28,33 @@ pub(crate) struct RankedContextItem {
     pub(crate) matched_terms: Vec<String>,
     pub(crate) reasons: Vec<String>,
     pub(crate) is_test_context: bool,
+    pub(crate) decision: RerankDecision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum RerankDecision {
+    MustInclude,
+    Include,
+    Summarize,
+    Drop,
+}
+
+impl RerankDecision {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            RerankDecision::MustInclude => "must_include",
+            RerankDecision::Include => "include",
+            RerankDecision::Summarize => "summarize",
+            RerankDecision::Drop => "drop",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 struct ContextDraft {
     source: &'static str,
+    sources: BTreeSet<String>,
     id: String,
     label: String,
     file_path: String,
@@ -79,7 +102,7 @@ pub(crate) fn rank_hybrid_context_with_plan(
     let mut ranked =
         rank_hybrid_context_with_profile(symbols, text_chunks, vector_chunks, impact, profile);
     apply_plan_ranking(&mut ranked, plan);
-    rerank_items(ranked)
+    rerank_items(ranked, plan)
 }
 
 fn symbol_context(symbol: &SymbolHit, index: usize, profile: &HybridRankProfile) -> ContextDraft {
@@ -108,6 +131,7 @@ fn symbol_context(symbol: &SymbolHit, index: usize, profile: &HybridRankProfile)
             (importance > 0.0).then(|| format!("importance={importance:.2}")),
         ]),
         is_test_context,
+        sources: source_set("symbol"),
     }
 }
 
@@ -143,6 +167,7 @@ fn text_chunk_context(
                 .then(|| format!("matched={}", chunk.matched_terms.join(","))),
         ]),
         is_test_context,
+        sources: source_set("full_text"),
     }
 }
 
@@ -177,6 +202,7 @@ fn vector_chunk_context(
             Some(format!("similarity={:.4}", chunk.score)),
         ]),
         is_test_context,
+        sources: source_set("vector"),
     }
 }
 
@@ -201,12 +227,14 @@ fn push_impact_context(
                 .importance_score
                 .map(|score| format!("importance={score:.2}")),
         ]);
+        candidate.sources = source_set("graph_symbol");
         drafts.push(candidate);
     }
     for (index, file) in impact.impacted_files.iter().enumerate() {
         let is_test_context = file.test_hint_count > 0 || looks_like_test(&file.path);
         drafts.push(ContextDraft {
             source: "graph_file",
+            sources: source_set("graph_file"),
             id: format!("graph-file:{}", file.path),
             label: file.path.clone(),
             file_path: file.path.clone(),
@@ -235,6 +263,7 @@ fn push_impact_context(
     for (index, hint) in impact.test_hints.iter().enumerate() {
         drafts.push(ContextDraft {
             source: "graph_test",
+            sources: source_set("graph_test"),
             id: format!("graph-test:{}", hint.symbol_id),
             label: hint.symbol_name.clone(),
             file_path: hint.path.clone(),
@@ -259,13 +288,17 @@ fn push_impact_context(
 
 fn apply_plan_ranking(items: &mut [RankedContextItem], plan: &RetrievalPlan) {
     for item in items {
-        let bonus = plan.ranking_bonus(&item.source);
+        let bonus = item
+            .sources
+            .iter()
+            .map(|source| plan.ranking_bonus(source))
+            .fold(plan.ranking_bonus(&item.source), f64::max);
         if bonus > 0.0 {
             item.score += bonus;
             item.reasons.push(format!(
-                "retrieval_plan={} source_weight={:.2} bonus={bonus:.1}",
+                "retrieval_plan={} sources={} bonus={bonus:.1}",
                 plan.intent.as_str(),
-                plan.source_weight(&item.source)
+                item.sources.join("+")
             ));
         }
         if item.is_test_context && !plan.pack_policy.include_tests {
@@ -281,12 +314,56 @@ fn apply_plan_ranking(items: &mut [RankedContextItem], plan: &RetrievalPlan) {
     }
 }
 
-fn rerank_items(mut items: Vec<RankedContextItem>) -> Vec<RankedContextItem> {
+fn rerank_items(mut items: Vec<RankedContextItem>, plan: &RetrievalPlan) -> Vec<RankedContextItem> {
+    items.sort_by(compare_ranked_candidates);
+    apply_rerank_diversity(&mut items);
     items.sort_by(compare_ranked_candidates);
     for (index, item) in items.iter_mut().enumerate() {
         item.rank = index + 1;
+        item.decision = decide_rerank_item(item, plan);
+        item.reasons
+            .push(format!("rerank_decision={}", item.decision.as_str()));
     }
     items
+}
+
+fn apply_rerank_diversity(items: &mut [RankedContextItem]) {
+    let mut file_counts = BTreeMap::<String, usize>::new();
+    for item in items {
+        let count = file_counts.entry(item.file_path.clone()).or_default();
+        *count += 1;
+        if *count > 3 && item.token_count > 0 {
+            item.score -= 90.0 + ((*count - 3) as f64 * 20.0);
+            item.reasons.push(format!(
+                "rerank_diversity_file_cap file={} ordinal={}",
+                item.file_path, count
+            ));
+        }
+    }
+}
+
+fn decide_rerank_item(item: &RankedContextItem, plan: &RetrievalPlan) -> RerankDecision {
+    if item.is_test_context && !plan.pack_policy.include_tests {
+        return RerankDecision::Drop;
+    }
+    if item.rank <= 3
+        && (item.score >= 120.0
+            || item_has_source(item, "symbol")
+            || item_has_source(item, "graph_symbol"))
+    {
+        return RerankDecision::MustInclude;
+    }
+    if item.rank <= 8 {
+        return RerankDecision::Include;
+    }
+    if item.rank <= 20 && item.score > 0.0 {
+        return RerankDecision::Summarize;
+    }
+    RerankDecision::Drop
+}
+
+fn item_has_source(item: &RankedContextItem, expected: &str) -> bool {
+    item.source == expected || item.sources.iter().any(|source| source == expected)
 }
 
 fn compare_ranked_candidates(left: &RankedContextItem, right: &RankedContextItem) -> Ordering {
@@ -303,11 +380,9 @@ fn rank_drafts(drafts: Vec<ContextDraft>) -> Vec<RankedContextItem> {
     let mut best = BTreeMap::<String, ContextDraft>::new();
     for draft in drafts {
         let key = candidate_key(&draft);
-        let replace = best
-            .get(&key)
-            .map(|existing| draft.score > existing.score)
-            .unwrap_or(true);
-        if replace {
+        if let Some(existing) = best.get_mut(&key) {
+            merge_context_draft(existing, draft);
+        } else {
             best.insert(key, draft);
         }
     }
@@ -324,6 +399,7 @@ fn ranked_item(rank: usize, draft: ContextDraft) -> RankedContextItem {
     RankedContextItem {
         rank,
         source: draft.source.to_string(),
+        sources: draft.sources.into_iter().collect(),
         id: draft.id,
         label: draft.label,
         file_path: draft.file_path,
@@ -335,6 +411,7 @@ fn ranked_item(rank: usize, draft: ContextDraft) -> RankedContextItem {
         matched_terms: draft.matched_terms,
         reasons: draft.reasons,
         is_test_context: draft.is_test_context,
+        decision: RerankDecision::Include,
     }
 }
 
@@ -350,12 +427,62 @@ fn compare_candidates(left: &ContextDraft, right: &ContextDraft) -> Ordering {
 
 fn candidate_key(candidate: &ContextDraft) -> String {
     if let Some(symbol_id) = candidate.symbol_id.as_deref() {
-        format!("{}:{symbol_id}", candidate.source)
-    } else {
+        format!("symbol:{symbol_id}")
+    } else if let Some(start_line) = candidate.start_line {
         format!(
-            "{}:{}:{}",
-            candidate.source, candidate.file_path, candidate.label
+            "range:{}:{}:{}",
+            candidate.file_path,
+            start_line,
+            candidate.end_line.unwrap_or(start_line)
         )
+    } else {
+        format!("file-label:{}:{}", candidate.file_path, candidate.label)
+    }
+}
+
+fn merge_context_draft(existing: &mut ContextDraft, incoming: ContextDraft) {
+    let mut sources = existing.sources.clone();
+    sources.extend(incoming.sources.iter().cloned());
+    let source_reason = if sources.len() > 1 {
+        Some(format!(
+            "merged_sources={}",
+            sources.iter().cloned().collect::<Vec<_>>().join("+")
+        ))
+    } else {
+        None
+    };
+    let reasons = merge_strings(
+        existing
+            .reasons
+            .iter()
+            .cloned()
+            .chain(incoming.reasons.iter().cloned())
+            .chain(source_reason),
+    );
+    let matched_terms = merge_strings(
+        existing
+            .matched_terms
+            .iter()
+            .cloned()
+            .chain(incoming.matched_terms.iter().cloned()),
+    );
+
+    if incoming.score > existing.score {
+        let fallback_token_count = existing.token_count;
+        *existing = incoming;
+        existing.sources = sources;
+        existing.reasons = reasons;
+        existing.matched_terms = matched_terms;
+        if existing.token_count == 0 {
+            existing.token_count = fallback_token_count;
+        }
+    } else {
+        existing.sources = sources;
+        existing.reasons = reasons;
+        existing.matched_terms = matched_terms;
+        if existing.token_count == 0 && incoming.token_count > 0 {
+            existing.token_count = incoming.token_count;
+        }
     }
 }
 
@@ -368,6 +495,20 @@ fn compact_reasons(reasons: impl IntoIterator<Item = Option<String>>) -> Vec<Str
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
+}
+
+fn merge_strings(values: impl IntoIterator<Item = String>) -> Vec<String> {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn source_set(source: &str) -> BTreeSet<String> {
+    BTreeSet::from([source.to_string()])
 }
 
 fn looks_like_test(path: &str) -> bool {

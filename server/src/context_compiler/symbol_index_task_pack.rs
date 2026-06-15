@@ -289,9 +289,11 @@ fn render_task_pack(
     ));
     for item in ranked_context.iter().take(20) {
         out.push_str(&format!(
-            "- #{} source={} `{}` path={}:{} score={:.2} reasons={}\n",
+            "- #{} decision={} source={} sources={} `{}` path={}:{} score={:.2} reasons={}\n",
             item.rank,
+            item.decision.as_str(),
             xml_escape(&item.source),
+            xml_escape(&item.sources.join("+")),
             xml_escape(&item.label),
             xml_escape(&item.file_path),
             item.start_line.unwrap_or_default(),
