@@ -263,7 +263,7 @@ class MainActivity : AppCompatActivity() {
             registerTaskWorkReceiver = { taskActions.taskWorkReceiverActions.registerTaskWorkReceiver() },
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
-            syncProjectsFromServer = { accountActions().syncProjectsFromServer() },
+            syncProjectsFromServer = { onComplete -> accountActions().syncProjectsFromServer(onComplete) },
             getWaitingForReply = { s.waitingForReply },
             getBackendConnected = { s.backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,

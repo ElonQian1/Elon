@@ -1031,8 +1031,8 @@ internal class ProjectSpaceController(
     }
 
     private fun prepareProjectContent(showAiMenu: Boolean = false): LinearLayout {
-        binding.projectPage.stopNestedScroll()
-        binding.projectPage.scrollTo(0, 0)
+        binding.projectScrollView.stopNestedScroll()
+        binding.projectScrollView.scrollTo(0, 0)
         if (showAiMenu) showProjectSpaceAiMenu() else hideProjectSpaceAiMenu()
         hideProjectSpaceFeedActions()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
@@ -1074,7 +1074,7 @@ internal class ProjectSpaceController(
     }
 
     private fun setupProjectSpaceAiMenuMotion() {
-        binding.projectPage.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+        binding.projectScrollView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
             val shouldExpand = scrollY <= dp(PROJECT_SPACE_AI_EXPAND_AT_TOP_DP)
             updateProjectSpaceAiMenuExpanded(shouldExpand, animate = true)
         }

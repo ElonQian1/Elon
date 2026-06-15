@@ -264,143 +264,150 @@
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
         </LinearLayout>
 
-        <ScrollView
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/projectPage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/elon_bg_app"
-            android:fillViewport="true"
             android:visibility="gone">
 
-            <LinearLayout
-                android:id="@+id/projectContentLayout"
+            <ScrollView
+                android:id="@+id/projectScrollView"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/currentStageText"
-                    android:layout_width="match_parent"
-                    android:layout_height="64dp"
-                    android:background="@color/elon_surface_card"
-                    android:gravity="center_vertical"
-                    android:paddingStart="22dp"
-                    android:paddingEnd="22dp"
-                    android:text="待提交需求"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="18sp" />
-
-                <TextView
-                    android:id="@+id/projectOverviewText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:background="@color/elon_surface_card"
-                    android:lineSpacingExtra="5dp"
-                    android:minHeight="104dp"
-                    android:padding="22dp"
-                    android:text="项目管理\n当前没有正在执行的开发任务。"
-                    android:textColor="@color/elon_text_primary"
-                    android:textSize="15sp" />
+                android:layout_height="match_parent"
+                android:background="@color/elon_bg_app"
+                android:fillViewport="true">
 
                 <LinearLayout
+                    android:id="@+id/projectContentLayout"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
-                    android:orientation="vertical"
-                    android:padding="18dp">
+                    android:orientation="vertical">
 
                     <TextView
-                        android:id="@+id/progressTitleText"
+                        android:id="@+id/currentStageText"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="@color/elon_surface_card"
+                        android:gravity="center_vertical"
+                        android:paddingStart="22dp"
+                        android:paddingEnd="22dp"
+                        android:text="待提交需求"
+                        android:textColor="@color/elon_text_primary"
+                        android:textSize="18sp" />
+
+                    <TextView
+                        android:id="@+id/projectOverviewText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="开发进度"
+                        android:layout_marginTop="1dp"
+                        android:background="@color/elon_surface_card"
+                        android:lineSpacingExtra="5dp"
+                        android:minHeight="104dp"
+                        android:padding="22dp"
+                        android:text="项目管理\n当前没有正在执行的开发任务。"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="16sp" />
+                        android:textSize="15sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@color/elon_surface_card"
+                        android:orientation="vertical"
+                        android:padding="18dp">
+
+                        <TextView
+                            android:id="@+id/progressTitleText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="开发进度"
+                            android:textColor="@color/elon_text_primary"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/stagePlanText"
+                            style="@style/StageLineText"
+                            android:text="1. 需求分析：等待" />
+
+                        <TextView
+                            android:id="@+id/stageCodeText"
+                            style="@style/StageLineText"
+                            android:text="2. 开发实现：等待" />
+
+                        <TextView
+                            android:id="@+id/stageBuildText"
+                            style="@style/StageLineText"
+                            android:text="3. 编译打包：等待" />
+
+                        <TextView
+                            android:id="@+id/stageDeliverText"
+                            style="@style/StageLineText"
+                            android:text="4. 交付下载：等待" />
+                    </LinearLayout>
 
                     <TextView
-                        android:id="@+id/stagePlanText"
-                        style="@style/StageLineText"
-                        android:text="1. 需求分析：等待" />
+                        android:id="@+id/projectWorkflowText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@color/elon_surface_card"
+                        android:lineSpacingExtra="4dp"
+                        android:minHeight="112dp"
+                        android:padding="18dp"
+                        android:text="通用项目工作流\n1. 准备 Git 和权限\n2. 读取项目文档\n3. 修改和验证\n4. 提交推送\n5. 合并发布串行保护"
+                        android:textColor="@color/elon_text_secondary"
+                        android:textSize="13sp" />
+
+                    <GridLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@color/elon_surface_card"
+                        android:columnCount="2"
+                        android:padding="12dp">
+
+                        <TextView
+                            android:id="@+id/projectContinueButton"
+                            style="@style/ProjectActionButton"
+                            android:text="继续开发" />
+
+                        <TextView
+                            android:id="@+id/projectBuildButton"
+                            style="@style/ProjectActionButton"
+                            android:text="生成 APK" />
+
+                        <TextView
+                            android:id="@+id/projectRecordButton"
+                            style="@style/ProjectActionButton"
+                            android:text="进度记录" />
+
+                        <TextView
+                            android:id="@+id/projectGitButton"
+                            style="@style/ProjectActionButton"
+                            android:text="Git 仓库" />
+
+                        <TextView
+                            android:id="@+id/projectSettingsButton"
+                            style="@style/ProjectActionButton"
+                            android:text="模型设置" />
+                    </GridLayout>
 
                     <TextView
-                        android:id="@+id/stageCodeText"
-                        style="@style/StageLineText"
-                        android:text="2. 开发实现：等待" />
-
-                    <TextView
-                        android:id="@+id/stageBuildText"
-                        style="@style/StageLineText"
-                        android:text="3. 编译打包：等待" />
-
-                    <TextView
-                        android:id="@+id/stageDeliverText"
-                        style="@style/StageLineText"
-                        android:text="4. 交付下载：等待" />
+                        android:id="@+id/projectHistoryText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="@color/elon_surface_card"
+                        android:lineSpacingExtra="5dp"
+                        android:minHeight="220dp"
+                        android:padding="22dp"
+                        android:text="暂无进度记录"
+                        android:textColor="@color/elon_text_secondary"
+                        android:textSize="13sp" />
                 </LinearLayout>
-
-                <TextView
-                    android:id="@+id/projectWorkflowText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
-                    android:lineSpacingExtra="4dp"
-                    android:minHeight="112dp"
-                    android:padding="18dp"
-                    android:text="通用项目工作流\n1. 准备 Git 和权限\n2. 读取项目文档\n3. 修改和验证\n4. 提交推送\n5. 合并发布串行保护"
-                    android:textColor="@color/elon_text_secondary"
-                    android:textSize="13sp" />
-
-                <GridLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
-                    android:columnCount="2"
-                    android:padding="12dp">
-
-                    <TextView
-                        android:id="@+id/projectContinueButton"
-                        style="@style/ProjectActionButton"
-                        android:text="继续开发" />
-
-                    <TextView
-                        android:id="@+id/projectBuildButton"
-                        style="@style/ProjectActionButton"
-                        android:text="生成 APK" />
-
-                    <TextView
-                        android:id="@+id/projectRecordButton"
-                        style="@style/ProjectActionButton"
-                        android:text="进度记录" />
-
-                    <TextView
-                        android:id="@+id/projectGitButton"
-                        style="@style/ProjectActionButton"
-                        android:text="Git 仓库" />
-
-                    <TextView
-                        android:id="@+id/projectSettingsButton"
-                        style="@style/ProjectActionButton"
-                        android:text="模型设置" />
-                </GridLayout>
-
-                <TextView
-                    android:id="@+id/projectHistoryText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@color/elon_surface_card"
-                    android:lineSpacingExtra="5dp"
-                    android:minHeight="220dp"
-                    android:padding="22dp"
-                    android:text="暂无进度记录"
-                    android:textColor="@color/elon_text_secondary"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </ScrollView>
+            </ScrollView>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
         <LinearLayout
             android:id="@+id/projectSpaceFeedActionsOverlay"

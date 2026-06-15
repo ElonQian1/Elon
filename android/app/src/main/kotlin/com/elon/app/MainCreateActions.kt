@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
@@ -33,7 +34,7 @@ internal class MainCreateActions(
     private val registerTaskWorkReceiver: () -> Unit,
     private val restorePendingActiveWork: () -> Unit,
     private val checkAndOfferGuestImport: () -> Unit,
-    private val syncProjectsFromServer: () -> Unit,
+    private val syncProjectsFromServer: (((Boolean) -> Unit)?) -> Unit,
     private val getWaitingForReply: () -> Boolean,
     private val getBackendConnected: () -> Boolean,
     private val isActiveConversationWorking: () -> Boolean,
@@ -61,7 +62,8 @@ internal class MainCreateActions(
         registerTaskWorkReceiver()
         restorePendingActiveWork()
         checkAndOfferGuestImport()
-        syncProjectsFromServer()
+        setupProjectPullRefresh()
+        syncProjectsFromServer(null)
         startTaskWorkService(
             if (getWaitingForReply()) TaskWorkService.ACTION_RESUME_PENDING else TaskWorkService.ACTION_CONNECT
         )
@@ -87,6 +89,26 @@ internal class MainCreateActions(
                 openConversation(0)
             } else {
                 startTaskWorkService(TaskWorkService.ACTION_CONNECT)
+            }
+        }
+    }
+
+    private fun setupProjectPullRefresh() {
+        binding.projectPage.setColorSchemeResources(R.color.elon_button_primary_bg)
+        binding.projectPage.setProgressBackgroundColorSchemeResource(R.color.elon_surface_card)
+        binding.projectPage.setOnRefreshListener {
+            if (!AuthManager.isLoggedIn(activity)) {
+                binding.projectPage.isRefreshing = false
+                Toast.makeText(activity, "请先登录后同步项目", Toast.LENGTH_SHORT).show()
+                return@setOnRefreshListener
+            }
+            syncProjectsFromServer { ok ->
+                binding.projectPage.isRefreshing = false
+                Toast.makeText(
+                    activity,
+                    if (ok) "项目已刷新" else "刷新失败，请稍后再试",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }

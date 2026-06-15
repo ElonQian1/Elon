@@ -29,8 +29,11 @@ internal class MainAccountActions(
      * - 手机控制/聊天记忆归到个人项目，只保留系统身份和受限操作。
      * - 同步拉取服务器头像并写入本地（仅当本地头像为空时）。
      */
-    fun syncProjectsFromServer() {
-        if (!AuthManager.isLoggedIn(activity)) return
+    fun syncProjectsFromServer(onComplete: ((Boolean) -> Unit)? = null) {
+        if (!AuthManager.isLoggedIn(activity)) {
+            onComplete?.invoke(false)
+            return
+        }
         thread(name = "sync-my-projects") {
             try {
                 val archive = fetchMyProjectArchive(http, serverUrl, activity)
@@ -48,17 +51,22 @@ internal class MainAccountActions(
                         renderProjectList()
                     }
                 }
-                // 头像恢复：本地无头像时从服务器拉取
-                val localAvatar = UserProfileStore.load(activity).avatarDataUrl
-                if (localAvatar.isNullOrBlank()) {
-                    val serverAvatar = fetchMyAvatarDataUrl(http, serverUrl, activity)
-                    if (!serverAvatar.isNullOrBlank()) {
-                        UserProfileStore.saveAvatar(activity, serverAvatar)
-                        activity.runOnUiThread { refreshProfileSummary() }
+                onComplete?.let { activity.runOnUiThread { it(true) } }
+
+                runCatching {
+                    // 头像恢复：本地无头像时从服务器拉取
+                    val localAvatar = UserProfileStore.load(activity).avatarDataUrl
+                    if (localAvatar.isNullOrBlank()) {
+                        val serverAvatar = fetchMyAvatarDataUrl(http, serverUrl, activity)
+                        if (!serverAvatar.isNullOrBlank()) {
+                            UserProfileStore.saveAvatar(activity, serverAvatar)
+                            activity.runOnUiThread { refreshProfileSummary() }
+                        }
                     }
                 }
             } catch (_: Throwable) {
                 // 网络不可用时静默失败，不影响正常使用
+                onComplete?.let { activity.runOnUiThread { it(false) } }
             }
         }
     }
