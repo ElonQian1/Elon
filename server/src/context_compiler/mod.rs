@@ -90,6 +90,13 @@ mod symbol_index_patch_repair_attempt;
 mod symbol_index_patch_repair_generate;
 #[cfg(test)]
 mod symbol_index_patch_repair_generate_tests;
+mod symbol_index_patch_review;
+mod symbol_index_patch_review_analysis;
+mod symbol_index_patch_review_findings;
+mod symbol_index_patch_review_render;
+#[cfg(test)]
+mod symbol_index_patch_review_tests;
+mod symbol_index_patch_review_types;
 mod symbol_index_patch_verification;
 mod symbol_index_patch_verification_repair;
 mod symbol_index_patch_verification_run;

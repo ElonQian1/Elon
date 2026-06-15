@@ -15,6 +15,7 @@ use super::{
     symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
     symbol_index_patch_repair_attempt::build_symbol_patch_repair_attempt_response,
     symbol_index_patch_repair_generate::generate_symbol_patch_repair as run_symbol_patch_repair_generation,
+    symbol_index_patch_review::build_symbol_patch_review,
     symbol_index_patch_verification_repair::{
         PatchVerificationCommandResultInput, build_symbol_patch_verification_repair_response,
     },
@@ -282,6 +283,43 @@ pub(crate) async fn generate_symbol_patch_repair(
             {
                 Ok(result) => Json(result).into_response(),
                 Err(error) => json_error(StatusCode::BAD_GATEWAY, &error),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn review_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let generation = response.patch_generation.clone();
+            let plan = response.patch_plan.clone();
+            let diff = parts.diff;
+            match tokio::task::spawn_blocking(move || {
+                let verification =
+                    run_symbol_patch_verification_flow(&generation, &diff, &workspace);
+                build_symbol_patch_review(&plan, &generation, &diff, Some(&verification))
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
             }
         }
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
