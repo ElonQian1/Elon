@@ -31,6 +31,10 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
+    symbol_index_vector::{
+        backfill_latest_symbol_vectors, search_latest_symbol_vectors, SymbolVectorBackfill,
+        SymbolVectorSearchQuery,
+    },
 };
 
 #[derive(Debug, Deserialize)]
@@ -106,6 +110,10 @@ pub(crate) struct SymbolTaskPackParams {
     pub(crate) search_limit: Option<usize>,
     #[serde(alias = "chunkLimit")]
     pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
     #[serde(alias = "maxChars")]
@@ -133,6 +141,28 @@ pub(crate) struct SymbolEmbeddingStatusParams {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SymbolVectorBackfillBody {
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) limit: Option<usize>,
+    pub(crate) force: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolVectorSearchParams {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "chunkType")]
+    pub(crate) chunk_type: Option<String>,
+    pub(crate) limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SymbolRetrievalEvalParams {
     pub(crate) q: Option<String>,
     pub(crate) query: Option<String>,
@@ -145,6 +175,10 @@ pub(crate) struct SymbolRetrievalEvalParams {
     pub(crate) symbol_limit: Option<usize>,
     #[serde(alias = "chunkLimit")]
     pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
     pub(crate) depth: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
@@ -163,6 +197,10 @@ pub(crate) struct SymbolRetrievalEvalBatchBody {
     pub(crate) symbol_limit: Option<usize>,
     #[serde(alias = "chunkLimit")]
     pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
     pub(crate) depth: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
@@ -182,6 +220,10 @@ pub(crate) struct SymbolRetrievalEvalCaseBody {
     pub(crate) symbol_limit: Option<usize>,
     #[serde(alias = "chunkLimit")]
     pub(crate) chunk_limit: Option<usize>,
+    #[serde(alias = "vectorModel")]
+    pub(crate) vector_model: Option<String>,
+    #[serde(alias = "vectorLimit")]
+    pub(crate) vector_limit: Option<usize>,
     pub(crate) depth: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
@@ -279,6 +321,8 @@ impl SymbolTaskPackParams {
             depth: self.depth.unwrap_or_default(),
             search_limit: self.search_limit.unwrap_or_default(),
             chunk_limit: self.chunk_limit.unwrap_or_default(),
+            vector_model: clean(self.vector_model),
+            vector_limit: self.vector_limit.unwrap_or_default(),
             impact_limit: self.impact_limit.unwrap_or_default(),
             max_chars: self.max_chars.unwrap_or_default(),
         })
@@ -307,6 +351,34 @@ impl SymbolEmbeddingStatusParams {
     }
 }
 
+impl SymbolVectorBackfillBody {
+    fn into_query(self) -> SymbolVectorBackfill {
+        SymbolVectorBackfill {
+            trace_id: clean(self.trace_id),
+            model: clean(self.model),
+            limit: self.limit.unwrap_or_default(),
+            force: self.force.unwrap_or(false),
+        }
+    }
+}
+
+impl SymbolVectorSearchParams {
+    fn into_query(self) -> Result<SymbolVectorSearchQuery, String> {
+        let text = clean(self.q).or_else(|| clean(self.query));
+        if text.is_none() {
+            return Err("q 不能为空".to_string());
+        }
+        Ok(SymbolVectorSearchQuery {
+            trace_id: clean(self.trace_id),
+            text,
+            model: clean(self.model),
+            path: clean(self.path),
+            chunk_type: clean(self.chunk_type),
+            limit: self.limit.unwrap_or_default(),
+        })
+    }
+}
+
 impl SymbolRetrievalEvalParams {
     fn into_query(self) -> Result<RetrievalEvalQuery, String> {
         let text = clean(self.q).or_else(|| clean(self.query));
@@ -317,9 +389,11 @@ impl SymbolRetrievalEvalParams {
             trace_id: clean(self.trace_id),
             text,
             must_include: split_must_include(self.must_include.as_deref()),
+            vector_model: clean(self.vector_model),
             k: self.k.unwrap_or_default(),
             symbol_limit: self.symbol_limit.unwrap_or_default(),
             chunk_limit: self.chunk_limit.unwrap_or_default(),
+            vector_limit: self.vector_limit.unwrap_or_default(),
             depth: self.depth.unwrap_or_default(),
             impact_limit: self.impact_limit.unwrap_or_default(),
         })
@@ -339,6 +413,8 @@ impl SymbolRetrievalEvalBatchBody {
         let batch_k = self.k.unwrap_or_default();
         let batch_symbol_limit = self.symbol_limit.unwrap_or_default();
         let batch_chunk_limit = self.chunk_limit.unwrap_or_default();
+        let batch_vector_model = clean(self.vector_model);
+        let batch_vector_limit = self.vector_limit.unwrap_or_default();
         let batch_depth = self.depth.unwrap_or_default();
         let batch_impact_limit = self.impact_limit.unwrap_or_default();
         let cases = self
@@ -356,9 +432,12 @@ impl SymbolRetrievalEvalBatchBody {
                         trace_id: clean(case.trace_id).or_else(|| trace_id.clone()),
                         text: Some(text),
                         must_include: parse_must_include_value(&case.must_include),
+                        vector_model: clean(case.vector_model)
+                            .or_else(|| batch_vector_model.clone()),
                         k: case.k.unwrap_or(batch_k),
                         symbol_limit: case.symbol_limit.unwrap_or(batch_symbol_limit),
                         chunk_limit: case.chunk_limit.unwrap_or(batch_chunk_limit),
+                        vector_limit: case.vector_limit.unwrap_or(batch_vector_limit),
                         depth: case.depth.unwrap_or(batch_depth),
                         impact_limit: case.impact_limit.unwrap_or(batch_impact_limit),
                     },
@@ -541,6 +620,41 @@ pub(crate) async fn get_symbol_embedding_status(
     }
 
     match load_latest_symbol_embedding_status(&state.data_dir, &params.into_query()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn backfill_symbol_vectors(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolVectorBackfillBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    match backfill_latest_symbol_vectors(&state.data_dir, &body.into_query()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn search_symbol_vectors(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolVectorSearchParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let query = match params.into_query() {
+        Ok(query) => query,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match search_latest_symbol_vectors(&state.data_dir, &query) {
         Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }

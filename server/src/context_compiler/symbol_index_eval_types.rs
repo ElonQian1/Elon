@@ -16,9 +16,11 @@ pub(crate) struct SymbolRetrievalEvalQuery {
     pub(crate) trace_id: Option<String>,
     pub(crate) text: Option<String>,
     pub(crate) must_include: Vec<String>,
+    pub(crate) vector_model: Option<String>,
     pub(crate) k: usize,
     pub(crate) symbol_limit: usize,
     pub(crate) chunk_limit: usize,
+    pub(crate) vector_limit: usize,
     pub(crate) depth: usize,
     pub(crate) impact_limit: usize,
 }
@@ -70,6 +72,14 @@ impl SymbolRetrievalEvalQuery {
             DEFAULT_EVAL_CHUNK_LIMIT
         } else {
             self.chunk_limit.min(MAX_EVAL_CHUNK_LIMIT)
+        }
+    }
+
+    pub(crate) fn vector_limit(&self) -> usize {
+        if self.vector_limit == 0 {
+            DEFAULT_EVAL_CHUNK_LIMIT
+        } else {
+            self.vector_limit.min(MAX_EVAL_CHUNK_LIMIT)
         }
     }
 
@@ -192,6 +202,8 @@ pub(crate) struct SymbolRetrievalEvalQueryEcho {
     pub(crate) k: usize,
     pub(crate) symbol_limit: usize,
     pub(crate) chunk_limit: usize,
+    pub(crate) vector_model: Option<String>,
+    pub(crate) vector_limit: usize,
     pub(crate) depth: usize,
     pub(crate) impact_limit: usize,
 }
@@ -207,6 +219,7 @@ pub(crate) struct SymbolRetrievalEvalMetrics {
     pub(crate) top_k_candidate_count: usize,
     pub(crate) symbol_candidate_count: usize,
     pub(crate) chunk_candidate_count: usize,
+    pub(crate) vector_candidate_count: usize,
     pub(crate) graph_candidate_count: usize,
     pub(crate) test_candidate_count_at_k: usize,
     pub(crate) total_token_count_at_k: usize,

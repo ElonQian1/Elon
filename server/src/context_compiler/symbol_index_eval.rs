@@ -16,6 +16,7 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
+    symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
 };
 
 pub(crate) use super::symbol_index_eval_types::SymbolRetrievalEvalQuery as RetrievalEvalQuery;
@@ -67,8 +68,24 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
     )
     .map(|response| response.chunks)
     .unwrap_or_default();
+    let vector_hits = if let Some(vector_model) = clean_filter(query.vector_model.as_deref()) {
+        search_latest_symbol_vectors(
+            data_dir,
+            &SymbolVectorSearchQuery {
+                trace_id: query.trace_id.clone(),
+                text: Some(text.clone()),
+                model: Some(vector_model),
+                limit: query.vector_limit(),
+                ..Default::default()
+            },
+        )
+        .map(|response| response.chunks)
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
-    if symbol_response.symbols.is_empty() && chunk_hits.is_empty() {
+    if symbol_response.symbols.is_empty() && chunk_hits.is_empty() && vector_hits.is_empty() {
         bail!("没有找到可评测的符号或全文 chunk");
     }
 
@@ -87,7 +104,12 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
     });
 
     let requirements = clean_requirements(&query.must_include);
-    let drafts = collect_candidates(&symbol_response.symbols, &chunk_hits, impact.as_ref());
+    let drafts = collect_candidates(
+        &symbol_response.symbols,
+        &chunk_hits,
+        &vector_hits,
+        impact.as_ref(),
+    );
     let candidates = rank_candidates(drafts, &requirements);
     let top_k = candidates.iter().take(query.k()).collect::<Vec<_>>();
     let missing_requirements = missing_requirements(&requirements, &top_k);
@@ -102,6 +124,8 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             k: query.k(),
             symbol_limit: query.symbol_limit(),
             chunk_limit: query.chunk_limit(),
+            vector_model: query.vector_model.clone(),
+            vector_limit: query.vector_limit(),
             depth: impact
                 .as_ref()
                 .map(|impact| impact.query.depth)
@@ -118,6 +142,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
 fn collect_candidates(
     symbols: &[SymbolHit],
     chunks: &[super::symbol_index_chunks::SymbolChunkHit],
+    vector_hits: &[super::symbol_index_vector_types::SymbolVectorHit],
     impact: Option<&super::symbol_index_impact_types::SymbolImpactResponse>,
 ) -> Vec<CandidateDraft> {
     let mut candidates = Vec::new();
@@ -137,6 +162,23 @@ fn collect_candidates(
             start_line: chunk.start_line,
             end_line: chunk.end_line,
             score: 800.0 + chunk.score - index as f64,
+            token_count: chunk.token_count,
+            is_test_context: chunk.chunk_type == "test" || looks_like_test(&chunk.file_path),
+        });
+    }
+    for (index, chunk) in vector_hits.iter().enumerate() {
+        candidates.push(CandidateDraft {
+            source: "vector",
+            id: format!("vector:{}", chunk.id),
+            label: chunk
+                .qualified_name
+                .clone()
+                .unwrap_or_else(|| chunk.id.clone()),
+            file_path: chunk.file_path.clone(),
+            symbol_id: chunk.symbol_id.clone(),
+            start_line: chunk.start_line,
+            end_line: chunk.end_line,
+            score: 760.0 + (chunk.score * 100.0) - index as f64,
             token_count: chunk.token_count,
             is_test_context: chunk.chunk_type == "test" || looks_like_test(&chunk.file_path),
         });
@@ -287,6 +329,10 @@ fn build_metrics(
             .iter()
             .filter(|candidate| candidate.source == "full_text")
             .count(),
+        vector_candidate_count: candidates
+            .iter()
+            .filter(|candidate| candidate.source == "vector")
+            .count(),
         graph_candidate_count: candidates
             .iter()
             .filter(|candidate| candidate.source.starts_with("graph_"))
@@ -396,6 +442,13 @@ fn clean_requirements(requirements: &[String]) -> Vec<String> {
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect()
+}
+
+fn clean_filter(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn looks_like_test(path: &str) -> bool {

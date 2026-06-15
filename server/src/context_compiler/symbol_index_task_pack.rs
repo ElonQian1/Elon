@@ -10,6 +10,8 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
+    symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
+    symbol_index_vector_types::SymbolVectorHit,
 };
 
 const DEFAULT_TASK_SEARCH_LIMIT: usize = 8;
@@ -27,6 +29,8 @@ pub(crate) struct SymbolTaskPackQuery {
     pub(crate) depth: usize,
     pub(crate) search_limit: usize,
     pub(crate) chunk_limit: usize,
+    pub(crate) vector_model: Option<String>,
+    pub(crate) vector_limit: usize,
     pub(crate) impact_limit: usize,
     pub(crate) max_chars: usize,
 }
@@ -42,6 +46,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) truncated: bool,
     pub(crate) candidate_symbols: Vec<SymbolHit>,
     pub(crate) text_chunks: Vec<SymbolChunkHit>,
+    pub(crate) vector_chunks: Vec<SymbolVectorHit>,
     pub(crate) chosen_seed: SymbolHit,
     pub(crate) impacted_symbol_count: usize,
     pub(crate) impacted_file_count: usize,
@@ -60,6 +65,8 @@ pub(crate) struct SymbolTaskPackQueryEcho {
     pub(crate) depth: usize,
     pub(crate) search_limit: usize,
     pub(crate) chunk_limit: usize,
+    pub(crate) vector_model: Option<String>,
+    pub(crate) vector_limit: usize,
     pub(crate) impact_limit: usize,
     pub(crate) max_chars: usize,
 }
@@ -97,6 +104,23 @@ pub(crate) fn build_latest_symbol_task_pack(
     )
     .map(|response| response.chunks)
     .unwrap_or_default();
+    let vector_chunks = if let Some(vector_model) = clean_filter(query.vector_model.as_deref()) {
+        search_latest_symbol_vectors(
+            data_dir,
+            &SymbolVectorSearchQuery {
+                trace_id: query.trace_id.clone(),
+                text: Some(text.clone()),
+                model: Some(vector_model),
+                path: query.path.clone(),
+                limit: vector_limit(query.vector_limit),
+                ..Default::default()
+            },
+        )
+        .map(|response| response.chunks)
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let Some(chosen_seed) = search_response.symbols.first().cloned() else {
         bail!("没有找到与任务相关的符号");
     };
@@ -116,6 +140,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         &text,
         &candidate_symbols,
         &text_chunks,
+        &vector_chunks,
         &chosen_seed,
         &impact_pack.pack,
     );
@@ -133,6 +158,8 @@ pub(crate) fn build_latest_symbol_task_pack(
             depth: impact_pack.query.depth,
             search_limit: search_limit(query.search_limit),
             chunk_limit: chunk_limit(query.chunk_limit),
+            vector_model: query.vector_model.clone(),
+            vector_limit: vector_limit(query.vector_limit),
             impact_limit: impact_pack.query.limit,
             max_chars: normalize_pack_max_chars(query.max_chars),
         },
@@ -142,6 +169,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         truncated: truncated || impact_pack.truncated,
         candidate_symbols,
         text_chunks,
+        vector_chunks,
         chosen_seed,
         impacted_symbol_count: impact_pack.impacted_symbol_count,
         impacted_file_count: impact_pack.impacted_file_count,
@@ -154,6 +182,7 @@ fn render_task_pack(
     task: &str,
     candidates: &[SymbolHit],
     text_chunks: &[SymbolChunkHit],
+    vector_chunks: &[SymbolVectorHit],
     chosen_seed: &SymbolHit,
     impact_pack: &str,
 ) -> String {
@@ -202,6 +231,25 @@ fn render_task_pack(
         }
     }
     out.push_str("</full_text_chunks>\n");
+    out.push_str(&format!(
+        "<vector_chunks count=\"{}\">\n",
+        vector_chunks.len()
+    ));
+    for chunk in vector_chunks.iter().take(20) {
+        out.push_str(&format!(
+            "- `{}` type={} path={}:{} score={:.4} matched={}\n",
+            xml_escape(chunk.qualified_name.as_deref().unwrap_or(chunk.id.as_str())),
+            xml_escape(&chunk.chunk_type),
+            xml_escape(&chunk.file_path),
+            chunk.start_line.unwrap_or_default(),
+            chunk.score,
+            xml_escape(&chunk.matched_terms.join(","))
+        ));
+        if let Some(summary) = chunk.summary.as_deref() {
+            out.push_str(&format!("  summary: {}\n", xml_escape(summary)));
+        }
+    }
+    out.push_str("</vector_chunks>\n");
     out.push_str(impact_pack);
     out.push_str("<task_pack_usage>\n");
     out.push_str("- Start by reading the chosen_seed file and the highest-ranked impacted files before editing.\n");
@@ -228,6 +276,17 @@ fn chunk_limit(limit: usize) -> usize {
     } else {
         limit.min(MAX_TASK_CHUNK_LIMIT)
     }
+}
+
+fn vector_limit(limit: usize) -> usize {
+    chunk_limit(limit)
+}
+
+fn clean_filter(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn truncate_pack(pack: String, max_chars: usize) -> (String, bool) {

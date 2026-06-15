@@ -532,6 +532,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(context_compiler::symbol_index_api::get_symbol_embedding_status),
         )
         .route(
+            "/api/admin/context/symbol-index/vector-backfill",
+            post(context_compiler::symbol_index_api::backfill_symbol_vectors),
+        )
+        .route(
+            "/api/admin/context/symbol-index/vector-search",
+            get(context_compiler::symbol_index_api::search_symbol_vectors),
+        )
+        .route(
             "/api/admin/context/symbol-index/eval",
             get(context_compiler::symbol_index_api::eval_symbol_retrieval),
         )

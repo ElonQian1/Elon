@@ -74,6 +74,8 @@ mod symbol_index_store;
 mod symbol_index_task_pack;
 #[cfg(test)]
 mod symbol_index_tests;
+mod symbol_index_vector;
+mod symbol_index_vector_types;
 mod task_context_exports;
 #[cfg(test)]
 mod task_context_exports_tests;

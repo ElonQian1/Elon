@@ -26,6 +26,11 @@ use super::{
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
+    symbol_index_vector::{
+        backfill_symbol_vectors_db, search_symbol_vectors_db, SymbolVectorBackfill,
+        SymbolVectorSearchQuery,
+    },
+    symbol_index_vector_types::LOCAL_HASH_VECTOR_MODEL,
 };
 
 #[test]
@@ -336,18 +341,27 @@ fn impact_pack_renders_model_friendly_context_and_truncates() {
 #[test]
 fn task_pack_searches_task_and_expands_top_symbol_impact() {
     let dir = temp_dir("elon_symbol_task_pack");
-    let _db = write_bundle(
+    let db = write_bundle(
         &dir,
         "20260614",
         "213012-trace-task-pack-user",
         sample_index(),
     );
+    backfill_symbol_vectors_db(
+        &db,
+        &SymbolVectorBackfill {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
 
     let response = build_latest_symbol_task_pack(
         &dir,
         &SymbolTaskPackQuery {
             text: Some("build context pack".to_string()),
             path: Some("context_pack.rs".to_string()),
+            vector_model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
             depth: 1,
             search_limit: 5,
             impact_limit: 20,
@@ -365,12 +379,17 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     assert!(response.pack.contains("<symbol_task_context"));
     assert!(response.pack.contains("<candidate_symbols"));
     assert!(response.pack.contains("<full_text_chunks"));
+    assert!(response.pack.contains("<vector_chunks"));
     assert!(response.pack.contains("<symbol_impact_context"));
     assert!(response.pack.contains("build_context_pack_test"));
     assert!(response
         .text_chunks
         .iter()
         .any(|chunk| chunk.chunk_type == "symbol" && chunk.id.contains("build_context_pack")));
+    assert!(response
+        .vector_chunks
+        .iter()
+        .any(|chunk| chunk.id.contains("build_context_pack")));
     assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
@@ -501,6 +520,73 @@ fn embedding_status_reports_missing_and_stale_chunks() {
 }
 
 #[test]
+fn vector_backfill_searches_embedded_chunks_and_updates_status() {
+    let dir = temp_dir("elon_symbol_vector_search");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213014-trace-vector-search-user",
+        sample_index(),
+    );
+
+    let backfill = backfill_symbol_vectors_db(
+        &db,
+        &SymbolVectorBackfill {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(backfill.model, LOCAL_HASH_VECTOR_MODEL);
+    assert_eq!(backfill.dim, 256);
+    assert!(backfill.upserted_count >= 5);
+    assert_eq!(backfill.skipped_count, 0);
+
+    let status = load_symbol_embedding_status_db(
+        &db,
+        &SymbolEmbeddingStatus {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            limit: 5,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(status.totals.embedded_count, status.totals.chunk_count);
+    assert_eq!(status.totals.missing_count, 0);
+    assert_eq!(status.totals.stale_count, 0);
+
+    let search = search_symbol_vectors_db(
+        &db,
+        &SymbolVectorSearchQuery {
+            text: Some("build context pack".to_string()),
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            limit: 5,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(search.model, LOCAL_HASH_VECTOR_MODEL);
+    assert!(search
+        .chunks
+        .iter()
+        .any(|chunk| chunk.id.contains("build_context_pack")));
+    assert!(search.chunks.iter().all(|chunk| chunk.score > 0.0));
+
+    let second = backfill_symbol_vectors_db(
+        &db,
+        &SymbolVectorBackfill {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(second.upserted_count, 0);
+    assert_eq!(second.skipped_count, second.scanned_count);
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn eval_reports_recall_mrr_and_missing_context_requirements() {
     let dir = temp_dir("elon_symbol_eval");
     let _db = write_bundle(&dir, "20260614", "213014-trace-eval-user", sample_index());
@@ -541,6 +627,54 @@ fn eval_reports_recall_mrr_and_missing_context_requirements() {
         .candidates
         .iter()
         .any(|candidate| candidate.source.starts_with("graph_")));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn eval_merges_vector_candidates_when_model_is_requested() {
+    let dir = temp_dir("elon_symbol_eval_vector");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213014-trace-eval-vector-user",
+        sample_index(),
+    );
+    backfill_symbol_vectors_db(
+        &db,
+        &SymbolVectorBackfill {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let response = evaluate_latest_symbol_retrieval(
+        &dir,
+        &RetrievalEvalQuery {
+            text: Some("build context pack".to_string()),
+            must_include: vec!["build_context_pack".to_string()],
+            vector_model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            vector_limit: 10,
+            k: 10,
+            symbol_limit: 5,
+            chunk_limit: 10,
+            depth: 1,
+            impact_limit: 20,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(
+        response.query.vector_model.as_deref(),
+        Some(LOCAL_HASH_VECTOR_MODEL)
+    );
+    assert!(response.metrics.vector_candidate_count > 0);
+    assert!(response
+        .candidates
+        .iter()
+        .any(|candidate| candidate.source == "vector"));
 
     fs::remove_dir_all(dir).unwrap();
 }
