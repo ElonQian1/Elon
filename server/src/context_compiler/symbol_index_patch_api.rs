@@ -16,6 +16,7 @@ use super::{
     symbol_index_patch_verification_repair::{
         PatchVerificationCommandResultInput, build_symbol_patch_verification_repair_response,
     },
+    symbol_index_patch_verification_run::run_symbol_patch_verification as run_symbol_patch_verification_flow,
     symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
 };
 
@@ -144,6 +145,40 @@ pub(crate) async fn verify_symbol_patch(
                     &workspace,
                     &verification_results,
                 )
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn run_symbol_patch_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let generation = response.patch_generation.clone();
+            let diff = parts.diff;
+            match tokio::task::spawn_blocking(move || {
+                run_symbol_patch_verification_flow(&generation, &diff, &workspace)
             })
             .await
             {

@@ -588,6 +588,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(context_compiler::symbol_index_patch_api::verify_symbol_patch),
         )
         .route(
+            "/api/admin/context/symbol-index/patch-verify-run",
+            post(context_compiler::symbol_index_patch_api::run_symbol_patch_verification),
+        )
+        .route(
             "/api/user/:user_id/agent",
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )

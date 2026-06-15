@@ -11,7 +11,7 @@ use super::{
 const OUTPUT_EXCERPT_LIMIT: usize = 2_000;
 const DIFF_EXCERPT_LIMIT: usize = 4_000;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PatchVerificationCommandResultInput {
     pub(crate) command: String,

@@ -14,6 +14,8 @@ use super::{
         PatchVerificationCommandResultInput, PatchVerificationRepairStatus,
         build_patch_verification_repair_context,
     },
+    symbol_index_patch_verification_run::run_symbol_patch_verification,
+    symbol_index_patch_verification_run_types::PatchVerificationExecutionStatus,
     symbol_index_store::{SYMBOL_INDEX_DB_FILE, write_symbol_index_sqlite},
     symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
 };
@@ -446,6 +448,90 @@ fn verification_repair_context_does_not_prompt_when_all_commands_pass() {
     fs::remove_dir_all(workspace).unwrap();
 }
 
+#[test]
+fn verification_run_applies_patch_in_isolated_worktree_and_cleans_up() {
+    let (data_dir, workspace, mut response, diff, _dry_run) =
+        ready_patch_fixture("elon_symbol_patch_verify_run_pass", "213022");
+    response.patch_generation.apply_readiness.post_apply_checks = vec![
+        "git diff --check".to_string(),
+        "git status --short".to_string(),
+    ];
+    let original =
+        fs::read_to_string(workspace.join("server/src/context_compiler/context_pack.rs")).unwrap();
+
+    let result = run_symbol_patch_verification(&response.patch_generation, &diff, &workspace);
+
+    assert_eq!(
+        result.execution.status,
+        PatchVerificationExecutionStatus::Passed
+    );
+    assert!(result.execution.patch_applied);
+    assert!(result.execution.run_workspace_removed);
+    assert_eq!(result.execution.executed_commands.len(), 3);
+    assert!(result.execution.skipped_commands.is_empty());
+    assert_eq!(
+        result.verification_repair_context.status,
+        PatchVerificationRepairStatus::VerificationPassed
+    );
+    let run_workspace = result.execution.run_workspace.as_deref().unwrap();
+    assert!(!Path::new(run_workspace).exists());
+    let current =
+        fs::read_to_string(workspace.join("server/src/context_compiler/context_pack.rs")).unwrap();
+    assert_eq!(current, original, "source workspace must remain untouched");
+    assert_git_clean(&workspace);
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn verification_run_builds_repair_context_when_auto_command_fails() {
+    let (data_dir, workspace, mut response, diff, _dry_run) =
+        ready_patch_fixture("elon_symbol_patch_verify_run_fail", "213023");
+    response.patch_generation.apply_readiness.post_apply_checks =
+        vec!["cargo test demo_target".to_string()];
+
+    let result = run_symbol_patch_verification(&response.patch_generation, &diff, &workspace);
+
+    assert_eq!(
+        result.execution.status,
+        PatchVerificationExecutionStatus::VerificationFailed
+    );
+    assert!(result.execution.patch_applied);
+    assert!(result.execution.run_workspace_removed);
+    assert!(
+        result
+            .execution
+            .executed_commands
+            .iter()
+            .any(|command| command.command == "cargo test demo_target"
+                && command.exit_code != Some(0))
+    );
+    assert_eq!(
+        result.verification_repair_context.status,
+        PatchVerificationRepairStatus::ReadyForRepair
+    );
+    assert!(result.verification_repair_context.model_repair_required);
+    assert!(
+        result
+            .verification_repair_context
+            .failed_commands
+            .iter()
+            .any(|command| command.failure_kind == "targeted_tests_failed")
+    );
+    assert!(
+        result
+            .verification_repair_context
+            .retry_prompt
+            .as_deref()
+            .unwrap_or_default()
+            .contains("<patch_verification_repair_task>")
+    );
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
 fn patch_generation(data_dir: &Path) -> super::symbol_index_task_pack::SymbolTaskPackResponse {
     build_latest_symbol_task_pack(
         data_dir,
@@ -535,6 +621,20 @@ fn commit_workspace(workspace: &Path) {
     run_git(workspace, &["config", "user.name", "Test User"]);
     run_git(workspace, &["add", "."]);
     run_git(workspace, &["commit", "-m", "seed"]);
+}
+
+fn assert_git_clean(workspace: &Path) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(["status", "--short"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stdout).trim().is_empty(),
+        "source workspace should be clean after isolated verification"
+    );
 }
 
 fn run_git(workspace: &Path, args: &[&str]) {

@@ -117,6 +117,13 @@ fn classify_command(order: usize, command: &str, ready_to_apply: bool) -> PatchV
             "workspace_dirty_after_apply",
             "Inspect status and keep only files allowed by the patch plan.",
         )
+    } else if lower == "cargo fmt --check" {
+        (
+            "format",
+            120,
+            "format_failed",
+            "Collect rustfmt diagnostics and repair formatting within allowed_files.",
+        )
     } else if lower.starts_with("cargo test") {
         (
             "test",
@@ -164,6 +171,7 @@ fn is_safe_post_apply_command(lower: &str) -> bool {
     !has_shell_metachar(lower)
         && (lower == "git diff --check"
             || lower == "git status --short"
+            || lower == "cargo fmt --check"
             || lower.starts_with("cargo test")
             || lower.starts_with("cargo check")
             || lower.starts_with("cargo clippy"))
@@ -260,6 +268,11 @@ mod tests {
         assert_eq!(ready.category, "test");
         assert_eq!(ready.failure_kind, "targeted_tests_failed");
         assert!(ready.auto_runnable_after_apply);
+
+        let fmt = classify_command(1, "cargo fmt --check", true);
+        assert_eq!(fmt.category, "format");
+        assert_eq!(fmt.failure_kind, "format_failed");
+        assert!(fmt.auto_runnable_after_apply);
 
         let blocked = classify_command(1, "git diff --check", false);
         assert_eq!(blocked.category, "diff_hygiene");
