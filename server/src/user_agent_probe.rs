@@ -28,6 +28,17 @@ pub struct UserAgentProbeResult {
     pub model: String,
     pub latency_ms: u128,
     pub sample: String,
+    pub tool_call_ok: bool,
+    pub tool_call_name: Option<String>,
+    pub capability: String,
+    pub warning: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ToolProbeOutcome {
+    pub ok: bool,
+    pub tool_call_name: Option<String>,
+    pub warning: Option<String>,
 }
 
 pub(crate) fn normalize_api_base(value: &str) -> Option<String> {
@@ -128,13 +139,145 @@ pub(crate) async fn probe_openai_compatible_api(
         .await
         .map_err(|e| anyhow!("模型返回的 JSON 无法解析: {}", e))?;
     let sample = extract_sample(&value);
+    let tool_probe = probe_tool_call_support(client, cfg, &url).await;
+    let capability = if tool_probe.ok {
+        "tools_ok"
+    } else {
+        "chat_only"
+    };
 
     Ok(UserAgentProbeResult {
         api_base: cfg.api_base.clone(),
         model: cfg.model.clone(),
         latency_ms: started.elapsed().as_millis(),
         sample,
+        tool_call_ok: tool_probe.ok,
+        tool_call_name: tool_probe.tool_call_name,
+        capability: capability.to_string(),
+        warning: tool_probe.warning,
     })
+}
+
+async fn probe_tool_call_support(
+    client: &Client,
+    cfg: &UserAgentProbeConfig,
+    url: &str,
+) -> ToolProbeOutcome {
+    let body = json!({
+        "model": cfg.model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are checking OpenAI-compatible tool call support. Call the provided function exactly."
+            },
+            {
+                "role": "user",
+                "content": "Call the elon_probe tool with ok=true. Do not answer in text."
+            }
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_probe_name(),
+                    "description": "Capability probe only. It does not execute any real action.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "ok": {
+                                "type": "boolean",
+                                "description": "Set to true when the tool call protocol is supported."
+                            }
+                        },
+                        "required": ["ok"]
+                    }
+                }
+            }
+        ],
+        "tool_choice": {
+            "type": "function",
+            "function": {
+                "name": tool_probe_name()
+            }
+        },
+        "stream": false,
+        "temperature": 0,
+        "max_tokens": 32
+    });
+
+    let resp = match client
+        .post(url)
+        .bearer_auth(&cfg.api_key)
+        .json(&body)
+        .timeout(Duration::from_secs(tool_probe_timeout_secs()))
+        .send()
+        .await
+    {
+        Ok(resp) => resp,
+        Err(e) => {
+            let warning = if e.is_timeout() {
+                "普通聊天可用，但工具调用测试超时；作为 API Agent 时可能无法稳定读写文件或构建项目"
+                    .to_string()
+            } else {
+                format!(
+                    "普通聊天可用，但工具调用测试请求失败；作为 API Agent 时可能受限: {}",
+                    e
+                )
+            };
+            return ToolProbeOutcome::unsupported(None, warning);
+        }
+    };
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return ToolProbeOutcome::unsupported(
+            None,
+            format!(
+                "普通聊天可用，但工具调用未通过；作为 API Agent 时可能无法读写文件或构建项目: {}",
+                friendly_ai_api_error(status, &text)
+            ),
+        );
+    }
+
+    let value: Value = match resp.json().await {
+        Ok(value) => value,
+        Err(e) => {
+            return ToolProbeOutcome::unsupported(
+                None,
+                format!(
+                    "普通聊天可用，但工具调用返回的 JSON 无法解析；作为 API Agent 时可能受限: {}",
+                    e
+                ),
+            )
+        }
+    };
+
+    tool_probe_outcome_from_response(&value)
+}
+
+pub(crate) fn tool_probe_outcome_from_response(value: &Value) -> ToolProbeOutcome {
+    let tool_call_name = extract_tool_call_name(value);
+    match tool_call_name.as_deref() {
+        Some(name) if name == tool_probe_name() => ToolProbeOutcome {
+            ok: true,
+            tool_call_name,
+            warning: None,
+        },
+        Some(name) => ToolProbeOutcome::unsupported(
+            tool_call_name.clone(),
+            format!(
+                "普通聊天可用，但工具调用名称为 {}，不是预期的 {}；作为 API Agent 时可能不兼容",
+                name,
+                tool_probe_name()
+            ),
+        ),
+        None => ToolProbeOutcome::unsupported(
+            None,
+            "普通聊天可用，但模型没有返回工具调用；作为 API Agent 时可能无法读写文件或构建项目"
+                .into(),
+        ),
+    }
 }
 
 fn extract_sample(value: &Value) -> String {
@@ -145,11 +288,44 @@ fn extract_sample(value: &Value) -> String {
     text.trim().chars().take(80).collect()
 }
 
+fn extract_tool_call_name(value: &Value) -> Option<String> {
+    value["choices"][0]["message"]["tool_calls"]
+        .as_array()
+        .and_then(|calls| {
+            calls
+                .iter()
+                .find_map(|call| call["function"]["name"].as_str())
+        })
+        .or_else(|| value["choices"][0]["message"]["function_call"]["name"].as_str())
+        .map(ToOwned::to_owned)
+}
+
 fn probe_timeout_secs() -> u64 {
     std::env::var("AI_USER_API_PROBE_TIMEOUT_SECS")
         .ok()
         .and_then(|value| value.trim().parse().ok())
         .unwrap_or(20)
+}
+
+fn tool_probe_timeout_secs() -> u64 {
+    std::env::var("AI_USER_API_TOOL_PROBE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse().ok())
+        .unwrap_or_else(|| probe_timeout_secs().clamp(3, 12))
+}
+
+fn tool_probe_name() -> &'static str {
+    "elon_probe"
+}
+
+impl ToolProbeOutcome {
+    fn unsupported(tool_call_name: Option<String>, warning: String) -> Self {
+        Self {
+            ok: false,
+            tool_call_name,
+            warning: Some(warning),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -186,5 +362,53 @@ mod tests {
         assert_eq!(cfg.api_base, "https://api.other.com/v1");
         assert_eq!(cfg.api_key, "sk-saved");
         assert_eq!(cfg.model, "new-model");
+    }
+
+    #[test]
+    fn tool_probe_detects_openai_tool_calls() {
+        let response = json!({
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {
+                                    "name": "elon_probe",
+                                    "arguments": "{\"ok\":true}"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        });
+
+        let outcome = tool_probe_outcome_from_response(&response);
+        assert!(outcome.ok);
+        assert_eq!(outcome.tool_call_name.as_deref(), Some("elon_probe"));
+        assert!(outcome.warning.is_none());
+    }
+
+    #[test]
+    fn tool_probe_warns_when_chat_response_has_no_tool_call() {
+        let response = json!({
+            "choices": [
+                {
+                    "message": {
+                        "content": "OK"
+                    }
+                }
+            ]
+        });
+
+        let outcome = tool_probe_outcome_from_response(&response);
+        assert!(!outcome.ok);
+        assert_eq!(outcome.tool_call_name, None);
+        assert!(outcome
+            .warning
+            .as_deref()
+            .unwrap_or_default()
+            .contains("没有返回工具调用"));
     }
 }

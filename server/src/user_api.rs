@@ -316,6 +316,10 @@ pub async fn test_user_agent(
             "model": result.model,
             "latency_ms": result.latency_ms,
             "sample": result.sample,
+            "tool_call_ok": result.tool_call_ok,
+            "tool_call_name": result.tool_call_name,
+            "capability": result.capability,
+            "warning": result.warning,
         }))
         .into_response(),
         Err(e) => (

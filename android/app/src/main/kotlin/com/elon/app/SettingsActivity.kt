@@ -313,7 +313,12 @@ class SettingsActivity : AppCompatActivity() {
                 if (resp.isSuccessful) {
                     val json = JSONObject(respBody)
                     val latency = json.optLong("latency_ms", 0)
-                    Toast.makeText(this@SettingsActivity, "连接成功（${latency}ms）", Toast.LENGTH_SHORT).show()
+                    val message = if (json.optBoolean("tool_call_ok", false)) {
+                        "连接成功（${latency}ms），支持工具调用"
+                    } else {
+                        "连接成功，但未通过工具调用测试，可能只能普通聊天"
+                    }
+                    Toast.makeText(this@SettingsActivity, message, Toast.LENGTH_LONG).show()
                 } else {
                     val msg = runCatching { JSONObject(respBody).getString("error") }.getOrDefault(respBody)
                     Toast.makeText(this@SettingsActivity, "测试失败: $msg", Toast.LENGTH_LONG).show()

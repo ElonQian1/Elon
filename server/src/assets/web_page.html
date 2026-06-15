@@ -4816,7 +4816,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
     const latency = data.latency_ms ? `（${data.latency_ms}ms）` : '';
-    setAgentMessage('连接成功：' + (data.model || payload.model) + latency, true);
+    const model = data.model || payload.model;
+    const capability = data.tool_call_ok
+      ? '，支持工具调用'
+      : '，但未通过工具调用测试：' + (data.warning || '可能只能普通聊天');
+    setAgentMessage('连接成功：' + model + latency + capability, true);
   }
   async function selectAgentOption(option) {
     if (!option || option.disabled || agentLoading) return;
