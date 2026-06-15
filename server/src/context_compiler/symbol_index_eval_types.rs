@@ -22,6 +22,19 @@ pub(crate) struct SymbolRetrievalEvalQuery {
     pub(crate) impact_limit: usize,
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SymbolRetrievalEvalBatchQuery {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) cases: Vec<SymbolRetrievalEvalBatchCaseQuery>,
+    pub(crate) record_runs: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SymbolRetrievalEvalBatchCaseQuery {
+    pub(crate) id: String,
+    pub(crate) query: SymbolRetrievalEvalQuery,
+}
+
 impl SymbolRetrievalEvalQuery {
     pub(crate) fn k(&self) -> usize {
         if self.k == 0 {
@@ -54,6 +67,45 @@ impl SymbolRetrievalEvalQuery {
             self.impact_limit
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalBatchResponse {
+    pub(crate) run_id: String,
+    pub(crate) trace_id: Option<String>,
+    pub(crate) db_path: Option<String>,
+    pub(crate) record_db_path: Option<String>,
+    pub(crate) recorded: bool,
+    pub(crate) record_error: Option<String>,
+    pub(crate) case_count: usize,
+    pub(crate) evaluated_count: usize,
+    pub(crate) failed_count: usize,
+    pub(crate) aggregate: SymbolRetrievalEvalBatchMetrics,
+    pub(crate) cases: Vec<SymbolRetrievalEvalBatchCaseResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalBatchMetrics {
+    pub(crate) requirement_count: usize,
+    pub(crate) hit_count_at_k: usize,
+    pub(crate) missing_requirement_count: usize,
+    pub(crate) mean_recall_at_k: f64,
+    pub(crate) mean_reciprocal_rank: f64,
+    pub(crate) has_test_context_rate: f64,
+    pub(crate) total_token_count_at_k: usize,
+    pub(crate) average_token_count_at_k: f64,
+    pub(crate) candidate_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalBatchCaseResponse {
+    pub(crate) id: String,
+    pub(crate) ok: bool,
+    pub(crate) error: Option<String>,
+    pub(crate) result: Option<SymbolRetrievalEvalResponse>,
 }
 
 #[derive(Debug, Clone, Serialize)]

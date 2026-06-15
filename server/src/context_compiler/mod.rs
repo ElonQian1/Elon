@@ -56,6 +56,7 @@ mod symbol_index_build;
 mod symbol_index_chunk_types;
 mod symbol_index_chunks;
 mod symbol_index_eval;
+mod symbol_index_eval_runs;
 mod symbol_index_eval_types;
 mod symbol_index_graph_query;
 mod symbol_index_impact_edges;

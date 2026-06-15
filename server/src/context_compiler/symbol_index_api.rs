@@ -7,12 +7,15 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
+use serde_json::Value;
 
 use crate::{admin, types::AppState};
 
 use super::{
     symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkSearch},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
+    symbol_index_eval_runs::evaluate_latest_symbol_retrieval_batch,
+    symbol_index_eval_types::{SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery},
     symbol_index_graph_query::{
         load_latest_symbol_graph, SymbolGraphQuery, SymbolRelationDirection,
     },
@@ -132,6 +135,43 @@ pub(crate) struct SymbolRetrievalEvalParams {
     pub(crate) impact_limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalEvalBatchBody {
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    #[serde(default)]
+    pub(crate) cases: Vec<SymbolRetrievalEvalCaseBody>,
+    #[serde(alias = "recordRuns")]
+    pub(crate) record_runs: Option<bool>,
+    pub(crate) k: Option<usize>,
+    #[serde(alias = "symbolLimit")]
+    pub(crate) symbol_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalEvalCaseBody {
+    pub(crate) id: Option<String>,
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    #[serde(default, alias = "mustInclude", alias = "must_include")]
+    pub(crate) must_include: Value,
+    pub(crate) k: Option<usize>,
+    #[serde(alias = "symbolLimit")]
+    pub(crate) symbol_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
+}
+
 impl SymbolIndexSearchParams {
     fn into_search(self) -> SymbolIndexSearch {
         SymbolIndexSearch {
@@ -241,6 +281,54 @@ impl SymbolRetrievalEvalParams {
             chunk_limit: self.chunk_limit.unwrap_or_default(),
             depth: self.depth.unwrap_or_default(),
             impact_limit: self.impact_limit.unwrap_or_default(),
+        })
+    }
+}
+
+impl SymbolRetrievalEvalBatchBody {
+    fn into_query(self) -> Result<SymbolRetrievalEvalBatchQuery, String> {
+        if self.cases.is_empty() {
+            return Err("cases 不能为空".to_string());
+        }
+        if self.cases.len() > 200 {
+            return Err("cases 最多支持 200 条".to_string());
+        }
+
+        let trace_id = clean(self.trace_id);
+        let batch_k = self.k.unwrap_or_default();
+        let batch_symbol_limit = self.symbol_limit.unwrap_or_default();
+        let batch_chunk_limit = self.chunk_limit.unwrap_or_default();
+        let batch_depth = self.depth.unwrap_or_default();
+        let batch_impact_limit = self.impact_limit.unwrap_or_default();
+        let cases = self
+            .cases
+            .into_iter()
+            .enumerate()
+            .map(|(index, case)| {
+                let text = clean(case.q).or_else(|| clean(case.query));
+                let Some(text) = text else {
+                    return Err(format!("cases[{}].q 不能为空", index));
+                };
+                Ok(SymbolRetrievalEvalBatchCaseQuery {
+                    id: clean(case.id).unwrap_or_else(|| format!("case-{}", index + 1)),
+                    query: RetrievalEvalQuery {
+                        trace_id: clean(case.trace_id).or_else(|| trace_id.clone()),
+                        text: Some(text),
+                        must_include: parse_must_include_value(&case.must_include),
+                        k: case.k.unwrap_or(batch_k),
+                        symbol_limit: case.symbol_limit.unwrap_or(batch_symbol_limit),
+                        chunk_limit: case.chunk_limit.unwrap_or(batch_chunk_limit),
+                        depth: case.depth.unwrap_or(batch_depth),
+                        impact_limit: case.impact_limit.unwrap_or(batch_impact_limit),
+                    },
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+
+        Ok(SymbolRetrievalEvalBatchQuery {
+            trace_id,
+            cases,
+            record_runs: self.record_runs.unwrap_or(true),
         })
     }
 }
@@ -401,10 +489,42 @@ pub(crate) async fn eval_symbol_retrieval(
     }
 }
 
+pub(crate) async fn eval_symbol_retrieval_batch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolRetrievalEvalBatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let query = match body.into_query() {
+        Ok(query) => query,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match evaluate_latest_symbol_retrieval_batch(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
 fn clean(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn parse_must_include_value(value: &Value) -> Vec<String> {
+    match value {
+        Value::String(text) => split_must_include(Some(text)),
+        Value::Array(items) => items
+            .iter()
+            .filter_map(|item| item.as_str())
+            .flat_map(|text| split_must_include(Some(text)))
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn split_must_include(value: Option<&str>) -> Vec<String> {

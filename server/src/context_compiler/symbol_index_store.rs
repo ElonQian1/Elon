@@ -41,7 +41,7 @@ pub(crate) fn write_symbol_index_sqlite(
 fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         r#"
-        PRAGMA user_version = 2;
+        PRAGMA user_version = 3;
 
         CREATE TABLE metadata (
             key TEXT PRIMARY KEY,
@@ -108,14 +108,32 @@ fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX idx_symbol_terms_symbol ON symbol_terms(symbol_id);
         "#,
     )?;
-    create_chunk_schema(conn)
+    create_chunk_schema(conn)?;
+    create_retrieval_runs_schema(conn)
+}
+
+pub(crate) fn create_retrieval_runs_schema(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS retrieval_runs (
+            id TEXT PRIMARY KEY,
+            query TEXT NOT NULL,
+            selected_chunks_json TEXT NOT NULL,
+            scores_json TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_retrieval_runs_created_at
+            ON retrieval_runs(created_at);
+        "#,
+    )
 }
 
 fn insert_metadata(tx: &Transaction<'_>, index: &SymbolIndex) -> rusqlite::Result<()> {
     let summary = index.lookup_summary();
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
-        params!["schema_version", "2"],
+        params!["schema_version", "3"],
     )?;
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",

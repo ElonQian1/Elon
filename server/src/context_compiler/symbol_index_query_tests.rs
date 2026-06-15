@@ -4,10 +4,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use rusqlite::Connection;
+
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{search_symbol_chunks_db, SymbolChunkSearch},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
+    symbol_index_eval_runs::evaluate_latest_symbol_retrieval_batch,
+    symbol_index_eval_types::{SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery},
     symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
@@ -383,7 +387,7 @@ fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
     assert!(response
         .metadata
         .get("schema_version")
-        .is_some_and(|version| version == "2"));
+        .is_some_and(|version| version == "3"));
     assert!(response
         .metadata
         .get("chunk_count")
@@ -453,6 +457,89 @@ fn eval_reports_recall_mrr_and_missing_context_requirements() {
         .iter()
         .any(|candidate| candidate.source.starts_with("graph_")));
 
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn eval_batch_aggregates_cases_and_records_retrieval_run() {
+    let dir = temp_dir("elon_symbol_eval_batch");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213015-trace-eval-batch-user",
+        sample_index(),
+    );
+
+    let response = evaluate_latest_symbol_retrieval_batch(
+        &dir,
+        &SymbolRetrievalEvalBatchQuery {
+            trace_id: Some("trace-eval-batch".to_string()),
+            record_runs: true,
+            cases: vec![
+                SymbolRetrievalEvalBatchCaseQuery {
+                    id: "context-pack".to_string(),
+                    query: RetrievalEvalQuery {
+                        text: Some("build context pack".to_string()),
+                        must_include: vec![
+                            "context_pack.rs".to_string(),
+                            "context_pack_tests.rs".to_string(),
+                            "build_context_pack".to_string(),
+                        ],
+                        k: 10,
+                        symbol_limit: 5,
+                        chunk_limit: 10,
+                        depth: 1,
+                        impact_limit: 20,
+                        ..Default::default()
+                    },
+                },
+                SymbolRetrievalEvalBatchCaseQuery {
+                    id: "compile-preflight".to_string(),
+                    query: RetrievalEvalQuery {
+                        text: Some("compile preflight".to_string()),
+                        must_include: vec![
+                            "mod.rs".to_string(),
+                            "compile_preflight_note".to_string(),
+                        ],
+                        k: 10,
+                        symbol_limit: 5,
+                        chunk_limit: 10,
+                        depth: 1,
+                        impact_limit: 20,
+                        ..Default::default()
+                    },
+                },
+            ],
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.case_count, 2);
+    assert_eq!(response.evaluated_count, 2);
+    assert_eq!(response.failed_count, 0);
+    assert!(response.recorded);
+    assert!(response.record_error.is_none());
+    assert_eq!(response.aggregate.requirement_count, 5);
+    assert_eq!(response.aggregate.mean_recall_at_k, 1.0);
+    assert!(response.aggregate.mean_reciprocal_rank > 0.0);
+    assert!(response.aggregate.has_test_context_rate > 0.0);
+    assert!(response
+        .cases
+        .iter()
+        .all(|case| case.ok && case.result.is_some()));
+
+    let conn = Connection::open(&db).unwrap();
+    let selected_chunks_json: String = conn
+        .query_row(
+            "SELECT selected_chunks_json FROM retrieval_runs WHERE id = ?1",
+            [response.run_id.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(selected_chunks_json.contains("build_context_pack"));
+    assert!(selected_chunks_json.contains("compile_preflight_note"));
+
+    drop(conn);
     fs::remove_dir_all(dir).unwrap();
 }
 
