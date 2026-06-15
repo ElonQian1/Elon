@@ -55,10 +55,10 @@ internal class ProjectManagementHomeView(
 
         val allProjects = personal + joint
         if (allProjects.isEmpty()) {
-            container.addView(createEmptyProjectCard(), cardLayoutParams(first = true))
+            container.addView(createEmptyProjectCard(), cardLayoutParams())
         } else {
-            allProjects.forEachIndexed { position, item ->
-                container.addView(createProjectCard(item), cardLayoutParams(first = position == 0))
+            allProjects.forEach { item ->
+                container.addView(createProjectCard(item), cardLayoutParams())
             }
         }
         container.addView(bottomSpacer())
@@ -275,14 +275,14 @@ internal class ProjectManagementHomeView(
         }
     }
 
-    private fun cardLayoutParams(first: Boolean): LinearLayout.LayoutParams {
+    private fun cardLayoutParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             marginStart = dp(16)
             marginEnd = dp(16)
-            topMargin = dp(if (first) 28 else 18)
+            topMargin = dp(8)
         }
     }
 

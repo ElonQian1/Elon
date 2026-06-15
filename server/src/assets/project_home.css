@@ -2,13 +2,13 @@
   min-height: 100%;
   background: #101010;
   color: #d6d6d6;
-  padding: 28px 16px 34px;
+  padding: 8px 16px 34px;
   box-sizing: border-box;
 }
 
 .project-home-list {
   display: grid;
-  gap: 18px;
+  gap: 8px;
 }
 
 .project-home-card,

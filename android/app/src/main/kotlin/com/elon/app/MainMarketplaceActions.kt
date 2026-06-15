@@ -143,14 +143,13 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(24)
+                topMargin = dp(12)
             }
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "搜索"
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                setTypeface(typeface, Typeface.BOLD)
             })
             addView(buildFilterScroller(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -254,12 +253,12 @@ internal class MainMarketplaceActions(
             container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
             return
         }
-        projects.forEachIndexed { index, project ->
-            container.addView(buildProjectCard(project, first = index == 0))
+        projects.forEach { project ->
+            container.addView(buildProjectCard(project))
         }
     }
 
-    private fun buildProjectCard(project: StoreProject, first: Boolean): LinearLayout {
+    private fun buildProjectCard(project: StoreProject): LinearLayout {
         val alreadyJoined = joinedIds.contains(project.id)
         val joinBtn = actionButton(projectJoinActionLabel(project.joinMode, alreadyJoined)).apply {
             setOnClickListener {
@@ -276,7 +275,7 @@ internal class MainMarketplaceActions(
             ).apply {
                 marginStart = dp(16)
                 marginEnd = dp(16)
-                topMargin = dp(if (first) 18 else 8)
+                topMargin = dp(8)
             }
             addView(createCardHeader(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
