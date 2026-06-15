@@ -475,6 +475,47 @@ fn task_pack_falls_back_to_text_chunk_path_when_symbol_search_misses() {
 }
 
 #[test]
+fn task_pack_uses_error_rank_profile_for_error_queries() {
+    let dir = temp_dir("elon_symbol_task_pack_error_profile");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-task-pack-error-profile-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("报错 symbol_count duplicate key".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            chunk_limit: 5,
+            impact_limit: 20,
+            max_chars: 12_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.ranking_profile.name, "error");
+    assert!(response.pack.contains("<ranking_profile name=\"error\""));
+    assert!(response.ranked_context.iter().any(|item| item
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("rank_profile=error"))));
+    assert_eq!(
+        response
+            .ranked_context
+            .first()
+            .map(|item| item.source.as_str()),
+        Some("full_text")
+    );
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
     let dir = temp_dir("elon_symbol_chunks");
     let db = write_bundle(&dir, "20260614", "213013-trace-chunks-user", sample_index());
@@ -710,6 +751,40 @@ fn eval_reports_recall_mrr_and_missing_context_requirements() {
         .candidates
         .iter()
         .any(|candidate| candidate.source.starts_with("graph_")));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn eval_uses_refactor_rank_profile_for_refactor_queries() {
+    let dir = temp_dir("elon_symbol_eval_refactor_profile");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213014-trace-eval-refactor-profile-user",
+        sample_index(),
+    );
+
+    let response = evaluate_latest_symbol_retrieval(
+        &dir,
+        &RetrievalEvalQuery {
+            text: Some("重构 build_context_pack callers".to_string()),
+            must_include: vec!["build_context_pack".to_string()],
+            k: 10,
+            symbol_limit: 5,
+            chunk_limit: 10,
+            depth: 1,
+            impact_limit: 20,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.ranking_profile.name, "refactor");
+    assert!(response.candidates.iter().any(|candidate| candidate
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("rank_profile=refactor"))));
 
     fs::remove_dir_all(dir).unwrap();
 }

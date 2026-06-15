@@ -10,7 +10,8 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
-    symbol_index_ranker::{rank_hybrid_context, RankedContextItem},
+    symbol_index_rank_profile::{infer_rank_profile, HybridRankProfile},
+    symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
     symbol_index_vector_types::SymbolVectorHit,
 };
@@ -42,6 +43,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) db_path: String,
     pub(crate) query: SymbolTaskPackQueryEcho,
     pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) ranking_profile: HybridRankProfile,
     pub(crate) pack: String,
     pub(crate) char_count: usize,
     pub(crate) truncated: bool,
@@ -149,8 +151,14 @@ pub(crate) fn build_latest_symbol_task_pack(
         .clone()
         .or_else(|| choose_impact_seed(&impact.seed_symbols, seed_choice.symbol_id.as_deref()))
         .ok_or_else(|| anyhow::anyhow!("没有找到与任务相关的符号"))?;
-    let ranked_context =
-        rank_hybrid_context(&search_symbols, &text_chunks, &vector_chunks, Some(&impact));
+    let ranking_profile = infer_rank_profile(&text);
+    let ranked_context = rank_hybrid_context_with_profile(
+        &search_symbols,
+        &text_chunks,
+        &vector_chunks,
+        Some(&impact),
+        &ranking_profile,
+    );
     let mut candidate_symbols = search_symbols;
     if candidate_symbols.is_empty() {
         candidate_symbols.extend(impact.seed_symbols.iter().cloned());
@@ -162,6 +170,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         &text_chunks,
         &vector_chunks,
         &ranked_context,
+        &ranking_profile,
         &chosen_seed,
         seed_choice.source,
         &impact_pack.pack,
@@ -186,6 +195,7 @@ pub(crate) fn build_latest_symbol_task_pack(
             max_chars: normalize_pack_max_chars(query.max_chars),
         },
         metadata: impact_pack.metadata,
+        ranking_profile,
         pack,
         char_count,
         truncated: truncated || impact_pack.truncated,
@@ -208,6 +218,7 @@ fn render_task_pack(
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
     ranked_context: &[RankedContextItem],
+    ranking_profile: &HybridRankProfile,
     chosen_seed: &SymbolHit,
     chosen_seed_source: &str,
     impact_pack: &str,
@@ -223,6 +234,25 @@ fn render_task_pack(
         chosen_seed.start_line,
         xml_escape(chosen_seed_source)
     ));
+    out.push_str(&format!(
+        "<ranking_profile name=\"{}\" testContextBonus=\"{:.0}\">\n",
+        xml_escape(&ranking_profile.name),
+        ranking_profile.test_context_bonus
+    ));
+    out.push_str(&format!(
+        "- description: {}\n",
+        xml_escape(&ranking_profile.description)
+    ));
+    for (source, weight) in &ranking_profile.source_weights {
+        out.push_str(&format!("- weight {}={:.0}\n", xml_escape(source), weight));
+    }
+    if !ranking_profile.reasons.is_empty() {
+        out.push_str(&format!(
+            "- reasons: {}\n",
+            xml_escape(&ranking_profile.reasons.join("; "))
+        ));
+    }
+    out.push_str("</ranking_profile>\n");
     out.push_str(&format!(
         "<ranked_context count=\"{}\">\n",
         ranked_context.len()

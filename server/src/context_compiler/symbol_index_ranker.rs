@@ -7,7 +7,8 @@ use serde::Serialize;
 
 use super::{
     symbol_index_chunks::SymbolChunkHit, symbol_index_impact_types::SymbolImpactResponse,
-    symbol_index_query_types::SymbolHit, symbol_index_vector_types::SymbolVectorHit,
+    symbol_index_query_types::SymbolHit, symbol_index_rank_profile::HybridRankProfile,
+    symbol_index_vector_types::SymbolVectorHit,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,30 +45,32 @@ struct ContextDraft {
     is_test_context: bool,
 }
 
-pub(crate) fn rank_hybrid_context(
+pub(crate) fn rank_hybrid_context_with_profile(
     symbols: &[SymbolHit],
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
     impact: Option<&SymbolImpactResponse>,
+    profile: &HybridRankProfile,
 ) -> Vec<RankedContextItem> {
     let mut drafts = Vec::new();
     for (index, symbol) in symbols.iter().enumerate() {
-        drafts.push(symbol_context(symbol, index));
+        drafts.push(symbol_context(symbol, index, profile));
     }
     for (index, chunk) in text_chunks.iter().enumerate() {
-        drafts.push(text_chunk_context(chunk, index));
+        drafts.push(text_chunk_context(chunk, index, profile));
     }
     for (index, chunk) in vector_chunks.iter().enumerate() {
-        drafts.push(vector_chunk_context(chunk, index));
+        drafts.push(vector_chunk_context(chunk, index, profile));
     }
     if let Some(impact) = impact {
-        push_impact_context(&mut drafts, impact);
+        push_impact_context(&mut drafts, impact, profile);
     }
     rank_drafts(drafts)
 }
 
-fn symbol_context(symbol: &SymbolHit, index: usize) -> ContextDraft {
+fn symbol_context(symbol: &SymbolHit, index: usize, profile: &HybridRankProfile) -> ContextDraft {
     let importance = symbol.importance_score.unwrap_or_default();
+    let is_test_context = looks_like_test(&symbol.file_path) || symbol.name.contains("test");
     ContextDraft {
         source: "symbol",
         id: format!("symbol:{}", symbol.id),
@@ -76,20 +79,30 @@ fn symbol_context(symbol: &SymbolHit, index: usize) -> ContextDraft {
         symbol_id: Some(symbol.id.clone()),
         start_line: Some(symbol.start_line),
         end_line: Some(symbol.end_line),
-        score: 1000.0 + symbol.score + importance - index as f64,
+        score: profile.source_weight("symbol")
+            + symbol.score
+            + importance
+            + profile.test_bonus(is_test_context)
+            - index as f64,
         token_count: estimate_token_count(&symbol.signature),
         matched_terms: symbol.matched_terms.clone(),
         reasons: compact_reasons([
             Some("symbol_search".to_string()),
+            Some(profile.reason("symbol")),
             (!symbol.matched_terms.is_empty())
                 .then(|| format!("matched={}", symbol.matched_terms.join(","))),
             (importance > 0.0).then(|| format!("importance={importance:.2}")),
         ]),
-        is_test_context: looks_like_test(&symbol.file_path) || symbol.name.contains("test"),
+        is_test_context,
     }
 }
 
-fn text_chunk_context(chunk: &SymbolChunkHit, index: usize) -> ContextDraft {
+fn text_chunk_context(
+    chunk: &SymbolChunkHit,
+    index: usize,
+    profile: &HybridRankProfile,
+) -> ContextDraft {
+    let is_test_context = chunk.chunk_type == "test" || looks_like_test(&chunk.file_path);
     ContextDraft {
         source: "full_text",
         id: format!("chunk:{}", chunk.id),
@@ -101,20 +114,30 @@ fn text_chunk_context(chunk: &SymbolChunkHit, index: usize) -> ContextDraft {
         symbol_id: chunk.symbol_id.clone(),
         start_line: chunk.start_line,
         end_line: chunk.end_line,
-        score: 800.0 + chunk.score - index as f64,
+        score: profile.source_weight("full_text")
+            + chunk.score
+            + profile.test_bonus(is_test_context)
+            + profile.chunk_type_bonus(&chunk.chunk_type)
+            - index as f64,
         token_count: chunk.token_count,
         matched_terms: chunk.matched_terms.clone(),
         reasons: compact_reasons([
             Some("fts_bm25".to_string()),
+            Some(profile.reason("full_text")),
             Some(format!("chunk_type={}", chunk.chunk_type)),
             (!chunk.matched_terms.is_empty())
                 .then(|| format!("matched={}", chunk.matched_terms.join(","))),
         ]),
-        is_test_context: chunk.chunk_type == "test" || looks_like_test(&chunk.file_path),
+        is_test_context,
     }
 }
 
-fn vector_chunk_context(chunk: &SymbolVectorHit, index: usize) -> ContextDraft {
+fn vector_chunk_context(
+    chunk: &SymbolVectorHit,
+    index: usize,
+    profile: &HybridRankProfile,
+) -> ContextDraft {
+    let is_test_context = chunk.chunk_type == "test" || looks_like_test(&chunk.file_path);
     ContextDraft {
         source: "vector",
         id: format!("vector:{}", chunk.id),
@@ -126,27 +149,40 @@ fn vector_chunk_context(chunk: &SymbolVectorHit, index: usize) -> ContextDraft {
         symbol_id: chunk.symbol_id.clone(),
         start_line: chunk.start_line,
         end_line: chunk.end_line,
-        score: 760.0 + (chunk.score * 100.0) - index as f64,
+        score: profile.source_weight("vector")
+            + (chunk.score * 100.0)
+            + profile.test_bonus(is_test_context)
+            + profile.chunk_type_bonus(&chunk.chunk_type)
+            - index as f64,
         token_count: chunk.token_count,
         matched_terms: chunk.matched_terms.clone(),
         reasons: compact_reasons([
             Some("vector_similarity".to_string()),
+            Some(profile.reason("vector")),
             Some(format!("chunk_type={}", chunk.chunk_type)),
             Some(format!("similarity={:.4}", chunk.score)),
         ]),
-        is_test_context: chunk.chunk_type == "test" || looks_like_test(&chunk.file_path),
+        is_test_context,
     }
 }
 
-fn push_impact_context(drafts: &mut Vec<ContextDraft>, impact: &SymbolImpactResponse) {
+fn push_impact_context(
+    drafts: &mut Vec<ContextDraft>,
+    impact: &SymbolImpactResponse,
+    profile: &HybridRankProfile,
+) {
     for (index, symbol) in impact.impacted_symbols.iter().enumerate() {
-        let mut candidate = symbol_context(symbol, index);
+        let mut candidate = symbol_context(symbol, index, profile);
         candidate.source = "graph_symbol";
         candidate.id = format!("graph-symbol:{}", symbol.id);
-        candidate.score = 650.0 + symbol.importance_score.unwrap_or_default() - index as f64;
+        candidate.score = profile.source_weight("graph_symbol")
+            + symbol.importance_score.unwrap_or_default()
+            + profile.test_bonus(candidate.is_test_context)
+            - index as f64;
         candidate.reasons = compact_reasons([
             Some("graph_expansion".to_string()),
             Some("impacted_symbol".to_string()),
+            Some(profile.reason("graph_symbol")),
             symbol
                 .importance_score
                 .map(|score| format!("importance={score:.2}")),
@@ -154,6 +190,7 @@ fn push_impact_context(drafts: &mut Vec<ContextDraft>, impact: &SymbolImpactResp
         drafts.push(candidate);
     }
     for (index, file) in impact.impacted_files.iter().enumerate() {
+        let is_test_context = file.test_hint_count > 0 || looks_like_test(&file.path);
         drafts.push(ContextDraft {
             source: "graph_file",
             id: format!("graph-file:{}", file.path),
@@ -162,21 +199,23 @@ fn push_impact_context(drafts: &mut Vec<ContextDraft>, impact: &SymbolImpactResp
             symbol_id: None,
             start_line: None,
             end_line: None,
-            score: 620.0
+            score: profile.source_weight("graph_file")
                 + (file.test_hint_count as f64 * 8.0)
                 + (file.edge_count as f64 * 2.0)
                 + (file.symbol_count as f64)
+                + profile.test_bonus(is_test_context)
                 - index as f64,
             token_count: 0,
             matched_terms: Vec::new(),
             reasons: compact_reasons([
                 Some("graph_expansion".to_string()),
+                Some(profile.reason("graph_file")),
                 Some(format!("symbols={}", file.symbol_count)),
                 Some(format!("edges={}", file.edge_count)),
                 (file.test_hint_count > 0).then(|| format!("test_hints={}", file.test_hint_count)),
                 file.seed.then(|| "seed_file".to_string()),
             ]),
-            is_test_context: file.test_hint_count > 0 || looks_like_test(&file.path),
+            is_test_context,
         });
     }
     for (index, hint) in impact.test_hints.iter().enumerate() {
@@ -188,11 +227,12 @@ fn push_impact_context(drafts: &mut Vec<ContextDraft>, impact: &SymbolImpactResp
             symbol_id: Some(hint.symbol_id.clone()),
             start_line: Some(hint.line),
             end_line: None,
-            score: 700.0 - index as f64,
+            score: profile.source_weight("graph_test") + profile.test_bonus(true) - index as f64,
             token_count: 0,
             matched_terms: Vec::new(),
             reasons: compact_reasons([
                 Some("test_hint".to_string()),
+                Some(profile.reason("graph_test")),
                 hint.edge_kind
                     .as_deref()
                     .map(|kind| format!("edge_kind={kind}")),

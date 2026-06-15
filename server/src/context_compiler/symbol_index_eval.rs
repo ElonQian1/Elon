@@ -14,7 +14,8 @@ use super::{
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
-    symbol_index_ranker::{rank_hybrid_context, RankedContextItem},
+    symbol_index_rank_profile::infer_rank_profile,
+    symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
 };
 
@@ -89,11 +90,13 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
     });
 
     let requirements = clean_requirements(&query.must_include);
-    let ranked_context = rank_hybrid_context(
+    let ranking_profile = infer_rank_profile(&text);
+    let ranked_context = rank_hybrid_context_with_profile(
         &symbol_response.symbols,
         &chunk_hits,
         &vector_hits,
         impact.as_ref(),
+        &ranking_profile,
     );
     let candidates = ranked_context
         .into_iter()
@@ -121,6 +124,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             impact_limit: query.impact_limit(),
         },
         metadata: symbol_response.metadata,
+        ranking_profile,
         metrics,
         candidates,
         missing_requirements,
