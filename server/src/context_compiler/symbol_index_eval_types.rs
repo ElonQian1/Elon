@@ -240,6 +240,8 @@ pub(crate) struct SymbolRetrievalEvalCandidate {
     pub(crate) end_line: Option<usize>,
     pub(crate) score: f64,
     pub(crate) token_count: usize,
+    pub(crate) matched_terms: Vec<String>,
+    pub(crate) reasons: Vec<String>,
     pub(crate) matched_requirements: Vec<String>,
     pub(crate) is_test_context: bool,
 }

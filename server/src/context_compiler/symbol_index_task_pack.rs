@@ -10,6 +10,7 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
+    symbol_index_ranker::{rank_hybrid_context, RankedContextItem},
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
     symbol_index_vector_types::SymbolVectorHit,
 };
@@ -47,6 +48,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) candidate_symbols: Vec<SymbolHit>,
     pub(crate) text_chunks: Vec<SymbolChunkHit>,
     pub(crate) vector_chunks: Vec<SymbolVectorHit>,
+    pub(crate) ranked_context: Vec<RankedContextItem>,
     pub(crate) chosen_seed: SymbolHit,
     pub(crate) chosen_seed_source: String,
     pub(crate) impacted_symbol_count: usize,
@@ -130,7 +132,8 @@ pub(crate) fn build_latest_symbol_task_pack(
     } else {
         Vec::new()
     };
-    let seed_choice = choose_task_seed(&search_response.symbols, &text_chunks, &vector_chunks)?;
+    let search_symbols = search_response.symbols;
+    let seed_choice = choose_task_seed(&search_symbols, &text_chunks, &vector_chunks)?;
 
     let impact_query = SymbolImpactQuery {
         trace_id: query.trace_id.clone(),
@@ -146,7 +149,9 @@ pub(crate) fn build_latest_symbol_task_pack(
         .clone()
         .or_else(|| choose_impact_seed(&impact.seed_symbols, seed_choice.symbol_id.as_deref()))
         .ok_or_else(|| anyhow::anyhow!("没有找到与任务相关的符号"))?;
-    let mut candidate_symbols = search_response.symbols;
+    let ranked_context =
+        rank_hybrid_context(&search_symbols, &text_chunks, &vector_chunks, Some(&impact));
+    let mut candidate_symbols = search_symbols;
     if candidate_symbols.is_empty() {
         candidate_symbols.extend(impact.seed_symbols.iter().cloned());
     }
@@ -156,6 +161,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         &candidate_symbols,
         &text_chunks,
         &vector_chunks,
+        &ranked_context,
         &chosen_seed,
         seed_choice.source,
         &impact_pack.pack,
@@ -186,6 +192,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         candidate_symbols,
         text_chunks,
         vector_chunks,
+        ranked_context,
         chosen_seed,
         chosen_seed_source: seed_choice.source.to_string(),
         impacted_symbol_count: impact_pack.impacted_symbol_count,
@@ -200,6 +207,7 @@ fn render_task_pack(
     candidates: &[SymbolHit],
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
+    ranked_context: &[RankedContextItem],
     chosen_seed: &SymbolHit,
     chosen_seed_source: &str,
     impact_pack: &str,
@@ -215,6 +223,23 @@ fn render_task_pack(
         chosen_seed.start_line,
         xml_escape(chosen_seed_source)
     ));
+    out.push_str(&format!(
+        "<ranked_context count=\"{}\">\n",
+        ranked_context.len()
+    ));
+    for item in ranked_context.iter().take(20) {
+        out.push_str(&format!(
+            "- #{} source={} `{}` path={}:{} score={:.2} reasons={}\n",
+            item.rank,
+            xml_escape(&item.source),
+            xml_escape(&item.label),
+            xml_escape(&item.file_path),
+            item.start_line.unwrap_or_default(),
+            item.score,
+            xml_escape(&item.reasons.join("; "))
+        ));
+    }
+    out.push_str("</ranked_context>\n");
     out.push_str(&format!(
         "<candidate_symbols count=\"{}\">\n",
         candidates.len()

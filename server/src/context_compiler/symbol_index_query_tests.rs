@@ -404,6 +404,7 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .iter()
         .any(|symbol| symbol.name == "build_context_pack"));
     assert!(response.pack.contains("<symbol_task_context"));
+    assert!(response.pack.contains("<ranked_context"));
     assert!(response.pack.contains("<candidate_symbols"));
     assert!(response.pack.contains("<full_text_chunks"));
     assert!(response.pack.contains("<vector_chunks"));
@@ -417,6 +418,10 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .vector_chunks
         .iter()
         .any(|chunk| chunk.id.contains("build_context_pack")));
+    assert!(response
+        .ranked_context
+        .iter()
+        .any(|item| item.source == "symbol" && item.label.contains("build_context_pack")));
     assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
@@ -457,7 +462,13 @@ fn task_pack_falls_back_to_text_chunk_path_when_symbol_search_misses() {
         .iter()
         .any(|chunk| chunk.chunk_type == "module"
             && chunk.file_path == "server/src/context_compiler/context_pack.rs"));
+    assert!(response
+        .ranked_context
+        .iter()
+        .any(|item| item.source == "full_text"
+            && item.reasons.iter().any(|reason| reason == "fts_bm25")));
     assert!(response.pack.contains("source=\"full_text_path\""));
+    assert!(response.pack.contains("<ranked_context"));
     assert!(response.pack.contains("<symbol_impact_context"));
 
     fs::remove_dir_all(dir).unwrap();
@@ -691,6 +702,10 @@ fn eval_reports_recall_mrr_and_missing_context_requirements() {
         .candidates
         .iter()
         .any(|candidate| candidate.source == "full_text"));
+    assert!(response
+        .candidates
+        .iter()
+        .any(|candidate| candidate.reasons.iter().any(|reason| reason == "fts_bm25")));
     assert!(response
         .candidates
         .iter()
