@@ -48,6 +48,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) text_chunks: Vec<SymbolChunkHit>,
     pub(crate) vector_chunks: Vec<SymbolVectorHit>,
     pub(crate) chosen_seed: SymbolHit,
+    pub(crate) chosen_seed_source: String,
     pub(crate) impacted_symbol_count: usize,
     pub(crate) impacted_file_count: usize,
     pub(crate) edge_count: usize,
@@ -69,6 +70,14 @@ pub(crate) struct SymbolTaskPackQueryEcho {
     pub(crate) vector_limit: usize,
     pub(crate) impact_limit: usize,
     pub(crate) max_chars: usize,
+}
+
+#[derive(Debug, Clone)]
+struct TaskSeedChoice {
+    source: &'static str,
+    symbol_id: Option<String>,
+    path: Option<String>,
+    symbol: Option<SymbolHit>,
 }
 
 pub(crate) fn build_latest_symbol_task_pack(
@@ -121,27 +130,34 @@ pub(crate) fn build_latest_symbol_task_pack(
     } else {
         Vec::new()
     };
-    let Some(chosen_seed) = search_response.symbols.first().cloned() else {
-        bail!("没有找到与任务相关的符号");
-    };
+    let seed_choice = choose_task_seed(&search_response.symbols, &text_chunks, &vector_chunks)?;
 
     let impact_query = SymbolImpactQuery {
         trace_id: query.trace_id.clone(),
-        symbol_id: Some(chosen_seed.id.clone()),
-        path: None,
+        symbol_id: seed_choice.symbol_id.clone(),
+        path: seed_choice.path.clone(),
         edge_kind: query.edge_kind.clone(),
         depth: query.depth,
         limit: query.impact_limit,
     };
     let impact = load_latest_symbol_impact(data_dir, &impact_query)?;
+    let chosen_seed = seed_choice
+        .symbol
+        .clone()
+        .or_else(|| choose_impact_seed(&impact.seed_symbols, seed_choice.symbol_id.as_deref()))
+        .ok_or_else(|| anyhow::anyhow!("没有找到与任务相关的符号"))?;
+    let mut candidate_symbols = search_response.symbols;
+    if candidate_symbols.is_empty() {
+        candidate_symbols.extend(impact.seed_symbols.iter().cloned());
+    }
     let impact_pack = build_symbol_impact_pack(impact, normalize_pack_max_chars(query.max_chars));
-    let candidate_symbols = search_response.symbols;
     let pack = render_task_pack(
         &text,
         &candidate_symbols,
         &text_chunks,
         &vector_chunks,
         &chosen_seed,
+        seed_choice.source,
         &impact_pack.pack,
     );
     let (pack, truncated) = truncate_pack(pack, normalize_pack_max_chars(query.max_chars));
@@ -171,6 +187,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         text_chunks,
         vector_chunks,
         chosen_seed,
+        chosen_seed_source: seed_choice.source.to_string(),
         impacted_symbol_count: impact_pack.impacted_symbol_count,
         impacted_file_count: impact_pack.impacted_file_count,
         edge_count: impact_pack.edge_count,
@@ -184,17 +201,19 @@ fn render_task_pack(
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
     chosen_seed: &SymbolHit,
+    chosen_seed_source: &str,
     impact_pack: &str,
 ) -> String {
     let mut out = String::new();
     out.push_str("<symbol_task_context format=\"xml-wrapped-markdown\">\n");
     out.push_str(&format!("<task>{}</task>\n", xml_escape(task)));
     out.push_str(&format!(
-        "<chosen_seed id=\"{}\" name=\"{}\" path=\"{}\" line=\"{}\" />\n",
+        "<chosen_seed id=\"{}\" name=\"{}\" path=\"{}\" line=\"{}\" source=\"{}\" />\n",
         xml_escape(&chosen_seed.id),
         xml_escape(&chosen_seed.name),
         xml_escape(&chosen_seed.file_path),
-        chosen_seed.start_line
+        chosen_seed.start_line,
+        xml_escape(chosen_seed_source)
     ));
     out.push_str(&format!(
         "<candidate_symbols count=\"{}\">\n",
@@ -260,6 +279,82 @@ fn render_task_pack(
     out.push_str("</task_pack_usage>\n");
     out.push_str("</symbol_task_context>\n");
     out
+}
+
+fn choose_task_seed(
+    symbols: &[SymbolHit],
+    text_chunks: &[SymbolChunkHit],
+    vector_chunks: &[SymbolVectorHit],
+) -> Result<TaskSeedChoice> {
+    if let Some(symbol) = symbols
+        .iter()
+        .find(|symbol| has_direct_symbol_match(symbol))
+    {
+        return Ok(TaskSeedChoice {
+            source: "symbol",
+            symbol_id: Some(symbol.id.clone()),
+            path: None,
+            symbol: Some(symbol.clone()),
+        });
+    }
+
+    if let Some(seed) = text_chunks
+        .iter()
+        .find_map(|chunk| seed_from_chunk("full_text_symbol", chunk.symbol_id.as_deref(), None))
+    {
+        return Ok(seed);
+    }
+
+    if let Some(seed) = vector_chunks
+        .iter()
+        .find_map(|chunk| seed_from_chunk("vector_symbol", chunk.symbol_id.as_deref(), None))
+    {
+        return Ok(seed);
+    }
+
+    if let Some(seed) = text_chunks
+        .iter()
+        .find_map(|chunk| seed_from_chunk("full_text_path", None, Some(chunk.file_path.as_str())))
+    {
+        return Ok(seed);
+    }
+
+    if let Some(seed) = vector_chunks
+        .iter()
+        .find_map(|chunk| seed_from_chunk("vector_path", None, Some(chunk.file_path.as_str())))
+    {
+        return Ok(seed);
+    }
+
+    bail!("没有找到与任务相关的符号或 chunk");
+}
+
+fn seed_from_chunk(
+    source: &'static str,
+    symbol_id: Option<&str>,
+    path: Option<&str>,
+) -> Option<TaskSeedChoice> {
+    let symbol_id = clean_filter(symbol_id);
+    let path = clean_filter(path);
+    if symbol_id.is_none() && path.is_none() {
+        return None;
+    }
+    Some(TaskSeedChoice {
+        source,
+        symbol_id,
+        path,
+        symbol: None,
+    })
+}
+
+fn choose_impact_seed(seed_symbols: &[SymbolHit], symbol_id: Option<&str>) -> Option<SymbolHit> {
+    symbol_id
+        .and_then(|id| seed_symbols.iter().find(|symbol| symbol.id == id).cloned())
+        .or_else(|| seed_symbols.first().cloned())
+}
+
+fn has_direct_symbol_match(symbol: &SymbolHit) -> bool {
+    !symbol.matched_terms.is_empty()
 }
 
 fn search_limit(limit: usize) -> usize {

@@ -305,7 +305,8 @@ fn score_symbol(
     terms: &[String],
     term_scores: &HashMap<String, i64>,
 ) -> (f64, Vec<String>) {
-    let mut score = term_scores.get(&symbol.id).copied().unwrap_or_default() as f64;
+    let term_score = term_scores.get(&symbol.id).copied().unwrap_or_default() as f64;
+    let mut score = term_score;
     let mut matched = BTreeSet::new();
     if terms.is_empty() {
         score += symbol.importance_score.unwrap_or_default() * 10.0;
@@ -349,18 +350,22 @@ fn score_symbol(
             matched.insert(term.clone());
         }
     }
-    if symbol.visibility == "pub" {
+    let matched_query = terms.is_empty() || term_score > 0.0 || !matched.is_empty();
+    if matched_query && symbol.visibility == "pub" {
         score += 4.0;
     }
-    if symbol
-        .source_providers
-        .iter()
-        .any(|source| source == "rust_analyzer_lsp")
+    if matched_query
+        && symbol
+            .source_providers
+            .iter()
+            .any(|source| source == "rust_analyzer_lsp")
     {
         score += 6.0;
     }
-    if !terms.is_empty() {
+    if !terms.is_empty() && matched_query {
         score += symbol.importance_score.unwrap_or_default();
+    } else if !terms.is_empty() {
+        score = 0.0;
     }
     (score, matched.into_iter().collect())
 }

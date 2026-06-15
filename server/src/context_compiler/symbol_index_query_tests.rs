@@ -89,6 +89,32 @@ fn filters_symbols_by_kind_and_path() {
 }
 
 #[test]
+fn symbol_search_ignores_importance_only_matches_when_query_has_terms() {
+    let dir = temp_dir("elon_symbol_query_no_weak_match");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213001-trace-no-weak-match-user",
+        sample_index(),
+    );
+
+    let response = search_symbol_index_db(
+        &db,
+        &SymbolIndexSearch {
+            text: Some("symbol_count".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            limit: 10,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert!(response.symbols.is_empty());
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn finds_latest_or_trace_specific_symbol_index_db() {
     let dir = temp_dir("elon_symbol_query_latest");
     let first = write_bundle(&dir, "20260614", "213002-trace-one-user", sample_index());
@@ -372,6 +398,7 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     .unwrap();
 
     assert_eq!(response.chosen_seed.name, "build_context_pack");
+    assert_eq!(response.chosen_seed_source, "symbol");
     assert!(response
         .candidate_symbols
         .iter()
@@ -391,6 +418,47 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .iter()
         .any(|chunk| chunk.id.contains("build_context_pack")));
     assert!(response.test_hint_count > 0);
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn task_pack_falls_back_to_text_chunk_path_when_symbol_search_misses() {
+    let dir = temp_dir("elon_symbol_task_pack_chunk_seed");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-task-pack-chunk-seed-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("symbol_count".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            chunk_limit: 5,
+            impact_limit: 20,
+            max_chars: 12_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.chosen_seed.name, "build_context_pack");
+    assert_eq!(response.chosen_seed_source, "full_text_path");
+    assert!(response
+        .candidate_symbols
+        .iter()
+        .any(|symbol| symbol.name == "build_context_pack"));
+    assert!(response
+        .text_chunks
+        .iter()
+        .any(|chunk| chunk.chunk_type == "module"
+            && chunk.file_path == "server/src/context_compiler/context_pack.rs"));
+    assert!(response.pack.contains("source=\"full_text_path\""));
+    assert!(response.pack.contains("<symbol_impact_context"));
 
     fs::remove_dir_all(dir).unwrap();
 }
