@@ -12,6 +12,7 @@ use super::{
     symbol_index_query_types::SymbolHit,
     symbol_index_rank_profile::{infer_rank_profile, HybridRankProfile},
     symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
+    symbol_index_retrieval_plan::{build_retrieval_plan, render_retrieval_plan, RetrievalPlan},
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
     symbol_index_vector_types::SymbolVectorHit,
 };
@@ -43,6 +44,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) db_path: String,
     pub(crate) query: SymbolTaskPackQueryEcho,
     pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) retrieval_plan: RetrievalPlan,
     pub(crate) ranking_profile: HybridRankProfile,
     pub(crate) pack: String,
     pub(crate) char_count: usize,
@@ -151,6 +153,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         .clone()
         .or_else(|| choose_impact_seed(&impact.seed_symbols, seed_choice.symbol_id.as_deref()))
         .ok_or_else(|| anyhow::anyhow!("没有找到与任务相关的符号"))?;
+    let retrieval_plan = build_retrieval_plan(&text, query.vector_model.is_some());
     let ranking_profile = infer_rank_profile(&text);
     let ranked_context = rank_hybrid_context_with_profile(
         &search_symbols,
@@ -170,6 +173,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         &text_chunks,
         &vector_chunks,
         &ranked_context,
+        &retrieval_plan,
         &ranking_profile,
         &chosen_seed,
         seed_choice.source,
@@ -195,6 +199,7 @@ pub(crate) fn build_latest_symbol_task_pack(
             max_chars: normalize_pack_max_chars(query.max_chars),
         },
         metadata: impact_pack.metadata,
+        retrieval_plan,
         ranking_profile,
         pack,
         char_count,
@@ -218,6 +223,7 @@ fn render_task_pack(
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
     ranked_context: &[RankedContextItem],
+    retrieval_plan: &RetrievalPlan,
     ranking_profile: &HybridRankProfile,
     chosen_seed: &SymbolHit,
     chosen_seed_source: &str,
@@ -234,6 +240,7 @@ fn render_task_pack(
         chosen_seed.start_line,
         xml_escape(chosen_seed_source)
     ));
+    out.push_str(&render_retrieval_plan(retrieval_plan));
     out.push_str(&format!(
         "<ranking_profile name=\"{}\" testContextBonus=\"{:.0}\">\n",
         xml_escape(&ranking_profile.name),

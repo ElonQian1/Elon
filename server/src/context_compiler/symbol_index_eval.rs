@@ -16,6 +16,7 @@ use super::{
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_rank_profile::infer_rank_profile,
     symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
+    symbol_index_retrieval_plan::build_retrieval_plan,
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
 };
 
@@ -90,6 +91,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
     });
 
     let requirements = clean_requirements(&query.must_include);
+    let retrieval_plan = build_retrieval_plan(&text, query.vector_model.is_some());
     let ranking_profile = infer_rank_profile(&text);
     let ranked_context = rank_hybrid_context_with_profile(
         &symbol_response.symbols,
@@ -124,6 +126,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             impact_limit: query.impact_limit(),
         },
         metadata: symbol_response.metadata,
+        retrieval_plan,
         ranking_profile,
         metrics,
         candidates,

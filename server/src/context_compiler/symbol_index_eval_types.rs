@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 use serde_json::Value;
 
-use super::symbol_index_rank_profile::HybridRankProfile;
+use super::{
+    symbol_index_rank_profile::HybridRankProfile, symbol_index_retrieval_plan::RetrievalPlan,
+};
 
 const DEFAULT_EVAL_K: usize = 10;
 const MAX_EVAL_K: usize = 100;
@@ -190,6 +192,7 @@ pub(crate) struct SymbolRetrievalEvalResponse {
     pub(crate) db_path: String,
     pub(crate) query: SymbolRetrievalEvalQueryEcho,
     pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) retrieval_plan: RetrievalPlan,
     pub(crate) ranking_profile: HybridRankProfile,
     pub(crate) metrics: SymbolRetrievalEvalMetrics,
     pub(crate) candidates: Vec<SymbolRetrievalEvalCandidate>,

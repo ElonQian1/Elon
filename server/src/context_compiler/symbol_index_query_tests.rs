@@ -24,6 +24,7 @@ use super::{
     symbol_index_impact_query::load_symbol_impact_db,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
+    symbol_index_retrieval_plan::QueryIntent,
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
     symbol_index_vector::{
@@ -499,6 +500,12 @@ fn task_pack_uses_error_rank_profile_for_error_queries() {
     .unwrap();
 
     assert_eq!(response.ranking_profile.name, "error");
+    assert_eq!(response.retrieval_plan.intent, QueryIntent::DebugError);
+    assert!(response
+        .pack
+        .contains("<retrieval_plan intent=\"debug_error\""));
+    assert!(response.retrieval_plan.graph_policy.include_error_mappers);
+    assert!(response.retrieval_plan.pack_policy.include_error_mapping);
     assert!(response.pack.contains("<ranking_profile name=\"error\""));
     assert!(response.ranked_context.iter().any(|item| item
         .reasons
@@ -781,6 +788,9 @@ fn eval_uses_refactor_rank_profile_for_refactor_queries() {
     .unwrap();
 
     assert_eq!(response.ranking_profile.name, "refactor");
+    assert_eq!(response.retrieval_plan.intent, QueryIntent::Refactor);
+    assert!(response.retrieval_plan.graph_policy.include_references);
+    assert_eq!(response.retrieval_plan.graph_policy.max_depth, 2);
     assert!(response.candidates.iter().any(|candidate| candidate
         .reasons
         .iter()

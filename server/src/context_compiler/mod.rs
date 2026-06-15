@@ -66,11 +66,13 @@ mod symbol_index_impact_pack;
 mod symbol_index_impact_query;
 mod symbol_index_impact_types;
 mod symbol_index_query;
+mod symbol_index_query_features;
 #[cfg(test)]
 mod symbol_index_query_tests;
 mod symbol_index_query_types;
 mod symbol_index_rank_profile;
 mod symbol_index_ranker;
+mod symbol_index_retrieval_plan;
 mod symbol_index_semantic;
 mod symbol_index_store;
 mod symbol_index_task_pack;
