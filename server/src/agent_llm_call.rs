@@ -8,7 +8,7 @@
 //! 让 agent.rs 只保留路由、Agent 选择和高层编排。
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 
 use crate::{
@@ -92,6 +92,19 @@ pub(crate) async fn call_chat_llm(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
+    call_chat_llm_with_options(state, agent, messages, user_id, feature, 0.8, 700).await
+}
+
+/// 调用 LLM API（普通对话，不带工具），允许调用方控制生成参数。
+pub(crate) async fn call_chat_llm_with_options(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    temperature: f64,
+    max_tokens: usize,
+) -> Result<Value> {
     // 计费前置检查
     if let Err(msg) = crate::billing::check_can_call(&state.store, user_id) {
         return Err(anyhow::anyhow!("{}", msg));
@@ -102,8 +115,8 @@ pub(crate) async fn call_chat_llm(
         "model": agent.model,
         "messages": messages,
         "stream": false,
-        "temperature": 0.8,
-        "max_tokens": 700,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
     });
 
     let is_copilot_direct = agent.api_base.contains("githubcopilot.com");

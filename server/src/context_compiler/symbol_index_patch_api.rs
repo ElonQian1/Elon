@@ -14,6 +14,7 @@ use super::{
     symbol_index_patch_check::check_symbol_patch_diff,
     symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
     symbol_index_patch_repair_attempt::build_symbol_patch_repair_attempt_response,
+    symbol_index_patch_repair_generate::generate_symbol_patch_repair as run_symbol_patch_repair_generation,
     symbol_index_patch_verification_repair::{
         PatchVerificationCommandResultInput, build_symbol_patch_verification_repair_response,
     },
@@ -25,6 +26,8 @@ use super::{
 pub(crate) struct SymbolPatchBody {
     pub(crate) q: Option<String>,
     pub(crate) query: Option<String>,
+    #[serde(alias = "userId")]
+    pub(crate) user_id: Option<String>,
     #[serde(alias = "traceId")]
     pub(crate) trace_id: Option<String>,
     pub(crate) kind: Option<String>,
@@ -246,6 +249,45 @@ pub(crate) async fn run_symbol_patch_repair_attempt(
     }
 }
 
+pub(crate) async fn generate_symbol_patch_repair(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let user_id = parts.user_id.unwrap_or_else(|| "admin".to_string());
+            match run_symbol_patch_repair_generation(
+                &state,
+                response.patch_generation.clone(),
+                parts.diff,
+                workspace,
+                user_id,
+                parts.attempt,
+                parts.max_attempts,
+            )
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::BAD_GATEWAY, &error),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
 impl SymbolPatchBody {
     fn into_parts(self, require_workspace: bool) -> Result<PatchBodyParts, String> {
         let text = clean(self.q).or_else(|| clean(self.query));
@@ -281,6 +323,7 @@ impl SymbolPatchBody {
             workspace,
             diff,
             repair_patch: non_empty_patch(self.repair_patch),
+            user_id: clean(self.user_id),
             attempt: self.attempt,
             max_attempts: self.max_attempts,
             verification_results: self.verification_results,
@@ -313,6 +356,7 @@ struct PatchBodyParts {
     workspace: Option<PathBuf>,
     diff: String,
     repair_patch: Option<String>,
+    user_id: Option<String>,
     attempt: Option<usize>,
     max_attempts: Option<usize>,
     verification_results: Vec<PatchVerificationCommandResultInput>,
