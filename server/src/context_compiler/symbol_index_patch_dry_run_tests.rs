@@ -8,7 +8,7 @@ use std::{
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_patch_check::PatchDiffCheckStatus,
-    symbol_index_patch_dry_run::dry_run_symbol_patch,
+    symbol_index_patch_dry_run::{dry_run_symbol_patch, PatchApplyGateStatus},
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
 };
@@ -55,6 +55,14 @@ fn patch_dry_run_accepts_diff_that_git_can_apply() {
     assert!(dry_run.accepted_for_apply_check);
     assert!(dry_run.apply_check.attempted);
     assert!(dry_run.apply_check.success);
+    assert_eq!(dry_run.apply_gate.status, PatchApplyGateStatus::Blocked);
+    assert!(!dry_run.apply_gate.ready_to_apply);
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "workspace_not_clean"));
+    assert_eq!(dry_run.apply_gate.patch_sha256.len(), 64);
     assert!(dry_run
         .apply_check
         .command
@@ -106,6 +114,12 @@ fn patch_dry_run_reports_git_apply_check_failure_without_applying() {
     assert!(dry_run.contract_check.accepted_for_apply_check);
     assert!(dry_run.apply_check.attempted);
     assert!(!dry_run.apply_check.success);
+    assert!(!dry_run.apply_gate.ready_to_apply);
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "git_apply_check_failed"));
     assert!(
         dry_run.apply_check.stderr.contains("patch failed")
             || dry_run.apply_check.stderr.contains("does not apply")
@@ -150,11 +164,74 @@ fn patch_dry_run_does_not_run_git_when_contract_rejects_diff() {
     );
     assert!(!dry_run.accepted_for_apply_check);
     assert!(!dry_run.apply_check.attempted);
+    assert!(!dry_run.apply_gate.ready_to_apply);
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "diff_contract_not_accepted"));
     assert!(dry_run
         .contract_check
         .violations
         .iter()
         .any(|violation| violation.code == "file_not_allowed"));
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn patch_dry_run_marks_clean_workspace_ready_for_apply() {
+    let data_dir = temp_dir("elon_symbol_patch_dry_run_ready_data");
+    let workspace = temp_dir("elon_symbol_patch_dry_run_ready_workspace");
+    write_bundle(
+        &data_dir,
+        "20260614",
+        "213019-trace-patch-dry-run-ready-user",
+        sample_index(),
+    );
+    init_git_workspace(&workspace);
+    write_workspace_file(
+        &workspace,
+        "server/src/context_compiler/context_pack.rs",
+        "pub fn demo() {\n    let status = 500;\n}\n",
+    );
+    write_workspace_file(
+        &workspace,
+        "server/src/context_compiler/context_pack_tests.rs",
+        "#[test]\nfn demo_test() {\n    assert_eq!(500, 500);\n}\n",
+    );
+    commit_workspace(&workspace);
+
+    let response = patch_generation(&data_dir);
+    let diff = r#"diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs
+--- a/server/src/context_compiler/context_pack.rs
++++ b/server/src/context_compiler/context_pack.rs
+@@ -1,3 +1,3 @@
+ pub fn demo() {
+-    let status = 500;
++    let status = 401;
+ }
+"#;
+
+    let dry_run = dry_run_symbol_patch(&response.patch_generation, diff, &workspace);
+
+    assert!(dry_run.workspace.clean);
+    assert!(dry_run.apply_check.success);
+    assert!(dry_run.apply_gate.ready_to_apply);
+    assert_eq!(dry_run.apply_gate.status, PatchApplyGateStatus::Ready);
+    assert!(dry_run.apply_gate.blockers.is_empty());
+    assert!(dry_run
+        .apply_gate
+        .safe_apply_command
+        .as_deref()
+        .unwrap_or_default()
+        .contains("git -C"));
+    assert!(dry_run
+        .apply_gate
+        .verification_commands
+        .iter()
+        .any(|command| command.contains("git status --short")));
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();
@@ -195,6 +272,29 @@ fn init_git_workspace(workspace: &Path) {
         .output()
         .unwrap();
     assert!(output.status.success());
+}
+
+fn commit_workspace(workspace: &Path) {
+    run_git(workspace, &["config", "user.email", "test@example.com"]);
+    run_git(workspace, &["config", "user.name", "Test User"]);
+    run_git(workspace, &["add", "."]);
+    run_git(workspace, &["commit", "-m", "seed"]);
+}
+
+fn run_git(workspace: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}{}",
+        args,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn write_workspace_file(workspace: &Path, relative_path: &str, content: &str) {
