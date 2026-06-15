@@ -392,7 +392,7 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
             depth: 1,
             search_limit: 5,
             impact_limit: 20,
-            max_chars: 12_000,
+            max_chars: 24_000,
             ..Default::default()
         },
     )
@@ -410,6 +410,8 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     assert!(response.pack.contains("sources="));
     assert!(response.pack.contains("<compressed_context"));
     assert!(response.pack.contains("Compression:"));
+    assert!(response.pack.contains("<patch_plan"));
+    assert!(response.pack.contains("# Patch Plan"));
     assert!(response.pack.contains("<candidate_symbols"));
     assert!(response.pack.contains("<full_text_chunks"));
     assert!(response.pack.contains("<vector_chunks"));
@@ -437,7 +439,59 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .level_counts
         .keys()
         .any(|level| level == "full_symbol_body" || level == "focused_snippet"));
+    assert_eq!(response.patch_plan.plan_kind, "context_only");
+    assert!(!response.patch_plan.should_inspect.is_empty());
     assert!(response.test_hint_count > 0);
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn task_pack_generates_patch_plan_for_status_change_tasks() {
+    let dir = temp_dir("elon_symbol_task_pack_patch_plan");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-task-pack-patch-plan-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("把 build_context_pack 报错 500 改成 401".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            depth: 1,
+            search_limit: 5,
+            chunk_limit: 10,
+            impact_limit: 20,
+            max_chars: 24_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.patch_plan.plan_kind, "debug_fix");
+    assert!(response.patch_plan.patch_required);
+    assert!(response
+        .patch_plan
+        .must_edit
+        .iter()
+        .any(|target| target.file_path == "server/src/context_compiler/context_pack.rs"));
+    assert!(response
+        .patch_plan
+        .must_edit
+        .iter()
+        .any(|target| target.file_path == "server/src/context_compiler/context_pack_tests.rs"));
+    assert!(response
+        .patch_plan
+        .test_plan
+        .commands
+        .iter()
+        .any(|command| command.contains("build_context_pack_test")));
+    assert!(response.pack.contains("<patch_plan intent=\"debug_error\""));
+    assert!(response.pack.contains("## Test Plan"));
+    assert!(response.pack.contains("Planning Trace"));
 
     fs::remove_dir_all(dir).unwrap();
 }

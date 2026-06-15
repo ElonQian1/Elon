@@ -68,6 +68,11 @@ mod symbol_index_impact_edges;
 mod symbol_index_impact_pack;
 mod symbol_index_impact_query;
 mod symbol_index_impact_types;
+mod symbol_index_patch_plan;
+mod symbol_index_patch_plan_guidance;
+mod symbol_index_patch_plan_render;
+mod symbol_index_patch_plan_rules;
+mod symbol_index_patch_plan_types;
 mod symbol_index_query;
 mod symbol_index_query_features;
 #[cfg(test)]

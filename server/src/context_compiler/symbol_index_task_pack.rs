@@ -11,6 +11,9 @@ use super::{
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
+    symbol_index_patch_plan::build_symbol_patch_plan,
+    symbol_index_patch_plan_render::render_patch_plan,
+    symbol_index_patch_plan_types::SymbolPatchPlan,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
     symbol_index_rank_profile::{infer_rank_profile, HybridRankProfile},
@@ -57,6 +60,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) vector_chunks: Vec<SymbolVectorHit>,
     pub(crate) ranked_context: Vec<RankedContextItem>,
     pub(crate) compressed_context: SymbolCompressedContext,
+    pub(crate) patch_plan: SymbolPatchPlan,
     pub(crate) chosen_seed: SymbolHit,
     pub(crate) chosen_seed_source: String,
     pub(crate) impacted_symbol_count: usize,
@@ -203,6 +207,14 @@ pub(crate) fn build_latest_symbol_task_pack(
         &retrieval_plan,
         max_chars,
     );
+    let patch_plan = build_symbol_patch_plan(
+        &text,
+        &retrieval_plan,
+        &ranked_context,
+        &compressed_context,
+        &impact,
+        &chosen_seed,
+    );
     let impact_pack = build_symbol_impact_pack(impact, max_chars);
     let pack = render_task_pack(
         &text,
@@ -211,6 +223,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         &vector_chunks,
         &ranked_context,
         &compressed_context,
+        &patch_plan,
         &retrieval_plan,
         &ranking_profile,
         &chosen_seed,
@@ -247,6 +260,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         vector_chunks,
         ranked_context,
         compressed_context,
+        patch_plan,
         chosen_seed,
         chosen_seed_source: seed_choice.source.to_string(),
         impacted_symbol_count: impact_pack.impacted_symbol_count,
@@ -263,6 +277,7 @@ fn render_task_pack(
     vector_chunks: &[SymbolVectorHit],
     ranked_context: &[RankedContextItem],
     compressed_context: &SymbolCompressedContext,
+    patch_plan: &SymbolPatchPlan,
     retrieval_plan: &RetrievalPlan,
     ranking_profile: &HybridRankProfile,
     chosen_seed: &SymbolHit,
@@ -374,6 +389,7 @@ fn render_task_pack(
         }
     }
     out.push_str("</vector_chunks>\n");
+    out.push_str(&render_patch_plan(patch_plan));
     out.push_str(impact_pack);
     out.push_str("<task_pack_usage>\n");
     out.push_str("- Start by reading the chosen_seed file and the highest-ranked impacted files before editing.\n");
