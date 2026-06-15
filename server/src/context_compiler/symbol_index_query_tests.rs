@@ -23,6 +23,7 @@ use super::{
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
     symbol_index_impact_types::SymbolImpactQuery,
+    symbol_index_patch_generation_types::PatchGenerationMode,
     symbol_index_query::{find_symbol_index_db, search_symbol_index_db, SymbolIndexSearch},
     symbol_index_retrieval_plan::QueryIntent,
     symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
@@ -441,6 +442,15 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .any(|level| level == "full_symbol_body" || level == "focused_snippet"));
     assert_eq!(response.patch_plan.plan_kind, "context_only");
     assert!(!response.patch_plan.should_inspect.is_empty());
+    assert_eq!(response.patch_generation.mode, PatchGenerationMode::NoPatch);
+    assert!(!response.patch_generation.ready_to_generate);
+    assert!(response
+        .patch_generation
+        .blocked_reasons
+        .contains(&"patch_plan_says_context_only".to_string()));
+    assert!(response
+        .pack
+        .contains("<patch_generation mode=\"no_patch\""));
     assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
@@ -489,7 +499,32 @@ fn task_pack_generates_patch_plan_for_status_change_tasks() {
         .commands
         .iter()
         .any(|command| command.contains("build_context_pack_test")));
+    assert_eq!(
+        response.patch_generation.mode,
+        PatchGenerationMode::GenerateDiff
+    );
+    assert!(response.patch_generation.ready_to_generate);
+    assert!(response
+        .patch_generation
+        .diff_contract
+        .allowed_files
+        .iter()
+        .any(|path| path == "server/src/context_compiler/context_pack.rs"));
+    assert!(response
+        .patch_generation
+        .diff_contract
+        .allowed_files
+        .iter()
+        .any(|path| path == "server/src/context_compiler/context_pack_tests.rs"));
+    assert!(response
+        .patch_generation
+        .prompt
+        .contains("Generate a unified diff only"));
     assert!(response.pack.contains("<patch_plan intent=\"debug_error\""));
+    assert!(response
+        .pack
+        .contains("<patch_generation mode=\"generate_diff\" ready=\"true\""));
+    assert!(response.pack.contains("# Patch Generation Contract"));
     assert!(response.pack.contains("## Test Plan"));
     assert!(response.pack.contains("Planning Trace"));
 
