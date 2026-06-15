@@ -9,6 +9,9 @@ use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_patch_check::PatchDiffCheckStatus,
     symbol_index_patch_dry_run::{PatchApplyGateStatus, dry_run_symbol_patch},
+    symbol_index_patch_repair_attempt::{
+        PatchRepairAttemptStatus, build_symbol_patch_repair_attempt_response,
+    },
     symbol_index_patch_verification::PatchVerificationStatus,
     symbol_index_patch_verification_repair::{
         PatchVerificationCommandResultInput, PatchVerificationRepairStatus,
@@ -527,6 +530,116 @@ fn verification_run_builds_repair_context_when_auto_command_fails() {
             .unwrap_or_default()
             .contains("<patch_verification_repair_task>")
     );
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn repair_attempt_accepts_incremental_patch_after_failed_verification() {
+    let (data_dir, workspace, mut response, _diff, _dry_run) =
+        ready_patch_fixture("elon_symbol_patch_repair_attempt_pass", "213024");
+    response.patch_generation.apply_readiness.post_apply_checks = vec![
+        "git diff --check".to_string(),
+        "git status --short".to_string(),
+    ];
+    let original_patch = concat!(
+        "diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs\n",
+        "--- a/server/src/context_compiler/context_pack.rs\n",
+        "+++ b/server/src/context_compiler/context_pack.rs\n",
+        "@@ -1,3 +1,3 @@\n",
+        " pub fn demo() {\n",
+        "-    let status = 500;\n",
+        "+    let status = 401;   \n",
+        " }\n",
+    );
+    let repair_patch = concat!(
+        "diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs\n",
+        "--- a/server/src/context_compiler/context_pack.rs\n",
+        "+++ b/server/src/context_compiler/context_pack.rs\n",
+        "@@ -1,3 +1,3 @@\n",
+        " pub fn demo() {\n",
+        "-    let status = 401;   \n",
+        "+    let status = 401;\n",
+        " }\n",
+    );
+
+    let result = build_symbol_patch_repair_attempt_response(
+        &response.patch_generation,
+        original_patch,
+        repair_patch,
+        &workspace,
+        Some(1),
+        Some(2),
+    );
+
+    assert_eq!(result.status, PatchRepairAttemptStatus::RepairedPatchPassed);
+    assert_eq!(
+        result.original_verification.execution.status,
+        PatchVerificationExecutionStatus::VerificationFailed
+    );
+    assert!(result.repair_diff_check.accepted_for_apply_check);
+    assert_eq!(
+        result
+            .repaired_verification
+            .as_ref()
+            .unwrap()
+            .execution
+            .status,
+        PatchVerificationExecutionStatus::Passed
+    );
+    assert!(result.repair_result.success);
+    assert!(result.combined_patch_sha256.is_some());
+    assert_git_clean(&workspace);
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn repair_attempt_rejects_patch_outside_allowed_files() {
+    let (data_dir, workspace, mut response, _diff, _dry_run) =
+        ready_patch_fixture("elon_symbol_patch_repair_attempt_reject", "213025");
+    response.patch_generation.apply_readiness.post_apply_checks =
+        vec!["git diff --check".to_string()];
+    let original_patch = concat!(
+        "diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs\n",
+        "--- a/server/src/context_compiler/context_pack.rs\n",
+        "+++ b/server/src/context_compiler/context_pack.rs\n",
+        "@@ -1,3 +1,3 @@\n",
+        " pub fn demo() {\n",
+        "-    let status = 500;\n",
+        "+    let status = 401;   \n",
+        " }\n",
+    );
+    let repair_patch = concat!(
+        "diff --git a/server/src/context_compiler/unrelated.rs b/server/src/context_compiler/unrelated.rs\n",
+        "--- a/server/src/context_compiler/unrelated.rs\n",
+        "+++ b/server/src/context_compiler/unrelated.rs\n",
+        "@@ -1,1 +1,1 @@\n",
+        "-pub fn other() {}\n",
+        "+pub fn other_repaired() {}\n",
+    );
+
+    let result = build_symbol_patch_repair_attempt_response(
+        &response.patch_generation,
+        original_patch,
+        repair_patch,
+        &workspace,
+        Some(1),
+        Some(2),
+    );
+
+    assert_eq!(result.status, PatchRepairAttemptStatus::AttemptRejected);
+    assert!(result.repaired_verification.is_none());
+    assert!(
+        result
+            .repair_diff_check
+            .violations
+            .iter()
+            .any(|violation| violation.code == "file_not_allowed")
+    );
+    assert_git_clean(&workspace);
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();

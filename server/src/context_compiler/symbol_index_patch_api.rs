@@ -13,6 +13,7 @@ use crate::{admin, types::AppState};
 use super::{
     symbol_index_patch_check::check_symbol_patch_diff,
     symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
+    symbol_index_patch_repair_attempt::build_symbol_patch_repair_attempt_response,
     symbol_index_patch_verification_repair::{
         PatchVerificationCommandResultInput, build_symbol_patch_verification_repair_response,
     },
@@ -54,6 +55,15 @@ pub(crate) struct SymbolPatchBody {
     #[serde(alias = "generatedDiff")]
     pub(crate) generated_diff: Option<String>,
     pub(crate) patch: Option<String>,
+    #[serde(alias = "repairPatch", alias = "repairDiff")]
+    pub(crate) repair_patch: Option<String>,
+    pub(crate) attempt: Option<usize>,
+    #[serde(
+        alias = "maxAttempts",
+        alias = "maxRepairAttempts",
+        alias = "max_repairs"
+    )]
+    pub(crate) max_attempts: Option<usize>,
     #[serde(default, alias = "verificationResults")]
     pub(crate) verification_results: Vec<PatchVerificationCommandResultInput>,
 }
@@ -190,6 +200,52 @@ pub(crate) async fn run_symbol_patch_verification(
     }
 }
 
+pub(crate) async fn run_symbol_patch_repair_attempt(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    let Some(repair_patch) = parts.repair_patch else {
+        return json_error(StatusCode::BAD_REQUEST, "repairPatch 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let generation = response.patch_generation.clone();
+            let original_patch = parts.diff;
+            let attempt = parts.attempt;
+            let max_attempts = parts.max_attempts;
+            match tokio::task::spawn_blocking(move || {
+                build_symbol_patch_repair_attempt_response(
+                    &generation,
+                    &original_patch,
+                    &repair_patch,
+                    &workspace,
+                    attempt,
+                    max_attempts,
+                )
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
 impl SymbolPatchBody {
     fn into_parts(self, require_workspace: bool) -> Result<PatchBodyParts, String> {
         let text = clean(self.q).or_else(|| clean(self.query));
@@ -224,6 +280,9 @@ impl SymbolPatchBody {
             },
             workspace,
             diff,
+            repair_patch: non_empty_patch(self.repair_patch),
+            attempt: self.attempt,
+            max_attempts: self.max_attempts,
             verification_results: self.verification_results,
         })
     }
@@ -253,5 +312,8 @@ struct PatchBodyParts {
     query: SymbolTaskPackQuery,
     workspace: Option<PathBuf>,
     diff: String,
+    repair_patch: Option<String>,
+    attempt: Option<usize>,
+    max_attempts: Option<usize>,
     verification_results: Vec<PatchVerificationCommandResultInput>,
 }
