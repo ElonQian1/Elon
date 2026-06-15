@@ -11,6 +11,7 @@ use serde::Deserialize;
 use crate::{admin, types::AppState};
 
 use super::{
+    symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkSearch},
     symbol_index_graph_query::{
         load_latest_symbol_graph, SymbolGraphQuery, SymbolRelationDirection,
     },
@@ -92,10 +93,24 @@ pub(crate) struct SymbolTaskPackParams {
     pub(crate) depth: Option<usize>,
     #[serde(alias = "searchLimit")]
     pub(crate) search_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
     #[serde(alias = "maxChars")]
     pub(crate) max_chars: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolChunkSearchParams {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) path: Option<String>,
+    #[serde(alias = "chunkType")]
+    pub(crate) chunk_type: Option<String>,
+    pub(crate) limit: Option<usize>,
 }
 
 impl SymbolIndexSearchParams {
@@ -173,9 +188,22 @@ impl SymbolTaskPackParams {
             edge_kind: clean(self.edge_kind),
             depth: self.depth.unwrap_or_default(),
             search_limit: self.search_limit.unwrap_or_default(),
+            chunk_limit: self.chunk_limit.unwrap_or_default(),
             impact_limit: self.impact_limit.unwrap_or_default(),
             max_chars: self.max_chars.unwrap_or_default(),
         })
+    }
+}
+
+impl SymbolChunkSearchParams {
+    fn into_search(self) -> SymbolChunkSearch {
+        SymbolChunkSearch {
+            trace_id: clean(self.trace_id),
+            text: clean(self.q).or_else(|| clean(self.query)),
+            path: clean(self.path),
+            chunk_type: clean(self.chunk_type),
+            limit: self.limit.unwrap_or_default(),
+        }
     }
 }
 
@@ -295,6 +323,21 @@ pub(crate) async fn get_symbol_task_pack(
     };
 
     match build_latest_symbol_task_pack(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn search_symbol_chunks(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolChunkSearchParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    match search_latest_symbol_chunks(&state.data_dir, &params.into_search()) {
         Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }

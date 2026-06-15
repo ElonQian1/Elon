@@ -6,7 +6,10 @@ use std::{
 
 use rusqlite::{params, Connection, Transaction};
 
-use super::symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord};
+use super::{
+    symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
+    symbol_index_chunks::{create_chunk_schema, insert_symbol_chunks},
+};
 
 pub(crate) const SYMBOL_INDEX_DB_FILE: &str = "symbol_index.sqlite";
 
@@ -26,6 +29,7 @@ pub(crate) fn write_symbol_index_sqlite(
         insert_metadata(&tx, index).ok()?;
         insert_symbols(&tx, index).ok()?;
         insert_edges(&tx, index).ok()?;
+        insert_symbol_chunks(&tx, index).ok()?;
         tx.commit().ok()?;
     }
     files.push(path.to_path_buf());
@@ -37,7 +41,7 @@ pub(crate) fn write_symbol_index_sqlite(
 fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         r#"
-        PRAGMA user_version = 1;
+        PRAGMA user_version = 2;
 
         CREATE TABLE metadata (
             key TEXT PRIMARY KEY,
@@ -103,14 +107,15 @@ fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX idx_symbol_terms_term ON symbol_terms(term);
         CREATE INDEX idx_symbol_terms_symbol ON symbol_terms(symbol_id);
         "#,
-    )
+    )?;
+    create_chunk_schema(conn)
 }
 
 fn insert_metadata(tx: &Transaction<'_>, index: &SymbolIndex) -> rusqlite::Result<()> {
     let summary = index.lookup_summary();
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
-        params!["schema_version", "1"],
+        params!["schema_version", "2"],
     )?;
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
@@ -119,6 +124,13 @@ fn insert_metadata(tx: &Transaction<'_>, index: &SymbolIndex) -> rusqlite::Resul
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
         params!["edge_count", summary.edge_count.to_string()],
+    )?;
+    tx.execute(
+        "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
+        params![
+            "chunk_count",
+            (summary.symbol_count + summary.file_count + count_test_symbols(index)).to_string()
+        ],
     )?;
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
@@ -229,6 +241,25 @@ fn insert_symbol_terms(
         stmt.execute(params![term, record.id.as_str(), weight, source])?;
     }
     Ok(())
+}
+
+fn count_test_symbols(index: &SymbolIndex) -> usize {
+    index
+        .records
+        .iter()
+        .filter(|record| {
+            let name = record.name.to_ascii_lowercase();
+            let path = record.file_path.to_ascii_lowercase();
+            let signature = record.signature.to_ascii_lowercase();
+            path.contains("/tests/")
+                || path.ends_with("_test.rs")
+                || path.ends_with("_tests.rs")
+                || path.contains("tests.rs")
+                || name.contains("test")
+                || signature.contains("#[test]")
+                || signature.contains("#[tokio::test]")
+        })
+        .count()
 }
 
 fn push_terms(

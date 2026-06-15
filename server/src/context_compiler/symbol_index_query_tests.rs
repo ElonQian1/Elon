@@ -6,6 +6,7 @@ use std::{
 
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
+    symbol_index_chunks::{search_symbol_chunks_db, SymbolChunkSearch},
     symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
@@ -351,9 +352,60 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .any(|symbol| symbol.name == "build_context_pack"));
     assert!(response.pack.contains("<symbol_task_context"));
     assert!(response.pack.contains("<candidate_symbols"));
+    assert!(response.pack.contains("<full_text_chunks"));
     assert!(response.pack.contains("<symbol_impact_context"));
     assert!(response.pack.contains("build_context_pack_test"));
+    assert!(response
+        .text_chunks
+        .iter()
+        .any(|chunk| chunk.chunk_type == "symbol" && chunk.id.contains("build_context_pack")));
     assert!(response.test_hint_count > 0);
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
+    let dir = temp_dir("elon_symbol_chunks");
+    let db = write_bundle(&dir, "20260614", "213013-trace-chunks-user", sample_index());
+
+    let response = search_symbol_chunks_db(
+        &db,
+        &SymbolChunkSearch {
+            text: Some("context pack test".to_string()),
+            limit: 10,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert!(response
+        .metadata
+        .get("schema_version")
+        .is_some_and(|version| version == "2"));
+    assert!(response
+        .metadata
+        .get("chunk_count")
+        .and_then(|value| value.parse::<usize>().ok())
+        .is_some_and(|count| count >= 5));
+    assert!(response
+        .chunks
+        .iter()
+        .any(|chunk| chunk.chunk_type == "symbol"
+            && chunk
+                .qualified_name
+                .as_deref()
+                .is_some_and(|name| name.contains("build_context_pack"))));
+    assert!(response
+        .chunks
+        .iter()
+        .any(|chunk| chunk.chunk_type == "module"
+            && chunk.file_path == "server/src/context_compiler/context_pack.rs"));
+    assert!(response
+        .chunks
+        .iter()
+        .any(|chunk| chunk.chunk_type == "test"
+            && chunk.file_path == "server/src/context_compiler/context_pack_tests.rs"));
 
     fs::remove_dir_all(dir).unwrap();
 }

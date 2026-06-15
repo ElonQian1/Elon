@@ -4,6 +4,7 @@ use anyhow::{bail, Result};
 use serde::Serialize;
 
 use super::{
+    symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkHit, SymbolChunkSearch},
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
@@ -13,6 +14,8 @@ use super::{
 
 const DEFAULT_TASK_SEARCH_LIMIT: usize = 8;
 const MAX_TASK_SEARCH_LIMIT: usize = 20;
+const DEFAULT_TASK_CHUNK_LIMIT: usize = 8;
+const MAX_TASK_CHUNK_LIMIT: usize = 20;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct SymbolTaskPackQuery {
@@ -23,6 +26,7 @@ pub(crate) struct SymbolTaskPackQuery {
     pub(crate) edge_kind: Option<String>,
     pub(crate) depth: usize,
     pub(crate) search_limit: usize,
+    pub(crate) chunk_limit: usize,
     pub(crate) impact_limit: usize,
     pub(crate) max_chars: usize,
 }
@@ -37,6 +41,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) char_count: usize,
     pub(crate) truncated: bool,
     pub(crate) candidate_symbols: Vec<SymbolHit>,
+    pub(crate) text_chunks: Vec<SymbolChunkHit>,
     pub(crate) chosen_seed: SymbolHit,
     pub(crate) impacted_symbol_count: usize,
     pub(crate) impacted_file_count: usize,
@@ -54,6 +59,7 @@ pub(crate) struct SymbolTaskPackQueryEcho {
     pub(crate) edge_kind: Option<String>,
     pub(crate) depth: usize,
     pub(crate) search_limit: usize,
+    pub(crate) chunk_limit: usize,
     pub(crate) impact_limit: usize,
     pub(crate) max_chars: usize,
 }
@@ -79,6 +85,18 @@ pub(crate) fn build_latest_symbol_task_pack(
         limit: search_limit(query.search_limit),
     };
     let search_response = search_latest_symbol_index(data_dir, &search)?;
+    let text_chunks = search_latest_symbol_chunks(
+        data_dir,
+        &SymbolChunkSearch {
+            trace_id: query.trace_id.clone(),
+            text: Some(text.clone()),
+            path: query.path.clone(),
+            chunk_type: None,
+            limit: chunk_limit(query.chunk_limit),
+        },
+    )
+    .map(|response| response.chunks)
+    .unwrap_or_default();
     let Some(chosen_seed) = search_response.symbols.first().cloned() else {
         bail!("没有找到与任务相关的符号");
     };
@@ -94,7 +112,13 @@ pub(crate) fn build_latest_symbol_task_pack(
     let impact = load_latest_symbol_impact(data_dir, &impact_query)?;
     let impact_pack = build_symbol_impact_pack(impact, normalize_pack_max_chars(query.max_chars));
     let candidate_symbols = search_response.symbols;
-    let pack = render_task_pack(&text, &candidate_symbols, &chosen_seed, &impact_pack.pack);
+    let pack = render_task_pack(
+        &text,
+        &candidate_symbols,
+        &text_chunks,
+        &chosen_seed,
+        &impact_pack.pack,
+    );
     let (pack, truncated) = truncate_pack(pack, normalize_pack_max_chars(query.max_chars));
     let char_count = pack.chars().count();
 
@@ -108,6 +132,7 @@ pub(crate) fn build_latest_symbol_task_pack(
             edge_kind: query.edge_kind.clone(),
             depth: impact_pack.query.depth,
             search_limit: search_limit(query.search_limit),
+            chunk_limit: chunk_limit(query.chunk_limit),
             impact_limit: impact_pack.query.limit,
             max_chars: normalize_pack_max_chars(query.max_chars),
         },
@@ -116,6 +141,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         char_count,
         truncated: truncated || impact_pack.truncated,
         candidate_symbols,
+        text_chunks,
         chosen_seed,
         impacted_symbol_count: impact_pack.impacted_symbol_count,
         impacted_file_count: impact_pack.impacted_file_count,
@@ -127,6 +153,7 @@ pub(crate) fn build_latest_symbol_task_pack(
 fn render_task_pack(
     task: &str,
     candidates: &[SymbolHit],
+    text_chunks: &[SymbolChunkHit],
     chosen_seed: &SymbolHit,
     impact_pack: &str,
 ) -> String {
@@ -156,6 +183,25 @@ fn render_task_pack(
         ));
     }
     out.push_str("</candidate_symbols>\n");
+    out.push_str(&format!(
+        "<full_text_chunks count=\"{}\">\n",
+        text_chunks.len()
+    ));
+    for chunk in text_chunks.iter().take(20) {
+        out.push_str(&format!(
+            "- `{}` type={} path={}:{} score={:.4} matched={}\n",
+            xml_escape(chunk.qualified_name.as_deref().unwrap_or(chunk.id.as_str())),
+            xml_escape(&chunk.chunk_type),
+            xml_escape(&chunk.file_path),
+            chunk.start_line.unwrap_or_default(),
+            chunk.score,
+            xml_escape(&chunk.matched_terms.join(","))
+        ));
+        if let Some(summary) = chunk.summary.as_deref() {
+            out.push_str(&format!("  summary: {}\n", xml_escape(summary)));
+        }
+    }
+    out.push_str("</full_text_chunks>\n");
     out.push_str(impact_pack);
     out.push_str("<task_pack_usage>\n");
     out.push_str("- Start by reading the chosen_seed file and the highest-ranked impacted files before editing.\n");
@@ -173,6 +219,14 @@ fn search_limit(limit: usize) -> usize {
         DEFAULT_TASK_SEARCH_LIMIT
     } else {
         limit.min(MAX_TASK_SEARCH_LIMIT)
+    }
+}
+
+fn chunk_limit(limit: usize) -> usize {
+    if limit == 0 {
+        DEFAULT_TASK_CHUNK_LIMIT
+    } else {
+        limit.min(MAX_TASK_CHUNK_LIMIT)
     }
 }
 

@@ -133,7 +133,7 @@ fn matches_trace(path: &Path, trace: Option<&str>) -> bool {
         .unwrap_or(false)
 }
 
-fn load_metadata(conn: &Connection) -> Result<BTreeMap<String, String>> {
+pub(crate) fn load_metadata(conn: &Connection) -> Result<BTreeMap<String, String>> {
     let mut stmt = conn.prepare("SELECT key, value FROM metadata ORDER BY key")?;
     let rows = stmt.query_map([], |row| {
         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
