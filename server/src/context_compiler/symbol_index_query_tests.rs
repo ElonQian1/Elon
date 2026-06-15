@@ -4,11 +4,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{search_symbol_chunks_db, SymbolChunkSearch},
+    symbol_index_embeddings::{load_symbol_embedding_status_db, SymbolEmbeddingStatus},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
     symbol_index_eval_runs::{
         evaluate_latest_symbol_retrieval_batch, list_latest_retrieval_runs,
@@ -393,7 +394,7 @@ fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
     assert!(response
         .metadata
         .get("schema_version")
-        .is_some_and(|version| version == "3"));
+        .is_some_and(|version| version == "4"));
     assert!(response
         .metadata
         .get("chunk_count")
@@ -417,6 +418,84 @@ fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
         .iter()
         .any(|chunk| chunk.chunk_type == "test"
             && chunk.file_path == "server/src/context_compiler/context_pack_tests.rs"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn embedding_status_reports_missing_and_stale_chunks() {
+    let dir = temp_dir("elon_symbol_embedding_status");
+    let db = write_bundle(
+        &dir,
+        "20260614",
+        "213014-trace-embedding-status-user",
+        sample_index(),
+    );
+    let query = SymbolEmbeddingStatus {
+        model: Some("mock-embed".to_string()),
+        limit: 10,
+        ..Default::default()
+    };
+
+    let initial = load_symbol_embedding_status_db(&db, &query).unwrap();
+    assert!(initial.totals.embeddings_table_available);
+    assert_eq!(initial.totals.embedded_count, 0);
+    assert_eq!(initial.totals.missing_count, initial.totals.chunk_count);
+    assert_eq!(initial.totals.stale_count, 0);
+    assert!(!initial.missing_chunks.is_empty());
+    assert!(initial.models.is_empty());
+
+    let conn = Connection::open(&db).unwrap();
+    let chunks = load_first_embedding_test_chunks(&conn);
+    conn.execute(
+        r#"
+        INSERT INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        params![
+            chunks[0].0.as_str(),
+            "mock-embed",
+            3_i64,
+            vec![0_u8; 12],
+            chunks[0].1.as_str(),
+            123_i64
+        ],
+    )
+    .unwrap();
+    conn.execute(
+        r#"
+        INSERT INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "#,
+        params![
+            chunks[1].0.as_str(),
+            "mock-embed",
+            3_i64,
+            vec![1_u8; 12],
+            "stale-content-hash",
+            124_i64
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let after = load_symbol_embedding_status_db(&db, &query).unwrap();
+    assert_eq!(after.totals.chunk_count, initial.totals.chunk_count);
+    assert_eq!(after.totals.embedded_count, 1);
+    assert_eq!(after.totals.missing_count, initial.totals.chunk_count - 1);
+    assert_eq!(after.totals.stale_count, 1);
+    assert!(after.totals.coverage > 0.0);
+    assert_eq!(after.models.len(), 1);
+    assert_eq!(after.models[0].model, "mock-embed");
+    assert_eq!(after.models[0].embedding_count, 2);
+    assert!(after
+        .missing_chunks
+        .iter()
+        .all(|chunk| chunk.id != chunks[0].0));
+    assert!(after
+        .missing_chunks
+        .iter()
+        .any(|chunk| chunk.id == chunks[1].0 && chunk.has_embedding));
 
     fs::remove_dir_all(dir).unwrap();
 }
@@ -585,6 +664,26 @@ fn write_bundle(data_dir: &Path, day: &str, stem: &str, index: SymbolIndex) -> P
     write_symbol_index_sqlite(&db, &index, &mut files).unwrap();
     assert!(db.is_file());
     db
+}
+
+fn load_first_embedding_test_chunks(conn: &Connection) -> Vec<(String, String)> {
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT id, hash
+            FROM chunks
+            ORDER BY CASE chunk_type WHEN 'symbol' THEN 0 WHEN 'module' THEN 1 ELSE 2 END,
+                file_path, start_line
+            LIMIT 2
+            "#,
+        )
+        .unwrap();
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .unwrap();
+    rows.map(|row| row.unwrap()).collect()
 }
 
 fn sample_index() -> SymbolIndex {

@@ -13,6 +13,7 @@ use crate::{admin, types::AppState};
 
 use super::{
     symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkSearch},
+    symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
     symbol_index_eval_runs::{
         evaluate_latest_symbol_retrieval_batch, list_latest_retrieval_runs,
@@ -120,6 +121,14 @@ pub(crate) struct SymbolChunkSearchParams {
     pub(crate) path: Option<String>,
     #[serde(alias = "chunkType")]
     pub(crate) chunk_type: Option<String>,
+    pub(crate) limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolEmbeddingStatusParams {
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) model: Option<String>,
     pub(crate) limit: Option<usize>,
 }
 
@@ -283,6 +292,16 @@ impl SymbolChunkSearchParams {
             text: clean(self.q).or_else(|| clean(self.query)),
             path: clean(self.path),
             chunk_type: clean(self.chunk_type),
+            limit: self.limit.unwrap_or_default(),
+        }
+    }
+}
+
+impl SymbolEmbeddingStatusParams {
+    fn into_query(self) -> SymbolEmbeddingStatus {
+        SymbolEmbeddingStatus {
+            trace_id: clean(self.trace_id),
+            model: clean(self.model),
             limit: self.limit.unwrap_or_default(),
         }
     }
@@ -507,6 +526,21 @@ pub(crate) async fn search_symbol_chunks(
     }
 
     match search_latest_symbol_chunks(&state.data_dir, &params.into_search()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn get_symbol_embedding_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolEmbeddingStatusParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    match load_latest_symbol_embedding_status(&state.data_dir, &params.into_query()) {
         Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }

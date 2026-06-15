@@ -9,6 +9,7 @@ use rusqlite::{params, Connection, Transaction};
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{create_chunk_schema, insert_symbol_chunks},
+    symbol_index_embeddings::create_embedding_schema,
 };
 
 pub(crate) const SYMBOL_INDEX_DB_FILE: &str = "symbol_index.sqlite";
@@ -41,7 +42,7 @@ pub(crate) fn write_symbol_index_sqlite(
 fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         r#"
-        PRAGMA user_version = 3;
+        PRAGMA user_version = 4;
 
         CREATE TABLE metadata (
             key TEXT PRIMARY KEY,
@@ -109,7 +110,8 @@ fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
         "#,
     )?;
     create_chunk_schema(conn)?;
-    create_retrieval_runs_schema(conn)
+    create_retrieval_runs_schema(conn)?;
+    create_embedding_schema(conn)
 }
 
 pub(crate) fn create_retrieval_runs_schema(conn: &Connection) -> rusqlite::Result<()> {
@@ -133,7 +135,7 @@ fn insert_metadata(tx: &Transaction<'_>, index: &SymbolIndex) -> rusqlite::Resul
     let summary = index.lookup_summary();
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
-        params!["schema_version", "3"],
+        params!["schema_version", "4"],
     )?;
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
