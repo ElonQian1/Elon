@@ -27,7 +27,9 @@ internal class ProjectSpaceFeedView(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val openPost: (ProjectChannel, ProjectChannelMessage) -> Unit,
     private val openPostComposer: () -> Unit,
-    private val openAnnouncementEditor: (ProjectChannel, String) -> Unit
+    private val openAnnouncementEditor: (ProjectChannel, String) -> Unit,
+    private val openProjectDocuments: () -> Unit,
+    private val downloadProjectApk: () -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
     private val announcementExpandedByProject = mutableMapOf<String, Boolean>()
@@ -164,12 +166,25 @@ internal class ProjectSpaceFeedView(
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor("#D6D6D6"))
             })
-            addView(TextView(activity).apply {
-                text = displayText
-                textSize = 14f
-                setTextColor(Color.parseColor("#A8A8A8"))
-                setLineSpacing(dp(3).toFloat(), 1f)
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
                 setPadding(0, dp(7), 0, 0)
+                addView(TextView(activity).apply {
+                    text = displayText
+                    textSize = 14f
+                    setTextColor(Color.parseColor("#A8A8A8"))
+                    setLineSpacing(dp(3).toFloat(), 1f)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(projectSpaceAnnouncementMenuButton(
+                    activity = activity,
+                    dp = dp,
+                    selectableForeground = selectableForeground,
+                    onOpenDocuments = openProjectDocuments,
+                    onDownloadApk = downloadProjectApk
+                ), LinearLayout.LayoutParams(dp(44), dp(40)).apply {
+                    marginStart = dp(12)
+                })
             })
         }
     }

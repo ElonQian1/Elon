@@ -443,51 +443,6 @@
     #projectProgressPanel .project-space-summary {
       display: none;
     }
-    .project-space-quick-actions {
-      display: flex;
-      justify-content: center;
-      padding: 70px 0 48px;
-      background: var(--bg);
-    }
-    .project-space-action-pill {
-      height: 56px;
-      border: 1px solid var(--ink-soft);
-      border-radius: 28px;
-      background: transparent;
-      color: var(--ink);
-      display: inline-flex;
-      align-items: center;
-      overflow: hidden;
-    }
-    .project-space-download-segment,
-    .project-space-docs-segment {
-      height: 100%;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .project-space-download-segment {
-      width: 122px;
-      font-size: 18px;
-      font-weight: 700;
-    }
-    .project-space-docs-segment {
-      width: 56px;
-      border-left: 1px solid var(--ink-soft);
-    }
-    .project-space-docs-segment svg {
-      width: 28px;
-      height: 28px;
-      stroke: currentColor;
-      stroke-width: 2.2;
-      stroke-linecap: round;
-      fill: none;
-    }
     .project-space-title {
       min-width: 0;
     }
@@ -567,6 +522,7 @@
       background: var(--bg);
     }
     .project-space-announcement {
+      position: relative;
       background: var(--project-space-info-bg);
       border-radius: 18px 18px 0 0;
       margin: 0;
@@ -611,11 +567,75 @@
       font-weight: 700;
       margin-bottom: 7px;
     }
+    .project-space-announcement-body-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
     .project-space-announcement-body {
+      flex: 1;
+      min-width: 0;
       color: var(--project-space-info-ink-soft);
       font-size: 14px;
       line-height: 1.55;
       white-space: pre-wrap;
+    }
+    .project-space-announcement-menu-wrap {
+      position: relative;
+      flex: none;
+      width: 44px;
+      height: 40px;
+    }
+    .project-space-announcement-menu-btn {
+      width: 44px;
+      height: 40px;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .project-space-announcement-menu-btn svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      fill: none;
+    }
+    .project-space-announcement-popup {
+      position: absolute;
+      top: 34px;
+      right: -8px;
+      width: 128px;
+      padding: 8px 0;
+      border-radius: 16px;
+      background: #BDBDBD;
+      z-index: 30;
+      filter: drop-shadow(0 8px 14px rgba(0,0,0,0.24));
+    }
+    .project-space-announcement-popup::before {
+      content: "";
+      position: absolute;
+      top: -11px;
+      right: 26px;
+      width: 0;
+      height: 0;
+      border-left: 12px solid transparent;
+      border-right: 12px solid transparent;
+      border-bottom: 12px solid #BDBDBD;
+    }
+    .project-space-announcement-popup button {
+      width: 100%;
+      height: 46px;
+      border: 0;
+      background: transparent;
+      color: #3F4146;
+      font-size: 17px;
+      cursor: pointer;
     }
     .project-space-post-head {
       display: flex;
@@ -1822,16 +1842,6 @@
       </div>
       <div id="projectHomeRoot" class="project-home-root" aria-live="polite"></div>
       <div id="projectProgressPanel" class="project-progress-panel hidden" aria-hidden="true">
-        <div class="project-space-quick-actions" id="projectSpaceQuickActions">
-          <div class="project-space-action-pill" aria-label="项目快捷入口">
-            <button class="project-space-download-segment" id="projectSpaceDownloadBtn" type="button">下载APK</button>
-            <button class="project-space-docs-segment" id="projectSpaceDocsBtn" title="项目文档" type="button" aria-label="项目文档">
-              <svg viewBox="0 0 28 28" aria-hidden="true">
-                <path d="M8 9H20M8 14H20M8 19H20"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
         <div class="project-space-summary" id="projectSpaceSummary">
           <div class="project-space-heading">
             <div class="project-space-icon" id="projectSpaceIcon" aria-hidden="true">项</div>
@@ -1845,7 +1855,20 @@
         <div class="project-space-feed" id="projectSpaceFeed">
           <div class="project-space-announcement">
             <div class="project-space-announcement-title">公告</div>
-            <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
+            <div class="project-space-announcement-body-row">
+              <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
+              <div class="project-space-announcement-menu-wrap">
+                <button class="project-space-announcement-menu-btn" id="projectSpaceAnnouncementMenuBtn" type="button" aria-label="项目快捷入口">
+                  <svg viewBox="0 0 28 28" aria-hidden="true">
+                    <path d="M8 9H20M8 14H20M8 19H20"></path>
+                  </svg>
+                </button>
+                <div class="project-space-announcement-popup hidden" id="projectSpaceAnnouncementMenu">
+                  <button id="projectSpaceDocsBtn" type="button">项目文档</button>
+                  <button id="projectSpaceDownloadBtn" type="button">下载APK</button>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="project-space-post-area">
             <div id="projectSpacePostList" class="project-space-post-list">
@@ -2417,6 +2440,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectIntroCard = $('projectIntroCard');
   const projectSpaceFeed = $('projectSpaceFeed');
   const projectSpaceAnnouncement = $('projectSpaceAnnouncement');
+  const projectSpaceAnnouncementMenuBtn = $('projectSpaceAnnouncementMenuBtn');
+  const projectSpaceAnnouncementMenu = $('projectSpaceAnnouncementMenu');
   const projectSpacePostList = $('projectSpacePostList');
   const projectSpaceDownloadBtn = $('projectSpaceDownloadBtn');
   const projectSpaceDocsBtn = $('projectSpaceDocsBtn');
@@ -2467,8 +2492,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       }
     });
   }
+  if (projectSpaceAnnouncementMenuBtn && projectSpaceAnnouncementMenu) {
+    projectSpaceAnnouncementMenuBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      projectSpaceAnnouncementMenu.classList.toggle('hidden');
+    });
+    projectSpaceAnnouncementMenu.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+    document.addEventListener('click', () => {
+      projectSpaceAnnouncementMenu.classList.add('hidden');
+    });
+  }
   if (projectSpaceDownloadBtn) {
     projectSpaceDownloadBtn.addEventListener('click', () => {
+      if (projectSpaceAnnouncementMenu) projectSpaceAnnouncementMenu.classList.add('hidden');
       const url = String(
         currentProjectSpaceLatestApkUrl ||
         (currentProject && (currentProject.latest_apk_url || currentProject.latestApkUrl)) ||
@@ -2483,6 +2521,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectSpaceDocsBtn) {
     projectSpaceDocsBtn.addEventListener('click', () => {
+      if (projectSpaceAnnouncementMenu) projectSpaceAnnouncementMenu.classList.add('hidden');
       openProjectDocumentDialog(currentProject);
     });
   }

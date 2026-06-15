@@ -90,7 +90,9 @@ internal class ProjectSpaceController(
         openPostComposer = { renderPostComposer() },
         openAnnouncementEditor = { channel, currentText ->
             activeSpace?.let { announcementEditor.show(it, channel, currentText) }
-        }
+        },
+        openProjectDocuments = { showProjectDocumentsDialog() },
+        downloadProjectApk = { openProjectApkDownload(activity, activeSpace?.latestApkUrl) }
     )
     private val postComposer = ProjectSpacePostComposer(
         activity = activity,
@@ -320,13 +322,6 @@ internal class ProjectSpaceController(
         val space = activeSpace ?: return
         val container = prepareProjectContent(showAiMenu = true)
         container.removeAllViews()
-        container.addView(projectSpaceQuickActions(
-            activity = activity,
-            apkUrl = space.latestApkUrl,
-            dp = dp,
-            selectableForeground = selectableForeground,
-            onOpenDocuments = { showProjectDocumentsDialog() }
-        ))
         feedView.render(
             container = container,
             space = space,
@@ -868,15 +863,6 @@ internal class ProjectSpaceController(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ))
-            space.latestApkUrl?.takeIf { it.isNotBlank() }?.let { apkUrl ->
-                addView(projectSpaceQuickActions(
-                    activity = activity,
-                    apkUrl = apkUrl,
-                    dp = dp,
-                    selectableForeground = selectableForeground,
-                    onOpenDocuments = { showProjectDocumentsDialog() }
-                ))
-            }
         }
     }
 
