@@ -115,6 +115,12 @@ mod symbol_index_query_tests;
 mod symbol_index_query_types;
 mod symbol_index_rank_profile;
 mod symbol_index_ranker;
+mod symbol_index_retrieval_learning;
+mod symbol_index_retrieval_learning_json;
+mod symbol_index_retrieval_learning_scoring;
+#[cfg(test)]
+mod symbol_index_retrieval_learning_tests;
+mod symbol_index_retrieval_learning_types;
 mod symbol_index_retrieval_plan;
 mod symbol_index_semantic;
 mod symbol_index_store;

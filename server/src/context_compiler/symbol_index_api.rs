@@ -30,6 +30,8 @@ use super::{
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
+    symbol_index_retrieval_learning::build_latest_symbol_retrieval_learning_report,
+    symbol_index_retrieval_learning_types::SymbolRetrievalLearningQuery,
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
     symbol_index_vector::{
         backfill_latest_symbol_vectors, search_latest_symbol_vectors, SymbolVectorBackfill,
@@ -243,6 +245,17 @@ pub(crate) struct SymbolRetrievalRunParams {
     pub(crate) run_id: Option<String>,
     #[serde(alias = "traceId")]
     pub(crate) trace_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalLearningParams {
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) limit: Option<usize>,
+    #[serde(alias = "minSamples", alias = "min_samples")]
+    pub(crate) min_samples: Option<usize>,
+    #[serde(alias = "topK", alias = "top_k")]
+    pub(crate) top_k: Option<usize>,
 }
 
 impl SymbolIndexSearchParams {
@@ -471,6 +484,17 @@ impl SymbolRetrievalRunParams {
             trace_id: clean(self.trace_id),
             id,
         })
+    }
+}
+
+impl SymbolRetrievalLearningParams {
+    fn into_query(self) -> SymbolRetrievalLearningQuery {
+        SymbolRetrievalLearningQuery {
+            trace_id: clean(self.trace_id),
+            limit: self.limit.unwrap_or_default(),
+            min_samples: self.min_samples.unwrap_or_default(),
+            top_k: self.top_k.unwrap_or_default(),
+        }
     }
 }
 
@@ -730,6 +754,21 @@ pub(crate) async fn get_symbol_retrieval_run(
     };
 
     match load_latest_retrieval_run(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn get_symbol_retrieval_learning(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolRetrievalLearningParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    match build_latest_symbol_retrieval_learning_report(&state.data_dir, &params.into_query()) {
         Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }

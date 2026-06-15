@@ -560,6 +560,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(context_compiler::symbol_index_eval_compare_api::compare_symbol_retrieval_runs),
         )
         .route(
+            "/api/admin/context/symbol-index/retrieval-learning",
+            get(context_compiler::symbol_index_api::get_symbol_retrieval_learning),
+        )
+        .route(
             "/api/admin/context/symbol-index/symbol",
             get(context_compiler::symbol_index_api::get_symbol_graph),
         )
