@@ -5,6 +5,9 @@ use serde::Serialize;
 
 use super::{
     symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkHit, SymbolChunkSearch},
+    symbol_index_compression::compress_symbol_context,
+    symbol_index_compression_render::render_compressed_context,
+    symbol_index_compression_types::SymbolCompressedContext,
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
@@ -53,6 +56,7 @@ pub(crate) struct SymbolTaskPackResponse {
     pub(crate) text_chunks: Vec<SymbolChunkHit>,
     pub(crate) vector_chunks: Vec<SymbolVectorHit>,
     pub(crate) ranked_context: Vec<RankedContextItem>,
+    pub(crate) compressed_context: SymbolCompressedContext,
     pub(crate) chosen_seed: SymbolHit,
     pub(crate) chosen_seed_source: String,
     pub(crate) impacted_symbol_count: usize,
@@ -189,20 +193,31 @@ pub(crate) fn build_latest_symbol_task_pack(
     if candidate_symbols.is_empty() {
         candidate_symbols.extend(impact.seed_symbols.iter().cloned());
     }
-    let impact_pack = build_symbol_impact_pack(impact, normalize_pack_max_chars(query.max_chars));
+    let max_chars = normalize_pack_max_chars(query.max_chars);
+    let compressed_context = compress_symbol_context(
+        &ranked_context,
+        &candidate_symbols,
+        &impact,
+        &text_chunks,
+        &vector_chunks,
+        &retrieval_plan,
+        max_chars,
+    );
+    let impact_pack = build_symbol_impact_pack(impact, max_chars);
     let pack = render_task_pack(
         &text,
         &candidate_symbols,
         &text_chunks,
         &vector_chunks,
         &ranked_context,
+        &compressed_context,
         &retrieval_plan,
         &ranking_profile,
         &chosen_seed,
         seed_choice.source,
         &impact_pack.pack,
     );
-    let (pack, truncated) = truncate_pack(pack, normalize_pack_max_chars(query.max_chars));
+    let (pack, truncated) = truncate_pack(pack, max_chars);
     let char_count = pack.chars().count();
 
     Ok(SymbolTaskPackResponse {
@@ -219,7 +234,7 @@ pub(crate) fn build_latest_symbol_task_pack(
             vector_model: query.vector_model.clone(),
             vector_limit: planned_vector_limit,
             impact_limit: impact_pack.query.limit,
-            max_chars: normalize_pack_max_chars(query.max_chars),
+            max_chars,
         },
         metadata: impact_pack.metadata,
         retrieval_plan,
@@ -231,6 +246,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         text_chunks,
         vector_chunks,
         ranked_context,
+        compressed_context,
         chosen_seed,
         chosen_seed_source: seed_choice.source.to_string(),
         impacted_symbol_count: impact_pack.impacted_symbol_count,
@@ -246,6 +262,7 @@ fn render_task_pack(
     text_chunks: &[SymbolChunkHit],
     vector_chunks: &[SymbolVectorHit],
     ranked_context: &[RankedContextItem],
+    compressed_context: &SymbolCompressedContext,
     retrieval_plan: &RetrievalPlan,
     ranking_profile: &HybridRankProfile,
     chosen_seed: &SymbolHit,
@@ -302,6 +319,7 @@ fn render_task_pack(
         ));
     }
     out.push_str("</ranked_context>\n");
+    out.push_str(&render_compressed_context(compressed_context));
     out.push_str(&format!(
         "<candidate_symbols count=\"{}\">\n",
         candidates.len()

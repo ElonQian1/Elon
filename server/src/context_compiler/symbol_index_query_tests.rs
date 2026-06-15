@@ -408,6 +408,8 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
     assert!(response.pack.contains("<ranked_context"));
     assert!(response.pack.contains("decision="));
     assert!(response.pack.contains("sources="));
+    assert!(response.pack.contains("<compressed_context"));
+    assert!(response.pack.contains("Compression:"));
     assert!(response.pack.contains("<candidate_symbols"));
     assert!(response.pack.contains("<full_text_chunks"));
     assert!(response.pack.contains("<vector_chunks"));
@@ -425,6 +427,16 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
         .ranked_context
         .iter()
         .any(|item| item.source == "symbol" && item.label.contains("build_context_pack")));
+    assert!(!response.compressed_context.blocks.is_empty());
+    assert!(
+        response.compressed_context.used_tokens <= response.compressed_context.budget_tokens,
+        "compressed context should fit its token budget"
+    );
+    assert!(response
+        .compressed_context
+        .level_counts
+        .keys()
+        .any(|level| level == "full_symbol_body" || level == "focused_snippet"));
     assert!(response.test_hint_count > 0);
 
     fs::remove_dir_all(dir).unwrap();
