@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -78,7 +79,7 @@ internal class ProjectSpaceFeedView(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            topMargin = announcementPostOffset(announcementExpanded)
+            topMargin = dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
         }
         val feedColumn = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -99,10 +100,11 @@ internal class ProjectSpaceFeedView(
         announcement.setOnClickListener {
             val nextExpanded = !(announcementExpandedByProject[space.project.id] == true)
             announcementExpandedByProject[space.project.id] = nextExpanded
-            animateAnnouncementFrame(frame, nextExpanded)
+            animateAnnouncementFrame(frame, announcement, nextExpanded)
             announcement.contentDescription = if (nextExpanded) "收起项目公告" else "展开项目公告"
         }
         stack.addView(frame, frameParams)
+        syncAnnouncementFrameAfterMeasure(stack, frame, announcement, announcementExpanded)
         feedShell.addView(stack)
         container.addView(feedShell)
     }
@@ -131,7 +133,7 @@ internal class ProjectSpaceFeedView(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(20), dp(20), dp(42))
             background = roundedBackground(
-                colorHex = "#30333A",
+                colorHex = PROJECT_SPACE_INFO_BG,
                 topStartDp = 18,
                 topEndDp = 18,
                 bottomEndDp = 0,
@@ -176,13 +178,41 @@ internal class ProjectSpaceFeedView(
         return value?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
-    private fun announcementPostOffset(expanded: Boolean): Int {
-        return dp(if (expanded) ANNOUNCEMENT_EXPANDED_POST_OFFSET_DP else ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
+    private fun syncAnnouncementFrameAfterMeasure(
+        parent: View,
+        frame: View,
+        announcement: View,
+        expanded: Boolean
+    ) {
+        parent.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                if (parent.viewTreeObserver.isAlive) {
+                    parent.viewTreeObserver.removeOnPreDrawListener(this)
+                }
+                setAnnouncementFrameOffset(frame, announcementPostOffset(announcement, expanded))
+                return true
+            }
+        })
     }
 
-    private fun animateAnnouncementFrame(frame: View, expanded: Boolean) {
+    private fun announcementPostOffset(announcement: View, expanded: Boolean): Int {
+        if (!expanded) return dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
+        return announcement.height
+            .takeIf { it > 0 }
+            ?: announcement.measuredHeight.takeIf { it > 0 }
+            ?: dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
+    }
+
+    private fun setAnnouncementFrameOffset(frame: View, offset: Int) {
         val params = frame.layoutParams as? FrameLayout.LayoutParams ?: return
-        val target = announcementPostOffset(expanded)
+        if (params.topMargin == offset) return
+        params.topMargin = offset
+        frame.layoutParams = params
+    }
+
+    private fun animateAnnouncementFrame(frame: View, announcement: View, expanded: Boolean) {
+        val params = frame.layoutParams as? FrameLayout.LayoutParams ?: return
+        val target = announcementPostOffset(announcement, expanded)
         val start = params.topMargin
         announcementAnimator?.cancel()
         if (start == target) return
@@ -497,7 +527,7 @@ internal class ProjectSpaceFeedView(
                     includeFontPadding = false
                     gravity = Gravity.CENTER
                     setTextColor(Color.parseColor("#D6D6D6"))
-                    background = roundedBackground("#30333A", 24)
+                    background = roundedBackground(PROJECT_SPACE_INFO_BG, 24)
                     isClickable = true
                     foreground = selectableForeground()
                     setOnClickListener { openPostComposer() }
@@ -542,8 +572,8 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
+        const val PROJECT_SPACE_INFO_BG = "#2F3136"
         const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 78
-        const val ANNOUNCEMENT_EXPANDED_POST_OFFSET_DP = 148
         const val ANNOUNCEMENT_ANIMATION_MS = 220L
     }
 

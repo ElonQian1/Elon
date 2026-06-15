@@ -3,13 +3,13 @@
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <corners android:radius="32dp" />
-            <solid android:color="#30333A" />
+            <solid android:color="@color/elon_project_space_info_bg" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="32dp" />
-            <solid android:color="#30333A" />
+            <solid android:color="@color/elon_project_space_info_bg" />
         </shape>
     </item>
 </selector>
