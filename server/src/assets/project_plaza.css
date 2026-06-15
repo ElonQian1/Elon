@@ -67,7 +67,7 @@
 
 .project-plaza-card {
   width: calc(100% - 32px);
-  margin: 18px 16px 0;
+  margin: 8px 16px 0;
   border: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -75,6 +75,10 @@
   color: #d6d6d6;
   padding: 0;
   text-align: left;
+}
+
+.project-plaza-card:first-child {
+  margin-top: 18px;
 }
 
 .project-plaza-card-head {
@@ -213,21 +217,24 @@
 
 .project-plaza-actions {
   position: absolute;
+  left: 24px;
   right: 24px;
-  bottom: 24px;
+  bottom: 20px;
   display: flex;
-  gap: 14px;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-plaza-btn {
-  width: 96px;
-  height: 38px;
+  width: 92px;
+  height: 34px;
   border: 0;
   border-radius: 999px;
   background: #c8c8c8;
   color: #101010;
-  font-size: 15px;
-  line-height: 38px;
+  font-size: 14px;
+  line-height: 34px;
   font-weight: 800;
   text-align: center;
   cursor: pointer;

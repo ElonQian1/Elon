@@ -254,10 +254,12 @@ internal class MainMarketplaceActions(
             container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
             return
         }
-        projects.forEach { container.addView(buildProjectCard(it)) }
+        projects.forEachIndexed { index, project ->
+            container.addView(buildProjectCard(project, first = index == 0))
+        }
     }
 
-    private fun buildProjectCard(project: StoreProject): LinearLayout {
+    private fun buildProjectCard(project: StoreProject, first: Boolean): LinearLayout {
         val alreadyJoined = joinedIds.contains(project.id)
         val joinBtn = actionButton(projectJoinActionLabel(project.joinMode, alreadyJoined)).apply {
             setOnClickListener {
@@ -274,7 +276,7 @@ internal class MainMarketplaceActions(
             ).apply {
                 marginStart = dp(16)
                 marginEnd = dp(16)
-                topMargin = dp(18)
+                topMargin = dp(if (first) 18 else 8)
             }
             addView(createCardHeader(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -368,22 +370,23 @@ internal class MainMarketplaceActions(
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                addView(joinBtn, LinearLayout.LayoutParams(dp(96), dp(38)).apply {
-                    marginEnd = dp(14)
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                addView(joinBtn, LinearLayout.LayoutParams(dp(92), dp(34)).apply {
+                    marginEnd = dp(10)
                 })
                 addView(actionButton("下载APK").apply {
                     isEnabled = !project.latestApkUrl.isNullOrBlank()
                     alpha = if (isEnabled) 1f else 0.55f
                     setOnClickListener { tryInstallProject(project, this, joinBtn) }
-                }, LinearLayout.LayoutParams(dp(96), dp(38)))
+                }, LinearLayout.LayoutParams(dp(92), dp(34)))
             }, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.END or Gravity.BOTTOM
+                Gravity.BOTTOM
             ).apply {
+                leftMargin = dp(24)
                 rightMargin = dp(24)
-                bottomMargin = dp(24)
+                bottomMargin = dp(20)
             })
         }
     }
@@ -463,12 +466,13 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#101010"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTypeface(typeface, Typeface.BOLD)
             background = rect("#C8C8C8", 999)
             isClickable = true
             foreground = selectableForeground()
             maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
         }
     }
 

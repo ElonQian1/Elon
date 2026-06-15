@@ -79,6 +79,13 @@
     return normalizeJoinMode(mode) === 'approval' ? '需审批' : '无需审批';
   }
 
+  function joinActionLabel(mode, joined) {
+    if (joined) return '进入项目';
+    if (normalizeJoinMode(mode) === 'open') return '加入';
+    if (normalizeJoinMode(mode) === 'readonly') return '进入体验';
+    return '申请加入';
+  }
+
   function projectIdentity(project) {
     const name = String(project.name || '').trim() || '未命名项目';
     const description = String(project.description || '').trim();
@@ -210,6 +217,7 @@
     const apkUrl = String(project.latest_apk_url || project.last_apk_url || '').trim();
     const mode = normalizeJoinMode(project.join_mode);
     const action = joined ? 'open' : mode === 'approval' ? 'apply' : 'join';
+    const actionLabel = busy ? '处理中...' : joinActionLabel(mode, joined);
     return `
       <div class="project-plaza-card" data-id="${escapeHtml(project.id)}">
         <div class="project-plaza-card-head">
@@ -231,7 +239,7 @@
           </div>
           <span class="project-plaza-time">时间</span>
           <div class="project-plaza-actions">
-            <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}">${busy ? '处理中...' : '进入空间'}</button>
+            <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}">${escapeHtml(actionLabel)}</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="download" data-id="${escapeHtml(project.id)}" aria-disabled="${apkUrl ? 'false' : 'true'}">下载APK</button>
           </div>
         </div>
