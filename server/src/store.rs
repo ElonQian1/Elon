@@ -266,6 +266,17 @@ impl Store {
             if is_system_project_source_type(&source_type) {
                 anyhow::bail!("系统归档项目不能绑定为外部代码工作区");
             }
+            if let Some(existing) =
+                find_owner_project_by_workspace_path(&conn, user_id, workspace_path)?
+            {
+                if existing.id != project_id {
+                    let display = existing
+                        .display_name
+                        .as_deref()
+                        .unwrap_or(existing.name.as_str());
+                    anyhow::bail!("该本地路径已绑定到项目「{}」，请直接打开该项目", display);
+                }
+            }
 
             let tx = conn.unchecked_transaction()?;
             tx.execute(
@@ -319,6 +330,37 @@ impl Store {
         }
 
         if let Some(mut project) = find_owner_project_by_name(&conn, user_id, name)? {
+            conn.execute(
+                "UPDATE projects
+                 SET template = 'local',
+                     source_type = 'local_path',
+                     workspace_path = ?2,
+                     node_id = ?3,
+                     repo_url = COALESCE(?4, repo_url),
+                     branch = COALESCE(?5, branch),
+                     updated_at = ?6
+                 WHERE id = ?1",
+                params![&project.id, workspace_path, node_id, repo_url, branch, now],
+            )?;
+            project.template = "local".into();
+            project.source_type = "local_path".into();
+            project.workspace_path = Some(workspace_path.to_string());
+            project.node_id = node_id.map(ToOwned::to_owned);
+            if repo_url.is_some() {
+                project.repo_url = repo_url.map(ToOwned::to_owned);
+            }
+            if branch.is_some() {
+                project.branch = branch.map(ToOwned::to_owned);
+            }
+            project.updated_at = now;
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
+        if let Some(mut project) =
+            find_owner_project_by_workspace_path(&conn, user_id, workspace_path)?
+        {
             conn.execute(
                 "UPDATE projects
                  SET template = 'local',
@@ -885,6 +927,71 @@ fn find_owner_project_by_name(
         .optional()?)
 }
 
+fn find_owner_project_by_workspace_path(
+    conn: &Connection,
+    user_id: &str,
+    workspace_path: &str,
+) -> Result<Option<ProjectSummary>> {
+    let expected = normalize_workspace_path_for_match(workspace_path);
+    if expected.is_empty() {
+        return Ok(None);
+    }
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
+                p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
+                p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                p.storage_worktree_path, COALESCE(p.storage_status, 'none'), p.status,
+                COALESCE(pm.role, 'owner') AS role,
+                (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id) AS member_count,
+                p.is_public,
+                p.join_mode,
+                (
+                    SELECT t.status FROM tasks t
+                    WHERE t.project_id = p.id
+                    ORDER BY t.created_at DESC
+                    LIMIT 1
+                ) AS last_task_status,
+                (
+                    SELECT t.apk_url FROM tasks t
+                    WHERE t.project_id = p.id AND t.apk_url IS NOT NULL
+                    ORDER BY t.created_at DESC
+                    LIMIT 1
+                ) AS last_apk_url,
+                p.icon_data_url,
+                p.updated_at,
+                p.display_name
+         FROM projects p
+         LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1
+         WHERE p.created_by = ?1
+           AND p.status != 'deleted'
+           AND p.source_type IN ('local_path', 'pc_managed')
+           AND p.workspace_path IS NOT NULL
+           AND TRIM(p.workspace_path) != ''
+         ORDER BY p.updated_at DESC",
+    )?;
+    let mut rows = stmt.query_map(params![user_id], project_summary_from_row)?;
+    while let Some(project) = rows.next() {
+        let project = project?;
+        if project
+            .workspace_path
+            .as_deref()
+            .map(normalize_workspace_path_for_match)
+            .as_deref()
+            == Some(expected.as_str())
+        {
+            return Ok(Some(project));
+        }
+    }
+    Ok(None)
+}
+
+fn normalize_workspace_path_for_match(path: &str) -> String {
+    path.trim()
+        .trim_end_matches(|ch| ch == '/' || ch == '\\')
+        .replace('\\', "/")
+        .to_ascii_lowercase()
+}
+
 fn find_project_by_id_for_user(
     conn: &Connection,
     user_id: &str,
@@ -1029,6 +1136,109 @@ mod tests {
             Some(r"D:\rust\active-projects\elon cli")
         );
         assert_eq!(bound.project.node_id.as_deref(), Some("node-owner"));
+    }
+
+    #[test]
+    fn register_external_project_reuses_existing_workspace_path_with_different_name() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-path-owner@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let workspace_path = r"D:\rust\active-projects\江西吉安商会";
+
+        let first = store
+            .register_external_project(
+                &user.id,
+                None,
+                "江西吉安商会",
+                None,
+                workspace_path,
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("first project should register");
+        let second = store
+            .register_external_project(
+                &user.id,
+                None,
+                "jxjssh",
+                None,
+                "D:/rust/active-projects/江西吉安商会/",
+                Some("node-b"),
+                None,
+                None,
+            )
+            .expect("same workspace path should reuse existing project");
+
+        assert!(second.reused_existing);
+        assert_eq!(second.project.id, first.project.id);
+        assert_eq!(second.project.name, "江西吉安商会");
+        assert_eq!(second.project.node_id.as_deref(), Some("node-b"));
+
+        let count: i64 = store
+            .conn()
+            .expect("db connection")
+            .query_row(
+                "SELECT COUNT(*) FROM projects WHERE created_by = ?1 AND status != 'deleted'",
+                params![user.id],
+                |row| row.get(0),
+            )
+            .expect("project count");
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn register_external_project_rejects_binding_to_path_owned_by_another_project() {
+        let store = temp_store();
+        let user = store
+            .create_user(
+                "pc-project-path-conflict@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .expect("user should be created");
+        let workspace_path = r"D:\rust\active-projects\江西吉安商会";
+        let existing = store
+            .register_external_project(
+                &user.id,
+                None,
+                "江西吉安商会",
+                None,
+                workspace_path,
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("first project should register");
+        let other = store
+            .ensure_project_for_user(
+                &user.id,
+                "prj-other",
+                "其他项目",
+                None,
+                "template",
+                "android",
+                None,
+            )
+            .expect("other project should exist");
+
+        let err = store
+            .register_external_project(
+                &user.id,
+                Some(&other.id),
+                "其他项目",
+                None,
+                workspace_path,
+                Some("node-b"),
+                None,
+                None,
+            )
+            .expect_err("binding duplicate workspace path should fail");
+
+        assert!(err.to_string().contains("该本地路径已绑定到项目"));
+        assert!(err.to_string().contains(&existing.project.name));
     }
 
     #[test]
