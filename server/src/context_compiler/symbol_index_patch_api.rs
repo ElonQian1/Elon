@@ -1,10 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
 use axum::{
+    Json,
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    Json,
 };
 use serde::Deserialize;
 
@@ -13,7 +13,10 @@ use crate::{admin, types::AppState};
 use super::{
     symbol_index_patch_check::check_symbol_patch_diff,
     symbol_index_patch_dry_run::dry_run_symbol_patch as run_symbol_patch_dry_run,
-    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
+    symbol_index_patch_verification_repair::{
+        PatchVerificationCommandResultInput, build_symbol_patch_verification_repair_response,
+    },
+    symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
 };
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +53,8 @@ pub(crate) struct SymbolPatchBody {
     #[serde(alias = "generatedDiff")]
     pub(crate) generated_diff: Option<String>,
     pub(crate) patch: Option<String>,
+    #[serde(default, alias = "verificationResults")]
+    pub(crate) verification_results: Vec<PatchVerificationCommandResultInput>,
 }
 
 pub(crate) async fn check_symbol_patch(
@@ -110,6 +115,46 @@ pub(crate) async fn dry_run_symbol_patch(
     }
 }
 
+pub(crate) async fn verify_symbol_patch(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<SymbolPatchBody>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let parts = match body.into_parts(true) {
+        Ok(parts) => parts,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    let Some(workspace) = parts.workspace else {
+        return json_error(StatusCode::BAD_REQUEST, "workspace 不能为空");
+    };
+    match build_latest_symbol_task_pack(&state.data_dir, &parts.query) {
+        Ok(response) => {
+            let generation = response.patch_generation.clone();
+            let diff = parts.diff;
+            let verification_results = parts.verification_results;
+            match tokio::task::spawn_blocking(move || {
+                build_symbol_patch_verification_repair_response(
+                    &generation,
+                    &diff,
+                    &workspace,
+                    &verification_results,
+                )
+            })
+            .await
+            {
+                Ok(result) => Json(result).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
 impl SymbolPatchBody {
     fn into_parts(self, require_workspace: bool) -> Result<PatchBodyParts, String> {
         let text = clean(self.q).or_else(|| clean(self.query));
@@ -144,6 +189,7 @@ impl SymbolPatchBody {
             },
             workspace,
             diff,
+            verification_results: self.verification_results,
         })
     }
 }
@@ -172,4 +218,5 @@ struct PatchBodyParts {
     query: SymbolTaskPackQuery,
     workspace: Option<PathBuf>,
     diff: String,
+    verification_results: Vec<PatchVerificationCommandResultInput>,
 }

@@ -10,6 +10,10 @@ use super::{
     symbol_index_patch_check::PatchDiffCheckStatus,
     symbol_index_patch_dry_run::{PatchApplyGateStatus, dry_run_symbol_patch},
     symbol_index_patch_verification::PatchVerificationStatus,
+    symbol_index_patch_verification_repair::{
+        PatchVerificationCommandResultInput, PatchVerificationRepairStatus,
+        build_patch_verification_repair_context,
+    },
     symbol_index_store::{SYMBOL_INDEX_DB_FILE, write_symbol_index_sqlite},
     symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
 };
@@ -342,6 +346,106 @@ fn patch_dry_run_marks_clean_workspace_ready_for_apply() {
     fs::remove_dir_all(workspace).unwrap();
 }
 
+#[test]
+fn verification_repair_context_prompts_for_failed_targeted_test() {
+    let (data_dir, workspace, response, diff, dry_run) =
+        ready_patch_fixture("elon_symbol_patch_verify_repair_fail", "213020");
+    let failed_command = dry_run
+        .verification_plan
+        .commands
+        .iter()
+        .find(|command| command.category == "test")
+        .unwrap()
+        .command
+        .clone();
+
+    let context = build_patch_verification_repair_context(
+        &response.patch_generation,
+        &dry_run,
+        &diff,
+        &[PatchVerificationCommandResultInput {
+            command: failed_command,
+            exit_code: Some(101),
+            stdout: Some("running 1 test\ncontext_pack_tests::demo_test FAILED".to_string()),
+            stderr: Some("assertion failed: expected status 401, got 500".to_string()),
+            elapsed_ms: Some(1_250),
+        }],
+    );
+
+    assert_eq!(
+        context.status,
+        PatchVerificationRepairStatus::ReadyForRepair
+    );
+    assert!(context.model_repair_required);
+    assert_eq!(context.failed_commands.len(), 1);
+    assert_eq!(
+        context.failed_commands[0].failure_kind,
+        "targeted_tests_failed"
+    );
+    assert!(context.failed_commands[0].matched_plan);
+    assert!(context.passed_commands.is_empty());
+    assert!(
+        context
+            .allowed_files
+            .iter()
+            .any(|file| file == "server/src/context_compiler/context_pack.rs")
+    );
+    assert!(
+        context
+            .retry_prompt
+            .as_deref()
+            .unwrap_or_default()
+            .contains("<patch_verification_repair_task>")
+    );
+    assert!(
+        context
+            .retry_prompt
+            .as_deref()
+            .unwrap_or_default()
+            .contains("targeted_tests_failed")
+    );
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
+#[test]
+fn verification_repair_context_does_not_prompt_when_all_commands_pass() {
+    let (data_dir, workspace, response, diff, dry_run) =
+        ready_patch_fixture("elon_symbol_patch_verify_repair_pass", "213021");
+    let results = dry_run
+        .verification_plan
+        .commands
+        .iter()
+        .map(|command| PatchVerificationCommandResultInput {
+            command: command.command.clone(),
+            exit_code: Some(0),
+            stdout: Some(String::new()),
+            stderr: Some(String::new()),
+            elapsed_ms: Some(10),
+        })
+        .collect::<Vec<_>>();
+
+    let context = build_patch_verification_repair_context(
+        &response.patch_generation,
+        &dry_run,
+        &diff,
+        &results,
+    );
+
+    assert_eq!(
+        context.status,
+        PatchVerificationRepairStatus::VerificationPassed
+    );
+    assert!(!context.model_repair_required);
+    assert!(context.failed_commands.is_empty());
+    assert_eq!(context.passed_commands.len(), results.len());
+    assert!(context.retry_prompt.is_none());
+
+    fs::remove_dir_all(data_dir).unwrap();
+    fs::remove_dir_all(workspace).unwrap();
+}
+
 fn patch_generation(data_dir: &Path) -> super::symbol_index_task_pack::SymbolTaskPackResponse {
     build_latest_symbol_task_pack(
         data_dir,
@@ -357,6 +461,53 @@ fn patch_generation(data_dir: &Path) -> super::symbol_index_task_pack::SymbolTas
         },
     )
     .unwrap()
+}
+
+fn ready_patch_fixture(
+    prefix: &str,
+    trace_suffix: &str,
+) -> (
+    PathBuf,
+    PathBuf,
+    super::symbol_index_task_pack::SymbolTaskPackResponse,
+    String,
+    super::symbol_index_patch_dry_run::SymbolPatchDryRunResponse,
+) {
+    let data_dir = temp_dir(&format!("{prefix}_data"));
+    let workspace = temp_dir(&format!("{prefix}_workspace"));
+    write_bundle(
+        &data_dir,
+        "20260614",
+        &format!("{trace_suffix}-trace-patch-verify-repair-user"),
+        sample_index(),
+    );
+    init_git_workspace(&workspace);
+    write_workspace_file(
+        &workspace,
+        "server/src/context_compiler/context_pack.rs",
+        "pub fn demo() {\n    let status = 500;\n}\n",
+    );
+    write_workspace_file(
+        &workspace,
+        "server/src/context_compiler/context_pack_tests.rs",
+        "#[test]\nfn demo_test() {\n    assert_eq!(500, 500);\n}\n",
+    );
+    commit_workspace(&workspace);
+
+    let response = patch_generation(&data_dir);
+    let diff = r#"diff --git a/server/src/context_compiler/context_pack.rs b/server/src/context_compiler/context_pack.rs
+--- a/server/src/context_compiler/context_pack.rs
++++ b/server/src/context_compiler/context_pack.rs
+@@ -1,3 +1,3 @@
+ pub fn demo() {
+-    let status = 500;
++    let status = 401;
+ }
+"#
+    .to_string();
+    let dry_run = dry_run_symbol_patch(&response.patch_generation, &diff, &workspace);
+
+    (data_dir, workspace, response, diff, dry_run)
 }
 
 fn write_bundle(data_dir: &Path, day: &str, stem: &str, index: SymbolIndex) -> PathBuf {
