@@ -12,6 +12,7 @@ use crate::{admin, types::AppState};
 
 use super::{
     symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkSearch},
+    symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
     symbol_index_graph_query::{
         load_latest_symbol_graph, SymbolGraphQuery, SymbolRelationDirection,
     },
@@ -113,6 +114,24 @@ pub(crate) struct SymbolChunkSearchParams {
     pub(crate) limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalEvalParams {
+    pub(crate) q: Option<String>,
+    pub(crate) query: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    #[serde(alias = "mustInclude", alias = "must_include")]
+    pub(crate) must_include: Option<String>,
+    pub(crate) k: Option<usize>,
+    #[serde(alias = "symbolLimit")]
+    pub(crate) symbol_limit: Option<usize>,
+    #[serde(alias = "chunkLimit")]
+    pub(crate) chunk_limit: Option<usize>,
+    pub(crate) depth: Option<usize>,
+    #[serde(alias = "impactLimit")]
+    pub(crate) impact_limit: Option<usize>,
+}
+
 impl SymbolIndexSearchParams {
     fn into_search(self) -> SymbolIndexSearch {
         SymbolIndexSearch {
@@ -204,6 +223,25 @@ impl SymbolChunkSearchParams {
             chunk_type: clean(self.chunk_type),
             limit: self.limit.unwrap_or_default(),
         }
+    }
+}
+
+impl SymbolRetrievalEvalParams {
+    fn into_query(self) -> Result<RetrievalEvalQuery, String> {
+        let text = clean(self.q).or_else(|| clean(self.query));
+        if text.is_none() {
+            return Err("q 不能为空".to_string());
+        }
+        Ok(RetrievalEvalQuery {
+            trace_id: clean(self.trace_id),
+            text,
+            must_include: split_must_include(self.must_include.as_deref()),
+            k: self.k.unwrap_or_default(),
+            symbol_limit: self.symbol_limit.unwrap_or_default(),
+            chunk_limit: self.chunk_limit.unwrap_or_default(),
+            depth: self.depth.unwrap_or_default(),
+            impact_limit: self.impact_limit.unwrap_or_default(),
+        })
     }
 }
 
@@ -343,10 +381,40 @@ pub(crate) async fn search_symbol_chunks(
     }
 }
 
+pub(crate) async fn eval_symbol_retrieval(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolRetrievalEvalParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let query = match params.into_query() {
+        Ok(query) => query,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match evaluate_latest_symbol_retrieval(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
 fn clean(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn split_must_include(value: Option<&str>) -> Vec<String> {
+    value
+        .unwrap_or_default()
+        .split(|ch| ch == ',' || ch == ';' || ch == '\n' || ch == '\r')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
 }
 
 fn json_error(status: StatusCode, message: &str) -> Response {

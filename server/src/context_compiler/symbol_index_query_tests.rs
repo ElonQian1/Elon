@@ -7,6 +7,7 @@ use std::{
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{search_symbol_chunks_db, SymbolChunkSearch},
+    symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
     symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
@@ -406,6 +407,51 @@ fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
         .iter()
         .any(|chunk| chunk.chunk_type == "test"
             && chunk.file_path == "server/src/context_compiler/context_pack_tests.rs"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn eval_reports_recall_mrr_and_missing_context_requirements() {
+    let dir = temp_dir("elon_symbol_eval");
+    let _db = write_bundle(&dir, "20260614", "213014-trace-eval-user", sample_index());
+
+    let response = evaluate_latest_symbol_retrieval(
+        &dir,
+        &RetrievalEvalQuery {
+            text: Some("build context pack".to_string()),
+            must_include: vec![
+                "context_pack.rs".to_string(),
+                "context_pack_tests.rs".to_string(),
+                "build_context_pack".to_string(),
+            ],
+            k: 10,
+            symbol_limit: 5,
+            chunk_limit: 10,
+            depth: 1,
+            impact_limit: 20,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.metrics.requirement_count, 3);
+    assert_eq!(response.metrics.recall_at_k, 1.0);
+    assert!(response.metrics.mean_reciprocal_rank > 0.0);
+    assert!(response.metrics.has_test_context_at_k);
+    assert!(response.missing_requirements.is_empty());
+    assert!(response
+        .candidates
+        .iter()
+        .any(|candidate| candidate.source == "symbol"));
+    assert!(response
+        .candidates
+        .iter()
+        .any(|candidate| candidate.source == "full_text"));
+    assert!(response
+        .candidates
+        .iter()
+        .any(|candidate| candidate.source.starts_with("graph_")));
 
     fs::remove_dir_all(dir).unwrap();
 }

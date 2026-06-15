@@ -1,0 +1,116 @@
+use std::collections::BTreeMap;
+
+use serde::Serialize;
+
+const DEFAULT_EVAL_K: usize = 10;
+const MAX_EVAL_K: usize = 100;
+const DEFAULT_EVAL_SYMBOL_LIMIT: usize = 20;
+const MAX_EVAL_SYMBOL_LIMIT: usize = 100;
+const DEFAULT_EVAL_CHUNK_LIMIT: usize = 30;
+const MAX_EVAL_CHUNK_LIMIT: usize = 100;
+const DEFAULT_EVAL_IMPACT_LIMIT: usize = 120;
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SymbolRetrievalEvalQuery {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) text: Option<String>,
+    pub(crate) must_include: Vec<String>,
+    pub(crate) k: usize,
+    pub(crate) symbol_limit: usize,
+    pub(crate) chunk_limit: usize,
+    pub(crate) depth: usize,
+    pub(crate) impact_limit: usize,
+}
+
+impl SymbolRetrievalEvalQuery {
+    pub(crate) fn k(&self) -> usize {
+        if self.k == 0 {
+            DEFAULT_EVAL_K
+        } else {
+            self.k.min(MAX_EVAL_K)
+        }
+    }
+
+    pub(crate) fn symbol_limit(&self) -> usize {
+        if self.symbol_limit == 0 {
+            DEFAULT_EVAL_SYMBOL_LIMIT
+        } else {
+            self.symbol_limit.min(MAX_EVAL_SYMBOL_LIMIT)
+        }
+    }
+
+    pub(crate) fn chunk_limit(&self) -> usize {
+        if self.chunk_limit == 0 {
+            DEFAULT_EVAL_CHUNK_LIMIT
+        } else {
+            self.chunk_limit.min(MAX_EVAL_CHUNK_LIMIT)
+        }
+    }
+
+    pub(crate) fn impact_limit(&self) -> usize {
+        if self.impact_limit == 0 {
+            DEFAULT_EVAL_IMPACT_LIMIT
+        } else {
+            self.impact_limit
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalResponse {
+    pub(crate) db_path: String,
+    pub(crate) query: SymbolRetrievalEvalQueryEcho,
+    pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) metrics: SymbolRetrievalEvalMetrics,
+    pub(crate) candidates: Vec<SymbolRetrievalEvalCandidate>,
+    pub(crate) missing_requirements: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalQueryEcho {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) q: String,
+    pub(crate) must_include: Vec<String>,
+    pub(crate) k: usize,
+    pub(crate) symbol_limit: usize,
+    pub(crate) chunk_limit: usize,
+    pub(crate) depth: usize,
+    pub(crate) impact_limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalMetrics {
+    pub(crate) requirement_count: usize,
+    pub(crate) hit_count_at_k: usize,
+    pub(crate) recall_at_k: f64,
+    pub(crate) mean_reciprocal_rank: f64,
+    pub(crate) first_relevant_rank: Option<usize>,
+    pub(crate) top_k_candidate_count: usize,
+    pub(crate) symbol_candidate_count: usize,
+    pub(crate) chunk_candidate_count: usize,
+    pub(crate) graph_candidate_count: usize,
+    pub(crate) test_candidate_count_at_k: usize,
+    pub(crate) total_token_count_at_k: usize,
+    pub(crate) average_token_count_at_k: f64,
+    pub(crate) has_test_context_at_k: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalEvalCandidate {
+    pub(crate) rank: usize,
+    pub(crate) source: String,
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) file_path: String,
+    pub(crate) symbol_id: Option<String>,
+    pub(crate) start_line: Option<usize>,
+    pub(crate) end_line: Option<usize>,
+    pub(crate) score: f64,
+    pub(crate) token_count: usize,
+    pub(crate) matched_requirements: Vec<String>,
+    pub(crate) is_test_context: bool,
+}
