@@ -1,7 +1,7 @@
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
     routing::{delete, get, post},
-    Router,
 };
 use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -554,6 +554,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/context/symbol-index/eval-run",
             get(context_compiler::symbol_index_api::get_symbol_retrieval_run),
+        )
+        .route(
+            "/api/admin/context/symbol-index/eval-compare",
+            get(context_compiler::symbol_index_eval_compare_api::compare_symbol_retrieval_runs),
         )
         .route(
             "/api/admin/context/symbol-index/symbol",

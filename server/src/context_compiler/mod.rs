@@ -61,6 +61,10 @@ mod symbol_index_compression_types;
 mod symbol_index_embedding_types;
 mod symbol_index_embeddings;
 mod symbol_index_eval;
+mod symbol_index_eval_compare;
+pub(crate) mod symbol_index_eval_compare_api;
+#[cfg(test)]
+mod symbol_index_eval_compare_tests;
 mod symbol_index_eval_runs;
 mod symbol_index_eval_types;
 mod symbol_index_graph_query;
