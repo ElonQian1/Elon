@@ -120,6 +120,38 @@
       font-weight: normal;
       color: var(--ink);
     }
+    .project-top-tabs {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 72px;
+      height: 100%;
+      padding-left: 24px;
+      color: var(--ink);
+    }
+    .project-top-tabs.hidden { display: none; }
+    .project-top-tab {
+      height: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 0;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .project-top-tab::after {
+      content: "";
+      width: 32px;
+      height: 2px;
+      margin-top: 5px;
+      border-radius: 999px;
+      background: transparent;
+    }
+    .project-top-tab.active::after { background: var(--ink); }
     .icon-btn {
       width: 44px; height: 44px;
       background: transparent;
@@ -1805,6 +1837,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
     </button>
     <h1 id="topTitle">好友</h1>
+    <div class="project-top-tabs hidden" id="projectTopTabs" aria-label="项目页面切换">
+      <button class="project-top-tab active" id="projectHomeTopTab" type="button">我的项目</button>
+      <button class="project-top-tab" id="projectPlazaTopTab" type="button">项目广场</button>
+    </div>
     <button class="icon-btn" id="voiceCallBtn" title="实时语音" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.17a2 2 0 0 1 2.11-.45c.84.29 1.71.5 2.61.62A2 2 0 0 1 22 16.92z"/></svg>
     </button>
@@ -1841,6 +1877,7 @@
         <button class="project-refresh-btn" id="projectRefreshBtn" type="button">刷新项目</button>
       </div>
       <div id="projectHomeRoot" class="project-home-root" aria-live="polite"></div>
+      <div id="projectPlazaInlineRoot" class="project-plaza-inline-root hidden" aria-live="polite"></div>
       <div id="projectProgressPanel" class="project-progress-panel hidden" aria-hidden="true">
         <div class="project-space-summary" id="projectSpaceSummary">
           <div class="project-space-heading">
@@ -2415,6 +2452,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const authModeButtons = document.querySelectorAll('[data-auth-mode]');
 
   const topTitle = $('topTitle');
+  const projectTopTabs = $('projectTopTabs');
+  const projectHomeTopTab = $('projectHomeTopTab');
+  const projectPlazaTopTab = $('projectPlazaTopTab');
   const backBtn = $('backBtn');
   const voiceCallBtn = $('voiceCallBtn');
   const addBtn = $('addBtn');
@@ -2950,6 +2990,47 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     appView.classList.remove('hidden');
   }
 
+  function setProjectTopTabsVisible(visible, plazaSelected) {
+    if (!projectTopTabs || !topTitle) return;
+    projectTopTabs.classList.toggle('hidden', !visible);
+    topTitle.style.display = visible ? 'none' : '';
+    if (projectHomeTopTab) projectHomeTopTab.classList.toggle('active', visible && !plazaSelected);
+    if (projectPlazaTopTab) projectPlazaTopTab.classList.toggle('active', visible && !!plazaSelected);
+  }
+
+  function showProjectHomeTab() {
+    setProjectTopTabsVisible(true, false);
+    const home = document.getElementById('projectHomeRoot');
+    const plaza = document.getElementById('projectPlazaInlineRoot');
+    const progress = document.getElementById('projectProgressPanel');
+    if (home) home.classList.remove('hidden');
+    if (plaza) plaza.classList.add('hidden');
+    if (progress) {
+      progress.classList.add('hidden');
+      progress.setAttribute('aria-hidden', 'true');
+    }
+    renderProjectHomePage();
+  }
+
+  function showProjectPlazaTab() {
+    setProjectTopTabsVisible(true, true);
+    const home = document.getElementById('projectHomeRoot');
+    const plaza = document.getElementById('projectPlazaInlineRoot');
+    const progress = document.getElementById('projectProgressPanel');
+    if (home) home.classList.add('hidden');
+    if (plaza) plaza.classList.remove('hidden');
+    if (progress) {
+      progress.classList.add('hidden');
+      progress.setAttribute('aria-hidden', 'true');
+    }
+    if (window.ElonProjectPlaza && typeof window.ElonProjectPlaza.openInline === 'function') {
+      window.ElonProjectPlaza.openInline();
+    }
+  }
+
+  if (projectHomeTopTab) projectHomeTopTab.addEventListener('click', showProjectHomeTab);
+  if (projectPlazaTopTab) projectPlazaTopTab.addEventListener('click', showProjectPlazaTab);
+
   // ====== Tab 切换 ======
   function switchTab(tabId) {
     currentTab = tabId;
@@ -2983,7 +3064,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       stageHint.classList.add('hidden');
       loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
     }
-    if (inProjectHome) renderProjectHomePage();
+    if (inProjectHome) {
+      showProjectHomeTab();
+    } else {
+      setProjectTopTabsVisible(false, false);
+    }
     // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
     messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
@@ -3272,6 +3357,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     moreBtn.style.display = 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setProjectTopTabsVisible(false, false);
     stageHint.classList.remove('hidden');
     modelBtn.style.display = '';
     messageInput.placeholder = '描述你想开发的 App 功能';
@@ -4221,6 +4307,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function renderProjectPage(p) {
     if (!p) { resetProjectPage(); return; }
+    setProjectTopTabsVisible(false, false);
+    const homeRoot = document.getElementById('projectHomeRoot');
+    const plazaRoot = document.getElementById('projectPlazaInlineRoot');
+    const progressPanel = document.getElementById('projectProgressPanel');
+    if (homeRoot) homeRoot.classList.add('hidden');
+    if (plazaRoot) plazaRoot.classList.add('hidden');
+    if (progressPanel) {
+      progressPanel.classList.remove('hidden');
+      progressPanel.setAttribute('aria-hidden', 'false');
+    }
     currentProjectSpaceLatestApkUrl = String(p.latest_apk_url || p.latestApkUrl || '').trim();
     projectSpaceAnnouncementExpanded = false;
     renderProjectIntroCard(p);
@@ -5662,12 +5758,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     reloadProjects: loadProjects,
     openNewProject,
     openProjectPlaza: () => {
-      if (window.ElonProjectPlaza && typeof window.ElonProjectPlaza.open === 'function') {
-        window.ElonProjectPlaza.open();
-      } else {
-        const row = document.getElementById('projectPlazaRow');
-        if (row) row.click();
-      }
+      switchTab('projectPage');
+      showProjectPlazaTab();
     },
     showNativeOnly,
     openProject: (project) => {

@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.FrameLayout
@@ -65,6 +66,8 @@ internal class MainNavigationController(
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
         binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
+        binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome(animate = false) }
+        binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
             showConversationActions(0)
@@ -90,6 +93,32 @@ internal class MainNavigationController(
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
+    }
+
+    private fun showProjectTopTabs(plazaSelected: Boolean) {
+        binding.topTitleText.visibility = View.GONE
+        binding.projectTopTabs.visibility = View.VISIBLE
+        updateProjectTopTabVisual(
+            tab = binding.projectHomeTopTab,
+            indicator = binding.projectHomeTabIndicator,
+            selected = !plazaSelected
+        )
+        updateProjectTopTabVisual(
+            tab = binding.projectPlazaTopTab,
+            indicator = binding.projectPlazaTabIndicator,
+            selected = plazaSelected
+        )
+    }
+
+    private fun hideProjectTopTabs() {
+        binding.projectTopTabs.visibility = View.GONE
+        binding.topTitleText.visibility = View.VISIBLE
+    }
+
+    private fun updateProjectTopTabVisual(tab: TextView, indicator: View, selected: Boolean) {
+        tab.setTextColor(activity.getColor(R.color.elon_text_primary))
+        tab.setTypeface(tab.typeface, if (selected) Typeface.BOLD else Typeface.BOLD)
+        indicator.visibility = if (selected) View.VISIBLE else View.INVISIBLE
     }
 
     private fun showProjectSpaceBottomMenu() {
@@ -169,6 +198,11 @@ internal class MainNavigationController(
             showHomeActionPopup(binding.addButton, tab)
         }
         binding.topTitleText.setOnLongClickListener(null)
+        if (tab == binding.tabProject) {
+            showProjectTopTabs(plazaSelected = false)
+        } else {
+            hideProjectTopTabs()
+        }
         binding.topTitleText.text = when (tab) {
             binding.tabProject -> "项目管理"
             binding.tabProfile -> "我的"
@@ -241,32 +275,9 @@ internal class MainNavigationController(
         clearMessageSelection()
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
-        val shouldAnimate = binding.projectPage.visibility == View.VISIBLE &&
-            binding.marketplacePage.visibility != View.VISIBLE
         loadMarketplace()
         applyMarketplaceChrome()
-        if (shouldAnimate) {
-            pageTransitionRunning = true
-            WechatPageTransition.enterFromRight(
-                container = binding.contentContainer,
-                incoming = listOf(binding.marketplacePage),
-                outgoing = listOf(binding.projectPage),
-                onEnd = {
-                    binding.conversationPage.visibility = View.GONE
-                    binding.chatPage.visibility = View.GONE
-                    binding.projectPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.VISIBLE
-                    binding.agentPage.root.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    showMainTabs()
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                }
-            )
-        } else {
-            clearPageTranslations()
-        }
+        clearPageTranslations()
     }
 
     fun showAgentCenter() {
@@ -291,6 +302,7 @@ internal class MainNavigationController(
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "Agent 自动化"
+        hideProjectTopTabs()
         onAgentTabSelected()
     }
 
@@ -728,6 +740,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
         hideBottomMenus()
+        hideProjectTopTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -753,6 +766,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
+        hideProjectTopTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.VISIBLE
         binding.addButton.visibility = View.VISIBLE
@@ -775,6 +789,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
         hideBottomMenus()
+        hideProjectTopTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -797,9 +812,13 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
+        showProjectTopTabs(plazaSelected = false)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
+        binding.addButton.setOnClickListener {
+            showHomeActionPopup(binding.addButton, binding.tabProject)
+        }
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
@@ -821,9 +840,10 @@ internal class MainNavigationController(
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
-        binding.backButton.visibility = View.VISIBLE
+        showProjectTopTabs(plazaSelected = true)
+        binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.GONE
+        binding.addButton.visibility = View.VISIBLE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
@@ -840,6 +860,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showProjectSpaceBottomMenu()
+        hideProjectTopTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -870,6 +891,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.VISIBLE
         hideBottomMenus()
+        hideProjectTopTabs()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE

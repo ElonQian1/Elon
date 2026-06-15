@@ -42,6 +42,74 @@
                 android:textColor="@color/elon_text_primary"
                 android:textSize="16sp" />
 
+            <LinearLayout
+                android:id="@+id/projectTopTabs"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="start|center_vertical"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="28dp"
+                android:paddingEnd="112dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/projectHomeTopTabWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="74dp"
+                    android:clickable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/projectHomeTopTab"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="我的项目"
+                        android:textColor="@color/elon_text_primary"
+                        android:textSize="19sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:id="@+id/projectHomeTabIndicator"
+                        android:layout_width="32dp"
+                        android:layout_height="2dp"
+                        android:layout_marginTop="5dp"
+                        android:background="@color/elon_text_primary" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/projectPlazaTopTabWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:clickable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/projectPlazaTopTab"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
+                        android:text="项目广场"
+                        android:textColor="@color/elon_text_primary"
+                        android:textSize="19sp"
+                        android:textStyle="bold" />
+
+                    <View
+                        android:id="@+id/projectPlazaTabIndicator"
+                        android:layout_width="32dp"
+                        android:layout_height="2dp"
+                        android:layout_marginTop="5dp"
+                        android:background="@color/elon_text_primary"
+                        android:visibility="invisible" />
+                </LinearLayout>
+            </LinearLayout>
+
             <ImageButton
                 android:id="@+id/searchButton"
                 android:layout_width="44dp"
