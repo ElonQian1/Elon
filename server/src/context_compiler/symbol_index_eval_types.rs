@@ -63,28 +63,35 @@ impl SymbolRetrievalEvalQuery {
         }
     }
 
-    pub(crate) fn symbol_limit(&self) -> usize {
-        if self.symbol_limit == 0 {
-            DEFAULT_EVAL_SYMBOL_LIMIT
-        } else {
-            self.symbol_limit.min(MAX_EVAL_SYMBOL_LIMIT)
-        }
+    pub(crate) fn planned_symbol_limit(&self, plan: &RetrievalPlan) -> usize {
+        plan.planned_limit(
+            self.symbol_limit,
+            DEFAULT_EVAL_SYMBOL_LIMIT,
+            MAX_EVAL_SYMBOL_LIMIT,
+            "symbol",
+        )
     }
 
-    pub(crate) fn chunk_limit(&self) -> usize {
-        if self.chunk_limit == 0 {
-            DEFAULT_EVAL_CHUNK_LIMIT
-        } else {
-            self.chunk_limit.min(MAX_EVAL_CHUNK_LIMIT)
-        }
+    pub(crate) fn planned_chunk_limit(&self, plan: &RetrievalPlan) -> usize {
+        plan.planned_limit(
+            self.chunk_limit,
+            DEFAULT_EVAL_CHUNK_LIMIT,
+            MAX_EVAL_CHUNK_LIMIT,
+            "full_text",
+        )
     }
 
-    pub(crate) fn vector_limit(&self) -> usize {
-        if self.vector_limit == 0 {
-            DEFAULT_EVAL_CHUNK_LIMIT
-        } else {
-            self.vector_limit.min(MAX_EVAL_CHUNK_LIMIT)
-        }
+    pub(crate) fn planned_vector_limit(&self, plan: &RetrievalPlan) -> usize {
+        plan.planned_limit(
+            self.vector_limit,
+            DEFAULT_EVAL_CHUNK_LIMIT,
+            MAX_EVAL_CHUNK_LIMIT,
+            "vector",
+        )
+    }
+
+    pub(crate) fn planned_depth(&self, plan: &RetrievalPlan) -> usize {
+        plan.planned_graph_depth(self.depth)
     }
 
     pub(crate) fn impact_limit(&self) -> usize {

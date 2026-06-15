@@ -15,7 +15,7 @@ use super::{
     symbol_index_impact_types::SymbolImpactQuery,
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_rank_profile::infer_rank_profile,
-    symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
+    symbol_index_ranker::{rank_hybrid_context_with_plan, RankedContextItem},
     symbol_index_retrieval_plan::build_retrieval_plan,
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
 };
@@ -33,6 +33,12 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow::anyhow!("q 不能为空"))?
         .to_string();
+    let vector_model = clean_filter(query.vector_model.as_deref());
+    let retrieval_plan = build_retrieval_plan(&text, vector_model.is_some());
+    let planned_symbol_limit = query.planned_symbol_limit(&retrieval_plan);
+    let planned_chunk_limit = query.planned_chunk_limit(&retrieval_plan);
+    let planned_vector_limit = query.planned_vector_limit(&retrieval_plan);
+    let planned_depth = query.planned_depth(&retrieval_plan);
 
     let symbol_response = search_latest_symbol_index(
         data_dir,
@@ -40,7 +46,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             trace_id: query.trace_id.clone(),
             text: Some(text.clone()),
             include_edges: false,
-            limit: query.symbol_limit(),
+            limit: planned_symbol_limit,
             ..Default::default()
         },
     )?;
@@ -49,20 +55,23 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
         &SymbolChunkSearch {
             trace_id: query.trace_id.clone(),
             text: Some(text.clone()),
-            limit: query.chunk_limit(),
+            limit: planned_chunk_limit,
             ..Default::default()
         },
     )
     .map(|response| response.chunks)
     .unwrap_or_default();
-    let vector_hits = if let Some(vector_model) = clean_filter(query.vector_model.as_deref()) {
+    let vector_hits = if retrieval_plan.retrievers.vector {
+        let Some(vector_model) = vector_model.as_deref() else {
+            unreachable!("vector retriever requires a requested vector model");
+        };
         search_latest_symbol_vectors(
             data_dir,
             &SymbolVectorSearchQuery {
                 trace_id: query.trace_id.clone(),
                 text: Some(text.clone()),
-                model: Some(vector_model),
-                limit: query.vector_limit(),
+                model: Some(vector_model.to_string()),
+                limit: planned_vector_limit,
                 ..Default::default()
             },
         )
@@ -82,7 +91,7 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             &SymbolImpactQuery {
                 trace_id: query.trace_id.clone(),
                 symbol_id: Some(seed.id.clone()),
-                depth: query.depth,
+                depth: planned_depth,
                 limit: query.impact_limit(),
                 ..Default::default()
             },
@@ -91,14 +100,14 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
     });
 
     let requirements = clean_requirements(&query.must_include);
-    let retrieval_plan = build_retrieval_plan(&text, query.vector_model.is_some());
     let ranking_profile = infer_rank_profile(&text);
-    let ranked_context = rank_hybrid_context_with_profile(
+    let ranked_context = rank_hybrid_context_with_plan(
         &symbol_response.symbols,
         &chunk_hits,
         &vector_hits,
         impact.as_ref(),
         &ranking_profile,
+        &retrieval_plan,
     );
     let candidates = ranked_context
         .into_iter()
@@ -115,14 +124,14 @@ pub(crate) fn evaluate_latest_symbol_retrieval(
             q: text,
             must_include: requirements,
             k: query.k(),
-            symbol_limit: query.symbol_limit(),
-            chunk_limit: query.chunk_limit(),
+            symbol_limit: planned_symbol_limit,
+            chunk_limit: planned_chunk_limit,
             vector_model: query.vector_model.clone(),
-            vector_limit: query.vector_limit(),
+            vector_limit: planned_vector_limit,
             depth: impact
                 .as_ref()
                 .map(|impact| impact.query.depth)
-                .unwrap_or(query.depth),
+                .unwrap_or(planned_depth),
             impact_limit: query.impact_limit(),
         },
         metadata: symbol_response.metadata,

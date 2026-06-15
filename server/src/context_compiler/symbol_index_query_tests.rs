@@ -511,6 +511,10 @@ fn task_pack_uses_error_rank_profile_for_error_queries() {
         .reasons
         .iter()
         .any(|reason| reason.contains("rank_profile=error"))));
+    assert!(response.ranked_context.iter().any(|item| item
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("retrieval_plan=debug_error"))));
     assert_eq!(
         response
             .ranked_context
@@ -518,6 +522,40 @@ fn task_pack_uses_error_rank_profile_for_error_queries() {
             .map(|item| item.source.as_str()),
         Some("full_text")
     );
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn task_pack_uses_retrieval_plan_defaults_for_refactor_queries() {
+    let dir = temp_dir("elon_symbol_task_pack_refactor_plan");
+    let _db = write_bundle(
+        &dir,
+        "20260614",
+        "213012-trace-task-pack-refactor-plan-user",
+        sample_index(),
+    );
+
+    let response = build_latest_symbol_task_pack(
+        &dir,
+        &SymbolTaskPackQuery {
+            text: Some("重构 build_context_pack callers".to_string()),
+            path: Some("context_pack.rs".to_string()),
+            search_limit: 5,
+            chunk_limit: 10,
+            impact_limit: 20,
+            max_chars: 12_000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(response.retrieval_plan.intent, QueryIntent::Refactor);
+    assert_eq!(response.query.depth, 2);
+    assert!(response.ranked_context.iter().any(|item| item
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("retrieval_plan=refactor"))));
 
     fs::remove_dir_all(dir).unwrap();
 }
@@ -780,7 +818,6 @@ fn eval_uses_refactor_rank_profile_for_refactor_queries() {
             k: 10,
             symbol_limit: 5,
             chunk_limit: 10,
-            depth: 1,
             impact_limit: 20,
             ..Default::default()
         },
@@ -791,10 +828,15 @@ fn eval_uses_refactor_rank_profile_for_refactor_queries() {
     assert_eq!(response.retrieval_plan.intent, QueryIntent::Refactor);
     assert!(response.retrieval_plan.graph_policy.include_references);
     assert_eq!(response.retrieval_plan.graph_policy.max_depth, 2);
+    assert_eq!(response.query.depth, 2);
     assert!(response.candidates.iter().any(|candidate| candidate
         .reasons
         .iter()
         .any(|reason| reason.contains("rank_profile=refactor"))));
+    assert!(response.candidates.iter().any(|candidate| candidate
+        .reasons
+        .iter()
+        .any(|reason| reason.contains("retrieval_plan=refactor"))));
 
     fs::remove_dir_all(dir).unwrap();
 }

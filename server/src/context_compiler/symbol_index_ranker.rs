@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::{
     symbol_index_chunks::SymbolChunkHit, symbol_index_impact_types::SymbolImpactResponse,
     symbol_index_query_types::SymbolHit, symbol_index_rank_profile::HybridRankProfile,
-    symbol_index_vector_types::SymbolVectorHit,
+    symbol_index_retrieval_plan::RetrievalPlan, symbol_index_vector_types::SymbolVectorHit,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -66,6 +66,20 @@ pub(crate) fn rank_hybrid_context_with_profile(
         push_impact_context(&mut drafts, impact, profile);
     }
     rank_drafts(drafts)
+}
+
+pub(crate) fn rank_hybrid_context_with_plan(
+    symbols: &[SymbolHit],
+    text_chunks: &[SymbolChunkHit],
+    vector_chunks: &[SymbolVectorHit],
+    impact: Option<&SymbolImpactResponse>,
+    profile: &HybridRankProfile,
+    plan: &RetrievalPlan,
+) -> Vec<RankedContextItem> {
+    let mut ranked =
+        rank_hybrid_context_with_profile(symbols, text_chunks, vector_chunks, impact, profile);
+    apply_plan_ranking(&mut ranked, plan);
+    rerank_items(ranked)
 }
 
 fn symbol_context(symbol: &SymbolHit, index: usize, profile: &HybridRankProfile) -> ContextDraft {
@@ -241,6 +255,48 @@ fn push_impact_context(
             is_test_context: true,
         });
     }
+}
+
+fn apply_plan_ranking(items: &mut [RankedContextItem], plan: &RetrievalPlan) {
+    for item in items {
+        let bonus = plan.ranking_bonus(&item.source);
+        if bonus > 0.0 {
+            item.score += bonus;
+            item.reasons.push(format!(
+                "retrieval_plan={} source_weight={:.2} bonus={bonus:.1}",
+                plan.intent.as_str(),
+                plan.source_weight(&item.source)
+            ));
+        }
+        if item.is_test_context && !plan.pack_policy.include_tests {
+            item.score -= 120.0;
+            item.reasons
+                .push("retrieval_plan_deprioritized_tests".to_string());
+        }
+        if item.source == "full_text" && !plan.pack_policy.include_code_snippets {
+            item.score -= 80.0;
+            item.reasons
+                .push("retrieval_plan_prefers_summary_over_snippet".to_string());
+        }
+    }
+}
+
+fn rerank_items(mut items: Vec<RankedContextItem>) -> Vec<RankedContextItem> {
+    items.sort_by(compare_ranked_candidates);
+    for (index, item) in items.iter_mut().enumerate() {
+        item.rank = index + 1;
+    }
+    items
+}
+
+fn compare_ranked_candidates(left: &RankedContextItem, right: &RankedContextItem) -> Ordering {
+    right
+        .score
+        .partial_cmp(&left.score)
+        .unwrap_or(Ordering::Equal)
+        .then_with(|| left.file_path.cmp(&right.file_path))
+        .then_with(|| left.start_line.cmp(&right.start_line))
+        .then_with(|| left.label.cmp(&right.label))
 }
 
 fn rank_drafts(drafts: Vec<ContextDraft>) -> Vec<RankedContextItem> {

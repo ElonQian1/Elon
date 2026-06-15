@@ -86,7 +86,11 @@ pub(crate) fn build_retrieval_plan(query: &str, vector_requested: bool) -> Retri
     plan.ranking_profile = infer_rank_profile(query);
     if vector_requested {
         plan.retrievers.vector = true;
+        let vector_weight = requested_vector_weight(intent);
+        plan.weights.vector = plan.weights.vector.max(vector_weight);
         plan.reasons.push("vector_enabled_by_request".to_string());
+        plan.reasons
+            .push(format!("vector_weight={vector_weight:.2}"));
     } else {
         plan.reasons.push("vector_disabled_no_model".to_string());
     }
@@ -183,6 +187,54 @@ impl QueryIntent {
     }
 }
 
+impl RetrievalPlan {
+    pub(crate) fn source_weight(&self, source: &str) -> f64 {
+        match source {
+            "symbol" => self.weights.symbol,
+            "full_text" | "text" | "chunk" => self.weights.full_text,
+            "vector" => self.weights.vector,
+            "graph" | "graph_symbol" | "graph_file" | "graph_test" => self.weights.graph,
+            "repo_map" => self.weights.repo_map,
+            "recent_files" | "recent" => self.weights.recent_files,
+            _ => 0.0,
+        }
+    }
+
+    pub(crate) fn planned_limit(
+        &self,
+        requested: usize,
+        default_limit: usize,
+        max_limit: usize,
+        source: &str,
+    ) -> usize {
+        if requested > 0 {
+            return requested.min(max_limit).max(1);
+        }
+
+        let weight = self.source_weight(source);
+        let limit = if weight >= 0.35 {
+            default_limit + ((default_limit + 1) / 2)
+        } else if weight <= 0.15 {
+            default_limit.saturating_sub((default_limit + 3) / 4)
+        } else {
+            default_limit
+        };
+        limit.min(max_limit).max(1)
+    }
+
+    pub(crate) fn planned_graph_depth(&self, requested: usize) -> usize {
+        if requested > 0 {
+            requested
+        } else {
+            self.graph_policy.max_depth.max(1)
+        }
+    }
+
+    pub(crate) fn ranking_bonus(&self, source: &str) -> f64 {
+        self.source_weight(source) * 250.0
+    }
+}
+
 fn detect_intent(features: &QueryFeatures) -> QueryIntent {
     if features.mentions_refactor {
         QueryIntent::Refactor
@@ -203,6 +255,18 @@ fn detect_intent(features: &QueryFeatures) -> QueryIntent {
         QueryIntent::Locate
     } else {
         QueryIntent::Unknown
+    }
+}
+
+fn requested_vector_weight(intent: QueryIntent) -> f64 {
+    match intent {
+        QueryIntent::Explain | QueryIntent::AddFeature => 0.20,
+        QueryIntent::Unknown => 0.15,
+        QueryIntent::Locate
+        | QueryIntent::DebugError
+        | QueryIntent::ModifyBehavior
+        | QueryIntent::Refactor
+        | QueryIntent::Test => 0.10,
     }
 }
 
@@ -377,11 +441,22 @@ mod tests {
     }
 
     #[test]
+    fn plan_defaults_drive_depth_and_limits_but_respect_explicit_values() {
+        let plan = build_retrieval_plan("重构 AuthService::login callers", false);
+
+        assert_eq!(plan.planned_graph_depth(0), 2);
+        assert_eq!(plan.planned_graph_depth(1), 1);
+        assert_eq!(plan.planned_limit(0, 8, 20, "graph"), 12);
+        assert_eq!(plan.planned_limit(5, 8, 20, "graph"), 5);
+    }
+
+    #[test]
     fn render_plan_exposes_selected_strategy() {
         let plan = build_retrieval_plan("新增 refresh token", true);
         let rendered = render_retrieval_plan(&plan);
 
         assert_eq!(plan.intent, QueryIntent::AddFeature);
+        assert!(plan.weights.vector > 0.0);
         assert!(rendered.contains("<retrieval_plan intent=\"add_feature\">"));
         assert!(rendered.contains("vector=on"));
         assert!(rendered.contains("pack_policy"));

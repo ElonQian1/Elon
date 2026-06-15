@@ -11,7 +11,7 @@ use super::{
     symbol_index_query::{search_latest_symbol_index, SymbolIndexSearch},
     symbol_index_query_types::SymbolHit,
     symbol_index_rank_profile::{infer_rank_profile, HybridRankProfile},
-    symbol_index_ranker::{rank_hybrid_context_with_profile, RankedContextItem},
+    symbol_index_ranker::{rank_hybrid_context_with_plan, RankedContextItem},
     symbol_index_retrieval_plan::{build_retrieval_plan, render_retrieval_plan, RetrievalPlan},
     symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
     symbol_index_vector_types::SymbolVectorHit,
@@ -97,6 +97,26 @@ pub(crate) fn build_latest_symbol_task_pack(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow::anyhow!("q 不能为空"))?
         .to_string();
+    let vector_model = clean_filter(query.vector_model.as_deref());
+    let retrieval_plan = build_retrieval_plan(&text, vector_model.is_some());
+    let planned_search_limit = retrieval_plan.planned_limit(
+        query.search_limit,
+        DEFAULT_TASK_SEARCH_LIMIT,
+        MAX_TASK_SEARCH_LIMIT,
+        "symbol",
+    );
+    let planned_chunk_limit = retrieval_plan.planned_limit(
+        query.chunk_limit,
+        DEFAULT_TASK_CHUNK_LIMIT,
+        MAX_TASK_CHUNK_LIMIT,
+        "full_text",
+    );
+    let planned_vector_limit = retrieval_plan.planned_limit(
+        query.vector_limit,
+        DEFAULT_TASK_CHUNK_LIMIT,
+        MAX_TASK_CHUNK_LIMIT,
+        "vector",
+    );
     let search = SymbolIndexSearch {
         trace_id: query.trace_id.clone(),
         text: Some(text.clone()),
@@ -104,7 +124,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         path: query.path.clone(),
         edge_kind: None,
         include_edges: false,
-        limit: search_limit(query.search_limit),
+        limit: planned_search_limit,
     };
     let search_response = search_latest_symbol_index(data_dir, &search)?;
     let text_chunks = search_latest_symbol_chunks(
@@ -114,20 +134,23 @@ pub(crate) fn build_latest_symbol_task_pack(
             text: Some(text.clone()),
             path: query.path.clone(),
             chunk_type: None,
-            limit: chunk_limit(query.chunk_limit),
+            limit: planned_chunk_limit,
         },
     )
     .map(|response| response.chunks)
     .unwrap_or_default();
-    let vector_chunks = if let Some(vector_model) = clean_filter(query.vector_model.as_deref()) {
+    let vector_chunks = if retrieval_plan.retrievers.vector {
+        let Some(vector_model) = vector_model.as_deref() else {
+            unreachable!("vector retriever requires a requested vector model");
+        };
         search_latest_symbol_vectors(
             data_dir,
             &SymbolVectorSearchQuery {
                 trace_id: query.trace_id.clone(),
                 text: Some(text.clone()),
-                model: Some(vector_model),
+                model: Some(vector_model.to_string()),
                 path: query.path.clone(),
-                limit: vector_limit(query.vector_limit),
+                limit: planned_vector_limit,
                 ..Default::default()
             },
         )
@@ -144,7 +167,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         symbol_id: seed_choice.symbol_id.clone(),
         path: seed_choice.path.clone(),
         edge_kind: query.edge_kind.clone(),
-        depth: query.depth,
+        depth: retrieval_plan.planned_graph_depth(query.depth),
         limit: query.impact_limit,
     };
     let impact = load_latest_symbol_impact(data_dir, &impact_query)?;
@@ -153,14 +176,14 @@ pub(crate) fn build_latest_symbol_task_pack(
         .clone()
         .or_else(|| choose_impact_seed(&impact.seed_symbols, seed_choice.symbol_id.as_deref()))
         .ok_or_else(|| anyhow::anyhow!("没有找到与任务相关的符号"))?;
-    let retrieval_plan = build_retrieval_plan(&text, query.vector_model.is_some());
     let ranking_profile = infer_rank_profile(&text);
-    let ranked_context = rank_hybrid_context_with_profile(
+    let ranked_context = rank_hybrid_context_with_plan(
         &search_symbols,
         &text_chunks,
         &vector_chunks,
         Some(&impact),
         &ranking_profile,
+        &retrieval_plan,
     );
     let mut candidate_symbols = search_symbols;
     if candidate_symbols.is_empty() {
@@ -191,10 +214,10 @@ pub(crate) fn build_latest_symbol_task_pack(
             path: query.path.clone(),
             edge_kind: query.edge_kind.clone(),
             depth: impact_pack.query.depth,
-            search_limit: search_limit(query.search_limit),
-            chunk_limit: chunk_limit(query.chunk_limit),
+            search_limit: planned_search_limit,
+            chunk_limit: planned_chunk_limit,
             vector_model: query.vector_model.clone(),
-            vector_limit: vector_limit(query.vector_limit),
+            vector_limit: planned_vector_limit,
             impact_limit: impact_pack.query.limit,
             max_chars: normalize_pack_max_chars(query.max_chars),
         },
@@ -417,26 +440,6 @@ fn choose_impact_seed(seed_symbols: &[SymbolHit], symbol_id: Option<&str>) -> Op
 
 fn has_direct_symbol_match(symbol: &SymbolHit) -> bool {
     !symbol.matched_terms.is_empty()
-}
-
-fn search_limit(limit: usize) -> usize {
-    if limit == 0 {
-        DEFAULT_TASK_SEARCH_LIMIT
-    } else {
-        limit.min(MAX_TASK_SEARCH_LIMIT)
-    }
-}
-
-fn chunk_limit(limit: usize) -> usize {
-    if limit == 0 {
-        DEFAULT_TASK_CHUNK_LIMIT
-    } else {
-        limit.min(MAX_TASK_CHUNK_LIMIT)
-    }
-}
-
-fn vector_limit(limit: usize) -> usize {
-    chunk_limit(limit)
 }
 
 fn clean_filter(value: Option<&str>) -> Option<String> {
