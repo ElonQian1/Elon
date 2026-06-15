@@ -572,7 +572,7 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_INFO_BG = "#2F3136"
+        const val PROJECT_SPACE_INFO_BG = "#202024"
         const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 78
         const val ANNOUNCEMENT_ANIMATION_MS = 220L
     }
