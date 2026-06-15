@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::Serialize;
+use serde_json::Value;
 
 const DEFAULT_EVAL_K: usize = 10;
 const MAX_EVAL_K: usize = 100;
@@ -35,6 +36,18 @@ pub(crate) struct SymbolRetrievalEvalBatchCaseQuery {
     pub(crate) query: SymbolRetrievalEvalQuery,
 }
 
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SymbolRetrievalRunHistoryQuery {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SymbolRetrievalRunLookupQuery {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) id: String,
+}
+
 impl SymbolRetrievalEvalQuery {
     pub(crate) fn k(&self) -> usize {
         if self.k == 0 {
@@ -67,6 +80,57 @@ impl SymbolRetrievalEvalQuery {
             self.impact_limit
         }
     }
+}
+
+impl SymbolRetrievalRunHistoryQuery {
+    pub(crate) fn limit(&self) -> usize {
+        if self.limit == 0 {
+            20
+        } else {
+            self.limit.min(100)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalRunsResponse {
+    pub(crate) db_path: String,
+    pub(crate) query: SymbolRetrievalRunHistoryQueryEcho,
+    pub(crate) runs: Vec<SymbolRetrievalRunSummary>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalRunDetailResponse {
+    pub(crate) db_path: String,
+    pub(crate) run: SymbolRetrievalRunDetail,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalRunHistoryQueryEcho {
+    pub(crate) trace_id: Option<String>,
+    pub(crate) limit: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalRunSummary {
+    pub(crate) id: String,
+    pub(crate) query: String,
+    pub(crate) scores: Value,
+    pub(crate) created_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SymbolRetrievalRunDetail {
+    pub(crate) id: String,
+    pub(crate) query: String,
+    pub(crate) selected_chunks: Value,
+    pub(crate) scores: Value,
+    pub(crate) created_at: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

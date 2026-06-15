@@ -536,6 +536,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(context_compiler::symbol_index_api::eval_symbol_retrieval_batch),
         )
         .route(
+            "/api/admin/context/symbol-index/eval-runs",
+            get(context_compiler::symbol_index_api::list_symbol_retrieval_runs),
+        )
+        .route(
+            "/api/admin/context/symbol-index/eval-run",
+            get(context_compiler::symbol_index_api::get_symbol_retrieval_run),
+        )
+        .route(
             "/api/admin/context/symbol-index/symbol",
             get(context_compiler::symbol_index_api::get_symbol_graph),
         )

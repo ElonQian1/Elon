@@ -4,8 +4,9 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde::Serialize;
+use serde_json::Value;
 use uuid::Uuid;
 
 use super::{
@@ -13,7 +14,9 @@ use super::{
     symbol_index_eval_types::{
         SymbolRetrievalEvalBatchCaseResponse, SymbolRetrievalEvalBatchMetrics,
         SymbolRetrievalEvalBatchQuery, SymbolRetrievalEvalBatchResponse,
-        SymbolRetrievalEvalResponse,
+        SymbolRetrievalEvalResponse, SymbolRetrievalRunDetail, SymbolRetrievalRunDetailResponse,
+        SymbolRetrievalRunHistoryQuery, SymbolRetrievalRunHistoryQueryEcho,
+        SymbolRetrievalRunLookupQuery, SymbolRetrievalRunSummary, SymbolRetrievalRunsResponse,
     },
     symbol_index_query::find_symbol_index_db,
     symbol_index_store::create_retrieval_runs_schema,
@@ -83,6 +86,101 @@ pub(crate) fn evaluate_latest_symbol_retrieval_batch(
     Ok(response)
 }
 
+pub(crate) fn list_latest_retrieval_runs(
+    data_dir: &Path,
+    query: &SymbolRetrievalRunHistoryQuery,
+) -> Result<SymbolRetrievalRunsResponse> {
+    let db_path = find_symbol_index_db(data_dir, query.trace_id.as_deref())
+        .context("没有找到可查询 retrieval_runs 的 symbol_index.sqlite")?;
+    let conn = open_read_only(&db_path)?;
+    if !retrieval_runs_table_exists(&conn)? {
+        return Ok(SymbolRetrievalRunsResponse {
+            db_path: db_path.to_string_lossy().replace('\\', "/"),
+            query: SymbolRetrievalRunHistoryQueryEcho {
+                trace_id: query.trace_id.clone(),
+                limit: query.limit(),
+            },
+            runs: Vec::new(),
+        });
+    }
+
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, query, scores_json, created_at
+        FROM retrieval_runs
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?1
+        "#,
+    )?;
+    let rows = stmt.query_map([i64::try_from(query.limit()).unwrap_or(i64::MAX)], |row| {
+        let scores_json: String = row.get(2)?;
+        Ok(SymbolRetrievalRunSummary {
+            id: row.get(0)?,
+            query: row.get(1)?,
+            scores: parse_json(&scores_json),
+            created_at: row.get(3)?,
+        })
+    })?;
+
+    let mut runs = Vec::new();
+    for row in rows {
+        runs.push(row?);
+    }
+
+    Ok(SymbolRetrievalRunsResponse {
+        db_path: db_path.to_string_lossy().replace('\\', "/"),
+        query: SymbolRetrievalRunHistoryQueryEcho {
+            trace_id: query.trace_id.clone(),
+            limit: query.limit(),
+        },
+        runs,
+    })
+}
+
+pub(crate) fn load_latest_retrieval_run(
+    data_dir: &Path,
+    query: &SymbolRetrievalRunLookupQuery,
+) -> Result<SymbolRetrievalRunDetailResponse> {
+    if query.id.trim().is_empty() {
+        bail!("id 不能为空");
+    }
+
+    let db_path = find_symbol_index_db(data_dir, query.trace_id.as_deref())
+        .context("没有找到可查询 retrieval_runs 的 symbol_index.sqlite")?;
+    let conn = open_read_only(&db_path)?;
+    if !retrieval_runs_table_exists(&conn)? {
+        bail!("retrieval_runs 表不存在，请先运行一次批量评测并记录结果");
+    }
+
+    let run = conn
+        .query_row(
+            r#"
+            SELECT id, query, selected_chunks_json, scores_json, created_at
+            FROM retrieval_runs
+            WHERE id = ?1
+            "#,
+            [query.id.trim()],
+            |row| {
+                let selected_chunks_json: String = row.get(2)?;
+                let scores_json: String = row.get(3)?;
+                Ok(SymbolRetrievalRunDetail {
+                    id: row.get(0)?,
+                    query: row.get(1)?,
+                    selected_chunks: parse_json(&selected_chunks_json),
+                    scores: parse_json(&scores_json),
+                    created_at: row.get(4)?,
+                })
+            },
+        )
+        .optional()?
+        .ok_or_else(|| anyhow::anyhow!("retrieval run 不存在: {}", query.id))?;
+
+    Ok(SymbolRetrievalRunDetailResponse {
+        db_path: db_path.to_string_lossy().replace('\\', "/"),
+        run,
+    })
+}
+
 fn success_case(
     id: String,
     result: SymbolRetrievalEvalResponse,
@@ -102,6 +200,23 @@ fn failed_case(id: String, error: String) -> SymbolRetrievalEvalBatchCaseRespons
         error: Some(error),
         result: None,
     }
+}
+
+fn open_read_only(db_path: &Path) -> Result<Connection> {
+    Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))
+}
+
+fn retrieval_runs_table_exists(conn: &Connection) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'retrieval_runs')",
+        [],
+        |row| row.get::<_, bool>(0),
+    )
+}
+
+fn parse_json(value: &str) -> Value {
+    serde_json::from_str(value).unwrap_or_else(|_| Value::String(value.to_string()))
 }
 
 fn aggregate_metrics(

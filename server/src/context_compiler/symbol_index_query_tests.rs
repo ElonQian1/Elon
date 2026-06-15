@@ -10,8 +10,14 @@ use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{search_symbol_chunks_db, SymbolChunkSearch},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
-    symbol_index_eval_runs::evaluate_latest_symbol_retrieval_batch,
-    symbol_index_eval_types::{SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery},
+    symbol_index_eval_runs::{
+        evaluate_latest_symbol_retrieval_batch, list_latest_retrieval_runs,
+        load_latest_retrieval_run,
+    },
+    symbol_index_eval_types::{
+        SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery,
+        SymbolRetrievalRunHistoryQuery, SymbolRetrievalRunLookupQuery,
+    },
     symbol_index_graph_query::{load_symbol_graph_db, SymbolGraphQuery, SymbolRelationDirection},
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_symbol_impact_db,
@@ -538,6 +544,34 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
         .unwrap();
     assert!(selected_chunks_json.contains("build_context_pack"));
     assert!(selected_chunks_json.contains("compile_preflight_note"));
+
+    let history = list_latest_retrieval_runs(
+        &dir,
+        &SymbolRetrievalRunHistoryQuery {
+            trace_id: Some("trace-eval-batch".to_string()),
+            limit: 10,
+        },
+    )
+    .unwrap();
+    assert_eq!(history.runs.len(), 1);
+    assert_eq!(history.runs[0].id.as_str(), response.run_id.as_str());
+    assert_eq!(history.runs[0].scores["caseCount"].as_u64(), Some(2));
+
+    let detail = load_latest_retrieval_run(
+        &dir,
+        &SymbolRetrievalRunLookupQuery {
+            trace_id: Some("trace-eval-batch".to_string()),
+            id: response.run_id.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(detail.run.id.as_str(), response.run_id.as_str());
+    assert_eq!(detail.run.scores["evaluatedCount"].as_u64(), Some(2));
+    assert!(detail
+        .run
+        .selected_chunks
+        .to_string()
+        .contains("context_pack_tests.rs"));
 
     drop(conn);
     fs::remove_dir_all(dir).unwrap();

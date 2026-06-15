@@ -14,8 +14,14 @@ use crate::{admin, types::AppState};
 use super::{
     symbol_index_chunks::{search_latest_symbol_chunks, SymbolChunkSearch},
     symbol_index_eval::{evaluate_latest_symbol_retrieval, RetrievalEvalQuery},
-    symbol_index_eval_runs::evaluate_latest_symbol_retrieval_batch,
-    symbol_index_eval_types::{SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery},
+    symbol_index_eval_runs::{
+        evaluate_latest_symbol_retrieval_batch, list_latest_retrieval_runs,
+        load_latest_retrieval_run,
+    },
+    symbol_index_eval_types::{
+        SymbolRetrievalEvalBatchCaseQuery, SymbolRetrievalEvalBatchQuery,
+        SymbolRetrievalRunHistoryQuery, SymbolRetrievalRunLookupQuery,
+    },
     symbol_index_graph_query::{
         load_latest_symbol_graph, SymbolGraphQuery, SymbolRelationDirection,
     },
@@ -170,6 +176,22 @@ pub(crate) struct SymbolRetrievalEvalCaseBody {
     pub(crate) depth: Option<usize>,
     #[serde(alias = "impactLimit")]
     pub(crate) impact_limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalRunsParams {
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
+    pub(crate) limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SymbolRetrievalRunParams {
+    pub(crate) id: Option<String>,
+    #[serde(alias = "runId")]
+    pub(crate) run_id: Option<String>,
+    #[serde(alias = "traceId")]
+    pub(crate) trace_id: Option<String>,
 }
 
 impl SymbolIndexSearchParams {
@@ -329,6 +351,27 @@ impl SymbolRetrievalEvalBatchBody {
             trace_id,
             cases,
             record_runs: self.record_runs.unwrap_or(true),
+        })
+    }
+}
+
+impl SymbolRetrievalRunsParams {
+    fn into_query(self) -> SymbolRetrievalRunHistoryQuery {
+        SymbolRetrievalRunHistoryQuery {
+            trace_id: clean(self.trace_id),
+            limit: self.limit.unwrap_or_default(),
+        }
+    }
+}
+
+impl SymbolRetrievalRunParams {
+    fn into_query(self) -> Result<SymbolRetrievalRunLookupQuery, String> {
+        let id = clean(self.id)
+            .or_else(|| clean(self.run_id))
+            .ok_or_else(|| "id 不能为空".to_string())?;
+        Ok(SymbolRetrievalRunLookupQuery {
+            trace_id: clean(self.trace_id),
+            id,
         })
     }
 }
@@ -504,6 +547,41 @@ pub(crate) async fn eval_symbol_retrieval_batch(
     };
 
     match evaluate_latest_symbol_retrieval_batch(&state.data_dir, &query) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn list_symbol_retrieval_runs(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolRetrievalRunsParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    match list_latest_retrieval_runs(&state.data_dir, &params.into_query()) {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
+    }
+}
+
+pub(crate) async fn get_symbol_retrieval_run(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(params): Query<SymbolRetrievalRunParams>,
+) -> Response {
+    if !admin::check_auth(&headers, &state.admin_token) {
+        return json_error(StatusCode::UNAUTHORIZED, "无效的管理员令牌");
+    }
+
+    let query = match params.into_query() {
+        Ok(query) => query,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, &message),
+    };
+
+    match load_latest_retrieval_run(&state.data_dir, &query) {
         Ok(response) => Json(response).into_response(),
         Err(error) => json_error(StatusCode::NOT_FOUND, &error.to_string()),
     }
