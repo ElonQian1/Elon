@@ -616,6 +616,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(user_api::get_user_agent).put(user_api::set_user_agent),
         )
         .route(
+            "/api/user/:user_id/agent/test",
+            post(user_api::test_user_agent),
+        )
+        .route(
             "/api/user/:user_id/usage/stats",
             get(token_usage_api::get_usage_stats),
         )

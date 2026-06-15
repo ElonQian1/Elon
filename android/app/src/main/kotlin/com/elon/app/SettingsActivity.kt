@@ -57,6 +57,7 @@ class SettingsActivity : AppCompatActivity() {
         loadCurrentConfig()
 
         findViewById<Button>(R.id.saveButton).setOnClickListener { saveConfig() }
+        findViewById<Button>(R.id.testAgentButton).setOnClickListener { testCustomAgent() }
         findViewById<Button>(R.id.tokenUsageButton).setOnClickListener {
             startActivity(android.content.Intent(this, TokenUsageActivity::class.java))
         }
@@ -234,6 +235,10 @@ class SettingsActivity : AppCompatActivity() {
             text = "已锁定 Codex CLI"
             isEnabled = false
         }
+        findViewById<Button>(R.id.testAgentButton).apply {
+            text = "已锁定 Codex CLI"
+            isEnabled = false
+        }
     }
 
     private fun setupSpinner() {
@@ -274,6 +279,54 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     // ── 保存配置 ──────────────────────────────
+    private fun testCustomAgent() {
+        if (codexCliOnly && !userByokApiEnabled) {
+            Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val base  = findViewById<EditText>(R.id.customBase).text.toString().trim()
+        val key   = findViewById<EditText>(R.id.customKey).text.toString().trim()
+        val model = findViewById<EditText>(R.id.customModel).text.toString().trim()
+        if (base.isEmpty() || model.isEmpty()) {
+            Toast.makeText(this, "请填写 API 地址和模型名称", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val btn = findViewById<Button>(R.id.testAgentButton)
+        btn.isEnabled = false
+        btn.text = "测试中..."
+
+        val payload = JSONObject()
+            .put("api_base", base)
+            .put("model", model)
+        if (key.isNotEmpty()) payload.put("api_key", key)
+
+        scope.launch {
+            try {
+                val body = payload.toString().toRequestBody("application/json".toMediaType())
+                val resp = withContext(Dispatchers.IO) {
+                    http.newCall(Request.Builder()
+                        .url("$SERVER_URL/api/user/$userId/agent/test")
+                        .post(body).build()).execute()
+                }
+                val respBody = resp.body?.string() ?: ""
+                if (resp.isSuccessful) {
+                    val json = JSONObject(respBody)
+                    val latency = json.optLong("latency_ms", 0)
+                    Toast.makeText(this@SettingsActivity, "连接成功（${latency}ms）", Toast.LENGTH_SHORT).show()
+                } else {
+                    val msg = runCatching { JSONObject(respBody).getString("error") }.getOrDefault(respBody)
+                    Toast.makeText(this@SettingsActivity, "测试失败: $msg", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@SettingsActivity, "网络错误: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                btn.isEnabled = true
+                btn.text = "测试连接"
+            }
+        }
+    }
+
     private fun saveConfig() {
         if (codexCliOnly && !userByokApiEnabled) {
             Toast.makeText(this, "当前已锁定使用 Codex CLI", Toast.LENGTH_SHORT).show()

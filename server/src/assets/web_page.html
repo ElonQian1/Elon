@@ -2423,6 +2423,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <input id="agentCustomKey" type="password" placeholder="sk-...（留空保留已保存密钥）" autocomplete="off" />
       <label for="agentCustomModel" style="margin-top:10px">模型名称</label>
       <input id="agentCustomModel" type="text" placeholder="deepseek-chat" autocomplete="off" />
+      <button type="button" class="btn-cancel" id="testAgentCustomBtn" style="width:100%;margin-top:12px">测试连接</button>
       <button type="button" class="btn-confirm" id="saveAgentCustomBtn" style="width:100%;margin-top:12px">保存自定义模型</button>
     </div>
     <div class="error-text" id="agentError"></div>
@@ -2692,6 +2693,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const agentCustomBase = $('agentCustomBase');
   const agentCustomKey = $('agentCustomKey');
   const agentCustomModel = $('agentCustomModel');
+  const testAgentCustomBtn = $('testAgentCustomBtn');
   const saveAgentCustomBtn = $('saveAgentCustomBtn');
   const cancelAgentBtn = $('cancelAgentBtn');
   const rechargeMask = $('rechargeMask');
@@ -4777,7 +4779,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
   }
-  async function persistCustomAgent() {
+  function setAgentMessage(message, ok) {
+    agentError.textContent = message || '';
+    agentError.style.color = ok ? 'var(--brand)' : '';
+  }
+  function customAgentPayload() {
     const base = (agentCustomBase && agentCustomBase.value || '').trim();
     const key = (agentCustomKey && agentCustomKey.value || '').trim();
     const model = (agentCustomModel && agentCustomModel.value || '').trim();
@@ -4785,17 +4791,32 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!base || !model) throw new Error('请填写 API 地址和模型名称');
     if (!key && !hasSavedKey) throw new Error('请填写 API Key；留空只用于保留已保存的密钥');
     const payload = {
-      use_agent: null,
       api_base: base,
       model,
     };
     if (key) payload.api_key = key;
+    return payload;
+  }
+  async function persistCustomAgent() {
+    const payload = customAgentPayload();
+    payload.use_agent = null;
     const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent', {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  }
+  async function testCustomAgent() {
+    const payload = customAgentPayload();
+    const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent/test', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    const latency = data.latency_ms ? `（${data.latency_ms}ms）` : '';
+    setAgentMessage('连接成功：' + (data.model || payload.model) + latency, true);
   }
   async function selectAgentOption(option) {
     if (!option || option.disabled || agentLoading) return;
@@ -4804,7 +4825,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     selectedAgent = option.name || '';
     updateModelButton(option.label);
     renderAgentOptions();
-    agentError.textContent = '';
+    setAgentMessage('');
     agentLoading = true;
     renderAgentOptions();
     try {
@@ -4813,7 +4834,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     } catch (err) {
       selectedAgent = previousAgent;
       updateModelButton(previousLabel);
-      agentError.textContent = '模型切换失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      setAgentMessage('模型切换失败：' + ((err && err.message) ? err.message : '请稍后重试'));
     } finally {
       agentLoading = false;
       renderAgentOptions();
@@ -4821,7 +4842,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   async function loadAgents() {
     if (!currentUser) return;
-    agentError.textContent = '';
+    setAgentMessage('');
     agentLoading = true;
     renderAgentOptions();
     try {
@@ -4863,7 +4884,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       codexCliOnly = false;
       userByokApiEnabled = false;
       agentOptions = [{ name: '', label: '默认模型' }];
-      agentError.textContent = '模型列表加载失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      setAgentMessage('模型列表加载失败：' + ((err && err.message) ? err.message : '请稍后重试'));
     } finally {
       agentLoading = false;
       renderAgentOptions();
@@ -5928,8 +5949,19 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   cancelAgentBtn.addEventListener('click', () => agentMask.classList.remove('active'));
   agentForm.addEventListener('submit', (e) => e.preventDefault());
   agentMask.addEventListener('click', (e) => { if (e.target === agentMask) agentMask.classList.remove('active'); });
+  testAgentCustomBtn.addEventListener('click', async () => {
+    setAgentMessage('');
+    testAgentCustomBtn.disabled = true;
+    try {
+      await testCustomAgent();
+    } catch (err) {
+      setAgentMessage('自定义模型测试失败：' + ((err && err.message) ? err.message : '请稍后重试'));
+    } finally {
+      testAgentCustomBtn.disabled = false;
+    }
+  });
   saveAgentCustomBtn.addEventListener('click', async () => {
-    agentError.textContent = '';
+    setAgentMessage('');
     saveAgentCustomBtn.disabled = true;
     try {
       await persistCustomAgent();
@@ -5938,7 +5970,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       agentMask.classList.remove('active');
       await loadAgents();
     } catch (err) {
-      agentError.textContent = '自定义模型保存失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      setAgentMessage('自定义模型保存失败：' + ((err && err.message) ? err.message : '请稍后重试'));
     } finally {
       saveAgentCustomBtn.disabled = false;
     }

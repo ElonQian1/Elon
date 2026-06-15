@@ -8,6 +8,7 @@
 /// 路由（无需管理员权限，user_id 即身份标识）：
 ///   GET /api/user/:user_id/agent   → 获取当前配置 + 可用全局代理列表
 ///   PUT /api/user/:user_id/agent   → 保存配置
+///   POST /api/user/:user_id/agent/test → 测试自定义 API 模型连通性
 use axum::{
     extract::{Path, State},
     http::{header, HeaderMap, StatusCode},
@@ -19,6 +20,9 @@ use std::sync::Arc;
 
 use crate::project_auth::{auth_from_headers, json_error};
 use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
+use crate::user_agent_probe::{
+    normalize_api_base, probe_openai_compatible_api, resolve_probe_config, UserAgentProbeRequest,
+};
 use crate::user_agent_secrets::user_byok_api_enabled;
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
@@ -144,14 +148,20 @@ pub async fn set_user_agent(
             Some(s)
         }
     });
-    let api_base = req.api_base.and_then(|s| {
-        let s = s.trim().to_string();
-        if s.is_empty() {
-            None
-        } else {
-            Some(s)
-        }
-    });
+    let api_base = match req.api_base.as_deref().map(str::trim) {
+        Some(value) if value.is_empty() => None,
+        Some(value) => match normalize_api_base(value) {
+            Some(normalized) => Some(normalized),
+            None => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": "API 地址必须以 http:// 或 https:// 开头" })),
+                )
+                    .into_response();
+            }
+        },
+        None => None,
+    };
     let mut api_key = req.api_key.and_then(|s| {
         let s = s.trim().to_string();
         if s.is_empty() {
@@ -268,6 +278,52 @@ pub async fn set_user_agent(
 
     tracing::info!("用户 '{}' 更新了 AI 代理配置: {:?}", user_id, cfg.use_agent);
     Json(serde_json::json!({ "ok": true })).into_response()
+}
+
+/// 测试用户自定义 API 模型连通性，不保存 API Key。
+pub async fn test_user_agent(
+    State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    Json(req): Json<UserAgentProbeRequest>,
+) -> Response {
+    if state.ai_cli.codex_cli_only && !user_byok_api_enabled() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "当前已锁定使用 Codex CLI，暂不允许测试自定义 API 模型"
+            })),
+        )
+            .into_response();
+    }
+
+    let workspace = state.get_user_workspace(&user_id);
+    let existing_config = UserAgentConfig::load(&workspace).unwrap_or_default();
+    let cfg = match resolve_probe_config(req, &existing_config) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+    };
+
+    match probe_openai_compatible_api(&state.http_client, &cfg).await {
+        Ok(result) => Json(serde_json::json!({
+            "ok": true,
+            "api_base": result.api_base,
+            "model": result.model,
+            "latency_ms": result.latency_ms,
+            "sample": result.sample,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+            .into_response(),
+    }
 }
 
 fn is_cli_selection(state: &AppState, name: &str) -> bool {
