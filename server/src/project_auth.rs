@@ -126,6 +126,7 @@ pub fn project_access(
             storage_status: "none".to_string(),
             role: "owner".to_string(),
             status: "active".to_string(),
+            runtime_permission: crate::store::default_project_runtime_permission(),
         });
     }
     state.store.get_project_access(user_id, project_id)

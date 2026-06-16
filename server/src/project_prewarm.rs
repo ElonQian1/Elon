@@ -174,6 +174,7 @@ async fn prewarm_project_response(
         project_id: project.id.clone(),
         user_id: user.id.clone(),
         conversation_id: conversation_id.clone(),
+        runtime_permission: project.runtime_permission.clone(),
     };
     let state_for_task = state.clone();
     let workspace_for_task = workspace.clone();

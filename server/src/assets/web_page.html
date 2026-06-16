@@ -2389,6 +2389,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <option value="invite">仅邀请</option>
       </select>
     </div>
+    <div>
+      <label for="projectRuntimePermissionMode">AI 运行权限</label>
+      <select id="projectRuntimePermissionMode">
+        <option value="project_write">项目目录写入</option>
+        <option value="full_access">完全访问</option>
+      </select>
+      <p id="projectRuntimePermissionHint" style="color:var(--ink-soft);font-size:12px;line-height:1.55;margin:6px 0 0"></p>
+    </div>
     <div class="error-text" id="projectVisibilityError"></div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="cancelProjectVisibilityBtn">取消</button>
@@ -2714,6 +2722,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectVisibilityTitle = $('projectVisibilityTitle');
   const projectVisibilityMode = $('projectVisibilityMode');
   const projectVisibilityJoinMode = $('projectVisibilityJoinMode');
+  const projectRuntimePermissionMode = $('projectRuntimePermissionMode');
+  const projectRuntimePermissionHint = $('projectRuntimePermissionHint');
   const projectVisibilityError = $('projectVisibilityError');
   const cancelProjectVisibilityBtn = $('cancelProjectVisibilityBtn');
   const saveProjectVisibilityBtn = $('saveProjectVisibilityBtn');
@@ -6286,6 +6296,37 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     else if (projectVisibilityJoinMode.value === 'invite') projectVisibilityJoinMode.value = 'open';
   }
 
+  function normalizeProjectRuntimePermission(value) {
+    return value === 'full_access' ? 'full_access' : 'project_write';
+  }
+
+  function syncProjectRuntimePermissionHint() {
+    const mode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
+    projectRuntimePermissionHint.textContent = mode === 'full_access'
+      ? '允许 AI CLI 在用户授权的项目会话中访问和修改本机更大范围内容。'
+      : '默认限制在项目工作区内读写，适合普通开发项目。';
+    projectRuntimePermissionHint.style.color = mode === 'full_access' ? '#b45309' : 'var(--ink-soft)';
+  }
+
+  async function loadProjectRuntimePermission(project) {
+    const projectId = project && project.id;
+    if (!projectId) return;
+    try {
+      const res = await api('/api/projects/' + encodeURIComponent(projectId) + '/runtime-permission');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      if (!pendingVisibilityProject || pendingVisibilityProject.id !== projectId) return;
+      const mode = normalizeProjectRuntimePermission(data.mode);
+      projectRuntimePermissionMode.value = mode;
+      pendingVisibilityProject.runtime_permission = mode;
+      syncProjectRuntimePermissionHint();
+    } catch (err) {
+      if (pendingVisibilityProject && pendingVisibilityProject.id === projectId) {
+        projectVisibilityError.textContent = '运行权限读取失败：' + ((err && err.message) ? err.message : '请稍后重试');
+      }
+    }
+  }
+
   function openProjectVisibility(project) {
     if (!project) return;
     if (!canManageProject(project)) {
@@ -6296,10 +6337,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectVisibilityTitle.textContent = '项目「' + projectNameOf(project) + '」的可见范围和加入方式。';
     projectVisibilityMode.value = boolLike(project.is_public || project.isPublic) ? 'public' : 'private';
     projectVisibilityJoinMode.value = project.join_mode || project.joinMode || (projectVisibilityMode.value === 'public' ? 'open' : 'invite');
+    projectRuntimePermissionMode.value = normalizeProjectRuntimePermission(project.runtime_permission || project.runtimePermission);
     projectVisibilityError.textContent = '';
     saveProjectVisibilityBtn.disabled = false;
     syncProjectVisibilityControls();
+    syncProjectRuntimePermissionHint();
     projectVisibilityMask.classList.add('active');
+    loadProjectRuntimePermission(project);
   }
 
   function closeProjectVisibility() {
@@ -6310,6 +6354,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   cancelProjectVisibilityBtn.addEventListener('click', closeProjectVisibility);
   projectVisibilityMask.addEventListener('click', (e) => { if (e.target === projectVisibilityMask) closeProjectVisibility(); });
   projectVisibilityMode.addEventListener('change', syncProjectVisibilityControls);
+  projectRuntimePermissionMode.addEventListener('change', syncProjectRuntimePermissionHint);
   projectVisibilityForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!pendingVisibilityProject) return;
@@ -6317,7 +6362,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectVisibilityError.textContent = '';
     const isPublic = projectVisibilityMode.value === 'public';
     const joinMode = isPublic ? projectVisibilityJoinMode.value : 'invite';
+    const runtimeMode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
+    if (runtimeMode === 'full_access') {
+      const ok = window.confirm('确认给项目「' + projectNameOf(pendingVisibilityProject) + '」开启完全访问？AI CLI 可能读取或修改项目目录外的本机文件和系统设置。');
+      if (!ok) {
+        saveProjectVisibilityBtn.disabled = false;
+        return;
+      }
+    }
     try {
+      const runtimeRes = await api('/api/projects/' + encodeURIComponent(pendingVisibilityProject.id) + '/runtime-permission', {
+        method: 'PATCH',
+        body: JSON.stringify({ mode: runtimeMode, confirmFullAccess: runtimeMode === 'full_access' })
+      });
+      const runtimeData = await runtimeRes.json().catch(() => ({}));
+      if (!runtimeRes.ok) throw new Error(runtimeData.error || ('HTTP ' + runtimeRes.status));
       const res = await api('/api/projects/' + encodeURIComponent(pendingVisibilityProject.id) + '/visibility', {
         method: 'PATCH',
         body: JSON.stringify({ is_public: isPublic, join_mode: joinMode })

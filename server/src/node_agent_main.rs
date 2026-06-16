@@ -817,11 +817,19 @@ async fn resolve_attachment_args(
 
 /// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
 /// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
+fn cli_prompt_full_access(runtime_permission: Option<&str>) -> bool {
+    matches!(
+        runtime_permission.map(str::trim),
+        Some("full_access" | "danger_full_access")
+    )
+}
+
 async fn run_cli_prompt(
     req_id: String,
     bin: &str,
     cli_name: &str,
     extra_args: Vec<String>,
+    runtime_permission: Option<String>,
     cwd: Option<String>,
     conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     prompt: String,
@@ -842,6 +850,7 @@ async fn run_cli_prompt(
     // Claude/Gemini: claude|gemini [extra_args] -p "<prompt>"
     // Codex 首次: codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"
     // Codex 续接: codex exec resume <session-uuid> "<prompt>"
+    let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let mut cmd = tokio::process::Command::new(actual_bin);
     for a in &actual_args_prefix {
         cmd.arg(a);
@@ -865,7 +874,13 @@ async fn run_cli_prompt(
             .iter()
             .find(|a| a.starts_with("--session-id="))
             .and_then(|a| a.strip_prefix("--session-id="))
-            .map(str::to_owned);
+            .map(|key| {
+                if full_access {
+                    format!("{key}:full_access")
+                } else {
+                    key.to_string()
+                }
+            });
         let real_codex_session_id = our_key.as_ref().and_then(|key| {
             std::fs::read_to_string(&codex_sessions_file)
                 .ok()
@@ -879,20 +894,29 @@ async fn run_cli_prompt(
             cmd.arg("resume");
             cmd.arg(real_sid);
         } else {
-            // 首次执行：全权限，Codex 会自动创建 session id
-            cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+            // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
+            if full_access {
+                cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+            } else {
+                cmd.arg("--sandbox");
+                cmd.arg("workspace-write");
+                cmd.arg("--skip-git-repo-check");
+            }
         }
         // 其余 extra_args，跳过已处理的 --session-id / --codex-model / --codex-effort
         for a in &extra_args {
             if !a.starts_with("--session-id=")
                 && !a.starts_with("--codex-model=")
                 && !a.starts_with("--codex-effort=")
+                && (full_access || a != "--dangerously-bypass-approvals-and-sandbox")
             {
                 cmd.arg(a);
             }
         }
     } else if cli_name == "copilot" {
-        cmd.arg("--allow-all");
+        if full_access {
+            cmd.arg("--allow-all");
+        }
         for a in &extra_args {
             cmd.arg(a);
         }
@@ -1774,6 +1798,9 @@ async fn run_session(
                                         .as_deref(),
                                 )
                                 .await;
+                                let runtime_permission = project_context
+                                    .as_ref()
+                                    .and_then(|ctx| ctx.runtime_permission.clone());
                                 let prepared_cwd =
                                     match prepare_cli_prompt_cwd(cwd, project_context) {
                                         Ok(cwd) => cwd,
@@ -1798,6 +1825,7 @@ async fn run_session(
                                     &full_path,
                                     &cli,
                                     resolved_args,
+                                    runtime_permission,
                                     prepared_cwd.cwd,
                                     prepared_cwd.conversation_workspace,
                                     prompt,

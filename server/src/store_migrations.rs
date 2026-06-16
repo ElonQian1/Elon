@@ -71,6 +71,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (49, "PC 硬盘节点 owner checkout 路径", migration_v49),
     (50, "项目展示别名", migration_v50),
     (51, "一龙自项目公开展示并审批加入", migration_v51),
+    (52, "项目级 AI 运行权限授权", migration_v52),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1795,6 +1796,38 @@ fn migration_v51(conn: &Connection) -> Result<()> {
                updated_at = datetime('now')
          WHERE id = 'elon-self'
            AND status != 'deleted';
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v52(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_runtime_permissions (
+          project_id TEXT PRIMARY KEY,
+          mode       TEXT NOT NULL DEFAULT 'project_write'
+                     CHECK (mode IN ('project_write', 'full_access')),
+          updated_by TEXT,
+          updated_at TEXT,
+          expires_at TEXT,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_runtime_permission_audit (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          user_id    TEXT NOT NULL,
+          old_mode   TEXT,
+          new_mode   TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_runtime_permission_audit_project_time
+          ON project_runtime_permission_audit(project_id, created_at DESC);
         "#,
     )?;
     Ok(())

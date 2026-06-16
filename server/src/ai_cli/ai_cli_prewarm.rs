@@ -78,6 +78,7 @@ pub async fn prewarm_codex_session(
         workspace,
         &prompt,
         None,
+        Some(native_session_scope.runtime_permission.as_str()),
         &tx,
         Some(CliTraceContext {
             state,

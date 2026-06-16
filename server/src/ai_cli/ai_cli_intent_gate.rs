@@ -65,6 +65,9 @@ pub async fn confirm_project_intent(
             .ok()
             .flatten()
     });
+    let runtime_permission = native_session_scope
+        .as_ref()
+        .map(|scope| scope.runtime_permission.as_str());
 
     let prompt = build_intent_gate_prompt(workspace, user_message, &option);
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -73,6 +76,7 @@ pub async fn confirm_project_intent(
         workspace,
         &prompt,
         native_session_id.as_deref(),
+        runtime_permission,
         &tx,
         Some(CliTraceContext {
             state,
@@ -124,6 +128,7 @@ pub async fn confirm_project_intent(
             workspace,
             &prompt,
             None,
+            runtime_permission,
             &tx,
             Some(CliTraceContext {
                 state,

@@ -6,6 +6,7 @@ pub struct NativeSessionScope {
     pub project_id: String,
     pub user_id: String,
     pub conversation_id: String,
+    pub runtime_permission: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -118,6 +118,7 @@ pub async fn run_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: cid.to_string(),
+            runtime_permission: project.runtime_permission.clone(),
         });
         if let Err(e) = ai_cli::run_with_pc_agent_workspace(
             agent_id,
@@ -202,6 +203,7 @@ pub async fn run_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
+            runtime_permission: project.runtime_permission.clone(),
         }),
         user_message,
         preflight_note.as_deref(),
@@ -282,6 +284,7 @@ pub async fn plan_for_project_in_workspace(
                 project_id: project.id.clone(),
                 user_id: user_id.to_string(),
                 conversation_id: cid.to_string(),
+                runtime_permission: project.runtime_permission.clone(),
             }),
             Some(pc_cli),
             copilot_model.as_deref(),
@@ -308,6 +311,7 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
+            runtime_permission: project.runtime_permission.clone(),
         }),
         user_message,
         None,

@@ -33,6 +33,7 @@ mod pc_project_binding;
 mod project_branding;
 mod project_execution_sessions;
 mod project_member_conversations;
+mod project_runtime_permissions;
 mod project_space;
 mod project_storage;
 mod project_workspace_health_snapshots;
@@ -680,7 +681,13 @@ impl Store {
                 "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
                         p.workspace_path, p.node_id,
                         p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
-                        p.storage_worktree_path, COALESCE(p.storage_status, 'none'), pm.role, p.status
+                        p.storage_worktree_path, COALESCE(p.storage_status, 'none'), pm.role, p.status,
+                        COALESCE(
+                            (SELECT prp.mode
+                               FROM project_runtime_permissions prp
+                              WHERE prp.project_id = p.id),
+                            'project_write'
+                        ) AS runtime_permission
                  FROM projects p
                  JOIN project_members pm ON pm.project_id = p.id
                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
@@ -702,6 +709,7 @@ impl Store {
                         storage_status: row.get(12)?,
                         role: row.get(13)?,
                         status: row.get(14)?,
+                        runtime_permission: row.get(15)?,
                     })
                 },
             )

@@ -78,6 +78,7 @@ pub(crate) async fn run_cli_command_traced(
     workspace: &Path,
     prompt: &str,
     native_session_id: Option<&str>,
+    runtime_permission: Option<&str>,
     tx: &UnboundedSender<String>,
     trace: Option<CliTraceContext<'_>>,
 ) -> Result<CliOutput> {
@@ -98,7 +99,15 @@ pub(crate) async fn run_cli_command_traced(
     if let Some(trace) = trace {
         record_cli_start(trace, option, workspace, prompt, native_session_id);
     }
-    let result = run_cli_command(option, workspace, prompt, native_session_id, tx).await;
+    let result = run_cli_command(
+        option,
+        workspace,
+        prompt,
+        native_session_id,
+        runtime_permission,
+        tx,
+    )
+    .await;
     if let Some(trace) = trace {
         match &result {
             Ok(output) => record_cli_done(
@@ -158,10 +167,12 @@ async fn run_cli_command(
     workspace: &Path,
     prompt: &str,
     native_session_id: Option<&str>,
+    runtime_permission: Option<&str>,
     tx: &UnboundedSender<String>,
 ) -> Result<CliOutput> {
     let mut cmd = Command::new(&option.bin);
-    let args = super::ai_cli_runner::cli_args_for_run(option, native_session_id);
+    let args =
+        super::ai_cli_runner::cli_args_for_run(option, native_session_id, runtime_permission);
     cmd.args(&args)
         .current_dir(workspace)
         .stdout(Stdio::piped())

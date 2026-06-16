@@ -230,6 +230,7 @@ fn schedule_background_native_session_repair(
                 &workspace,
                 &prompt,
                 None,
+                Some(scope.runtime_permission.as_str()),
                 &tx,
                 Some(CliTraceContext {
                     state: &state,

@@ -90,6 +90,9 @@ pub struct DevToolchainStatus {
 pub struct CliProjectContext {
     pub project_id: String,
     pub conversation_id: String,
+    /// "project_write" | "full_access". Old nodes ignore this field.
+    #[serde(default)]
+    pub runtime_permission: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

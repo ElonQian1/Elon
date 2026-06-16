@@ -640,6 +640,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             project_id: project.id.clone(),
             user_id: user_id.clone(),
             conversation_id: conversation_id.clone(),
+            runtime_permission: project.runtime_permission.clone(),
         };
         match ai_cli::confirm_project_intent(
             workspace,

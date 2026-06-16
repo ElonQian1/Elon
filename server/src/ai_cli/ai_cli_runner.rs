@@ -11,17 +11,26 @@ use crate::types::AiCliOption;
 pub(crate) fn cli_args_for_run(
     option: &AiCliOption,
     native_session_id: Option<&str>,
+    runtime_permission: Option<&str>,
 ) -> Vec<String> {
+    let full_access = crate::store::project_runtime_permission_allows_full_access(
+        runtime_permission.unwrap_or_default(),
+    );
     if supports_codex_sessions(option) {
+        let raw_args = if full_access {
+            codex_full_access_raw_args(&option.args)
+        } else {
+            option.args.clone()
+        };
         if let Some(session_id) = native_session_id {
-            if let Some(args) = codex_resume_args(&option.args, session_id) {
+            if let Some(args) = codex_resume_args(&raw_args, session_id) {
                 return args;
             }
         }
-        return codex_exec_json_args(&option.args);
+        return codex_exec_json_args(&raw_args);
     }
     if supports_copilot_sessions(option) {
-        return copilot_session_args(&option.args, native_session_id);
+        return copilot_session_args(&option.args, native_session_id, full_access);
     }
     option.args.clone()
 }
@@ -34,11 +43,15 @@ pub(crate) fn cli_args_for_run(
 pub(crate) fn copilot_session_args(
     raw_args: &[String],
     native_session_id: Option<&str>,
+    full_access: bool,
 ) -> Vec<String> {
     let mut args = Vec::new();
     if native_session_id.is_some() {
         // --continue 会在当前工作目录续接最近的 CopilotCLI 会话
         args.push("--continue".into());
+    }
+    if full_access && !raw_args.iter().any(|arg| arg == "--allow-all") {
+        args.push("--allow-all".into());
     }
     args.extend_from_slice(raw_args);
     args
@@ -60,6 +73,42 @@ pub(crate) fn codex_exec_json_args(raw_args: &[String]) -> Vec<String> {
     if let Some(exec_index) = args.iter().position(|arg| arg == "exec" || arg == "e") {
         args.insert(exec_index + 1, "--json".into());
     }
+    args
+}
+
+pub(crate) fn codex_full_access_raw_args(raw_args: &[String]) -> Vec<String> {
+    let mut args = Vec::with_capacity(raw_args.len() + 1);
+    let mut i = 0;
+    while i < raw_args.len() {
+        match raw_args[i].as_str() {
+            "--sandbox" | "-s" => {
+                i += 2;
+                continue;
+            }
+            arg if arg.starts_with("--sandbox=") => {
+                i += 1;
+                continue;
+            }
+            "--dangerously-bypass-approvals-and-sandbox" => {
+                i += 1;
+                continue;
+            }
+            _ => {
+                args.push(raw_args[i].clone());
+                i += 1;
+            }
+        }
+    }
+
+    let insert_at = args
+        .iter()
+        .position(|arg| arg == "exec" || arg == "e")
+        .map(|index| index + 1)
+        .unwrap_or(args.len());
+    args.insert(
+        insert_at,
+        "--dangerously-bypass-approvals-and-sandbox".into(),
+    );
     args
 }
 
@@ -127,5 +176,83 @@ pub(crate) fn codex_thread_uri(session_id: &str) -> String {
         session_id.to_string()
     } else {
         format!("codex://threads/{session_id}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::CliPromptMode;
+
+    fn option(id: &str, provider: &str, args: &[&str]) -> AiCliOption {
+        AiCliOption {
+            id: id.to_string(),
+            label: id.to_string(),
+            provider: provider.to_string(),
+            model: None,
+            reasoning_effort: None,
+            reasoning_summary: None,
+            verbosity: None,
+            bin: provider.to_string(),
+            args: args.iter().map(|arg| arg.to_string()).collect(),
+            prompt_mode: CliPromptMode::Arg,
+            timeout_secs: 60,
+        }
+    }
+
+    #[test]
+    fn codex_project_write_keeps_workspace_sandbox() {
+        let option = option(
+            "codex_cli",
+            "codex",
+            &[
+                "exec",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check",
+            ],
+        );
+        let args = cli_args_for_run(&option, None, Some("project_write"));
+        assert_eq!(
+            args,
+            vec![
+                "exec",
+                "--json",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check"
+            ]
+        );
+    }
+
+    #[test]
+    fn codex_full_access_replaces_workspace_sandbox() {
+        let option = option(
+            "codex_cli",
+            "codex",
+            &[
+                "exec",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check",
+            ],
+        );
+        let args = cli_args_for_run(&option, None, Some("full_access"));
+        assert_eq!(
+            args,
+            vec![
+                "exec",
+                "--json",
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--skip-git-repo-check"
+            ]
+        );
+    }
+
+    #[test]
+    fn copilot_full_access_adds_allow_all() {
+        let option = option("copilot_cli", "copilot", &["--model", "gpt-5"]);
+        let args = cli_args_for_run(&option, Some("conv-1"), Some("full_access"));
+        assert_eq!(args, vec!["--continue", "--allow-all", "--model", "gpt-5"]);
     }
 }

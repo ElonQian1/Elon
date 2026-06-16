@@ -295,6 +295,9 @@ async fn run_with_workspace_mode(
             WsMessage::progress("Restoring Codex CLI context for this conversation.").to_json(),
         );
     }
+    let runtime_permission = native_session_scope
+        .as_ref()
+        .map(|scope| scope.runtime_permission.as_str());
 
     let mut prompt = build_cli_prompt(
         workspace,
@@ -320,6 +323,7 @@ async fn run_with_workspace_mode(
         workspace,
         &prompt,
         native_session_id.as_deref(),
+        runtime_permission,
         tx,
         Some(CliTraceContext {
             state,
@@ -389,6 +393,7 @@ async fn run_with_workspace_mode(
                 workspace,
                 &prompt,
                 None,
+                runtime_permission,
                 tx,
                 Some(CliTraceContext {
                     state,
@@ -489,6 +494,7 @@ async fn run_with_workspace_mode(
             workspace,
             &prompt,
             None,
+            runtime_permission,
             tx,
             Some(CliTraceContext {
                 state,
@@ -777,6 +783,7 @@ async fn run_via_pc_agent(
                     .map(|scope| CliProjectContext {
                         project_id: scope.project_id.clone(),
                         conversation_id: scope.conversation_id.clone(),
+                        runtime_permission: Some(scope.runtime_permission.clone()),
                     })
             };
             match state
