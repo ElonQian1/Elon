@@ -40,8 +40,7 @@ internal class ProjectManagementHomeView(
 
     fun render() {
         container.removeAllViews()
-        container.setBackgroundColor(Color.parseColor(COLOR_APP_BG))
-
+        container.setBackgroundColor(Color.parseColor(COLOR_BG))
         val indexed = projects().mapIndexed { index, project -> IndexedProject(index, project) }
         val personal = indexed
             .filter { !it.project.isJointDevelopmentProject() }
@@ -52,24 +51,68 @@ internal class ProjectManagementHomeView(
         val joint = indexed
             .filter { it.project.isJointDevelopmentProject() }
             .sortedByDescending { it.project.updatedAt }
+        val showJoint = jointProjectsExpanded() && !personalProjectsExpanded()
+        val visibleProjects = if (showJoint) joint else personal
 
-        val allProjects = personal + joint
-        if (allProjects.isEmpty()) {
-            container.addView(createEmptyProjectCard(), cardLayoutParams())
+        container.addView(createSegmentRow(showJoint), segmentLayoutParams())
+        if (visibleProjects.isEmpty()) {
+            container.addView(createEmptyState(showJoint), firstRowLayoutParams())
         } else {
-            allProjects.forEach { item ->
-                container.addView(createProjectCard(item), cardLayoutParams())
+            visibleProjects.forEachIndexed { rowIndex, item ->
+                container.addView(createProjectRow(item), rowLayoutParams(rowIndex))
             }
         }
         container.addView(bottomSpacer())
     }
 
-    private fun createProjectCard(item: IndexedProject): View {
+    private fun createSegmentRow(showJoint: Boolean): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(segmentButton("独立", selected = !showJoint) {
+                setPersonalProjectsExpanded(true)
+                setJointProjectsExpanded(false)
+                render()
+            })
+            addView(segmentButton("联合", selected = showJoint) {
+                setPersonalProjectsExpanded(false)
+                setJointProjectsExpanded(true)
+                render()
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(SEGMENT_HEIGHT_DP)
+            ).apply {
+                marginStart = dp(38)
+            })
+        }
+    }
+
+    private fun segmentButton(
+        label: String,
+        selected: Boolean,
+        onClick: () -> Unit
+    ): TextView {
+        return TextView(activity).apply {
+            text = label
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { onClick() }
+            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, SEGMENT_TEXT_SP)
+            setTypeface(typeface, Typeface.NORMAL)
+            setPadding(dp(if (selected) 21 else 0), 0, dp(if (selected) 21 else 0), 0)
+            if (selected) background = rounded(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_DP / 2)
+            minWidth = dp(if (selected) 72 else 64)
+        }
+    }
+
+    private fun createProjectRow(item: IndexedProject): View {
         val project = item.project
         return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rect(COLOR_CARD_BODY, PROJECT_CARD_RADIUS_DP)
-            clipToOutline = true
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
@@ -78,156 +121,98 @@ internal class ProjectManagementHomeView(
                 true
             }
 
-            addView(createCardHeader(project), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(CARD_HEADER_HEIGHT_DP)
+            addView(projectThumbnail(project), LinearLayout.LayoutParams(
+                dp(THUMB_SIZE_DP),
+                dp(THUMB_SIZE_DP)
             ))
-            addView(createCardBody(project), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(CARD_BODY_HEIGHT_DP)
-            ))
-        }
-    }
 
-    private fun createCardHeader(project: AppProject): View {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(24), 0, dp(24), 0)
-            background = topRoundedRect(COLOR_CARD_HEADER, PROJECT_CARD_RADIUS_DP)
-
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = project.title.ifBlank { "未命名项目" }
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TITLE_TEXT_SP)
-                setTypeface(typeface, Typeface.BOLD)
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = projectMeta(project)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_META_TEXT_SP)
-            }, LinearLayout.LayoutParams(
+            addView(projectTextColumn(project), LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                1.45f
+                1f
             ).apply {
-                marginStart = dp(18)
-            })
-        }
-    }
-
-    private fun createCardBody(project: AppProject): View {
-        return FrameLayout(activity).apply {
-            background = rect(COLOR_CARD_BODY, 0)
-
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-
-                addView(LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-
-                    addView(projectThumbnail(project), LinearLayout.LayoutParams(
-                        dp(THUMB_SIZE_DP),
-                        dp(THUMB_SIZE_DP)
-                    ).apply {
-                        marginEnd = dp(14)
-                    })
-
-                    addView(LinearLayout(activity).apply {
-                        orientation = LinearLayout.VERTICAL
-                        addProjectDetailText("创建者：${projectOwner(project)}")
-                        addProjectDetailText("成员：${projectMemberCount(project)}")
-                    }, LinearLayout.LayoutParams(
-                        0,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        1f
-                    ))
-                }, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ))
-
-                addView(View(activity).apply {
-                    setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
-                    alpha = 0.74f
-                }, LinearLayout.LayoutParams(
-                    dp(DIVIDER_WIDTH_DP),
-                    dp(1)
-                ).apply {
-                    topMargin = dp(12)
-                })
-
-                addView(TextView(activity).apply {
-                    includeFontPadding = false
-                    text = "简介：${projectIntroduction(project)}"
-                    maxLines = 2
-                    ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
-                    setLineSpacing(dp(2).toFloat(), 1.0f)
-                }, LinearLayout.LayoutParams(
-                    dp(INTRO_WIDTH_DP),
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(11)
-                })
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                leftMargin = dp(24)
-                rightMargin = dp(132)
-                topMargin = dp(35)
+                marginStart = dp(20)
+                marginEnd = dp(14)
             })
 
             addView(TextView(activity).apply {
                 includeFontPadding = false
-                text = projectTime(project)
+                gravity = Gravity.CENTER
+                text = "›"
+                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, CHEVRON_TEXT_SP)
+            }, LinearLayout.LayoutParams(
+                dp(24),
+                LinearLayout.LayoutParams.MATCH_PARENT
+            ))
+        }
+    }
+
+    private fun projectTextColumn(project: AppProject): View {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(activity).apply {
+                includeFontPadding = false
+                text = project.title.ifBlank { "项目名称" }
                 maxLines = 1
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_META_TEXT_SP)
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.END or Gravity.TOP
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_LIST_TITLE))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, LIST_TITLE_TEXT_SP)
+                setTypeface(typeface, Typeface.NORMAL)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+
+            addView(TextView(activity).apply {
+                includeFontPadding = false
+                text = projectIntroduction(project)
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, LIST_DESC_TEXT_SP)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                rightMargin = dp(24)
-                topMargin = dp(42)
+                topMargin = dp(7)
+            })
+
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addMetaText("创建者：${projectOwner(project)}")
+                addMetaText("成员：${projectMemberCount(project)}", marginStartDp = 34)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(8)
             })
         }
     }
 
-    private fun LinearLayout.addProjectDetailText(value: String) {
+    private fun LinearLayout.addMetaText(value: String, marginStartDp: Int = 0) {
         addView(TextView(activity).apply {
             includeFontPadding = false
             text = value
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_DETAIL_TEXT_SP)
+            setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, META_TEXT_SP)
         }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            bottomMargin = dp(9)
+            marginStart = dp(marginStartDp)
         })
     }
 
     private fun projectThumbnail(project: AppProject): View {
         return FrameLayout(activity).apply {
             contentDescription = "${project.title.ifBlank { "项目" }}封面"
-            background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(Color.parseColor(COLOR_THUMB_BG))
-            }
+            background = rounded(COLOR_THUMB_BG, THUMB_RADIUS_DP)
             clipToOutline = true
             val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
             if (iconBitmap != null) {
@@ -238,76 +223,60 @@ internal class ProjectManagementHomeView(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 ))
-            } else {
-                addView(TextView(activity).apply {
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    text = avatarText(project.title.ifBlank { "项目" })
-                    setTextColor(Color.parseColor("#253140"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    setTypeface(typeface, Typeface.BOLD)
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
             }
         }
     }
 
-    private fun createEmptyProjectCard(): View {
+    private fun createEmptyState(showJoint: Boolean): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = rect(COLOR_CARD_BODY, PROJECT_CARD_RADIUS_DP)
-            isClickable = true
-            foreground = selectableForeground()
-            setOnClickListener { showCreateProjectDialog() }
+            isClickable = !showJoint
+            foreground = if (showJoint) null else selectableForeground()
+            if (!showJoint) setOnClickListener { showCreateProjectDialog() }
+
             addView(TextView(activity).apply {
                 includeFontPadding = false
-                text = "+"
-                gravity = Gravity.CENTER
-                setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 38f)
+                text = if (showJoint) "暂无联合项目" else "还没有项目，点击 + 创建"
+                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, EMPTY_TEXT_SP)
             }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(EMPTY_CARD_HEIGHT_DP)
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ))
         }
     }
 
-    private fun cardLayoutParams(): LinearLayout.LayoutParams {
+    private fun segmentLayoutParams(): LinearLayout.LayoutParams {
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
+            dp(SEGMENT_HEIGHT_DP)
         ).apply {
-            marginStart = dp(16)
-            marginEnd = dp(16)
-            topMargin = dp(8)
+            marginStart = dp(PAGE_SIDE_DP)
+            marginEnd = dp(PAGE_SIDE_DP)
+            topMargin = dp(SEGMENT_TOP_MARGIN_DP)
         }
     }
 
-    private fun projectMeta(project: AppProject): String {
-        val kind = if (project.isJointDevelopmentProject()) "联合项目" else "个人独立"
-        val stage = projectStageText(project.stage)
-        val workspace = projectWorkspaceText(project, stage)
-        return "$kind · ${project.displayConversationCount()}个会话 · $workspace"
+    private fun firstRowLayoutParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(EMPTY_HEIGHT_DP)
+        ).apply {
+            marginStart = dp(PAGE_SIDE_DP)
+            marginEnd = dp(PAGE_SIDE_DP)
+            topMargin = dp(FIRST_ROW_TOP_MARGIN_DP)
+        }
     }
 
-    private fun projectWorkspaceText(project: AppProject, stage: String): String {
-        if (stage == "运行中") return stage
-        val label = cleanProjectText(project.workspaceHealthLabel)
-        if (!label.isNullOrBlank()) return label
-        return stage
-    }
-
-    private fun projectStageText(stage: String): String {
-        val value = cleanProjectText(stage)
-        return when (value?.lowercase()) {
-            "running" -> "运行中"
-            "done" -> "交付完成"
-            "failed" -> "需要处理"
-            null -> "待提交需求"
-            else -> value
+    private fun rowLayoutParams(index: Int): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(ROW_HEIGHT_DP)
+        ).apply {
+            marginStart = dp(PAGE_SIDE_DP)
+            marginEnd = dp(ROW_END_DP)
+            topMargin = dp(if (index == 0) FIRST_ROW_TOP_MARGIN_DP else ROW_GAP_DP)
         }
     }
 
@@ -333,56 +302,47 @@ internal class ProjectManagementHomeView(
         return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
-    private fun projectTime(project: AppProject): String {
-        if (project.updatedAt <= 0L) return "时间"
-        return formatTime(project.updatedAt).ifBlank { "时间" }
-    }
-
     private fun bottomSpacer(): View {
         return View(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(34)
+                dp(42)
             )
         }
     }
 
-    private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
+    private fun rounded(color: String, radiusDp: Int): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(Color.parseColor(color))
-            if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
-        }
-    }
-
-    private fun topRoundedRect(color: String, radiusDp: Int): GradientDrawable {
-        val radius = dp(radiusDp).toFloat()
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
-            cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+            cornerRadius = dp(radiusDp).toFloat()
         }
     }
 
     private companion object {
-        const val COLOR_APP_BG = "#101010"
-        const val COLOR_CARD_HEADER = "#202024"
-        const val COLOR_CARD_BODY = "#2A2A2A"
-        const val COLOR_TEXT_PRIMARY = "#D6D6D6"
-        const val COLOR_TEXT_SECONDARY = "#A8A8A8"
-        const val COLOR_DIVIDER = "#A8A8A8"
-        const val COLOR_THUMB_BG = "#D2D2D2"
+        const val COLOR_BG = "#000000"
+        const val COLOR_SEGMENT_SELECTED = "#1A1A1A"
+        const val COLOR_TEXT_PRIMARY = "#D9D9D9"
+        const val COLOR_TEXT_LIST_TITLE = "#FFFFFF"
+        const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
+        const val COLOR_THUMB_BG = "#FFFFFF"
 
-        const val PROJECT_CARD_RADIUS_DP = 12
-        const val CARD_HEADER_HEIGHT_DP = 54
-        const val CARD_BODY_HEIGHT_DP = 184
-        const val THUMB_SIZE_DP = 40
-        const val DIVIDER_WIDTH_DP = 196
-        const val INTRO_WIDTH_DP = 206
-        const val EMPTY_CARD_HEIGHT_DP = 238
+        const val PAGE_SIDE_DP = 32
+        const val ROW_END_DP = 28
+        const val SEGMENT_TOP_MARGIN_DP = 56
+        const val SEGMENT_HEIGHT_DP = 52
+        const val FIRST_ROW_TOP_MARGIN_DP = 48
+        const val ROW_HEIGHT_DP = 106
+        const val ROW_GAP_DP = 20
+        const val THUMB_SIZE_DP = 56
+        const val THUMB_RADIUS_DP = 6
+        const val EMPTY_HEIGHT_DP = 220
 
-        const val CARD_TITLE_TEXT_SP = 16f
-        const val CARD_META_TEXT_SP = 14f
-        const val CARD_DETAIL_TEXT_SP = 13f
+        const val SEGMENT_TEXT_SP = 18f
+        const val LIST_TITLE_TEXT_SP = 17f
+        const val LIST_DESC_TEXT_SP = 17f
+        const val META_TEXT_SP = 14f
+        const val EMPTY_TEXT_SP = 16f
+        const val CHEVRON_TEXT_SP = 34f
     }
 }

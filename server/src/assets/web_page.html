@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#101010" />
+  <meta name="theme-color" content="#000000" />
   <title>一龙 · 云端开发</title>
   <!-- ===== iOS PWA ===== -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -16,51 +16,51 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #101010;
-      --bg-hint: #151515;
-      --panel: #222222;
-      --panel-2: #222222;
-      --panel-3: #2A2A2A;
-      --line: #2E2E2E;
-      --ink: #D6D6D6;
-      --ink-strong: #D6D6D6;
-      --ink-soft: #A8A8A8;
-      --ink-muted: #A8A8A8;
+      --bg: #000000;
+      --bg-hint: #000000;
+      --panel: #1A1A1A;
+      --panel-2: #1A1A1A;
+      --panel-3: #1A1A1A;
+      --line: #4D4D4D;
+      --ink: #D9D9D9;
+      --ink-strong: #FFFFFF;
+      --ink-soft: #B8B8B8;
+      --ink-muted: #AFAFAF;
       --ink-faint: #777777;
       --ink-dim: #777777;
-      --brand: #C8C8C8;
-      --brand-hover: #B8B8B8;
-      --brand-ink: #101010;
+      --brand: #FFFFFF;
+      --brand-hover: #FFFFFF;
+      --brand-ink: #000000;
       --accent: #58BE6A;
       --link: #58BE6A;
-      --secondary-btn: #2A2A2A;
-      --secondary-btn-ink: #D6D6D6;
-      --input-pill-bg: #303030;
-      --project-space-info-bg: #202024;
-      --project-space-info-ink: #D6D6D6;
-      --project-space-info-ink-soft: #A8A8A8;
+      --secondary-btn: #1A1A1A;
+      --secondary-btn-ink: #D9D9D9;
+      --input-pill-bg: #272727;
+      --project-space-info-bg: #1F2023;
+      --project-space-info-ink: #D9D9D9;
+      --project-space-info-ink-soft: #AFAFAF;
       --project-space-info-ink-faint: #777777;
       --badge-info-bg: #16251A;
       --badge-info-ink: #8DDC9B;
-      --badge-neutral-bg: #2A2A2A;
-      --badge-neutral-ink: #D0D0D0;
-      --nav-bg: #222222;
-      --nav-active-bg: #242424;
+      --badge-neutral-bg: #1A1A1A;
+      --badge-neutral-ink: #D9D9D9;
+      --nav-bg: #212121;
+      --nav-active-bg: #212121;
       --popup-panel-bg: #242424;
-      --bubble-user: #C8C8C8;
-      --bubble-user-ink: #101010;
-      --bubble-ai-bg: #222222;
-      --bubble-ai-border: #2E2E2E;
-      --bubble-ai-ink: #D6D6D6;
-      --bubble-progress-bg: #151515;
-      --bubble-progress-border: #2E2E2E;
-      --bubble-progress-ink: #A8A8A8;
+      --bubble-user: #FFFFFF;
+      --bubble-user-ink: #000000;
+      --bubble-ai-bg: #1A1A1A;
+      --bubble-ai-border: #4D4D4D;
+      --bubble-ai-ink: #D9D9D9;
+      --bubble-progress-bg: #1A1A1A;
+      --bubble-progress-border: #4D4D4D;
+      --bubble-progress-ink: #B8B8B8;
       --bubble-error-bg: #fff1f0;
       --bubble-error-border: #ffd6d2;
       --bubble-error-ink: #c62828;
-      --tab-icon: #A8A8A8;
+      --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 56px;
+      --bottom-menu-height: 84px;
     }
     * { box-sizing: border-box; }
     * {
@@ -90,7 +90,7 @@
     .app {
       display: grid;
       min-height: 100vh;
-      grid-template-rows: 50px 1fr auto auto;
+      grid-template-rows: 72px 1fr auto auto;
       grid-template-columns: 1fr;
       grid-template-areas:
         "toolbar"
@@ -106,7 +106,7 @@
     /* ===== Toolbar ===== */
     .toolbar {
       grid-area: toolbar;
-      height: 50px;
+      height: 72px;
       background: var(--bg);
       display: flex;
       align-items: center;
@@ -127,7 +127,7 @@
       gap: 52px;
       height: 100%;
       padding-left: 24px;
-      padding-right: 96px;
+      padding-right: 112px;
       box-sizing: border-box;
       color: var(--ink);
     }
@@ -141,7 +141,7 @@
       display: grid;
       place-items: center;
       cursor: pointer;
-      font-size: 17px;
+      font-size: 26px;
       font-weight: 800;
       line-height: 1;
       white-space: nowrap;
@@ -150,7 +150,7 @@
       content: "";
       width: 32px;
       height: 2px;
-      margin-top: 5px;
+      margin-top: 6px;
       border-radius: 999px;
       background: transparent;
     }
@@ -166,6 +166,18 @@
     }
     .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
     .icon-btn svg { width: 100%; height: 100%; display: block; }
+    #addBtn {
+      width: 56px;
+      height: 56px;
+      margin-right: 16px;
+      padding: 14px;
+      border-radius: 999px;
+      background: #212121;
+      color: #D3D3D3;
+      box-shadow: inset 0 0 0 1px #4D4D4D;
+    }
+    #addBtn:hover { background: #212121; color: #D3D3D3; }
+    #searchBtn, #voiceCallBtn { margin-right: 12px; }
 
     /* ===== Content ===== */
     .content {
@@ -1534,15 +1546,15 @@
       background: transparent;
       border: 0;
       color: var(--tab-icon);
-      font-size: 11px;
+      font-size: 14px;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 2px;
-      padding: 5px 0 4px;
+      gap: 5px;
+      padding: 12px 0 10px;
       cursor: pointer;
     }
     .tab.active { color: var(--tab-active); background: var(--nav-active-bg); }
-    .tab .ic { width: 24px; height: 24px; display: block; }
+    .tab .ic { width: 28px; height: 28px; display: block; }
     .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
     .tab .ic svg { width: 100%; height: 100%; }
     .project-space-ai-menu {

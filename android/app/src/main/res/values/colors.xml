@@ -1,29 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="elon_bg_app">#101010</color>
-    <color name="elon_surface_card">#222222</color>
-    <color name="elon_surface_subtle">#151515</color>
-    <color name="elon_border_subtle">#2E2E2E</color>
+    <color name="elon_bg_app">#000000</color>
+    <color name="elon_bg_canvas">#000000</color>
+    <color name="elon_bg_plaza">#000000</color>
+    <color name="elon_bg_chrome">#000000</color>
+    <color name="elon_surface_card">#1A1A1A</color>
+    <color name="elon_surface_header">#1F2023</color>
+    <color name="elon_surface_search">#272727</color>
+    <color name="elon_surface_float">#212121</color>
+    <color name="elon_surface_subtle">#1A1A1A</color>
+    <color name="elon_segment_selected">#1A1A1A</color>
+    <color name="elon_border_subtle">#4D4D4D</color>
+    <color name="elon_divider_card">#6D6E6F</color>
 
-    <color name="elon_text_primary">#D6D6D6</color>
-    <color name="elon_text_secondary">#A8A8A8</color>
+    <color name="elon_text_primary">#D9D9D9</color>
+    <color name="elon_text_list_title">#FFFFFF</color>
+    <color name="elon_text_detail_title">#F4F5FB</color>
+    <color name="elon_text_secondary">#B8B8B8</color>
+    <color name="elon_text_placeholder">#AFAFAF</color>
+    <color name="elon_text_nav">#D6D6D6</color>
     <color name="elon_text_tertiary">#777777</color>
+    <color name="elon_text_menu">#2F3136</color>
+    <color name="elon_icon_member">#A5AFBD</color>
+    <color name="elon_icon_primary">#D9D9D9</color>
+    <color name="elon_icon_add_top">#D3D3D3</color>
 
-    <color name="elon_input_pill_bg">#303030</color>
-    <color name="elon_project_space_info_bg">#202024</color>
+    <color name="elon_input_pill_bg">#272727</color>
+    <color name="elon_project_space_info_bg">#1F2023</color>
 
-    <color name="elon_button_secondary_bg">#2A2A2A</color>
-    <color name="elon_button_secondary_text">#D6D6D6</color>
-    <color name="elon_button_primary_bg">#C8C8C8</color>
-    <color name="elon_button_primary_text">#101010</color>
+    <color name="elon_button_secondary_bg">#1A1A1A</color>
+    <color name="elon_button_secondary_text">#D9D9D9</color>
+    <color name="elon_button_primary_bg">#FFFFFF</color>
+    <color name="elon_button_primary_text">#000000</color>
 
     <color name="elon_accent_primary">#58BE6A</color>
     <color name="elon_link_primary">#58BE6A</color>
     <color name="elon_badge_info_bg">#16251A</color>
     <color name="elon_badge_info_text">#8DDC9B</color>
-    <color name="elon_badge_neutral_bg">#2A2A2A</color>
-    <color name="elon_badge_neutral_text">#D0D0D0</color>
+    <color name="elon_badge_neutral_bg">#1A1A1A</color>
+    <color name="elon_badge_neutral_text">#D9D9D9</color>
+    <color name="elon_status_danger">#E62129</color>
 
-    <color name="elon_nav_bg">#222222</color>
-    <color name="elon_nav_active_bg">#242424</color>
+    <color name="elon_nav_bg">#212121</color>
+    <color name="elon_nav_active_bg">#212121</color>
 </resources>

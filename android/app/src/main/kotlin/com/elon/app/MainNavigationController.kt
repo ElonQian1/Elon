@@ -923,12 +923,10 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
-        val color = tab.context.getColor(
-            if (selected) R.color.elon_text_primary else R.color.elon_text_secondary
-        )
+        val color = tab.context.getColor(R.color.elon_text_nav)
         tab.isSelected = selected
         tab.setTextColor(color)
-        tab.textSize = 12f
+        tab.textSize = 14f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
     }
 

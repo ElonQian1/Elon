@@ -7,6 +7,7 @@
     pressTimer: null,
     suppressNextOpen: false
   };
+  let selectedSegment = 'personal';
   let renderedProjectsById = new Map();
 
   function bridge() {
@@ -173,7 +174,7 @@
     return `${kind} · ${conversationCount(project)}个会话 · ${workspaceStatusOf(project) || stageOf(project)}`;
   }
 
-  function projectSectionItems() {
+  function projectSections() {
     const all = projects();
     const archiveData = archive();
     const serverPersonal = Array.isArray(archiveData && archiveData.personal_projects)
@@ -193,7 +194,12 @@
       : all.filter((project) => !isSystemProject(project) && isJointProject(project)))
       .slice()
       .sort((a, b) => Number(b.updated_at || b.updatedAt || 0) - Number(a.updated_at || a.updatedAt || 0));
-    return personal.concat(joint);
+    return { personal, joint };
+  }
+
+  function projectSectionItems() {
+    const sections = projectSections();
+    return selectedSegment === 'joint' ? sections.joint : sections.personal;
   }
 
   function renderCard(project) {
@@ -201,24 +207,16 @@
     const active = typeof app.isCurrentProject === 'function' && app.isCurrentProject(project);
     return `
       <button class="project-home-card ${active ? 'active' : ''}" type="button" data-project-home-action="open" data-project-id="${escapeHtml(project.id)}" aria-label="打开项目 ${escapeHtml(titleOf(project))}">
-        <span class="project-home-card-head">
+        ${renderProjectThumb(project, 'project-home-thumb')}
+        <span class="project-home-copy">
           <span class="project-home-name">${escapeHtml(titleOf(project))}</span>
-          <span class="project-home-meta">${escapeHtml(projectMeta(project))}</span>
-        </span>
-        <span class="project-home-card-body">
-          <span class="project-home-card-main">
-            <span class="project-home-info-row">
-              ${renderProjectThumb(project, 'project-home-thumb')}
-              <span class="project-home-card-details">
-                <span>创建者：${escapeHtml(ownerOf(project))}</span>
-                <span>成员：${escapeHtml(cardMemberCount(project))}</span>
-              </span>
-            </span>
-            <span class="project-home-card-divider" aria-hidden="true"></span>
-            <span class="project-home-intro">简介：${escapeHtml(projectIntroOf(project))}</span>
+          <span class="project-home-desc">${escapeHtml(projectIntroOf(project))}</span>
+          <span class="project-home-meta-row">
+            <span>创建者：${escapeHtml(ownerOf(project))}</span>
+            <span>成员：${escapeHtml(cardMemberCount(project))}</span>
           </span>
-          <span class="project-home-time">${escapeHtml(projectTime(project))}</span>
         </span>
+        <span class="project-home-chevron" aria-hidden="true">›</span>
       </button>
     `;
   }
@@ -226,7 +224,7 @@
   function renderEmptyCard() {
     return `
       <button class="project-home-empty-card" type="button" data-project-home-action="create" aria-label="新建项目">
-        <span class="project-home-empty-plus" aria-hidden="true">+</span>
+        <span class="project-home-empty-plus">${selectedSegment === 'joint' ? '暂无联合项目' : '还没有项目，点击 + 创建'}</span>
       </button>
     `;
   }
@@ -290,6 +288,10 @@
     const items = projectSectionItems();
     renderedProjectsById = new Map(items.map((project) => [String(project.id), project]));
     root.innerHTML = `
+      <div class="project-home-segments" role="tablist" aria-label="项目类型">
+        <button class="project-home-segment ${selectedSegment === 'personal' ? 'active' : ''}" type="button" data-project-home-action="segment-personal">独立</button>
+        <button class="project-home-segment ${selectedSegment === 'joint' ? 'active' : ''}" type="button" data-project-home-action="segment-joint">联合</button>
+      </div>
       <div class="project-home-list">
         ${items.length ? items.map(renderCard).join('') : renderEmptyCard()}
       </div>
@@ -388,6 +390,16 @@
     }
     if (action === 'create') {
       if (typeof app.openNewProject === 'function') app.openNewProject();
+      return;
+    }
+    if (action === 'segment-personal') {
+      selectedSegment = 'personal';
+      closeActionMenu();
+      return;
+    }
+    if (action === 'segment-joint') {
+      selectedSegment = 'joint';
+      closeActionMenu();
       return;
     }
     const project = projectById(actionEl.dataset.projectId);
