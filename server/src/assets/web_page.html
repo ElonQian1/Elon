@@ -60,7 +60,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 84px;
+      --bottom-menu-height: 56px;
     }
     * { box-sizing: border-box; }
     * {
@@ -805,7 +805,7 @@
     .project-space-feed-actions {
       position: fixed;
       right: max(8px, calc((100vw - 720px) / 2 + 8px));
-      bottom: calc(82px + env(safe-area-inset-bottom) + 14px);
+      bottom: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom) + 14px);
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -1549,8 +1549,8 @@
       font-size: 14px;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 5px;
-      padding: 12px 0 10px;
+      gap: 2px;
+      padding: 5px 0 4px;
       cursor: pointer;
     }
     .tab.active { color: var(--tab-active); background: var(--nav-active-bg); }
