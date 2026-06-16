@@ -185,6 +185,7 @@ class SettingsActivity : AppCompatActivity() {
                 val json = JSONObject(body)
                 codexCliOnly = json.optBoolean("codex_cli_only", false)
                 userByokApiEnabled = json.optBoolean("user_byok_api_enabled", false)
+                applyRagReadinessUi(json.optJSONObject("rag_readiness"))
 
                 if (codexCliOnly && !userByokApiEnabled) {
                     availableAgents = parseAgentOptions(json)
@@ -204,9 +205,31 @@ class SettingsActivity : AppCompatActivity() {
                 applyConfig(cfg)
 
             } catch (e: Exception) {
+                findViewById<TextView>(R.id.agentReadinessText).text =
+                    "项目 RAG 状态加载失败\n• 请检查网络后重新进入设置页\n• 已保存配置不会因此丢失"
                 Toast.makeText(this@SettingsActivity, "加载配置失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun applyRagReadinessUi(readiness: JSONObject?) {
+        val view = findViewById<TextView>(R.id.agentReadinessText)
+        if (readiness == null) {
+            view.text = "项目 RAG 状态未知\n• 请先测试并保存支持工具调用的自定义模型\n• Codex CLI 模式仍可使用服务器默认项目理解能力"
+            return
+        }
+        val ready = readiness.optBoolean("development_ready", false)
+        val title = if (ready) "项目 RAG 已就绪" else "项目 RAG 未就绪"
+        val label = readiness.optString("label", "请检查模型配置")
+        val detail = readiness.optString("detail", "")
+        val capability = readiness.optString("required_capability", "OpenAI tools/function calling")
+        val tools = readiness.optJSONArray("tools")
+        val toolText = if (tools != null && tools.length() > 0) {
+            (0 until tools.length()).joinToString(" / ") { tools.optString(it) }
+        } else {
+            "repo map / symbol search / task pack"
+        }
+        view.text = "$title：$label\n• $detail\n• 必需能力：$capability\n• 项目工具：$toolText"
     }
 
     private fun parseAgentOptions(json: JSONObject): List<AgentOption> {

@@ -24,6 +24,7 @@ use crate::user_agent_probe::{
     normalize_api_base, probe_development_agent_capability, probe_openai_compatible_api,
     resolve_probe_config, UserAgentProbeConfig, UserAgentProbeRequest,
 };
+use crate::user_agent_readiness::build_user_agent_rag_readiness;
 use crate::user_agent_secrets::user_byok_api_enabled;
 
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
@@ -111,6 +112,11 @@ pub async fn get_user_agent(
         "codex_cli_only": state.ai_cli.codex_cli_only,
         "user_byok_api_enabled": byok_api_enabled,
         "api_key_set": config.has_api_key_reference(),
+        "rag_readiness": build_user_agent_rag_readiness(
+            &config,
+            state.ai_cli.codex_cli_only,
+            byok_api_enabled
+        ),
     }))
     .into_response()
 }
@@ -315,6 +321,11 @@ pub async fn set_user_agent(
         "tool_call_ok": capability_result.as_ref().map(|result| result.tool_call_ok),
         "capability": capability_result.as_ref().map(|result| result.capability.clone()),
         "warning": capability_result.and_then(|result| result.warning),
+        "rag_readiness": build_user_agent_rag_readiness(
+            &cfg,
+            state.ai_cli.codex_cli_only,
+            byok_api_enabled
+        ),
     }))
     .into_response()
 }

@@ -2426,6 +2426,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <button type="button" class="btn-cancel" id="testAgentCustomBtn" style="width:100%;margin-top:12px">测试连接</button>
       <button type="button" class="btn-confirm" id="saveAgentCustomBtn" style="width:100%;margin-top:12px">保存自定义模型</button>
     </div>
+    <div class="hint-text" id="agentRagStatus"></div>
     <div class="error-text" id="agentError"></div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="cancelAgentBtn">关闭</button>
@@ -2689,6 +2690,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const agentForm = $('agentForm');
   const agentList = $('agentList');
   const agentError = $('agentError');
+  const agentRagStatus = $('agentRagStatus');
   const agentCustomPanel = $('agentCustomPanel');
   const agentCustomBase = $('agentCustomBase');
   const agentCustomKey = $('agentCustomKey');
@@ -4766,6 +4768,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       agentCustomKey.dataset.hasSavedKey = apiKeySet ? 'true' : 'false';
     }
   }
+  function renderAgentRagReadiness(readiness) {
+    if (!agentRagStatus) return;
+    if (!readiness) {
+      agentRagStatus.textContent = '项目 RAG 状态未知：请测试并保存支持工具调用的模型。Codex CLI 模式仍可使用服务器默认项目理解能力。';
+      return;
+    }
+    const title = readiness.development_ready ? '项目 RAG 已就绪' : '项目 RAG 未就绪';
+    const label = readiness.label || '请检查模型配置';
+    const detail = readiness.detail || '';
+    const capability = readiness.required_capability || 'OpenAI tools/function calling';
+    const tools = Array.isArray(readiness.tools) && readiness.tools.length
+      ? readiness.tools.join(' / ')
+      : 'repo map / symbol search / task pack';
+    agentRagStatus.textContent = `${title}：${label}。${detail} 必需能力：${capability}。项目工具：${tools}`;
+  }
   async function persistAgentSelection(option) {
     const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/agent', {
       method: 'PUT',
@@ -4857,6 +4874,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       userByokApiEnabled = !!data.user_byok_api_enabled;
       const config = data.config || {};
       syncAgentCustomFields(config, !!data.api_key_set);
+      renderAgentRagReadiness(data.rag_readiness);
       const serverOptions = (data.available_agents || []).map((it) => ({
         name: it.name || '',
         label: modelOptionLabel(it),

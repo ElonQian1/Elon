@@ -12,12 +12,13 @@
 
         <!-- 说明文字 -->
         <TextView
+            android:id="@+id/agentReadinessText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             android:background="@color/elon_badge_info_bg"
             android:padding="12dp"
-            android:text="当前测试阶段已锁定 Codex CLI。\n• 聊天、意图分析和代码协作统一走 Codex CLI\n• 暂不切换到其他 AI 代理或自定义 API 模型\n• 恢复多模型前会同步更新服务端和 APK 设置"
+            android:text="正在加载 AI 代理和项目 RAG 状态..."
             android:textColor="@color/elon_badge_info_text"
             android:textSize="13sp" />
 

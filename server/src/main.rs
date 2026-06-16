@@ -122,6 +122,7 @@ mod tools_git;
 mod types;
 mod typing_events;
 mod user_agent_probe;
+mod user_agent_readiness;
 mod user_agent_secrets;
 mod user_api;
 mod user_archive_api;
