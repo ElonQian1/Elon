@@ -86,14 +86,14 @@ internal class MainNavigationController(
     }
 
     private fun showMainTabs() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun hideBottomMenus() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
@@ -935,13 +935,7 @@ internal class MainNavigationController(
         val color = tab.context.getColor(R.color.elon_text_nav)
         tab.isSelected = selected
         tab.setTextColor(color)
-        tab.setTextSize(TypedValue.COMPLEX_UNIT_PX, designPx(BOTTOM_TAB_TEXT_PX).toFloat())
-        tab.compoundDrawablePadding = designPx(BOTTOM_TAB_DRAWABLE_GAP_PX)
-        tab.compoundDrawables[1]?.let { drawable ->
-            val size = designPx(BOTTOM_TAB_ICON_PX)
-            drawable.setBounds(0, 0, size, size)
-            tab.setCompoundDrawables(null, drawable, null, null)
-        }
+        tab.textSize = 14f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
     }
 
@@ -982,9 +976,6 @@ internal class MainNavigationController(
             designPx(PROJECT_ADD_BUTTON_PADDING_PX),
             designPx(PROJECT_ADD_BUTTON_PADDING_PX)
         )
-        binding.pageTabs.layoutParams = binding.pageTabs.layoutParams.apply {
-            height = designPx(BOTTOM_MENU_HEIGHT_PX)
-        }
         listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
             updateBottomTabVisual(it, it.isSelected)
         }
@@ -1057,9 +1048,5 @@ internal class MainNavigationController(
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
         const val PROJECT_ADD_BUTTON_END_PX = 70
         const val PROJECT_ADD_BUTTON_PADDING_PX = 46
-        const val BOTTOM_MENU_HEIGHT_PX = 270
-        const val BOTTOM_TAB_ICON_PX = 68
-        const val BOTTOM_TAB_TEXT_PX = 42
-        const val BOTTOM_TAB_DRAWABLE_GAP_PX = 16
     }
 }
