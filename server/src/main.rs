@@ -15,6 +15,7 @@ mod agent_intent;
 mod agent_llm_call;
 mod agent_prompts;
 mod agent_routing;
+mod agent_tool_calls;
 mod ai_cli;
 mod api;
 mod app_update;

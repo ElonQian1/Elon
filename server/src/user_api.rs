@@ -21,7 +21,8 @@ use std::sync::Arc;
 use crate::project_auth::{auth_from_headers, json_error};
 use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
 use crate::user_agent_probe::{
-    normalize_api_base, probe_openai_compatible_api, resolve_probe_config, UserAgentProbeRequest,
+    normalize_api_base, probe_development_agent_capability, probe_openai_compatible_api,
+    resolve_probe_config, UserAgentProbeConfig, UserAgentProbeRequest,
 };
 use crate::user_agent_secrets::user_byok_api_enabled;
 
@@ -184,10 +185,7 @@ pub async fn set_user_agent(
         api_key = existing_config.api_key.clone();
         api_key_encrypted = existing_config.api_key_encrypted.clone();
     }
-    if (api_base.is_some() || model.is_some())
-        && api_key.is_none()
-        && api_key_encrypted.is_some()
-    {
+    if (api_base.is_some() || model.is_some()) && api_key.is_none() && api_key_encrypted.is_some() {
         return (
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": "已保存的 API 密钥当前无法解密，请重新填写 API Key 或检查服务器密钥配置" })),
@@ -268,6 +266,41 @@ pub async fn set_user_agent(
         updated_at: Some(now),
     };
 
+    let capability_result = if custom_api_requested {
+        let probe_cfg = {
+            let global = state.agents_config.read().await;
+            match cfg.resolve(&global) {
+                Some(agent) => UserAgentProbeConfig {
+                    api_base: agent.api_base,
+                    api_key: agent.api_key,
+                    model: agent.model,
+                },
+                None => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        Json(serde_json::json!({
+                            "error": "自定义 API 模型无法解析为可用代理，请检查 API 地址、密钥和模型名称"
+                        })),
+                    )
+                        .into_response();
+                }
+            }
+        };
+
+        match probe_development_agent_capability(&state.http_client, &probe_cfg).await {
+            Ok(result) => Some(result),
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response();
+            }
+        }
+    } else {
+        None
+    };
+
     if let Err(e) = cfg.save(&workspace) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -277,7 +310,13 @@ pub async fn set_user_agent(
     }
 
     tracing::info!("用户 '{}' 更新了 AI 代理配置: {:?}", user_id, cfg.use_agent);
-    Json(serde_json::json!({ "ok": true })).into_response()
+    Json(serde_json::json!({
+        "ok": true,
+        "tool_call_ok": capability_result.as_ref().map(|result| result.tool_call_ok),
+        "capability": capability_result.as_ref().map(|result| result.capability.clone()),
+        "warning": capability_result.and_then(|result| result.warning),
+    }))
+    .into_response()
 }
 
 /// 测试用户自定义 API 模型连通性，不保存 API Key。

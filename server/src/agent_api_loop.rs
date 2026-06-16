@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
@@ -8,6 +8,7 @@ use crate::{
     agent_llm_call::{call_chat_llm, call_llm, execute_tool},
     agent_prompts::system_prompt,
     agent_routing::{casual_chat_prompt, is_local_cli_option, quick_casual_reply},
+    agent_tool_calls::extract_tool_calls,
     intent_router, tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
     user_memory_extract::{extract_and_save_memories, extract_and_save_memories_scoped},
@@ -278,8 +279,10 @@ pub(crate) async fn run_api_inner_with_workspace(
         // 把助手消息加入历史
         messages.push(assistant_message.clone());
 
+        let tool_calls = extract_tool_calls(assistant_message);
+
         // 如果 LLM 决定结束（没有更多工具调用）
-        if finish_reason == "stop" {
+        if tool_calls.is_empty() && finish_reason == "stop" {
             let final_text = assistant_message["content"]
                 .as_str()
                 .unwrap_or("完成")
@@ -299,20 +302,11 @@ pub(crate) async fn run_api_inner_with_workspace(
         }
 
         // 处理工具调用
-        if finish_reason == "tool_calls" {
-            let tool_calls = match assistant_message["tool_calls"].as_array() {
-                Some(t) => t.clone(),
-                None => break,
-            };
-
+        if !tool_calls.is_empty() {
             for tool_call in &tool_calls {
-                let tool_id = tool_call["id"].as_str().unwrap_or("").to_string();
-                let tool_name = tool_call["function"]["name"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-                let args_str = tool_call["function"]["arguments"].as_str().unwrap_or("{}");
-                let args: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
+                let tool_id = tool_call.id.clone();
+                let tool_name = tool_call.name.clone();
+                let args = tool_call.args.clone();
 
                 info!("工具调用: {} {:?}", tool_name, args);
 
@@ -385,11 +379,19 @@ pub(crate) async fn run_api_inner_with_workspace(
                 );
 
                 // 把工具结果加入对话历史
-                messages.push(json!({
-                    "role": "tool",
-                    "tool_call_id": tool_id,
-                    "content": result_str
-                }));
+                if tool_call.legacy_function_call {
+                    messages.push(json!({
+                        "role": "function",
+                        "name": tool_name,
+                        "content": result_str
+                    }));
+                } else {
+                    messages.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tool_id,
+                        "content": result_str
+                    }));
+                }
             }
         } else {
             // 未知 finish_reason，退出循环

@@ -158,6 +158,17 @@ pub(crate) async fn probe_openai_compatible_api(
     })
 }
 
+pub(crate) async fn probe_development_agent_capability(
+    client: &Client,
+    cfg: &UserAgentProbeConfig,
+) -> Result<UserAgentProbeResult> {
+    let result = probe_openai_compatible_api(client, cfg).await?;
+    if user_api_requires_tool_calls() && !result.tool_call_ok {
+        return Err(anyhow!("{}", development_tool_call_error(&result)));
+    }
+    Ok(result)
+}
+
 async fn probe_tool_call_support(
     client: &Client,
     cfg: &UserAgentProbeConfig,
@@ -318,6 +329,28 @@ fn tool_probe_name() -> &'static str {
     "elon_probe"
 }
 
+fn user_api_requires_tool_calls() -> bool {
+    std::env::var("AI_USER_API_REQUIRE_TOOL_CALLS")
+        .map(|value| {
+            !matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "0" | "false" | "no" | "off"
+            )
+        })
+        .unwrap_or(true)
+}
+
+fn development_tool_call_error(result: &UserAgentProbeResult) -> String {
+    format!(
+        "自定义模型可以普通聊天，但未通过工具调用能力测试，不能作为项目开发代理保存。请换用支持 OpenAI tools/function calling 的模型。{}",
+        result
+            .warning
+            .as_deref()
+            .map(|warning| format!("详情：{warning}"))
+            .unwrap_or_else(|| "详情：模型没有返回可识别的工具调用。".to_string())
+    )
+}
+
 impl ToolProbeOutcome {
     fn unsupported(tool_call_name: Option<String>, warning: String) -> Self {
         Self {
@@ -410,5 +443,23 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("没有返回工具调用"));
+    }
+
+    #[test]
+    fn development_tool_call_error_explains_save_block() {
+        let result = UserAgentProbeResult {
+            api_base: "https://api.example.com/v1".into(),
+            model: "chat-only".into(),
+            latency_ms: 12,
+            sample: "OK".into(),
+            tool_call_ok: false,
+            tool_call_name: None,
+            capability: "chat_only".into(),
+            warning: Some("模型没有返回工具调用".into()),
+        };
+
+        let message = development_tool_call_error(&result);
+        assert!(message.contains("不能作为项目开发代理保存"));
+        assert!(message.contains("OpenAI tools/function calling"));
     }
 }
