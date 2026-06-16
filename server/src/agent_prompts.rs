@@ -67,6 +67,27 @@ pub(crate) fn tool_definitions() -> Value {
         {
             "type": "function",
             "function": {
+                "name": "apply_patch",
+                "description": "用 unified diff 对项目文件做局部修改。适合修改已有文件或多文件小改动；工具会限制补丁目标在当前工作区内，并先运行 git apply --check。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "patch": {
+                            "type": "string",
+                            "description": "unified diff 内容，必须包含 diff --git/---/+++/@@ 等补丁结构"
+                        },
+                        "check_only": {
+                            "type": "boolean",
+                            "description": "true 时只检查补丁能否应用，不实际修改文件；默认 false"
+                        }
+                    },
+                    "required": ["patch"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "list_dir",
                 "description": "列出项目中某个目录的文件列表，用于了解代码结构。",
                 "parameters": {
@@ -188,7 +209,7 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
 1. **新项目**（工作区为空时）:
    - 先调用 init_project("android") 初始化模板
    - 读取模板中的关键文件了解结构
-   - 用 write_file 修改/新增文件实现用户功能
+   - 新建完整文件时用 write_file；修改已有文件时优先用 apply_patch 做局部修改
    - git_commit 提交
    - build_project("android") 编译打包
 
@@ -197,7 +218,7 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
    - 对已有项目、跨文件改动、理解陌生代码、定位定义/引用/调用链时，优先调用 repo_context_status，再用 repo_context_task_pack(q=用户任务) 获取 RAG 上下文；需要精确定位符号或引用时调用 repo_symbol_search
    - 读取项目说明文档和目标文件
    - read_file 读取要修改的文件
-   - write_file 写入修改
+   - 优先用 apply_patch 写入局部修改；新建完整文件或需要重写整个文件时再用 write_file
    - git_commit 提交
    - 按项目类型运行 build_project("android" / "rust" / "frontend") 或必要检查
 
@@ -211,8 +232,9 @@ pub(crate) fn system_prompt(workspace: &str, memories: &[crate::store::UserMemor
 
 === 规则 ===
 - 如果用户需求不是“修改/生成/构建项目代码”，不要调用工具。请直接用简洁中文回复。
-- 只有在确实需要读取、修改、提交或构建项目时，才调用 read_file/write_file/git_commit/build_project 等工具。
+- 只有在确实需要读取、修改、提交或构建项目时，才调用 read_file/apply_patch/write_file/git_commit/build_project 等工具。
 - 修改文件前必须先 read_file 读取原内容
+- 修改已有文件优先使用 apply_patch，避免无意覆盖整文件；apply_patch 失败时先读取最新文件内容再生成更小补丁
 - 每完成一个功能点就 git_commit（中文描述）
 - git_commit 会自动提交，并在工作区配置 origin 时推送当前分支；未配置 origin 的本地模板项目只需本地提交，不要把它写成用户可见失败。如果当前目录是会话 worktree，不要手动推 main，服务器会在任务完成后串行合并。
 - build_project("android") 会自动递增 versionCode 和 versionName，无需手动改版本号

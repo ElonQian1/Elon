@@ -241,6 +241,13 @@ pub(crate) fn execute_tool(
                 .ok_or_else(|| anyhow::anyhow!("缺少 content 参数"))?;
             tools::write_file(workspace, path, content)
         }
+        "apply_patch" => {
+            let patch = args["patch"]
+                .as_str()
+                .ok_or_else(|| anyhow::anyhow!("缺少 patch 参数"))?;
+            let check_only = args["check_only"].as_bool().unwrap_or(false);
+            tools::apply_patch(workspace, patch, check_only)
+        }
         "list_dir" => {
             let path = args["path"].as_str().unwrap_or(".");
             tools::list_dir(workspace, path)

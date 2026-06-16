@@ -119,6 +119,7 @@ mod tools;
 mod tools_apk;
 mod tools_exec;
 mod tools_git;
+mod tools_patch;
 mod types;
 mod typing_events;
 mod user_agent_probe;

@@ -385,6 +385,7 @@ pub use crate::tools_apk::{
     find_apk_by_filename, find_download_apk, find_latest_apk, stable_apk_url, STABLE_APK_FILENAME,
 };
 pub use crate::tools_exec::{build_project_via_agent, elon_pc_project_path, exec_via_agent};
+pub use crate::tools_patch::apply_patch;
 pub fn run_shell(project_root: &Path, command: &str) -> Result<String> {
     // 白名单：只允许安全的只读或构建相关命令
     const ALLOWED_PREFIXES: &[&str] = &[
