@@ -255,7 +255,7 @@ pub async fn set_user_agent(
         .format("%Y-%m-%d %H:%M:%S UTC")
         .to_string();
 
-    let cfg = UserAgentConfig {
+    let mut cfg = UserAgentConfig {
         use_agent,
         api_base,
         api_key,
@@ -270,6 +270,7 @@ pub async fn set_user_agent(
             }
         }),
         updated_at: Some(now),
+        ..Default::default()
     };
 
     let capability_result = if custom_api_requested {
@@ -294,7 +295,10 @@ pub async fn set_user_agent(
         };
 
         match probe_development_agent_capability(&state.http_client, &probe_cfg).await {
-            Ok(result) => Some(result),
+            Ok(result) => {
+                cfg.remember_capability_probe(&result, cfg.updated_at.clone().unwrap_or_default());
+                Some(result)
+            }
             Err(e) => {
                 return (
                     StatusCode::BAD_REQUEST,
@@ -306,6 +310,9 @@ pub async fn set_user_agent(
     } else {
         None
     };
+    if !custom_api_requested {
+        cfg.clear_capability_probe();
+    }
 
     if let Err(e) = cfg.save(&workspace) {
         return (

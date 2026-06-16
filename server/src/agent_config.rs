@@ -154,6 +154,17 @@ pub struct UserAgentConfig {
     pub model: Option<String>,
     /// 用户昵称（可选，仅用于管理后台展示）
     pub nickname: Option<String>,
+    /// 最近一次保存为开发代理时的能力探测结果。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_ok: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_warning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_checked_at: Option<String>,
     /// 最后更新时间
     pub updated_at: Option<String>,
 }
@@ -233,6 +244,26 @@ impl UserAgentConfig {
                 .as_deref()
                 .map(str::trim)
                 .is_some_and(|value| !value.is_empty())
+    }
+
+    pub fn remember_capability_probe(
+        &mut self,
+        result: &crate::user_agent_probe::UserAgentProbeResult,
+        checked_at: String,
+    ) {
+        self.tool_call_ok = Some(result.tool_call_ok);
+        self.tool_call_name = result.tool_call_name.clone();
+        self.capability = Some(result.capability.clone());
+        self.capability_warning = result.warning.clone();
+        self.capability_checked_at = Some(checked_at);
+    }
+
+    pub fn clear_capability_probe(&mut self) {
+        self.tool_call_ok = None;
+        self.tool_call_name = None;
+        self.capability = None;
+        self.capability_warning = None;
+        self.capability_checked_at = None;
     }
 
     /// 解析为实际可使用的 AgentConfig（以全局代理为基础，用自定义值覆盖）
@@ -337,6 +368,47 @@ mod tests {
 
         let loaded = UserAgentConfig::load(&workspace).expect("load config");
         assert_eq!(loaded.api_key.as_deref(), Some("sk-sensitive"));
+
+        let _ = std::fs::remove_dir_all(workspace);
+        std::env::remove_var("USER_API_KEY_SECRET");
+    }
+
+    #[test]
+    fn capability_probe_metadata_is_persisted_without_plain_api_key() {
+        std::env::set_var("USER_API_KEY_SECRET", "test-secret-for-user-api-key");
+        let workspace = std::env::temp_dir().join(format!(
+            "elon-user-agent-capability-test-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let mut cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-sensitive".into()),
+            model: Some("example-model".into()),
+            ..Default::default()
+        };
+        let probe = crate::user_agent_probe::UserAgentProbeResult {
+            api_base: "https://api.example.com/v1".into(),
+            model: "example-model".into(),
+            latency_ms: 12,
+            sample: "OK".into(),
+            tool_call_ok: true,
+            tool_call_name: Some("elon_probe".into()),
+            capability: "tools_ok".into(),
+            warning: None,
+        };
+
+        cfg.remember_capability_probe(&probe, "2026-06-16 00:00:00 UTC".into());
+        cfg.save(&workspace).expect("save config");
+        let raw =
+            std::fs::read_to_string(workspace.join("agent_config.json")).expect("read config");
+
+        assert!(!raw.contains("sk-sensitive"));
+        assert!(raw.contains("\"tool_call_ok\": true"));
+        assert!(raw.contains("\"capability_checked_at\""));
+
+        let loaded = UserAgentConfig::load(&workspace).expect("load config");
+        assert_eq!(loaded.tool_call_ok, Some(true));
+        assert_eq!(loaded.capability.as_deref(), Some("tools_ok"));
 
         let _ = std::fs::remove_dir_all(workspace);
         std::env::remove_var("USER_API_KEY_SECRET");

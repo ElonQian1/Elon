@@ -11,6 +11,10 @@ pub(crate) struct UserAgentRagReadiness {
     pub byok_api_enabled: bool,
     pub codex_cli_only: bool,
     pub development_ready: bool,
+    pub tool_call_verified: bool,
+    pub capability: Option<String>,
+    pub capability_checked_at: Option<String>,
+    pub capability_warning: Option<String>,
     pub status: &'static str,
     pub label: &'static str,
     pub detail: &'static str,
@@ -34,7 +38,8 @@ pub(crate) fn build_user_agent_rag_readiness(
     let api_key_set = config.has_api_key_reference();
     let custom_configured = api_base_set && model_set && api_key_set;
     let blocked_by_policy = codex_cli_only && !byok_api_enabled;
-    let development_ready = custom_configured && !blocked_by_policy;
+    let tool_call_verified = matches!(config.tool_call_ok, Some(true));
+    let development_ready = custom_configured && !blocked_by_policy && tool_call_verified;
 
     let (status, label, detail) = if blocked_by_policy {
         (
@@ -46,7 +51,19 @@ pub(crate) fn build_user_agent_rag_readiness(
         (
             "ready",
             "自定义模型可用于项目 RAG",
-            "配置完整；保存时已要求模型支持工具调用，AI 可调用 repo map、符号搜索和任务上下文工具。",
+            "配置完整且最近一次能力探测已通过；AI 可调用 repo map、符号搜索和任务上下文工具。",
+        )
+    } else if custom_configured && matches!(config.tool_call_ok, Some(false)) {
+        (
+            "tool_call_failed",
+            "模型未通过工具调用测试",
+            "这个模型可以普通聊天，但不能作为项目开发/RAG 代理；请换用支持 OpenAI tools/function calling 的模型后重新保存。",
+        )
+    } else if custom_configured {
+        (
+            "needs_capability_check",
+            "需要重新验证模型能力",
+            "配置字段完整，但没有最近一次工具调用通过记录；请点击保存自定义模型，让服务器重新检测是否可用于项目 RAG。",
         )
     } else if !api_base_set && !model_set && !api_key_set {
         (
@@ -82,6 +99,10 @@ pub(crate) fn build_user_agent_rag_readiness(
         byok_api_enabled,
         codex_cli_only,
         development_ready,
+        tool_call_verified,
+        capability: config.capability.clone(),
+        capability_checked_at: config.capability_checked_at.clone(),
+        capability_warning: config.capability_warning.clone(),
         status,
         label,
         detail,
@@ -104,6 +125,9 @@ mod tests {
             api_base: Some("https://api.example.com/v1".into()),
             api_key: Some("sk-test".into()),
             model: Some("tool-model".into()),
+            tool_call_ok: Some(true),
+            capability: Some("tools_ok".into()),
+            capability_checked_at: Some("2026-06-16 00:00:00 UTC".into()),
             ..Default::default()
         };
 
@@ -111,6 +135,7 @@ mod tests {
 
         assert_eq!(readiness.status, "ready");
         assert!(readiness.development_ready);
+        assert!(readiness.tool_call_verified);
         assert_eq!(
             readiness.required_capability,
             "OpenAI tools/function calling"
@@ -123,6 +148,7 @@ mod tests {
             api_base: Some("https://api.example.com/v1".into()),
             api_key: Some("sk-test".into()),
             model: Some("tool-model".into()),
+            tool_call_ok: Some(true),
             ..Default::default()
         };
 
@@ -130,6 +156,44 @@ mod tests {
 
         assert_eq!(readiness.status, "blocked_by_policy");
         assert!(!readiness.development_ready);
+    }
+
+    #[test]
+    fn complete_config_without_probe_needs_capability_check() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-test".into()),
+            model: Some("tool-model".into()),
+            ..Default::default()
+        };
+
+        let readiness = build_user_agent_rag_readiness(&cfg, false, true);
+
+        assert_eq!(readiness.status, "needs_capability_check");
+        assert!(!readiness.development_ready);
+        assert!(!readiness.tool_call_verified);
+    }
+
+    #[test]
+    fn failed_probe_is_not_ready() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-test".into()),
+            model: Some("chat-only".into()),
+            tool_call_ok: Some(false),
+            capability: Some("chat_only".into()),
+            capability_warning: Some("no tool calls".into()),
+            ..Default::default()
+        };
+
+        let readiness = build_user_agent_rag_readiness(&cfg, false, true);
+
+        assert_eq!(readiness.status, "tool_call_failed");
+        assert!(!readiness.development_ready);
+        assert_eq!(
+            readiness.capability_warning.as_deref(),
+            Some("no tool calls")
+        );
     }
 
     #[test]
