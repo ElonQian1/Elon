@@ -5,6 +5,7 @@ use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
 use super::{
+    agent_rag_vector_policy::{choose_agent_vector_policy, AgentVectorPolicy},
     symbol_index_embedding_provider::resolve_embedding_provider,
     symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
     symbol_index_query::{
@@ -99,7 +100,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         },
                         "useVector": {
                             "type": "boolean",
-                            "description": "是否启用本地 hash 向量检索，默认 true。"
+                            "description": "是否启用向量检索；不填时由任务意图自动决定，Explain/AddFeature/Unknown 默认开启，Debug/Refactor/Test/Locate 默认关闭。"
                         },
                         "vectorModel": {
                             "type": "string",
@@ -256,6 +257,7 @@ fn context_task_pack(
     args: &Value,
     default_trace_id: Option<&str>,
 ) -> Result<String> {
+    let vector_policy = task_pack_vector_policy(args)?;
     let query = task_pack_query(args, default_trace_id)?;
     let vector_backfill = query
         .vector_model
@@ -319,18 +321,34 @@ fn context_task_pack(
         },
         "charCount": response.char_count,
         "truncated": response.truncated,
+        "vectorPolicy": vector_policy,
         "vectorBackfill": vector_backfill,
         "pack": response.pack
     }))
 }
 
 fn task_pack_query(args: &Value, default_trace_id: Option<&str>) -> Result<SymbolTaskPackQuery> {
-    let use_vector = bool_arg(args, &["useVector", "use_vector"]).unwrap_or(true);
-    let vector_model = if use_vector {
-        let model = string_arg(args, &["vectorModel", "vector_model"])
-            .unwrap_or_else(|| LOCAL_HASH_VECTOR_MODEL.to_string());
-        resolve_embedding_provider(&model)?;
-        Some(model)
+    let vector_policy = task_pack_vector_policy(args)?;
+    task_pack_query_with_policy(args, default_trace_id, &vector_policy)
+}
+
+fn task_pack_vector_policy(args: &Value) -> Result<AgentVectorPolicy> {
+    let query = required_query(args)?;
+    Ok(choose_agent_vector_policy(
+        &query,
+        bool_arg(args, &["useVector", "use_vector"]),
+        string_arg(args, &["vectorModel", "vector_model"]),
+    ))
+}
+
+fn task_pack_query_with_policy(
+    args: &Value,
+    default_trace_id: Option<&str>,
+    vector_policy: &AgentVectorPolicy,
+) -> Result<SymbolTaskPackQuery> {
+    let vector_model = if let Some(model) = vector_policy.model.as_deref() {
+        resolve_embedding_provider(model)?;
+        Some(model.to_string())
     } else {
         None
     };
@@ -450,19 +468,49 @@ mod tests {
     }
 
     #[test]
-    fn task_pack_query_defaults_to_local_vector_model() {
+    fn task_pack_query_auto_enables_vector_for_semantic_tasks() {
         let query = task_pack_query(
             &json!({
-                "q": "modify agent api rag context",
+                "q": "新增 refresh token",
                 "maxChars": 12000
             }),
             Some("trace-1"),
         )
         .expect("query");
 
-        assert_eq!(query.text.as_deref(), Some("modify agent api rag context"));
+        assert_eq!(query.text.as_deref(), Some("新增 refresh token"));
         assert_eq!(query.trace_id.as_deref(), Some("trace-1"));
         assert_eq!(query.max_chars, 12000);
+        assert_eq!(query.vector_model.as_deref(), Some(LOCAL_HASH_VECTOR_MODEL));
+    }
+
+    #[test]
+    fn task_pack_query_auto_disables_vector_for_precision_tasks() {
+        let query = task_pack_query(
+            &json!({
+                "q": "登录失败为什么返回 500？"
+            }),
+            Some("server-trace"),
+        )
+        .expect("query");
+
+        assert_eq!(query.text.as_deref(), Some("登录失败为什么返回 500？"));
+        assert_eq!(query.trace_id.as_deref(), Some("server-trace"));
+        assert_eq!(query.vector_model, None);
+    }
+
+    #[test]
+    fn task_pack_query_can_force_vector_retrieval() {
+        let query = task_pack_query(
+            &json!({
+                "query": "登录失败为什么返回 500？",
+                "useVector": true
+            }),
+            Some("server-trace"),
+        )
+        .expect("query");
+
+        assert_eq!(query.text.as_deref(), Some("登录失败为什么返回 500？"));
         assert_eq!(query.vector_model.as_deref(), Some(LOCAL_HASH_VECTOR_MODEL));
     }
 
@@ -495,6 +543,21 @@ mod tests {
 
         assert!(err.to_string().contains("暂未配置 provider"));
         assert!(err.to_string().contains(LOCAL_HASH_VECTOR_MODEL));
+    }
+
+    #[test]
+    fn task_pack_query_ignores_unsupported_vector_model_when_vector_disabled() {
+        let query = task_pack_query(
+            &json!({
+                "q": "解释登录流程",
+                "useVector": false,
+                "vectorModel": "bge-m3"
+            }),
+            Some("server-trace"),
+        )
+        .expect("query");
+
+        assert_eq!(query.vector_model, None);
     }
 
     #[test]

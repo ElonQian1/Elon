@@ -1,4 +1,5 @@
 pub(crate) mod agent_rag_context;
+mod agent_rag_vector_policy;
 mod artifact;
 mod artifact_exports;
 #[cfg(test)]
