@@ -138,6 +138,61 @@ impl Store {
         Ok(rows)
     }
 
+    pub fn count_public_projects(
+        &self,
+        search: Option<&str>,
+        join_mode: Option<&str>,
+        has_apk: Option<bool>,
+    ) -> Result<i64> {
+        let conn = self.conn()?;
+        let pattern = search
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| format!("%{}%", s.to_ascii_lowercase()));
+        let join_mode_filter = join_mode.and_then(|mode| match mode.trim() {
+            "open" | "approval" | "readonly" => Some(mode.trim().to_string()),
+            _ => None,
+        });
+        let has_apk_filter = has_apk.map(|value| if value { 1_i64 } else { 0_i64 });
+
+        conn.query_row(
+            "
+            SELECT COUNT(*)
+            FROM projects p
+            LEFT JOIN users u ON u.id = p.created_by
+             WHERE p.is_public = 1
+              AND p.join_mode != 'invite'
+              AND p.status != 'deleted'
+              AND p.source_type NOT IN ('agent_balloon', 'chat_memory')
+              AND (
+                ?1 IS NULL
+                OR LOWER(p.name) LIKE ?1
+                OR LOWER(COALESCE(p.display_name,'')) LIKE ?1
+                OR LOWER(COALESCE(p.description,'')) LIKE ?1
+                OR LOWER(COALESCE(u.nickname, '')) LIKE ?1
+                OR LOWER(COALESCE(u.phone, u.email, p.created_by)) LIKE ?1
+              )
+              AND (?2 IS NULL OR p.join_mode = ?2)
+              AND (
+                ?3 IS NULL
+                OR (?3 = 1 AND EXISTS (
+                  SELECT 1 FROM tasks t_apk
+                  WHERE t_apk.project_id = p.id
+                    AND t_apk.apk_url IS NOT NULL
+                    AND t_apk.apk_url != ''
+                ))
+                OR (?3 = 0 AND NOT EXISTS (
+                  SELECT 1 FROM tasks t_apk
+                  WHERE t_apk.project_id = p.id
+                    AND t_apk.apk_url IS NOT NULL
+                    AND t_apk.apk_url != ''
+                ))
+              )",
+            params![pattern, join_mode_filter, has_apk_filter],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
     /// 获取单个公开项目详情（不要求是成员）
     pub fn get_public_project(&self, project_id: &str) -> Result<PublicProjectItem> {
         let conn = self.conn()?;

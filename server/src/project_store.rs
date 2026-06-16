@@ -46,7 +46,7 @@ pub async fn list_store_projects(
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
     let offset = q.offset.unwrap_or(0).max(0);
 
-    match state.store.list_public_projects(
+    let projects = match state.store.list_public_projects(
         q.q.as_deref(),
         q.join_mode.as_deref(),
         q.has_apk,
@@ -54,15 +54,25 @@ pub async fn list_store_projects(
         limit,
         offset,
     ) {
-        Ok(projects) => Json(serde_json::json!({
-            "projects": projects,
-            "total": projects.len(),
-            "limit": limit,
-            "offset": offset,
-        }))
-        .into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    }
+        Ok(projects) => projects,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let total =
+        match state
+            .store
+            .count_public_projects(q.q.as_deref(), q.join_mode.as_deref(), q.has_apk)
+        {
+            Ok(total) => total,
+            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+
+    Json(serde_json::json!({
+        "projects": projects,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }))
+    .into_response()
 }
 
 /// GET /api/store/projects/:id — 公开项目详情（无需登录）

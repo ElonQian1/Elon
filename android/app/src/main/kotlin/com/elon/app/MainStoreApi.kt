@@ -142,6 +142,43 @@ internal fun fetchStoreProjects(
     return parseStoreProjectList(JSONObject(body))
 }
 
+internal fun fetchAllStoreProjects(
+    http: OkHttpClient,
+    serverUrl: String,
+    search: String? = null,
+    joinMode: String? = null,
+    hasApk: Boolean? = null,
+    sort: String? = null,
+    maxProjects: Int = STORE_FETCH_MAX_PROJECTS
+): List<StoreProject> {
+    val projects = mutableListOf<StoreProject>()
+    val seenIds = mutableSetOf<String>()
+    var offset = 0
+    val cappedMax = maxProjects.coerceAtLeast(1)
+    while (projects.size < cappedMax) {
+        val limit = minOf(STORE_FETCH_PAGE_LIMIT, cappedMax - projects.size)
+        val page = fetchStoreProjects(
+            http = http,
+            serverUrl = serverUrl,
+            search = search,
+            limit = limit,
+            offset = offset,
+            joinMode = joinMode,
+            hasApk = hasApk,
+            sort = sort
+        )
+        if (page.isEmpty()) break
+        page.forEach { project ->
+            if (seenIds.add(project.id) && projects.size < cappedMax) {
+                projects.add(project)
+            }
+        }
+        if (page.size < limit) break
+        offset += limit
+    }
+    return projects
+}
+
 /** POST /api/projects — 创建私有 PC 托管项目，发布为联合项目时再设置公开 */
 internal fun createStoreProject(
     http: OkHttpClient,
@@ -432,6 +469,9 @@ private fun parseStoreProjectList(json: JSONObject): List<StoreProject> {
     val arr = json.optJSONArray("projects") ?: return emptyList()
     return (0 until arr.length()).map { i -> parseStoreProject(arr.getJSONObject(i)) }
 }
+
+private const val STORE_FETCH_PAGE_LIMIT = 50
+private const val STORE_FETCH_MAX_PROJECTS = 200
 
 private fun storeUrlPart(value: String): String =
     URLEncoder.encode(value, "UTF-8").replace("+", "%20")

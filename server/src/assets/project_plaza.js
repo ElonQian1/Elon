@@ -1,6 +1,7 @@
 (function () {
   const ROOT_ID = 'projectPlazaInlineRoot';
   const PAGE_LIMIT = 50;
+  const MAX_PROJECTS = 200;
   const filters = [
     { key: 'all', label: '全部' },
     { key: 'installable', label: '可安装', hasApk: true },
@@ -146,13 +147,7 @@
     render();
     try {
       const filter = activeFilter();
-      const params = new URLSearchParams({ limit: String(PAGE_LIMIT) });
-      if (filter.hasApk != null) params.set('has_apk', String(filter.hasApk));
-      if (filter.sort) params.set('sort', filter.sort);
-      const res = await fetch('/api/store/projects?' + params.toString(), { cache: 'no-store' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || '加载失败');
-      const projects = Array.isArray(data.projects) ? data.projects : [];
+      const projects = await fetchAllProjects(filter);
       await loadJoinedIds();
       state.projects = applyClientFilter(projects, filter);
     } catch (e) {
@@ -163,6 +158,37 @@
       state.loading = false;
       render();
     }
+  }
+
+  async function fetchAllProjects(filter) {
+    const projects = [];
+    const seenIds = new Set();
+    let offset = 0;
+    while (projects.length < MAX_PROJECTS) {
+      const page = await fetchProjectPage(filter, offset);
+      if (!page.length) break;
+      page.forEach((project) => {
+        if (!project || !project.id || seenIds.has(project.id) || projects.length >= MAX_PROJECTS) return;
+        seenIds.add(project.id);
+        projects.push(project);
+      });
+      if (page.length < PAGE_LIMIT) break;
+      offset += PAGE_LIMIT;
+    }
+    return projects;
+  }
+
+  async function fetchProjectPage(filter, offset) {
+    const params = new URLSearchParams({
+      limit: String(PAGE_LIMIT),
+      offset: String(offset)
+    });
+    if (filter.hasApk != null) params.set('has_apk', String(filter.hasApk));
+    if (filter.sort) params.set('sort', filter.sort);
+    const res = await fetch('/api/store/projects?' + params.toString(), { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载失败');
+    return Array.isArray(data.projects) ? data.projects : [];
   }
 
   function applyClientFilter(projects, filter) {

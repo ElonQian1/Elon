@@ -72,11 +72,10 @@ internal class MainMarketplaceActions(
         thread(name = "project-plaza-list") {
             val filter = activeFilter()
             val storeResult = runCatching {
-                fetchStoreProjects(
+                fetchAllStoreProjects(
                     http = http,
                     serverUrl = serverUrl,
                     search = searchQuery.ifBlank { null },
-                    limit = STORE_PAGE_LIMIT,
                     joinMode = filter.joinMode,
                     hasApk = filter.hasApk,
                     sort = filter.sort
@@ -647,7 +646,6 @@ internal class MainMarketplaceActions(
 
     private companion object {
         const val FILTER_ALL = "all"
-        const val STORE_PAGE_LIMIT = 50
         const val COLOR_APP_BG = "#101010"
         const val COLOR_CARD_HEADER = "#202024"
         const val COLOR_CARD_BODY = "#2A2A2A"

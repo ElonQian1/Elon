@@ -41,6 +41,8 @@ private const val SECONDARY_TEXT = "#D6D6D6"
 private const val BORDER = "#2E2E2E"
 private const val PENDING_COLOR = "#F0A030"
 private const val DANGER = "#D97A7A"
+private const val STORE_PAGE_LIMIT = 50
+private const val STORE_MAX_PROJECTS = 200
 
 /**
  * 项目广场 — 浏览/搜索公开项目，申请加入。
@@ -253,10 +255,25 @@ class ProjectPlazaActivity : Activity() {
     }
 
     private fun fetchProjects(query: String): JSONArray? {
+        val all = JSONArray()
+        var offset = 0
+        while (all.length() < STORE_MAX_PROJECTS) {
+            val page = fetchProjectPage(query, offset) ?: return null
+            for (i in 0 until page.length()) {
+                if (all.length() >= STORE_MAX_PROJECTS) break
+                all.put(page.getJSONObject(i))
+            }
+            if (page.length() < STORE_PAGE_LIMIT) break
+            offset += STORE_PAGE_LIMIT
+        }
+        return all
+    }
+
+    private fun fetchProjectPage(query: String, offset: Int): JSONArray? {
         return try {
             val url = buildString {
                 append(authService.getServerUrl())
-                append("/api/store/projects?limit=30")
+                append("/api/store/projects?limit=$STORE_PAGE_LIMIT&offset=$offset")
                 if (query.isNotEmpty()) append("&q=${java.net.URLEncoder.encode(query, "UTF-8")}")
             }
             val conn = URL(url).openConnection() as HttpURLConnection

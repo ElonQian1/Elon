@@ -133,7 +133,7 @@ internal class MainStoreController(
 
         Thread {
             try {
-                val projects = fetchStoreProjects(http, serverUrl, search?.trim()?.ifBlank { null })
+                val projects = fetchAllStoreProjects(http, serverUrl, search?.trim()?.ifBlank { null })
                 activity.runOnUiThread {
                     if (!dialog.isShowing) return@runOnUiThread
                     statusText.visibility = View.GONE
