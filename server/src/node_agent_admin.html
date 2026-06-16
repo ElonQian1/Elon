@@ -35,6 +35,7 @@
   .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .mini-panel { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
   .mini-panel strong { display: block; margin-bottom: 4px; }
+  .doctor-output { white-space: pre-wrap; line-height: 1.6; }
   @media (max-width: 720px) { .split-grid { grid-template-columns: 1fr; } }
   .warn { background: #3a2e1f; border-left: 4px solid #d29922; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
   .ok-toast { background: #1f3a26; border-left: 4px solid #2ea043; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
@@ -148,6 +149,50 @@
 
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
+
+  <h3>电脑医生（Windows）</h3>
+  <div class="card">
+    <div class="warn" style="margin-top:0">
+      默认只做只读体检；清 DNS、改代理、重启网卡等修复动作必须在下方白名单内手动确认。
+    </div>
+    <div class="form-row">
+      <label>电脑问题</label>
+      <textarea id="doctorProblem" rows="3" placeholder="如：网页打不开但微信能用；GitHub 访问很慢；代理开关关不掉；Wi-Fi 连上但没有网络"></textarea>
+    </div>
+    <div class="action-row">
+      <button id="doctorSnapshotBtn" type="button" onclick="loadDoctorSnapshot()">只读体检</button>
+      <button id="doctorAnalyzeBtn" type="button" onclick="doctorAnalyze()">远程 AI 分析</button>
+      <button class="secondary" type="button" onclick="saveDoctorMemory()">保存为问题记忆</button>
+    </div>
+    <div id="doctorResult"></div>
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;color:#8b949e;font-size:13px">查看只读系统快照</summary>
+      <pre id="doctorSnapshot">尚未体检</pre>
+    </details>
+    <div class="split-grid" style="margin-top:12px">
+      <div class="mini-panel">
+        <strong>白名单修复</strong>
+        <div class="muted">执行前会弹出确认；网卡重启通常需要管理员权限。</div>
+        <div class="form-row">
+          <label>网卡名称（仅“重启指定网卡”需要）</label>
+          <input id="doctorAdapterName" placeholder="如：Wi-Fi 或 以太网" />
+        </div>
+        <div class="action-row">
+          <button class="secondary" type="button" onclick="doctorRepair('flush_dns')">清 DNS 缓存</button>
+          <button class="secondary" type="button" onclick="doctorRepair('reset_winhttp_proxy')">重置 WinHTTP 代理</button>
+          <button class="secondary" type="button" onclick="doctorRepair('clear_user_proxy')">关闭当前用户代理</button>
+          <button class="secondary" type="button" onclick="doctorRepair('restart_adapter')">重启指定网卡</button>
+        </div>
+      </div>
+      <div class="mini-panel">
+        <strong>常见问题记忆</strong>
+        <div id="doctorMemory" class="muted">加载中…</div>
+        <div class="action-row">
+          <button class="secondary" type="button" onclick="loadDoctorMemory()">刷新记忆</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <h3>注册本地项目（绑定到本 PC 节点）</h3>
   <div class="card">
@@ -519,6 +564,177 @@ async function saveStorageConfig() {
   }
 }
 
+// ── 电脑医生 ────────────────────────────────────────────────────────────────
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function doctorProblem() {
+  return (document.getElementById('doctorProblem')?.value || '').trim();
+}
+
+function setDoctorResult(html) {
+  const out = document.getElementById('doctorResult');
+  if (out) out.innerHTML = html;
+}
+
+function renderDoctorSnapshot(snapshot) {
+  window.__elonDoctorSnapshot = snapshot || null;
+  const el = document.getElementById('doctorSnapshot');
+  if (el) el.textContent = snapshot ? JSON.stringify(snapshot, null, 2) : '尚未体检';
+}
+
+async function loadDoctorSnapshot() {
+  const btn = document.getElementById('doctorSnapshotBtn');
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '体检中…'; }
+  setDoctorResult('');
+  try {
+    const resp = await fetch('/api/doctor/snapshot');
+    const j = await resp.json();
+    if (resp.ok && j.ok) {
+      renderDoctorSnapshot(j.snapshot);
+      const count = Array.isArray(j.snapshot?.commands) ? j.snapshot.commands.length : 0;
+      setDoctorResult(`<div class="ok-toast">✅ 只读体检完成，已采集 ${count} 组系统状态。</div>`);
+    } else {
+      setDoctorResult(`<div class="err-toast">❌ ${escapeHtml(j.error || ('HTTP ' + resp.status))}</div>`);
+    }
+  } catch (e) {
+    setDoctorResult(`<div class="err-toast">❌ 请求失败: ${escapeHtml(e)}</div>`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prev || '只读体检'; }
+  }
+}
+
+async function doctorAnalyze() {
+  const problem = doctorProblem();
+  if (!problem) {
+    setDoctorResult('<div class="err-toast">请先描述电脑问题</div>');
+    return;
+  }
+  const btn = document.getElementById('doctorAnalyzeBtn');
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '分析中…'; }
+  setDoctorResult('<div class="warn">正在采集只读快照并请求远程 AI，请稍等…</div>');
+  try {
+    const resp = await fetch('/api/doctor/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem }),
+    });
+    const j = await resp.json();
+    if (resp.ok && j.ok) {
+      window.__elonDoctorAnalysis = j.analysis || '';
+      renderDoctorSnapshot(j.snapshot);
+      setDoctorResult(
+        `<div class="ok-toast"><strong>远程 AI 分析</strong><div class="doctor-output">${escapeHtml(j.analysis || '')}</div></div>`
+      );
+    } else {
+      setDoctorResult(`<div class="err-toast">❌ ${escapeHtml(j.error || ('HTTP ' + resp.status))}</div>`);
+    }
+  } catch (e) {
+    setDoctorResult(`<div class="err-toast">❌ 请求失败: ${escapeHtml(e)}</div>`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prev || '远程 AI 分析'; }
+  }
+}
+
+async function doctorRepair(action) {
+  const labels = {
+    flush_dns: '清 DNS 缓存',
+    reset_winhttp_proxy: '重置 WinHTTP 代理',
+    clear_user_proxy: '关闭当前用户代理',
+    restart_adapter: '重启指定网卡',
+  };
+  const adapterName = (document.getElementById('doctorAdapterName')?.value || '').trim();
+  if (action === 'restart_adapter' && !adapterName) {
+    setDoctorResult('<div class="err-toast">请先填写网卡名称</div>');
+    return;
+  }
+  const label = labels[action] || action;
+  const suffix = action === 'restart_adapter' ? `：${adapterName}` : '';
+  if (!window.confirm(`确认执行「${label}${suffix}」？该动作会修改本机网络状态。`)) {
+    return;
+  }
+
+  setDoctorResult(`<div class="warn">正在执行：${escapeHtml(label)}…</div>`);
+  try {
+    const resp = await fetch('/api/doctor/repair', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, confirm: true, adapterName: adapterName || null }),
+    });
+    const j = await resp.json();
+    const outcome = j.outcome || {};
+    const text = [
+      outcome.stdout ? `stdout:\n${outcome.stdout}` : '',
+      outcome.stderr ? `stderr:\n${outcome.stderr}` : '',
+      outcome.error ? `error:\n${outcome.error}` : '',
+    ].filter(Boolean).join('\n\n');
+    if (resp.ok && j.ok) {
+      setDoctorResult(`<div class="ok-toast">✅ ${escapeHtml(j.title || label)} 已执行</div><pre>${escapeHtml(text || '完成')}</pre>`);
+      setTimeout(loadDoctorSnapshot, 800);
+    } else {
+      setDoctorResult(`<div class="err-toast">❌ ${escapeHtml(j.error || j.title || ('HTTP ' + resp.status))}</div><pre>${escapeHtml(text || JSON.stringify(j, null, 2))}</pre>`);
+    }
+  } catch (e) {
+    setDoctorResult(`<div class="err-toast">❌ 请求失败: ${escapeHtml(e)}</div>`);
+  }
+}
+
+async function loadDoctorMemory() {
+  const box = document.getElementById('doctorMemory');
+  if (!box) return;
+  const r = await fetch('/api/doctor/memory').then(r => r.json()).catch(() => null);
+  if (!r || !r.ok) {
+    box.innerHTML = '<span style="color:#f85149">记忆读取失败</span>';
+    return;
+  }
+  const items = Array.isArray(r.items) ? r.items.slice(0, 5) : [];
+  if (!items.length) {
+    box.textContent = '暂无电脑问题记忆';
+    return;
+  }
+  box.innerHTML = items.map(item => {
+    const time = item.createdAtMs ? new Date(Number(item.createdAtMs)).toLocaleString() : '';
+    return `<div style="margin-bottom:10px">
+      <div><code>${escapeHtml(time)}</code></div>
+      <div>${escapeHtml(item.problem || '')}</div>
+      <div style="color:#8b949e">${escapeHtml((item.summary || '').slice(0, 160))}</div>
+    </div>`;
+  }).join('');
+}
+
+async function saveDoctorMemory() {
+  const problem = doctorProblem();
+  const summary = (window.__elonDoctorAnalysis || '').trim();
+  if (!problem || !summary) {
+    setDoctorResult('<div class="err-toast">需要先填写问题并完成一次远程 AI 分析</div>');
+    return;
+  }
+  try {
+    const resp = await fetch('/api/doctor/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem, summary }),
+    });
+    const j = await resp.json();
+    if (resp.ok && j.ok) {
+      setDoctorResult('<div class="ok-toast">✅ 已保存为电脑问题记忆</div>');
+      loadDoctorMemory();
+    } else {
+      setDoctorResult(`<div class="err-toast">❌ ${escapeHtml(j.error || ('HTTP ' + resp.status))}</div>`);
+    }
+  } catch (e) {
+    setDoctorResult(`<div class="err-toast">❌ 请求失败: ${escapeHtml(e)}</div>`);
+  }
+}
+
 // ── TTS 中继配置 ─────────────────────────────────────────────────────────────
 async function loadTtsRelayConfig() {
   const r = await fetch('/api/tts-relay-config').then(r => r.json()).catch(() => null);
@@ -702,6 +918,7 @@ async function saveApiKey() {
 
 load();
 loadStorageConfig();
+loadDoctorMemory();
 loadEnvCheck();
 loadTts();
 loadTtsRelayConfig();

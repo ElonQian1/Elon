@@ -47,6 +47,7 @@ mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
 mod project_workspace_inspect;
+mod windows_doctor;
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
 
@@ -1971,7 +1972,7 @@ struct NodeStatus {
     models_cached: Vec<ModelCapability>,
 }
 
-struct NodeRuntime {
+pub(crate) struct NodeRuntime {
     cfg: NodeConfig,
     creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
@@ -2009,6 +2010,18 @@ impl NodeRuntime {
 
     async fn creds(&self) -> Option<Credentials> {
         self.creds.read().await.clone()
+    }
+
+    pub(crate) fn cloud_http_url(&self) -> String {
+        self.cfg.cloud_http_url.clone()
+    }
+
+    pub(crate) async fn user_token(&self) -> Option<String> {
+        self.creds
+            .read()
+            .await
+            .as_ref()
+            .and_then(|creds| creds.user_token.clone())
     }
 
     async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
@@ -2060,6 +2073,23 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route("/api/status", axum::routing::get(admin_status))
             .route("/api/env-check", axum::routing::get(admin_env_check))
             .route("/api/install-env", axum::routing::post(admin_install_env))
+            .route(
+                "/api/doctor/snapshot",
+                axum::routing::get(windows_doctor::snapshot_handler),
+            )
+            .route(
+                "/api/doctor/analyze",
+                axum::routing::post(windows_doctor::analyze_handler),
+            )
+            .route(
+                "/api/doctor/memory",
+                axum::routing::get(windows_doctor::memory_list_handler)
+                    .post(windows_doctor::memory_save_handler),
+            )
+            .route(
+                "/api/doctor/repair",
+                axum::routing::post(windows_doctor::repair_handler),
+            )
             .route(
                 "/api/save-openai-key",
                 axum::routing::post(admin_save_openai_key),
