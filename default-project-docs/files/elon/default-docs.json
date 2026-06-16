@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "template_version": "2026-06-13.2",
+  "template_version": "2026-06-16.1",
   "authority": ".github/copilot-instructions.md",
   "strategy": "copilot-primary-bridged-agents",
   "update_policy": {
@@ -21,6 +21,26 @@
     {
       "path": ".elon/default-docs.json",
       "role": "manifest"
+    },
+    {
+      "path": "AI_PROJECT.md",
+      "role": "ai-project-guide"
+    },
+    {
+      "path": "AI_INDEX.md",
+      "role": "ai-project-index"
+    },
+    {
+      "path": "AI_RULES.md",
+      "role": "ai-rules-bridge"
+    },
+    {
+      "path": "AI_TASK_TEMPLATE.md",
+      "role": "ai-task-template"
+    },
+    {
+      "path": ".aiignore",
+      "role": "ai-ignore"
     },
     {
       "path": "CODEX.md",

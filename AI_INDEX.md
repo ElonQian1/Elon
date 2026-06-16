@@ -1,0 +1,77 @@
+# Elon AI Index
+
+本文件是给 AI 的高信噪比入口索引。需要规则时先读 `AGENTS.md`；需要项目事实时读 `AI_PROJECT.md`；需要具体实现时再按本文件定位源码。
+
+## 后端核心入口
+
+| 领域 | 入口 |
+|---|---|
+| Rust 服务启动和路由 | `server/src/main.rs` |
+| 项目 API / 项目空间 | `server/src/project_api.rs` 及同领域拆分模块 |
+| AI CLI 调度 | `server/src/ai_cli/`、`server/src/agent.rs` |
+| 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
+| context compiler / repo map | `server/src/context_compiler/` |
+| 项目 RAG 工具上下文 | `server/src/context_compiler/agent_rag_context.rs` |
+| 符号索引 API | `server/src/context_compiler/symbol_index_api.rs` |
+| task pack / impact pack | `server/src/context_compiler/symbol_index_task_pack.rs`、`symbol_index_impact_pack.rs` |
+| 向量检索 | `server/src/context_compiler/symbol_index_vector.rs` |
+| embedding provider | `server/src/context_compiler/symbol_index_embedding_provider.rs` |
+| SQLite 符号库 schema | `server/src/context_compiler/symbol_index_store.rs`、`symbol_index_embeddings.rs` |
+
+## Android 核心入口
+
+| 领域 | 入口 |
+|---|---|
+| APK 主界面和导航 | `android/app/src/main/kotlin/com/elon/app/MainActivity.kt` |
+| 应用更新 | `android/app/src/main/kotlin/com/elon/app/update/` |
+| 网络/API/WebSocket | `android/app/src/main/kotlin/com/elon/app/net/` |
+| 项目相关 UI | `android/app/src/main/kotlin/com/elon/app/project/` |
+
+## Web/静态资源入口
+
+| 领域 | 入口 |
+|---|---|
+| Web 项目页 | `server/src/assets/web_page.html` |
+| 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
+| 节点管理本地页 | `server/src/node_agent_admin.html` |
+
+## 脚本入口
+
+| 任务 | 命令 |
+|---|---|
+| 任务预检并创建隔离 worktree | `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree` |
+| 代码已推送检查 | `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed` |
+| 后端发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1` |
+| APK 发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-apk.ps1 -Changelog "<用户可见改动>"` |
+| worktree 清理 | `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply` |
+
+## context compiler 产物
+
+常见产物包括：
+
+- `repo_map.md`
+- `summaries.md`
+- `symbols.jsonl`
+- `symbol_index.jsonl`
+- `symbol_edges.jsonl`
+- `symbol_lookup.json`
+- `symbol_index.sqlite`
+- `chunks.jsonl`
+- `tests.jsonl`
+- `lsp_locations.jsonl`
+- `semantic_facts.jsonl`
+- `context_budget.json` / `context_budget.md`
+
+面向 agent 的推荐入口优先级：
+
+1. `repo_context_status`
+2. `repo_context_task_pack`
+3. `repo_symbol_search`
+4. `list_dir` / `read_file` 作为兜底
+
+## 修改前搜索建议
+
+- 精确文案、函数名、错误信息：用 `rg`。
+- Rust 类型、trait、调用关系：先查符号索引或 rust-analyzer 事实。
+- 自然语言业务描述：优先 `repo_context_task_pack`，必要时启用 vector。
+- 修改后影响面：查 impact pack，再跑建议测试。
