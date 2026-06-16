@@ -30,7 +30,8 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
     let dev_env_ready = android_ready || rust_ready || node_ready;
     let route_a_ready = route_a_cli_ready(allowed_clis);
     let api_runtime_ready = api_runtime_key_available();
-    let ai_cli_ready = route_a_ready || api_runtime_ready;
+    let server_runtime_ready = server_runtime_available();
+    let ai_cli_ready = route_a_ready || api_runtime_ready || server_runtime_ready;
 
     let mut issues = Vec::new();
     if let Some(issue) = root_issue {
@@ -45,9 +46,9 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
         );
     }
 
-    if !ai_cli_ready && !api_runtime_ready {
+    if !ai_cli_ready {
         issues.push(
-            "未检测到 Route A AI CLI，也未检测到 Route B API key；项目仍可创建，但本机 AI agent 入口暂不可用".to_string(),
+            "未检测到 Route A AI CLI、Route B API key 或 Route C 服务器 token；项目仍可创建，但本机 AI agent 入口暂不可用".to_string(),
         );
     }
 
@@ -93,6 +94,26 @@ fn api_runtime_key_available() -> bool {
                 .map(|value| !value.trim().is_empty())
                 .unwrap_or(false)
         })
+}
+
+fn server_runtime_available() -> bool {
+    let has_url = ["ELON_SERVER_URL", "ELON_AGENT_SERVER_URL"]
+        .iter()
+        .any(|key| env_present(key));
+    let has_token = [
+        "ELON_SERVER_TOKEN",
+        "ELON_AGENT_SERVER_TOKEN",
+        "OWNER_TOKEN",
+    ]
+    .iter()
+    .any(|key| env_present(key));
+    has_url && has_token
+}
+
+fn env_present(key: &str) -> bool {
+    std::env::var(key)
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
 }
 
 fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {

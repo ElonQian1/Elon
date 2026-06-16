@@ -105,7 +105,7 @@ fn gitattributes() -> io::Result<String> {
 
 fn env_example(req: &ProjectScaffoldRequest<'_>) -> io::Result<String> {
     Ok(format!(
-        "ELON_PROJECT_ID=\"{}\"\nELON_PROJECT_NAME=\"{}\"\nELON_PROJECT_TEMPLATE=\"{}\"\n# ANDROID_HOME=\"C:\\\\Users\\\\<you>\\\\AppData\\\\Local\\\\Android\\\\Sdk\"\n# RUST_LOG=\"info\"\n",
+        "ELON_PROJECT_ID=\"{}\"\nELON_PROJECT_NAME=\"{}\"\nELON_PROJECT_TEMPLATE=\"{}\"\n# Route C server-runtime, used when this PC has no AI CLI and no API key.\n# ELON_SERVER_URL=\"http://43.139.149.158:8080\"\n# ELON_SERVER_TOKEN=\"<login-token>\"\n# ELON_SERVER_AGENT=\"\"\n# ANDROID_HOME=\"C:\\\\Users\\\\<you>\\\\AppData\\\\Local\\\\Android\\\\Sdk\"\n# RUST_LOG=\"info\"\n",
         env_escape(req.project_id),
         env_escape(req.name.trim()),
         env_escape(req.template)

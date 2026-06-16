@@ -32,9 +32,10 @@ fn agent_runtime_doc(req: &ProjectScaffoldRequest<'_>) -> io::Result<String> {
     Ok(format!(
         r#"# Agent Runtime Modes
 
-This project supports two local AI development modes through `scripts\elon.ps1 agent`.
+This project supports three AI development modes through `scripts\elon.ps1 agent`.
 - Route A, `cli-wrapper`: this project CLI calls an installed AI CLI such as Codex, Claude, Gemini, or Copilot. That external CLI owns model calls, file edits, shell execution, and its own approval policy.
 - Route B, `api-runtime`: this project CLI calls an OpenAI-compatible API directly and executes a small local tool loop itself. The local runtime owns file reads, file writes, command execution checks, confirmations, and workspace path limits.
+- Route C, `server-runtime`: this project CLI asks the Elon server to call a configured platform AI agent. The server owns the model/API key, while this PC still owns local file reads, file writes, command execution checks, confirmations, and workspace path limits.
 
 Project metadata: `project_id={}`, `template={}`, `owner_user_id={}`
 
@@ -67,6 +68,21 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with t
 ```
 
 Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of low-risk commands. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them.
+
+## Route C: Elon server runtime
+Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
+
+```powershell
+$env:ELON_SERVER_URL = "http://43.139.149.158:8080"
+$env:ELON_SERVER_TOKEN = "<login token>"
+```
+
+```powershell
+scripts\elon.ps1 agent -AgentMode server-runtime -Prompt "Read README.md and summarize this project"
+scripts\elon.ps1 agent -AgentMode server-runtime -Prompt "Create a docs note" -DryRun
+```
+
+Route C does not expose the server API key to this PC. The server only returns structured local actions; this PC runtime still applies the same workspace path, dry-run, command policy, and confirmation checks as Route B.
 "#,
         req.project_id, req.template, req.user_id
     ))
@@ -74,13 +90,16 @@ Route B is intentionally conservative. It only permits workspace-scoped `list_di
 
 fn agent_runtime_script() -> io::Result<String> {
     Ok(r#"param(
-    [ValidateSet('status', 'cli-wrapper', 'api-runtime')][string]$Mode = 'status',
+    [ValidateSet('status', 'cli-wrapper', 'api-runtime', 'server-runtime')][string]$Mode = 'status',
     [string]$Prompt = '',
     [ValidateSet('codex', 'claude', 'gemini', 'copilot')][string]$Cli = 'codex',
     [string[]]$CliArgs = @(),
     [string]$ApiBase = '',
     [string]$ApiKey = '',
     [string]$Model = '',
+    [string]$ServerUrl = '',
+    [string]$ServerToken = '',
+    [string]$ServerAgent = '',
     [int]$MaxTurns = 6,
     [switch]$DryRun,
     [switch]$Yes
@@ -132,6 +151,14 @@ function Show-AgentStatus {
     if ($base) { Write-Host "[OK] api_base -> $base" } else { Write-Host '[WARN] api_base missing; set ELON_AGENT_API_BASE or pass -ApiBase' }
     if ($key) { Write-Host '[OK] api_key -> configured' } else { Write-Host '[WARN] api_key missing; set ELON_AGENT_API_KEY or pass -ApiKey' }
     if ($modelName) { Write-Host "[OK] model -> $modelName" } else { Write-Host '[WARN] model missing; set ELON_AGENT_MODEL or pass -Model' }
+    Write-Host ''
+    Write-Host 'Route C: server-runtime'
+    $server = if ($ServerUrl.Trim()) { $ServerUrl.Trim() } else { Get-FirstEnv @('ELON_SERVER_URL', 'ELON_AGENT_SERVER_URL') }
+    $token = if ($ServerToken.Trim()) { $ServerToken.Trim() } else { Get-FirstEnv @('ELON_SERVER_TOKEN', 'ELON_AGENT_SERVER_TOKEN', 'OWNER_TOKEN') }
+    $agent = if ($ServerAgent.Trim()) { $ServerAgent.Trim() } else { Get-FirstEnv @('ELON_SERVER_AGENT', 'ELON_AGENT_SERVER_AGENT') }
+    if ($server) { Write-Host "[OK] server_url -> $server" } else { Write-Host '[WARN] server_url missing; set ELON_SERVER_URL or pass -ServerUrl' }
+    if ($token) { Write-Host '[OK] server_token -> configured' } else { Write-Host '[WARN] server_token missing; set ELON_SERVER_TOKEN or pass -ServerToken' }
+    if ($agent) { Write-Host "[OK] server_agent -> $agent" } else { Write-Host '[INFO] server_agent not set; server default agent will be used' }
 }
 
 function Require-Prompt {
@@ -190,6 +217,19 @@ function Resolve-ApiConfig {
     }
 }
 
+function Resolve-ServerConfig {
+    $resolvedUrl = if ($ServerUrl.Trim()) { $ServerUrl.Trim() } else { Get-FirstEnv @('ELON_SERVER_URL', 'ELON_AGENT_SERVER_URL') }
+    $resolvedToken = if ($ServerToken.Trim()) { $ServerToken.Trim() } else { Get-FirstEnv @('ELON_SERVER_TOKEN', 'ELON_AGENT_SERVER_TOKEN', 'OWNER_TOKEN') }
+    $resolvedAgent = if ($ServerAgent.Trim()) { $ServerAgent.Trim() } else { Get-FirstEnv @('ELON_SERVER_AGENT', 'ELON_AGENT_SERVER_AGENT') }
+    if (-not $resolvedUrl) { throw 'Missing server URL. Set ELON_SERVER_URL or pass -ServerUrl.' }
+    if (-not $resolvedToken) { throw 'Missing server token. Set ELON_SERVER_TOKEN or pass -ServerToken.' }
+    return [pscustomobject]@{
+        Url = $resolvedUrl.TrimEnd('/')
+        Token = $resolvedToken
+        Agent = $resolvedAgent
+    }
+}
+
 function New-SystemPrompt {
     return @'
 You are the Route B local agent runtime for an Elon-managed project workspace.
@@ -232,6 +272,24 @@ function Invoke-ChatCompletion {
         Authorization = "Bearer $($Config.Key)"
     }
     Invoke-RestMethod -Method Post -Uri "$($Config.Base)/chat/completions" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 120
+}
+
+function Invoke-ServerChatCompletion {
+    param(
+        [Parameter(Mandatory = $true)]$Config,
+        [Parameter(Mandatory = $true)]$Messages
+    )
+    $payload = @{
+        messages = $Messages
+    }
+    if ($Config.Agent) {
+        $payload.agent = $Config.Agent
+    }
+    $body = $payload | ConvertTo-Json -Depth 20
+    $headers = @{
+        Authorization = "Bearer $($Config.Token)"
+    }
+    Invoke-RestMethod -Method Post -Uri "$($Config.Url)/api/agent/runtime/chat" -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 120
 }
 
 function Get-AssistantContent {
@@ -379,17 +437,20 @@ function Invoke-AgentAction {
     }
 }
 
-function Invoke-ApiRuntime {
+function Invoke-AgentRuntimeLoop {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][scriptblock]$ChatCompletion
+    )
     Require-Prompt
-    $config = Resolve-ApiConfig
     $messages = @(
         @{ role = 'system'; content = (New-SystemPrompt) },
         @{ role = 'user'; content = $Prompt }
     )
 
     for ($turn = 1; $turn -le $MaxTurns; $turn++) {
-        Write-Host "[api-runtime] turn $turn"
-        $response = Invoke-ChatCompletion -Config $config -Messages $messages
+        Write-Host "[$Label] turn $turn"
+        $response = & $ChatCompletion -Messages $messages
         $content = Get-AssistantContent $response
         $messages += @{ role = 'assistant'; content = $content }
         $agent = ConvertFrom-AgentJson $content
@@ -424,13 +485,30 @@ function Invoke-ApiRuntime {
         }
     }
 
-    throw "api-runtime stopped after MaxTurns=$MaxTurns without done=true"
+    throw "$Label stopped after MaxTurns=$MaxTurns without done=true"
+}
+
+function Invoke-ApiRuntime {
+    $config = Resolve-ApiConfig
+    Invoke-AgentRuntimeLoop -Label 'api-runtime' -ChatCompletion {
+        param([Parameter(Mandatory = $true)]$Messages)
+        Invoke-ChatCompletion -Config $config -Messages $Messages
+    }
+}
+
+function Invoke-ServerRuntime {
+    $config = Resolve-ServerConfig
+    Invoke-AgentRuntimeLoop -Label 'server-runtime' -ChatCompletion {
+        param([Parameter(Mandatory = $true)]$Messages)
+        Invoke-ServerChatCompletion -Config $config -Messages $Messages
+    }
 }
 
 switch ($Mode) {
     'status' { Show-AgentStatus }
     'cli-wrapper' { Invoke-CliWrapper }
     'api-runtime' { Invoke-ApiRuntime }
+    'server-runtime' { Invoke-ServerRuntime }
 }
 "#
     .to_string())
@@ -464,10 +542,13 @@ mod tests {
     #[test]
     fn agent_runtime_script_exposes_both_routes() {
         let script = agent_runtime_script().unwrap();
-        assert!(script.contains("ValidateSet('status', 'cli-wrapper', 'api-runtime')"));
+        assert!(script
+            .contains("ValidateSet('status', 'cli-wrapper', 'api-runtime', 'server-runtime')"));
         assert!(script.contains("ValidateSet('codex', 'claude', 'gemini', 'copilot')"));
         assert!(script.contains("Invoke-CliWrapper"));
         assert!(script.contains("Invoke-ApiRuntime"));
+        assert!(script.contains("Invoke-ServerRuntime"));
+        assert!(script.contains("/api/agent/runtime/chat"));
         assert!(script.contains("Resolve-SafePath"));
     }
 
@@ -476,7 +557,9 @@ mod tests {
         let doc = agent_runtime_doc(&request()).unwrap();
         assert!(doc.contains("Route A"));
         assert!(doc.contains("Route B"));
+        assert!(doc.contains("Route C"));
         assert!(doc.contains("ELON_AGENT_API_KEY"));
+        assert!(doc.contains("ELON_SERVER_TOKEN"));
     }
 
     fn request() -> ProjectScaffoldRequest<'static> {

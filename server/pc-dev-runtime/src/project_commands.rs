@@ -30,7 +30,7 @@ fn local_cli_script() -> io::Result<String> {
 
     [string]$Base = '',
 
-    [ValidateSet('status', 'cli-wrapper', 'api-runtime')][string]$AgentMode = 'status',
+    [ValidateSet('status', 'cli-wrapper', 'api-runtime', 'server-runtime')][string]$AgentMode = 'status',
 
     [ValidateSet('codex', 'claude', 'gemini', 'copilot')][string]$Cli = 'codex',
 
@@ -41,6 +41,12 @@ fn local_cli_script() -> io::Result<String> {
     [string]$ApiKey = '',
 
     [string]$Model = '',
+
+    [string]$ServerUrl = '',
+
+    [string]$ServerToken = '',
+
+    [string]$ServerAgent = '',
 
     [switch]$DryRun,
 
@@ -122,6 +128,9 @@ function Invoke-Agent {
     if ($ApiBase.Trim()) { $agentArgs += @('-ApiBase', $ApiBase) }
     if ($ApiKey.Trim()) { $agentArgs += @('-ApiKey', $ApiKey) }
     if ($Model.Trim()) { $agentArgs += @('-Model', $Model) }
+    if ($ServerUrl.Trim()) { $agentArgs += @('-ServerUrl', $ServerUrl) }
+    if ($ServerToken.Trim()) { $agentArgs += @('-ServerToken', $ServerToken) }
+    if ($ServerAgent.Trim()) { $agentArgs += @('-ServerAgent', $ServerAgent) }
     if ($DryRun) { $agentArgs += '-DryRun' }
     if ($Yes) { $agentArgs += '-Yes' }
     & $script @agentArgs
@@ -215,6 +224,8 @@ mod tests {
         assert!(script.contains("elon-new-task.ps1"));
         assert!(script.contains("elon-agent.ps1"));
         assert!(script.contains("AgentMode"));
+        assert!(script.contains("server-runtime"));
+        assert!(script.contains("ServerToken"));
         assert!(script.contains("assembleDebug"));
         assert!(script.contains("cargo"));
         assert!(script.contains("npm"));
