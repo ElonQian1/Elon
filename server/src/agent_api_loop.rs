@@ -11,6 +11,7 @@ use crate::{
     agent_tool_calls::extract_tool_calls,
     intent_router, tools,
     types::{AgentConfig, AppState, UserAgentConfig, WsMessage},
+    user_agent_readiness::custom_api_development_block_message,
     user_memory_extract::{extract_and_save_memories, extract_and_save_memories_scoped},
 };
 
@@ -191,6 +192,16 @@ pub(crate) async fn run_api_inner_with_workspace(
             .to_json(),
         );
         return Ok(());
+    }
+
+    if let Some(cfg) = UserAgentConfig::load(user_config_workspace) {
+        if let Some(message) = custom_api_development_block_message(
+            &cfg,
+            state.ai_cli.codex_cli_only,
+            crate::user_agent_secrets::user_byok_api_enabled(),
+        ) {
+            return Err(anyhow::anyhow!(message));
+        }
     }
 
     // 确保用户工作区存在

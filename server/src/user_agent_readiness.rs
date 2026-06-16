@@ -115,6 +115,26 @@ pub(crate) fn build_user_agent_rag_readiness(
     }
 }
 
+pub(crate) fn custom_api_development_block_message(
+    config: &UserAgentConfig,
+    codex_cli_only: bool,
+    byok_api_enabled: bool,
+) -> Option<String> {
+    if !config.has_direct_custom_api() {
+        return None;
+    }
+
+    let readiness = build_user_agent_rag_readiness(config, codex_cli_only, byok_api_enabled);
+    if readiness.development_ready {
+        return None;
+    }
+
+    Some(format!(
+        "当前自定义模型不能作为项目 RAG/开发代理使用（{}）：{} 请在设置中重新保存支持 {} 的模型，或切回 Codex CLI。",
+        readiness.label, readiness.detail, readiness.required_capability
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,5 +228,48 @@ mod tests {
 
         assert_eq!(readiness.status, "missing_api_key");
         assert!(!readiness.development_ready);
+    }
+
+    #[test]
+    fn allows_verified_custom_api_for_development() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-test".into()),
+            model: Some("tool-model".into()),
+            tool_call_ok: Some(true),
+            ..Default::default()
+        };
+
+        let block = custom_api_development_block_message(&cfg, true, true);
+
+        assert!(block.is_none());
+    }
+
+    #[test]
+    fn blocks_unverified_custom_api_for_development() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-test".into()),
+            model: Some("tool-model".into()),
+            ..Default::default()
+        };
+
+        let block = custom_api_development_block_message(&cfg, false, true)
+            .expect("unverified custom API should be blocked");
+
+        assert!(block.contains("需要重新验证模型能力"));
+        assert!(block.contains("OpenAI tools/function calling"));
+    }
+
+    #[test]
+    fn does_not_block_cli_or_global_agent_selection() {
+        let cfg = UserAgentConfig {
+            use_agent: Some("codex_cli".into()),
+            ..Default::default()
+        };
+
+        let block = custom_api_development_block_message(&cfg, true, false);
+
+        assert!(block.is_none());
     }
 }
