@@ -5,6 +5,7 @@ use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
 use super::{
+    agent_rag_project_docs::{load_agent_project_docs, prepend_project_docs_to_pack},
     agent_rag_vector_policy::{choose_agent_vector_policy, AgentVectorPolicy},
     symbol_index_embedding_provider::resolve_embedding_provider,
     symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
@@ -74,7 +75,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": TOOL_CONTEXT_TASK_PACK,
-                "description": "为当前用户任务生成压缩的 RAG 上下文包，融合符号搜索、全文 chunk、本地向量检索、影响分析、补丁计划和验证线索。跨文件修改前优先调用。",
+                "description": "为当前用户任务生成压缩的 RAG 上下文包，先融合 AI 项目说明文档，再融合符号搜索、全文 chunk、本地向量检索、影响分析、补丁计划和验证线索。跨文件修改前优先调用。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -143,7 +144,7 @@ pub(crate) fn is_rag_tool(tool_name: &str) -> bool {
 
 pub(crate) fn execute_rag_tool(
     data_dir: &Path,
-    _workspace: &Path,
+    workspace: &Path,
     tool_name: &str,
     args: &Value,
     default_trace_id: Option<&str>,
@@ -151,7 +152,7 @@ pub(crate) fn execute_rag_tool(
     match tool_name {
         TOOL_CONTEXT_STATUS => context_status(data_dir, args, default_trace_id),
         TOOL_SYMBOL_SEARCH => symbol_search(data_dir, args, default_trace_id),
-        TOOL_CONTEXT_TASK_PACK => context_task_pack(data_dir, args, default_trace_id),
+        TOOL_CONTEXT_TASK_PACK => context_task_pack(data_dir, workspace, args, default_trace_id),
         _ => bail!("未知 RAG 工具: {tool_name}"),
     }
 }
@@ -254,6 +255,7 @@ fn symbol_search(data_dir: &Path, args: &Value, default_trace_id: Option<&str>) 
 
 fn context_task_pack(
     data_dir: &Path,
+    workspace: &Path,
     args: &Value,
     default_trace_id: Option<&str>,
 ) -> Result<String> {
@@ -292,6 +294,10 @@ fn context_task_pack(
     };
 
     let response = build_latest_symbol_task_pack(data_dir, &query)?;
+    let project_docs = load_agent_project_docs(workspace);
+    let pack = prepend_project_docs_to_pack(&project_docs, &response.pack);
+    let char_count = pack.chars().count();
+    let truncated = response.truncated || project_docs.truncated;
     compact_json(json!({
         "ok": true,
         "dbPath": response.db_path,
@@ -314,16 +320,18 @@ fn context_task_pack(
             "textChunks": response.text_chunks.len(),
             "vectorChunks": response.vector_chunks.len(),
             "rankedContext": response.ranked_context.len(),
+            "projectDocs": project_docs.included_count,
             "impactedSymbols": response.impacted_symbol_count,
             "impactedFiles": response.impacted_file_count,
             "edges": response.edge_count,
             "testHints": response.test_hint_count
         },
-        "charCount": response.char_count,
-        "truncated": response.truncated,
+        "charCount": char_count,
+        "truncated": truncated,
+        "projectDocs": project_docs,
         "vectorPolicy": vector_policy,
         "vectorBackfill": vector_backfill,
-        "pack": response.pack
+        "pack": pack
     }))
 }
 
