@@ -42,7 +42,7 @@ pub(crate) fn write_symbol_index_sqlite(
 fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         r#"
-        PRAGMA user_version = 4;
+        PRAGMA user_version = 5;
 
         CREATE TABLE metadata (
             key TEXT PRIMARY KEY,
@@ -135,7 +135,7 @@ fn insert_metadata(tx: &Transaction<'_>, index: &SymbolIndex) -> rusqlite::Resul
     let summary = index.lookup_summary();
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",
-        params!["schema_version", "4"],
+        params!["schema_version", "5"],
     )?;
     tx.execute(
         "INSERT INTO metadata(key, value) VALUES (?1, ?2)",

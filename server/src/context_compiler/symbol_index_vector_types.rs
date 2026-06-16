@@ -4,6 +4,7 @@ use serde::Serialize;
 
 pub(crate) const LOCAL_HASH_VECTOR_MODEL: &str = "local-hash-v1";
 pub(crate) const LOCAL_HASH_VECTOR_DIM: usize = 256;
+pub(crate) const SUPPORTED_EMBEDDING_MODELS: [&str; 1] = [LOCAL_HASH_VECTOR_MODEL];
 
 const DEFAULT_VECTOR_LIMIT: usize = 12;
 const MAX_VECTOR_LIMIT: usize = 50;

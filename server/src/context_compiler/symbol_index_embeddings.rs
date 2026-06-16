@@ -15,15 +15,19 @@ use super::{
 pub(crate) use super::symbol_index_embedding_types::SymbolEmbeddingStatusQuery as SymbolEmbeddingStatus;
 
 pub(crate) fn create_embedding_schema(conn: &Connection) -> rusqlite::Result<()> {
+    if legacy_embedding_primary_key(conn)? {
+        migrate_legacy_embedding_schema(conn)?;
+    }
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS embeddings (
-            chunk_id TEXT PRIMARY KEY,
+            chunk_id TEXT NOT NULL,
             model TEXT NOT NULL,
             dim INTEGER NOT NULL,
             vector BLOB NOT NULL,
             content_hash TEXT NOT NULL,
             created_at INTEGER NOT NULL,
+            PRIMARY KEY(chunk_id, model),
             FOREIGN KEY(chunk_id) REFERENCES chunks(id) ON DELETE CASCADE
         );
 
@@ -31,6 +35,56 @@ pub(crate) fn create_embedding_schema(conn: &Connection) -> rusqlite::Result<()>
             ON embeddings(model);
         CREATE INDEX IF NOT EXISTS idx_embeddings_created_at
             ON embeddings(created_at);
+        "#,
+    )
+}
+
+fn legacy_embedding_primary_key(conn: &Connection) -> rusqlite::Result<bool> {
+    if !sqlite_table_exists(conn, "embeddings")? {
+        return Ok(false);
+    }
+
+    let mut stmt = conn.prepare("PRAGMA table_info(embeddings)")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, String>(1)?, row.get::<_, i64>(5)?))
+    })?;
+    let mut pk_cols = Vec::new();
+    for row in rows {
+        let (name, pk_order) = row?;
+        if pk_order > 0 {
+            pk_cols.push((pk_order, name));
+        }
+    }
+    pk_cols.sort_by_key(|(order, _)| *order);
+    let names = pk_cols
+        .into_iter()
+        .map(|(_, name)| name)
+        .collect::<Vec<_>>();
+    Ok(names == ["chunk_id"])
+}
+
+fn migrate_legacy_embedding_schema(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        r#"
+        DROP TABLE IF EXISTS embeddings_legacy_single_model;
+        ALTER TABLE embeddings RENAME TO embeddings_legacy_single_model;
+
+        CREATE TABLE embeddings (
+            chunk_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            dim INTEGER NOT NULL,
+            vector BLOB NOT NULL,
+            content_hash TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY(chunk_id, model),
+            FOREIGN KEY(chunk_id) REFERENCES chunks(id) ON DELETE CASCADE
+        );
+
+        INSERT OR REPLACE INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
+        SELECT chunk_id, model, dim, vector, content_hash, created_at
+        FROM embeddings_legacy_single_model;
+
+        DROP TABLE embeddings_legacy_single_model;
         "#,
     )
 }
@@ -284,6 +338,14 @@ fn table_exists(conn: &Connection, name: &str) -> Result<bool> {
     .map_err(Into::into)
 }
 
+fn sqlite_table_exists(conn: &Connection, name: &str) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?1)",
+        params![name],
+        |row| row.get::<_, bool>(0),
+    )
+}
+
 fn row_to_missing_chunk(row: &rusqlite::Row<'_>) -> rusqlite::Result<SymbolEmbeddingMissingChunk> {
     Ok(SymbolEmbeddingMissingChunk {
         id: row.get(0)?,
@@ -324,4 +386,61 @@ fn to_i64(value: usize) -> i64 {
 
 fn to_usize(value: i64) -> usize {
     usize::try_from(value).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrates_legacy_single_model_embedding_table() {
+        let conn = Connection::open_in_memory().expect("open sqlite");
+        conn.execute_batch(
+            r#"
+            CREATE TABLE chunks(id TEXT PRIMARY KEY);
+            INSERT INTO chunks(id) VALUES ('chunk-1');
+
+            CREATE TABLE embeddings (
+                chunk_id TEXT PRIMARY KEY,
+                model TEXT NOT NULL,
+                dim INTEGER NOT NULL,
+                vector BLOB NOT NULL,
+                content_hash TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+
+            INSERT INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
+            VALUES ('chunk-1', 'local-hash-v1', 256, zeroblob(1024), 'hash-1', 1);
+            "#,
+        )
+        .expect("seed legacy schema");
+
+        create_embedding_schema(&conn).expect("migrate schema");
+
+        assert!(!legacy_embedding_primary_key(&conn).expect("check pk"));
+        conn.execute(
+            r#"
+            INSERT INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+            params![
+                "chunk-1",
+                "future-semantic-model",
+                768_i64,
+                vec![1_u8; 3072],
+                "hash-1",
+                2_i64
+            ],
+        )
+        .expect("insert second model for same chunk");
+
+        let count = conn
+            .query_row(
+                "SELECT COUNT(*) FROM embeddings WHERE chunk_id = 'chunk-1'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count embeddings");
+        assert_eq!(count, 2);
+    }
 }

@@ -812,7 +812,7 @@ fn chunk_search_uses_fts_for_symbol_module_and_test_chunks() {
     assert!(response
         .metadata
         .get("schema_version")
-        .is_some_and(|version| version == "4"));
+        .is_some_and(|version| version == "5"));
     assert!(response
         .metadata
         .get("chunk_count")

@@ -2,16 +2,16 @@ use std::{cmp::Ordering, collections::HashMap, path::Path};
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, OpenFlags};
-use sha2::{Digest, Sha256};
 
 use super::{
     symbol_index::normalize_path,
+    symbol_index_embedding_provider::{embedding_terms, resolve_embedding_provider, vector_norm},
     symbol_index_embeddings::create_embedding_schema,
     symbol_index_query::{find_symbol_index_db, load_metadata},
     symbol_index_vector_types::{
         SymbolVectorBackfillQuery, SymbolVectorBackfillQueryEcho, SymbolVectorBackfillResponse,
         SymbolVectorHit, SymbolVectorSearch, SymbolVectorSearchQueryEcho,
-        SymbolVectorSearchResponse, LOCAL_HASH_VECTOR_DIM,
+        SymbolVectorSearchResponse,
     },
 };
 
@@ -72,6 +72,7 @@ pub(crate) fn backfill_symbol_vectors_db(
     create_embedding_schema(&conn)?;
     let metadata = load_metadata(&conn)?;
     let model = query.model();
+    let provider = resolve_embedding_provider(&model)?;
     let existing = load_existing_hashes(&conn, &model)?;
     let chunks = load_chunks_for_embedding(&conn, query.limit())?;
 
@@ -83,7 +84,7 @@ pub(crate) fn backfill_symbol_vectors_db(
             skipped += 1;
             continue;
         }
-        let vector = embed_chunk(chunk);
+        let vector = provider.embed_chunk(&chunk.content, chunk.summary.as_deref());
         conn.execute(
             r#"
             INSERT OR REPLACE INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
@@ -91,8 +92,8 @@ pub(crate) fn backfill_symbol_vectors_db(
             "#,
             params![
                 chunk.id.as_str(),
-                model.as_str(),
-                to_i64(LOCAL_HASH_VECTOR_DIM),
+                provider.model(),
+                to_i64(provider.dim()),
                 vector_to_blob(&vector),
                 chunk.hash.as_str(),
             ],
@@ -110,7 +111,7 @@ pub(crate) fn backfill_symbol_vectors_db(
         },
         metadata,
         model,
-        dim: LOCAL_HASH_VECTOR_DIM,
+        dim: provider.dim(),
         scanned_count: chunks.len(),
         upserted_count: upserted,
         skipped_count: skipped,
@@ -132,12 +133,13 @@ pub(crate) fn search_symbol_vectors_db(
         .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))?;
     let metadata = load_metadata(&conn)?;
     let model = search.model();
-    let query_vector = embed_text(&text);
+    let provider = resolve_embedding_provider(&model)?;
+    let query_vector = provider.embed_text(&text);
     if vector_norm(&query_vector) == 0.0 {
         bail!("q 没有可用于向量检索的词项");
     }
-    let terms = query_terms(&text);
-    let chunks = load_vector_chunks(&conn, &model, search)?;
+    let terms = embedding_terms(&text);
+    let chunks = load_vector_chunks(&conn, &model, provider.dim(), search)?;
     let mut hits = chunks
         .into_iter()
         .filter_map(|chunk| {
@@ -160,7 +162,7 @@ pub(crate) fn search_symbol_vectors_db(
         },
         metadata,
         model,
-        dim: LOCAL_HASH_VECTOR_DIM,
+        dim: provider.dim(),
         chunks: hits,
     })
 }
@@ -203,6 +205,7 @@ fn load_chunks_for_embedding(conn: &Connection, limit: usize) -> Result<Vec<Chun
 fn load_vector_chunks(
     conn: &Connection,
     model: &str,
+    dim: usize,
     search: &SymbolVectorSearch,
 ) -> Result<Vec<StoredVectorChunk>> {
     let mut sql = String::from(
@@ -220,7 +223,7 @@ fn load_vector_chunks(
     );
     let mut values = vec![
         rusqlite::types::Value::Text(model.to_string()),
-        rusqlite::types::Value::Integer(to_i64(LOCAL_HASH_VECTOR_DIM)),
+        rusqlite::types::Value::Integer(to_i64(dim)),
     ];
     if let Some(path) = clean_filter(search.path.as_deref()) {
         sql.push_str(" AND lower(replace(c.file_path, char(92), '/')) LIKE lower(?)");
@@ -251,54 +254,14 @@ fn load_vector_chunks(
             summary: row.get(9)?,
             hash: row.get(10)?,
             token_count: to_usize(row.get::<_, i64>(11)?),
-            vector: blob_to_vector(&blob).unwrap_or_default(),
+            vector: blob_to_vector(&blob, dim).unwrap_or_default(),
         })
     })?;
     let chunks = collect_rows(rows)?
         .into_iter()
-        .filter(|chunk| chunk.vector.len() == LOCAL_HASH_VECTOR_DIM)
+        .filter(|chunk| chunk.vector.len() == dim)
         .collect();
     Ok(chunks)
-}
-
-fn embed_chunk(chunk: &ChunkForEmbedding) -> Vec<f32> {
-    let text = match chunk.summary.as_deref() {
-        Some(summary) if !summary.trim().is_empty() => {
-            format!("{}\n{}", summary.trim(), chunk.content)
-        }
-        _ => chunk.content.clone(),
-    };
-    embed_text(&text)
-}
-
-fn embed_text(text: &str) -> Vec<f32> {
-    let mut vector = vec![0.0_f32; LOCAL_HASH_VECTOR_DIM];
-    let mut freqs = HashMap::<String, usize>::new();
-    for term in query_terms(text) {
-        *freqs.entry(term).or_default() += 1;
-    }
-    for (term, count) in freqs {
-        let digest = Sha256::digest(term.as_bytes());
-        let idx = u16::from_le_bytes([digest[0], digest[1]]) as usize % LOCAL_HASH_VECTOR_DIM;
-        let sign = if digest[2] & 1 == 0 { 1.0 } else { -1.0 };
-        vector[idx] += sign * (count as f32).ln_1p();
-    }
-    normalize_vector(&mut vector);
-    vector
-}
-
-fn normalize_vector(vector: &mut [f32]) {
-    let norm = vector_norm(vector);
-    if norm == 0.0 {
-        return;
-    }
-    for value in vector {
-        *value /= norm;
-    }
-}
-
-fn vector_norm(vector: &[f32]) -> f32 {
-    vector.iter().map(|value| value * value).sum::<f32>().sqrt()
 }
 
 fn dot(left: &[f32], right: &[f32]) -> f32 {
@@ -316,8 +279,8 @@ fn vector_to_blob(vector: &[f32]) -> Vec<u8> {
     blob
 }
 
-fn blob_to_vector(blob: &[u8]) -> Option<Vec<f32>> {
-    if blob.len() != LOCAL_HASH_VECTOR_DIM * 4 {
+fn blob_to_vector(blob: &[u8], dim: usize) -> Option<Vec<f32>> {
+    if blob.len() != dim * 4 {
         return None;
     }
     Some(
@@ -354,14 +317,6 @@ fn compare_hits(left: &SymbolVectorHit, right: &SymbolVectorHit) -> Ordering {
         .then_with(|| left.file_path.cmp(&right.file_path))
         .then_with(|| left.start_line.cmp(&right.start_line))
         .then_with(|| left.id.cmp(&right.id))
-}
-
-fn query_terms(value: &str) -> Vec<String> {
-    value
-        .split(|ch: char| !ch.is_ascii_alphanumeric())
-        .filter(|term| !term.is_empty())
-        .map(|term| term.to_ascii_lowercase())
-        .collect()
 }
 
 fn matched_terms(content: &str, terms: &[String]) -> Vec<String> {
