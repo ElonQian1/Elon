@@ -271,6 +271,9 @@ class MainActivity : AppCompatActivity() {
                 taskActions.taskWorkServiceActions.startTaskWorkService(action, isDevelopment = s.activeRequestIsDevelopment)
             },
             openConversation = conversationOpenActions::openConversation,
+            openProjectSpaceById = { projectId, title ->
+                projectSpaceController.openProjectSpace(projectId, title, true)
+            },
             loadModelOptions = { modelActions.loadModelOptions() },
             sendMessage = { inputActions.sendMessageActions.sendMessage() }
         )

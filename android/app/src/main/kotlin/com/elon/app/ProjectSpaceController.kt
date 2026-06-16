@@ -92,7 +92,24 @@ internal class ProjectSpaceController(
             activeSpace?.let { announcementEditor.show(it, channel, currentText) }
         },
         openProjectDocuments = { showProjectDocumentsDialog() },
-        downloadProjectApk = { openProjectApkDownload(activity, activeSpace?.latestApkUrl) }
+        projectApkActionLabel = {
+            val space = activeSpace
+            projectApkActionLabel(
+                activity,
+                space?.project?.id.orEmpty(),
+                space?.project?.name.orEmpty(),
+                space?.latestApkUrl
+            )
+        },
+        downloadProjectApk = {
+            val space = activeSpace
+            openProjectApkDownload(
+                activity,
+                space?.latestApkUrl,
+                space?.project?.id,
+                space?.project?.name
+            )
+        }
     )
     private val postComposer = ProjectSpacePostComposer(
         activity = activity,

@@ -209,6 +209,8 @@ pub struct PublicProjectItem {
     pub member_count: i64,
     pub is_public: bool,
     pub join_mode: String, // "open" | "approval" | "invite" | "readonly"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub viewer_role: Option<String>, // 当前访问者在该项目中的角色；未登录/未加入时为空
     pub last_task_status: Option<String>,
     pub latest_apk_url: Option<String>,
     pub icon_data_url: Option<String>,

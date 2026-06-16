@@ -78,7 +78,8 @@ internal class MainMarketplaceActions(
                     search = searchQuery.ifBlank { null },
                     joinMode = filter.joinMode,
                     hasApk = filter.hasApk,
-                    sort = filter.sort
+                    sort = filter.sort,
+                    ctx = activity
                 )
             }
             val alreadyJoined = runCatching {
@@ -258,7 +259,7 @@ internal class MainMarketplaceActions(
     }
 
     private fun buildProjectCard(project: StoreProject): LinearLayout {
-        val alreadyJoined = joinedIds.contains(project.id)
+        val alreadyJoined = isProjectJoined(project)
         val joinBtn = actionButton(projectJoinActionLabel(project.joinMode, alreadyJoined)).apply {
             setOnClickListener {
                 if (alreadyJoined) openJoinedProject(project) else tryJoinProject(project, this)
@@ -304,7 +305,7 @@ internal class MainMarketplaceActions(
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(statusLabel(joinApprovalLabel(project.joinMode), approvalDotColor(project.joinMode)))
-            addView(statusLabel(if (project.latestApkUrl.isNullOrBlank()) "暂无APK" else "可安装", apkDotColor(project)))
+            addView(statusLabel(apkStatusLabel(project), apkDotColor(project)))
         }
     }
 
@@ -372,8 +373,10 @@ internal class MainMarketplaceActions(
                 addView(joinBtn, LinearLayout.LayoutParams(dp(92), dp(34)).apply {
                     marginEnd = dp(10)
                 })
-                addView(actionButton("下载APK").apply {
-                    isEnabled = !project.latestApkUrl.isNullOrBlank()
+                addView(actionButton(projectApkActionLabel(activity, project.id, project.name, project.latestApkUrl)).apply {
+                    val hasApk = !project.latestApkUrl.isNullOrBlank()
+                    val hasInstalledApp = isProjectAppInstalled(activity, project.id, project.name)
+                    isEnabled = hasApk || hasInstalledApp
                     alpha = if (isEnabled) 1f else 0.55f
                     setOnClickListener { tryInstallProject(project, this, joinBtn) }
                 }, LinearLayout.LayoutParams(dp(92), dp(34)))
@@ -528,6 +531,9 @@ internal class MainMarketplaceActions(
     }
 
     private fun tryInstallProject(project: StoreProject, installBtn: TextView, joinBtn: TextView?) {
+        if (openInstalledProjectApp(activity, project.id, project.name)) {
+            return
+        }
         if (!isAndroidApkInstallSupported()) {
             Toast.makeText(activity, "当前设备不是 Android，无法直接安装 APK", Toast.LENGTH_SHORT).show()
             return
@@ -543,7 +549,7 @@ internal class MainMarketplaceActions(
             return
         }
 
-        val shouldJoin = !joinedIds.contains(project.id)
+        val shouldJoin = !isProjectJoined(project)
         installBtn.isEnabled = false
         installBtn.text = if (shouldJoin) "加入中..." else "准备安装..."
         thread(name = "install-store-project") {
@@ -553,20 +559,24 @@ internal class MainMarketplaceActions(
             }
             activity.runOnUiThread {
                 installBtn.isEnabled = true
-                installBtn.text = "下载APK"
+                installBtn.text = projectApkActionLabel(activity, project.id, project.name, project.latestApkUrl)
                 result
                     .onSuccess { url ->
                         if (shouldJoin) {
                             joinedIds.add(project.id)
                             joinBtn?.let { markProjectJoined(project, it) }
                         }
-                        openProjectApkInstall(activity, url, token)
+                        openProjectApkInstall(activity, url, token, project.id, project.name, http)
                     }
                     .onFailure {
                         Toast.makeText(activity, it.message ?: "安装失败", Toast.LENGTH_SHORT).show()
                     }
             }
         }
+    }
+
+    private fun isProjectJoined(project: StoreProject): Boolean {
+        return !project.viewerRole.isNullOrBlank() || joinedIds.contains(project.id)
     }
 
     private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
@@ -595,7 +605,7 @@ internal class MainMarketplaceActions(
 
     private fun applyClientFilter(projects: List<StoreProject>, filter: MarketplaceFilter): List<StoreProject> {
         return projects.filter { project ->
-            (!filter.joinedOnly || joinedIds.contains(project.id)) &&
+            (!filter.joinedOnly || isProjectJoined(project)) &&
                 (!filter.noApprovalOnly || normalizeProjectJoinMode(project.joinMode) != PROJECT_JOIN_MODE_APPROVAL)
         }
     }
@@ -624,7 +634,17 @@ internal class MainMarketplaceActions(
     }
 
     private fun apkDotColor(project: StoreProject): String {
-        return if (project.latestApkUrl.isNullOrBlank()) "#777777" else "#58BE6A"
+        return if (project.latestApkUrl.isNullOrBlank() &&
+            !isProjectAppInstalled(activity, project.id, project.name)
+        ) "#777777" else "#58BE6A"
+    }
+
+    private fun apkStatusLabel(project: StoreProject): String {
+        return when {
+            isProjectAppInstalled(activity, project.id, project.name) -> "已安装"
+            project.latestApkUrl.isNullOrBlank() -> "暂无APK"
+            else -> "可安装"
+        }
     }
 
     private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {

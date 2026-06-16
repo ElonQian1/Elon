@@ -28,6 +28,20 @@ impl Store {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<PublicProjectItem>> {
+        self.list_public_projects_for_viewer(search, join_mode, has_apk, sort, limit, offset, None)
+    }
+
+    /// 列出公开项目；登录用户传入 `viewer_user_id` 时返回该用户在每个项目中的角色。
+    pub fn list_public_projects_for_viewer(
+        &self,
+        search: Option<&str>,
+        join_mode: Option<&str>,
+        has_apk: Option<bool>,
+        sort: Option<&str>,
+        limit: i64,
+        offset: i64,
+        viewer_user_id: Option<&str>,
+    ) -> Result<Vec<PublicProjectItem>> {
         let conn = self.conn()?;
         let pattern = search
             .filter(|s| !s.trim().is_empty())
@@ -67,7 +81,10 @@ impl Store {
               p.created_by AS owner_id,
               p.source_type,
               p.workspace_path,
-              p.display_name
+              p.display_name,
+              (SELECT pm.role FROM project_members pm
+               WHERE pm.project_id = p.id AND pm.user_id = ?6
+               LIMIT 1) AS viewer_role
             FROM projects p
             LEFT JOIN users u ON u.id = p.created_by
              WHERE p.is_public = 1
@@ -105,7 +122,14 @@ impl Store {
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt
             .query_map(
-                params![pattern, join_mode_filter, has_apk_filter, limit, offset],
+                params![
+                    pattern,
+                    join_mode_filter,
+                    has_apk_filter,
+                    limit,
+                    offset,
+                    viewer_user_id
+                ],
                 |row| {
                     let mut project = PublicProjectItem {
                         id: row.get(0)?,
@@ -117,6 +141,7 @@ impl Store {
                         member_count: row.get(5)?,
                         is_public: row.get::<_, i64>(6)? != 0,
                         join_mode: row.get(7)?,
+                        viewer_role: row.get(17)?,
                         last_task_status: row.get(8)?,
                         latest_apk_url: row.get(9)?,
                         icon_data_url: row.get(10)?,
@@ -195,6 +220,15 @@ impl Store {
 
     /// 获取单个公开项目详情（不要求是成员）
     pub fn get_public_project(&self, project_id: &str) -> Result<PublicProjectItem> {
+        self.get_public_project_for_viewer(project_id, None)
+    }
+
+    /// 获取单个公开项目详情；登录用户传入 `viewer_user_id` 时返回该用户角色。
+    pub fn get_public_project_for_viewer(
+        &self,
+        project_id: &str,
+        viewer_user_id: Option<&str>,
+    ) -> Result<PublicProjectItem> {
         let conn = self.conn()?;
         conn.query_row(
             "SELECT
@@ -214,7 +248,10 @@ impl Store {
                p.created_by AS owner_id,
                p.source_type,
                p.workspace_path,
-               p.display_name
+               p.display_name,
+               (SELECT pm.role FROM project_members pm
+                WHERE pm.project_id = p.id AND pm.user_id = ?2
+                LIMIT 1) AS viewer_role
              FROM projects p
              LEFT JOIN users u ON u.id = p.created_by
              WHERE p.id = ?1
@@ -222,7 +259,7 @@ impl Store {
                AND p.join_mode != 'invite'
                AND p.status != 'deleted'
                AND p.source_type NOT IN ('agent_balloon', 'chat_memory')",
-            params![project_id],
+            params![project_id, viewer_user_id],
             |row| {
                 let mut project = PublicProjectItem {
                     id: row.get(0)?,
@@ -234,6 +271,7 @@ impl Store {
                     member_count: row.get(5)?,
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
+                    viewer_role: row.get(17)?,
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
                     icon_data_url: row.get(10)?,
@@ -534,6 +572,7 @@ impl Store {
                     member_count: row.get(5)?,
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
+                    viewer_role: None,
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
                     icon_data_url: row.get(10)?,
@@ -987,6 +1026,48 @@ mod tests {
             public_projects[0].latest_apk_url.as_deref(),
             Some("https://example.test/latest.apk")
         );
+    }
+
+    #[test]
+    fn public_projects_include_viewer_role_when_authenticated() {
+        let store = temp_store();
+        let owner = store
+            .create_user("viewer-role-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let member = store
+            .create_user("viewer-role-member@example.com", "secret1", None, None)
+            .expect("member should be created");
+        let project = store
+            .create_project(&owner.id, "Viewer Role Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should become public");
+        store
+            .join_project(&member.id, &project.id)
+            .expect("member should join");
+
+        let anonymous_projects = store
+            .list_public_projects(None, None, None, None, 10, 0)
+            .expect("anonymous store projects should list");
+        assert_eq!(anonymous_projects[0].viewer_role, None);
+
+        let owner_projects = store
+            .list_public_projects_for_viewer(None, None, None, None, 10, 0, Some(&owner.id))
+            .expect("owner store projects should list");
+        assert_eq!(owner_projects[0].viewer_role.as_deref(), Some("owner"));
+
+        let member_projects = store
+            .list_public_projects_for_viewer(None, None, None, None, 10, 0, Some(&member.id))
+            .expect("member store projects should list");
+        assert_eq!(member_projects[0].viewer_role.as_deref(), Some("member"));
+
+        let detail = store
+            .get_public_project_for_viewer(&project.id, Some(&member.id))
+            .expect("public project should load for member");
+        assert_eq!(detail.viewer_role.as_deref(), Some("member"));
     }
 
     #[test]

@@ -7,6 +7,7 @@ package com.elon.app.agent.ui
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -15,6 +16,9 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.*
+import com.elon.app.EXTRA_OPEN_PROJECT_SPACE_ID
+import com.elon.app.EXTRA_OPEN_PROJECT_SPACE_TITLE
+import com.elon.app.MainActivity
 import com.elon.app.agent.infrastructure.auth.AuthService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -296,6 +300,7 @@ class ProjectPlazaActivity : Activity() {
         val ownerAccount = project.optString("owner_account", "")
         val memberCount = project.optInt("member_count", 0)
         val joinMode = project.optString("join_mode", "open") // open | approval | invite | readonly
+        val viewerRole = project.optString("viewer_role", "").trim()
         val template = project.optString("template", "android")
 
         return LinearLayout(this).apply {
@@ -372,9 +377,24 @@ class ProjectPlazaActivity : Activity() {
             })
 
             // 操作按钮（根据 join_mode）
-            if (joinMode != "invite") {
+            if (viewerRole.isNotEmpty()) {
+                addView(buildEnterSpaceButton(projectId, name))
+            } else if (joinMode != "invite") {
                 addView(buildJoinButton(projectId, name, joinMode))
             }
+        }
+    }
+
+    private fun buildEnterSpaceButton(projectId: String, projectName: String): View {
+        return Button(this).apply {
+            text = "进入空间"
+            textSize = 14f
+            setBackgroundColor(Color.parseColor(ACTION_BG))
+            setTextColor(Color.parseColor(PRIMARY_TEXT))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 110
+            ).apply { topMargin = 16 }
+            setOnClickListener { openProjectSpace(projectId, projectName) }
         }
     }
 
@@ -435,6 +455,7 @@ class ProjectPlazaActivity : Activity() {
             }
             if (result != null && result.optBoolean("ok")) {
                 Toast.makeText(this@ProjectPlazaActivity, "已成功加入「$projectName」", Toast.LENGTH_SHORT).show()
+                openProjectSpace(projectId, projectName)
             } else {
                 // 如果返回 approval_required，自动弹申请对话框
                 val code = result?.optString("code")
@@ -469,6 +490,16 @@ class ProjectPlazaActivity : Activity() {
                 Toast.makeText(this@ProjectPlazaActivity, msg, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun openProjectSpace(projectId: String, projectName: String) {
+        if (projectId.isBlank()) return
+        startActivity(Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_OPEN_PROJECT_SPACE_ID, projectId)
+            putExtra(EXTRA_OPEN_PROJECT_SPACE_TITLE, projectName.ifBlank { "项目空间" })
+        })
+        finish()
     }
 
     // ── Tab2: 我的申请 ───────────────────────────────────────────────────────

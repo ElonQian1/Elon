@@ -21,6 +21,7 @@ internal data class StoreProject(
     val memberCount: Int,
     val isPublic: Boolean,
     val joinMode: String,
+    val viewerRole: String? = null,
     val lastTaskStatus: String?,
     val latestApkUrl: String? = null,
     val iconDataUrl: String? = null,
@@ -119,7 +120,8 @@ internal fun fetchStoreProjects(
     offset: Int = 0,
     joinMode: String? = null,
     hasApk: Boolean? = null,
-    sort: String? = null
+    sort: String? = null,
+    ctx: Context? = null
 ): List<StoreProject> {
     val qs = buildString {
         append("limit=$limit&offset=$offset")
@@ -131,12 +133,10 @@ internal fun fetchStoreProjects(
         appendParam("sort", sort)
         if (hasApk != null) append("&has_apk=$hasApk")
     }
-    val resp = http.newCall(
-        Request.Builder()
-            .url("$serverUrl/api/store/projects?$qs")
-            .get()
-            .build()
-    ).execute()
+    val builder = Request.Builder()
+        .url("$serverUrl/api/store/projects?$qs")
+        .get()
+    val resp = http.newCall((ctx?.let { AuthManager.applyAuth(it, builder) } ?: builder).build()).execute()
     val body = resp.body?.string().orEmpty()
     if (!resp.isSuccessful) error(body.ifBlank { "HTTP ${resp.code}" })
     return parseStoreProjectList(JSONObject(body))
@@ -149,6 +149,7 @@ internal fun fetchAllStoreProjects(
     joinMode: String? = null,
     hasApk: Boolean? = null,
     sort: String? = null,
+    ctx: Context? = null,
     maxProjects: Int = STORE_FETCH_MAX_PROJECTS
 ): List<StoreProject> {
     val projects = mutableListOf<StoreProject>()
@@ -165,7 +166,8 @@ internal fun fetchAllStoreProjects(
             offset = offset,
             joinMode = joinMode,
             hasApk = hasApk,
-            sort = sort
+            sort = sort,
+            ctx = ctx
         )
         if (page.isEmpty()) break
         page.forEach { project ->
@@ -486,6 +488,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     memberCount = obj.optInt("member_count", 0),
     isPublic = obj.optBoolean("is_public", true),
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "open")),
+    viewerRole = obj.optCleanStoreString("viewer_role")
+        ?: obj.optCleanStoreString("viewerRole"),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
         ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
@@ -517,6 +521,8 @@ private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = S
     memberCount = obj.optInt("member_count", 1).coerceAtLeast(0),
     isPublic = false,
     joinMode = normalizeProjectJoinMode(obj.optString("join_mode", "invite")),
+    viewerRole = obj.optCleanStoreString("viewer_role")
+        ?: obj.optCleanStoreString("viewerRole"),
     lastTaskStatus = null,
     latestApkUrl = null,
     iconDataUrl = obj.optProjectIconDataUrl(),

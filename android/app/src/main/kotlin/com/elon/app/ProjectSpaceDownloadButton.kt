@@ -41,7 +41,7 @@ internal fun projectSpaceQuickActions(
                 setStroke(dp(1), Color.parseColor("#A8A8A8"))
             }
             addView(TextView(activity).apply {
-                text = "下载APK"
+                text = "安装应用"
                 textSize = 18f
                 gravity = Gravity.CENTER
                 setTypeface(typeface, Typeface.BOLD)
@@ -51,7 +51,7 @@ internal fun projectSpaceQuickActions(
                 setOnClickListener {
                     val url = apkUrl?.trim().orEmpty()
                     if (url.isBlank()) {
-                        Toast.makeText(activity, "暂无可下载 APK", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "暂无可安装 APK", Toast.LENGTH_SHORT).show()
                     } else {
                         openProjectApkDownload(activity, url)
                     }
@@ -86,6 +86,7 @@ internal fun projectSpaceAnnouncementMenuButton(
     dp: (Int) -> Int,
     selectableForeground: () -> android.graphics.drawable.Drawable?,
     onOpenDocuments: () -> Unit,
+    apkActionLabel: () -> String = { "安装应用" },
     onDownloadApk: () -> Unit
 ): FrameLayout {
     var popup: PopupWindow? = null
@@ -101,6 +102,7 @@ internal fun projectSpaceAnnouncementMenuButton(
                 dp = dp,
                 selectableForeground = selectableForeground,
                 onOpenDocuments = onOpenDocuments,
+                apkActionLabel = apkActionLabel,
                 onDownloadApk = onDownloadApk
             )
         }
@@ -122,6 +124,7 @@ private fun showProjectSpaceActionPopup(
     dp: (Int) -> Int,
     selectableForeground: () -> android.graphics.drawable.Drawable?,
     onOpenDocuments: () -> Unit,
+    apkActionLabel: () -> String,
     onDownloadApk: () -> Unit
 ): PopupWindow {
     previousPopup?.dismiss()
@@ -143,7 +146,7 @@ private fun showProjectSpaceActionPopup(
             setColor(panelColor)
         }
         addView(projectSpaceMenuRow(activity, dp, selectableForeground, "项目文档", { popup.dismiss() }, onOpenDocuments))
-        addView(projectSpaceMenuRow(activity, dp, selectableForeground, "下载APK", { popup.dismiss() }, onDownloadApk))
+        addView(projectSpaceMenuRow(activity, dp, selectableForeground, apkActionLabel(), { popup.dismiss() }, onDownloadApk))
     }
     root.addView(panel, FrameLayout.LayoutParams(
         FrameLayout.LayoutParams.MATCH_PARENT,
@@ -218,16 +221,26 @@ private fun projectSpaceMenuArrow(activity: AppCompatActivity, color: Int): View
     }
 }
 
-internal fun openProjectApkDownload(activity: AppCompatActivity, apkUrl: String?) {
+internal fun openProjectApkDownload(
+    activity: AppCompatActivity,
+    apkUrl: String?,
+    projectId: String? = null,
+    projectName: String? = null
+) {
+    if (!projectId.isNullOrBlank() && !projectName.isNullOrBlank() &&
+        openInstalledProjectApp(activity, projectId, projectName)
+    ) {
+        return
+    }
     val url = apkUrl?.trim().orEmpty()
     if (url.isBlank()) {
-        Toast.makeText(activity, "暂无可下载 APK", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "暂无可安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
     val token = AuthManager.token(activity)?.trim().orEmpty()
     if (token.isBlank()) {
-        Toast.makeText(activity, "请先登录后下载 APK", Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    openProjectApkInstall(activity, url, token)
+    openProjectApkInstall(activity, url, token, projectId, projectName)
 }

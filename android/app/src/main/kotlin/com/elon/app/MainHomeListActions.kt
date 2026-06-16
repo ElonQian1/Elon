@@ -361,7 +361,8 @@ internal class MainHomeListActions(
                     http = http,
                     serverUrl = serverUrl(),
                     limit = 18,
-                    sort = "members"
+                    sort = "members",
+                    ctx = activity
                 ).filter { it.isPublic }
             }
             activity.runOnUiThread {

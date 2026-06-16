@@ -133,7 +133,12 @@ internal class MainStoreController(
 
         Thread {
             try {
-                val projects = fetchAllStoreProjects(http, serverUrl, search?.trim()?.ifBlank { null })
+                val projects = fetchAllStoreProjects(
+                    http = http,
+                    serverUrl = serverUrl,
+                    search = search?.trim()?.ifBlank { null },
+                    ctx = activity
+                )
                 activity.runOnUiThread {
                     if (!dialog.isShowing) return@runOnUiThread
                     statusText.visibility = View.GONE
@@ -229,14 +234,22 @@ internal class MainStoreController(
             }
         }
 
-        val joinLabel = projectJoinActionLabel(project.joinMode)
+        val alreadyJoined = !project.viewerRole.isNullOrBlank()
+        val joinLabel = if (alreadyJoined) "进入空间" else projectJoinActionLabel(project.joinMode)
         val builder = AlertDialog.Builder(activity)
             .setTitle(project.name)
             .setMessage(msg)
             .setNegativeButton("返回", null)
 
         if (project.joinMode != "invite") {
-            builder.setPositiveButton(joinLabel) { _, _ -> doJoinProject(project, parentDialog) }
+            builder.setPositiveButton(joinLabel) { _, _ ->
+                if (alreadyJoined) {
+                    addJoinedProject(project)
+                    parentDialog.dismiss()
+                } else {
+                    doJoinProject(project, parentDialog)
+                }
+            }
         }
         builder.show()
     }

@@ -11,6 +11,9 @@ import com.elon.app.update.AppUpdateManager
 import com.elon.app.update.PeerSeederManager
 import com.elon.app.update.UpdateCheckWorker
 
+internal const val EXTRA_OPEN_PROJECT_SPACE_ID = "com.elon.app.extra.OPEN_PROJECT_SPACE_ID"
+internal const val EXTRA_OPEN_PROJECT_SPACE_TITLE = "com.elon.app.extra.OPEN_PROJECT_SPACE_TITLE"
+
 internal class MainCreateActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
@@ -40,6 +43,7 @@ internal class MainCreateActions(
     private val isActiveConversationWorking: () -> Boolean,
     private val startTaskWorkService: (String) -> Boolean,
     private val openConversation: (Int) -> Unit,
+    private val openProjectSpaceById: (String, String) -> Unit,
     private val loadModelOptions: () -> Unit,
     private val sendMessage: () -> Unit
 ) {
@@ -80,6 +84,14 @@ internal class MainCreateActions(
         if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
             intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
             AppUpdateManager(activity).realtimeCheck()
+        }
+        val projectId = intent?.getStringExtra(EXTRA_OPEN_PROJECT_SPACE_ID)?.trim().orEmpty()
+        if (projectId.isNotBlank()) {
+            val title = intent?.getStringExtra(EXTRA_OPEN_PROJECT_SPACE_TITLE)?.trim().orEmpty()
+                .ifBlank { "项目空间" }
+            intent?.removeExtra(EXTRA_OPEN_PROJECT_SPACE_ID)
+            intent?.removeExtra(EXTRA_OPEN_PROJECT_SPACE_TITLE)
+            openProjectSpaceById(projectId, title)
         }
     }
 

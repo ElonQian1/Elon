@@ -20,7 +20,13 @@ import java.io.File
  */
 internal object ApkChatInstaller {
 
-    fun downloadAndInstall(activity: AppCompatActivity, url: String, http: OkHttpClient) {
+    fun downloadAndInstall(
+        activity: AppCompatActivity,
+        url: String,
+        http: OkHttpClient,
+        projectId: String? = null,
+        projectName: String? = null
+    ) {
         val progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal)
             .apply { max = 100 }
         val progressText = TextView(activity).apply {
@@ -37,20 +43,23 @@ internal object ApkChatInstaller {
             addView(progressText)
         }
         val progressDialog = AlertDialog.Builder(activity)
-            .setTitle("下载 APK")
+            .setTitle("安装应用")
             .setView(layout)
             .setCancelable(false)
             .show()
 
         Thread {
             try {
-                activity.runOnUiThread { progressText.text = "正在从服务器下载..." }
+                activity.runOnUiThread { progressText.text = "正在下载安装包..." }
                 val request = Request.Builder().url(url).build()
                 http.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) error("HTTP ${resp.code}")
                     val body = resp.body ?: error("空响应体")
                     val totalBytes = body.contentLength()
-                    val apkFile = File(activity.getExternalFilesDir(null), "elon_project.apk")
+                    val apkFile = File(
+                        activity.getExternalFilesDir(null),
+                        projectApkFileName(projectId, projectName)
+                    )
 
                     var downloaded = 0L
                     body.byteStream().use { input ->
@@ -73,6 +82,7 @@ internal object ApkChatInstaller {
                     }
                     activity.runOnUiThread {
                         progressDialog.dismiss()
+                        rememberProjectApkPackage(activity, projectId, projectApkPackageName(activity, apkFile))
                         installApk(activity, apkFile)
                     }
                 }
@@ -80,7 +90,7 @@ internal object ApkChatInstaller {
                 activity.runOnUiThread {
                     progressDialog.dismiss()
                     AlertDialog.Builder(activity)
-                        .setTitle("下载失败")
+                        .setTitle("安装失败")
                         .setMessage(e.message ?: "未知错误")
                         .setPositiveButton("确定", null)
                         .show()
@@ -120,5 +130,15 @@ internal object ApkChatInstaller {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
             }
         )
+    }
+
+    private fun projectApkFileName(projectId: String?, projectName: String?): String {
+        val raw = projectId?.trim()?.takeIf { it.isNotBlank() }
+            ?: projectName?.trim()?.takeIf { it.isNotBlank() }
+            ?: "project"
+        val safe = raw.map { char ->
+            if (char.isLetterOrDigit() || char == '_' || char == '-') char else '_'
+        }.joinToString("").trim('_').ifBlank { "project" }
+        return "elon_$safe.apk"
     }
 }

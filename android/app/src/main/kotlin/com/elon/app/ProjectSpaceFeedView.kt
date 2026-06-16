@@ -29,6 +29,7 @@ internal class ProjectSpaceFeedView(
     private val openPostComposer: () -> Unit,
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit,
     private val openProjectDocuments: () -> Unit,
+    private val projectApkActionLabel: () -> String,
     private val downloadProjectApk: () -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
@@ -181,6 +182,7 @@ internal class ProjectSpaceFeedView(
                     dp = dp,
                     selectableForeground = selectableForeground,
                     onOpenDocuments = openProjectDocuments,
+                    apkActionLabel = projectApkActionLabel,
                     onDownloadApk = downloadProjectApk
                 ), LinearLayout.LayoutParams(dp(44), dp(40)).apply {
                     marginStart = dp(12)

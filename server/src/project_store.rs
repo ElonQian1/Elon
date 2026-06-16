@@ -41,18 +41,21 @@ pub struct StoreQuery {
 /// GET /api/store/projects — 浏览公开项目（无需登录）
 pub async fn list_store_projects(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(q): Query<StoreQuery>,
 ) -> Response {
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
     let offset = q.offset.unwrap_or(0).max(0);
+    let viewer_user_id = auth_from_headers(&state, &headers).ok().map(|user| user.id);
 
-    let projects = match state.store.list_public_projects(
+    let projects = match state.store.list_public_projects_for_viewer(
         q.q.as_deref(),
         q.join_mode.as_deref(),
         q.has_apk,
         q.sort.as_deref(),
         limit,
         offset,
+        viewer_user_id.as_deref(),
     ) {
         Ok(projects) => projects,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -78,9 +81,14 @@ pub async fn list_store_projects(
 /// GET /api/store/projects/:id — 公开项目详情（无需登录）
 pub async fn get_store_project(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(project_id): Path<String>,
 ) -> Response {
-    match state.store.get_public_project(&project_id) {
+    let viewer_user_id = auth_from_headers(&state, &headers).ok().map(|user| user.id);
+    match state
+        .store
+        .get_public_project_for_viewer(&project_id, viewer_user_id.as_deref())
+    {
         Ok(project) => Json(serde_json::json!({ "project": project })).into_response(),
         Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
     }
