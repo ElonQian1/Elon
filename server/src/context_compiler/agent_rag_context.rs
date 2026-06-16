@@ -5,13 +5,14 @@ use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
 use super::{
+    symbol_index_embedding_provider::resolve_embedding_provider,
     symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
     symbol_index_query::{
         find_symbol_index_db, load_metadata, search_latest_symbol_index, SymbolIndexSearch,
     },
     symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
     symbol_index_vector::{backfill_latest_symbol_vectors, SymbolVectorBackfill},
-    symbol_index_vector_types::LOCAL_HASH_VECTOR_MODEL,
+    symbol_index_vector_types::{LOCAL_HASH_VECTOR_MODEL, SUPPORTED_EMBEDDING_MODELS},
 };
 
 const TOOL_CONTEXT_STATUS: &str = "repo_context_status";
@@ -100,6 +101,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                             "type": "boolean",
                             "description": "是否启用本地 hash 向量检索，默认 true。"
                         },
+                        "vectorModel": {
+                            "type": "string",
+                            "description": "可选。embedding 模型；当前支持 local-hash-v1，不填默认 local-hash-v1。"
+                        },
                         "searchLimit": {
                             "type": "integer",
                             "description": "符号候选数量。"
@@ -159,6 +164,7 @@ fn context_status(
         return compact_json(json!({
             "ok": false,
             "indexed": false,
+            "embeddingCapabilities": embedding_capabilities(),
             "message": "当前 API agent 会话缺少 trace_id，无法安全选择项目索引。请先让服务器为本任务运行 context compiler，或改用 list_dir/read_file。"
         }));
     };
@@ -166,6 +172,7 @@ fn context_status(
         return compact_json(json!({
             "ok": false,
             "indexed": false,
+            "embeddingCapabilities": embedding_capabilities(),
             "message": "当前还没有可查询的 symbol_index.sqlite。先运行一次项目开发/预检流程，或先用 list_dir/read_file 做低保真读取。",
             "recommendedNext": ["repo_context_task_pack", "repo_symbol_search", "list_dir", "read_file"]
         }));
@@ -186,8 +193,12 @@ fn context_status(
             "indexed": true,
             "dbPath": status.db_path,
             "metadata": status.metadata,
+            "embeddingCapabilities": embedding_capabilities(),
             "embeddings": {
                 "defaultModel": LOCAL_HASH_VECTOR_MODEL,
+                "supportedModels": supported_embedding_models(),
+                "providerMode": "local_hash",
+                "remoteProviderConfigured": false,
                 "totals": status.totals,
                 "models": status.models,
                 "sampleMissingChunks": status.missing_chunks
@@ -206,6 +217,7 @@ fn context_status(
                 "indexed": true,
                 "dbPath": db_path.to_string_lossy().replace('\\', "/"),
                 "metadata": metadata,
+                "embeddingCapabilities": embedding_capabilities(),
                 "embeddingStatusError": error.to_string(),
                 "recommendedTools": [
                     TOOL_CONTEXT_TASK_PACK,
@@ -315,8 +327,10 @@ fn context_task_pack(
 fn task_pack_query(args: &Value, default_trace_id: Option<&str>) -> Result<SymbolTaskPackQuery> {
     let use_vector = bool_arg(args, &["useVector", "use_vector"]).unwrap_or(true);
     let vector_model = if use_vector {
-        string_arg(args, &["vectorModel", "vector_model"])
-            .or_else(|| Some(LOCAL_HASH_VECTOR_MODEL.to_string()))
+        let model = string_arg(args, &["vectorModel", "vector_model"])
+            .unwrap_or_else(|| LOCAL_HASH_VECTOR_MODEL.to_string());
+        resolve_embedding_provider(&model)?;
+        Some(model)
     } else {
         None
     };
@@ -375,6 +389,20 @@ fn usize_arg(args: &Value, names: &[&str]) -> Option<usize> {
         .and_then(|value| usize::try_from(value).ok())
 }
 
+fn supported_embedding_models() -> Vec<&'static str> {
+    SUPPORTED_EMBEDDING_MODELS.to_vec()
+}
+
+fn embedding_capabilities() -> Value {
+    json!({
+        "defaultModel": LOCAL_HASH_VECTOR_MODEL,
+        "supportedModels": supported_embedding_models(),
+        "providerMode": "local_hash",
+        "remoteProviderConfigured": false,
+        "message": "当前只有本地 hash embedding provider；远程语义 embedding 模型尚未接入。"
+    })
+}
+
 fn compact_json(value: Value) -> Result<String> {
     serde_json::to_string(&value).context("序列化 RAG 工具结果失败")
 }
@@ -400,6 +428,25 @@ mod tests {
         assert!(names.contains(&TOOL_CONTEXT_STATUS.to_string()));
         assert!(names.contains(&TOOL_SYMBOL_SEARCH.to_string()));
         assert!(names.contains(&TOOL_CONTEXT_TASK_PACK.to_string()));
+    }
+
+    #[test]
+    fn task_pack_tool_schema_exposes_vector_model() {
+        let task_pack_tool = tool_definitions()
+            .into_iter()
+            .find(|tool| {
+                tool.pointer("/function/name")
+                    .and_then(Value::as_str)
+                    .is_some_and(|name| name == TOOL_CONTEXT_TASK_PACK)
+            })
+            .expect("task pack tool");
+
+        let vector_model = task_pack_tool
+            .pointer("/function/parameters/properties/vectorModel/description")
+            .and_then(Value::as_str)
+            .expect("vector model description");
+
+        assert!(vector_model.contains(LOCAL_HASH_VECTOR_MODEL));
     }
 
     #[test]
@@ -433,6 +480,21 @@ mod tests {
         assert_eq!(query.text.as_deref(), Some("inspect only"));
         assert_eq!(query.trace_id.as_deref(), Some("server-trace"));
         assert_eq!(query.vector_model, None);
+    }
+
+    #[test]
+    fn task_pack_query_rejects_unsupported_vector_model() {
+        let err = task_pack_query(
+            &json!({
+                "q": "inspect",
+                "vectorModel": "bge-m3"
+            }),
+            Some("server-trace"),
+        )
+        .expect_err("unsupported vector model");
+
+        assert!(err.to_string().contains("暂未配置 provider"));
+        assert!(err.to_string().contains(LOCAL_HASH_VECTOR_MODEL));
     }
 
     #[test]
