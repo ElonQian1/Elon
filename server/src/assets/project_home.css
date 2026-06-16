@@ -2,40 +2,40 @@
   min-height: 100%;
   background: #000000;
   color: #D9D9D9;
-  padding: 56px 32px 42px;
+  padding: 44px 32px 34px;
   box-sizing: border-box;
 }
 
 .project-home-segments {
-  height: 52px;
+  height: 42px;
   display: flex;
   align-items: center;
   gap: 38px;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
 }
 
 .project-home-segment {
-  min-width: 64px;
-  height: 52px;
+  min-width: 60px;
+  height: 42px;
   border: 0;
-  border-radius: 26px;
+  border-radius: 21px;
   background: transparent;
   color: #D9D9D9;
   padding: 0;
-  font-size: 18px;
-  line-height: 26px;
+  font-size: 17px;
+  line-height: 24px;
   cursor: pointer;
 }
 
 .project-home-segment.active {
-  min-width: 72px;
-  padding: 0 21px;
+  min-width: 66px;
+  padding: 0 18px;
   background: #1A1A1A;
 }
 
 .project-home-list {
   display: grid;
-  gap: 20px;
+  gap: 34px;
 }
 
 .project-home-card,
@@ -52,7 +52,7 @@
   display: flex;
   align-items: center;
   cursor: pointer;
-  min-height: 106px;
+  min-height: 82px;
 }
 
 .project-home-card:hover,
@@ -69,9 +69,9 @@
 .project-home-name {
   min-width: 0;
   color: #FFFFFF;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 500;
-  line-height: 24px;
+  line-height: 21px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -80,8 +80,8 @@
 .project-home-thumb {
   position: relative;
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 6px;
   background: #FFFFFF;
   color: transparent;
@@ -101,16 +101,16 @@
 .project-home-copy {
   min-width: 0;
   flex: 1;
-  padding-left: 20px;
-  padding-right: 14px;
+  padding-left: 18px;
+  padding-right: 12px;
 }
 
 .project-home-desc {
   display: block;
   margin-top: 7px;
   color: #AFAFAF;
-  font-size: 17px;
-  line-height: 24px;
+  font-size: 15px;
+  line-height: 21px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -118,11 +118,11 @@
 
 .project-home-meta-row {
   display: flex;
-  gap: 34px;
-  margin-top: 8px;
+  gap: 30px;
+  margin-top: 7px;
   color: #AFAFAF;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 12px;
+  line-height: 18px;
   overflow: hidden;
 }
 
@@ -135,9 +135,9 @@
 
 .project-home-chevron {
   flex: none;
-  width: 24px;
+  width: 22px;
   color: #AFAFAF;
-  font-size: 34px;
+  font-size: 28px;
   line-height: 1;
   text-align: center;
 }

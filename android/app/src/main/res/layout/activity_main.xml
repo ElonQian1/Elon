@@ -9,7 +9,7 @@
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
+        android:layout_height="50dp"
         android:background="@color/elon_bg_app"
         android:contentInsetStart="0dp"
         android:contentInsetEnd="0dp"
@@ -50,14 +50,14 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="24dp"
-                android:paddingEnd="112dp"
+                android:paddingEnd="84dp"
                 android:visibility="gone">
 
                 <LinearLayout
                     android:id="@+id/projectHomeTopTabWrap"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:layout_marginEnd="56dp"
+                    android:layout_marginEnd="52dp"
                     android:clickable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless"
                     android:gravity="center"
@@ -72,14 +72,14 @@
                         android:singleLine="true"
                         android:text="我的项目"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="26sp"
+                        android:textSize="20dp"
                         android:textStyle="bold" />
 
                     <View
                         android:id="@+id/projectHomeTabIndicator"
                         android:layout_width="32dp"
                         android:layout_height="2dp"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="5dp"
                         android:background="@color/elon_text_primary" />
                 </LinearLayout>
 
@@ -101,7 +101,7 @@
                         android:singleLine="true"
                         android:text="项目广场"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="26sp"
+                        android:textSize="20dp"
                         android:textStyle="bold" />
 
                     <View
@@ -128,14 +128,14 @@
 
             <ImageButton
                 android:id="@+id/addButton"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="20dp"
                 android:background="@drawable/bg_top_add_button"
                 android:contentDescription="新增"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
-                android:padding="14dp"
+                android:padding="12dp"
                 android:scaleType="center"
                 android:src="@drawable/ic_project_fab_plus"
                 app:tint="@color/elon_icon_add_top" />

@@ -4,14 +4,17 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
+import kotlin.math.roundToInt
 
 internal class MainNavigationController(
     private val activity: AppCompatActivity,
@@ -63,6 +66,7 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
 
     fun setupNavigation() {
+        applyProjectManagementDesignMetrics()
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
         binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
@@ -82,14 +86,14 @@ internal class MainNavigationController(
     }
 
     private fun showMainTabs() {
-        setNavigationBarColor(R.color.elon_nav_bg)
+        setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun hideBottomMenus() {
-        setNavigationBarColor(R.color.elon_nav_bg)
+        setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
@@ -213,6 +217,7 @@ internal class MainNavigationController(
         }
         if (tab == binding.tabProject) {
             renderProjectList()
+            resetProjectHomeScroll()
         } else if (tab == binding.tabChat) {
             refreshFriends()
             renderConversationList()
@@ -669,6 +674,7 @@ internal class MainNavigationController(
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectList()
+                    resetProjectHomeScroll()
                 }
             )
         } else if (animate && binding.marketplacePage.visibility == View.VISIBLE) {
@@ -692,6 +698,7 @@ internal class MainNavigationController(
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectList()
+                    resetProjectHomeScroll()
                 }
             )
         } else if (animate && binding.chatPage.visibility == View.VISIBLE) {
@@ -714,6 +721,7 @@ internal class MainNavigationController(
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderProjectList()
+                    resetProjectHomeScroll()
                 }
             )
         } else {
@@ -828,6 +836,7 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = "项目管理"
         renderProjectList()
+        resetProjectHomeScroll()
     }
 
     private fun applyMarketplaceChrome() {
@@ -926,8 +935,68 @@ internal class MainNavigationController(
         val color = tab.context.getColor(R.color.elon_text_nav)
         tab.isSelected = selected
         tab.setTextColor(color)
-        tab.textSize = 14f
+        tab.setTextSize(TypedValue.COMPLEX_UNIT_PX, designPx(BOTTOM_TAB_TEXT_PX).toFloat())
+        tab.compoundDrawablePadding = designPx(BOTTOM_TAB_DRAWABLE_GAP_PX)
+        tab.compoundDrawables[1]?.let { drawable ->
+            val size = designPx(BOTTOM_TAB_ICON_PX)
+            drawable.setBounds(0, 0, size, size)
+            tab.setCompoundDrawables(null, drawable, null, null)
+        }
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
+    }
+
+    private fun applyProjectManagementDesignMetrics() {
+        binding.toolbar.layoutParams = binding.toolbar.layoutParams.apply {
+            height = designPx(PROJECT_TOOLBAR_HEIGHT_PX)
+        }
+        binding.projectTopTabs.setPadding(
+            designPx(PROJECT_TOP_PADDING_START_PX),
+            0,
+            designPx(PROJECT_TOP_PADDING_END_PX),
+            0
+        )
+        (binding.projectHomeTopTabWrap.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.marginEnd = designPx(PROJECT_TOP_TAB_GAP_PX)
+            binding.projectHomeTopTabWrap.layoutParams = it
+        }
+        listOf(binding.projectHomeTopTab, binding.projectPlazaTopTab).forEach {
+            it.setTextSize(TypedValue.COMPLEX_UNIT_PX, designPx(PROJECT_TOP_TAB_TEXT_PX).toFloat())
+        }
+        listOf(binding.projectHomeTabIndicator, binding.projectPlazaTabIndicator).forEach {
+            it.layoutParams = it.layoutParams.apply {
+                width = designPx(PROJECT_TOP_INDICATOR_WIDTH_PX)
+                height = designPx(PROJECT_TOP_INDICATOR_HEIGHT_PX)
+            }
+            (it.layoutParams as? LinearLayout.LayoutParams)?.topMargin = designPx(PROJECT_TOP_INDICATOR_TOP_PX)
+        }
+        (binding.addButton.layoutParams as? FrameLayout.LayoutParams)?.let {
+            val size = designPx(PROJECT_ADD_BUTTON_SIZE_PX)
+            it.width = size
+            it.height = size
+            it.marginEnd = designPx(PROJECT_ADD_BUTTON_END_PX)
+            binding.addButton.layoutParams = it
+        }
+        binding.addButton.setPadding(
+            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
+            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
+            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
+            designPx(PROJECT_ADD_BUTTON_PADDING_PX)
+        )
+        binding.pageTabs.layoutParams = binding.pageTabs.layoutParams.apply {
+            height = designPx(BOTTOM_MENU_HEIGHT_PX)
+        }
+        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
+            updateBottomTabVisual(it, it.isSelected)
+        }
+    }
+
+    private fun resetProjectHomeScroll() {
+        binding.projectScrollView.post { binding.projectScrollView.scrollTo(0, 0) }
+    }
+
+    private fun designPx(value: Int): Int {
+        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
+        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
     /** 更新"好友"tab 未读消息角标。count=0 时隐藏角标。 */
@@ -973,5 +1042,24 @@ internal class MainNavigationController(
         binding.pageTabs.translationX = 0f
         binding.projectSpaceAiMenu.translationX = 0f
         binding.projectSpaceFeedActionsOverlay.translationX = 0f
+    }
+
+    private companion object {
+        const val DESIGN_WIDTH_PX = 1272
+        const val PROJECT_TOOLBAR_HEIGHT_PX = 176
+        const val PROJECT_TOP_PADDING_START_PX = 78
+        const val PROJECT_TOP_PADDING_END_PX = 250
+        const val PROJECT_TOP_TAB_GAP_PX = 188
+        const val PROJECT_TOP_TAB_TEXT_PX = 70
+        const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
+        const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
+        const val PROJECT_TOP_INDICATOR_TOP_PX = 14
+        const val PROJECT_ADD_BUTTON_SIZE_PX = 156
+        const val PROJECT_ADD_BUTTON_END_PX = 70
+        const val PROJECT_ADD_BUTTON_PADDING_PX = 46
+        const val BOTTOM_MENU_HEIGHT_PX = 270
+        const val BOTTOM_TAB_ICON_PX = 68
+        const val BOTTOM_TAB_TEXT_PX = 42
+        const val BOTTOM_TAB_DRAWABLE_GAP_PX = 16
     }
 }
