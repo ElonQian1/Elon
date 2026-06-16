@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use sha2::{Digest, Sha256};
 
 use super::{
@@ -64,6 +64,7 @@ impl SymbolEmbeddingProvider for LocalHashEmbeddingProvider {
 pub(crate) struct SymbolEmbeddingProviderContext {
     pub(crate) api_base: Option<String>,
     pub(crate) api_key: Option<String>,
+    pub(crate) embedding_model: Option<String>,
     pub(crate) source: Option<String>,
 }
 
@@ -72,6 +73,7 @@ impl std::fmt::Debug for SymbolEmbeddingProviderContext {
         f.debug_struct("SymbolEmbeddingProviderContext")
             .field("api_base", &self.api_base)
             .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("embedding_model", &self.embedding_model)
             .field("source", &self.source)
             .finish()
     }
@@ -82,8 +84,17 @@ impl SymbolEmbeddingProviderContext {
         Self {
             api_base: Some(api_base.trim().trim_end_matches('/').to_string()),
             api_key: Some(api_key.to_string()),
+            embedding_model: None,
             source: Some(source.into()),
         }
+    }
+
+    pub(crate) fn with_embedding_model(mut self, embedding_model: Option<&str>) -> Self {
+        self.embedding_model = embedding_model
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        self
     }
 
     pub(crate) fn remote_provider_configured(&self) -> bool {

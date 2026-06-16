@@ -10,10 +10,10 @@
 ///
 /// 鉴权：所有 API 需要请求头 `Authorization: Bearer <ADMIN_TOKEN>`
 use axum::{
+    Json,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -148,6 +148,10 @@ pub async fn upsert_agent(
     } else {
         req.api_key.trim().to_string()
     };
+    let embedding_model = config
+        .agents
+        .get(&name)
+        .and_then(|agent| agent.embedding_model.clone());
 
     let is_new = !config.agents.contains_key(&name);
     config.agents.insert(
@@ -157,6 +161,7 @@ pub async fn upsert_agent(
             api_base: req.api_base.trim().to_string(),
             api_key,
             model: req.model.trim().to_string(),
+            embedding_model,
             usage_mode: None,
         },
     );

@@ -21,6 +21,8 @@ pub struct AgentConfig {
     pub api_key: String,
     pub model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding_model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_mode: Option<String>,
 }
 
@@ -34,6 +36,9 @@ impl AgentConfig {
             api_key: key,
             model: std::env::var(format!("AGENT_{}_MODEL", prefix))
                 .unwrap_or_else(|_| default_model.into()),
+            embedding_model: std::env::var(format!("AGENT_{}_EMBEDDING_MODEL", prefix))
+                .ok()
+                .and_then(clean_optional),
             usage_mode: None,
         })
     }
@@ -152,6 +157,9 @@ pub struct UserAgentConfig {
     pub api_key_encrypted: Option<String>,
     /// 自定义模型名（None = 使用所选全局代理的模型）
     pub model: Option<String>,
+    /// 自定义 embedding 模型（None = 使用 RAG 默认 local-hash-v1）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding_model: Option<String>,
     /// 用户昵称（可选，仅用于管理后台展示）
     pub nickname: Option<String>,
     /// 最近一次保存为开发代理时的能力探测结果。
@@ -213,6 +221,7 @@ impl UserAgentConfig {
             || self.api_base.is_some()
             || self.has_api_key_reference()
             || self.model.is_some()
+            || self.embedding_model.is_some()
     }
 
     pub fn has_api_key_reference(&self) -> bool {
@@ -274,6 +283,7 @@ impl UserAgentConfig {
                 api_base: self.api_base.clone()?,
                 api_key: self.api_key.clone()?,
                 model: self.model.clone()?,
+                embedding_model: self.embedding_model.clone(),
                 usage_mode: Some("user_api_key_proxy".to_string()),
             });
         }
@@ -285,6 +295,7 @@ impl UserAgentConfig {
             api_base: self.api_base.clone().unwrap_or(base.api_base),
             api_key: self.api_key.clone().unwrap_or(base.api_key),
             model: self.model.clone().unwrap_or(base.model),
+            embedding_model: self.embedding_model.clone().or(base.embedding_model),
             usage_mode: if user_key_override {
                 Some("user_api_key_proxy".to_string())
             } else {
@@ -292,6 +303,11 @@ impl UserAgentConfig {
             },
         })
     }
+}
+
+fn clean_optional(value: String) -> Option<String> {
+    let value = value.trim().to_string();
+    if value.is_empty() { None } else { Some(value) }
 }
 
 #[cfg(test)]
@@ -315,6 +331,7 @@ mod tests {
 
         assert_eq!(resolved.name, "user-custom-api");
         assert_eq!(resolved.api_key, "sk-user");
+        assert_eq!(resolved.embedding_model, None);
         assert_eq!(resolved.usage_mode(), "user_api_key_proxy");
     }
 
@@ -332,6 +349,7 @@ mod tests {
                     api_base: "https://api.example.com/v1".into(),
                     api_key: "server-key".into(),
                     model: "server-model".into(),
+                    embedding_model: Some("openai:text-embedding-3-small".into()),
                     usage_mode: None,
                 },
             )]),
@@ -343,7 +361,37 @@ mod tests {
         assert_eq!(resolved.api_base, "https://api.example.com/v1");
         assert_eq!(resolved.api_key, "server-key");
         assert_eq!(resolved.model, "user-model");
+        assert_eq!(
+            resolved.embedding_model.as_deref(),
+            Some("openai:text-embedding-3-small")
+        );
         assert_eq!(resolved.usage_mode(), "server_api_key");
+    }
+
+    #[test]
+    fn user_embedding_model_overrides_global_agent() {
+        let cfg = UserAgentConfig {
+            embedding_model: Some("remote:bge-m3".into()),
+            ..Default::default()
+        };
+        let global = AgentsConfig {
+            agents: HashMap::from([(
+                "default".into(),
+                AgentConfig {
+                    name: "default".into(),
+                    api_base: "https://api.example.com/v1".into(),
+                    api_key: "server-key".into(),
+                    model: "server-model".into(),
+                    embedding_model: Some("openai:text-embedding-3-small".into()),
+                    usage_mode: None,
+                },
+            )]),
+            default_agent: "default".into(),
+        };
+
+        let resolved = cfg.resolve(&global).expect("default agent should resolve");
+
+        assert_eq!(resolved.embedding_model.as_deref(), Some("remote:bge-m3"));
     }
 
     #[test]
@@ -357,6 +405,7 @@ mod tests {
             api_base: Some("https://api.example.com/v1".into()),
             api_key: Some("sk-sensitive".into()),
             model: Some("example-model".into()),
+            embedding_model: Some("openai:text-embedding-3-small".into()),
             ..Default::default()
         };
 
@@ -365,9 +414,14 @@ mod tests {
             std::fs::read_to_string(workspace.join("agent_config.json")).expect("read config");
         assert!(!raw.contains("sk-sensitive"));
         assert!(raw.contains("api_key_encrypted"));
+        assert!(raw.contains("openai:text-embedding-3-small"));
 
         let loaded = UserAgentConfig::load(&workspace).expect("load config");
         assert_eq!(loaded.api_key.as_deref(), Some("sk-sensitive"));
+        assert_eq!(
+            loaded.embedding_model.as_deref(),
+            Some("openai:text-embedding-3-small")
+        );
 
         let _ = std::fs::remove_dir_all(workspace);
         std::env::remove_var("USER_API_KEY_SECRET");

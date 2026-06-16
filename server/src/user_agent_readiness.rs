@@ -8,9 +8,12 @@ pub(crate) struct UserAgentRagReadiness {
     pub api_base_set: bool,
     pub model_set: bool,
     pub api_key_set: bool,
+    pub embedding_model_set: bool,
+    pub embedding_model: Option<String>,
     pub byok_api_enabled: bool,
     pub codex_cli_only: bool,
     pub development_ready: bool,
+    pub semantic_embedding_ready: bool,
     pub tool_call_verified: bool,
     pub capability: Option<String>,
     pub capability_checked_at: Option<String>,
@@ -19,6 +22,7 @@ pub(crate) struct UserAgentRagReadiness {
     pub label: &'static str,
     pub detail: &'static str,
     pub required_capability: &'static str,
+    pub embedding_model_format: &'static str,
     pub tools: [&'static str; 3],
 }
 
@@ -35,11 +39,19 @@ pub(crate) fn build_user_agent_rag_readiness(
         .model
         .as_deref()
         .is_some_and(|v| !v.trim().is_empty());
+    let embedding_model = config
+        .embedding_model
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string);
+    let embedding_model_set = embedding_model.is_some();
     let api_key_set = config.has_api_key_reference();
     let custom_configured = api_base_set && model_set && api_key_set;
     let blocked_by_policy = codex_cli_only && !byok_api_enabled;
     let tool_call_verified = matches!(config.tool_call_ok, Some(true));
     let development_ready = custom_configured && !blocked_by_policy && tool_call_verified;
+    let semantic_embedding_ready = development_ready && embedding_model_set;
 
     let (status, label, detail) = if blocked_by_policy {
         (
@@ -48,11 +60,19 @@ pub(crate) fn build_user_agent_rag_readiness(
             "当前服务器策略不允许用户自带 API Key；项目理解和开发仍走 Codex CLI。",
         )
     } else if development_ready {
-        (
-            "ready",
-            "自定义模型可用于项目 RAG",
-            "配置完整且最近一次能力探测已通过；AI 可调用 repo map、符号搜索和任务上下文工具。",
-        )
+        if semantic_embedding_ready {
+            (
+                "ready",
+                "自定义模型和语义 embedding 可用于项目 RAG",
+                "配置完整且最近一次能力探测已通过；AI 可调用 repo map、符号搜索、任务上下文工具和真实语义向量检索。",
+            )
+        } else {
+            (
+                "ready_without_embedding_model",
+                "自定义模型可用于项目 RAG",
+                "配置完整且最近一次能力探测已通过；语义 embedding 模型未指定，向量检索仍使用本地 hash 默认模型。",
+            )
+        }
     } else if custom_configured && matches!(config.tool_call_ok, Some(false)) {
         (
             "tool_call_failed",
@@ -96,9 +116,12 @@ pub(crate) fn build_user_agent_rag_readiness(
         api_base_set,
         model_set,
         api_key_set,
+        embedding_model_set,
+        embedding_model,
         byok_api_enabled,
         codex_cli_only,
         development_ready,
+        semantic_embedding_ready,
         tool_call_verified,
         capability: config.capability.clone(),
         capability_checked_at: config.capability_checked_at.clone(),
@@ -107,6 +130,7 @@ pub(crate) fn build_user_agent_rag_readiness(
         label,
         detail,
         required_capability: "OpenAI tools/function calling",
+        embedding_model_format: "openai:<embedding-model> / remote:<embedding-model> / agent:<embedding-model>",
         tools: [
             "repo_context_status",
             "repo_symbol_search",
@@ -153,12 +177,37 @@ mod tests {
 
         let readiness = build_user_agent_rag_readiness(&cfg, true, true);
 
-        assert_eq!(readiness.status, "ready");
+        assert_eq!(readiness.status, "ready_without_embedding_model");
         assert!(readiness.development_ready);
+        assert!(!readiness.semantic_embedding_ready);
         assert!(readiness.tool_call_verified);
         assert_eq!(
             readiness.required_capability,
             "OpenAI tools/function calling"
+        );
+    }
+
+    #[test]
+    fn semantic_embedding_ready_when_embedding_model_is_configured() {
+        let cfg = UserAgentConfig {
+            api_base: Some("https://api.example.com/v1".into()),
+            api_key: Some("sk-test".into()),
+            model: Some("tool-model".into()),
+            embedding_model: Some("openai:text-embedding-3-small".into()),
+            tool_call_ok: Some(true),
+            capability: Some("tools_ok".into()),
+            capability_checked_at: Some("2026-06-16 00:00:00 UTC".into()),
+            ..Default::default()
+        };
+
+        let readiness = build_user_agent_rag_readiness(&cfg, true, true);
+
+        assert_eq!(readiness.status, "ready");
+        assert!(readiness.development_ready);
+        assert!(readiness.semantic_embedding_ready);
+        assert_eq!(
+            readiness.embedding_model.as_deref(),
+            Some("openai:text-embedding-3-small")
         );
     }
 

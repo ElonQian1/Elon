@@ -541,6 +541,7 @@ pub(crate) fn copilot_api_agents() -> Vec<AgentConfig> {
             api_base: api_base.clone(),
             api_key: token.clone(),
             model,
+            embedding_model: None,
             usage_mode: None,
         })
         .collect()

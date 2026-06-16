@@ -1,23 +1,23 @@
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OpenFlags};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::types::AgentConfig;
 
 use super::{
     agent_rag_project_docs::{load_agent_project_docs, prepend_project_docs_to_pack},
-    agent_rag_vector_policy::{choose_agent_vector_policy, AgentVectorPolicy},
+    agent_rag_vector_policy::{AgentVectorPolicy, choose_agent_vector_policy},
     symbol_index_embedding_provider::{
-        is_remote_embedding_model, resolve_embedding_provider, SymbolEmbeddingProviderContext,
+        SymbolEmbeddingProviderContext, is_remote_embedding_model, resolve_embedding_provider,
     },
-    symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
+    symbol_index_embeddings::{SymbolEmbeddingStatus, load_latest_symbol_embedding_status},
     symbol_index_query::{
-        find_symbol_index_db, load_metadata, search_latest_symbol_index, SymbolIndexSearch,
+        SymbolIndexSearch, find_symbol_index_db, load_metadata, search_latest_symbol_index,
     },
-    symbol_index_task_pack::{build_latest_symbol_task_pack_with_context, SymbolTaskPackQuery},
-    symbol_index_vector::{backfill_latest_symbol_vectors_with_context, SymbolVectorBackfill},
+    symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack_with_context},
+    symbol_index_vector::{SymbolVectorBackfill, backfill_latest_symbol_vectors_with_context},
     symbol_index_vector_types::{LOCAL_HASH_VECTOR_MODEL, SUPPORTED_EMBEDDING_MODELS},
 };
 
@@ -281,7 +281,7 @@ fn context_task_pack(
     default_trace_id: Option<&str>,
     provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<String> {
-    let vector_policy = task_pack_vector_policy(args)?;
+    let vector_policy = task_pack_vector_policy_with_context(args, provider_context)?;
     let query = task_pack_query(args, default_trace_id, provider_context)?;
     let vector_backfill = query
         .vector_model
@@ -363,16 +363,20 @@ fn task_pack_query(
     default_trace_id: Option<&str>,
     provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<SymbolTaskPackQuery> {
-    let vector_policy = task_pack_vector_policy(args)?;
+    let vector_policy = task_pack_vector_policy_with_context(args, provider_context)?;
     task_pack_query_with_policy(args, default_trace_id, &vector_policy, provider_context)
 }
 
-fn task_pack_vector_policy(args: &Value) -> Result<AgentVectorPolicy> {
+fn task_pack_vector_policy_with_context(
+    args: &Value,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
+) -> Result<AgentVectorPolicy> {
     let query = required_query(args)?;
     Ok(choose_agent_vector_policy(
         &query,
         bool_arg(args, &["useVector", "use_vector"]),
         string_arg(args, &["vectorModel", "vector_model"]),
+        provider_context.and_then(|context| context.embedding_model.clone()),
     ))
 }
 
@@ -465,6 +469,7 @@ fn agent_embedding_context(agent: &AgentConfig) -> SymbolEmbeddingProviderContex
         &agent.api_key,
         agent.usage_mode().to_string(),
     )
+    .with_embedding_model(agent.embedding_model.as_deref())
 }
 
 fn embedding_capabilities(provider_context: Option<&SymbolEmbeddingProviderContext>) -> Value {
@@ -474,6 +479,7 @@ fn embedding_capabilities(provider_context: Option<&SymbolEmbeddingProviderConte
         provider_context.and_then(|context| context.remote_provider_source());
     json!({
         "defaultModel": LOCAL_HASH_VECTOR_MODEL,
+        "configuredDefaultModel": provider_context.and_then(|context| context.embedding_model.clone()),
         "supportedModels": supported_embedding_models(),
         "providerMode": if remote_provider_configured { "local_hash_plus_openai_compatible" } else { "local_hash" },
         "remoteProviderConfigured": remote_provider_configured,
@@ -628,6 +634,30 @@ mod tests {
                 "q": "解释登录流程",
                 "useVector": true,
                 "vectorModel": "openai:text-embedding-3-small"
+            }),
+            Some("server-trace"),
+            Some(&provider_context),
+        )
+        .expect("remote embedding query");
+
+        assert_eq!(
+            query.vector_model.as_deref(),
+            Some("openai:text-embedding-3-small")
+        );
+    }
+
+    #[test]
+    fn task_pack_query_uses_configured_embedding_model_by_default() {
+        let provider_context = SymbolEmbeddingProviderContext::from_agent(
+            "https://api.example.com/v1",
+            "sk-user",
+            "user_api_key_proxy",
+        )
+        .with_embedding_model(Some("openai:text-embedding-3-small"));
+
+        let query = task_pack_query(
+            &json!({
+                "q": "解释登录流程"
             }),
             Some("server-trace"),
             Some(&provider_context),
