@@ -382,6 +382,7 @@ fn task_pack_searches_task_and_expands_top_symbol_impact() {
             model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
             ..Default::default()
         },
+        None,
     )
     .unwrap();
 
@@ -934,6 +935,7 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
             model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
             ..Default::default()
         },
+        None,
     )
     .unwrap();
     assert_eq!(backfill.model, LOCAL_HASH_VECTOR_MODEL);
@@ -962,6 +964,7 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
             limit: 5,
             ..Default::default()
         },
+        None,
     )
     .unwrap();
     assert_eq!(search.model, LOCAL_HASH_VECTOR_MODEL);
@@ -977,6 +980,7 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
             model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
             ..Default::default()
         },
+        None,
     )
     .unwrap();
     assert_eq!(second.upserted_count, 0);
@@ -1095,6 +1099,7 @@ fn eval_merges_vector_candidates_when_model_is_requested() {
             model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
             ..Default::default()
         },
+        None,
     )
     .unwrap();
 

@@ -8,6 +8,7 @@ use super::{
     symbol_index_compression::compress_symbol_context,
     symbol_index_compression_render::render_compressed_context,
     symbol_index_compression_types::SymbolCompressedContext,
+    symbol_index_embedding_provider::SymbolEmbeddingProviderContext,
     symbol_index_impact_pack::{build_symbol_impact_pack, normalize_pack_max_chars},
     symbol_index_impact_query::load_latest_symbol_impact,
     symbol_index_impact_types::SymbolImpactQuery,
@@ -22,7 +23,7 @@ use super::{
     symbol_index_rank_profile::{infer_rank_profile, HybridRankProfile},
     symbol_index_ranker::{rank_hybrid_context_with_plan, RankedContextItem},
     symbol_index_retrieval_plan::{build_retrieval_plan, render_retrieval_plan, RetrievalPlan},
-    symbol_index_vector::{search_latest_symbol_vectors, SymbolVectorSearchQuery},
+    symbol_index_vector::{search_latest_symbol_vectors_with_context, SymbolVectorSearchQuery},
     symbol_index_vector_types::SymbolVectorHit,
 };
 
@@ -102,6 +103,14 @@ pub(crate) fn build_latest_symbol_task_pack(
     data_dir: &Path,
     query: &SymbolTaskPackQuery,
 ) -> Result<SymbolTaskPackResponse> {
+    build_latest_symbol_task_pack_with_context(data_dir, query, None)
+}
+
+pub(crate) fn build_latest_symbol_task_pack_with_context(
+    data_dir: &Path,
+    query: &SymbolTaskPackQuery,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
+) -> Result<SymbolTaskPackResponse> {
     let text = query
         .text
         .as_deref()
@@ -155,7 +164,7 @@ pub(crate) fn build_latest_symbol_task_pack(
         let Some(vector_model) = vector_model.as_deref() else {
             unreachable!("vector retriever requires a requested vector model");
         };
-        search_latest_symbol_vectors(
+        search_latest_symbol_vectors_with_context(
             data_dir,
             &SymbolVectorSearchQuery {
                 trace_id: query.trace_id.clone(),
@@ -165,6 +174,7 @@ pub(crate) fn build_latest_symbol_task_pack(
                 limit: planned_vector_limit,
                 ..Default::default()
             },
+            provider_context,
         )
         .map(|response| response.chunks)
         .unwrap_or_default()

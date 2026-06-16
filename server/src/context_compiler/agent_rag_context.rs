@@ -4,22 +4,28 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
+use crate::types::AgentConfig;
+
 use super::{
     agent_rag_project_docs::{load_agent_project_docs, prepend_project_docs_to_pack},
     agent_rag_vector_policy::{choose_agent_vector_policy, AgentVectorPolicy},
-    symbol_index_embedding_provider::resolve_embedding_provider,
+    symbol_index_embedding_provider::{
+        is_remote_embedding_model, resolve_embedding_provider, SymbolEmbeddingProviderContext,
+    },
     symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
     symbol_index_query::{
         find_symbol_index_db, load_metadata, search_latest_symbol_index, SymbolIndexSearch,
     },
-    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
-    symbol_index_vector::{backfill_latest_symbol_vectors, SymbolVectorBackfill},
+    symbol_index_task_pack::{build_latest_symbol_task_pack_with_context, SymbolTaskPackQuery},
+    symbol_index_vector::{backfill_latest_symbol_vectors_with_context, SymbolVectorBackfill},
     symbol_index_vector_types::{LOCAL_HASH_VECTOR_MODEL, SUPPORTED_EMBEDDING_MODELS},
 };
 
 const TOOL_CONTEXT_STATUS: &str = "repo_context_status";
 const TOOL_SYMBOL_SEARCH: &str = "repo_symbol_search";
 const TOOL_CONTEXT_TASK_PACK: &str = "repo_context_task_pack";
+const DEFAULT_REMOTE_VECTOR_BACKFILL_LIMIT: usize = 64;
+const MAX_REMOTE_VECTOR_BACKFILL_LIMIT: usize = 512;
 
 pub(crate) fn tool_definitions() -> Vec<Value> {
     vec![
@@ -105,7 +111,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         },
                         "vectorModel": {
                             "type": "string",
-                            "description": "可选。embedding 模型；当前支持 local-hash-v1，不填默认 local-hash-v1。"
+                            "description": "可选。embedding 模型；默认 local-hash-v1。需要真实语义 embedding 时显式传 openai:<embedding模型>、remote:<embedding模型> 或 agent:<embedding模型>，并要求当前用户/环境已配置 API key。"
                         },
                         "searchLimit": {
                             "type": "integer",
@@ -118,6 +124,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         "vectorLimit": {
                             "type": "integer",
                             "description": "向量 chunk 候选数量。"
+                        },
+                        "vectorBackfillLimit": {
+                            "type": "integer",
+                            "description": "向量回填 chunk 数量。仅远程 embedding 默认限制为 64，最大 512，防止一次任务产生过多远程请求。"
                         },
                         "depth": {
                             "type": "integer",
@@ -145,14 +155,24 @@ pub(crate) fn is_rag_tool(tool_name: &str) -> bool {
 pub(crate) fn execute_rag_tool(
     data_dir: &Path,
     workspace: &Path,
+    agent: Option<&AgentConfig>,
     tool_name: &str,
     args: &Value,
     default_trace_id: Option<&str>,
 ) -> Result<String> {
+    let provider_context = agent.map(agent_embedding_context);
     match tool_name {
-        TOOL_CONTEXT_STATUS => context_status(data_dir, args, default_trace_id),
+        TOOL_CONTEXT_STATUS => {
+            context_status(data_dir, args, default_trace_id, provider_context.as_ref())
+        }
         TOOL_SYMBOL_SEARCH => symbol_search(data_dir, args, default_trace_id),
-        TOOL_CONTEXT_TASK_PACK => context_task_pack(data_dir, workspace, args, default_trace_id),
+        TOOL_CONTEXT_TASK_PACK => context_task_pack(
+            data_dir,
+            workspace,
+            args,
+            default_trace_id,
+            provider_context.as_ref(),
+        ),
         _ => bail!("未知 RAG 工具: {tool_name}"),
     }
 }
@@ -161,12 +181,13 @@ fn context_status(
     data_dir: &Path,
     _args: &Value,
     default_trace_id: Option<&str>,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<String> {
     let Some(trace_id) = effective_trace_id(default_trace_id) else {
         return compact_json(json!({
             "ok": false,
             "indexed": false,
-            "embeddingCapabilities": embedding_capabilities(),
+            "embeddingCapabilities": embedding_capabilities(provider_context),
             "message": "当前 API agent 会话缺少 trace_id，无法安全选择项目索引。请先让服务器为本任务运行 context compiler，或改用 list_dir/read_file。"
         }));
     };
@@ -174,7 +195,7 @@ fn context_status(
         return compact_json(json!({
             "ok": false,
             "indexed": false,
-            "embeddingCapabilities": embedding_capabilities(),
+            "embeddingCapabilities": embedding_capabilities(provider_context),
             "message": "当前还没有可查询的 symbol_index.sqlite。先运行一次项目开发/预检流程，或先用 list_dir/read_file 做低保真读取。",
             "recommendedNext": ["repo_context_task_pack", "repo_symbol_search", "list_dir", "read_file"]
         }));
@@ -195,12 +216,12 @@ fn context_status(
             "indexed": true,
             "dbPath": status.db_path,
             "metadata": status.metadata,
-            "embeddingCapabilities": embedding_capabilities(),
+            "embeddingCapabilities": embedding_capabilities(provider_context),
             "embeddings": {
                 "defaultModel": LOCAL_HASH_VECTOR_MODEL,
                 "supportedModels": supported_embedding_models(),
                 "providerMode": "local_hash",
-                "remoteProviderConfigured": false,
+                "remoteProviderConfigured": provider_context.is_some_and(|context| context.remote_provider_configured()),
                 "totals": status.totals,
                 "models": status.models,
                 "sampleMissingChunks": status.missing_chunks
@@ -219,7 +240,7 @@ fn context_status(
                 "indexed": true,
                 "dbPath": db_path.to_string_lossy().replace('\\', "/"),
                 "metadata": metadata,
-                "embeddingCapabilities": embedding_capabilities(),
+                "embeddingCapabilities": embedding_capabilities(provider_context),
                 "embeddingStatusError": error.to_string(),
                 "recommendedTools": [
                     TOOL_CONTEXT_TASK_PACK,
@@ -258,21 +279,23 @@ fn context_task_pack(
     workspace: &Path,
     args: &Value,
     default_trace_id: Option<&str>,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<String> {
     let vector_policy = task_pack_vector_policy(args)?;
-    let query = task_pack_query(args, default_trace_id)?;
+    let query = task_pack_query(args, default_trace_id, provider_context)?;
     let vector_backfill = query
         .vector_model
         .as_ref()
         .map(|model| {
-            backfill_latest_symbol_vectors(
+            backfill_latest_symbol_vectors_with_context(
                 data_dir,
                 &SymbolVectorBackfill {
                     trace_id: query.trace_id.clone(),
                     model: Some(model.clone()),
-                    limit: 0,
+                    limit: vector_backfill_limit(args, model),
                     force: false,
                 },
+                provider_context,
             )
         })
         .transpose();
@@ -293,7 +316,7 @@ fn context_task_pack(
         })),
     };
 
-    let response = build_latest_symbol_task_pack(data_dir, &query)?;
+    let response = build_latest_symbol_task_pack_with_context(data_dir, &query, provider_context)?;
     let project_docs = load_agent_project_docs(workspace);
     let pack = prepend_project_docs_to_pack(&project_docs, &response.pack);
     let char_count = pack.chars().count();
@@ -335,9 +358,13 @@ fn context_task_pack(
     }))
 }
 
-fn task_pack_query(args: &Value, default_trace_id: Option<&str>) -> Result<SymbolTaskPackQuery> {
+fn task_pack_query(
+    args: &Value,
+    default_trace_id: Option<&str>,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
+) -> Result<SymbolTaskPackQuery> {
     let vector_policy = task_pack_vector_policy(args)?;
-    task_pack_query_with_policy(args, default_trace_id, &vector_policy)
+    task_pack_query_with_policy(args, default_trace_id, &vector_policy, provider_context)
 }
 
 fn task_pack_vector_policy(args: &Value) -> Result<AgentVectorPolicy> {
@@ -353,9 +380,10 @@ fn task_pack_query_with_policy(
     args: &Value,
     default_trace_id: Option<&str>,
     vector_policy: &AgentVectorPolicy,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<SymbolTaskPackQuery> {
     let vector_model = if let Some(model) = vector_policy.model.as_deref() {
-        resolve_embedding_provider(model)?;
+        resolve_embedding_provider(model, provider_context)?;
         Some(model.to_string())
     } else {
         None
@@ -415,17 +443,47 @@ fn usize_arg(args: &Value, names: &[&str]) -> Option<usize> {
         .and_then(|value| usize::try_from(value).ok())
 }
 
+fn vector_backfill_limit(args: &Value, model: &str) -> usize {
+    let requested = usize_arg(args, &["vectorBackfillLimit", "vector_backfill_limit"])
+        .filter(|value| *value > 0);
+    if !is_remote_embedding_model(model) {
+        return requested.unwrap_or_default();
+    }
+
+    requested
+        .unwrap_or(DEFAULT_REMOTE_VECTOR_BACKFILL_LIMIT)
+        .min(MAX_REMOTE_VECTOR_BACKFILL_LIMIT)
+}
+
 fn supported_embedding_models() -> Vec<&'static str> {
     SUPPORTED_EMBEDDING_MODELS.to_vec()
 }
 
-fn embedding_capabilities() -> Value {
+fn agent_embedding_context(agent: &AgentConfig) -> SymbolEmbeddingProviderContext {
+    SymbolEmbeddingProviderContext::from_agent(
+        &agent.api_base,
+        &agent.api_key,
+        agent.usage_mode().to_string(),
+    )
+}
+
+fn embedding_capabilities(provider_context: Option<&SymbolEmbeddingProviderContext>) -> Value {
+    let remote_provider_configured =
+        provider_context.is_some_and(|context| context.remote_provider_configured());
+    let remote_provider_source =
+        provider_context.and_then(|context| context.remote_provider_source());
     json!({
         "defaultModel": LOCAL_HASH_VECTOR_MODEL,
         "supportedModels": supported_embedding_models(),
-        "providerMode": "local_hash",
-        "remoteProviderConfigured": false,
-        "message": "当前只有本地 hash embedding provider；远程语义 embedding 模型尚未接入。"
+        "providerMode": if remote_provider_configured { "local_hash_plus_openai_compatible" } else { "local_hash" },
+        "remoteProviderConfigured": remote_provider_configured,
+        "remoteProviderSource": remote_provider_source,
+        "remoteModelSyntax": ["openai:<embedding-model>", "remote:<embedding-model>", "agent:<embedding-model>"],
+        "message": if remote_provider_configured {
+            "默认使用本地 hash embedding；显式传 vectorModel=openai:<embedding模型> 可使用当前用户/环境的 OpenAI-compatible embedding provider。"
+        } else {
+            "默认只有本地 hash embedding；显式远程 embedding 需要用户 API key 或 ELON_EMBEDDING_API_KEY。"
+        }
     })
 }
 
@@ -483,6 +541,7 @@ mod tests {
                 "maxChars": 12000
             }),
             Some("trace-1"),
+            None,
         )
         .expect("query");
 
@@ -499,6 +558,7 @@ mod tests {
                 "q": "登录失败为什么返回 500？"
             }),
             Some("server-trace"),
+            None,
         )
         .expect("query");
 
@@ -515,6 +575,7 @@ mod tests {
                 "useVector": true
             }),
             Some("server-trace"),
+            None,
         )
         .expect("query");
 
@@ -530,6 +591,7 @@ mod tests {
                 "useVector": false
             }),
             Some("server-trace"),
+            None,
         )
         .expect("query");
 
@@ -546,11 +608,52 @@ mod tests {
                 "vectorModel": "bge-m3"
             }),
             Some("server-trace"),
+            None,
         )
         .expect_err("unsupported vector model");
 
         assert!(err.to_string().contains("暂未配置 provider"));
         assert!(err.to_string().contains(LOCAL_HASH_VECTOR_MODEL));
+    }
+
+    #[test]
+    fn task_pack_query_accepts_remote_embedding_with_provider_context() {
+        let provider_context = SymbolEmbeddingProviderContext::from_agent(
+            "https://api.example.com/v1",
+            "sk-user",
+            "user_api_key_proxy",
+        );
+        let query = task_pack_query(
+            &json!({
+                "q": "解释登录流程",
+                "useVector": true,
+                "vectorModel": "openai:text-embedding-3-small"
+            }),
+            Some("server-trace"),
+            Some(&provider_context),
+        )
+        .expect("remote embedding query");
+
+        assert_eq!(
+            query.vector_model.as_deref(),
+            Some("openai:text-embedding-3-small")
+        );
+    }
+
+    #[test]
+    fn remote_vector_backfill_limit_is_bounded() {
+        assert_eq!(
+            vector_backfill_limit(&json!({}), "openai:text-embedding-3-small"),
+            DEFAULT_REMOTE_VECTOR_BACKFILL_LIMIT
+        );
+        assert_eq!(
+            vector_backfill_limit(&json!({ "vectorBackfillLimit": 20_000 }), "remote:bge-m3"),
+            MAX_REMOTE_VECTOR_BACKFILL_LIMIT
+        );
+        assert_eq!(
+            vector_backfill_limit(&json!({}), LOCAL_HASH_VECTOR_MODEL),
+            0
+        );
     }
 
     #[test]
@@ -562,6 +665,7 @@ mod tests {
                 "vectorModel": "bge-m3"
             }),
             Some("server-trace"),
+            None,
         )
         .expect("query");
 
@@ -576,6 +680,7 @@ mod tests {
                 "traceId": "model-supplied"
             }),
             Some("server-trace"),
+            None,
         )
         .expect("query");
 
@@ -589,6 +694,7 @@ mod tests {
                 "q": "inspect",
                 "traceId": "model-supplied"
             }),
+            None,
             None,
         )
         .expect_err("server trace is required");

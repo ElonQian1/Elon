@@ -353,12 +353,16 @@ pub(crate) async fn run_api_inner_with_workspace(
                             ))
                             .to_json(),
                         );
-                        execute_tool(state, &workspace, &tool_name, &args, user_id, trace_id)
+                        execute_tool(
+                            state, &workspace, &agent, &tool_name, &args, user_id, trace_id,
+                        )
                     } else {
                         r
                     }
                 } else {
-                    execute_tool(state, &workspace, &tool_name, &args, user_id, trace_id)
+                    execute_tool(
+                        state, &workspace, &agent, &tool_name, &args, user_id, trace_id,
+                    )
                 };
 
                 let result_str = match result {

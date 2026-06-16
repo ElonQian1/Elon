@@ -4,7 +4,13 @@ use serde::Serialize;
 
 pub(crate) const LOCAL_HASH_VECTOR_MODEL: &str = "local-hash-v1";
 pub(crate) const LOCAL_HASH_VECTOR_DIM: usize = 256;
-pub(crate) const SUPPORTED_EMBEDDING_MODELS: [&str; 1] = [LOCAL_HASH_VECTOR_MODEL];
+pub(crate) const REMOTE_EMBEDDING_MODEL_PREFIXES: [&str; 3] = ["openai:", "remote:", "agent:"];
+pub(crate) const SUPPORTED_EMBEDDING_MODELS: [&str; 4] = [
+    LOCAL_HASH_VECTOR_MODEL,
+    "openai:<embedding-model>",
+    "remote:<embedding-model>",
+    "agent:<embedding-model>",
+];
 
 const DEFAULT_VECTOR_LIMIT: usize = 12;
 const MAX_VECTOR_LIMIT: usize = 50;

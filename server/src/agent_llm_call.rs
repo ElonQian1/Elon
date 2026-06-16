@@ -204,6 +204,7 @@ pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> 
 pub(crate) fn execute_tool(
     state: &Arc<AppState>,
     workspace: &std::path::Path,
+    agent: &AgentConfig,
     tool_name: &str,
     args: &Value,
     user_id: &str,
@@ -213,6 +214,7 @@ pub(crate) fn execute_tool(
         return crate::context_compiler::agent_rag_context::execute_rag_tool(
             &state.data_dir,
             workspace,
+            Some(agent),
             tool_name,
             args,
             trace_id,

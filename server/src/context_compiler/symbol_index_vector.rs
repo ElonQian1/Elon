@@ -5,7 +5,9 @@ use rusqlite::{params, Connection, OpenFlags};
 
 use super::{
     symbol_index::normalize_path,
-    symbol_index_embedding_provider::{embedding_terms, resolve_embedding_provider, vector_norm},
+    symbol_index_embedding_provider::{
+        embedding_terms, resolve_embedding_provider, vector_norm, SymbolEmbeddingProviderContext,
+    },
     symbol_index_embeddings::create_embedding_schema,
     symbol_index_query::{find_symbol_index_db, load_metadata},
     symbol_index_vector_types::{
@@ -49,42 +51,61 @@ pub(crate) fn backfill_latest_symbol_vectors(
     data_dir: &Path,
     query: &SymbolVectorBackfillQuery,
 ) -> Result<SymbolVectorBackfillResponse> {
+    backfill_latest_symbol_vectors_with_context(data_dir, query, None)
+}
+
+pub(crate) fn backfill_latest_symbol_vectors_with_context(
+    data_dir: &Path,
+    query: &SymbolVectorBackfillQuery,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
+) -> Result<SymbolVectorBackfillResponse> {
     let db_path = find_symbol_index_db(data_dir, query.trace_id.as_deref())
         .context("没有找到可回填向量的 symbol_index.sqlite，请先运行一次 context compiler")?;
-    backfill_symbol_vectors_db(&db_path, query)
+    backfill_symbol_vectors_db(&db_path, query, provider_context)
 }
 
 pub(crate) fn search_latest_symbol_vectors(
     data_dir: &Path,
     search: &SymbolVectorSearch,
 ) -> Result<SymbolVectorSearchResponse> {
+    search_latest_symbol_vectors_with_context(data_dir, search, None)
+}
+
+pub(crate) fn search_latest_symbol_vectors_with_context(
+    data_dir: &Path,
+    search: &SymbolVectorSearch,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
+) -> Result<SymbolVectorSearchResponse> {
     let db_path = find_symbol_index_db(data_dir, search.trace_id.as_deref())
         .context("没有找到可查询向量的 symbol_index.sqlite，请先运行一次 context compiler")?;
-    search_symbol_vectors_db(&db_path, search)
+    search_symbol_vectors_db(&db_path, search, provider_context)
 }
 
 pub(crate) fn backfill_symbol_vectors_db(
     db_path: &Path,
     query: &SymbolVectorBackfillQuery,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<SymbolVectorBackfillResponse> {
     let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_WRITE)
         .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))?;
     create_embedding_schema(&conn)?;
     let metadata = load_metadata(&conn)?;
     let model = query.model();
-    let provider = resolve_embedding_provider(&model)?;
+    let provider = resolve_embedding_provider(&model, provider_context)?;
     let existing = load_existing_hashes(&conn, &model)?;
     let chunks = load_chunks_for_embedding(&conn, query.limit())?;
 
     let mut upserted = 0;
     let mut skipped = 0;
+    let mut dim = provider.dim();
     for chunk in &chunks {
         let current = existing.get(chunk.id.as_str());
         if !query.force && current.is_some_and(|hash| hash == &chunk.hash) {
             skipped += 1;
             continue;
         }
-        let vector = provider.embed_chunk(&chunk.content, chunk.summary.as_deref());
+        let vector = provider.embed_chunk(&chunk.content, chunk.summary.as_deref())?;
+        dim = vector.len();
         conn.execute(
             r#"
             INSERT OR REPLACE INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
@@ -93,7 +114,7 @@ pub(crate) fn backfill_symbol_vectors_db(
             params![
                 chunk.id.as_str(),
                 provider.model(),
-                to_i64(provider.dim()),
+                to_i64(vector.len()),
                 vector_to_blob(&vector),
                 chunk.hash.as_str(),
             ],
@@ -111,7 +132,7 @@ pub(crate) fn backfill_symbol_vectors_db(
         },
         metadata,
         model,
-        dim: provider.dim(),
+        dim,
         scanned_count: chunks.len(),
         upserted_count: upserted,
         skipped_count: skipped,
@@ -121,6 +142,7 @@ pub(crate) fn backfill_symbol_vectors_db(
 pub(crate) fn search_symbol_vectors_db(
     db_path: &Path,
     search: &SymbolVectorSearch,
+    provider_context: Option<&SymbolEmbeddingProviderContext>,
 ) -> Result<SymbolVectorSearchResponse> {
     let text = search
         .text
@@ -133,13 +155,14 @@ pub(crate) fn search_symbol_vectors_db(
         .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))?;
     let metadata = load_metadata(&conn)?;
     let model = search.model();
-    let provider = resolve_embedding_provider(&model)?;
-    let query_vector = provider.embed_text(&text);
+    let provider = resolve_embedding_provider(&model, provider_context)?;
+    let query_vector = provider.embed_text(&text)?;
     if vector_norm(&query_vector) == 0.0 {
         bail!("q 没有可用于向量检索的词项");
     }
+    let dim = query_vector.len();
     let terms = embedding_terms(&text);
-    let chunks = load_vector_chunks(&conn, &model, provider.dim(), search)?;
+    let chunks = load_vector_chunks(&conn, &model, dim, search)?;
     let mut hits = chunks
         .into_iter()
         .filter_map(|chunk| {
@@ -162,7 +185,7 @@ pub(crate) fn search_symbol_vectors_db(
         },
         metadata,
         model,
-        dim: provider.dim(),
+        dim,
         chunks: hits,
     })
 }

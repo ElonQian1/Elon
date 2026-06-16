@@ -62,6 +62,7 @@ mod symbol_index_compression;
 mod symbol_index_compression_render;
 mod symbol_index_compression_types;
 mod symbol_index_embedding_provider;
+mod symbol_index_embedding_openai;
 mod symbol_index_embedding_types;
 mod symbol_index_embeddings;
 mod symbol_index_eval;
